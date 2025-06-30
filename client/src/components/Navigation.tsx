@@ -14,22 +14,34 @@ import {
   Home, 
   Search,
   Menu,
-  ChevronDown
+  ChevronDown,
+  Settings
 } from "lucide-react";
 
-const navigationItems = [
-  { name: "Dashboard", href: "/", icon: BarChart3 },
-  { name: "Tasks", href: "/tasks", icon: CheckSquare },
-  { name: "Properties", href: "/properties", icon: Building },
-  { name: "Team", href: "/team", icon: Users },
-  { name: "People", href: "/people", icon: UserCheck },
-  { name: "Property Center", href: "/property-center", icon: Home },
-];
+const getNavigationItems = (user: any) => {
+  const baseItems = [
+    { name: "Dashboard", href: "/", icon: BarChart3 },
+    { name: "Properties", href: "/properties", icon: Building },
+    { name: "People", href: "/people", icon: UserCheck },
+    { name: "Tasks", href: "/tasks", icon: CheckSquare },
+    { name: "Team", href: "/team", icon: Users },
+    { name: "Property Center", href: "/property-center", icon: Home },
+  ];
+
+  // Add Admin tab only for admin users
+  if (user?.role === 'admin') {
+    baseItems.push({ name: "Admin", href: "/admin", icon: Settings });
+  }
+
+  return baseItems;
+};
 
 export default function Navigation() {
   const [location] = useLocation();
   const { user } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  const navigationItems = getNavigationItems(user);
 
   const handleLogout = () => {
     window.location.href = "/api/logout";

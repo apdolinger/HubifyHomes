@@ -245,6 +245,31 @@ export default function Team() {
           </div>
         </CardContent>
       </Card>
+
+      {/* My Team Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>My Team</CardTitle>
+          <p className="text-sm text-slate-600">
+            Team members assigned to you or those you work closely with
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* For now, showing placeholder content - this would be populated based on user's direct reports/teammates */}
+            <div className="text-center py-8">
+              <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-slate-900 mb-2">No Direct Team Members</h3>
+              <p className="text-slate-600 mb-4">
+                Team assignment features will be available in a future update.
+              </p>
+              <Button variant="outline" disabled>
+                Manage Team Assignments
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </main>
   );
 }

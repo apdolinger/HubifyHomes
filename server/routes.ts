@@ -99,7 +99,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const property = await storage.createProperty({
         ...validatedData,
         managerId: userId,
-      });
+      }, userId);
       res.status(201).json(property);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -189,10 +189,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/contacts", isAuthenticated, async (req, res) => {
+  app.post("/api/contacts", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const validatedData = insertContactSchema.parse(req.body);
-      const contact = await storage.createContact(validatedData);
+      const contact = await storage.createContact(validatedData, userId);
       res.status(201).json(contact);
     } catch (error) {
       if (error instanceof z.ZodError) {

@@ -29,7 +29,7 @@ export interface IStorage {
   // Property operations
   getProperties(): Promise<Property[]>;
   getProperty(id: number): Promise<Property | undefined>;
-  createProperty(property: InsertProperty): Promise<Property>;
+  createProperty(property: InsertProperty, userId: string): Promise<Property>;
   updateProperty(id: number, property: Partial<InsertProperty>): Promise<Property>;
   deleteProperty(id: number): Promise<void>;
   
@@ -48,7 +48,7 @@ export interface IStorage {
   getContacts(): Promise<Contact[]>;
   getContactsByProperty(propertyId: number): Promise<Contact[]>;
   getContact(id: number): Promise<Contact | undefined>;
-  createContact(contact: InsertContact): Promise<Contact>;
+  createContact(contact: InsertContact, userId: string): Promise<Contact>;
   updateContact(id: number, contact: Partial<InsertContact>): Promise<Contact>;
   deleteContact(id: number): Promise<void>;
   
@@ -109,16 +109,16 @@ export class DatabaseStorage implements IStorage {
     return property;
   }
 
-  async createProperty(property: InsertProperty): Promise<Property> {
+  async createProperty(property: InsertProperty, userId: string): Promise<Property> {
     const [newProperty] = await db.insert(properties).values(property).returning();
     
     // Log activity
     await this.logActivity({
-      userId: property.managerId || "system",
-      action: "property_added",
+      userId: userId,
+      action: "property_created",
       entityType: "property",
       entityId: newProperty.id.toString(),
-      description: `Added new property "${newProperty.name}"`,
+      description: `Added property "${newProperty.name}"`,
     });
     
     return newProperty;
@@ -260,8 +260,18 @@ export class DatabaseStorage implements IStorage {
     return contact;
   }
 
-  async createContact(contact: InsertContact): Promise<Contact> {
+  async createContact(contact: InsertContact, userId: string): Promise<Contact> {
     const [newContact] = await db.insert(contacts).values(contact).returning();
+    
+    // Log activity
+    await this.logActivity({
+      userId: userId,
+      action: "contact_created",
+      entityType: "contact",
+      entityId: newContact.id.toString(),
+      description: `Added contact "${newContact.firstName} ${newContact.lastName}"`,
+    });
+    
     return newContact;
   }
 

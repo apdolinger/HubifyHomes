@@ -13,6 +13,7 @@ import Properties from "@/pages/Properties";
 import Team from "@/pages/Team";
 import People from "@/pages/People";
 import PropertyCenter from "@/pages/PropertyCenter";
+import Admin from "@/pages/Admin";
 import Navigation from "@/components/Navigation";
 import QuickSearchModal from "@/components/QuickSearchModal";
 import QuickAddTaskModal from "@/components/QuickAddTaskModal";
@@ -34,6 +35,7 @@ function Router() {
           <Route path="/team" component={Team} />
           <Route path="/people" component={People} />
           <Route path="/property-center" component={PropertyCenter} />
+          <Route path="/admin" component={Admin} />
         </>
       )}
       <Route component={NotFound} />

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +43,7 @@ export default function People() {
   const { isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedContact, setSelectedContact] = useState<any>(null);
@@ -106,14 +108,18 @@ export default function People() {
       const response = await apiRequest("POST", "/api/contacts", data);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (newContact) => {
       queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
       toast({
         title: "Contact Added",
-        description: "Contact has been added successfully.",
+        description: "Contact has been added successfully. Redirecting to profile...",
       });
       setIsAddModalOpen(false);
       addForm.reset();
+      // Redirect to contact profile page after creation
+      setTimeout(() => {
+        setLocation(`/people?id=${newContact.id}`);
+      }, 1000);
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {

@@ -16,7 +16,8 @@ export default function QuickSearchModal({ isOpen, onClose }: QuickSearchModalPr
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: searchResults, isLoading } = useQuery({
-    queryKey: ["/api/search", query],
+    queryKey: ["/api/search"],
+    queryFn: () => fetch(`/api/search?q=${encodeURIComponent(query)}`).then(res => res.json()),
     enabled: isOpen && query.length > 2,
     staleTime: 30000,
   });
