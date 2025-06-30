@@ -1,0 +1,250 @@
+import { useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Users, Plus, Mail, User } from "lucide-react";
+
+export default function Team() {
+  const { isAuthenticated, isLoading } = useAuth();
+  const { toast } = useToast();
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      toast({
+        title: "Unauthorized",
+        description: "You are logged out. Logging in again...",
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        window.location.href = "/api/login";
+      }, 500);
+      return;
+    }
+  }, [isAuthenticated, isLoading, toast]);
+
+  // Mock team data for now - in real app this would come from API
+  const teamMembers = [
+    {
+      id: 1,
+      firstName: "Sarah",
+      lastName: "Chen",
+      email: "sarah.chen@nestive.com",
+      role: "admin",
+      isActive: true,
+      profileImageUrl: null,
+    },
+    {
+      id: 2,
+      firstName: "Mike",
+      lastName: "Rodriguez",
+      email: "mike.rodriguez@nestive.com", 
+      role: "supervisor",
+      isActive: true,
+      profileImageUrl: null,
+    },
+    {
+      id: 3,
+      firstName: "Lisa",
+      lastName: "Thompson",
+      email: "lisa.thompson@nestive.com",
+      role: "staff",
+      isActive: true,
+      profileImageUrl: null,
+    },
+  ];
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case "admin":
+        return "destructive";
+      case "supervisor":
+        return "default";
+      case "staff":
+        return "secondary";
+      case "client":
+        return "outline";
+      default:
+        return "outline";
+    }
+  };
+
+  const getUserInitials = (firstName: string, lastName: string) => {
+    return `${firstName[0]}${lastName[0]}`.toUpperCase();
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  return (
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Team</h1>
+            <p className="mt-1 text-sm text-slate-600">
+              Manage your team members and their roles
+            </p>
+          </div>
+          <div className="mt-4 sm:mt-0">
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              Invite Team Member
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Team Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                  <Users className="w-4 h-4 text-purple-600" />
+                </div>
+              </div>
+              <div className="ml-4">
+                <dl>
+                  <dt className="text-sm font-medium text-slate-500 truncate">
+                    Total Members
+                  </dt>
+                  <dd className="text-2xl font-semibold text-slate-900">
+                    {teamMembers.length}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <User className="w-4 h-4 text-blue-600" />
+                </div>
+              </div>
+              <div className="ml-4">
+                <dl>
+                  <dt className="text-sm font-medium text-slate-500 truncate">
+                    Admins
+                  </dt>
+                  <dd className="text-2xl font-semibold text-slate-900">
+                    {teamMembers.filter(m => m.role === 'admin').length}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                  <User className="w-4 h-4 text-green-600" />
+                </div>
+              </div>
+              <div className="ml-4">
+                <dl>
+                  <dt className="text-sm font-medium text-slate-500 truncate">
+                    Supervisors
+                  </dt>
+                  <dd className="text-2xl font-semibold text-slate-900">
+                    {teamMembers.filter(m => m.role === 'supervisor').length}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
+                  <User className="w-4 h-4 text-amber-600" />
+                </div>
+              </div>
+              <div className="ml-4">
+                <dl>
+                  <dt className="text-sm font-medium text-slate-500 truncate">
+                    Staff
+                  </dt>
+                  <dd className="text-2xl font-semibold text-slate-900">
+                    {teamMembers.filter(m => m.role === 'staff').length}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Team Members List */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Team Members</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {teamMembers.map((member) => (
+              <div key={member.id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
+                <div className="flex items-center space-x-4">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={member.profileImageUrl || undefined} />
+                    <AvatarFallback>
+                      {getUserInitials(member.firstName, member.lastName)}
+                    </AvatarFallback>
+                  </Avatar>
+                  
+                  <div>
+                    <h3 className="text-sm font-medium text-slate-900">
+                      {member.firstName} {member.lastName}
+                    </h3>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <Mail className="w-3 h-3 text-slate-500" />
+                      <span className="text-xs text-slate-600">{member.email}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-3">
+                  <Badge variant={getRoleColor(member.role)}>
+                    {member.role}
+                  </Badge>
+                  
+                  <Badge variant={member.isActive ? "default" : "secondary"}>
+                    {member.isActive ? "Active" : "Inactive"}
+                  </Badge>
+                  
+                  <Button variant="outline" size="sm">
+                    Edit
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </main>
+  );
+}

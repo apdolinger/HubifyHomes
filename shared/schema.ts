@@ -1,0 +1,206 @@
+import {
+  pgTable,
+  text,
+  varchar,
+  timestamp,
+  jsonb,
+  index,
+  integer,
+  boolean,
+  serial,
+} from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+
+// Session storage table - required for Replit Auth
+export const sessions = pgTable(
+  "sessions",
+  {
+    sid: varchar("sid").primaryKey(),
+    sess: jsonb("sess").notNull(),
+    expire: timestamp("expire").notNull(),
+  },
+  (table) => [index("IDX_session_expire").on(table.expire)],
+);
+
+// User storage table - required for Replit Auth
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().notNull(),
+  email: varchar("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
+  role: varchar("role").notNull().default("staff"), // admin, supervisor, staff, client
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Properties table
+export const properties = pgTable("properties", {
+  id: serial("id").primaryKey(),
+  name: varchar("name").notNull(),
+  address: text("address").notNull(),
+  type: varchar("type").notNull(), // apartment, house, commercial, etc.
+  units: integer("units").default(1),
+  managerId: varchar("manager_id").references(() => users.id),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Tasks table
+export const tasks = pgTable("tasks", {
+  id: serial("id").primaryKey(),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  priority: varchar("priority").notNull().default("normal"), // urgent, high, normal, low
+  status: varchar("status").notNull().default("pending"), // pending, in_progress, completed, cancelled
+  propertyId: integer("property_id").references(() => properties.id),
+  assignedToId: varchar("assigned_to_id").references(() => users.id),
+  assignedById: varchar("assigned_by_id").references(() => users.id),
+  dueDate: timestamp("due_date"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Contacts/People table
+export const contacts = pgTable("contacts", {
+  id: serial("id").primaryKey(),
+  firstName: varchar("first_name").notNull(),
+  lastName: varchar("last_name").notNull(),
+  email: varchar("email"),
+  phone: varchar("phone"),
+  type: varchar("type").notNull(), // tenant, owner, vendor, emergency_contact
+  propertyId: integer("property_id").references(() => properties.id),
+  isActive: boolean("is_active").notNull().default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Team Messages table
+export const teamMessages = pgTable("team_messages", {
+  id: serial("id").primaryKey(),
+  content: text("content").notNull(),
+  authorId: varchar("author_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Activity Log table
+export const activityLog = pgTable("activity_log", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
+  action: varchar("action").notNull(), // task_completed, property_added, etc.
+  entityType: varchar("entity_type").notNull(), // task, property, contact
+  entityId: varchar("entity_id").notNull(),
+  description: text("description").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Relations
+export const usersRelations = relations(users, ({ many }) => ({
+  managedProperties: many(properties),
+  assignedTasks: many(tasks, { relationName: "assignedTo" }),
+  createdTasks: many(tasks, { relationName: "assignedBy" }),
+  messages: many(teamMessages),
+  activities: many(activityLog),
+}));
+
+export const propertiesRelations = relations(properties, ({ one, many }) => ({
+  manager: one(users, {
+    fields: [properties.managerId],
+    references: [users.id],
+  }),
+  tasks: many(tasks),
+  contacts: many(contacts),
+}));
+
+export const tasksRelations = relations(tasks, ({ one }) => ({
+  property: one(properties, {
+    fields: [tasks.propertyId],
+    references: [properties.id],
+  }),
+  assignedTo: one(users, {
+    fields: [tasks.assignedToId],
+    references: [users.id],
+    relationName: "assignedTo",
+  }),
+  assignedBy: one(users, {
+    fields: [tasks.assignedById],
+    references: [users.id],
+    relationName: "assignedBy",
+  }),
+}));
+
+export const contactsRelations = relations(contacts, ({ one }) => ({
+  property: one(properties, {
+    fields: [contacts.propertyId],
+    references: [properties.id],
+  }),
+}));
+
+export const teamMessagesRelations = relations(teamMessages, ({ one }) => ({
+  author: one(users, {
+    fields: [teamMessages.authorId],
+    references: [users.id],
+  }),
+}));
+
+export const activityLogRelations = relations(activityLog, ({ one }) => ({
+  user: one(users, {
+    fields: [activityLog.userId],
+    references: [users.id],
+  }),
+}));
+
+// Insert schemas
+export const insertUserSchema = createInsertSchema(users).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPropertySchema = createInsertSchema(properties).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTaskSchema = createInsertSchema(tasks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  completedAt: true,
+});
+
+export const insertContactSchema = createInsertSchema(contacts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTeamMessageSchema = createInsertSchema(teamMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertActivityLogSchema = createInsertSchema(activityLog).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Types
+export type UpsertUser = typeof users.$inferInsert;
+export type User = typeof users.$inferSelect;
+export type InsertProperty = z.infer<typeof insertPropertySchema>;
+export type Property = typeof properties.$inferSelect;
+export type InsertTask = z.infer<typeof insertTaskSchema>;
+export type Task = typeof tasks.$inferSelect;
+export type InsertContact = z.infer<typeof insertContactSchema>;
+export type Contact = typeof contacts.$inferSelect;
+export type InsertTeamMessage = z.infer<typeof insertTeamMessageSchema>;
+export type TeamMessage = typeof teamMessages.$inferSelect;
+export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
+export type ActivityLog = typeof activityLog.$inferSelect;
