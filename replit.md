@@ -135,6 +135,38 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### July 8, 2025 - Property and People Profile Pages Implementation
+
+#### Property Profile Page
+- Created comprehensive PropertyProfile page with complete property management features
+- Includes property details, owner/contact info, billing status, and task history
+- Added tabbed interface for tasks, supplies log, community info, and notes
+- Property card displays square footage, billing type, and status badges
+- Linked properties are clickable from Properties page and navigate to profile
+
+#### Person Profile Page
+- Created PersonProfile page for complete contact management
+- Displays contact details, linked properties, and related tasks
+- Added tabs for tasks, billing info, notes, and activity history
+- Person cards are clickable from People page and navigate to profile
+
+#### Navigation and Routing Updates
+- Added property-profile and person-profile routes to App.tsx
+- Updated Properties page to make table rows clickable
+- Updated People page to make contact cards clickable
+- Fixed redirect logic after property and contact creation
+
+#### Dashboard Enhancements
+- Added gear icon to Recent Activity widget for customization
+- Implemented gear icon functionality with toast notifications
+- Enhanced dashboard with proper widget management foundation
+
+#### User Experience Improvements
+- Made all profile pages responsive with proper loading states
+- Added back navigation buttons to all profile pages
+- Implemented proper error handling for unauthorized access
+- Enhanced profile cards with avatars and status badges
+
 ### June 30, 2025 - User Interface and Functionality Updates
 
 #### Navigation Bar Reordering

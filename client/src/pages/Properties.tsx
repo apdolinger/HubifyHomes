@@ -97,7 +97,7 @@ export default function Properties() {
       form.reset();
       // Redirect to property profile page after creation
       setTimeout(() => {
-        setLocation(`/properties?id=${newProperty.id}`);
+        setLocation(`/property-profile?id=${newProperty.id}`);
       }, 1000);
     },
     onError: (error) => {
@@ -391,7 +391,7 @@ export default function Properties() {
                     <TableRow 
                       key={property.id}
                       className="cursor-pointer hover:bg-slate-50"
-                      onClick={() => setLocation(`/properties?id=${property.id}`)}
+                      onClick={() => setLocation(`/property-profile?id=${property.id}`)}
                     >
                       <TableCell>
                         {property.imageUrl ? (
@@ -453,7 +453,7 @@ export default function Properties() {
                             variant="outline"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setLocation(`/properties?id=${property.id}`);
+                              setLocation(`/property-profile?id=${property.id}`);
                             }}
                           >
                             <Eye className="h-4 w-4" />
@@ -463,7 +463,7 @@ export default function Properties() {
                             variant="outline"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setLocation(`/properties?id=${property.id}&edit=true`);
+                              setLocation(`/property-profile?id=${property.id}&edit=true`);
                             }}
                           >
                             <Edit className="h-4 w-4" />

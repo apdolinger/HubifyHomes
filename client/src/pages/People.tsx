@@ -118,7 +118,7 @@ export default function People() {
       addForm.reset();
       // Redirect to contact profile page after creation
       setTimeout(() => {
-        setLocation(`/people?id=${newContact.id}`);
+        setLocation(`/person-profile?id=${newContact.id}`);
       }, 1000);
     },
     onError: (error) => {
@@ -440,7 +440,8 @@ export default function People() {
               {filteredContacts.map((contact: any) => (
                 <div
                   key={contact.id}
-                  className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:shadow-md transition-shadow"
+                  className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => setLocation(`/person-profile?id=${contact.id}`)}
                 >
                   <div className="flex-1">
                     <div className="flex items-center space-x-3 mb-2">
@@ -484,14 +485,20 @@ export default function People() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleEditContact(contact)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditContact(contact);
+                      }}
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDeleteContact(contact.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteContact(contact.id);
+                      }}
                       className="text-red-600 hover:text-red-700"
                     >
                       <Trash2 className="w-4 h-4" />

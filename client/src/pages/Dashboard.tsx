@@ -26,11 +26,13 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useState } from "react";
+import { useLocation } from "wouter";
 
 export default function Dashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
   const [newMessage, setNewMessage] = useState("");
 
   // Redirect if not authenticated
@@ -530,7 +532,22 @@ export default function Dashboard() {
       <div className="mt-8">
         <Card>
           <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Clock className="w-5 h-5 mr-2" />
+                Recent Activity
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => toast({
+                  title: "Customization",
+                  description: "Widget customization coming soon!",
+                })}
+              >
+                <Settings className="w-4 h-4" />
+              </Button>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {activityLoading ? (

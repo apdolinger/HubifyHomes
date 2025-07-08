@@ -10,8 +10,10 @@ import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import Tasks from "@/pages/Tasks";
 import Properties from "@/pages/Properties";
+import PropertyProfile from "@/pages/PropertyProfile";
 import Team from "@/pages/Team";
 import People from "@/pages/People";
+import PersonProfile from "@/pages/PersonProfile";
 import PropertyCenter from "@/pages/PropertyCenter";
 import Admin from "@/pages/Admin";
 import Navigation from "@/components/Navigation";
@@ -32,8 +34,10 @@ function Router() {
           <Route path="/" component={Dashboard} />
           <Route path="/tasks" component={Tasks} />
           <Route path="/properties" component={Properties} />
+          <Route path="/property-profile" component={PropertyProfile} />
           <Route path="/team" component={Team} />
           <Route path="/people" component={People} />
+          <Route path="/person-profile" component={PersonProfile} />
           <Route path="/property-center" component={PropertyCenter} />
           <Route path="/admin" component={Admin} />
         </>

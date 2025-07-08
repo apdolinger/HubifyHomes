@@ -1,0 +1,58 @@
+Hi! Here are the next prioritized features and fixes based on the latest walkthrough:
+
+🔒 Admin & Super Admin Access
+Add "Admin" tab to the top navigation bar (visible only to users with admin roles).
+Enable a Super Admin toggle or dedicated access area for platform-wide controls (can be via URL path like /super-admin or permission check).
+⚙️ Dashboard Enhancements
+Add a gear icon (⚙️) on the Dashboard page to allow customization of visible widgets (Support, Calendar, Duplicates).
+Ensure all dashboard widgets are visible:
+✅ Support (with links to Help, Training, and Tips)
+✅ Calendar
+✅ Duplicates (pulling flagged people or properties)
+🧾 Properties Page
+Make each row in the Properties list clickable.
+Add a Property Profile Page with the following:
+Property image, address, and key details
+Owner/contact info
+Square footage, status, billing type
+Community info block
+Work/task history
+Bird’s eye view or 3D rendering placeholder
+Toggle for active/inactive billing
+Supplies log (lightbulbs, filters, with last installed dates)
+Notes and customizable fields
+🏘 Community Profiles
+Create a Community Profiles list (like properties/people)
+Allow shared info for properties in same HOA/POA:
+Community name, photo, HOA contact
+Shared vendors, notices, service contacts
+Admin panel should allow bulk editing and viewing of all community profiles.
+🧍 People Page
+Rename “Contacts” to “People.”
+Update table with these columns:
+Profile Picture | Name | Type (Owner, Vendor, etc) | Phone | Email | Property Status | Last Interaction
+Make each person clickable and route to a People Profile Page with:
+Contact info, linked properties, tasks, billing info, preferred vendors
+Notes section + Quick Links
+Customizable fields
+✅ Tasks Page
+Ensure tasks are clickable and lead to a full Task Profile Page:
+Task title, assigned user, property, due date, priority, category, status
+Description, estimated time, attachments, checklist, recurrence toggle
+Comments & quick links
+Add “Import Tasks from CSV” button to Tasks Page
+👤 Team Page
+Each team member should be clickable, leading to a Team Profile Page:
+Profile image, contact info, team, role, certifications, joined date
+Assigned tasks/properties, overdue tasks, last login
+Supervisor view: cost to company, revenue generated, private performance notes
+🧠 Admin Panel Expansion
+Ensure Admin panel has:
+
+Email Templates
+Task Templates
+Report Templates
+Automation Rules
+Audit Logs
+Notification Center
+Custom Field Editor (to adjust labels/fields on Properties, People, Tasks)
