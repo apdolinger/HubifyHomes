@@ -15,7 +15,13 @@ import {
   Plus,
   ArrowRight,
   Clock,
-  User
+  User,
+  Settings,
+  HelpCircle,
+  GraduationCap,
+  Calendar,
+  Copy,
+  MessageSquare
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -207,6 +213,10 @@ export default function Dashboard() {
               Quick Add Task
               <kbd className="kbd-light ml-2">T</kbd>
             </Button>
+            <Button variant="outline" size="sm" className="flex items-center">
+              <Settings className="w-4 h-4" />
+              <span className="sr-only">Customize Dashboard</span>
+            </Button>
           </div>
         </div>
       </div>
@@ -379,10 +389,10 @@ export default function Dashboard() {
               <div className="flex items-center justify-between">
                 <CardTitle>Team Messages</CardTitle>
                 <Button
-                  variant="outline"
                   size="sm"
                   onClick={handlePostMessage}
                   disabled={!newMessage.trim() || postMessageMutation.isPending}
+                  className="bg-primary hover:bg-primary/90"
                 >
                   <Plus className="w-3 h-3 mr-1" />
                   Post
@@ -437,6 +447,80 @@ export default function Dashboard() {
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Additional Widgets Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+        {/* Support Widget */}
+        <div className="lg:col-span-1">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <HelpCircle className="w-4 h-4 mr-2" />
+                Support
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <Button variant="outline" className="w-full justify-start">
+                  <HelpCircle className="w-4 h-4 mr-2" />
+                  Need Help?
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <GraduationCap className="w-4 h-4 mr-2" />
+                  Training & Tips
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Calendar Widget */}
+        <div className="lg:col-span-1">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center">
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Calendar
+                </CardTitle>
+                <div className="flex space-x-1">
+                  <Button variant="outline" size="sm">Day</Button>
+                  <Button variant="outline" size="sm">Week</Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-slate-500">
+                <Calendar className="w-12 h-12 mx-auto mb-4 text-slate-400" />
+                <p>Calendar view coming soon</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Duplicates Widget */}
+        <div className="lg:col-span-1">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Copy className="w-4 h-4 mr-2" />
+                Duplicates
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="text-center py-4 text-slate-500">
+                  <Copy className="w-8 h-8 mx-auto mb-2 text-slate-400" />
+                  <p className="text-sm">No duplicates found</p>
+                </div>
+                <Button variant="outline" className="w-full" size="sm">
+                  Scan for Duplicates
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

@@ -37,15 +37,34 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Communities table
+export const communities = pgTable("communities", {
+  id: serial("id").primaryKey(),
+  name: varchar("name").notNull(),
+  address: text("address"),
+  imageUrl: varchar("image_url"),
+  managerId: varchar("manager_id").references(() => users.id),
+  hoaPresidentId: varchar("hoa_president_id").references(() => users.id),
+  isActive: boolean("is_active").notNull().default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Properties table
 export const properties = pgTable("properties", {
   id: serial("id").primaryKey(),
   name: varchar("name").notNull(),
   address: text("address").notNull(),
-  type: varchar("type").notNull(), // apartment, house, commercial, etc.
+  type: varchar("type").notNull(), // single-family, condo, apartment, house, commercial
   units: integer("units").default(1),
   managerId: varchar("manager_id").references(() => users.id),
   isActive: boolean("is_active").notNull().default(true),
+  imageUrl: varchar("image_url"),
+  squareFootage: integer("square_footage"),
+  billingType: varchar("billing_type"), // sqft, flat_fee
+  status: varchar("status").notNull().default("occupied"), // occupied, vacant, under_repair
+  communityId: integer("community_id").references(() => communities.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -109,10 +128,26 @@ export const usersRelations = relations(users, ({ many }) => ({
   activities: many(activityLog),
 }));
 
+export const communitiesRelations = relations(communities, ({ one, many }) => ({
+  manager: one(users, {
+    fields: [communities.managerId],
+    references: [users.id],
+  }),
+  hoaPresident: one(users, {
+    fields: [communities.hoaPresidentId],
+    references: [users.id],
+  }),
+  properties: many(properties),
+}));
+
 export const propertiesRelations = relations(properties, ({ one, many }) => ({
   manager: one(users, {
     fields: [properties.managerId],
     references: [users.id],
+  }),
+  community: one(communities, {
+    fields: [properties.communityId],
+    references: [communities.id],
   }),
   tasks: many(tasks),
   contacts: many(contacts),
@@ -162,6 +197,12 @@ export const insertUserSchema = createInsertSchema(users).omit({
   updatedAt: true,
 });
 
+export const insertCommunitySchema = createInsertSchema(communities).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertPropertySchema = createInsertSchema(properties).omit({
   id: true,
   createdAt: true,
@@ -194,6 +235,8 @@ export const insertActivityLogSchema = createInsertSchema(activityLog).omit({
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+export type InsertCommunity = z.infer<typeof insertCommunitySchema>;
+export type Community = typeof communities.$inferSelect;
 export type InsertProperty = z.infer<typeof insertPropertySchema>;
 export type Property = typeof properties.$inferSelect;
 export type InsertTask = z.infer<typeof insertTaskSchema>;

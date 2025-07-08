@@ -1,0 +1,165 @@
+Please implement the following feature enhancements and interface corrections across the Nestive SaaS platform.
+
+✅ GENERAL UPDATES
+1. Top Navigation Bar
+
+Tabs should be arranged in the following order:
+Dashboard | Tasks | Properties | People | Team | Property Center | Admin
+2. Dashboard Updates
+
+Add “Admin” to the top navigation for admins.
+Add a sprocket icon in the top-right or corner of the dashboard for dashboard customization (draggable widgets).
+Add a “Support” widget (styled like Team Messages):
+Link 1: “Need Help?” → opens Help Center
+Link 2: “Training & Tips” → opens onboarding guides
+Add a Calendar Widget (day/week toggle view).
+The “Post” button should match the blue color used for the Quick Add Task button.
+Add a “Duplicates” widget to display possible duplicate people or properties.
+“Recent Activity” should log actions like adding new people or properties (e.g., “John Smith added”).
+🏠 Properties Page
+Properties List View:
+
+Make properties clickable to open their profile pages.
+Add “Add Property” functionality.
+List view columns should be:
+Image
+Property/Community Name
+Address
+Type (Single-Family, Condo, etc.)
+Primary Contact
+Square Footage
+Billing Type (sqft/flat fee)
+Status (Occupied, Vacant, Under Repair)
+Property Profile Page:
+
+Profile picture and address display at top.
+Show owner, status, square footage, billing, community info.
+Add customizable fields (editable from Admin).
+Section for Supplies (linked to spaces, e.g., filters, bulbs, etc.)
+View of task/work history, upcoming tasks, and notes.
+Ability to inactivate/reactivate property (affects billing, not deletion).
+Upload or embed a 3D rendering or bird’s eye view.
+Include links or quick entries to space-specific tasks.
+🌐 Community Profile (linked from properties)
+Shared fields populated across all properties in the community.
+Community image, name, manager/HOA president.
+Shared vendors (landscaping, security, etc.)
+Admin can view all Communities in a dedicated list view like Properties.
+👤 People Page
+People List View:
+
+Change “Contacts” → “People”
+Make rows clickable to view full person profile.
+Columns:
+Profile Image
+Name
+Type (Owner, Guest, Vendor, Staff)
+Phone
+Email
+Property Status (Active, Inactive, Vendor, Blocked)
+Last Interaction Date
+People Profile Page:
+
+Header with profile pic, phone, and email.
+Tabs or sections:
+Properties linked
+Tasks
+Requests
+Documents
+Notices
+Billing plan + cost
+Preferred vendors
+Customizable fields (from Admin area)
+Notes area (with timestamps)
+“Quick Links” section for pasting URLs
+Profile opens after creation via modal
+✅ Tasks Page
+Task List View:
+
+Must support: All Tasks, Assigned to Me, Due This Week, Templates
+Import/Export via CSV
+Columns:
+Task Name
+Assigned To
+Property
+Due Date
+Priority
+Status
+Task Profile Page:
+
+Editable overview:
+Title, Property, Assigned To, Due Date, Status
+Recurring toggle
+Time estimate
+Checklist/subtasks
+Category
+Attachments
+Quick links
+Comments
+Description
+Conflict detection:
+Alert if task overlaps by time/location
+Escalation to supervisor if needed
+👥 Team Page
+Team List View:
+
+Clickable rows to access profile pages.
+Filter by Role. Clicking a role shows list of team members in that role.
+Below team list: “My Team” section (team members assigned under a person)
+Team Member Profile Page:
+
+Image, name, contact, joined date, birthday
+Role and Team
+Certifications (e.g., LCAM), Skills (e.g., Irrigation)
+Properties assigned
+Tasks assigned
+Last login
+Overdue tasks
+Supervisor View Only:
+Cost to company
+Revenue generated
+Performance notes
+🛠️ Admin Page (Top Nav: Admin)
+Templates
+Emails
+Task templates
+Reports
+Automation Rules
+Logs
+Audit Logs
+System Actions
+Customization
+Custom Fields (for Properties, People, Tasks)
+Notifications (by role or event)
+🔐 Super Admin Area (Accessed via Admin tab or hidden route)
+Platform Settings
+General Config
+Billing Plans
+Feature Toggles
+Integrations
+Usage & Reports
+Client-by-client usage analytics
+Heatmaps or click trails
+Inactivity tracking
+User Oversight
+Manage Admins
+Impersonate User
+Suspended Users
+User Audit Log
+Automations
+Configure triggers
+Run custom scripts
+Support Escalation
+Active Tickets
+Unresolved Tickets
+System Audit Log
+🔐 Legal Document: Anti-Squatter Authorization
+Add feature where:
+Homeowner can digitally authorize a staff member to issue trespass notice
+Generates a downloadable document (PDF)
+Stored on property and/or person profile
+⌨️ Keyboard Shortcuts (Global)
+Space → Quick Search
+T → Add Task
+? → Help
+(Future: Cmd+Shift+A → Admin, Cmd+P → People, Cmd+R → Properties)

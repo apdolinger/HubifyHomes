@@ -21,9 +21,9 @@ import {
 const getNavigationItems = (user: any) => {
   const baseItems = [
     { name: "Dashboard", href: "/", icon: BarChart3 },
+    { name: "Tasks", href: "/tasks", icon: CheckSquare },
     { name: "Properties", href: "/properties", icon: Building },
     { name: "People", href: "/people", icon: UserCheck },
-    { name: "Tasks", href: "/tasks", icon: CheckSquare },
     { name: "Team", href: "/team", icon: Users },
     { name: "Property Center", href: "/property-center", icon: Home },
   ];

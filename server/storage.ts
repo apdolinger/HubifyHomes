@@ -1,5 +1,6 @@
 import {
   users,
+  communities,
   properties,
   tasks,
   contacts,
@@ -7,6 +8,8 @@ import {
   activityLog,
   type User,
   type UpsertUser,
+  type Community,
+  type InsertCommunity,
   type Property,
   type InsertProperty,
   type Task,
@@ -25,6 +28,13 @@ export interface IStorage {
   // User operations - required for Replit Auth
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  
+  // Community operations
+  getCommunities(): Promise<Community[]>;
+  getCommunity(id: number): Promise<Community | undefined>;
+  createCommunity(community: InsertCommunity, userId: string): Promise<Community>;
+  updateCommunity(id: number, community: Partial<InsertCommunity>): Promise<Community>;
+  deleteCommunity(id: number): Promise<void>;
   
   // Property operations
   getProperties(): Promise<Property[]>;
@@ -97,6 +107,49 @@ export class DatabaseStorage implements IStorage {
       const [user] = await db.insert(users).values(userData).returning();
       return user;
     }
+  }
+
+  // Community operations
+  async getCommunities(): Promise<Community[]> {
+    return db.select().from(communities).orderBy(desc(communities.createdAt));
+  }
+
+  async getCommunity(id: number): Promise<Community | undefined> {
+    const [community] = await db
+      .select()
+      .from(communities)
+      .where(eq(communities.id, id));
+    return community;
+  }
+
+  async createCommunity(communityData: InsertCommunity, userId: string): Promise<Community> {
+    const [community] = await db
+      .insert(communities)
+      .values(communityData)
+      .returning();
+    
+    await this.logActivity({
+      userId,
+      action: "community_created",
+      entityType: "community",
+      entityId: community.id.toString(),
+      description: `Added community "${community.name}"`
+    });
+    
+    return community;
+  }
+
+  async updateCommunity(id: number, communityData: Partial<InsertCommunity>): Promise<Community> {
+    const [community] = await db
+      .update(communities)
+      .set({ ...communityData, updatedAt: new Date() })
+      .where(eq(communities.id, id))
+      .returning();
+    return community;
+  }
+
+  async deleteCommunity(id: number): Promise<void> {
+    await db.delete(communities).where(eq(communities.id, id));
   }
 
   // Property operations
