@@ -1,0 +1,60 @@
+Within the Super Admin Area
+
+1. Organizations Overview
+Purpose: View and manage all accounts (organizations) on Nestive.
+Details Shown:
+Org Name
+Admin Contact(s)
+Status (Active, Suspended, Trial, Cancelled)
+Number of Properties / Users / Tasks
+Plan Level (Free, Pro, Enterprise)
+Billing Summary
+Functions:
+Impersonate admin (login-as)
+Suspend / Reactivate account
+Reset password for org admins
+View organization logs
+2. Revenue Dashboard
+Purpose: See revenue breakdown across all organizations.
+Details Shown:
+MRR / ARR
+Revenue per plan
+Churn rate
+Stripe integration status
+Note: This is only visible in Super Admin — not accessible to any org-level users.
+3. Feature Flags / Toggles
+Purpose: Enable/disable beta or custom features per organization.
+Examples:
+Enable task cost tracking
+Enable community profiles
+Turn on Zapier integration
+Functionality: Toggle per org or globally
+4. Global Error Logs / Monitoring
+Purpose: See errors across the platform.
+Details Shown:
+API request failures
+Component load issues
+Failed integrations
+Tools: May include connection to a tool like Sentry or Logs Viewer
+5. Broadcast Messaging
+Purpose: Send a system-wide announcement or alert.
+Examples:
+"System maintenance July 30, 2–3AM EST"
+"New feature: recurring inspections now live"
+Delivery: In-app banner or popup, optionally email.
+6. Platform Configuration
+Purpose: Set global defaults.
+Settings Include:
+Default task reminder settings
+Default time zone
+Global terms of service or privacy policy links
+Enable/disable new registration
+7. Custom Branding & White-Label Settings
+Purpose: If used as a white-label platform
+Details:
+Organization-specific logo / color theme uploads
+Custom domain mapping (e.g. app.acmehomewatch.com)
+Email sending profile (e.g. support@acmehomewatch.com)
+8. License & Compliance Records
+Purpose: Store/track FFL licenses, agreements, or usage terms if needed across orgs (especially important for United Citadel or security accounts).
+Optional Expansion: Legal docs management module (Phase 2+)

@@ -34,13 +34,33 @@ import {
   Upload,
   RefreshCw,
   Trash2,
-  Edit
+  Edit,
+  MessageSquare,
+  DollarSign,
+  Globe,
+  Building,
+  Play,
+  Pause,
+  Ban,
+  RotateCcw,
+  LogIn,
+  FileText,
+  Megaphone,
+  Flag,
+  Palette,
+  Mail,
+  CreditCard,
+  Calendar,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  AlertCircle
 } from "lucide-react";
 
 export default function SuperAdmin() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("system");
+  const [activeTab, setActiveTab] = useState("organizations");
 
   // Redirect to home if not authenticated or not admin
   useEffect(() => {
@@ -160,32 +180,943 @@ export default function SuperAdmin() {
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="system" className="flex items-center">
-            <Server className="w-4 h-4 mr-2" />
-            System
-          </TabsTrigger>
-          <TabsTrigger value="database" className="flex items-center">
-            <Database className="w-4 h-4 mr-2" />
-            Database
-          </TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center">
+        <TabsList className="grid w-full grid-cols-7">
+          <TabsTrigger value="organizations" className="flex items-center">
             <Users className="w-4 h-4 mr-2" />
-            Users
+            Organizations
           </TabsTrigger>
-          <TabsTrigger value="security" className="flex items-center">
-            <Shield className="w-4 h-4 mr-2" />
-            Security
+          <TabsTrigger value="revenue" className="flex items-center">
+            <TrendingUp className="w-4 h-4 mr-2" />
+            Revenue
+          </TabsTrigger>
+          <TabsTrigger value="features" className="flex items-center">
+            <Settings className="w-4 h-4 mr-2" />
+            Feature Flags
           </TabsTrigger>
           <TabsTrigger value="monitoring" className="flex items-center">
             <Activity className="w-4 h-4 mr-2" />
             Monitoring
           </TabsTrigger>
-          <TabsTrigger value="maintenance" className="flex items-center">
-            <Settings className="w-4 h-4 mr-2" />
-            Maintenance
+          <TabsTrigger value="messaging" className="flex items-center">
+            <MessageSquare className="w-4 h-4 mr-2" />
+            Messaging
+          </TabsTrigger>
+          <TabsTrigger value="platform" className="flex items-center">
+            <Server className="w-4 h-4 mr-2" />
+            Platform
+          </TabsTrigger>
+          <TabsTrigger value="compliance" className="flex items-center">
+            <Shield className="w-4 h-4 mr-2" />
+            Compliance
           </TabsTrigger>
         </TabsList>
+
+        {/* Organizations Tab */}
+        <TabsContent value="organizations" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-semibold">Organizations Overview</h3>
+              <p className="text-sm text-muted-foreground">Manage all accounts and organizations on the platform</p>
+            </div>
+            <Button>
+              <Building className="w-4 h-4 mr-2" />
+              Add Organization
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Organizations</CardTitle>
+                <Building className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">247</div>
+                <p className="text-xs text-muted-foreground">+12 this month</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Active Accounts</CardTitle>
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">234</div>
+                <p className="text-xs text-muted-foreground">94.7% active rate</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Trial Accounts</CardTitle>
+                <Clock className="h-4 w-4 text-yellow-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">23</div>
+                <p className="text-xs text-muted-foreground">8 expiring soon</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Properties</CardTitle>
+                <Network className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">15,432</div>
+                <p className="text-xs text-muted-foreground">Across all orgs</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Organizations</CardTitle>
+              <CardDescription>
+                View and manage all organizations on the platform
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Organization</TableHead>
+                    <TableHead>Admin Contact</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Properties</TableHead>
+                    <TableHead>Users</TableHead>
+                    <TableHead>Plan</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">Coastal Property Management</div>
+                        <div className="text-sm text-muted-foreground">coastal@example.com</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">Sarah Johnson</div>
+                        <div className="text-sm text-muted-foreground">sarah@coastal.com</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center">
+                        <CheckCircle2 className="w-4 h-4 text-green-500 mr-2" />
+                        Active
+                      </div>
+                    </TableCell>
+                    <TableCell>142</TableCell>
+                    <TableCell>28</TableCell>
+                    <TableCell>Enterprise</TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Button size="sm" variant="ghost">
+                          <LogIn className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost">
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost">
+                          <Pause className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">Mountain View HOA</div>
+                        <div className="text-sm text-muted-foreground">admin@mvhoa.com</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">Mike Chen</div>
+                        <div className="text-sm text-muted-foreground">mike@mvhoa.com</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center">
+                        <Clock className="w-4 h-4 text-yellow-500 mr-2" />
+                        Trial
+                      </div>
+                    </TableCell>
+                    <TableCell>89</TableCell>
+                    <TableCell>12</TableCell>
+                    <TableCell>Pro Trial</TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Button size="sm" variant="ghost">
+                          <LogIn className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost">
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost">
+                          <RotateCcw className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Revenue Dashboard Tab */}
+        <TabsContent value="revenue" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-semibold">Revenue Dashboard</h3>
+              <p className="text-sm text-muted-foreground">Platform-wide revenue tracking and analytics</p>
+            </div>
+            <Button>
+              <Download className="w-4 h-4 mr-2" />
+              Export Report
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Monthly Recurring Revenue</CardTitle>
+                <DollarSign className="h-4 w-4 text-green-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">$847,230</div>
+                <p className="text-xs text-muted-foreground">+12.3% from last month</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Annual Recurring Revenue</CardTitle>
+                <TrendingUp className="h-4 w-4 text-green-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">$10.2M</div>
+                <p className="text-xs text-muted-foreground">+8.7% year over year</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Churn Rate</CardTitle>
+                <AlertCircle className="h-4 w-4 text-yellow-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">2.3%</div>
+                <p className="text-xs text-muted-foreground">-0.5% from last month</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Average Revenue Per User</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">$342</div>
+                <p className="text-xs text-muted-foreground">+5.2% from last month</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Revenue by Plan</CardTitle>
+                <CardDescription>
+                  Breakdown of revenue by subscription plans
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                      <span>Enterprise</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium">$523,400</div>
+                      <div className="text-sm text-muted-foreground">62%</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <span>Professional</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium">$254,230</div>
+                      <div className="text-sm text-muted-foreground">30%</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                      <span>Starter</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium">$69,600</div>
+                      <div className="text-sm text-muted-foreground">8%</div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment Method Distribution</CardTitle>
+                <CardDescription>
+                  How customers are paying for subscriptions
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <CreditCard className="w-4 h-4 text-blue-500" />
+                      <span>Credit Card</span>
+                    </div>
+                    <span className="font-medium">89%</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Building className="w-4 h-4 text-green-500" />
+                      <span>Bank Transfer</span>
+                    </div>
+                    <span className="font-medium">8%</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Globe className="w-4 h-4 text-purple-500" />
+                      <span>PayPal</span>
+                    </div>
+                    <span className="font-medium">3%</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Feature Flags Tab */}
+        <TabsContent value="features" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-semibold">Feature Flags & Toggles</h3>
+              <p className="text-sm text-muted-foreground">Enable/disable features per organization or globally</p>
+            </div>
+            <Button>
+              <Flag className="w-4 h-4 mr-2" />
+              Add Feature Flag
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Global Feature Flags</CardTitle>
+                <CardDescription>
+                  Features enabled/disabled platform-wide
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">Task Cost Tracking</div>
+                    <div className="text-sm text-muted-foreground">Enable cost tracking for tasks</div>
+                  </div>
+                  <Button variant="outline" size="sm">
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  </Button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">Community Profiles</div>
+                    <div className="text-sm text-muted-foreground">Enhanced community management features</div>
+                  </div>
+                  <Button variant="outline" size="sm">
+                    <XCircle className="w-4 h-4 text-red-500" />
+                  </Button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">Zapier Integration</div>
+                    <div className="text-sm text-muted-foreground">Third-party automation workflows</div>
+                  </div>
+                  <Button variant="outline" size="sm">
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  </Button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">Advanced Analytics</div>
+                    <div className="text-sm text-muted-foreground">Enhanced reporting and insights</div>
+                  </div>
+                  <Button variant="outline" size="sm">
+                    <Clock className="w-4 h-4 text-yellow-500" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Organization-Specific Flags</CardTitle>
+                <CardDescription>
+                  Custom features enabled for specific organizations
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="orgSelect">Select Organization</Label>
+                    <Select defaultValue="coastal">
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="coastal">Coastal Property Management</SelectItem>
+                        <SelectItem value="mountain">Mountain View HOA</SelectItem>
+                        <SelectItem value="sunset">Sunset Communities</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">White Label Branding</div>
+                        <div className="text-sm text-muted-foreground">Custom branding and domain</div>
+                      </div>
+                      <Button variant="outline" size="sm">
+                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      </Button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">API Access</div>
+                        <div className="text-sm text-muted-foreground">Full REST API access</div>
+                      </div>
+                      <Button variant="outline" size="sm">
+                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      </Button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">Custom Fields</div>
+                        <div className="text-sm text-muted-foreground">Unlimited custom property fields</div>
+                      </div>
+                      <Button variant="outline" size="sm">
+                        <XCircle className="w-4 h-4 text-red-500" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Broadcast Messaging Tab */}
+        <TabsContent value="messaging" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-semibold">Broadcast Messaging</h3>
+              <p className="text-sm text-muted-foreground">Send system-wide announcements and alerts</p>
+            </div>
+            <Button>
+              <Megaphone className="w-4 h-4 mr-2" />
+              New Broadcast
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Create Announcement</CardTitle>
+                <CardDescription>
+                  Send a message to all organizations or specific targets
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="messageType">Message Type</Label>
+                  <Select defaultValue="maintenance">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="maintenance">System Maintenance</SelectItem>
+                      <SelectItem value="feature">New Feature</SelectItem>
+                      <SelectItem value="alert">Security Alert</SelectItem>
+                      <SelectItem value="general">General Announcement</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="messageTitle">Title</Label>
+                  <Input 
+                    id="messageTitle" 
+                    placeholder="System maintenance July 30, 2-3AM EST" 
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="messageContent">Message</Label>
+                  <Textarea 
+                    id="messageContent" 
+                    placeholder="Describe the announcement details..."
+                    rows={4}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="deliveryMethod">Delivery Method</Label>
+                  <Select defaultValue="both">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="app">In-App Banner Only</SelectItem>
+                      <SelectItem value="email">Email Only</SelectItem>
+                      <SelectItem value="both">Both App & Email</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex space-x-2">
+                  <Button className="flex-1">
+                    <Megaphone className="w-4 h-4 mr-2" />
+                    Send Now
+                  </Button>
+                  <Button variant="outline" className="flex-1">
+                    <Calendar className="w-4 h-4 mr-2" />
+                    Schedule
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Broadcasts</CardTitle>
+                <CardDescription>
+                  Messages sent in the last 30 days
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="border-l-4 border-blue-500 pl-4">
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium">New Feature: Recurring Inspections</div>
+                      <span className="text-sm text-muted-foreground">2 days ago</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">Recurring inspections are now live for all users</p>
+                    <div className="text-xs text-green-600 mt-1">Delivered to 247 organizations</div>
+                  </div>
+                  <div className="border-l-4 border-yellow-500 pl-4">
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium">Scheduled Maintenance</div>
+                      <span className="text-sm text-muted-foreground">1 week ago</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">System maintenance July 23, 2-3AM EST</p>
+                    <div className="text-xs text-green-600 mt-1">Delivered to 247 organizations</div>
+                  </div>
+                  <div className="border-l-4 border-red-500 pl-4">
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium">Security Update Required</div>
+                      <span className="text-sm text-muted-foreground">2 weeks ago</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">Please update your password for enhanced security</p>
+                    <div className="text-xs text-green-600 mt-1">Delivered to 247 organizations</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Platform Configuration Tab */}
+        <TabsContent value="platform" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-semibold">Platform Configuration</h3>
+              <p className="text-sm text-muted-foreground">Global platform settings and defaults</p>
+            </div>
+            <Button>
+              <Settings className="w-4 h-4 mr-2" />
+              Save All Settings
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Global Defaults</CardTitle>
+                <CardDescription>
+                  Set default values for new organizations
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="defaultTimezone">Default Time Zone</Label>
+                  <Select defaultValue="est">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pst">Pacific (PST)</SelectItem>
+                      <SelectItem value="mst">Mountain (MST)</SelectItem>
+                      <SelectItem value="cst">Central (CST)</SelectItem>
+                      <SelectItem value="est">Eastern (EST)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="taskReminders">Default Task Reminder Settings</Label>
+                  <Select defaultValue="24h">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1h">1 Hour Before</SelectItem>
+                      <SelectItem value="24h">24 Hours Before</SelectItem>
+                      <SelectItem value="48h">48 Hours Before</SelectItem>
+                      <SelectItem value="none">No Default Reminders</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="allowRegistration">Allow New Registration</Label>
+                  <Select defaultValue="invite">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="open">Open Registration</SelectItem>
+                      <SelectItem value="invite">Invitation Only</SelectItem>
+                      <SelectItem value="closed">Registration Closed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Legal & Compliance</CardTitle>
+                <CardDescription>
+                  Terms of service and privacy policy settings
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="tosUrl">Terms of Service URL</Label>
+                  <Input 
+                    id="tosUrl" 
+                    placeholder="https://nestive.com/terms"
+                    defaultValue="https://nestive.com/terms"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="privacyUrl">Privacy Policy URL</Label>
+                  <Input 
+                    id="privacyUrl" 
+                    placeholder="https://nestive.com/privacy"
+                    defaultValue="https://nestive.com/privacy"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="supportEmail">Support Contact Email</Label>
+                  <Input 
+                    id="supportEmail" 
+                    type="email"
+                    placeholder="support@nestive.com"
+                    defaultValue="support@nestive.com"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="cookieConsent">Cookie Consent Required</Label>
+                  <Select defaultValue="yes">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="yes">Required</SelectItem>
+                      <SelectItem value="no">Not Required</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>White-Label Settings</CardTitle>
+                <CardDescription>
+                  Custom branding and domain configuration
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="brandingEnabled">Enable White-Label Branding</Label>
+                  <Select defaultValue="enterprise">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Organizations</SelectItem>
+                      <SelectItem value="enterprise">Enterprise Only</SelectItem>
+                      <SelectItem value="disabled">Disabled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="customDomains">Allow Custom Domains</Label>
+                  <Select defaultValue="yes">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="yes">Enabled</SelectItem>
+                      <SelectItem value="no">Disabled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="emailBranding">Custom Email Branding</Label>
+                  <Select defaultValue="yes">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="yes">Enabled</SelectItem>
+                      <SelectItem value="no">Disabled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>API Configuration</CardTitle>
+                <CardDescription>
+                  Platform-wide API settings and limits
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="apiRateLimit">API Rate Limit (requests/hour)</Label>
+                  <Input 
+                    id="apiRateLimit" 
+                    type="number"
+                    defaultValue="1000"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="webhookRetries">Webhook Retry Attempts</Label>
+                  <Input 
+                    id="webhookRetries" 
+                    type="number"
+                    defaultValue="3"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="apiVersioning">API Versioning Strategy</Label>
+                  <Select defaultValue="header">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="header">Header-based</SelectItem>
+                      <SelectItem value="url">URL-based</SelectItem>
+                      <SelectItem value="both">Both Supported</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* License & Compliance Tab */}
+        <TabsContent value="compliance" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-semibold">License & Compliance Records</h3>
+              <p className="text-sm text-muted-foreground">Track licenses, agreements, and compliance across organizations</p>
+            </div>
+            <Button>
+              <FileText className="w-4 h-4 mr-2" />
+              Add License Record
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>License Overview</CardTitle>
+                <CardDescription>
+                  Track licenses and certifications across organizations
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <div className="font-medium">FFL Licenses</div>
+                      <div className="text-sm text-muted-foreground">Federal Firearms License tracking</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium">23 Active</div>
+                      <div className="text-sm text-yellow-600">3 Expiring Soon</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <div className="font-medium">Security Agreements</div>
+                      <div className="text-sm text-muted-foreground">Security company agreements</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium">47 Active</div>
+                      <div className="text-sm text-green-600">All Current</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <div className="font-medium">Insurance Certificates</div>
+                      <div className="text-sm text-muted-foreground">Liability and bonding certificates</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium">89 Active</div>
+                      <div className="text-sm text-red-600">12 Expired</div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Compliance Status</CardTitle>
+                <CardDescription>
+                  Overall compliance status across the platform
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span>GDPR Compliance</span>
+                    <div className="flex items-center">
+                      <CheckCircle2 className="w-4 h-4 text-green-500 mr-2" />
+                      <span className="text-sm">Compliant</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>CCPA Compliance</span>
+                    <div className="flex items-center">
+                      <CheckCircle2 className="w-4 h-4 text-green-500 mr-2" />
+                      <span className="text-sm">Compliant</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>SOC 2 Type II</span>
+                    <div className="flex items-center">
+                      <Clock className="w-4 h-4 text-yellow-500 mr-2" />
+                      <span className="text-sm">In Progress</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>ISO 27001</span>
+                    <div className="flex items-center">
+                      <AlertCircle className="w-4 h-4 text-red-500 mr-2" />
+                      <span className="text-sm">Not Certified</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>License Records</CardTitle>
+                <CardDescription>
+                  Detailed view of all license and compliance records
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Organization</TableHead>
+                      <TableHead>License Type</TableHead>
+                      <TableHead>License Number</TableHead>
+                      <TableHead>Issue Date</TableHead>
+                      <TableHead>Expiry Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell>United Citadel Security</TableCell>
+                      <TableCell>FFL License</TableCell>
+                      <TableCell>FFL-2023-001</TableCell>
+                      <TableCell>Jan 15, 2023</TableCell>
+                      <TableCell>Jan 15, 2026</TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          <CheckCircle2 className="w-4 h-4 text-green-500 mr-2" />
+                          Active
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button size="sm" variant="ghost">
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost">
+                            <Download className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Coastal Property Management</TableCell>
+                      <TableCell>Insurance Certificate</TableCell>
+                      <TableCell>INS-2023-456</TableCell>
+                      <TableCell>Mar 1, 2023</TableCell>
+                      <TableCell>Mar 1, 2024</TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          <XCircle className="w-4 h-4 text-red-500 mr-2" />
+                          Expired
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button size="sm" variant="ghost">
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost">
+                            <RefreshCw className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
         {/* System Management Tab */}
         <TabsContent value="system" className="space-y-6">
