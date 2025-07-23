@@ -136,7 +136,6 @@ export default function Navigation() {
               <DropdownMenuContent align="end">
                 {((user as any)?.role === 'admin' || (user as any)?.role === 'manager') && (
                   <DropdownMenuItem onClick={() => window.location.href = '/admin'}>
-                    <Settings className="w-4 h-4 mr-2" />
                     Admin Panel
                   </DropdownMenuItem>
                 )}
