@@ -1,0 +1,70 @@
+1. Email & Message Templates
+Purpose: Let admins configure reusable templates for communication.
+Items:
+New client welcome email
+New team member invitation
+Property report summary
+Task notification emails
+Payment reminder
+Maintenance notice
+Emergency alerts
+Functionality: Edit subject, body (with smart tags like {ClientName}, {PropertyAddress}), and preview before saving.
+2. Task, Report, and Inspection Templates
+Purpose: Define pre-built task checklists or report formats.
+Items:
+New property onboarding tasks
+Recurring inspection templates
+Emergency visit checklist
+Pool, lawn, or vendor visit task packs
+Functionality: Name, description, tasks/subtasks, assign default cost (if any), assign default assignee or team.
+3. Custom Field Manager
+Purpose: Let admins add custom fields across the platform.
+Entities:
+People (e.g. “Gate Code”, “Preferred Language”)
+Properties (e.g. “Garage Code”, “Trash Day”)
+Tasks (e.g. “Estimated Time”, “Service Type”)
+Functionality: Add field name, type (text, dropdown, date, checkbox), required/optional toggle.
+4. Automation Rules (Phase 2+)
+Purpose: Admins can configure logic such as:
+"If task is overdue > 3 days, alert supervisor"
+"When new person is added with no linked property, flag as incomplete"
+"If emergency contact is blank, require profile update"
+Future-ready: This will eventually expand into a rule engine with if-this-then-that logic.
+5. Team Role and Permission Settings
+Purpose: Define what each role (e.g. Field Staff, Admin, Billing) can view or edit.
+Functionality:
+View-only vs edit rights for pages
+Module visibility toggles
+Access to financial info, vendor contact, etc.
+6. Account Contacts and Billing Designation
+Purpose: Admins can define:
+Main Point of Contact
+Billing Contact
+Support Contact
+These roles help route questions, invoices, and updates properly.
+7. Notifications & Alerts
+Purpose: Manage system-wide alert settings for:
+Task deadlines
+Duplicate warnings
+Login failures
+Property access log summaries
+Functionality: On/off toggles per item, choose method (email, SMS, in-app).
+8. Audit Logs (Activity Tracking)
+Purpose: Track actions like:
+Task edits
+Profile updates
+Logins
+Deletions
+Functionality: Filter by date range, user, action type.
+9. Export / Import Tools
+Purpose: Manage bulk data.
+Functions:
+Export all People, Properties, or Tasks (CSV format)
+Import templates for new accounts
+Sync setup (e.g. future Zapier or QuickBooks integrations)
+10. Support + Feedback Tools
+Purpose: Help admins resolve issues or submit feedback.
+Functions:
+“Contact Support” shortcut
+“Request a Feature” link
+Access to Help Docs

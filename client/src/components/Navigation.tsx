@@ -135,13 +135,12 @@ export default function Navigation() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {((user as any)?.role === 'admin' || (user as any)?.role === 'manager') && (
-                  <>
-                    <DropdownMenuItem onClick={() => window.location.href = '/admin'}>
-                      Admin Panel
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                  </>
+                  <DropdownMenuItem onClick={() => window.location.href = '/admin'}>
+                    <Settings className="w-4 h-4 mr-2" />
+                    Admin Panel
+                  </DropdownMenuItem>
                 )}
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>
                   Logout
                 </DropdownMenuItem>
