@@ -27,6 +27,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useState } from "react";
 import { useLocation } from "wouter";
+import DashboardCustomizationModal from "@/components/DashboardCustomizationModal";
+import { CalendarWidget, SupportWidget, DuplicatesWidget } from "@/components/DashboardWidgets";
 
 export default function Dashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -34,6 +36,74 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
   const [newMessage, setNewMessage] = useState("");
+  const [isCustomizationModalOpen, setIsCustomizationModalOpen] = useState(false);
+  
+  // Default widget configuration
+  const [dashboardWidgets, setDashboardWidgets] = useState([
+    {
+      id: "urgent-tasks",
+      name: "Urgent Tasks",
+      description: "View and manage high-priority tasks",
+      icon: <AlertTriangle className="w-4 h-4" />,
+      enabled: true,
+      order: 1,
+      category: "content" as const
+    },
+    {
+      id: "stats-overview",
+      name: "Statistics Overview", 
+      description: "Key metrics at a glance",
+      icon: <Building className="w-4 h-4" />,
+      enabled: true,
+      order: 2,
+      category: "stats" as const
+    },
+    {
+      id: "team-chat",
+      name: "Team Chat",
+      description: "Quick team communication",
+      icon: <MessageSquare className="w-4 h-4" />,
+      enabled: true,
+      order: 3,
+      category: "communication" as const
+    },
+    {
+      id: "recent-activity",
+      name: "Recent Activity",
+      description: "Latest system activity and updates", 
+      icon: <Clock className="w-4 h-4" />,
+      enabled: true,
+      order: 4,
+      category: "content" as const
+    },
+    {
+      id: "calendar",
+      name: "Calendar",
+      description: "Upcoming events and deadlines",
+      icon: <Calendar className="w-4 h-4" />,
+      enabled: false,
+      order: 5,
+      category: "content" as const
+    },
+    {
+      id: "support",
+      name: "Support",
+      description: "Help, training, and tips",
+      icon: <HelpCircle className="w-4 h-4" />,
+      enabled: false,
+      order: 6,
+      category: "content" as const
+    },
+    {
+      id: "duplicates",
+      name: "Duplicates", 
+      description: "Flagged duplicate people or properties",
+      icon: <User className="w-4 h-4" />,
+      enabled: false,
+      order: 7,
+      category: "content" as const
+    }
+  ]);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -143,8 +213,8 @@ export default function Dashboard() {
   });
 
   const handleAssignTask = (taskId: number) => {
-    if (user?.id) {
-      assignTaskMutation.mutate({ taskId, assignedToId: user.id });
+    if ((user as any)?.id) {
+      assignTaskMutation.mutate({ taskId, assignedToId: (user as any).id });
     }
   };
 
@@ -152,6 +222,19 @@ export default function Dashboard() {
     if (newMessage.trim()) {
       postMessageMutation.mutate(newMessage.trim());
     }
+  };
+
+  // Get enabled widgets sorted by order
+  const enabledWidgets = dashboardWidgets
+    .filter(widget => widget.enabled)
+    .sort((a, b) => a.order - b.order);
+
+  const handleSaveWidgets = (newWidgets: any[]) => {
+    setDashboardWidgets(newWidgets);
+    toast({
+      title: "Dashboard Updated",
+      description: "Your dashboard layout has been saved successfully.",
+    });
   };
 
   const getTaskCardClass = (priority: string) => {
@@ -215,7 +298,12 @@ export default function Dashboard() {
               Quick Add Task
               <kbd className="kbd-light ml-2">T</kbd>
             </Button>
-            <Button variant="outline" size="sm" className="flex items-center">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex items-center"
+              onClick={() => setIsCustomizationModalOpen(true)}
+            >
               <Settings className="w-4 h-4" />
               <span className="sr-only">Customize Dashboard</span>
             </Button>
@@ -239,7 +327,7 @@ export default function Dashboard() {
                     Total Properties
                   </dt>
                   <dd className="text-2xl font-semibold text-slate-900">
-                    {statsLoading ? "..." : stats?.totalProperties || 0}
+                    {statsLoading ? "..." : (stats as any)?.totalProperties || 0}
                   </dd>
                 </dl>
               </div>
@@ -261,7 +349,7 @@ export default function Dashboard() {
                     Urgent Tasks
                   </dt>
                   <dd className="text-2xl font-semibold text-slate-900">
-                    {statsLoading ? "..." : stats?.urgentTasks || 0}
+                    {statsLoading ? "..." : (stats as any)?.urgentTasks || 0}
                   </dd>
                 </dl>
               </div>
@@ -283,7 +371,7 @@ export default function Dashboard() {
                     Completed Today
                   </dt>
                   <dd className="text-2xl font-semibold text-slate-900">
-                    {statsLoading ? "..." : stats?.completedToday || 0}
+                    {statsLoading ? "..." : (stats as any)?.completedToday || 0}
                   </dd>
                 </dl>
               </div>
@@ -305,7 +393,7 @@ export default function Dashboard() {
                     Active Team
                   </dt>
                   <dd className="text-2xl font-semibold text-slate-900">
-                    {statsLoading ? "..." : stats?.activeTeam || 0}
+                    {statsLoading ? "..." : (stats as any)?.activeTeam || 0}
                   </dd>
                 </dl>
               </div>
@@ -323,7 +411,7 @@ export default function Dashboard() {
               <div className="flex items-center justify-between">
                 <CardTitle>Urgent Tasks</CardTitle>
                 <Badge variant="destructive">
-                  {urgentTasks?.length || 0} pending
+                  {(urgentTasks as any)?.length || 0} pending
                 </Badge>
               </div>
             </CardHeader>
@@ -332,9 +420,9 @@ export default function Dashboard() {
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                 </div>
-              ) : urgentTasks?.length > 0 ? (
+              ) : (urgentTasks as any)?.length > 0 ? (
                 <div className="space-y-4">
-                  {urgentTasks.map((task: any) => (
+                  {(urgentTasks as any).map((task: any) => (
                     <div key={task.id} className={getTaskCardClass(task.priority)}>
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -408,8 +496,8 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {teamMessages?.length > 0 ? (
-                    teamMessages.map((message: any) => (
+                  {(teamMessages as any)?.length > 0 ? (
+                    (teamMessages as any).map((message: any) => (
                       <div key={message.id} className="flex space-x-3">
                         <Avatar className="h-8 w-8">
                           <AvatarImage src={message.author?.profileImageUrl} />
@@ -540,10 +628,7 @@ export default function Dashboard() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => toast({
-                  title: "Customization",
-                  description: "Widget customization coming soon!",
-                })}
+                onClick={() => setIsCustomizationModalOpen(true)}
               >
                 <Settings className="w-4 h-4" />
               </Button>
@@ -554,13 +639,13 @@ export default function Dashboard() {
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
               </div>
-            ) : recentActivity?.length > 0 ? (
+            ) : (recentActivity as any)?.length > 0 ? (
               <div className="flow-root">
                 <ul className="-mb-8">
-                  {recentActivity.map((activity: any, index: number) => (
+                  {(recentActivity as any).map((activity: any, index: number) => (
                     <li key={activity.id}>
                       <div className="relative pb-8">
-                        {index !== recentActivity.length - 1 && (
+                        {index !== (recentActivity as any).length - 1 && (
                           <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-slate-200" />
                         )}
                         <div className="relative flex space-x-3">
@@ -593,6 +678,14 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dashboard Customization Modal */}
+      <DashboardCustomizationModal
+        isOpen={isCustomizationModalOpen}
+        onClose={() => setIsCustomizationModalOpen(false)}
+        onSave={handleSaveWidgets}
+        currentWidgets={dashboardWidgets}
+      />
     </main>
   );
 }
