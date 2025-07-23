@@ -18,12 +18,12 @@ export default function Admin() {
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
 
-  // Redirect if not admin
+  // Redirect if not admin or manager
   useEffect(() => {
-    if (!isLoading && isAuthenticated && user?.role !== 'admin') {
+    if (!isLoading && isAuthenticated && (user as any)?.role !== 'admin' && (user as any)?.role !== 'manager') {
       toast({
         title: "Access Denied",
-        description: "You need admin permissions to access this page.",
+        description: "You need admin or manager permissions to access this page.",
         variant: "destructive",
       });
       setTimeout(() => {
@@ -55,7 +55,7 @@ export default function Admin() {
     );
   }
 
-  if (!isAuthenticated || user?.role !== 'admin') {
+  if (!isAuthenticated || ((user as any)?.role !== 'admin' && (user as any)?.role !== 'manager')) {
     return null;
   }
 
@@ -68,10 +68,21 @@ export default function Admin() {
             Manage system settings, users, and monitor platform activity
           </p>
         </div>
-        <Badge variant="secondary" className="px-3 py-1">
-          <Shield className="w-4 h-4 mr-1" />
-          Admin Access
-        </Badge>
+        <div className="flex items-center space-x-3">
+          {(user as any)?.role === 'admin' && (
+            <Button 
+              onClick={() => window.location.href = '/super-admin'}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              <Shield className="w-4 h-4 mr-2" />
+              Super Admin
+            </Button>
+          )}
+          <Badge variant="secondary" className="px-3 py-1">
+            <Shield className="w-4 h-4 mr-1" />
+            {(user as any)?.role === 'admin' ? 'Admin' : 'Manager'} Access
+          </Badge>
+        </div>
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">

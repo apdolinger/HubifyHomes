@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { 
   BarChart3, 
@@ -48,17 +48,17 @@ export default function Navigation() {
   };
 
   const getUserInitials = () => {
-    if (user?.firstName && user?.lastName) {
-      return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
+    if ((user as any)?.firstName && (user as any)?.lastName) {
+      return `${(user as any).firstName[0]}${(user as any).lastName[0]}`.toUpperCase();
     }
-    return user?.email?.[0]?.toUpperCase() || "U";
+    return (user as any)?.email?.[0]?.toUpperCase() || "U";
   };
 
   const getUserDisplayName = () => {
-    if (user?.firstName && user?.lastName) {
-      return `${user.firstName} ${user.lastName}`;
+    if ((user as any)?.firstName && (user as any)?.lastName) {
+      return `${(user as any).firstName} ${(user as any).lastName}`;
     }
-    return user?.email || "User";
+    return (user as any)?.email || "User";
   };
 
   return (
@@ -124,7 +124,7 @@ export default function Navigation() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center space-x-2">
                   <Avatar className="w-8 h-8">
-                    <AvatarImage src={user?.profileImageUrl || undefined} />
+                    <AvatarImage src={(user as any)?.profileImageUrl || undefined} />
                     <AvatarFallback>{getUserInitials()}</AvatarFallback>
                   </Avatar>
                   <span className="text-sm font-medium hidden sm:block">
@@ -134,6 +134,14 @@ export default function Navigation() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {((user as any)?.role === 'admin' || (user as any)?.role === 'manager') && (
+                  <>
+                    <DropdownMenuItem onClick={() => window.location.href = '/admin'}>
+                      Admin Panel
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 <DropdownMenuItem onClick={handleLogout}>
                   Logout
                 </DropdownMenuItem>
