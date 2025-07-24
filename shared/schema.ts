@@ -119,6 +119,42 @@ export const activityLog = pgTable("activity_log", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Forms system tables
+export const forms = pgTable("forms", {
+  id: varchar("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  accountId: varchar("account_id"), // References account/organization 
+  name: text("name").notNull(),
+  description: text("description"),
+  type: text("type").notNull().default("intake"), // intake, feedback, registration
+  isPublic: boolean("is_public").notNull().default(false),
+  isEmbedEnabled: boolean("is_embed_enabled").notNull().default(false),
+  destination: text("destination").default("none"), // "contacts", "tasks", or "none"
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const formFields = pgTable("form_fields", {
+  id: varchar("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  formId: varchar("form_id").references(() => forms.id, { onDelete: 'cascade' }).notNull(),
+  label: text("label").notNull(),
+  fieldType: text("field_type").notNull(), // text, email, select, checkbox, textarea, phone
+  isRequired: boolean("is_required").notNull().default(false),
+  order: integer("order").notNull().default(0),
+  options: text("options").array(), // for dropdown/multiple-choice fields
+  placeholder: text("placeholder"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const formSubmissions = pgTable("form_submissions", {
+  id: varchar("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  formId: varchar("form_id").references(() => forms.id, { onDelete: 'cascade' }).notNull(),
+  data: jsonb("data").notNull(), // Form field values
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  submittedBy: text("submitted_by"), // email address or "anonymous"
+  ipAddress: varchar("ip_address"),
+  userAgent: text("user_agent"),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   managedProperties: many(properties),
@@ -191,6 +227,25 @@ export const activityLogRelations = relations(activityLog, ({ one }) => ({
   }),
 }));
 
+export const formsRelations = relations(forms, ({ many }) => ({
+  fields: many(formFields),
+  submissions: many(formSubmissions),
+}));
+
+export const formFieldsRelations = relations(formFields, ({ one }) => ({
+  form: one(forms, {
+    fields: [formFields.formId],
+    references: [forms.id],
+  }),
+}));
+
+export const formSubmissionsRelations = relations(formSubmissions, ({ one }) => ({
+  form: one(forms, {
+    fields: [formSubmissions.formId],
+    references: [forms.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   createdAt: true,
@@ -232,6 +287,22 @@ export const insertActivityLogSchema = createInsertSchema(activityLog).omit({
   createdAt: true,
 });
 
+export const insertFormSchema = createInsertSchema(forms).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertFormFieldSchema = createInsertSchema(formFields).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).omit({
+  id: true,
+  submittedAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -247,3 +318,9 @@ export type InsertTeamMessage = z.infer<typeof insertTeamMessageSchema>;
 export type TeamMessage = typeof teamMessages.$inferSelect;
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type ActivityLog = typeof activityLog.$inferSelect;
+export type InsertForm = z.infer<typeof insertFormSchema>;
+export type Form = typeof forms.$inferSelect;
+export type InsertFormField = z.infer<typeof insertFormFieldSchema>;
+export type FormField = typeof formFields.$inferSelect;
+export type InsertFormSubmission = z.infer<typeof insertFormSubmissionSchema>;
+export type FormSubmission = typeof formSubmissions.$inferSelect;

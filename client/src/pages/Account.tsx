@@ -126,9 +126,10 @@ export default function Account() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-10">
+        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-11">
           <TabsTrigger value="account-info">Account Info</TabsTrigger>
           <TabsTrigger value="billing">Billing</TabsTrigger>
+          <TabsTrigger value="forms">Forms</TabsTrigger>
           <TabsTrigger value="custom-fields">Custom Fields</TabsTrigger>
           <TabsTrigger value="email-templates">Email Templates</TabsTrigger>
           <TabsTrigger value="task-templates">Task Templates</TabsTrigger>
@@ -328,6 +329,210 @@ export default function Account() {
                       </Button>
                     </div>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Forms Tab */}
+        <TabsContent value="forms">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center">
+                    <FileText className="w-5 h-5 mr-2" />
+                    Form Management
+                  </CardTitle>
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create New Form
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Sample Forms */}
+                  <div className="border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h3 className="font-semibold">Property Intake Form</h3>
+                        <p className="text-sm text-gray-600">Collect new property information from clients</p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="outline" className="bg-green-50 text-green-700">Public</Badge>
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700">Embeddable</Badge>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
+                      <div>
+                        <span className="font-medium">Fields:</span> 8 fields
+                      </div>
+                      <div>
+                        <span className="font-medium">Submissions:</span> 23 total
+                      </div>
+                      <div>
+                        <span className="font-medium">Destination:</span> Creates Contacts
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between mt-4 pt-3 border-t">
+                      <div className="text-sm text-gray-500">
+                        Created: Jan 15, 2025 • Last updated: Jan 20, 2025
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button variant="outline" size="sm">
+                          <Eye className="w-3 h-3 mr-1" />
+                          Preview
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          <Edit className="w-3 h-3 mr-1" />
+                          Edit
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          Embed Code
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          <Download className="w-3 h-3 mr-1" />
+                          Export Data
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h3 className="font-semibold">Maintenance Request Form</h3>
+                        <p className="text-sm text-gray-600">Allow residents to submit maintenance requests</p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="outline" className="bg-gray-50 text-gray-700">Private</Badge>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
+                      <div>
+                        <span className="font-medium">Fields:</span> 12 fields
+                      </div>
+                      <div>
+                        <span className="font-medium">Submissions:</span> 47 total
+                      </div>
+                      <div>
+                        <span className="font-medium">Destination:</span> Creates Tasks
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between mt-4 pt-3 border-t">
+                      <div className="text-sm text-gray-500">
+                        Created: Dec 8, 2024 • Last updated: Jan 18, 2025
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button variant="outline" size="sm">
+                          <Eye className="w-3 h-3 mr-1" />
+                          Preview
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          <Edit className="w-3 h-3 mr-1" />
+                          Edit
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          Share Link
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          <Download className="w-3 h-3 mr-1" />
+                          Export Data
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h3 className="font-semibold">Client Feedback Survey</h3>
+                        <p className="text-sm text-gray-600">Collect service feedback from property owners</p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="outline" className="bg-green-50 text-green-700">Public</Badge>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
+                      <div>
+                        <span className="font-medium">Fields:</span> 6 fields
+                      </div>
+                      <div>
+                        <span className="font-medium">Submissions:</span> 12 total
+                      </div>
+                      <div>
+                        <span className="font-medium">Destination:</span> None (Survey only)
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between mt-4 pt-3 border-t">
+                      <div className="text-sm text-gray-500">
+                        Created: Jan 5, 2025 • Last updated: Jan 5, 2025
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button variant="outline" size="sm">
+                          <Eye className="w-3 h-3 mr-1" />
+                          Preview
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          <Edit className="w-3 h-3 mr-1" />
+                          Edit
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          Share Link
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          <Download className="w-3 h-3 mr-1" />
+                          Export Data
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Form Builder */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Settings className="w-5 h-5 mr-2" />
+                  Form Templates & Quick Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Button variant="outline" className="h-24 flex flex-col justify-center">
+                    <FileText className="w-6 h-6 mb-2" />
+                    <span className="font-medium">Property Intake</span>
+                    <span className="text-xs text-gray-500">Collect new property info</span>
+                  </Button>
+                  <Button variant="outline" className="h-24 flex flex-col justify-center">
+                    <Settings className="w-6 h-6 mb-2" />
+                    <span className="font-medium">Maintenance Request</span>
+                    <span className="text-xs text-gray-500">Resident service requests</span>
+                  </Button>
+                  <Button variant="outline" className="h-24 flex flex-col justify-center">
+                    <User className="w-6 h-6 mb-2" />
+                    <span className="font-medium">Contact Information</span>
+                    <span className="text-xs text-gray-500">Collect contact details</span>
+                  </Button>
+                  <Button variant="outline" className="h-24 flex flex-col justify-center">
+                    <CheckCircle className="w-6 h-6 mb-2" />
+                    <span className="font-medium">Service Feedback</span>
+                    <span className="text-xs text-gray-500">Customer satisfaction</span>
+                  </Button>
+                  <Button variant="outline" className="h-24 flex flex-col justify-center">
+                    <AlertTriangle className="w-6 h-6 mb-2" />
+                    <span className="font-medium">Incident Report</span>
+                    <span className="text-xs text-gray-500">Report issues or incidents</span>
+                  </Button>
+                  <Button variant="outline" className="h-24 flex flex-col justify-center">
+                    <Plus className="w-6 h-6 mb-2" />
+                    <span className="font-medium">Custom Form</span>
+                    <span className="text-xs text-gray-500">Build from scratch</span>
+                  </Button>
                 </div>
               </CardContent>
             </Card>
