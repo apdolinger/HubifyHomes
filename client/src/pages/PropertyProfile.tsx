@@ -10,6 +10,10 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Building, 
   MapPin, 
@@ -44,6 +48,18 @@ export default function PropertyProfile() {
   const [propertyImage, setPropertyImage] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isImageUploading, setIsImageUploading] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    address: "",
+    type: "",
+    status: "",
+    squareFootage: "",
+    bedrooms: "",
+    bathrooms: "",
+    billingRate: "",
+    description: ""
+  });
   
   // Get property ID from URL query params
   const urlParams = new URLSearchParams(window.location.search);
@@ -77,6 +93,42 @@ export default function PropertyProfile() {
   const { data: tasks } = useQuery({
     queryKey: ["/api/tasks"],
     enabled: isAuthenticated,
+  });
+
+  // Property update mutation
+  const updatePropertyMutation = useMutation({
+    mutationFn: async (updateData: any) => {
+      const response = await apiRequest(`/api/properties/${propertyId}`, {
+        method: "PATCH",
+        body: JSON.stringify(updateData),
+      });
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/properties", propertyId] });
+      toast({
+        title: "Property updated",
+        description: "Property details have been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error as Error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Update failed",
+        description: "Failed to update property details.",
+        variant: "destructive",
+      });
+    },
   });
 
   const propertyContacts = contacts?.filter((contact: any) => 
@@ -179,6 +231,53 @@ export default function PropertyProfile() {
       title: "Image removed",
       description: "Property image has been removed",
     });
+  };
+
+  // Initialize edit form when property data changes
+  useEffect(() => {
+    if (property && !isEditModalOpen) {
+      setEditForm({
+        name: property.name || "",
+        address: property.address || "",
+        type: property.type || "",
+        status: property.status || "",
+        squareFootage: property.squareFootage?.toString() || "",
+        bedrooms: property.bedrooms?.toString() || "",
+        bathrooms: property.bathrooms?.toString() || "",
+        billingRate: property.billingRate?.toString() || "",
+        description: property.description || ""
+      });
+    }
+  }, [property, isEditModalOpen]);
+
+  const handleSave = () => {
+    const updateData = {
+      ...editForm,
+      squareFootage: editForm.squareFootage ? parseInt(editForm.squareFootage) : null,
+      bedrooms: editForm.bedrooms ? parseInt(editForm.bedrooms) : null,
+      bathrooms: editForm.bathrooms ? parseInt(editForm.bathrooms) : null,
+      billingRate: editForm.billingRate ? parseFloat(editForm.billingRate) : null,
+    };
+
+    updatePropertyMutation.mutate(updateData);
+    setIsEditModalOpen(false);
+  };
+
+  const handleCancel = () => {
+    setIsEditModalOpen(false);
+    if (property) {
+      setEditForm({
+        name: property.name || "",
+        address: property.address || "",
+        type: property.type || "",
+        status: property.status || "",
+        squareFootage: property.squareFootage?.toString() || "",
+        bedrooms: property.bedrooms?.toString() || "",
+        bathrooms: property.bathrooms?.toString() || "",
+        billingRate: property.billingRate?.toString() || "",
+        description: property.description || ""
+      });
+    }
   };
 
   if (isLoading) {
@@ -291,10 +390,149 @@ export default function PropertyProfile() {
               </div>
               
               <div className="flex space-x-2 flex-shrink-0">
-                <Button variant="outline">
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit Property
-                </Button>
+                <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline">
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Property
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Edit Property</DialogTitle>
+                      <DialogDescription>
+                        Update property details, specifications, and other information.
+                      </DialogDescription>
+                    </DialogHeader>
+                    
+                    {/* Edit Modal Content */}
+                    <div className="space-y-6 py-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="edit-name">Property Name</Label>
+                          <Input
+                            id="edit-name"
+                            value={editForm.name}
+                            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                            placeholder="Enter property name"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-address">Address</Label>
+                          <Input
+                            id="edit-address"
+                            value={editForm.address}
+                            onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                            placeholder="Enter full address"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="edit-description">Description</Label>
+                        <Textarea
+                          id="edit-description"
+                          value={editForm.description}
+                          onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                          placeholder="Enter property description..."
+                          rows={3}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="edit-type">Property Type</Label>
+                          <Select 
+                            value={editForm.type}
+                            onValueChange={(value) => setEditForm({ ...editForm, type: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="single-family">Single-Family</SelectItem>
+                              <SelectItem value="condo">Condo</SelectItem>
+                              <SelectItem value="apartment">Apartment</SelectItem>
+                              <SelectItem value="house">House</SelectItem>
+                              <SelectItem value="commercial">Commercial</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-status">Status</Label>
+                          <Select 
+                            value={editForm.status}
+                            onValueChange={(value) => setEditForm({ ...editForm, status: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="occupied">Occupied</SelectItem>
+                              <SelectItem value="vacant">Vacant</SelectItem>
+                              <SelectItem value="under_repair">Under Repair</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <Label htmlFor="edit-square-footage">Square Footage</Label>
+                          <Input
+                            id="edit-square-footage"
+                            type="number"
+                            value={editForm.squareFootage}
+                            onChange={(e) => setEditForm({ ...editForm, squareFootage: e.target.value })}
+                            placeholder="e.g. 1200"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-bedrooms">Bedrooms</Label>
+                          <Input
+                            id="edit-bedrooms"
+                            type="number"
+                            value={editForm.bedrooms}
+                            onChange={(e) => setEditForm({ ...editForm, bedrooms: e.target.value })}
+                            placeholder="e.g. 3"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-bathrooms">Bathrooms</Label>
+                          <Input
+                            id="edit-bathrooms"
+                            type="number"
+                            step="0.5"
+                            value={editForm.bathrooms}
+                            onChange={(e) => setEditForm({ ...editForm, bathrooms: e.target.value })}
+                            placeholder="e.g. 2.5"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="edit-billing-rate">Billing Rate ($/month)</Label>
+                        <Input
+                          id="edit-billing-rate"
+                          type="number"
+                          step="0.01"
+                          value={editForm.billingRate}
+                          onChange={(e) => setEditForm({ ...editForm, billingRate: e.target.value })}
+                          placeholder="e.g. 150.00"
+                        />
+                      </div>
+                    </div>
+
+                    <DialogFooter>
+                      <Button variant="outline" onClick={handleCancel}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handleSave} disabled={updatePropertyMutation.isPending}>
+                        Save Changes
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
                 <Button className="bg-primary hover:bg-primary/90">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Task
