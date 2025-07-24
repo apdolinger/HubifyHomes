@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,6 +73,7 @@ import {
 export default function SuperAdmin() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("organizations");
 
   // This is internal-only access - in real implementation, would check for internal employee role
@@ -257,7 +259,14 @@ export default function SuperAdmin() {
                 <TableBody>
                   {organizations.map((org) => (
                     <TableRow key={org.id}>
-                      <TableCell className="font-medium">{org.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <button 
+                          onClick={() => setLocation(`/nestive-admin/organization/${org.id}`)}
+                          className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                        >
+                          {org.name}
+                        </button>
+                      </TableCell>
                       <TableCell>{org.admin}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{org.plan}</Badge>

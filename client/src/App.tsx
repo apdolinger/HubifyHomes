@@ -19,6 +19,7 @@ import PropertyCenter from "@/pages/PropertyCenter";
 import Admin from "@/pages/Admin";
 import Account from "@/pages/Account";
 import SuperAdmin from "@/pages/SuperAdmin";
+import OrganizationProfile from "@/pages/OrganizationProfile";
 import Navigation from "@/components/Navigation";
 import QuickSearchModal from "@/components/QuickSearchModal";
 import QuickAddTaskModal from "@/components/QuickAddTaskModal";
@@ -46,6 +47,7 @@ function Router() {
           <Route path="/admin" component={Admin} />
           <Route path="/super-admin" component={Account} />
           <Route path="/nestive-admin" component={SuperAdmin} />
+          <Route path="/nestive-admin/organization/:id" component={OrganizationProfile} />
         </>
       )}
       <Route component={NotFound} />
