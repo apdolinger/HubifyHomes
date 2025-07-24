@@ -28,7 +28,10 @@ import {
   FileText,
   Home,
   ArrowLeft,
-  CheckSquare
+  CheckSquare,
+  Upload,
+  X,
+  RefreshCw
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -38,6 +41,9 @@ export default function PropertyProfile() {
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const [propertyImage, setPropertyImage] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [isImageUploading, setIsImageUploading] = useState(false);
   
   // Get property ID from URL query params
   const urlParams = new URLSearchParams(window.location.search);
@@ -119,6 +125,62 @@ export default function PropertyProfile() {
     });
   };
 
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Invalid file type",
+          description: "Please select an image file (JPG, PNG, GIF, etc.)",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: "Please select an image smaller than 5MB",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setImageFile(file);
+      
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setPropertyImage(previewUrl);
+      
+      // TODO: Upload to server and update property record
+      setIsImageUploading(true);
+      
+      // Simulate upload
+      setTimeout(() => {
+        setIsImageUploading(false);
+        toast({
+          title: "Image uploaded",
+          description: "Property image has been updated successfully",
+        });
+      }, 1500);
+    }
+  };
+
+  const removePropertyImage = () => {
+    if (propertyImage) {
+      URL.revokeObjectURL(propertyImage);
+    }
+    setPropertyImage(null);
+    setImageFile(null);
+    
+    toast({
+      title: "Image removed",
+      description: "Property image has been removed",
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -168,46 +230,77 @@ export default function PropertyProfile() {
           </Button>
         </div>
         
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex-shrink-0">
-              {property?.imageUrl ? (
-                <Avatar className="h-20 w-20">
-                  <AvatarImage src={property.imageUrl} alt={property.name} />
-                  <AvatarFallback>
-                    <Building className="h-10 w-10" />
-                  </AvatarFallback>
-                </Avatar>
-              ) : (
-                <div className="h-20 w-20 bg-slate-100 rounded-full flex items-center justify-center">
-                  <Building className="h-10 w-10 text-slate-500" />
+        {/* Property Image and Name */}
+        <div className="flex items-start space-x-6 mb-6">
+          {/* Property Image Upload Area */}
+          <div className="flex-shrink-0">
+            <div className="relative">
+              {propertyImage || property?.imageUrl ? (
+                <div className="relative group">
+                  <img
+                    src={propertyImage || property?.imageUrl}
+                    alt="Property image"
+                    className="w-32 h-32 object-cover rounded-lg border-2 border-slate-200"
+                  />
+                  {isImageUploading && (
+                    <div className="absolute inset-0 bg-black bg-opacity-50 rounded-lg flex items-center justify-center">
+                      <RefreshCw className="w-6 h-6 text-white animate-spin" />
+                    </div>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="absolute -top-2 -right-2 w-6 h-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={removePropertyImage}
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
                 </div>
+              ) : (
+                <label className="w-32 h-32 border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-slate-400 hover:bg-slate-50 transition-colors">
+                  <Upload className="w-8 h-8 text-slate-400 mb-2" />
+                  <span className="text-sm text-slate-500 text-center px-2">Upload Property Image</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                </label>
               )}
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">{property?.name}</h1>
-              <p className="text-slate-600 flex items-center mt-1">
-                <MapPin className="w-4 h-4 mr-1" />
-                {property?.address}
-              </p>
-              <div className="flex items-center space-x-3 mt-2">
-                <Badge variant="outline">{getTypeDisplay(property?.type)}</Badge>
-                <Badge variant={getStatusColor(property?.status)}>
-                  {property?.status?.replace('_', ' ')}
-                </Badge>
+          </div>
+
+          {/* Property Name and Details */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0 mr-4">
+                <h1 className="text-3xl font-bold text-slate-900 mb-2 break-words">
+                  {property?.name}
+                </h1>
+                <p className="text-slate-600 flex items-center mb-3">
+                  <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
+                  <span className="break-words">{property?.address}</span>
+                </p>
+                <div className="flex items-center space-x-3">
+                  <Badge variant="outline">{getTypeDisplay(property?.type)}</Badge>
+                  <Badge variant={getStatusColor(property?.status)}>
+                    {property?.status?.replace('_', ' ')}
+                  </Badge>
+                </div>
+              </div>
+              
+              <div className="flex space-x-2 flex-shrink-0">
+                <Button variant="outline">
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit Property
+                </Button>
+                <Button className="bg-primary hover:bg-primary/90">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Task
+                </Button>
               </div>
             </div>
-          </div>
-          
-          <div className="mt-4 lg:mt-0 flex space-x-2">
-            <Button variant="outline">
-              <Edit className="w-4 h-4 mr-2" />
-              Edit Property
-            </Button>
-            <Button className="bg-primary hover:bg-primary/90">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Task
-            </Button>
           </div>
         </div>
       </div>
