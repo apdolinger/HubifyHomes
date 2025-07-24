@@ -9,7 +9,7 @@ interface KeyboardHelpModalProps {
 
 export default function KeyboardHelpModal({ isOpen, onClose }: KeyboardHelpModalProps) {
   const shortcuts = [
-    { key: "Space", description: "Quick Search" },
+    { key: "S", description: "Quick Search" },
     { key: "T", description: "Add Task" },
     { key: "?", description: "Help" },
     { key: "ESC", description: "Close Modal" },

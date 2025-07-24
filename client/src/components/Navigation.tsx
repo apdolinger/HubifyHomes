@@ -111,7 +111,7 @@ export default function Navigation() {
                 id="globalSearch"
               />
               <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                <kbd className="kbd">Space</kbd>
+                <kbd className="kbd">S</kbd>
               </div>
             </div>
 

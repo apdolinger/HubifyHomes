@@ -57,7 +57,8 @@ function AuthenticatedApp() {
   const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState(false);
 
   useHotkeys({
-    " ": () => setIsQuickSearchOpen(true),
+    "s": () => setIsQuickSearchOpen(true),
+    "S": () => setIsQuickSearchOpen(true),
     "t": () => setIsQuickAddTaskOpen(true),
     "T": () => setIsQuickAddTaskOpen(true),
     "?": () => setIsKeyboardHelpOpen(true),

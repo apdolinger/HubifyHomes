@@ -36,10 +36,7 @@ export function useHotkeys(hotkeys: HotkeyConfig) {
         return;
       }
 
-      // Prevent default behavior for space key to avoid page scroll
-      if (event.key === ' ') {
-        event.preventDefault();
-      }
+      // No need to prevent default for letter keys
 
       handler();
     }
