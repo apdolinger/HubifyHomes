@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -18,14 +18,12 @@ import {
   User,
   Settings,
   HelpCircle,
-  GraduationCap,
   Calendar,
   Copy,
   MessageSquare
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { useState } from "react";
 import { useLocation } from "wouter";
 import DashboardCustomizationModal from "@/components/DashboardCustomizationModal";
 import { CalendarWidget, SupportWidget, DuplicatesWidget } from "@/components/DashboardWidgets";
@@ -38,21 +36,26 @@ export default function Dashboard() {
   const [newMessage, setNewMessage] = useState("");
   const [isCustomizationModalOpen, setIsCustomizationModalOpen] = useState(false);
   
-  // Load saved widget configuration from localStorage or use defaults
-  const [dashboardWidgets, setDashboardWidgets] = useState(() => {
-    const saved = localStorage.getItem('dashboardWidgets');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (error) {
-        console.error('Failed to parse saved dashboard widgets:', error);
-      }
-    }
-    return [{
+  // Widget icon mapping for consistent icons
+  const getWidgetIcon = (id: string) => {
+    const iconMap: Record<string, React.ReactNode> = {
+      "urgent-tasks": <AlertTriangle className="w-4 h-4" />,
+      "stats-overview": <Building className="w-4 h-4" />,
+      "team-chat": <MessageSquare className="w-4 h-4" />,
+      "recent-activity": <Clock className="w-4 h-4" />,
+      "calendar": <Calendar className="w-4 h-4" />,
+      "support": <HelpCircle className="w-4 h-4" />,
+      "duplicates": <Copy className="w-4 h-4" />
+    };
+    return iconMap[id] || <Building className="w-4 h-4" />;
+  };
+
+  // Default widget configuration
+  const getDefaultWidgets = () => [{
       id: "urgent-tasks",
       name: "Urgent Tasks",
       description: "View and manage high-priority tasks",
-      icon: <AlertTriangle className="w-4 h-4" />,
+      icon: getWidgetIcon("urgent-tasks"),
       enabled: true,
       order: 1,
       category: "content" as const
@@ -61,7 +64,7 @@ export default function Dashboard() {
       id: "stats-overview",
       name: "Statistics Overview", 
       description: "Key metrics at a glance",
-      icon: <Building className="w-4 h-4" />,
+      icon: getWidgetIcon("stats-overview"),
       enabled: true,
       order: 2,
       category: "stats" as const
@@ -70,7 +73,7 @@ export default function Dashboard() {
       id: "team-chat",
       name: "Team Chat",
       description: "Quick team communication",
-      icon: <MessageSquare className="w-4 h-4" />,
+      icon: getWidgetIcon("team-chat"),
       enabled: true,
       order: 3,
       category: "communication" as const
@@ -79,7 +82,7 @@ export default function Dashboard() {
       id: "recent-activity",
       name: "Recent Activity",
       description: "Latest system activity and updates", 
-      icon: <Clock className="w-4 h-4" />,
+      icon: getWidgetIcon("recent-activity"),
       enabled: true,
       order: 4,
       category: "content" as const
@@ -88,7 +91,7 @@ export default function Dashboard() {
       id: "calendar",
       name: "Calendar",
       description: "Upcoming events and deadlines",
-      icon: <Calendar className="w-4 h-4" />,
+      icon: getWidgetIcon("calendar"),
       enabled: false,
       order: 5,
       category: "content" as const
@@ -97,7 +100,7 @@ export default function Dashboard() {
       id: "support",
       name: "Support",
       description: "Help, training, and tips",
-      icon: <HelpCircle className="w-4 h-4" />,
+      icon: getWidgetIcon("support"),
       enabled: false,
       order: 6,
       category: "content" as const
@@ -106,11 +109,28 @@ export default function Dashboard() {
       id: "duplicates",
       name: "Duplicates", 
       description: "Flagged duplicate people or properties",
-      icon: <User className="w-4 h-4" />,
+      icon: getWidgetIcon("duplicates"),
       enabled: false,
       order: 7,
       category: "content" as const
     }];
+
+  // Load saved widget configuration from localStorage or use defaults
+  const [dashboardWidgets, setDashboardWidgets] = useState(() => {
+    const saved = localStorage.getItem('dashboardWidgets');
+    if (saved) {
+      try {
+        const savedWidgets = JSON.parse(saved);
+        // Merge saved data with default structure and add icons
+        return savedWidgets.map((savedWidget: any) => ({
+          ...savedWidget,
+          icon: getWidgetIcon(savedWidget.id)
+        }));
+      } catch (error) {
+        console.error('Failed to parse saved dashboard widgets:', error);
+      }
+    }
+    return getDefaultWidgets();
   });
 
   // Redirect if not authenticated
@@ -141,29 +161,31 @@ export default function Dashboard() {
   });
 
   // Team messages query
-  const { data: teamMessages, isLoading: messagesLoading } = useQuery({
+  const { data: teamMessages, isLoading: teamMessagesLoading } = useQuery({
     queryKey: ["/api/dashboard/team-messages"],
     enabled: isAuthenticated,
   });
 
   // Recent activity query
-  const { data: recentActivity, isLoading: activityLoading } = useQuery({
+  const { data: recentActivity, isLoading: recentActivityLoading } = useQuery({
     queryKey: ["/api/dashboard/recent-activity"],
     enabled: isAuthenticated,
   });
 
-  // Post team message mutation
-  const postMessageMutation = useMutation({
-    mutationFn: async (content: string) => {
-      const response = await apiRequest("POST", "/api/team-messages", { content });
-      return response.json();
+  // Send message mutation
+  const sendMessageMutation = useMutation({
+    mutationFn: async (message: string) => {
+      await apiRequest("/api/dashboard/team-messages", {
+        method: "POST",
+        body: { message }
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/team-messages"] });
       setNewMessage("");
       toast({
-        title: "Message Posted",
-        description: "Your message has been posted to the team.",
+        title: "Message sent",
+        description: "Your message has been sent to the team.",
       });
     },
     onError: (error) => {
@@ -180,24 +202,26 @@ export default function Dashboard() {
       }
       toast({
         title: "Error",
-        description: "Failed to post message. Please try again.",
+        description: "Failed to send message. Please try again.",
         variant: "destructive",
       });
     },
   });
 
-  // Assign task mutation
-  const assignTaskMutation = useMutation({
-    mutationFn: async ({ taskId, assignedToId }: { taskId: number; assignedToId: string }) => {
-      const response = await apiRequest("PATCH", `/api/tasks/${taskId}/assign`, { assignedToId });
-      return response.json();
+  // Complete task mutation  
+  const completeTaskMutation = useMutation({
+    mutationFn: async (taskId: number) => {
+      await apiRequest(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        body: { status: "completed" }
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/urgent-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       toast({
-        title: "Task Assigned",
-        description: "Task has been assigned successfully.",
+        title: "Task completed",
+        description: "Task has been marked as completed successfully.",
       });
     },
     onError: (error) => {
@@ -214,22 +238,19 @@ export default function Dashboard() {
       }
       toast({
         title: "Error",
-        description: "Failed to assign task. Please try again.",
+        description: "Failed to complete task. Please try again.",
         variant: "destructive",
       });
     },
   });
 
-  const handleAssignTask = (taskId: number) => {
-    if ((user as any)?.id) {
-      assignTaskMutation.mutate({ taskId, assignedToId: (user as any).id });
-    }
+  const handleSendMessage = () => {
+    if (!newMessage.trim()) return;
+    sendMessageMutation.mutate(newMessage);
   };
 
-  const handlePostMessage = () => {
-    if (newMessage.trim()) {
-      postMessageMutation.mutate(newMessage.trim());
-    }
+  const handleCompleteTask = (taskId: number) => {
+    completeTaskMutation.mutate(taskId);
   };
 
   // Get enabled widgets sorted by order
@@ -239,8 +260,16 @@ export default function Dashboard() {
 
   const handleSaveWidgets = (newWidgets: any[]) => {
     setDashboardWidgets(newWidgets);
-    // Save to localStorage for persistence
-    localStorage.setItem('dashboardWidgets', JSON.stringify(newWidgets));
+    // Save to localStorage for persistence (exclude non-serializable icon property)
+    const serializableWidgets = newWidgets.map(widget => ({
+      id: widget.id,
+      name: widget.name,
+      description: widget.description,
+      enabled: widget.enabled,
+      order: widget.order,
+      category: widget.category
+    }));
+    localStorage.setItem('dashboardWidgets', JSON.stringify(serializableWidgets));
     toast({
       title: "Dashboard Updated",
       description: "Your dashboard layout has been saved successfully.",
@@ -328,363 +357,235 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                  <Building className="w-4 h-4 text-blue-600" />
-                </div>
-              </div>
-              <div className="ml-4 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-slate-500 truncate">
-                    Total Properties
-                  </dt>
-                  <dd className="text-2xl font-semibold text-slate-900">
-                    {statsLoading ? "..." : (stats as any)?.totalProperties || 0}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                  <AlertTriangle className="w-4 h-4 text-red-600" />
-                </div>
-              </div>
-              <div className="ml-4 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-slate-500 truncate">
-                    Urgent Tasks
-                  </dt>
-                  <dd className="text-2xl font-semibold text-slate-900">
-                    {statsLoading ? "..." : (stats as any)?.urgentTasks || 0}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                  <CheckCircle className="w-4 h-4 text-green-600" />
-                </div>
-              </div>
-              <div className="ml-4 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-slate-500 truncate">
-                    Completed Today
-                  </dt>
-                  <dd className="text-2xl font-semibold text-slate-900">
-                    {statsLoading ? "..." : (stats as any)?.completedToday || 0}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                  <Users className="w-4 h-4 text-purple-600" />
-                </div>
-              </div>
-              <div className="ml-4 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-slate-500 truncate">
-                    Active Team
-                  </dt>
-                  <dd className="text-2xl font-semibold text-slate-900">
-                    {statsLoading ? "..." : (stats as any)?.activeTeam || 0}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Dashboard Widgets Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Urgent Tasks List */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Urgent Tasks</CardTitle>
-                <Badge variant="destructive">
-                  {(urgentTasks as any)?.length || 0} pending
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {urgentTasksLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                </div>
-              ) : (urgentTasks as any)?.length > 0 ? (
-                <div className="space-y-4">
-                  {(urgentTasks as any).map((task: any) => (
-                    <div key={task.id} className={getTaskCardClass(task.priority)}>
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <h4 className="text-sm font-medium text-slate-900">
-                            {task.title}
-                          </h4>
-                          {task.propertyId && (
-                            <p className="text-xs text-slate-600 mt-1">
-                              Property ID: {task.propertyId}
-                            </p>
-                          )}
-                          <div className="flex items-center space-x-2 mt-1">
-                            <Badge variant={getPriorityColor(task.priority)} className="text-xs">
-                              {task.priority}
-                            </Badge>
-                            {task.dueDate && (
-                              <span className="text-xs text-slate-500 flex items-center">
-                                <Clock className="w-3 h-3 mr-1" />
-                                Due: {new Date(task.dueDate).toLocaleDateString()}
-                              </span>
-                            )}
+      {/* Dashboard Widgets */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {enabledWidgets.map((widget) => {
+          switch (widget.id) {
+            case "urgent-tasks":
+              return (
+                <Card key={widget.id} className="lg:col-span-6">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium flex items-center">
+                      {widget.icon}
+                      <span className="ml-2">{widget.name}</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {urgentTasksLoading ? (
+                      <div className="space-y-2">
+                        <div className="h-12 bg-slate-100 rounded animate-pulse"></div>
+                        <div className="h-12 bg-slate-100 rounded animate-pulse"></div>
+                      </div>
+                    ) : urgentTasks && urgentTasks.length > 0 ? (
+                      <div className="space-y-3">
+                        {urgentTasks.slice(0, 3).map((task: any) => (
+                          <div key={task.id} className={`p-3 rounded-lg border ${getTaskCardClass(task.priority)}`}>
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <h4 className="font-medium text-sm">{task.title}</h4>
+                                <p className="text-xs text-slate-600 mt-1">
+                                  Due: {new Date(task.dueDate).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Badge variant={getPriorityColor(task.priority)} className="text-xs">
+                                  {task.priority}
+                                </Badge>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleCompleteTask(task.id)}
+                                  disabled={completeTaskMutation.isPending}
+                                  className="h-6 w-6 p-0"
+                                >
+                                  <CheckCircle className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        ))}
                         <Button
+                          variant="ghost"
                           size="sm"
-                          onClick={() => handleAssignTask(task.id)}
-                          disabled={assignTaskMutation.isPending}
-                          className="assign-button ml-4"
+                          className="w-full"
+                          onClick={() => setLocation("/tasks")}
                         >
-                          {assignTaskMutation.isPending ? "..." : "Assign"}
+                          View all tasks <ArrowRight className="w-4 h-4 ml-1" />
                         </Button>
                       </div>
-                    </div>
-                  ))}
-                  <div className="text-center pt-4">
-                    <Button variant="link" className="text-primary">
-                      View all urgent tasks <ArrowRight className="w-4 h-4 ml-1" />
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-8 text-slate-500">
-                  No urgent tasks at the moment
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                    ) : (
+                      <div className="text-center py-6 text-sm text-slate-500">
+                        <CheckCircle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                        No urgent tasks at the moment
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
 
-        {/* Team Messages */}
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Team Messages</CardTitle>
-                <Button
-                  size="sm"
-                  onClick={handlePostMessage}
-                  disabled={!newMessage.trim() || postMessageMutation.isPending}
-                  className="bg-primary hover:bg-primary/90"
-                >
-                  <Plus className="w-3 h-3 mr-1" />
-                  Post
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {messagesLoading ? (
-                <div className="flex items-center justify-center py-4">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {(teamMessages as any)?.length > 0 ? (
-                    (teamMessages as any).map((message: any) => (
-                      <div key={message.id} className="flex space-x-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={message.author?.profileImageUrl} />
-                          <AvatarFallback>
-                            <User className="w-4 h-4" />
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <div className="text-sm">
-                            <span className="font-medium text-slate-900">
-                              {message.author?.firstName} {message.author?.lastName}
-                            </span>
-                            <span className="text-slate-500 text-xs ml-2">
-                              {formatTimeAgo(message.createdAt)}
-                            </span>
-                          </div>
-                          <p className="text-sm text-slate-700 mt-1">
-                            {message.content}
-                          </p>
+            case "stats-overview":
+              return (
+                <Card key={widget.id} className="lg:col-span-6">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium flex items-center">
+                      {widget.icon}
+                      <span className="ml-2">{widget.name}</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {statsLoading ? (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="h-16 bg-slate-100 rounded animate-pulse"></div>
+                        <div className="h-16 bg-slate-100 rounded animate-pulse"></div>
+                        <div className="h-16 bg-slate-100 rounded animate-pulse"></div>
+                        <div className="h-16 bg-slate-100 rounded animate-pulse"></div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="text-center p-3">
+                          <div className="text-2xl font-bold text-primary">{stats?.totalProperties || 0}</div>
+                          <div className="text-xs text-slate-600">Properties</div>
+                        </div>
+                        <div className="text-center p-3">
+                          <div className="text-2xl font-bold text-orange-600">{stats?.urgentTasks || 0}</div>
+                          <div className="text-xs text-slate-600">Urgent Tasks</div>
+                        </div>
+                        <div className="text-center p-3">
+                          <div className="text-2xl font-bold text-green-600">{stats?.completedTasks || 0}</div>
+                          <div className="text-xs text-slate-600">Completed</div>
+                        </div>
+                        <div className="text-center p-3">
+                          <div className="text-2xl font-bold text-blue-600">{stats?.activeTeamMembers || 0}</div>
+                          <div className="text-xs text-slate-600">Team Members</div>
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-4 text-slate-500">
-                      No team messages yet
-                    </div>
-                  )}
-                  
-                  <div className="mt-4 space-y-2">
-                    <Textarea
-                      placeholder="Post a message to your team..."
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      rows={2}
-                      className="resize-none"
-                    />
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
 
-      {/* Additional Widgets Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
-        {/* Support Widget */}
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <HelpCircle className="w-4 h-4 mr-2" />
-                Support
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <Button variant="outline" className="w-full justify-start">
-                  <HelpCircle className="w-4 h-4 mr-2" />
-                  Need Help?
-                </Button>
-                <Button variant="outline" className="w-full justify-start">
-                  <GraduationCap className="w-4 h-4 mr-2" />
-                  Training & Tips
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Calendar Widget */}
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center">
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Calendar
-                </CardTitle>
-                <div className="flex space-x-1">
-                  <Button variant="outline" size="sm">Day</Button>
-                  <Button variant="outline" size="sm">Week</Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-slate-500">
-                <Calendar className="w-12 h-12 mx-auto mb-4 text-slate-400" />
-                <p>Calendar view coming soon</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Duplicates Widget */}
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Copy className="w-4 h-4 mr-2" />
-                Duplicates
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="text-center py-4 text-slate-500">
-                  <Copy className="w-8 h-8 mx-auto mb-2 text-slate-400" />
-                  <p className="text-sm">No duplicates found</p>
-                </div>
-                <Button variant="outline" className="w-full" size="sm">
-                  Scan for Duplicates
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Recent Activity */}
-      <div className="mt-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Clock className="w-5 h-5 mr-2" />
-              Recent Activity
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {activityLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-              </div>
-            ) : (recentActivity as any)?.length > 0 ? (
-              <div className="flow-root">
-                <ul className="-mb-8">
-                  {(recentActivity as any).map((activity: any, index: number) => (
-                    <li key={activity.id}>
-                      <div className="relative pb-8">
-                        {index !== (recentActivity as any).length - 1 && (
-                          <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-slate-200" />
-                        )}
-                        <div className="relative flex space-x-3">
-                          <div>
-                            <span className="h-8 w-8 rounded-full bg-primary flex items-center justify-center ring-8 ring-white">
-                              <CheckCircle className="w-4 h-4 text-white" />
-                            </span>
-                          </div>
-                          <div className="min-w-0 flex-1 pt-1.5">
-                            <div>
-                              <p className="text-sm text-slate-600">
-                                {activity.description}
-                              </p>
-                              <p className="text-xs text-slate-500 mt-1">
-                                {formatTimeAgo(activity.createdAt)}
+            case "team-chat":
+              return (
+                <Card key={widget.id} className="lg:col-span-6">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium flex items-center">
+                      {widget.icon}
+                      <span className="ml-2">{widget.name}</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {teamMessagesLoading ? (
+                        <div className="space-y-2">
+                          <div className="h-8 bg-slate-100 rounded animate-pulse"></div>
+                          <div className="h-8 bg-slate-100 rounded animate-pulse"></div>
+                        </div>
+                      ) : teamMessages && teamMessages.length > 0 ? (
+                        teamMessages.slice(0, 2).map((message: any) => (
+                          <div key={message.id} className="flex space-x-3">
+                            <Avatar className="h-6 w-6">
+                              <AvatarImage src={message.user?.profileImageUrl} />
+                              <AvatarFallback className="text-xs">
+                                {message.user?.firstName?.[0]}{message.user?.lastName?.[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-slate-900">{message.message}</p>
+                              <p className="text-xs text-slate-500">
+                                {message.user?.firstName} • {formatTimeAgo(message.createdAt)}
                               </p>
                             </div>
                           </div>
-                        </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-slate-500 text-center py-4">No recent messages</p>
+                      )}
+                      
+                      <div className="flex space-x-2 pt-2">
+                        <Textarea
+                          placeholder="Send a message..."
+                          value={newMessage}
+                          onChange={(e) => setNewMessage(e.target.value)}
+                          className="flex-1 min-h-0 h-8 text-xs resize-none"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              handleSendMessage();
+                            }
+                          }}
+                        />
+                        <Button
+                          size="sm"
+                          onClick={handleSendMessage}
+                          disabled={sendMessageMutation.isPending || !newMessage.trim()}
+                          className="h-8 px-3"
+                        >
+                          Send
+                        </Button>
                       </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-slate-500">
-                No recent activity
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+
+            case "recent-activity":
+              return (
+                <Card key={widget.id} className="lg:col-span-6">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium flex items-center justify-between">
+                      <div className="flex items-center">
+                        {widget.icon}
+                        <span className="ml-2">{widget.name}</span>
+                      </div>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                        <Settings className="w-3 h-3" />
+                      </Button>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {recentActivityLoading ? (
+                      <div className="space-y-2">
+                        <div className="h-8 bg-slate-100 rounded animate-pulse"></div>
+                        <div className="h-8 bg-slate-100 rounded animate-pulse"></div>
+                        <div className="h-8 bg-slate-100 rounded animate-pulse"></div>
+                      </div>
+                    ) : recentActivity && recentActivity.length > 0 ? (
+                      <div className="space-y-3">
+                        {recentActivity.slice(0, 4).map((activity: any) => (
+                          <div key={activity.id} className="flex items-start space-x-3">
+                            <div className="flex-shrink-0 mt-0.5">
+                              <User className="w-4 h-4 text-slate-400" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-slate-900">{activity.description}</p>
+                              <p className="text-xs text-slate-500">{formatTimeAgo(activity.createdAt)}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 text-sm text-slate-500">
+                        <Clock className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                        No recent activity
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+
+            case "calendar":
+              return <CalendarWidget key={widget.id} />;
+
+            case "support":
+              return <SupportWidget key={widget.id} />;
+
+            case "duplicates":
+              return <DuplicatesWidget key={widget.id} />;
+
+            default:
+              return null;
+          }
+        })}
       </div>
 
       {/* Dashboard Customization Modal */}

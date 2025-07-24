@@ -100,6 +100,20 @@ export default function DashboardCustomizationModal({
 
 
 
+  // Get widget icon based on ID
+  const getWidgetIcon = (id: string) => {
+    const iconMap: Record<string, React.ReactNode> = {
+      "urgent-tasks": <AlertTriangle className="w-4 h-4" />,
+      "stats-overview": <Building className="w-4 h-4" />,
+      "team-chat": <MessageSquare className="w-4 h-4" />,
+      "recent-activity": <Clock className="w-4 h-4" />,
+      "calendar": <Calendar className="w-4 h-4" />,
+      "support": <HelpCircle className="w-4 h-4" />,
+      "duplicates": <UserX className="w-4 h-4" />
+    };
+    return iconMap[id] || <Building className="w-4 h-4" />;
+  };
+
   const handleReset = () => {
     // Reset to default configuration
     const defaultWidgets: Widget[] = [
@@ -107,7 +121,7 @@ export default function DashboardCustomizationModal({
         id: "urgent-tasks",
         name: "Urgent Tasks",
         description: "View and manage high-priority tasks",
-        icon: <AlertTriangle className="w-4 h-4" />,
+        icon: getWidgetIcon("urgent-tasks"),
         enabled: true,
         order: 1,
         category: "content"
@@ -116,7 +130,7 @@ export default function DashboardCustomizationModal({
         id: "stats-overview",
         name: "Statistics Overview",
         description: "Key metrics at a glance",
-        icon: <Building className="w-4 h-4" />,
+        icon: getWidgetIcon("stats-overview"),
         enabled: true,
         order: 2,
         category: "stats"
@@ -125,7 +139,7 @@ export default function DashboardCustomizationModal({
         id: "team-chat",
         name: "Team Chat",
         description: "Quick team communication",
-        icon: <MessageSquare className="w-4 h-4" />,
+        icon: getWidgetIcon("team-chat"),
         enabled: true,
         order: 3,
         category: "communication"
@@ -134,7 +148,7 @@ export default function DashboardCustomizationModal({
         id: "recent-activity",
         name: "Recent Activity",
         description: "Latest system activity and updates",
-        icon: <Clock className="w-4 h-4" />,
+        icon: getWidgetIcon("recent-activity"),
         enabled: true,
         order: 4,
         category: "content"
@@ -143,7 +157,7 @@ export default function DashboardCustomizationModal({
         id: "calendar",
         name: "Calendar",
         description: "Upcoming events and deadlines",
-        icon: <Calendar className="w-4 h-4" />,
+        icon: getWidgetIcon("calendar"),
         enabled: false,
         order: 5,
         category: "content"
@@ -152,7 +166,7 @@ export default function DashboardCustomizationModal({
         id: "support",
         name: "Support",
         description: "Help, training, and tips",
-        icon: <HelpCircle className="w-4 h-4" />,
+        icon: getWidgetIcon("support"),
         enabled: false,
         order: 6,
         category: "content"
@@ -161,7 +175,7 @@ export default function DashboardCustomizationModal({
         id: "duplicates",
         name: "Duplicates",
         description: "Flagged duplicate people or properties",
-        icon: <UserX className="w-4 h-4" />,
+        icon: getWidgetIcon("duplicates"),
         enabled: false,
         order: 7,
         category: "content"
