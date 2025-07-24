@@ -80,6 +80,122 @@ export default function TaskProfile() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isImageUploading, setIsImageUploading] = useState(false);
 
+  // Task templates
+  const taskTemplates = {
+    "weekly-inspection": {
+      title: "Weekly Property Inspection",
+      category: "inspection",
+      priority: "normal",
+      description: "Conduct thorough weekly inspection of property including:\n• Check exterior condition\n• Inspect HVAC systems\n• Test smoke and carbon monoxide detectors\n• Review security systems\n• Document any maintenance needs",
+      timeEstimate: "2 hours",
+      checklist: [
+        { id: "1", text: "Inspect exterior walls and roof", completed: false },
+        { id: "2", text: "Check HVAC filter and operation", completed: false },
+        { id: "3", text: "Test smoke detectors", completed: false },
+        { id: "4", text: "Check security system functionality", completed: false },
+        { id: "5", text: "Document findings in report", completed: false }
+      ]
+    },
+    "monthly-maintenance": {
+      title: "Monthly Maintenance Review",
+      category: "maintenance",
+      priority: "high",
+      description: "Comprehensive monthly maintenance tasks:\n• Deep clean common areas\n• Service mechanical equipment\n• Update maintenance logs\n• Plan upcoming repairs\n• Review vendor contracts",
+      timeEstimate: "4 hours",
+      checklist: [
+        { id: "1", text: "Deep clean all common areas", completed: false },
+        { id: "2", text: "Service HVAC equipment", completed: false },
+        { id: "3", text: "Update maintenance logs", completed: false },
+        { id: "4", text: "Review and plan repairs", completed: false },
+        { id: "5", text: "Check vendor contract status", completed: false }
+      ]
+    },
+    "quarterly-review": {
+      title: "Quarterly Property Review",
+      category: "administrative",
+      priority: "high", 
+      description: "Comprehensive quarterly assessment:\n• Financial review and budgeting\n• Tenant satisfaction survey\n• Maintenance planning for next quarter\n• Insurance and compliance review\n• Strategic planning updates",
+      timeEstimate: "6 hours",
+      checklist: [
+        { id: "1", text: "Review quarterly financials", completed: false },
+        { id: "2", text: "Conduct tenant satisfaction survey", completed: false },
+        { id: "3", text: "Plan maintenance for next quarter", completed: false },
+        { id: "4", text: "Review insurance compliance", completed: false },
+        { id: "5", text: "Update strategic plans", completed: false }
+      ]
+    },
+    "emergency-repair": {
+      title: "Emergency Repair Response",
+      category: "repair",
+      priority: "urgent",
+      description: "Immediate response to emergency repair situation:\n• Assess damage and safety risks\n• Contact emergency services if needed\n• Implement temporary solutions\n• Coordinate with vendors\n• Document incident thoroughly",
+      timeEstimate: "Varies",
+      checklist: [
+        { id: "1", text: "Assess safety and damage", completed: false },
+        { id: "2", text: "Contact emergency services if needed", completed: false },
+        { id: "3", text: "Implement temporary fixes", completed: false },
+        { id: "4", text: "Contact repair vendors", completed: false },
+        { id: "5", text: "Document incident and costs", completed: false }
+      ]
+    },
+    "cleaning-checklist": {
+      title: "Deep Cleaning Service",
+      category: "cleaning",
+      priority: "normal",
+      description: "Comprehensive cleaning service including:\n• All interior surfaces and fixtures\n• Window cleaning inside and out\n• Floor deep cleaning and maintenance\n• Sanitization of high-touch areas\n• Restocking of supplies",
+      timeEstimate: "3 hours",
+      checklist: [
+        { id: "1", text: "Clean all interior surfaces", completed: false },
+        { id: "2", text: "Clean windows inside and out", completed: false },
+        { id: "3", text: "Deep clean and maintain floors", completed: false },
+        { id: "4", text: "Sanitize high-touch areas", completed: false },
+        { id: "5", text: "Restock cleaning supplies", completed: false }
+      ]
+    },
+    "hvac-maintenance": {
+      title: "HVAC System Maintenance",
+      category: "maintenance",
+      priority: "high",
+      description: "Regular HVAC system maintenance:\n• Replace air filters\n• Clean and inspect ductwork\n• Check thermostat calibration\n• Inspect and clean outdoor units\n• Test system efficiency",
+      timeEstimate: "2.5 hours",
+      checklist: [
+        { id: "1", text: "Replace all air filters", completed: false },
+        { id: "2", text: "Clean and inspect ductwork", completed: false },
+        { id: "3", text: "Calibrate thermostats", completed: false },
+        { id: "4", text: "Clean outdoor units", completed: false },
+        { id: "5", text: "Test system efficiency", completed: false }
+      ]
+    },
+    "landscaping": {
+      title: "Landscaping Maintenance",
+      category: "maintenance",
+      priority: "normal",
+      description: "Seasonal landscaping maintenance:\n• Lawn mowing and edging\n• Pruning shrubs and trees\n• Weed control and fertilization\n• Irrigation system check\n• Seasonal plantings",
+      timeEstimate: "4 hours",
+      checklist: [
+        { id: "1", text: "Mow and edge all lawn areas", completed: false },
+        { id: "2", text: "Prune shrubs and trees", completed: false },
+        { id: "3", text: "Apply weed control and fertilizer", completed: false },
+        { id: "4", text: "Check irrigation system", completed: false },
+        { id: "5", text: "Install seasonal plantings", completed: false }
+      ]
+    },
+    "security-check": {
+      title: "Security System Check",
+      category: "inspection",
+      priority: "high",
+      description: "Comprehensive security system review:\n• Test all security cameras\n• Check door and window sensors\n• Verify alarm system functionality\n• Update access codes if needed\n• Review security logs",
+      timeEstimate: "1.5 hours",
+      checklist: [
+        { id: "1", text: "Test all security cameras", completed: false },
+        { id: "2", text: "Check door and window sensors", completed: false },
+        { id: "3", text: "Test alarm system", completed: false },
+        { id: "4", text: "Update access codes", completed: false },
+        { id: "5", text: "Review security logs", completed: false }
+      ]
+    }
+  };
+
   // Get task ID from URL params or localStorage
   const taskId = new URLSearchParams(window.location.search).get('id') || localStorage.getItem('selectedTaskId');
 
@@ -202,6 +318,27 @@ export default function TaskProfile() {
         isRecurring: (task as any).isRecurring || false,
         recurrenceFrequency: (task as any).recurrenceFrequency || "",
         propertyId: (task as any).propertyId || ""
+      });
+    }
+  };
+
+  const handleTemplateSelect = (templateId: string) => {
+    if (templateId === "none") return;
+    
+    const template = taskTemplates[templateId as keyof typeof taskTemplates];
+    if (template) {
+      setEditForm({
+        ...editForm,
+        title: template.title,
+        description: template.description,
+        category: template.category,
+        priority: template.priority,
+        timeEstimate: template.timeEstimate
+      });
+      setChecklist(template.checklist);
+      toast({
+        title: "Template Applied",
+        description: `${template.title} template has been applied to the task.`,
       });
     }
   };
@@ -574,10 +711,33 @@ export default function TaskProfile() {
               </DialogTrigger>
               <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Edit Task</DialogTitle>
-                  <DialogDescription>
-                    Update task details, checklist items, and other information.
-                  </DialogDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <DialogTitle>Edit Task</DialogTitle>
+                      <DialogDescription>
+                        Update task details, checklist items, and other information.
+                      </DialogDescription>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Label htmlFor="task-template" className="text-sm font-medium">Template:</Label>
+                      <Select onValueChange={handleTemplateSelect}>
+                        <SelectTrigger className="w-48">
+                          <SelectValue placeholder="Select template" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No Template</SelectItem>
+                          <SelectItem value="weekly-inspection">Weekly Inspection</SelectItem>
+                          <SelectItem value="monthly-maintenance">Monthly Maintenance</SelectItem>
+                          <SelectItem value="quarterly-review">Quarterly Review</SelectItem>
+                          <SelectItem value="emergency-repair">Emergency Repair</SelectItem>
+                          <SelectItem value="cleaning-checklist">Cleaning Checklist</SelectItem>
+                          <SelectItem value="hvac-maintenance">HVAC Maintenance</SelectItem>
+                          <SelectItem value="landscaping">Landscaping Tasks</SelectItem>
+                          <SelectItem value="security-check">Security Check</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </DialogHeader>
                 
                 {/* Edit Modal Content */}
