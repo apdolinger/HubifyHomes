@@ -32,8 +32,30 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+      {/* Top Header with Login */}
+      <header className="bg-blue-600 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center">
+              <h1 className="text-xl font-bold text-white">
+                Nestive
+              </h1>
+            </div>
+            <div>
+              <Button 
+                onClick={handleLogin}
+                variant="ghost"
+                className="text-white hover:bg-blue-700 hover:text-white"
+              >
+                Login
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
+        {/* Main Header */}
         <div className="pt-16 pb-8">
           <div className="text-center">
             <h1 className="text-4xl font-bold text-slate-900 sm:text-5xl md:text-6xl">
