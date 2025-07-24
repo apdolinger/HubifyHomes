@@ -192,7 +192,37 @@ export class DatabaseStorage implements IStorage {
 
   // Task operations
   async getTasks(): Promise<Task[]> {
-    return await db.select().from(tasks).orderBy(desc(tasks.createdAt));
+    return await db.select({
+      id: tasks.id,
+      title: tasks.title,
+      description: tasks.description,
+      priority: tasks.priority,
+      status: tasks.status,
+      propertyId: tasks.propertyId,
+      assignedToId: tasks.assignedToId,
+      assignedById: tasks.assignedById,
+      dueDate: tasks.dueDate,
+      completedAt: tasks.completedAt,
+      createdAt: tasks.createdAt,
+      updatedAt: tasks.updatedAt,
+      property: {
+        id: properties.id,
+        name: properties.name,
+        address: properties.address,
+        type: properties.type,
+      },
+      assignedUser: {
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        profileImageUrl: users.profileImageUrl,
+      }
+    })
+    .from(tasks)
+    .leftJoin(properties, eq(tasks.propertyId, properties.id))
+    .leftJoin(users, eq(tasks.assignedToId, users.id))
+    .orderBy(desc(tasks.createdAt));
   }
 
   async getTasksByProperty(propertyId: number): Promise<Task[]> {
@@ -221,7 +251,41 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTask(id: number): Promise<Task | undefined> {
-    const [task] = await db.select().from(tasks).where(eq(tasks.id, id));
+    const [task] = await db.select({
+      id: tasks.id,
+      title: tasks.title,
+      description: tasks.description,
+      priority: tasks.priority,
+      status: tasks.status,
+      propertyId: tasks.propertyId,
+      assignedToId: tasks.assignedToId,
+      assignedById: tasks.assignedById,
+      dueDate: tasks.dueDate,
+      completedAt: tasks.completedAt,
+      createdAt: tasks.createdAt,
+      updatedAt: tasks.updatedAt,
+      property: {
+        id: properties.id,
+        name: properties.name,
+        address: properties.address,
+        type: properties.type,
+        units: properties.units,
+        status: properties.status,
+        squareFootage: properties.squareFootage,
+        billingType: properties.billingType,
+      },
+      assignedUser: {
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        profileImageUrl: users.profileImageUrl,
+      }
+    })
+    .from(tasks)
+    .leftJoin(properties, eq(tasks.propertyId, properties.id))
+    .leftJoin(users, eq(tasks.assignedToId, users.id))
+    .where(eq(tasks.id, id));
     return task;
   }
 

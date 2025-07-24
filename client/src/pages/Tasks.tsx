@@ -133,17 +133,17 @@ export default function Tasks() {
                     )}
                     
                     <div className="flex items-center space-x-4 text-sm text-slate-500">
-                      {task.propertyId && (
+                      {task.property && (
                         <div className="flex items-center">
                           <Building className="w-4 h-4 mr-1" />
-                          Property ID: {task.propertyId}
+                          {task.property.name}
                         </div>
                       )}
                       
-                      {task.assignedToId && (
+                      {task.assignedUser && (
                         <div className="flex items-center">
                           <User className="w-4 h-4 mr-1" />
-                          Assigned
+                          {task.assignedUser.firstName} {task.assignedUser.lastName}
                         </div>
                       )}
                       

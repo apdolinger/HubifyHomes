@@ -66,7 +66,8 @@ export default function TaskProfile() {
     timeEstimate: "",
     category: "",
     isRecurring: false,
-    recurrenceFrequency: ""
+    recurrenceFrequency: "",
+    propertyId: ""
   });
   const [checklist, setChecklist] = useState<Array<{id: string, text: string, completed: boolean}>>([]);
   const [newChecklistItem, setNewChecklistItem] = useState("");
@@ -124,7 +125,7 @@ export default function TaskProfile() {
         title: "Success",
         description: "Task updated successfully",
       });
-      setIsEditing(false);
+      // Task updated successfully
     },
     onError: (error) => {
       toast({
@@ -147,7 +148,8 @@ export default function TaskProfile() {
         timeEstimate: (task as any).timeEstimate || "",
         category: (task as any).category || "",
         isRecurring: (task as any).isRecurring || false,
-        recurrenceFrequency: (task as any).recurrenceFrequency || ""
+        recurrenceFrequency: (task as any).recurrenceFrequency || "",
+        propertyId: (task as any).propertyId || ""
       });
       
       // Initialize checklist, attachments, etc. from task data
@@ -183,7 +185,8 @@ export default function TaskProfile() {
         timeEstimate: (task as any).timeEstimate || "",
         category: (task as any).category || "",
         isRecurring: (task as any).isRecurring || false,
-        recurrenceFrequency: (task as any).recurrenceFrequency || ""
+        recurrenceFrequency: (task as any).recurrenceFrequency || "",
+        propertyId: (task as any).propertyId || ""
       });
     }
   };
@@ -234,7 +237,7 @@ export default function TaskProfile() {
       const comment = {
         id: Date.now().toString(),
         text: newComment.trim(),
-        author: user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : "Current User",
+        author: "Current User", // TODO: Use actual user data when available
         timestamp: new Date().toISOString()
       };
       setComments([...comments, comment]);
@@ -440,6 +443,32 @@ export default function TaskProfile() {
                           <SelectItem value="user3">Mike Wilson</SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-property">Property</Label>
+                      <Select 
+                        value={editForm.propertyId}
+                        onValueChange={(value) => setEditForm({ ...editForm, propertyId: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select property" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">Main Office Building</SelectItem>
+                          <SelectItem value="2">Residential Complex A</SelectItem>
+                          <SelectItem value="3">Commercial Plaza</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-tags">Tags (Optional)</Label>
+                      <Input
+                        id="edit-tags"
+                        placeholder="maintenance, urgent, inspection"
+                      />
                     </div>
                   </div>
 
@@ -710,7 +739,7 @@ export default function TaskProfile() {
                 </CardContent>
               </Card>
 
-              {(task as any).propertyId && (
+              {(task as any).property && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center">
@@ -722,15 +751,44 @@ export default function TaskProfile() {
                     <div className="space-y-3">
                       <div>
                         <Label className="text-sm font-medium text-slate-500">Property</Label>
-                        <p className="font-medium">{(task as any).property?.name || "Unknown Property"}</p>
+                        <Button
+                          variant="link"
+                          className="p-0 h-auto font-medium text-blue-600 hover:text-blue-800"
+                          onClick={() => navigate(`/property-profile?id=${(task as any).property.id}`)}
+                        >
+                          {(task as any).property.name}
+                        </Button>
                       </div>
                       <div>
                         <Label className="text-sm font-medium text-slate-500">Address</Label>
-                        <p className="text-slate-700">{(task as any).property?.address || "Address not available"}</p>
+                        <p className="text-slate-700">{(task as any).property.address}</p>
                       </div>
-                      <div>
-                        <Label className="text-sm font-medium text-slate-500">Type</Label>
-                        <p className="text-slate-700 capitalize">{(task as any).property?.type || "Unknown"}</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-slate-500">Type</Label>
+                          <p className="text-slate-700 capitalize">{(task as any).property.type}</p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-slate-500">Units</Label>
+                          <p className="text-slate-700">{(task as any).property.units || 1}</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-slate-500">Status</Label>
+                          <Badge variant="outline" className="capitalize">
+                            {(task as any).property.status}
+                          </Badge>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-slate-500">Square Footage</Label>
+                          <p className="text-slate-700">
+                            {(task as any).property.squareFootage ? 
+                              `${(task as any).property.squareFootage.toLocaleString()} sq ft` : 
+                              'Not specified'
+                            }
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
