@@ -84,7 +84,7 @@ export default function Tasks() {
       <div className="mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Tasks</h1>
+            <h1 className="text-3xl font-bold text-slate-900">Tasks</h1>
             <p className="mt-1 text-sm text-slate-600">
               Manage and track all your tasks
             </p>
@@ -98,101 +98,93 @@ export default function Tasks() {
         </div>
       </div>
 
-      {/* Tasks List */}
-      <div className="space-y-4">
+      {/* Tasks Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {tasksLoading ? (
-          <div className="flex items-center justify-center py-12">
+          <div className="col-span-full flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         ) : tasks?.length > 0 ? (
           tasks.map((task: any) => (
             <Card 
               key={task.id} 
-              className="cursor-pointer hover:shadow-md transition-shadow"
+              className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:-translate-y-1"
               onClick={() => handleTaskClick(task.id)}
             >
-              <CardContent className="p-6">
+              <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <h3 className="text-lg font-medium text-slate-900">
-                        {task.title}
-                      </h3>
-                      <Badge variant={getPriorityColor(task.priority)}>
+                    <CardTitle className="text-lg font-semibold text-slate-900 mb-2">
+                      {task.title}
+                    </CardTitle>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant={getPriorityColor(task.priority)} className="text-xs">
                         {task.priority}
                       </Badge>
-                      <Badge variant={getStatusColor(task.status)}>
+                      <Badge variant={getStatusColor(task.status)} className="text-xs">
                         {task.status.replace('_', ' ')}
                       </Badge>
                     </div>
-                    
-                    {task.description && (
-                      <p className="text-slate-600 mb-3">
-                        {task.description}
-                      </p>
-                    )}
-                    
-                    <div className="flex items-center space-x-4 text-sm text-slate-500">
-                      {task.property && (
-                        <div className="flex items-center">
-                          <Building className="w-4 h-4 mr-1" />
-                          {task.property.name}
-                        </div>
-                      )}
-                      
-                      {task.assignedUser && (
-                        <div className="flex items-center">
-                          <User className="w-4 h-4 mr-1" />
-                          {task.assignedUser.firstName} {task.assignedUser.lastName}
-                        </div>
-                      )}
-                      
-                      {task.dueDate && (
-                        <div className="flex items-center">
-                          <Clock className="w-4 h-4 mr-1" />
-                          Due: {new Date(task.dueDate).toLocaleDateString()}
-                        </div>
-                      )}
-                      
-                      <div>
-                        Created: {new Date(task.createdAt).toLocaleDateString()}
-                      </div>
-                    </div>
                   </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {task.description && (
+                  <p className="text-slate-600 text-sm mb-4 line-clamp-2">
+                    {task.description}
+                  </p>
+                )}
+                
+                <div className="space-y-2">
+                  {task.property && (
+                    <div className="flex items-center text-sm text-slate-600">
+                      <Building className="w-4 h-4 mr-2 text-slate-400" />
+                      <span className="truncate">{task.property.name}</span>
+                    </div>
+                  )}
                   
-                  <div className="flex space-x-2 ml-4">
-                    {task.status === 'pending' && (
-                      <Button size="sm" variant="outline">
-                        Assign
-                      </Button>
-                    )}
-                    
-                    {task.status !== 'completed' && (
-                      <Button size="sm">
-                        Mark Complete
-                      </Button>
-                    )}
+                  {task.assignedUser && (
+                    <div className="flex items-center text-sm text-slate-600">
+                      <User className="w-4 h-4 mr-2 text-slate-400" />
+                      <span className="truncate">
+                        {task.assignedUser.firstName} {task.assignedUser.lastName}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {task.dueDate && (
+                    <div className="flex items-center text-sm text-slate-600">
+                      <Clock className="w-4 h-4 mr-2 text-slate-400" />
+                      <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center text-sm text-slate-500">
+                    <CheckSquare className="w-4 h-4 mr-2 text-slate-400" />
+                    <span>Created: {new Date(task.createdAt).toLocaleDateString()}</span>
                   </div>
                 </div>
               </CardContent>
             </Card>
           ))
         ) : (
-          <Card>
-            <CardContent className="text-center py-12">
-              <CheckSquare className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-slate-900 mb-2">
-                No tasks yet
-              </h3>
-              <p className="text-slate-600 mb-4">
-                Create your first task to get started
-              </p>
-              <Button>
-                <CheckSquare className="w-4 h-4 mr-2" />
-                Add Task
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="col-span-full">
+            <Card>
+              <CardContent className="text-center py-12">
+                <CheckSquare className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-slate-900 mb-2">
+                  No tasks yet
+                </h3>
+                <p className="text-slate-600 mb-4">
+                  Create your first task to get started
+                </p>
+                <Button>
+                  <CheckSquare className="w-4 h-4 mr-2" />
+                  Add Task
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
     </main>
