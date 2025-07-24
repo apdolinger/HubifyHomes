@@ -51,7 +51,11 @@ export default function PropertyProfile() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     name: "",
-    address: "",
+    address1: "",
+    address2: "",
+    city: "",
+    state: "",
+    zip: "",
     type: "",
     status: "",
     squareFootage: "",
@@ -230,12 +234,29 @@ export default function PropertyProfile() {
     });
   };
 
+  // Helper function to format full address display
+  const formatFullAddress = (property: any) => {
+    if (!property) return "";
+    const parts = [
+      property.address1,
+      property.address2,
+      property.city,
+      property.state,
+      property.zip
+    ].filter(Boolean);
+    return parts.join(", ");
+  };
+
   // Initialize edit form when property data changes
   useEffect(() => {
     if (property && !isEditModalOpen) {
       setEditForm({
         name: (property as any)?.name || "",
-        address: (property as any)?.address || "",
+        address1: (property as any)?.address1 || (property as any)?.address || "",
+        address2: (property as any)?.address2 || "",
+        city: (property as any)?.city || "",
+        state: (property as any)?.state || "",
+        zip: (property as any)?.zip || "",
         type: (property as any)?.type || "",
         status: (property as any)?.status || "",
         squareFootage: (property as any)?.squareFootage?.toString() || "",
@@ -265,7 +286,11 @@ export default function PropertyProfile() {
     if (property) {
       setEditForm({
         name: (property as any)?.name || "",
-        address: (property as any)?.address || "",
+        address1: (property as any)?.address1 || (property as any)?.address || "",
+        address2: (property as any)?.address2 || "",
+        city: (property as any)?.city || "",
+        state: (property as any)?.state || "",
+        zip: (property as any)?.zip || "",
         type: (property as any)?.type || "",
         status: (property as any)?.status || "",
         squareFootage: (property as any)?.squareFootage?.toString() || "",
@@ -376,7 +401,7 @@ export default function PropertyProfile() {
                 </h1>
                 <p className="text-slate-600 flex items-center mb-3">
                   <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
-                  <span className="break-words">{(property as any)?.address}</span>
+                  <span className="break-words">{formatFullAddress(property)}</span>
                 </p>
                 <div className="flex items-center space-x-3">
                   <Badge variant="outline">{getTypeDisplay((property as any)?.type)}</Badge>
@@ -404,23 +429,65 @@ export default function PropertyProfile() {
                     
                     {/* Edit Modal Content */}
                     <div className="space-y-6 py-4">
+                      <div>
+                        <Label htmlFor="edit-name">Property Name</Label>
+                        <Input
+                          id="edit-name"
+                          value={editForm.name}
+                          onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                          placeholder="Enter property name"
+                        />
+                      </div>
+
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <Label htmlFor="edit-name">Property Name</Label>
+                          <Label htmlFor="edit-address1">Address Line 1</Label>
                           <Input
-                            id="edit-name"
-                            value={editForm.name}
-                            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                            placeholder="Enter property name"
+                            id="edit-address1"
+                            value={editForm.address1}
+                            onChange={(e) => setEditForm({ ...editForm, address1: e.target.value })}
+                            placeholder="Street address"
                           />
                         </div>
                         <div>
-                          <Label htmlFor="edit-address">Address</Label>
+                          <Label htmlFor="edit-address2">Address Line 2</Label>
                           <Input
-                            id="edit-address"
-                            value={editForm.address}
-                            onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                            placeholder="Enter full address"
+                            id="edit-address2"
+                            value={editForm.address2}
+                            onChange={(e) => setEditForm({ ...editForm, address2: e.target.value })}
+                            placeholder="Apt, suite, unit #"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <Label htmlFor="edit-city">City</Label>
+                          <Input
+                            id="edit-city"
+                            value={editForm.city}
+                            onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                            placeholder="City"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-state">State</Label>
+                          <Input
+                            id="edit-state"
+                            value={editForm.state}
+                            onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
+                            placeholder="State"
+                            maxLength={2}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-zip">ZIP Code</Label>
+                          <Input
+                            id="edit-zip"
+                            value={editForm.zip}
+                            onChange={(e) => setEditForm({ ...editForm, zip: e.target.value })}
+                            placeholder="ZIP"
+                            maxLength={10}
                           />
                         </div>
                       </div>

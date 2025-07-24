@@ -22,7 +22,11 @@ import { useLocation } from "wouter";
 
 const propertySchema = z.object({
   name: z.string().min(1, "Property name is required"),
-  address: z.string().min(1, "Address is required"),
+  address1: z.string().min(1, "Address line 1 is required"),
+  address2: z.string().optional(),
+  city: z.string().min(1, "City is required"),
+  state: z.string().min(2, "State is required").max(2, "State must be 2 characters"),
+  zip: z.string().min(5, "ZIP code is required"),
   type: z.enum(["single-family", "condo", "apartment", "house", "commercial"]),
   units: z.number().min(1).optional(),
   squareFootage: z.number().min(1).optional(),
@@ -70,7 +74,11 @@ export default function Properties() {
     resolver: zodResolver(propertySchema),
     defaultValues: {
       name: "",
-      address: "",
+      address1: "",
+      address2: "",
+      city: "",
+      state: "",
+      zip: "",
       type: "single-family",
       units: 1,
       status: "occupied",
@@ -161,6 +169,18 @@ export default function Properties() {
     }
   };
 
+  const formatFullAddress = (property: any) => {
+    if (!property) return "";
+    const parts = [
+      property.address1,
+      property.address2,
+      property.city,
+      property.state,
+      property.zip
+    ].filter(Boolean);
+    return parts.join(", ");
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -213,19 +233,79 @@ export default function Properties() {
                         )}
                       />
                       
-                      <FormField
-                        control={form.control}
-                        name="address"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Address</FormLabel>
-                            <FormControl>
-                              <Textarea placeholder="Enter full address" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="address1"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Address Line 1</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Street address" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="address2"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Address Line 2</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Apt, suite, unit #" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="city"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>City</FormLabel>
+                              <FormControl>
+                                <Input placeholder="City" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="state"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>State</FormLabel>
+                              <FormControl>
+                                <Input placeholder="State" maxLength={2} {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="zip"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>ZIP Code</FormLabel>
+                              <FormControl>
+                                <Input placeholder="ZIP" maxLength={10} {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
                       
                       <div className="grid grid-cols-2 gap-4">
                         <FormField
@@ -408,7 +488,7 @@ export default function Properties() {
                         )}
                       </TableCell>
                       <TableCell className="font-medium">{property.name}</TableCell>
-                      <TableCell className="text-sm text-slate-600">{property.address}</TableCell>
+                      <TableCell className="text-sm text-slate-600">{formatFullAddress(property)}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{getTypeDisplay(property.type)}</Badge>
                       </TableCell>

@@ -90,7 +90,13 @@ export default function QuickSearchModal({ isOpen, onClose }: QuickSearchModalPr
                             {property.name}
                           </div>
                           <div className="text-xs text-slate-500">
-                            Property • {property.address}
+                            Property • {[
+                              property.address1,
+                              property.address2,
+                              property.city,
+                              property.state,
+                              property.zip
+                            ].filter(Boolean).join(", ")}
                           </div>
                         </div>
                       </div>

@@ -269,7 +269,13 @@ export default function PersonProfile() {
                       <p className="font-medium">{property.name}</p>
                       <p className="text-sm text-slate-500 flex items-center">
                         <MapPin className="w-3 h-3 mr-1" />
-                        {property.address}
+                        {[
+                          property.address1,
+                          property.address2,
+                          property.city,
+                          property.state,
+                          property.zip
+                        ].filter(Boolean).join(", ")}
                       </p>
                     </div>
                     <Button

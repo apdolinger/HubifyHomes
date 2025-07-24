@@ -42,7 +42,11 @@ export const users = pgTable("users", {
 export const communities = pgTable("communities", {
   id: serial("id").primaryKey(),
   name: varchar("name").notNull(),
-  address: text("address"),
+  address1: varchar("address1"),
+  address2: varchar("address2"),
+  city: varchar("city"),
+  state: varchar("state"),
+  zip: varchar("zip"),
   imageUrl: varchar("image_url"),
   managerId: varchar("manager_id").references(() => users.id),
   hoaPresidentId: varchar("hoa_president_id").references(() => users.id),
@@ -56,7 +60,11 @@ export const communities = pgTable("communities", {
 export const properties = pgTable("properties", {
   id: serial("id").primaryKey(),
   name: varchar("name").notNull(),
-  address: text("address").notNull(),
+  address1: varchar("address1").notNull(),
+  address2: varchar("address2"),
+  city: varchar("city").notNull(),
+  state: varchar("state").notNull(),
+  zip: varchar("zip").notNull(),
   type: varchar("type").notNull(), // single-family, condo, apartment, house, commercial
   units: integer("units").default(1),
   managerId: varchar("manager_id").references(() => users.id),

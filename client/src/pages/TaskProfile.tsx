@@ -1130,7 +1130,15 @@ export default function TaskProfile() {
                       </div>
                       <div>
                         <Label className="text-sm font-medium text-slate-500">Address</Label>
-                        <p className="text-slate-700">{(task as any).property.address}</p>
+                        <p className="text-slate-700">
+                          {(task as any).property ? [
+                            (task as any).property.address1,
+                            (task as any).property.address2,
+                            (task as any).property.city,
+                            (task as any).property.state,
+                            (task as any).property.zip
+                          ].filter(Boolean).join(", ") : "No address"}
+                        </p>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>

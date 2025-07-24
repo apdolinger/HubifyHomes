@@ -178,7 +178,15 @@ export default function PropertyCenter() {
                         <CardTitle className="text-xl">{property.name}</CardTitle>
                         <div className="flex items-center text-slate-600 mt-1">
                           <MapPin className="w-4 h-4 mr-1" />
-                          <span className="text-sm">{property.address}</span>
+                          <span className="text-sm">
+                            {[
+                              property.address1,
+                              property.address2,
+                              property.city,
+                              property.state,
+                              property.zip
+                            ].filter(Boolean).join(", ")}
+                          </span>
                         </div>
                       </div>
                     </div>

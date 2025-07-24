@@ -221,7 +221,11 @@ export class DatabaseStorage implements IStorage {
       property: {
         id: properties.id,
         name: properties.name,
-        address: properties.address,
+        address1: properties.address1,
+        address2: properties.address2,
+        city: properties.city,
+        state: properties.state,
+        zip: properties.zip,
         type: properties.type,
       },
       assignedUser: {
@@ -280,7 +284,11 @@ export class DatabaseStorage implements IStorage {
       property: {
         id: properties.id,
         name: properties.name,
-        address: properties.address,
+        address1: properties.address1,
+        address2: properties.address2,
+        city: properties.city,
+        state: properties.state,
+        zip: properties.zip,
         type: properties.type,
         units: properties.units,
         status: properties.status,

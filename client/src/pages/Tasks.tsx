@@ -398,7 +398,15 @@ export default function Tasks() {
                       {task.property ? (
                         <div className="text-sm">
                           <div className="font-medium">{task.property.name}</div>
-                          <div className="text-slate-600 truncate max-w-xs">{task.property.address}</div>
+                          <div className="text-slate-600 truncate max-w-xs">
+                            {[
+                              task.property.address1,
+                              task.property.address2,
+                              task.property.city,
+                              task.property.state,
+                              task.property.zip
+                            ].filter(Boolean).join(", ")}
+                          </div>
                         </div>
                       ) : (
                         <span className="text-slate-400">No property</span>
