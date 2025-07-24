@@ -17,7 +17,7 @@ import People from "@/pages/People";
 import PersonProfile from "@/pages/PersonProfile";
 import PropertyCenter from "@/pages/PropertyCenter";
 import Admin from "@/pages/Admin";
-import SuperAdmin from "@/pages/SuperAdmin";
+import Account from "@/pages/Account";
 import Navigation from "@/components/Navigation";
 import QuickSearchModal from "@/components/QuickSearchModal";
 import QuickAddTaskModal from "@/components/QuickAddTaskModal";
@@ -43,7 +43,7 @@ function Router() {
           <Route path="/person-profile" component={PersonProfile} />
           <Route path="/property-center" component={PropertyCenter} />
           <Route path="/admin" component={Admin} />
-          <Route path="/super-admin" component={SuperAdmin} />
+          <Route path="/super-admin" component={Account} />
         </>
       )}
       <Route component={NotFound} />

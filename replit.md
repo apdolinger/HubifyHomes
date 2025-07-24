@@ -144,54 +144,73 @@ Preferred communication style: Simple, everyday language.
 - Admin panel displays appropriate role badge (Admin vs Manager access)
 - Removed gear icon from dropdown menu option as requested
 
-#### Enhanced Account Panel - Multi-Organization Management
-- Created comprehensive Account panel for platform-wide management
-- Only accessible to users with "admin" role (not managers)
-- Accessible via "Account" button in the regular Admin panel
+#### Account Settings - Business Owner Control Center
+- Redesigned Account panel as business owner control center
+- Only accessible to users with "admin" role for their own company
+- Comprehensive account management for individual organizations
 
 #### Account Panel Features Implemented:
-1. **Organizations Overview**
-   - View and manage all accounts (organizations) on Nestive
-   - Organization details: name, admin contacts, status, property/user counts, plan levels
-   - Admin functions: impersonate admin (login-as), suspend/reactivate accounts, password resets
-   - Organization status tracking: Active, Suspended, Trial, Cancelled
+1. **Account Information**
+   - Company name, logo, address, and contact information
+   - Business phone, email, billing contact management
+   - Editable fields with save functionality
+   - Professional company profile management
 
-2. **Revenue Dashboard**
-   - Platform-wide revenue tracking: MRR/ARR, churn rate, ARPU
-   - Revenue breakdown by subscription plans (Enterprise, Professional, Starter)
-   - Payment method distribution analytics
-   - Export capabilities for financial reporting
+2. **Subscription & Billing**
+   - Current plan information and status display
+   - Payment method management and updates
+   - Billing history with invoice downloads
+   - Plan upgrade/downgrade options
+   - Subscription cancellation with confirmation
 
-3. **Feature Flags & Toggles**
-   - Enable/disable beta features per organization or globally
-   - Features include: task cost tracking, community profiles, Zapier integration
-   - Organization-specific feature management
-   - White label branding controls and API access management
+3. **Custom Fields Configuration**
+   - Create, edit, and remove custom fields for properties, people, tasks
+   - Field type selection (text, dropdown, checkbox, etc.)
+   - Required/optional field settings
+   - Cross-module field usage tracking
 
-4. **Global Error Logs & Monitoring**
-   - Platform-wide error tracking and monitoring
-   - API request failure monitoring
-   - Component load issue tracking
-   - Integration failure alerts
+4. **Email Template Editor**
+   - Welcome email templates for new users
+   - Task notification templates
+   - Reminder and alert templates
+   - WYSIWYG editor with variable insertion ({{firstName}}, {{propertyName}})
+   - Template categorization and management
 
-5. **Broadcast Messaging**
-   - System-wide announcement capabilities
-   - Message types: maintenance, new features, security alerts
-   - Delivery options: in-app banners, email notifications, or both
-   - Broadcast history and delivery tracking
+5. **Task Template Manager**
+   - Create and manage reusable task sets
+   - Templates like "Weekly Inspection Checklist", "Monthly Maintenance Review"
+   - Apply templates to properties or assign to team members
+   - Template usage analytics
 
-6. **Platform Configuration**
-   - Global default settings for new organizations
-   - Legal & compliance settings (ToS, Privacy Policy URLs)
-   - White-label branding configuration
-   - API configuration and rate limiting
-   - Registration controls and timezone defaults
+6. **Report Templates**
+   - Custom report configuration (Phase 2 feature)
+   - PDF and web report generation
+   - Data source selection from properties, tasks, people
+   - Scheduled report delivery
 
-7. **License & Compliance Records**
-   - Track FFL licenses, security agreements, insurance certificates
-   - Compliance status monitoring (GDPR, CCPA, SOC 2, ISO 27001)
-   - License expiration tracking and renewal alerts
-   - Document management for legal compliance
+7. **Notification Settings**
+   - Multi-channel notification preferences (SMS, email, in-app)
+   - Category-based notification controls
+   - Delivery method selection per notification type
+   - Team-wide notification management
+
+8. **Team Roles & Permissions**
+   - Role-based access control (Field Staff, Supervisor, Admin)
+   - Permission matrix management
+   - Custom role creation and modification
+   - User assignment and override capabilities
+
+9. **Automation Rules**
+   - IF/THEN automation workflow creation (Phase 2 feature)
+   - Task automation based on conditions
+   - Email triggers and notifications
+   - Workflow optimization tools
+
+10. **Audit Log**
+    - Complete system activity tracking
+    - User action logging with timestamps
+    - Export capabilities for compliance
+    - Read-only security event monitoring
 
 #### Navigation Updates
 - Removed Admin tab from main navigation bar
