@@ -98,10 +98,7 @@ export default function PropertyProfile() {
   // Property update mutation
   const updatePropertyMutation = useMutation({
     mutationFn: async (updateData: any) => {
-      const response = await apiRequest(`/api/properties/${propertyId}`, {
-        method: "PATCH",
-        body: JSON.stringify(updateData),
-      });
+      const response = await apiRequest(`/api/properties/${propertyId}`, "PATCH", updateData);
       return response;
     },
     onSuccess: () => {
@@ -131,13 +128,13 @@ export default function PropertyProfile() {
     },
   });
 
-  const propertyContacts = contacts?.filter((contact: any) => 
+  const propertyContacts = Array.isArray(contacts) ? contacts?.filter((contact: any) => 
     contact.propertyId === parseInt(propertyId || "0")
-  );
+  ) : [];
 
-  const propertyTasks = tasks?.filter((task: any) => 
+  const propertyTasks = Array.isArray(tasks) ? tasks?.filter((task: any) => 
     task.propertyId === parseInt(propertyId || "0")
-  );
+  ) : [];
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -237,15 +234,15 @@ export default function PropertyProfile() {
   useEffect(() => {
     if (property && !isEditModalOpen) {
       setEditForm({
-        name: property.name || "",
-        address: property.address || "",
-        type: property.type || "",
-        status: property.status || "",
-        squareFootage: property.squareFootage?.toString() || "",
-        bedrooms: property.bedrooms?.toString() || "",
-        bathrooms: property.bathrooms?.toString() || "",
-        billingRate: property.billingRate?.toString() || "",
-        description: property.description || ""
+        name: (property as any)?.name || "",
+        address: (property as any)?.address || "",
+        type: (property as any)?.type || "",
+        status: (property as any)?.status || "",
+        squareFootage: (property as any)?.squareFootage?.toString() || "",
+        bedrooms: (property as any)?.bedrooms?.toString() || "",
+        bathrooms: (property as any)?.bathrooms?.toString() || "",
+        billingRate: (property as any)?.billingRate?.toString() || "",
+        description: (property as any)?.description || ""
       });
     }
   }, [property, isEditModalOpen]);
@@ -267,15 +264,15 @@ export default function PropertyProfile() {
     setIsEditModalOpen(false);
     if (property) {
       setEditForm({
-        name: property.name || "",
-        address: property.address || "",
-        type: property.type || "",
-        status: property.status || "",
-        squareFootage: property.squareFootage?.toString() || "",
-        bedrooms: property.bedrooms?.toString() || "",
-        bathrooms: property.bathrooms?.toString() || "",
-        billingRate: property.billingRate?.toString() || "",
-        description: property.description || ""
+        name: (property as any)?.name || "",
+        address: (property as any)?.address || "",
+        type: (property as any)?.type || "",
+        status: (property as any)?.status || "",
+        squareFootage: (property as any)?.squareFootage?.toString() || "",
+        bedrooms: (property as any)?.bedrooms?.toString() || "",
+        bathrooms: (property as any)?.bathrooms?.toString() || "",
+        billingRate: (property as any)?.billingRate?.toString() || "",
+        description: (property as any)?.description || ""
       });
     }
   };
@@ -334,10 +331,10 @@ export default function PropertyProfile() {
           {/* Property Image Upload Area */}
           <div className="flex-shrink-0">
             <div className="relative">
-              {propertyImage || property?.imageUrl ? (
+              {propertyImage || (property as any)?.imageUrl ? (
                 <div className="relative group">
                   <img
-                    src={propertyImage || property?.imageUrl}
+                    src={propertyImage || (property as any)?.imageUrl}
                     alt="Property image"
                     className="w-32 h-32 object-cover rounded-lg border-2 border-slate-200"
                   />
@@ -375,16 +372,16 @@ export default function PropertyProfile() {
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0 mr-4">
                 <h1 className="text-3xl font-bold text-slate-900 mb-2 break-words">
-                  {property?.name}
+                  {(property as any)?.name}
                 </h1>
                 <p className="text-slate-600 flex items-center mb-3">
                   <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
-                  <span className="break-words">{property?.address}</span>
+                  <span className="break-words">{(property as any)?.address}</span>
                 </p>
                 <div className="flex items-center space-x-3">
-                  <Badge variant="outline">{getTypeDisplay(property?.type)}</Badge>
-                  <Badge variant={getStatusColor(property?.status)}>
-                    {property?.status?.replace('_', ' ')}
+                  <Badge variant="outline">{getTypeDisplay((property as any)?.type)}</Badge>
+                  <Badge variant={getStatusColor((property as any)?.status)}>
+                    {(property as any)?.status?.replace('_', ' ')}
                   </Badge>
                 </div>
               </div>
@@ -556,34 +553,34 @@ export default function PropertyProfile() {
           <CardContent className="space-y-4">
             <div className="flex justify-between">
               <span className="text-slate-500">Type:</span>
-              <span className="font-medium">{getTypeDisplay(property?.type)}</span>
+              <span className="font-medium">{getTypeDisplay((property as any)?.type)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Status:</span>
-              <Badge variant={getStatusColor(property?.status)}>
-                {property?.status?.replace('_', ' ')}
+              <Badge variant={getStatusColor((property as any)?.status)}>
+                {(property as any)?.status?.replace('_', ' ')}
               </Badge>
             </div>
-            {property?.squareFootage && (
+            {(property as any)?.squareFootage && (
               <div className="flex justify-between">
                 <span className="text-slate-500">Square Footage:</span>
                 <span className="font-medium flex items-center">
                   <Square className="w-4 h-4 mr-1" />
-                  {property.squareFootage.toLocaleString()} sq ft
+                  {(property as any).squareFootage.toLocaleString()} sq ft
                 </span>
               </div>
             )}
-            {property?.billingType && (
+            {(property as any)?.billingType && (
               <div className="flex justify-between">
                 <span className="text-slate-500">Billing Type:</span>
                 <Badge variant="secondary">
-                  {property.billingType === 'sqft' ? 'Per Sq Ft' : 'Flat Fee'}
+                  {(property as any).billingType === 'sqft' ? 'Per Sq Ft' : 'Flat Fee'}
                 </Badge>
               </div>
             )}
             <div className="flex justify-between">
               <span className="text-slate-500">Added:</span>
-              <span className="font-medium">{formatDate(property?.createdAt)}</span>
+              <span className="font-medium">{formatDate((property as any)?.createdAt)}</span>
             </div>
           </CardContent>
         </Card>
