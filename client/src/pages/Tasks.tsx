@@ -5,7 +5,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckSquare, Clock, User, Building } from "lucide-react";
+import { CheckSquare, Clock, User, Building, Eye, Edit } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation } from "wouter";
 
 export default function Tasks() {
@@ -98,95 +100,144 @@ export default function Tasks() {
         </div>
       </div>
 
-      {/* Tasks Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {tasksLoading ? (
-          <div className="col-span-full flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        ) : tasks?.length > 0 ? (
-          tasks.map((task: any) => (
-            <Card 
-              key={task.id} 
-              className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:-translate-y-1"
-              onClick={() => handleTaskClick(task.id)}
-            >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg font-semibold text-slate-900 mb-2">
-                      {task.title}
-                    </CardTitle>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant={getPriorityColor(task.priority)} className="text-xs">
+      {/* Tasks Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Tasks List</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {tasksLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : tasks?.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Task Title</TableHead>
+                  <TableHead>Property</TableHead>
+                  <TableHead>Assigned To</TableHead>
+                  <TableHead>Priority</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Due Date</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(tasks as any[]).map((task: any) => (
+                  <TableRow 
+                    key={task.id}
+                    className="cursor-pointer hover:bg-slate-50"
+                    onClick={() => handleTaskClick(task.id)}
+                  >
+                    <TableCell className="font-medium">
+                      <div>
+                        <div className="font-semibold">{task.title}</div>
+                        {task.description && (
+                          <div className="text-sm text-slate-600 truncate max-w-xs">
+                            {task.description}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {task.property ? (
+                        <div className="text-sm">
+                          <div className="font-medium">{task.property.name}</div>
+                          <div className="text-slate-600 truncate max-w-xs">{task.property.address}</div>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">No property</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {task.assignedUser ? (
+                        <div className="flex items-center space-x-2">
+                          <Avatar className="w-6 h-6">
+                            <AvatarImage src={task.assignedUser.profileImageUrl} alt={`${task.assignedUser.firstName} ${task.assignedUser.lastName}`} />
+                            <AvatarFallback className="text-xs">
+                              {task.assignedUser.firstName?.[0]}{task.assignedUser.lastName?.[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="text-sm">
+                            <div className="font-medium">{task.assignedUser.firstName} {task.assignedUser.lastName}</div>
+                            <div className="text-slate-600">{task.assignedUser.email}</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">Unassigned</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getPriorityColor(task.priority)} className="capitalize">
                         {task.priority}
                       </Badge>
-                      <Badge variant={getStatusColor(task.status)} className="text-xs">
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getStatusColor(task.status)} className="capitalize">
                         {task.status.replace('_', ' ')}
                       </Badge>
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                {task.description && (
-                  <p className="text-slate-600 text-sm mb-4 line-clamp-2">
-                    {task.description}
-                  </p>
-                )}
-                
-                <div className="space-y-2">
-                  {task.property && (
-                    <div className="flex items-center text-sm text-slate-600">
-                      <Building className="w-4 h-4 mr-2 text-slate-400" />
-                      <span className="truncate">{task.property.name}</span>
-                    </div>
-                  )}
-                  
-                  {task.assignedUser && (
-                    <div className="flex items-center text-sm text-slate-600">
-                      <User className="w-4 h-4 mr-2 text-slate-400" />
-                      <span className="truncate">
-                        {task.assignedUser.firstName} {task.assignedUser.lastName}
+                    </TableCell>
+                    <TableCell>
+                      {task.dueDate ? (
+                        <span className="text-sm">
+                          {new Date(task.dueDate).toLocaleDateString()}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">No due date</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-slate-600">
+                        {new Date(task.createdAt).toLocaleDateString()}
                       </span>
-                    </div>
-                  )}
-                  
-                  {task.dueDate && (
-                    <div className="flex items-center text-sm text-slate-600">
-                      <Clock className="w-4 h-4 mr-2 text-slate-400" />
-                      <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
-                    </div>
-                  )}
-                  
-                  <div className="flex items-center text-sm text-slate-500">
-                    <CheckSquare className="w-4 h-4 mr-2 text-slate-400" />
-                    <span>Created: {new Date(task.createdAt).toLocaleDateString()}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        ) : (
-          <div className="col-span-full">
-            <Card>
-              <CardContent className="text-center py-12">
-                <CheckSquare className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-slate-900 mb-2">
-                  No tasks yet
-                </h3>
-                <p className="text-slate-600 mb-4">
-                  Create your first task to get started
-                </p>
-                <Button>
-                  <CheckSquare className="w-4 h-4 mr-2" />
-                  Add Task
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-2">
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleTaskClick(task.id);
+                          }}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Open edit modal - will implement later
+                          }}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-12">
+              <CheckSquare className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-slate-900 mb-2">
+                No tasks yet
+              </h3>
+              <p className="text-slate-600 mb-4">
+                Create your first task to get started
+              </p>
+              <Button>
+                <CheckSquare className="w-4 h-4 mr-2" />
+                Add Task
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </main>
   );
 }
