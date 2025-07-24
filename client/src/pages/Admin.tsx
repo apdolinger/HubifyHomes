@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -106,13 +107,12 @@ export default function Admin() {
         </div>
         <div className="flex items-center space-x-3">
           {(user as any)?.role === 'admin' && (
-            <Button 
-              onClick={() => window.location.href = '/super-admin'}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              <Shield className="w-4 h-4 mr-2" />
-              Super Admin
-            </Button>
+            <Link href="/super-admin">
+              <Button className="bg-red-600 hover:bg-red-700">
+                <Shield className="w-4 h-4 mr-2" />
+                Super Admin
+              </Button>
+            </Link>
           )}
           <Badge variant="secondary" className="px-3 py-1">
             <Shield className="w-4 h-4 mr-1" />
