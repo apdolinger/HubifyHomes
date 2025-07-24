@@ -36,7 +36,8 @@ export function useHotkeys(hotkeys: HotkeyConfig) {
         return;
       }
 
-      // No need to prevent default for letter keys
+      // Prevent default behavior to stop the key from being typed
+      event.preventDefault();
 
       handler();
     }
