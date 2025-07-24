@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -42,6 +42,13 @@ export default function DashboardCustomizationModal({
 }: DashboardCustomizationModalProps) {
   const [widgets, setWidgets] = useState<Widget[]>(currentWidgets);
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
+
+  // Update widgets when modal opens or currentWidgets change
+  useEffect(() => {
+    if (isOpen) {
+      setWidgets(currentWidgets);
+    }
+  }, [isOpen, currentWidgets]);
 
   const toggleWidget = (id: string) => {
     setWidgets(prev => prev.map(widget => 
@@ -91,10 +98,7 @@ export default function DashboardCustomizationModal({
     setDraggedItem(null);
   };
 
-  const handleSave = () => {
-    onSave(widgets);
-    onClose();
-  };
+
 
   const handleReset = () => {
     // Reset to default configuration
@@ -273,7 +277,10 @@ export default function DashboardCustomizationModal({
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button onClick={handleSave}>
+            <Button onClick={() => {
+              onSave([...widgets]); // Pass a copy to ensure state update
+              onClose();
+            }}>
               Save Changes
             </Button>
           </div>

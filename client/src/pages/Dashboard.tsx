@@ -38,9 +38,17 @@ export default function Dashboard() {
   const [newMessage, setNewMessage] = useState("");
   const [isCustomizationModalOpen, setIsCustomizationModalOpen] = useState(false);
   
-  // Default widget configuration
-  const [dashboardWidgets, setDashboardWidgets] = useState([
-    {
+  // Load saved widget configuration from localStorage or use defaults
+  const [dashboardWidgets, setDashboardWidgets] = useState(() => {
+    const saved = localStorage.getItem('dashboardWidgets');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (error) {
+        console.error('Failed to parse saved dashboard widgets:', error);
+      }
+    }
+    return [{
       id: "urgent-tasks",
       name: "Urgent Tasks",
       description: "View and manage high-priority tasks",
@@ -102,8 +110,8 @@ export default function Dashboard() {
       enabled: false,
       order: 7,
       category: "content" as const
-    }
-  ]);
+    }];
+  });
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -231,6 +239,8 @@ export default function Dashboard() {
 
   const handleSaveWidgets = (newWidgets: any[]) => {
     setDashboardWidgets(newWidgets);
+    // Save to localStorage for persistence
+    localStorage.setItem('dashboardWidgets', JSON.stringify(newWidgets));
     toast({
       title: "Dashboard Updated",
       description: "Your dashboard layout has been saved successfully.",
