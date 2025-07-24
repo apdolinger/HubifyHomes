@@ -154,7 +154,7 @@ export default function TaskProfile() {
       setChecklist((task as any).checklist || []);
       setAttachments((task as any).attachments || []);
       setQuickLinks((task as any).quickLinks || []);
-      setComments((task as any).comments || fetchedComments || []);
+      setComments((task as any).comments || []);
     }
   }, [task, isEditModalOpen]);
 
@@ -234,7 +234,7 @@ export default function TaskProfile() {
       const comment = {
         id: Date.now().toString(),
         text: newComment.trim(),
-        author: "Current User", // Replace with actual user name
+        author: user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : "Current User",
         timestamp: new Date().toISOString()
       };
       setComments([...comments, comment]);
@@ -861,10 +861,10 @@ export default function TaskProfile() {
                           <div className="flex items-center space-x-2">
                             <Avatar className="w-6 h-6">
                               <AvatarFallback className="text-xs">
-                                {comment.author.split(' ').map(n => n[0]).join('')}
+                                {comment.author ? comment.author.split(' ').map(n => n[0]).join('') : 'U'}
                               </AvatarFallback>
                             </Avatar>
-                            <span className="font-medium text-sm">{comment.author}</span>
+                            <span className="font-medium text-sm">{comment.author || 'Unknown User'}</span>
                           </div>
                           <span className="text-xs text-slate-500">
                             {new Date(comment.timestamp).toLocaleDateString()} at {new Date(comment.timestamp).toLocaleTimeString()}
