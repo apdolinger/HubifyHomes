@@ -6,10 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CheckSquare, Clock, User, Building } from "lucide-react";
+import { useLocation } from "wouter";
 
 export default function Tasks() {
   const { isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
+  const [location, navigate] = useLocation();
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -59,6 +61,11 @@ export default function Tasks() {
     }
   };
 
+  const handleTaskClick = (taskId: string) => {
+    localStorage.setItem('selectedTaskId', taskId);
+    navigate(`/task-profile?id=${taskId}`);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -99,7 +106,11 @@ export default function Tasks() {
           </div>
         ) : tasks?.length > 0 ? (
           tasks.map((task: any) => (
-            <Card key={task.id}>
+            <Card 
+              key={task.id} 
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => handleTaskClick(task.id)}
+            >
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">

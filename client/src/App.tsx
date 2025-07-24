@@ -9,6 +9,7 @@ import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import Tasks from "@/pages/Tasks";
+import TaskProfile from "@/pages/TaskProfile";
 import Properties from "@/pages/Properties";
 import PropertyProfile from "@/pages/PropertyProfile";
 import Team from "@/pages/Team";
@@ -34,6 +35,7 @@ function Router() {
         <>
           <Route path="/" component={Dashboard} />
           <Route path="/tasks" component={Tasks} />
+          <Route path="/task-profile" component={TaskProfile} />
           <Route path="/properties" component={Properties} />
           <Route path="/property-profile" component={PropertyProfile} />
           <Route path="/team" component={Team} />

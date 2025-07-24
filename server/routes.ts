@@ -190,6 +190,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/tasks/:id", isAuthenticated, async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      const updateData = req.body;
+      const task = await storage.updateTask(taskId, updateData);
+      res.json(task);
+    } catch (error) {
+      console.error("Error updating task:", error);
+      res.status(500).json({ message: "Failed to update task" });
+    }
+  });
+
   app.patch("/api/tasks/:id/complete", isAuthenticated, async (req, res) => {
     try {
       const taskId = parseInt(req.params.id);
