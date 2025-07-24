@@ -261,11 +261,11 @@ export default function TaskProfile() {
               <h1 className="text-3xl font-bold text-slate-900">{(task as any).title}</h1>
             )}
             <div className="flex items-center space-x-4 mt-2">
-              <Badge variant={getPriorityColor((task as any).priority)} className="capitalize">
-                {(task as any).priority} Priority
+              <Badge variant={getPriorityColor((task as any).priority || 'normal')} className="capitalize">
+                {(task as any).priority || 'normal'} Priority
               </Badge>
-              <Badge variant={getStatusColor((task as any).status)} className="capitalize">
-                {(task as any).status.replace('_', ' ')}
+              <Badge variant={getStatusColor((task as any).status || 'pending')} className="capitalize">
+                {(task as any).status ? (task as any).status.replace('_', ' ') : 'pending'}
               </Badge>
               <div className="flex items-center text-slate-500">
                 <Calendar className="w-4 h-4 mr-1" />
@@ -362,7 +362,7 @@ export default function TaskProfile() {
                         </SelectContent>
                       </Select>
                     ) : (
-                      <p className="font-medium capitalize">{(task as any).priority}</p>
+                      <p className="font-medium capitalize">{(task as any).priority || 'normal'}</p>
                     )}
                   </div>
 
@@ -384,7 +384,7 @@ export default function TaskProfile() {
                         </SelectContent>
                       </Select>
                     ) : (
-                      <p className="font-medium capitalize">{(task as any).status.replace('_', ' ')}</p>
+                      <p className="font-medium capitalize">{(task as any).status ? (task as any).status.replace('_', ' ') : 'pending'}</p>
                     )}
                   </div>
 
