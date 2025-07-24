@@ -123,14 +123,14 @@ export default function SuperAdmin() {
             Back to Admin
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Super Admin Panel</h1>
+            <h1 className="text-3xl font-bold text-slate-900">Account Panel</h1>
             <p className="text-lg text-slate-600">Advanced system administration and configuration</p>
           </div>
         </div>
         <div className="flex items-center space-x-2">
           <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
             <Shield className="w-3 h-3 mr-1" />
-            Super Admin Access
+            Account Access
           </Badge>
         </div>
       </div>

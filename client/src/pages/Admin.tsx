@@ -110,7 +110,7 @@ export default function Admin() {
             <Link href="/super-admin">
               <Button className="bg-red-600 hover:bg-red-700">
                 <Shield className="w-4 h-4 mr-2" />
-                Super Admin
+                Account
               </Button>
             </Link>
           )}

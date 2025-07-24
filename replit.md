@@ -144,12 +144,12 @@ Preferred communication style: Simple, everyday language.
 - Admin panel displays appropriate role badge (Admin vs Manager access)
 - Removed gear icon from dropdown menu option as requested
 
-#### Enhanced Super Admin Panel - Multi-Organization Management
-- Created comprehensive Super Admin panel for platform-wide management
+#### Enhanced Account Panel - Multi-Organization Management
+- Created comprehensive Account panel for platform-wide management
 - Only accessible to users with "admin" role (not managers)
-- Accessible via "Super Admin" button in the regular Admin panel
+- Accessible via "Account" button in the regular Admin panel
 
-#### Super Admin Features Implemented:
+#### Account Panel Features Implemented:
 1. **Organizations Overview**
    - View and manage all accounts (organizations) on Nestive
    - Organization details: name, admin contacts, status, property/user counts, plan levels
@@ -197,12 +197,12 @@ Preferred communication style: Simple, everyday language.
 - Removed Admin tab from main navigation bar
 - Admin access now through user dropdown menu for cleaner navigation
 - Role-based menu items displayed appropriately
-- Super Admin button only visible to admin users
-- Updated Super Admin interface with 7-tab layout: Organizations, Revenue, Feature Flags, Monitoring, Messaging, Platform, Compliance
+- Account button only visible to admin users
+- Updated Account interface with 7-tab layout: Organizations, Revenue, Feature Flags, Monitoring, Messaging, Platform, Compliance
 
 #### Security Enhancements
 - Enhanced role-based access control for admin features
-- Proper authentication checks for both admin and super admin pages
+- Proper authentication checks for both admin and account pages
 - Unauthorized access redirects with appropriate error messages
 - Role verification on both frontend and backend levels
 - Multi-organization security and access controls
