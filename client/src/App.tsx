@@ -44,6 +44,7 @@ function Router() {
           <Route path="/property-center" component={PropertyCenter} />
           <Route path="/admin" component={Admin} />
           <Route path="/super-admin" component={Account} />
+          <Route path="/nestive-admin" component={SuperAdmin} />
         </>
       )}
       <Route component={NotFound} />
@@ -70,9 +71,29 @@ function AuthenticatedApp() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
       <Navigation />
-      <Router />
+      <div className="flex-1">
+        <Router />
+      </div>
+      
+      {/* Footer - Internal Only */}
+      <footer className="bg-white border-t border-slate-200 py-4">
+        <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
+          <div className="text-sm text-slate-600">
+            © 2025 Nestive. All rights reserved.
+          </div>
+          <div className="text-xs">
+            <a 
+              href="/nestive-admin" 
+              className="text-slate-400 hover:text-slate-600 transition-colors"
+              title="Internal Platform Management"
+            >
+              Platform
+            </a>
+          </div>
+        </div>
+      </footer>
       
       <QuickSearchModal 
         isOpen={isQuickSearchOpen} 
