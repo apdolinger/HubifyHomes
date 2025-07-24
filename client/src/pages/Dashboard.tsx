@@ -574,13 +574,13 @@ export default function Dashboard() {
               );
 
             case "calendar":
-              return <CalendarWidget key={widget.id} />;
+              return <CalendarWidget key={widget.id} className="lg:col-span-4" />;
 
             case "support":
-              return <SupportWidget key={widget.id} />;
+              return <SupportWidget key={widget.id} className="lg:col-span-4" />;
 
             case "duplicates":
-              return <DuplicatesWidget key={widget.id} />;
+              return <DuplicatesWidget key={widget.id} className="lg:col-span-4" />;
 
             default:
               return null;
