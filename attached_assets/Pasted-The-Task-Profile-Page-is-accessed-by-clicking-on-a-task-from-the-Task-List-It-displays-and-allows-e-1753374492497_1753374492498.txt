@@ -1,0 +1,85 @@
+The Task Profile Page is accessed by clicking on a task from the Task List. It displays and allows editing of full task details, provides assignment control, visibility into related properties/people, and supports attachments and notes.
+
+⸻
+
+🧱 LAYOUT & SECTIONS
+
+1. Header
+	•	Task Name (e.g., “Inspect Pool Heater”) – editable
+	•	Status badge (e.g., “Pending”, “In Progress”, “Completed”) – clickable to change status
+	•	[Edit Task] button — opens task edit modal (see section 8)
+
+⸻
+
+2. Task Details
+
+A structured display of task attributes:
+	•	Assigned To: dropdown with team member list (searchable)
+	•	Property: linked property name (clickable to view profile)
+	•	Due Date: calendar selector
+	•	Time Estimate: e.g., “45 minutes”
+	•	Task Category: dropdown (e.g., “Maintenance”, “Inspection”)
+	•	Priority Level: dropdown (Low, Medium, High, Urgent)
+	•	Recurring: toggle switch with frequency options (e.g., weekly, monthly)
+	•	Conflict Warning: if task time overlaps with another task assigned to the same person or property (optional supervisor override)
+
+⸻
+
+3. Checklist / Subtasks
+
+A checklist field to break the task into subtasks.
+	•	Example:
+	•	Check exterior doors
+	•	Test security cameras
+	•	Reset alarm
+	•	Each checklist item has a checkbox and can be marked completed.
+
+⸻
+
+4. Description
+
+Rich text area for writing out full task instructions or context.
+
+⸻
+
+5. Attachments
+	•	Allow file uploads (e.g., PDF, photos, documents)
+	•	Display file name, size, and preview if image
+	•	Option to download or delete
+
+⸻
+
+6. Quick Links
+	•	Section to paste in URLs related to the task (e.g., camera login page, parts order form)
+	•	Displayed as clickable links with optional label field
+
+⸻
+
+7. Comments
+	•	Comment box with timestamp and user name
+	•	Threaded style or simple comment log
+	•	Team members can leave updates (e.g., “Started inspection. Waiting on part delivery.”)
+
+⸻
+
+8. Edit Modal (Opened by Edit Button)
+
+A popup or slide-in panel to update full task details:
+	•	Name
+	•	Category
+	•	Due date
+	•	Assigned team member
+	•	Description
+	•	Checklist
+	•	Priority
+	•	Time estimate
+	•	Recurrence settings
+	•	Attachments
+	•	Task tags (if tagging is used)
+
+⸻
+
+🔐 Permissions & Behavior
+	•	Only users with appropriate roles (e.g., Admin, Supervisor) can edit the full task.
+	•	Regular users may only mark subtasks complete or leave a comment if permission is restricted.
+	•	Once a task is marked “Completed,” a timestamp and name of who completed it should be shown.
