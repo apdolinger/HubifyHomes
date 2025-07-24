@@ -293,9 +293,16 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="mt-4 sm:mt-0 flex space-x-3">
-            <Button className="bg-primary hover:bg-primary/90">
+            <Button 
+              className="bg-primary hover:bg-primary/90"
+              onClick={() => {
+                // Trigger keyboard shortcut to open modal
+                const event = new KeyboardEvent('keydown', { key: 't' });
+                document.dispatchEvent(event);
+              }}
+            >
               <Plus className="w-4 h-4 mr-2" />
-              Quick Add Task
+              Task
               <kbd className="kbd-light ml-2">T</kbd>
             </Button>
             <Button 
