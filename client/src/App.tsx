@@ -18,6 +18,7 @@ import PersonProfile from "@/pages/PersonProfile";
 import PropertyCenter from "@/pages/PropertyCenter";
 import Admin from "@/pages/Admin";
 import Account from "@/pages/Account";
+import SuperAdmin from "@/pages/SuperAdmin";
 import Navigation from "@/components/Navigation";
 import QuickSearchModal from "@/components/QuickSearchModal";
 import QuickAddTaskModal from "@/components/QuickAddTaskModal";
