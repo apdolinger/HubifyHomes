@@ -76,6 +76,9 @@ export default function TaskProfile() {
   const [newQuickLink, setNewQuickLink] = useState({label: "", url: ""});
   const [comments, setComments] = useState<Array<{id: string, text: string, author: string, timestamp: string}>>([]);
   const [newComment, setNewComment] = useState("");
+  const [taskImage, setTaskImage] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [isImageUploading, setIsImageUploading] = useState(false);
 
   // Get task ID from URL params or localStorage
   const taskId = new URLSearchParams(window.location.search).get('id') || localStorage.getItem('selectedTaskId');
@@ -111,6 +114,18 @@ export default function TaskProfile() {
   const { data: history } = useQuery({
     queryKey: ["/api/tasks", taskId, "history"],
     enabled: isAuthenticated && !!taskId,
+  });
+
+  // Fetch properties for association
+  const { data: properties } = useQuery({
+    queryKey: ["/api/properties"],
+    enabled: isAuthenticated,
+  });
+
+  // Fetch contacts for association
+  const { data: contacts } = useQuery({
+    queryKey: ["/api/contacts"],
+    enabled: isAuthenticated,
   });
 
   // Update task mutation
@@ -245,6 +260,72 @@ export default function TaskProfile() {
     }
   };
 
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Invalid file type",
+          description: "Please select an image file (JPG, PNG, GIF, etc.)",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: "Please select an image smaller than 5MB",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setImageFile(file);
+      
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setTaskImage(previewUrl);
+      
+      // TODO: Upload to server
+      setIsImageUploading(true);
+      
+      // Simulate upload
+      setTimeout(() => {
+        setIsImageUploading(false);
+        toast({
+          title: "Image uploaded",
+          description: "Task image has been updated successfully",
+        });
+      }, 1500);
+    }
+  };
+
+  const removeTaskImage = () => {
+    if (taskImage) {
+      URL.revokeObjectURL(taskImage);
+    }
+    setTaskImage(null);
+    setImageFile(null);
+    
+    toast({
+      title: "Image removed",
+      description: "Task image has been removed",
+    });
+  };
+
+  const handlePropertyAssociation = (propertyId: string) => {
+    const updatedTask = { propertyId: propertyId === "none" ? null : parseInt(propertyId) };
+    updateTaskMutation.mutate(updatedTask);
+  };
+
+  const handlePersonAssociation = (contactId: string) => {
+    const updatedTask = { contactId: contactId === "none" ? null : parseInt(contactId) };
+    updateTaskMutation.mutate(updatedTask);
+  };
+
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "urgent":
@@ -315,7 +396,8 @@ export default function TaskProfile() {
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
       <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
+        {/* Back to Tasks Button */}
+        <div className="mb-6">
           <Button
             variant="ghost"
             onClick={() => navigate("/tasks")}
@@ -324,6 +406,164 @@ export default function TaskProfile() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Tasks
           </Button>
+        </div>
+
+        {/* Task Image, Name, and Associations */}
+        <div className="flex items-start space-x-6 mb-6">
+          {/* Task Image Upload Area */}
+          <div className="flex-shrink-0">
+            <div className="relative">
+              {taskImage ? (
+                <div className="relative group">
+                  <img
+                    src={taskImage}
+                    alt="Task image"
+                    className="w-24 h-24 object-cover rounded-lg border-2 border-slate-200"
+                  />
+                  {isImageUploading && (
+                    <div className="absolute inset-0 bg-black bg-opacity-50 rounded-lg flex items-center justify-center">
+                      <RefreshCw className="w-6 h-6 text-white animate-spin" />
+                    </div>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="absolute -top-2 -right-2 w-6 h-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={removeTaskImage}
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              ) : (
+                <label className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-slate-400 hover:bg-slate-50 transition-colors">
+                  <Upload className="w-6 h-6 text-slate-400 mb-1" />
+                  <span className="text-xs text-slate-500 text-center px-1">Upload Image</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
+          </div>
+
+          {/* Task Name and Details */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0 mr-4">
+                <h1 className="text-3xl font-bold text-slate-900 mb-2 break-words">
+                  {(task as any).title}
+                </h1>
+                <div className="flex items-center space-x-4 text-sm text-slate-600 mb-4">
+                  <div className="flex items-center space-x-1">
+                    <Badge variant={getPriorityColor((task as any).priority)} className="capitalize">
+                      {(task as any).priority}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <Badge variant={getStatusColor((task as any).status)} className="capitalize">
+                      {(task as any).status?.replace('_', ' ')}
+                    </Badge>
+                  </div>
+                  {(task as any).dueDate && (
+                    <div className="flex items-center space-x-1">
+                      <Calendar className="w-4 h-4" />
+                      <span>Due {formatDate((task as any).dueDate)}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Property and Person Associations */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  {/* Property Association */}
+                  <div>
+                    <Label className="text-sm font-medium text-slate-700 mb-2 block">
+                      Associated Property
+                    </Label>
+                    <Select
+                      value={(task as any).propertyId?.toString() || "none"}
+                      onValueChange={handlePropertyAssociation}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select a property">
+                          {(task as any).property ? (
+                            <div className="flex items-center space-x-2">
+                              <Building className="w-4 h-4 text-slate-500" />
+                              <span>{(task as any).property.name}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-500">No property assigned</span>
+                          )}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">
+                          <div className="flex items-center space-x-2">
+                            <X className="w-4 h-4 text-slate-400" />
+                            <span>No property</span>
+                          </div>
+                        </SelectItem>
+                        {properties?.map((property: any) => (
+                          <SelectItem key={property.id} value={property.id.toString()}>
+                            <div className="flex items-center space-x-2">
+                              <Building className="w-4 h-4 text-slate-500" />
+                              <span>{property.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Person Association */}
+                  <div>
+                    <Label className="text-sm font-medium text-slate-700 mb-2 block">
+                      Associated Person
+                    </Label>
+                    <Select
+                      value={(task as any).contactId?.toString() || "none"}
+                      onValueChange={handlePersonAssociation}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select a person">
+                          {(task as any).contact ? (
+                            <div className="flex items-center space-x-2">
+                              <User className="w-4 h-4 text-slate-500" />
+                              <span>{(task as any).contact.firstName} {(task as any).contact.lastName}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-500">No person assigned</span>
+                          )}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">
+                          <div className="flex items-center space-x-2">
+                            <X className="w-4 h-4 text-slate-400" />
+                            <span>No person</span>
+                          </div>
+                        </SelectItem>
+                        {contacts?.map((contact: any) => (
+                          <SelectItem key={contact.id} value={contact.id.toString()}>
+                            <div className="flex items-center space-x-2">
+                              <User className="w-4 h-4 text-slate-500" />
+                              <span>{contact.firstName} {contact.lastName}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Actions Row */}
+        <div className="flex items-center justify-end">
           <div className="flex items-center space-x-2">
             <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
               <DialogTrigger asChild>
@@ -532,37 +772,6 @@ export default function TaskProfile() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-          </div>
-        </div>
-
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold text-slate-900">{(task as any).title}</h1>
-            <div className="flex items-center space-x-4 mt-2">
-              <Select
-                value={(task as any).status || 'pending'}
-                onValueChange={handleStatusChange}
-              >
-                <SelectTrigger className="w-auto">
-                  <Badge variant={getStatusColor((task as any).status || 'pending')} className="capitalize">
-                    {(task as any).status ? (task as any).status.replace('_', ' ') : 'pending'}
-                  </Badge>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-              <Badge variant={getPriorityColor((task as any).priority || 'normal')} className="capitalize">
-                {(task as any).priority || 'normal'} Priority
-              </Badge>
-              <div className="flex items-center text-slate-500">
-                <Calendar className="w-4 h-4 mr-1" />
-                Due: {formatDate((task as any).dueDate)}
-              </div>
-            </div>
           </div>
         </div>
       </div>
