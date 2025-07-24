@@ -32,6 +32,7 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   role: varchar("role").notNull().default("staff"), // admin, supervisor, staff, client
+  tier: varchar("tier").notNull().default("basic"), // basic, standard, premium
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -121,38 +122,23 @@ export const activityLog = pgTable("activity_log", {
 
 // Forms system tables
 export const forms = pgTable("forms", {
-  id: varchar("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  accountId: varchar("account_id"), // References account/organization 
-  name: text("name").notNull(),
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
   description: text("description"),
-  type: text("type").notNull().default("intake"), // intake, feedback, registration
-  isPublic: boolean("is_public").notNull().default(false),
-  isEmbedEnabled: boolean("is_embed_enabled").notNull().default(false),
-  destination: text("destination").default("none"), // "contacts", "tasks", or "none"
+  fields: jsonb("fields").notNull(), // Form fields structure
+  embedEnabled: boolean("embed_enabled").notNull().default(false),
+  createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-export const formFields = pgTable("form_fields", {
-  id: varchar("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  formId: varchar("form_id").references(() => forms.id, { onDelete: 'cascade' }).notNull(),
-  label: text("label").notNull(),
-  fieldType: text("field_type").notNull(), // text, email, select, checkbox, textarea, phone
-  isRequired: boolean("is_required").notNull().default(false),
-  order: integer("order").notNull().default(0),
-  options: text("options").array(), // for dropdown/multiple-choice fields
-  placeholder: text("placeholder"),
-  createdAt: timestamp("created_at").defaultNow(),
+  formKey: text("form_key").notNull().unique(), // used in public URL and embed
+  tierRequired: text("tier_required").notNull().default("standard"), // 'basic', 'standard', 'premium'
 });
 
 export const formSubmissions = pgTable("form_submissions", {
-  id: varchar("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  formId: varchar("form_id").references(() => forms.id, { onDelete: 'cascade' }).notNull(),
+  id: serial("id").primaryKey(),
+  formId: integer("form_id").references(() => forms.id, { onDelete: 'cascade' }).notNull(),
   data: jsonb("data").notNull(), // Form field values
   submittedAt: timestamp("submitted_at").defaultNow(),
-  submittedBy: text("submitted_by"), // email address or "anonymous"
-  ipAddress: varchar("ip_address"),
-  userAgent: text("user_agent"),
 });
 
 // Relations
@@ -227,15 +213,11 @@ export const activityLogRelations = relations(activityLog, ({ one }) => ({
   }),
 }));
 
-export const formsRelations = relations(forms, ({ many }) => ({
-  fields: many(formFields),
+export const formsRelations = relations(forms, ({ many, one }) => ({
   submissions: many(formSubmissions),
-}));
-
-export const formFieldsRelations = relations(formFields, ({ one }) => ({
-  form: one(forms, {
-    fields: [formFields.formId],
-    references: [forms.id],
+  createdBy: one(users, {
+    fields: [forms.createdBy],
+    references: [users.id],
   }),
 }));
 
@@ -293,10 +275,7 @@ export const insertFormSchema = createInsertSchema(forms).omit({
   updatedAt: true,
 });
 
-export const insertFormFieldSchema = createInsertSchema(formFields).omit({
-  id: true,
-  createdAt: true,
-});
+
 
 export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).omit({
   id: true,
@@ -320,7 +299,6 @@ export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type ActivityLog = typeof activityLog.$inferSelect;
 export type InsertForm = z.infer<typeof insertFormSchema>;
 export type Form = typeof forms.$inferSelect;
-export type InsertFormField = z.infer<typeof insertFormFieldSchema>;
-export type FormField = typeof formFields.$inferSelect;
+
 export type InsertFormSubmission = z.infer<typeof insertFormSubmissionSchema>;
 export type FormSubmission = typeof formSubmissions.$inferSelect;

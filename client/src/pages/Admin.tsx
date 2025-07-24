@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+import AdminForms from "./AdminForms";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,7 +37,7 @@ import {
 export default function Admin() {
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState("templates");
+  const [activeTab, setActiveTab] = useState("forms");
   const [isNewTemplateDialogOpen, setIsNewTemplateDialogOpen] = useState(false);
 
   // Redirect if not admin or manager
@@ -122,7 +123,11 @@ export default function Admin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="forms" className="flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            Forms
+          </TabsTrigger>
           <TabsTrigger value="templates" className="flex items-center gap-2">
             <Mail className="w-4 h-4" />
             Templates
@@ -144,6 +149,11 @@ export default function Admin() {
             Tools & Support
           </TabsTrigger>
         </TabsList>
+
+        {/* Forms Tab */}
+        <TabsContent value="forms" className="space-y-6">
+          <AdminForms />
+        </TabsContent>
 
         {/* Email & Message Templates Tab */}
         <TabsContent value="templates" className="space-y-6">

@@ -6,6 +6,8 @@ import {
   contacts,
   teamMessages,
   activityLog,
+  forms,
+  formSubmissions,
   type User,
   type UpsertUser,
   type Community,
@@ -20,6 +22,10 @@ import {
   type InsertTeamMessage,
   type ActivityLog,
   type InsertActivityLog,
+  type Form,
+  type InsertForm,
+  type FormSubmission,
+  type InsertFormSubmission,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, like, count, sql } from "drizzle-orm";
@@ -84,6 +90,13 @@ export interface IStorage {
     tasks: Task[];
     contacts: Contact[];
   }>;
+  
+  // Forms operations
+  getForms(userId: string): Promise<Form[]>;
+  getFormByKey(formKey: string): Promise<Form | undefined>;
+  createForm(form: InsertForm): Promise<Form>;
+  deleteForm(formId: number, userId: string): Promise<void>;
+  createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -522,6 +535,42 @@ export class DatabaseStorage implements IStorage {
       tasks: searchTasks,
       contacts: searchContacts,
     };
+  }
+
+  // Forms operations
+  async getForms(userId: string): Promise<Form[]> {
+    return await db
+      .select()
+      .from(forms)
+      .where(eq(forms.createdBy, userId))
+      .orderBy(desc(forms.createdAt));
+  }
+
+  async getFormByKey(formKey: string): Promise<Form | undefined> {
+    const [form] = await db
+      .select()
+      .from(forms)
+      .where(eq(forms.formKey, formKey));
+    return form;
+  }
+
+  async createForm(formData: InsertForm): Promise<Form> {
+    const [form] = await db.insert(forms).values(formData).returning();
+    return form;
+  }
+
+  async deleteForm(formId: number, userId: string): Promise<void> {
+    await db
+      .delete(forms)
+      .where(and(eq(forms.id, formId), eq(forms.createdBy, userId)));
+  }
+
+  async createFormSubmission(submissionData: InsertFormSubmission): Promise<FormSubmission> {
+    const [submission] = await db
+      .insert(formSubmissions)
+      .values(submissionData)
+      .returning();
+    return submission;
   }
 }
 
