@@ -135,13 +135,44 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### July 24, 2025 - Super Admin Internal Platform Management
+### July 24, 2025 - Super Admin Internal Platform Management & Enhanced Features
 
 #### Internal Super Admin Area
 - Created dedicated Super Admin control panel for Nestive platform team (internal use only)
 - Accessible via discrete "Platform" link in footer (bottom right)
 - Route: `/nestive-admin` - separate from client account management
 - Provides platform-wide monitoring and management capabilities
+
+#### Enhanced Super Admin Features (3 Major Additions):
+
+1. **All Users Management Table**
+   - Comprehensive table showing all users across client accounts
+   - Columns: Name, Email, Company, Role, Status, Last Login, Created Date
+   - Search functionality across name, email, and account fields
+   - Sortable columns and filtering by role/status/account
+   - Export to CSV capability for administrative reporting
+   - User selection with checkboxes for bulk operations
+
+2. **Mass Email Communication Tool**
+   - Dedicated tab for sending emails to selected user groups
+   - Target options: All Users, Admin Only, Selected Users, Specific Account
+   - Rich text composition with dynamic field support
+   - Available dynamic fields: {{firstName}}, {{lastName}}, {{email}}, {{accountName}}, {{role}}
+   - Schedule send functionality with date/time picker
+   - Quick templates: Maintenance Notice, Feature Announcement, System Update, Account Reminder
+   - Delivery analytics: sent count, delivery rate, open rate tracking
+   - Preview functionality before sending
+
+3. **System Alerts & Pop-up Management**
+   - Create and schedule system-wide pop-up messages for users
+   - Targeting options: All Users, Admin Only, Specific Account, Specific Role
+   - Alert severity levels: Info (Blue), Warning (Yellow), Critical (Red), Success (Green)
+   - Time-based scheduling with start/end times
+   - Optional acknowledgment requirement before proceeding
+   - "Show once per session" toggle for user experience control
+   - Action buttons with custom text and URLs
+   - Active alerts management with edit/delete capabilities
+   - Sample alerts: Maintenance notices, feature announcements, system updates
 
 #### Super Admin Features:
 1. **Organizations Management**
