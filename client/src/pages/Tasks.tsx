@@ -1,19 +1,34 @@
-import { useEffect } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckSquare, Clock, User, Building, Eye, Edit } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CheckSquare, Clock, User, Building, Eye, Edit, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation } from "wouter";
+
+type SortField = 'title' | 'priority' | 'status' | 'dueDate' | 'createdAt' | 'assignedUser' | 'property';
+type SortDirection = 'asc' | 'desc';
 
 export default function Tasks() {
   const { isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const [location, navigate] = useLocation();
+  
+  // Filter and search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
+  const [assignedFilter, setAssignedFilter] = useState("all");
+  
+  // Sort state
+  const [sortField, setSortField] = useState<SortField>('createdAt');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -34,6 +49,123 @@ export default function Tasks() {
     queryKey: ["/api/tasks"],
     enabled: isAuthenticated,
   });
+
+  // Sort and filter tasks
+  const filteredAndSortedTasks = useMemo(() => {
+    if (!tasks || !Array.isArray(tasks)) return [];
+    
+    let filtered = [...tasks] as any[];
+    
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(task => 
+        task.title?.toLowerCase().includes(query) ||
+        task.description?.toLowerCase().includes(query) ||
+        task.property?.name?.toLowerCase().includes(query) ||
+        task.assignedUser?.firstName?.toLowerCase().includes(query) ||
+        task.assignedUser?.lastName?.toLowerCase().includes(query)
+      );
+    }
+    
+    // Apply status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(task => task.status === statusFilter);
+    }
+    
+    // Apply priority filter
+    if (priorityFilter !== "all") {
+      filtered = filtered.filter(task => task.priority === priorityFilter);
+    }
+    
+    // Apply assigned filter
+    if (assignedFilter !== "all") {
+      if (assignedFilter === "unassigned") {
+        filtered = filtered.filter(task => !task.assignedUser);
+      } else {
+        filtered = filtered.filter(task => task.assignedUser?.id === assignedFilter);
+      }
+    }
+    
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+      
+      switch (sortField) {
+        case 'title':
+          aValue = a.title?.toLowerCase() || '';
+          bValue = b.title?.toLowerCase() || '';
+          break;
+        case 'priority':
+          const priorityOrder = { urgent: 4, high: 3, normal: 2, low: 1 };
+          aValue = priorityOrder[a.priority as keyof typeof priorityOrder] || 0;
+          bValue = priorityOrder[b.priority as keyof typeof priorityOrder] || 0;
+          break;
+        case 'status':
+          const statusOrder = { pending: 1, in_progress: 2, completed: 3, cancelled: 0 };
+          aValue = statusOrder[a.status as keyof typeof statusOrder] || 0;
+          bValue = statusOrder[b.status as keyof typeof statusOrder] || 0;
+          break;
+        case 'dueDate':
+          aValue = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+          bValue = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+          break;
+        case 'createdAt':
+          aValue = new Date(a.createdAt).getTime();
+          bValue = new Date(b.createdAt).getTime();
+          break;
+        case 'assignedUser':
+          aValue = a.assignedUser ? `${a.assignedUser.firstName} ${a.assignedUser.lastName}`.toLowerCase() : '';
+          bValue = b.assignedUser ? `${b.assignedUser.firstName} ${b.assignedUser.lastName}`.toLowerCase() : '';
+          break;
+        case 'property':
+          aValue = a.property?.name?.toLowerCase() || '';
+          bValue = b.property?.name?.toLowerCase() || '';
+          break;
+        default:
+          return 0;
+      }
+      
+      if (sortDirection === 'asc') {
+        return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+      } else {
+        return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+      }
+    });
+    
+    return filtered;
+  }, [tasks, searchQuery, statusFilter, priorityFilter, assignedFilter, sortField, sortDirection]);
+
+  // Get unique users for assigned filter
+  const uniqueUsers = useMemo(() => {
+    if (!tasks || !Array.isArray(tasks)) return [];
+    const users = new Map();
+    (tasks as any[]).forEach(task => {
+      if (task.assignedUser) {
+        users.set(task.assignedUser.id, task.assignedUser);
+      }
+    });
+    return Array.from(users.values());
+  }, [tasks]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="w-4 h-4 ml-1 text-slate-400" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="w-4 h-4 ml-1 text-slate-600" />
+      : <ArrowDown className="w-4 h-4 ml-1 text-slate-600" />;
+  };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -88,7 +220,7 @@ export default function Tasks() {
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Tasks</h1>
             <p className="mt-1 text-sm text-slate-600">
-              Manage and track all your tasks
+              Manage and track all your tasks ({filteredAndSortedTasks.length} {filteredAndSortedTasks.length === 1 ? 'task' : 'tasks'})
             </p>
           </div>
           <div className="mt-4 sm:mt-0">
@@ -100,6 +232,92 @@ export default function Tasks() {
         </div>
       </div>
 
+      {/* Filters and Search */}
+      <Card className="mb-6">
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            {/* Search */}
+            <div className="lg:col-span-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Input
+                  placeholder="Search tasks, properties, or people..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            
+            {/* Status Filter */}
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            {/* Priority Filter */}
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Priorities" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Priorities</SelectItem>
+                <SelectItem value="urgent">Urgent</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="normal">Normal</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            {/* Assigned Filter */}
+            <Select value={assignedFilter} onValueChange={setAssignedFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Assignees" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Assignees</SelectItem>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
+                {uniqueUsers.map((user: any) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.firstName} {user.lastName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Clear Filters */}
+          {(searchQuery || statusFilter !== "all" || priorityFilter !== "all" || assignedFilter !== "all") && (
+            <div className="mt-4 flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-sm text-slate-600">
+                <Filter className="w-4 h-4" />
+                <span>Filters applied</span>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => {
+                  setSearchQuery("");
+                  setStatusFilter("all");
+                  setPriorityFilter("all");
+                  setAssignedFilter("all");
+                }}
+              >
+                Clear all filters
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Tasks Table */}
       <Card>
         <CardHeader>
@@ -110,22 +328,57 @@ export default function Tasks() {
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
-          ) : tasks?.length > 0 ? (
+          ) : filteredAndSortedTasks.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Task Title</TableHead>
-                  <TableHead>Property</TableHead>
-                  <TableHead>Assigned To</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Created</TableHead>
+                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('title')}>
+                    <div className="flex items-center">
+                      Task Title
+                      {getSortIcon('title')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('property')}>
+                    <div className="flex items-center">
+                      Property
+                      {getSortIcon('property')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('assignedUser')}>
+                    <div className="flex items-center">
+                      Assigned To
+                      {getSortIcon('assignedUser')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('priority')}>
+                    <div className="flex items-center">
+                      Priority
+                      {getSortIcon('priority')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('status')}>
+                    <div className="flex items-center">
+                      Status
+                      {getSortIcon('status')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('dueDate')}>
+                    <div className="flex items-center">
+                      Due Date
+                      {getSortIcon('dueDate')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('createdAt')}>
+                    <div className="flex items-center">
+                      Created
+                      {getSortIcon('createdAt')}
+                    </div>
+                  </TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(tasks as any[]).map((task: any) => (
+                {filteredAndSortedTasks.map((task: any) => (
                   <TableRow 
                     key={task.id}
                     className="cursor-pointer hover:bg-slate-50"
@@ -223,17 +476,44 @@ export default function Tasks() {
             </Table>
           ) : (
             <div className="text-center py-12">
-              <CheckSquare className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-slate-900 mb-2">
-                No tasks yet
-              </h3>
-              <p className="text-slate-600 mb-4">
-                Create your first task to get started
-              </p>
-              <Button>
-                <CheckSquare className="w-4 h-4 mr-2" />
-                Add Task
-              </Button>
+              {Array.isArray(tasks) && tasks.length > 0 ? (
+                // No results after filtering
+                <>
+                  <Filter className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-slate-900 mb-2">
+                    No tasks match your filters
+                  </h3>
+                  <p className="text-slate-600 mb-4">
+                    Try adjusting your search or filter criteria
+                  </p>
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setStatusFilter("all");
+                      setPriorityFilter("all");
+                      setAssignedFilter("all");
+                    }}
+                  >
+                    Clear all filters
+                  </Button>
+                </>
+              ) : (
+                // No tasks at all
+                <>
+                  <CheckSquare className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-slate-900 mb-2">
+                    No tasks yet
+                  </h3>
+                  <p className="text-slate-600 mb-4">
+                    Create your first task to get started
+                  </p>
+                  <Button>
+                    <CheckSquare className="w-4 h-4 mr-2" />
+                    Add Task
+                  </Button>
+                </>
+              )}
             </div>
           )}
         </CardContent>
