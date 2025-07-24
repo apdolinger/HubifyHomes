@@ -28,11 +28,7 @@ const getNavigationItems = (user: any) => {
     { name: "Property Center", href: "/property-center", icon: Home },
   ];
 
-  // Add Admin tab only for admin users
-  if (user?.role === 'admin') {
-    baseItems.push({ name: "Admin", href: "/admin", icon: Settings });
-  }
-
+  // Admin access is now only available through the dropdown menu
   return baseItems;
 };
 
