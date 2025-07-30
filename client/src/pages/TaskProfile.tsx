@@ -1192,7 +1192,13 @@ export default function TaskProfile() {
                 <CardContent>
                   <p className="text-slate-700 whitespace-pre-wrap">
                     {(task as any).title && (task as any).property ? 
-                      `${(task as any).title} for ${(task as any).property.name}` :
+                      `${(task as any).title} for ${(task as any).property.name || [
+                        (task as any).property.address1,
+                        (task as any).property.address2,
+                        (task as any).property.city,
+                        (task as any).property.state,
+                        (task as any).property.zip
+                      ].filter(Boolean).join(", ")}` :
                       (task as any).description || "No description provided."
                     }
                     {(task as any).description && (task as any).title && (task as any).property && (
