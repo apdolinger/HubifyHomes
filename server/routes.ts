@@ -545,16 +545,203 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Data import endpoint (for importing sample data)
   app.post("/api/import-sample-data", async (req: any, res) => {
     try {
+      console.log("Starting sample data import...");
+      
+      const csvData = [
+        {
+          fullName: "Bruce Wayne",
+          propertyName: "Wayne Manor",
+          streetAddress: "1313 Mockingbird Ln.",
+          city: "Gotham City",
+          state: "NJ",
+          zipCode: "00001",
+          phoneNumber: "(807) 536-1076",
+          email: "bruce.wayne@example.com",
+          tasks: "Replace roof tiles; Inspect security cameras"
+        },
+        {
+          fullName: "Tony Stark",
+          propertyName: "Stark Lake House",
+          streetAddress: "10880 Malibu Point",
+          city: "Malibu",
+          state: "CA",
+          zipCode: "90265",
+          phoneNumber: "(625) 667-8476",
+          email: "tony.stark@example.com",
+          tasks: "Calibrate solar panels; Reset water system"
+        },
+        {
+          fullName: "Bilbo Baggins",
+          propertyName: "Bag End",
+          streetAddress: "111 Bag End, Bagshot Row",
+          city: "Hobbiton, The Shire",
+          state: "ME",
+          zipCode: "24791",
+          phoneNumber: "(397) 259-9198",
+          email: "bilbo.baggins@example.com",
+          tasks: "Chimney sweep; Pantry pest control"
+        },
+        {
+          fullName: "Jay Gatsby",
+          propertyName: "Gatsby Estate",
+          streetAddress: "1 Gatsby Lane",
+          city: "West Egg",
+          state: "NY",
+          zipCode: "11560",
+          phoneNumber: "(734) 348-9487",
+          email: "jay.gatsby@example.com",
+          tasks: "Clean pool; Repair ballroom lights"
+        },
+        {
+          fullName: "Elsa Arendelle",
+          propertyName: "Ice Castle",
+          streetAddress: "1 Ice Palace Rd",
+          city: "North Mountain",
+          state: "AK",
+          zipCode: "99686",
+          phoneNumber: "(918) 766-7895",
+          email: "elsa.arendelle@example.com",
+          tasks: "De-ice entry; Inspect HVAC"
+        },
+        {
+          fullName: "Clark Kent",
+          propertyName: "Smallville Farmhouse",
+          streetAddress: "100 Farmhouse Way",
+          city: "Smallville",
+          state: "KS",
+          zipCode: "67524",
+          phoneNumber: "(884) 945-4765",
+          email: "clark.kent@example.com",
+          tasks: "Repair barn door; Reset perimeter alert"
+        },
+        {
+          fullName: "Sherlock Holmes",
+          propertyName: "221B Baker Street",
+          streetAddress: "221B Baker Street",
+          city: "London",
+          state: "UK",
+          zipCode: "NW1 6XE",
+          phoneNumber: "(366) 722-1185",
+          email: "sherlock.holmes@example.com",
+          tasks: "Check gas line; Fix loose window latch"
+        },
+        {
+          fullName: "Lara Croft",
+          propertyName: "Croft Manor",
+          streetAddress: "1 Croft Manor",
+          city: "Surrey",
+          state: "UK",
+          zipCode: "GU1 1AA",
+          phoneNumber: "(743) 571-6460",
+          email: "lara.croft@example.com",
+          tasks: "Fix surveillance system; Schedule garden trim"
+        },
+        {
+          fullName: "Doc Brown",
+          propertyName: "Hill Valley Garage",
+          streetAddress: "1640 Riverside Drive",
+          city: "Hill Valley",
+          state: "CA",
+          zipCode: "95420",
+          phoneNumber: "(380) 547-9627",
+          email: "doc.brown@example.com",
+          tasks: "Clean flux capacitor bay; Inspect storm damage"
+        },
+        {
+          fullName: "Willy Wonka",
+          propertyName: "Chocolate Factory Guest House",
+          streetAddress: "10 Candy Cane Lane",
+          city: "Candy Town",
+          state: "PA",
+          zipCode: "15001",
+          phoneNumber: "(720) 511-5742",
+          email: "willy.wonka@example.com",
+          tasks: "Sanitize chocolate river filter; Inspect candy wall"
+        }
+      ];
 
-      const result = await importSampleData();
-      if (result.success) {
-        res.json({ message: result.message });
-      } else {
-        res.status(500).json({ message: result.message });
+      const importResults = {
+        properties: 0,
+        contacts: 0,
+        tasks: 0
+      };
+
+      for (const record of csvData) {
+        console.log(`Processing ${record.fullName}...`);
+        
+        // Split full name
+        const nameParts = record.fullName.split(' ');
+        const firstName = nameParts[0];
+        const lastName = nameParts.slice(1).join(' ');
+        
+        // Create property
+        const property = await storage.createProperty({
+          name: record.propertyName,
+          type: "house",
+          address1: record.streetAddress,
+          address2: "",
+          city: record.city,
+          state: record.state,
+          zip: record.zipCode,
+          status: "occupied", // Use default status from schema
+          units: 1,
+          isActive: true
+        }, null); // Use null for user_id to avoid foreign key constraint
+        
+        importResults.properties++;
+        console.log(`Created property: ${property.name}`);
+        
+        // Create contact
+        const contact = await storage.createContact({
+          firstName,
+          lastName,
+          email: record.email,
+          phone: record.phoneNumber,
+          type: "owner",
+          propertyId: property.id,
+          isActive: true
+        }, null); // Use null for user_id to avoid foreign key constraint
+        
+        importResults.contacts++;
+        console.log(`Created contact: ${contact.firstName} ${contact.lastName}`);
+        
+        // Create tasks
+        const taskList = record.tasks.split(';').map(task => task.trim());
+        
+        for (const taskTitle of taskList) {
+          if (taskTitle) {
+            const task = await storage.createTask({
+              title: taskTitle,
+              description: `Task for ${record.propertyName}`,
+              priority: "normal",
+              status: "pending",
+              propertyId: property.id,
+              dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+              assignedToId: null,
+              assignedById: null
+            }, null); // Use null for user_id to avoid foreign key constraint
+            
+            importResults.tasks++;
+            console.log(`Created task: ${task.title}`);
+          }
+        }
       }
+      
+      console.log("Import completed successfully!");
+      console.log(`Results: ${importResults.properties} properties, ${importResults.contacts} contacts, ${importResults.tasks} tasks`);
+      
+      res.json({
+        success: true,
+        message: `Successfully imported ${importResults.properties} properties, ${importResults.contacts} contacts, and ${importResults.tasks} tasks`,
+        results: importResults
+      });
+
     } catch (error) {
       console.error("Error importing data:", error);
-      res.status(500).json({ message: "Failed to import data" });
+      res.status(500).json({ 
+        success: false, 
+        message: `Failed to import data: ${error}` 
+      });
     }
   });
 

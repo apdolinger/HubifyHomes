@@ -175,17 +175,19 @@ export class DatabaseStorage implements IStorage {
     return property;
   }
 
-  async createProperty(property: InsertProperty, userId: string): Promise<Property> {
+  async createProperty(property: InsertProperty, userId: string | null): Promise<Property> {
     const [newProperty] = await db.insert(properties).values(property).returning();
     
-    // Log activity
-    await this.logActivity({
-      userId: userId,
-      action: "property_created",
-      entityType: "property",
-      entityId: newProperty.id.toString(),
-      description: `Added property "${newProperty.name}"`,
-    });
+    // Log activity only if we have a valid userId
+    if (userId) {
+      await this.logActivity({
+        userId: userId,
+        action: "property_created",
+        entityType: "property",
+        entityId: newProperty.id.toString(),
+        description: `Added property "${newProperty.name}"`,
+      });
+    }
     
     return newProperty;
   }
@@ -310,17 +312,20 @@ export class DatabaseStorage implements IStorage {
     return task;
   }
 
-  async createTask(task: InsertTask): Promise<Task> {
+  async createTask(task: InsertTask, userId: string | null = null): Promise<Task> {
     const [newTask] = await db.insert(tasks).values(task).returning();
     
-    // Log activity
-    await this.logActivity({
-      userId: task.assignedById || "system",
-      action: "task_created",
-      entityType: "task",
-      entityId: newTask.id.toString(),
-      description: `Created task "${newTask.title}"`,
-    });
+    // Log activity only if we have a valid userId
+    const activityUserId = userId || task.assignedById;
+    if (activityUserId) {
+      await this.logActivity({
+        userId: activityUserId,
+        action: "task_created",
+        entityType: "task",
+        entityId: newTask.id.toString(),
+        description: `Created task "${newTask.title}"`,
+      });
+    }
     
     return newTask;
   }
@@ -398,17 +403,19 @@ export class DatabaseStorage implements IStorage {
     return contact;
   }
 
-  async createContact(contact: InsertContact, userId: string): Promise<Contact> {
+  async createContact(contact: InsertContact, userId: string | null): Promise<Contact> {
     const [newContact] = await db.insert(contacts).values(contact).returning();
     
-    // Log activity
-    await this.logActivity({
-      userId: userId,
-      action: "contact_created",
-      entityType: "contact",
-      entityId: newContact.id.toString(),
-      description: `Added contact "${newContact.firstName} ${newContact.lastName}"`,
-    });
+    // Log activity only if we have a valid userId
+    if (userId) {
+      await this.logActivity({
+        userId: userId,
+        action: "contact_created",
+        entityType: "contact",
+        entityId: newContact.id.toString(),
+        description: `Added contact "${newContact.firstName} ${newContact.lastName}"`,
+      });
+    }
     
     return newContact;
   }
