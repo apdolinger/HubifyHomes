@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Building, MapPin, Users, Plus, Home, Square, DollarSign, Activity, Eye, Edit } from "lucide-react";
+import { Building, MapPin, Users, Plus, Home, Square, DollarSign, Activity, Eye, Edit, ToggleLeft, ToggleRight } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useLocation } from "wouter";
@@ -44,6 +44,7 @@ export default function Properties() {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -61,7 +62,8 @@ export default function Properties() {
   }, [isAuthenticated, isLoading, toast]);
 
   const { data: properties, isLoading: propertiesLoading } = useQuery({
-    queryKey: ["/api/properties"],
+    queryKey: ["/api/properties", showInactive],
+    queryFn: () => apiRequest(`/api/properties${showInactive ? '?includeInactive=true' : ''}`),
     enabled: isAuthenticated,
   });
 
@@ -204,7 +206,22 @@ export default function Properties() {
               Manage your property portfolio and community information.
             </p>
           </div>
-          <div className="mt-4 sm:mt-0">
+          <div className="mt-4 sm:mt-0 flex items-center gap-4">
+            {/* Show Inactive Toggle */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowInactive(!showInactive)}
+              className="flex items-center gap-2"
+            >
+              {showInactive ? (
+                <ToggleRight className="w-4 h-4 text-green-600" />
+              ) : (
+                <ToggleLeft className="w-4 h-4 text-slate-400" />
+              )}
+              {showInactive ? "Hide Inactive" : "Show Inactive"}
+            </Button>
+            
             <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
               <DialogTrigger asChild>
                 <Button className="bg-primary hover:bg-primary/90">
@@ -490,7 +507,12 @@ export default function Properties() {
                       <TableCell className="font-medium">{property.name}</TableCell>
                       <TableCell className="text-sm text-slate-600">{formatFullAddress(property)}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{getTypeDisplay(property.type)}</Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">{getTypeDisplay(property.type)}</Badge>
+                          {!property.isActive && (
+                            <Badge variant="secondary" className="bg-red-100 text-red-800 border-red-200">Inactive</Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         {primaryContact ? (

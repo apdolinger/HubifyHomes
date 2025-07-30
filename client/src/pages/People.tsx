@@ -22,7 +22,9 @@ import {
   Building, 
   Edit,
   Trash2,
-  Search
+  Search,
+  ToggleLeft,
+  ToggleRight
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -48,6 +50,7 @@ export default function People() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedContact, setSelectedContact] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showInactive, setShowInactive] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -66,7 +69,8 @@ export default function People() {
 
   // Fetch contacts
   const { data: contacts, isLoading: contactsLoading } = useQuery({
-    queryKey: ["/api/contacts"],
+    queryKey: ["/api/contacts", showInactive],
+    queryFn: () => apiRequest(`/api/contacts${showInactive ? '?includeInactive=true' : ''}`),
     enabled: isAuthenticated,
   });
 
@@ -240,18 +244,18 @@ export default function People() {
     }
   };
 
-  const getTypeColor = (type: string) => {
+  const getTypeColor = (type: string): "default" | "secondary" | "destructive" | "outline" => {
     switch (type) {
-      case "owner":
-        return "default";
       case "tenant":
+        return "default";
+      case "owner": 
         return "secondary";
       case "vendor":
         return "outline";
       case "emergency_contact":
         return "destructive";
       default:
-        return "outline";
+        return "default";
     }
   };
 
@@ -308,7 +312,22 @@ export default function People() {
               Manage contacts, tenants, owners, and vendors
             </p>
           </div>
-          <div className="mt-4 sm:mt-0">
+          <div className="mt-4 sm:mt-0 flex items-center gap-4">
+            {/* Show Inactive Toggle */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowInactive(!showInactive)}
+              className="flex items-center gap-2"
+            >
+              {showInactive ? (
+                <ToggleRight className="w-4 h-4 text-green-600" />
+              ) : (
+                <ToggleLeft className="w-4 h-4 text-slate-400" />
+              )}
+              {showInactive ? "Hide Inactive" : "Show Inactive"}
+            </Button>
+            
             <Button onClick={() => setIsAddModalOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Add Contact
@@ -448,9 +467,14 @@ export default function People() {
                       <h3 className="text-lg font-medium text-slate-900">
                         {contact.firstName} {contact.lastName}
                       </h3>
-                      <Badge variant={getTypeColor(contact.type)}>
-                        {contact.type.replace('_', ' ')}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={getTypeColor(contact.type)}>
+                          {contact.type.replace('_', ' ')}
+                        </Badge>
+                        {!contact.isActive && (
+                          <Badge variant="secondary" className="bg-red-100 text-red-800 border-red-200">Inactive</Badge>
+                        )}
+                      </div>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-slate-600">

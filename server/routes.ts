@@ -235,7 +235,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Property routes
   app.get("/api/properties", isAuthenticated, async (req, res) => {
     try {
-      const properties = await storage.getProperties();
+      const includeInactive = req.query.includeInactive === 'true';
+      const properties = await storage.getProperties(includeInactive);
       res.json(properties);
     } catch (error) {
       console.error("Error fetching properties:", error);
@@ -380,7 +381,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Contact routes
   app.get("/api/contacts", isAuthenticated, async (req, res) => {
     try {
-      const contacts = await storage.getContacts();
+      const includeInactive = req.query.includeInactive === 'true';
+      const contacts = await storage.getContacts(includeInactive);
       res.json(contacts);
     } catch (error) {
       console.error("Error fetching contacts:", error);

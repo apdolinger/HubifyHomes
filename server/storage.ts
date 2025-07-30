@@ -46,7 +46,7 @@ export interface IStorage {
   deleteCommunity(id: number): Promise<void>;
   
   // Property operations
-  getProperties(): Promise<Property[]>;
+  getProperties(includeInactive?: boolean): Promise<Property[]>;
   getProperty(id: number): Promise<Property | undefined>;
   createProperty(property: InsertProperty, userId: string): Promise<Property>;
   updateProperty(id: number, property: Partial<InsertProperty>): Promise<Property>;
@@ -66,7 +66,7 @@ export interface IStorage {
   deleteTask(taskId: number): Promise<void>;
   
   // Contact operations
-  getContacts(): Promise<Contact[]>;
+  getContacts(includeInactive?: boolean): Promise<Contact[]>;
   getContactsByProperty(propertyId: number): Promise<Contact[]>;
   getContact(id: number): Promise<Contact | undefined>;
   createContact(contact: InsertContact, userId: string): Promise<Contact>;
@@ -171,7 +171,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Property operations
-  async getProperties(): Promise<Property[]> {
+  async getProperties(includeInactive: boolean = false): Promise<Property[]> {
+    if (includeInactive) {
+      return await db.select().from(properties).orderBy(desc(properties.createdAt));
+    }
     return await db.select().from(properties).where(eq(properties.isActive, true)).orderBy(desc(properties.createdAt));
   }
 
@@ -482,7 +485,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Contact operations
-  async getContacts(): Promise<Contact[]> {
+  async getContacts(includeInactive: boolean = false): Promise<Contact[]> {
+    if (includeInactive) {
+      return await db.select().from(contacts).orderBy(desc(contacts.createdAt));
+    }
     return await db.select().from(contacts).where(eq(contacts.isActive, true)).orderBy(desc(contacts.createdAt));
   }
 
