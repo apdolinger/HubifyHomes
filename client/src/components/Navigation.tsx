@@ -66,7 +66,7 @@ export default function Navigation() {
             <div className="flex-shrink-0">
               <Link href="/">
                 <h1 className="text-xl font-bold text-slate-800 cursor-pointer">
-                  Nestive
+                  Dwellerly
                 </h1>
               </Link>
             </div>

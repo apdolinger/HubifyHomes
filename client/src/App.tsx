@@ -46,8 +46,8 @@ function Router() {
           <Route path="/property-center" component={PropertyCenter} />
           <Route path="/admin" component={Admin} />
           <Route path="/super-admin" component={Account} />
-          <Route path="/nestive-admin" component={SuperAdmin} />
-          <Route path="/nestive-admin/organization/:id" component={OrganizationProfile} />
+          <Route path="/dwellerly-admin" component={SuperAdmin} />
+          <Route path="/dwellerly-admin/organization/:id" component={OrganizationProfile} />
         </>
       )}
       <Route component={NotFound} />
@@ -84,11 +84,11 @@ function AuthenticatedApp() {
       <footer className="bg-white border-t border-slate-200 py-4">
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
           <div className="text-sm text-slate-600">
-            © 2025 Nestive. All rights reserved.
+            © 2025 Dwellerly. All rights reserved.
           </div>
           <div className="text-xs">
             <a 
-              href="/nestive-admin" 
+              href="/dwellerly-admin" 
               className="text-slate-400 hover:text-slate-600 transition-colors"
               title="Internal Platform Management"
             >

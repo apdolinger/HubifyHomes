@@ -81,7 +81,7 @@ export default function SuperAdmin() {
     if (!isLoading && !isAuthenticated) {
       toast({
         title: "Access Denied",
-        description: "Super Admin access is restricted to Nestive platform team only.",
+        description: "Super Admin access is restricted to Dwellerly platform team only.",
         variant: "destructive",
       });
       setTimeout(() => {
@@ -146,7 +146,7 @@ export default function SuperAdmin() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Super Admin Control Panel</h1>
-            <p className="text-lg text-slate-600">Platform-wide monitoring and management for Nestive team</p>
+            <p className="text-lg text-slate-600">Platform-wide monitoring and management for Dwellerly team</p>
           </div>
         </div>
         <div className="flex items-center space-x-2">

@@ -1,8 +1,8 @@
-# Nestive - Property Management Platform
+# Dwellerly - Property Management Platform
 
 ## Overview
 
-Nestive is a professional property management platform designed for home watch and HOA companies. It provides a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface.
+Dwellerly is a professional property management platform designed for home watch and HOA companies. It provides a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface.
 
 ## System Architecture
 
@@ -187,9 +187,9 @@ Preferred communication style: Simple, everyday language.
 ### July 24, 2025 - Super Admin Internal Platform Management & Enhanced Features
 
 #### Internal Super Admin Area
-- Created dedicated Super Admin control panel for Nestive platform team (internal use only)
+- Created dedicated Super Admin control panel for Dwellerly platform team (internal use only)
 - Accessible via discrete "Platform" link in footer (bottom right)
-- Route: `/nestive-admin` - separate from client account management
+- Route: `/dwellerly-admin` - separate from client account management
 - Provides platform-wide monitoring and management capabilities
 
 #### Enhanced Super Admin Features (3 Major Additions):
@@ -259,7 +259,7 @@ Preferred communication style: Simple, everyday language.
    - Security audit logs and certification tracking
 
 #### Access Control
-- Internal-only access for Nestive platform management team
+- Internal-only access for Dwellerly platform management team
 - Hidden from client accounts and regular admin users
 - Discrete footer access to maintain professional client experience
 - Complete separation from client account management features
@@ -267,7 +267,7 @@ Preferred communication style: Simple, everyday language.
 #### Future Tasks To Complete:
 1. **Platform Team Authentication**
    - Implement proper login system for Super Admin platform access
-   - Add role-based access control for internal Nestive team members
+   - Add role-based access control for internal Dwellerly team members
    - Secure authentication separate from client account system
    
 2. **Account Panel Feature Implementation**
@@ -441,6 +441,15 @@ Preferred communication style: Simple, everyday language.
 - Enhanced user experience with confirmation messages and smooth transitions
 
 ## Changelog
+
+## Recent Updates
+
+### July 30, 2025 - Application Rebranding from Nestive to Dwellerly
+- Updated application name from "Nestive" to "Dwellerly" throughout entire codebase
+- Changed Super Admin route from `/nestive-admin` to `/dwellerly-admin`
+- Updated branding in Navigation, Landing page, embedded forms, and all user-facing text
+- Changed team member email addresses to @dwellerly.com domain
+- Updated documentation and comments to reflect new company name
 
 Changelog:
 - June 30, 2025. Initial setup and comprehensive feature implementation
