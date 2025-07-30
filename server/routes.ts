@@ -353,6 +353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const taskId = parseInt(req.params.id);
       const updateData = req.body;
+      console.log("Updating task:", taskId, "with data:", updateData);
       const task = await storage.updateTask(taskId, updateData);
       res.json(task);
     } catch (error) {
