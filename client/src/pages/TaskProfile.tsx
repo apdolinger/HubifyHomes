@@ -871,7 +871,7 @@ export default function TaskProfile() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="edit-priority">Priority</Label>
                       <Select 
@@ -906,65 +906,6 @@ export default function TaskProfile() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
-                      <Label htmlFor="edit-time-estimate">Time Estimate</Label>
-                      <div className="flex items-center space-x-2">
-                        <div className="flex items-center space-x-1">
-                          <Input
-                            type="number"
-                            min="0"
-                            max="30"
-                            className="w-16"
-                            placeholder="0"
-                            value={editForm.timeEstimate.split(' ')[0] || ''}
-                            onChange={(e) => {
-                              const days = e.target.value || '0';
-                              const currentParts = editForm.timeEstimate.split(' ');
-                              const hours = currentParts[2] || '0';
-                              const minutes = currentParts[4] || '0';
-                              setEditForm({ ...editForm, timeEstimate: `${days} days ${hours} hours ${minutes} minutes` });
-                            }}
-                          />
-                          <span className="text-sm text-slate-600">days</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <Input
-                            type="number"
-                            min="0"
-                            max="23"
-                            className="w-16"
-                            placeholder="0"
-                            value={editForm.timeEstimate.split(' ')[2] || ''}
-                            onChange={(e) => {
-                              const hours = e.target.value || '0';
-                              const currentParts = editForm.timeEstimate.split(' ');
-                              const days = currentParts[0] || '0';
-                              const minutes = currentParts[4] || '0';
-                              setEditForm({ ...editForm, timeEstimate: `${days} days ${hours} hours ${minutes} minutes` });
-                            }}
-                          />
-                          <span className="text-sm text-slate-600">hrs</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <Input
-                            type="number"
-                            min="0"
-                            max="59"
-                            className="w-16"
-                            placeholder="0"
-                            value={editForm.timeEstimate.split(' ')[4] || ''}
-                            onChange={(e) => {
-                              const minutes = e.target.value || '0';
-                              const currentParts = editForm.timeEstimate.split(' ');
-                              const days = currentParts[0] || '0';
-                              const hours = currentParts[2] || '0';
-                              setEditForm({ ...editForm, timeEstimate: `${days} days ${hours} hours ${minutes} minutes` });
-                            }}
-                          />
-                          <span className="text-sm text-slate-600">mins</span>
-                        </div>
-                      </div>
-                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -994,6 +935,66 @@ export default function TaskProfile() {
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-time-estimate">Time Estimate</Label>
+                    <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="30"
+                          className="w-16"
+                          placeholder="0"
+                          value={editForm.timeEstimate.split(' ')[0] || ''}
+                          onChange={(e) => {
+                            const days = e.target.value || '0';
+                            const currentParts = editForm.timeEstimate.split(' ');
+                            const hours = currentParts[2] || '0';
+                            const minutes = currentParts[4] || '0';
+                            setEditForm({ ...editForm, timeEstimate: `${days} days ${hours} hours ${minutes} minutes` });
+                          }}
+                        />
+                        <span className="text-sm text-slate-600">days</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="23"
+                          className="w-16"
+                          placeholder="0"
+                          value={editForm.timeEstimate.split(' ')[2] || ''}
+                          onChange={(e) => {
+                            const hours = e.target.value || '0';
+                            const currentParts = editForm.timeEstimate.split(' ');
+                            const days = currentParts[0] || '0';
+                            const minutes = currentParts[4] || '0';
+                            setEditForm({ ...editForm, timeEstimate: `${days} days ${hours} hours ${minutes} minutes` });
+                          }}
+                        />
+                        <span className="text-sm text-slate-600">hrs</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="59"
+                          className="w-16"
+                          placeholder="0"
+                          value={editForm.timeEstimate.split(' ')[4] || ''}
+                          onChange={(e) => {
+                            const minutes = e.target.value || '0';
+                            const currentParts = editForm.timeEstimate.split(' ');
+                            const days = currentParts[0] || '0';
+                            const hours = currentParts[2] || '0';
+                            setEditForm({ ...editForm, timeEstimate: `${days} days ${hours} hours ${minutes} minutes` });
+                          }}
+                        />
+                        <span className="text-sm text-slate-600">mins</span>
+                      </div>
                     </div>
                   </div>
 
