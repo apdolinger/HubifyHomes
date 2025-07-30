@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -36,7 +37,11 @@ import {
   CheckSquare,
   Upload,
   X,
-  RefreshCw
+  RefreshCw,
+  Archive,
+  Trash2,
+  MoreVertical,
+  User
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -51,6 +56,7 @@ export default function PropertyProfile() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isImageUploading, setIsImageUploading] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [showArchivedTasks, setShowArchivedTasks] = useState(false);
   const [editForm, setEditForm] = useState({
     name: "",
     address1: "",
@@ -740,42 +746,72 @@ export default function PropertyProfile() {
         <TabsContent value="tasks">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center">
-                <CheckSquare className="w-5 h-5 mr-2" />
-                Work & Task History
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center">
+                  <CheckSquare className="w-5 h-5 mr-2" />
+                  Task History & Work Completed
+                </CardTitle>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant={showArchivedTasks ? "secondary" : "outline"}
+                    size="sm"
+                    onClick={() => setShowArchivedTasks(!showArchivedTasks)}
+                  >
+                    <Archive className="w-4 h-4 mr-2" />
+                    {showArchivedTasks ? "Hide Archived" : "Show Archived"}
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               {propertyTasks?.length > 0 ? (
                 <div className="space-y-4">
-                  {propertyTasks.map((task: any) => (
-                    <div key={task.id} className="flex items-center space-x-3 p-3 bg-slate-50 rounded-lg">
-                      <div className="flex-shrink-0">
-                        <div className={`w-3 h-3 rounded-full ${
-                          task.status === 'completed' ? 'bg-green-500' : 
-                          task.status === 'in_progress' ? 'bg-yellow-500' : 'bg-slate-400'
-                        }`}></div>
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium">{task.title}</p>
-                        <p className="text-sm text-slate-500">{task.description}</p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <Calendar className="w-3 h-3 text-slate-400" />
-                          <span className="text-xs text-slate-600">
-                            {task.dueDate ? formatDate(task.dueDate) : 'No due date'}
-                          </span>
-                        </div>
-                      </div>
-                      <Badge variant="outline">{task.priority}</Badge>
+                  {/* Active Tasks */}
+                  <div className="mb-6">
+                    <h4 className="text-lg font-semibold mb-4 text-slate-800">Active Tasks</h4>
+                    <div className="space-y-3">
+                      {propertyTasks
+                        .filter((task: any) => task.status !== 'completed' && !task.isArchived)
+                        .map((task: any) => (
+                          <TaskCard key={task.id} task={task} showActions={true} />
+                        ))}
                     </div>
-                  ))}
+                  </div>
+
+                  {/* Completed Tasks */}
+                  <div className="mb-6">
+                    <h4 className="text-lg font-semibold mb-4 text-slate-800">Completed Tasks</h4>
+                    <div className="space-y-3">
+                      {propertyTasks
+                        .filter((task: any) => task.status === 'completed' && !task.isArchived)
+                        .sort((a: any, b: any) => new Date(b.completedAt || b.updatedAt).getTime() - new Date(a.completedAt || a.updatedAt).getTime())
+                        .map((task: any) => (
+                          <CompletedTaskCard key={task.id} task={task} />
+                        ))}
+                    </div>
+                  </div>
+
+                  {/* Archived Tasks (when toggled) */}
+                  {showArchivedTasks && (
+                    <div>
+                      <h4 className="text-lg font-semibold mb-4 text-slate-600">Archived Tasks</h4>
+                      <div className="space-y-3">
+                        {propertyTasks
+                          .filter((task: any) => task.isArchived)
+                          .sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+                          .map((task: any) => (
+                            <ArchivedTaskCard key={task.id} task={task} />
+                          ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-8 text-slate-500">
                   <History className="w-12 h-12 mx-auto mb-4 text-slate-400" />
                   <h3 className="text-lg font-medium mb-2">No Task History</h3>
                   <p className="mb-4">No tasks have been assigned to this property yet.</p>
-                  <Button className="bg-primary hover:bg-primary/90">
+                  <Button onClick={openTaskModal} className="bg-primary hover:bg-primary/90">
                     <Plus className="w-4 h-4 mr-2" />
                     Create First Task
                   </Button>
@@ -889,5 +925,278 @@ export default function PropertyProfile() {
         </TabsContent>
       </Tabs>
     </main>
+  );
+}
+
+// Task Card Components
+function TaskCard({ task, showActions }: { task: any; showActions?: boolean }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const completeTaskMutation = useMutation({
+    mutationFn: async (taskId: number) => {
+      await apiRequest(`/api/tasks/${taskId}/complete`, {
+        method: "PATCH",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
+      toast({
+        title: "Task completed",
+        description: "Task has been marked as completed",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to complete task",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  return (
+    <div className="flex items-center space-x-3 p-4 bg-white border border-slate-200 rounded-lg">
+      <div className="flex-shrink-0">
+        <div className={`w-3 h-3 rounded-full ${
+          task.status === 'completed' ? 'bg-green-500' : 
+          task.status === 'in_progress' ? 'bg-yellow-500' : 'bg-slate-400'
+        }`}></div>
+      </div>
+      <div className="flex-1">
+        <p className="font-medium text-slate-900">{task.title}</p>
+        <p className="text-sm text-slate-600">{task.description}</p>
+        <div className="flex items-center space-x-4 mt-2">
+          <div className="flex items-center space-x-1">
+            <Calendar className="w-3 h-3 text-slate-400" />
+            <span className="text-xs text-slate-500">
+              {task.dueDate ? formatDate(task.dueDate) : 'No due date'}
+            </span>
+          </div>
+          {task.assignedUser && (
+            <div className="flex items-center space-x-1">
+              <User className="w-3 h-3 text-slate-400" />
+              <span className="text-xs text-slate-500">
+                {task.assignedUser.firstName} {task.assignedUser.lastName}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center space-x-2">
+        <Badge variant="outline">{task.priority}</Badge>
+        {showActions && task.status !== 'completed' && (
+          <Button
+            size="sm"
+            onClick={() => completeTaskMutation.mutate(task.id)}
+            disabled={completeTaskMutation.isPending}
+          >
+            <CheckSquare className="w-4 h-4 mr-1" />
+            Complete
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CompletedTaskCard({ task }: { task: any }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const archiveTaskMutation = useMutation({
+    mutationFn: async (taskId: number) => {
+      await apiRequest(`/api/tasks/${taskId}/archive`, {
+        method: "PATCH",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
+      toast({
+        title: "Task archived",
+        description: "Task has been moved to archive",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to archive task",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: async (taskId: number) => {
+      await apiRequest(`/api/tasks/${taskId}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
+      toast({
+        title: "Task deleted",
+        description: "Task has been permanently deleted",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to delete task",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  return (
+    <div className="flex items-center space-x-3 p-4 bg-green-50 border border-green-200 rounded-lg">
+      <div className="flex-shrink-0">
+        <CheckSquare className="w-5 h-5 text-green-600" />
+      </div>
+      <div className="flex-1">
+        <p className="font-medium text-slate-900">{task.title}</p>
+        <p className="text-sm text-slate-600">{task.description}</p>
+        <div className="flex items-center space-x-4 mt-2">
+          <div className="flex items-center space-x-1">
+            <Calendar className="w-3 h-3 text-slate-400" />
+            <span className="text-xs text-slate-500">
+              Completed: {task.completedAt ? formatDate(task.completedAt) : formatDate(task.updatedAt)}
+            </span>
+          </div>
+          {task.assignedUser && (
+            <div className="flex items-center space-x-1">
+              <User className="w-3 h-3 text-slate-400" />
+              <span className="text-xs text-slate-500">
+                {task.assignedUser.firstName} {task.assignedUser.lastName}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center space-x-2">
+        <Badge variant="default" className="bg-green-100 text-green-800">
+          Completed
+        </Badge>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm">
+              <MoreVertical className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem 
+              onClick={() => archiveTaskMutation.mutate(task.id)}
+              disabled={archiveTaskMutation.isPending}
+            >
+              <Archive className="w-4 h-4 mr-2" />
+              Archive
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={() => deleteTaskMutation.mutate(task.id)}
+              disabled={deleteTaskMutation.isPending}
+              className="text-red-600"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+}
+
+function ArchivedTaskCard({ task }: { task: any }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: async (taskId: number) => {
+      await apiRequest(`/api/tasks/${taskId}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
+      toast({
+        title: "Task deleted",
+        description: "Task has been permanently deleted",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to delete task",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  return (
+    <div className="flex items-center space-x-3 p-4 bg-slate-50 border border-slate-200 rounded-lg opacity-75">
+      <div className="flex-shrink-0">
+        <Archive className="w-5 h-5 text-slate-400" />
+      </div>
+      <div className="flex-1">
+        <p className="font-medium text-slate-700">{task.title}</p>
+        <p className="text-sm text-slate-500">{task.description}</p>
+        <div className="flex items-center space-x-4 mt-2">
+          <div className="flex items-center space-x-1">
+            <Calendar className="w-3 h-3 text-slate-400" />
+            <span className="text-xs text-slate-400">
+              Archived: {formatDate(task.updatedAt)}
+            </span>
+          </div>
+          {task.assignedUser && (
+            <div className="flex items-center space-x-1">
+              <User className="w-3 h-3 text-slate-400" />
+              <span className="text-xs text-slate-400">
+                {task.assignedUser.firstName} {task.assignedUser.lastName}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center space-x-2">
+        <Badge variant="secondary" className="bg-slate-200 text-slate-600">
+          Archived
+        </Badge>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => deleteTaskMutation.mutate(task.id)}
+          disabled={deleteTaskMutation.isPending}
+          className="text-red-600 hover:text-red-700"
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      </div>
+    </div>
   );
 }

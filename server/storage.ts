@@ -62,6 +62,8 @@ export interface IStorage {
   updateTask(id: number, task: Partial<InsertTask>): Promise<Task>;
   assignTask(taskId: number, userId: string, assignedById: string): Promise<Task>;
   completeTask(taskId: number): Promise<Task>;
+  archiveTask(taskId: number): Promise<Task>;
+  deleteTask(taskId: number): Promise<void>;
   
   // Contact operations
   getContacts(): Promise<Contact[]>;
@@ -221,6 +223,7 @@ export class DatabaseStorage implements IStorage {
       assignedById: tasks.assignedById,
       dueDate: tasks.dueDate,
       completedAt: tasks.completedAt,
+      isArchived: tasks.isArchived,
       createdAt: tasks.createdAt,
       updatedAt: tasks.updatedAt,
       property: {
@@ -248,11 +251,61 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTasksByProperty(propertyId: number): Promise<Task[]> {
-    return await db.select().from(tasks).where(eq(tasks.propertyId, propertyId)).orderBy(desc(tasks.createdAt));
+    return await db.select({
+      id: tasks.id,
+      title: tasks.title,
+      description: tasks.description,
+      priority: tasks.priority,
+      status: tasks.status,
+      propertyId: tasks.propertyId,
+      assignedToId: tasks.assignedToId,
+      assignedById: tasks.assignedById,
+      dueDate: tasks.dueDate,
+      completedAt: tasks.completedAt,
+      isArchived: tasks.isArchived,
+      createdAt: tasks.createdAt,
+      updatedAt: tasks.updatedAt,
+      assignedUser: {
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        profileImageUrl: users.profileImageUrl,
+      }
+    })
+    .from(tasks)
+    .leftJoin(users, eq(tasks.assignedToId, users.id))
+    .where(eq(tasks.propertyId, propertyId))
+    .orderBy(desc(tasks.createdAt));
   }
 
   async getTasksByUser(userId: string): Promise<Task[]> {
-    return await db.select().from(tasks).where(eq(tasks.assignedToId, userId)).orderBy(desc(tasks.createdAt));
+    return await db.select({
+      id: tasks.id,
+      title: tasks.title,
+      description: tasks.description,
+      priority: tasks.priority,
+      status: tasks.status,
+      propertyId: tasks.propertyId,
+      assignedToId: tasks.assignedToId,
+      assignedById: tasks.assignedById,
+      dueDate: tasks.dueDate,
+      completedAt: tasks.completedAt,
+      isArchived: tasks.isArchived,
+      createdAt: tasks.createdAt,
+      updatedAt: tasks.updatedAt,
+      property: {
+        id: properties.id,
+        name: properties.name,
+        address1: properties.address1,
+        city: properties.city,
+        state: properties.state,
+      }
+    })
+    .from(tasks)
+    .leftJoin(properties, eq(tasks.propertyId, properties.id))
+    .where(eq(tasks.assignedToId, userId))
+    .orderBy(desc(tasks.createdAt));
   }
 
   async getUrgentTasks(): Promise<Task[]> {
@@ -284,6 +337,7 @@ export class DatabaseStorage implements IStorage {
       assignedById: tasks.assignedById,
       dueDate: tasks.dueDate,
       completedAt: tasks.completedAt,
+      isArchived: tasks.isArchived,
       createdAt: tasks.createdAt,
       updatedAt: tasks.updatedAt,
       property: {
@@ -386,6 +440,45 @@ export class DatabaseStorage implements IStorage {
     });
     
     return updatedTask;
+  }
+
+  async archiveTask(taskId: number): Promise<Task> {
+    const [updatedTask] = await db
+      .update(tasks)
+      .set({ 
+        isArchived: true,
+        updatedAt: new Date() 
+      })
+      .where(eq(tasks.id, taskId))
+      .returning();
+    
+    // Log activity
+    await this.logActivity({
+      userId: updatedTask.assignedToId || "system",
+      action: "task_archived",
+      entityType: "task",
+      entityId: taskId.toString(),
+      description: `Archived task "${updatedTask.title}"`,
+    });
+    
+    return updatedTask;
+  }
+
+  async deleteTask(taskId: number): Promise<void> {
+    const taskToDelete = await this.getTask(taskId);
+    
+    await db.delete(tasks).where(eq(tasks.id, taskId));
+    
+    // Log activity
+    if (taskToDelete) {
+      await this.logActivity({
+        userId: taskToDelete.assignedToId || "system",
+        action: "task_deleted",
+        entityType: "task",
+        entityId: taskId.toString(),
+        description: `Deleted task "${taskToDelete.title}"`,
+      });
+    }
   }
 
   // Contact operations

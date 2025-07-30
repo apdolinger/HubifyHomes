@@ -355,6 +355,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/tasks/:id/archive", isAuthenticated, async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      const task = await storage.archiveTask(taskId);
+      res.json(task);
+    } catch (error) {
+      console.error("Error archiving task:", error);
+      res.status(500).json({ message: "Failed to archive task" });
+    }
+  });
+
+  app.delete("/api/tasks/:id", isAuthenticated, async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      await storage.deleteTask(taskId);
+      res.json({ message: "Task deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      res.status(500).json({ message: "Failed to delete task" });
+    }
+  });
+
   // Contact routes
   app.get("/api/contacts", isAuthenticated, async (req, res) => {
     try {

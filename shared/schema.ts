@@ -90,6 +90,7 @@ export const tasks = pgTable("tasks", {
   assignedById: varchar("assigned_by_id").references(() => users.id),
   dueDate: timestamp("due_date"),
   completedAt: timestamp("completed_at"),
+  isArchived: boolean("is_archived").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
