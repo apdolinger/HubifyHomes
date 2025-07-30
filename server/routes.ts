@@ -431,6 +431,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/tasks/check-conflicts", isAuthenticated, async (req, res) => {
+    try {
+      const { assignedUserId, dueDate, timeEstimate, excludeTaskId } = req.body;
+      const conflicts = await storage.checkTaskConflicts(assignedUserId, dueDate, timeEstimate, excludeTaskId);
+      res.json(conflicts);
+    } catch (error) {
+      console.error("Error checking task conflicts:", error);
+      res.status(500).json({ message: "Failed to check task conflicts" });
+    }
+  });
+
   // Contact routes
   app.get("/api/contacts", isAuthenticated, async (req, res) => {
     try {

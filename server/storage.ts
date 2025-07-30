@@ -65,6 +65,7 @@ export interface IStorage {
   completeTask(taskId: number): Promise<Task>;
   archiveTask(taskId: number): Promise<Task>;
   deleteTask(taskId: number): Promise<void>;
+  checkTaskConflicts(assignedUserId: string, dueDate: string, timeEstimate: string, excludeTaskId?: number): Promise<any[]>;
   
   // Contact operations
   getContacts(includeInactive?: boolean): Promise<Contact[]>;
@@ -594,6 +595,99 @@ export class DatabaseStorage implements IStorage {
         entityId: taskId.toString(),
         description: `Deleted task "${taskToDelete.title}"`,
       });
+    }
+  }
+
+  async checkTaskConflicts(assignedUserId: string, dueDate: string, timeEstimate: string, excludeTaskId?: number): Promise<any[]> {
+    try {
+      // Parse the time estimate to get duration in minutes
+      const timeMatch = timeEstimate.match(/(\d+)\s*days?\s*(\d+)\s*hours?\s*(\d+)\s*minutes?/);
+      let durationMinutes = 0;
+      if (timeMatch) {
+        const [, days, hours, minutes] = timeMatch;
+        durationMinutes = (parseInt(days) || 0) * 24 * 60 + (parseInt(hours) || 0) * 60 + (parseInt(minutes) || 0);
+      }
+
+      // Convert dueDate to Date object
+      const taskDate = new Date(dueDate);
+      const startTime = new Date(taskDate.getTime() - durationMinutes * 60000); // Subtract duration from due date
+      const endTime = taskDate;
+
+      // Query for overlapping tasks assigned to the same user
+      let query = db
+        .select({
+          id: tasks.id,
+          title: tasks.title,
+          dueDate: tasks.dueDate,
+          timeEstimate: tasks.timeEstimate,
+          assignedToId: tasks.assignedToId,
+          propertyId: tasks.propertyId,
+          assignedToName: sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, 'Unassigned')`,
+          property: sql<string>`${properties.name}`,
+        })
+        .from(tasks)
+        .leftJoin(users, eq(tasks.assignedToId, users.id))
+        .leftJoin(properties, eq(tasks.propertyId, properties.id))
+        .where(
+          and(
+            eq(tasks.assignedToId, assignedUserId),
+            eq(tasks.status, 'pending'), // Only check pending tasks
+            sql`${tasks.dueDate} IS NOT NULL`
+          )
+        );
+
+      // Exclude current task if editing by adding to existing where conditions
+      if (excludeTaskId) {
+        query = db
+          .select({
+            id: tasks.id,
+            title: tasks.title,
+            dueDate: tasks.dueDate,
+            timeEstimate: tasks.timeEstimate,
+            assignedToId: tasks.assignedToId,
+            propertyId: tasks.propertyId,
+            assignedToName: sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, 'Unassigned')`,
+            property: sql<string>`${properties.name}`,
+          })
+          .from(tasks)
+          .leftJoin(users, eq(tasks.assignedToId, users.id))
+          .leftJoin(properties, eq(tasks.propertyId, properties.id))
+          .where(
+            and(
+              eq(tasks.assignedToId, assignedUserId),
+              eq(tasks.status, 'pending'),
+              sql`${tasks.dueDate} IS NOT NULL`,
+              sql`${tasks.id} != ${excludeTaskId}`
+            )
+          );
+      }
+
+      const existingTasks = await query;
+
+      // Check for time conflicts
+      const conflicts = existingTasks.filter(existingTask => {
+        if (!existingTask.dueDate || !existingTask.timeEstimate) return false;
+
+        // Parse existing task's time estimate
+        const existingTimeMatch = existingTask.timeEstimate.match(/(\d+)\s*days?\s*(\d+)\s*hours?\s*(\d+)\s*minutes?/);
+        let existingDurationMinutes = 0;
+        if (existingTimeMatch) {
+          const [, days, hours, minutes] = existingTimeMatch;
+          existingDurationMinutes = (parseInt(days) || 0) * 24 * 60 + (parseInt(hours) || 0) * 60 + (parseInt(minutes) || 0);
+        }
+
+        const existingEndTime = new Date(existingTask.dueDate);
+        const existingStartTime = new Date(existingEndTime.getTime() - existingDurationMinutes * 60000);
+
+        // Check for overlap: tasks overlap if one starts before the other ends
+        const overlap = startTime < existingEndTime && endTime > existingStartTime;
+        return overlap;
+      });
+
+      return conflicts;
+    } catch (error) {
+      console.error("Error checking task conflicts:", error);
+      return [];
     }
   }
 

@@ -85,6 +85,8 @@ export default function TaskProfile() {
   const [taskImage, setTaskImage] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isImageUploading, setIsImageUploading] = useState(false);
+  const [conflictData, setConflictData] = useState<any>(null);
+  const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
 
   // Task templates
   const taskTemplates = {
@@ -339,7 +341,7 @@ export default function TaskProfile() {
     }
   }, [task]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     // Transform form data to match API expectations
     const updateData = {
       title: editForm.title,
@@ -357,6 +359,21 @@ export default function TaskProfile() {
       billingAmount: editForm.billingAmount,
       // Note: checklist, attachments, etc. will be handled later when we implement those features
     };
+
+    // Check for conflicts before saving
+    if (editForm.assignedTo && editForm.dueDate) {
+      try {
+        const conflicts = await checkForConflicts(editForm.assignedTo, editForm.dueDate, editForm.timeEstimate, task?.id);
+        if (conflicts && conflicts.length > 0) {
+          setConflictData({ conflicts, updateData });
+          setIsConflictModalOpen(true);
+          return; // Don't save yet - let user resolve conflicts
+        }
+      } catch (error) {
+        console.log("Conflict check failed, proceeding with save");
+      }
+    }
+
     console.log("Sending update data:", updateData);
     updateTaskMutation.mutate(updateData, {
       onSuccess: () => {
@@ -369,6 +386,45 @@ export default function TaskProfile() {
         setIsEditModalOpen(false);
       }
     });
+  };
+
+  const checkForConflicts = async (assignedUserId: string, dueDate: string, timeEstimate: string, currentTaskId?: number) => {
+    try {
+      const response = await apiRequest('/api/tasks/check-conflicts', {
+        method: 'POST',
+        body: {
+          assignedUserId,
+          dueDate,
+          timeEstimate,
+          excludeTaskId: currentTaskId
+        }
+      });
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const handleConflictResolution = (forceUpdate: boolean) => {
+    if (forceUpdate && conflictData) {
+      // User chose to proceed despite conflicts
+      console.log("Forcing update despite conflicts:", conflictData.updateData);
+      updateTaskMutation.mutate(conflictData.updateData, {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ['/api/tasks', task?.id?.toString()] });
+          queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/dashboard/urgent-tasks'] });
+          setIsEditModalOpen(false);
+          setIsConflictModalOpen(false);
+          setConflictData(null);
+        }
+      });
+    } else {
+      // User chose to go back and edit
+      setIsConflictModalOpen(false);
+      setConflictData(null);
+    }
   };
 
   const handleCancel = () => {
@@ -1097,17 +1153,7 @@ export default function TaskProfile() {
                     )}
                   </div>
 
-                  {/* Conflict Warning */}
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <AlertCircle className="w-5 h-5 text-yellow-600" />
-                      <span className="font-medium text-yellow-800">Schedule Conflict</span>
-                    </div>
-                    <p className="text-sm text-yellow-700 mt-1">
-                      This task overlaps with another task assigned to the same person or property. 
-                      Supervisor override may be required.
-                    </p>
-                  </div>
+
                 </div>
 
                 <DialogFooter>
@@ -1581,6 +1627,47 @@ export default function TaskProfile() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Conflict Resolution Modal */}
+      <Dialog open={isConflictModalOpen} onOpenChange={setIsConflictModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <AlertCircle className="w-5 h-5 text-yellow-600" />
+              <span>Schedule Conflict</span>
+            </DialogTitle>
+            <DialogDescription>
+              This task conflicts with existing assignments. Review the conflicts below.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {conflictData?.conflicts?.map((conflict: any, index: number) => (
+              <div key={index} className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="font-medium text-sm text-yellow-800">
+                  {conflict.title}
+                </div>
+                <div className="text-xs text-yellow-700 mt-1">
+                  {conflict.assignedToName} • {formatDate(conflict.dueDate)}
+                </div>
+                <div className="text-xs text-yellow-600 mt-1">
+                  {conflict.property ? `Property: ${conflict.property}` : ''}
+                  {conflict.timeEstimate ? ` • Duration: ${conflict.timeEstimate}` : ''}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <DialogFooter className="space-x-2">
+            <Button variant="outline" onClick={() => handleConflictResolution(false)}>
+              Back to Edit
+            </Button>
+            <Button onClick={() => handleConflictResolution(true)}>
+              Confirm Anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
