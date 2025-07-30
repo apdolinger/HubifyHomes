@@ -328,21 +328,57 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUrgentTasks(): Promise<Task[]> {
-    return await db
-      .select()
-      .from(tasks)
-      .where(and(
-        eq(tasks.status, "pending"),
-        eq(tasks.isArchived, false),
-        or(
-          eq(tasks.priority, "urgent"),
-          and(
-            eq(tasks.priority, "high"),
-            sql`${tasks.dueDate} <= CURRENT_TIMESTAMP + INTERVAL '1 day'`
-          )
-        )
-      ))
-      .orderBy(desc(tasks.priority), tasks.dueDate);
+    return await db.select({
+      id: tasks.id,
+      title: tasks.title,
+      description: tasks.description,
+      priority: tasks.priority,
+      status: tasks.status,
+      propertyId: tasks.propertyId,
+      contactId: tasks.contactId,
+      assignedToId: tasks.assignedToId,
+      assignedById: tasks.assignedById,
+      dueDate: tasks.dueDate,
+      completedAt: tasks.completedAt,
+      isArchived: tasks.isArchived,
+      createdAt: tasks.createdAt,
+      updatedAt: tasks.updatedAt,
+      property: {
+        id: properties.id,
+        name: properties.name,
+        address1: properties.address1,
+        address2: properties.address2,
+        city: properties.city,
+        state: properties.state,
+        zip: properties.zip,
+        type: properties.type,
+      },
+      contact: {
+        id: contacts.id,
+        firstName: contacts.firstName,
+        lastName: contacts.lastName,
+        email: contacts.email,
+        phone: contacts.phone,
+        type: contacts.type,
+      },
+      assignedUser: {
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        profileImageUrl: users.profileImageUrl,
+      }
+    })
+    .from(tasks)
+    .leftJoin(properties, eq(tasks.propertyId, properties.id))
+    .leftJoin(contacts, eq(tasks.contactId, contacts.id))
+    .leftJoin(users, eq(tasks.assignedToId, users.id))
+    .where(and(
+      or(eq(tasks.status, "pending"), eq(tasks.status, "in_progress")),
+      eq(tasks.isArchived, false),
+      eq(tasks.priority, "urgent")
+    ))
+    .orderBy(desc(tasks.createdAt));
   }
 
   async getTask(id: number): Promise<Task | undefined> {
@@ -792,11 +828,9 @@ export class DatabaseStorage implements IStorage {
       .select({ count: count() })
       .from(tasks)
       .where(and(
-        eq(tasks.status, "pending"),
-        or(
-          eq(tasks.priority, "urgent"),
-          eq(tasks.priority, "high")
-        )
+        or(eq(tasks.status, "pending"), eq(tasks.status, "in_progress")),
+        eq(tasks.isArchived, false),
+        eq(tasks.priority, "urgent")
       ));
 
     const [completedTodayCount] = await db
