@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import AdminForms from "./AdminForms";
+import { SupportModal } from "@/components/SupportModal";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ export default function Admin() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState("forms");
   const [isNewTemplateDialogOpen, setIsNewTemplateDialogOpen] = useState(false);
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
 
   // Redirect if not admin or manager
   useEffect(() => {
@@ -655,7 +657,10 @@ export default function Admin() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3">
-                  <Button className="w-full justify-start">
+                  <Button 
+                    className="w-full justify-start"
+                    onClick={() => setIsSupportModalOpen(true)}
+                  >
                     <MessageSquare className="w-4 h-4 mr-2" />
                     Contact Support
                   </Button>
@@ -679,6 +684,11 @@ export default function Admin() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <SupportModal
+        isOpen={isSupportModalOpen}
+        onClose={() => setIsSupportModalOpen(false)}
+      />
     </main>
   );
 }

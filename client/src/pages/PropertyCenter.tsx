@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { SupportModal } from "@/components/SupportModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import {
 export default function PropertyCenter() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -349,9 +351,12 @@ export default function PropertyCenter() {
               Our property management team is here to assist you with any questions or concerns.
             </p>
             <div className="flex items-center justify-center space-x-4">
-              <Button variant="outline">
+              <Button 
+                variant="outline"
+                onClick={() => setIsSupportModalOpen(true)}
+              >
                 <Mail className="w-4 h-4 mr-2" />
-                Email Support
+                Contact Support
               </Button>
               <Button variant="outline">
                 <Phone className="w-4 h-4 mr-2" />
@@ -361,6 +366,11 @@ export default function PropertyCenter() {
           </div>
         </CardContent>
       </Card>
+
+      <SupportModal
+        isOpen={isSupportModalOpen}
+        onClose={() => setIsSupportModalOpen(false)}
+      />
     </main>
   );
 }

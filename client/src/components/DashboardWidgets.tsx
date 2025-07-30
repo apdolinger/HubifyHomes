@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { SupportModal } from "@/components/SupportModal";
 import { 
   Calendar, 
   HelpCircle, 
@@ -11,6 +12,7 @@ import {
   Lightbulb,
   Users
 } from "lucide-react";
+import { useState } from "react";
 
 interface CalendarWidgetProps {
   className?: string;
@@ -75,49 +77,73 @@ interface SupportWidgetProps {
 }
 
 export function SupportWidget({ className }: SupportWidgetProps) {
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+
   return (
-    <Card className={className}>
-      <CardHeader>
-        <CardTitle className="flex items-center">
-          <HelpCircle className="w-5 h-5 mr-2" />
-          Support
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          <div className="grid grid-cols-1 gap-3">
-            <Button variant="outline" className="justify-start">
-              <BookOpen className="w-4 h-4 mr-2" />
-              Help Documentation
-              <ExternalLink className="w-3 h-3 ml-auto" />
-            </Button>
+    <>
+      <Card className={className}>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <HelpCircle className="w-5 h-5 mr-2" />
+            Support
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-3">
+              <Button 
+                variant="outline" 
+                className="justify-start"
+                onClick={() => window.open('https://help.dwellerlyonline.com', '_blank')}
+              >
+                <BookOpen className="w-4 h-4 mr-2" />
+                Help Documentation
+                <ExternalLink className="w-3 h-3 ml-auto" />
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                className="justify-start"
+                onClick={() => window.open('https://help.dwellerlyonline.com/videos', '_blank')}
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Training Videos
+                <ExternalLink className="w-3 h-3 ml-auto" />
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                className="justify-start"
+                onClick={() => window.open('https://help.dwellerlyonline.com/tips', '_blank')}
+              >
+                <Lightbulb className="w-4 h-4 mr-2" />
+                Tips & Tricks
+                <ExternalLink className="w-3 h-3 ml-auto" />
+              </Button>
+            </div>
             
-            <Button variant="outline" className="justify-start">
-              <Users className="w-4 h-4 mr-2" />
-              Training Videos
-              <ExternalLink className="w-3 h-3 ml-auto" />
-            </Button>
+            <div className="bg-slate-50 rounded-lg p-3">
+              <h4 className="font-medium text-slate-900 mb-1">Quick Tip</h4>
+              <p className="text-sm text-slate-600">
+                Use keyboard shortcut "T" to quickly add a new task from anywhere in the app.
+              </p>
+            </div>
             
-            <Button variant="outline" className="justify-start">
-              <Lightbulb className="w-4 h-4 mr-2" />
-              Tips & Tricks
-              <ExternalLink className="w-3 h-3 ml-auto" />
+            <Button 
+              className="w-full bg-primary hover:bg-primary/90"
+              onClick={() => setIsSupportModalOpen(true)}
+            >
+              Contact Support
             </Button>
           </div>
-          
-          <div className="bg-slate-50 rounded-lg p-3">
-            <h4 className="font-medium text-slate-900 mb-1">Quick Tip</h4>
-            <p className="text-sm text-slate-600">
-              Use keyboard shortcut "T" to quickly add a new task from anywhere in the app.
-            </p>
-          </div>
-          
-          <Button className="w-full bg-primary hover:bg-primary/90">
-            Contact Support
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      <SupportModal
+        isOpen={isSupportModalOpen}
+        onClose={() => setIsSupportModalOpen(false)}
+      />
+    </>
   );
 }
 
