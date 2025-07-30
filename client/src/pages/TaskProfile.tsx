@@ -322,7 +322,7 @@ export default function TaskProfile() {
       description: editForm.description,
       priority: editForm.priority,
       status: editForm.status,
-      dueDate: editForm.dueDate ? new Date(editForm.dueDate).toISOString() : null,
+      dueDate: editForm.dueDate ? new Date(editForm.dueDate) : null,
       assignedToId: editForm.assignedTo || null,
       timeEstimate: editForm.timeEstimate,
       category: editForm.category,
