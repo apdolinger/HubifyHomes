@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useTaskModal } from "@/contexts/TaskModalContext";
 import { useToast } from "@/hooks/use-toast";
-import { useLocation } from "wouter";
+import { useLocation, useParams } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -80,9 +80,9 @@ export default function PropertyProfile() {
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<any>(null);
   
-  // Get property ID from URL query params
-  const urlParams = new URLSearchParams(window.location.search);
-  const propertyId = urlParams.get('id');
+  // Get property ID from URL path parameters
+  const params = useParams();
+  const propertyId = params.id;
   
   // Redirect if not authenticated
   useEffect(() => {
