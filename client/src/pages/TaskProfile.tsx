@@ -253,7 +253,7 @@ export default function TaskProfile() {
   // Update task mutation
   const updateTaskMutation = useMutation({
     mutationFn: async (updatedTask: any) => {
-      return await apiRequest(`/api/tasks/${taskId}`, "PATCH", updatedTask);
+      return await apiRequest("PATCH", `/api/tasks/${taskId}`, updatedTask);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
