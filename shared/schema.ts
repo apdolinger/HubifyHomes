@@ -91,6 +91,12 @@ export const tasks = pgTable("tasks", {
   assignedById: varchar("assigned_by_id").references(() => users.id),
   dueDate: timestamp("due_date"),
   completedAt: timestamp("completed_at"),
+  timeEstimate: varchar("time_estimate"), // e.g., "1 days 2 hours 30 minutes"
+  category: varchar("category"), // maintenance, inspection, cleaning, repair, administrative
+  isRecurring: boolean("is_recurring").notNull().default(false),
+  recurrenceFrequency: varchar("recurrence_frequency"), // daily, weekly, monthly, quarterly
+  billedSeparately: boolean("billed_separately").notNull().default(false),
+  billingAmount: varchar("billing_amount"), // dollar amount as string, e.g., "125.00"
   isArchived: boolean("is_archived").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
