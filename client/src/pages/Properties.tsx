@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Building, MapPin, Users, Plus, Home, Square, DollarSign, Activity, Eye, Edit, ToggleLeft, ToggleRight } from "lucide-react";
+import { Building, MapPin, Users, Plus, Home, Square, DollarSign, Activity, Eye, Edit, ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useLocation } from "wouter";
@@ -45,6 +45,9 @@ export default function Properties() {
   const [, setLocation] = useLocation();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [selectedProperty, setSelectedProperty] = useState<any>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -131,8 +134,55 @@ export default function Properties() {
     },
   });
 
+  // Delete property mutation
+  const deletePropertyMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiRequest("DELETE", `/api/properties/${id}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
+      toast({
+        title: "Property Deleted",
+        description: "Property has been permanently deleted.",
+      });
+      setDeleteModalOpen(false);
+      setSelectedProperty(null);
+      setDeleteConfirmText("");
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to delete property. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleAddProperty = (data: PropertyFormData) => {
     createPropertyMutation.mutate(data);
+  };
+
+  const handleDeleteProperty = (property: any) => {
+    setSelectedProperty(property);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDeleteProperty = () => {
+    if (deleteConfirmText === "DELETE" && selectedProperty) {
+      deletePropertyMutation.mutate(selectedProperty.id);
+    }
   };
 
   const getPrimaryContact = (propertyId: number) => {
@@ -570,6 +620,17 @@ export default function Properties() {
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteProperty(property);
+                            }}
+                            className="text-red-600 hover:text-red-700 hover:border-red-300"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -593,6 +654,57 @@ export default function Properties() {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Property Confirmation Modal */}
+      <Dialog open={deleteModalOpen} onOpenChange={(open) => {
+        setDeleteModalOpen(open);
+        if (!open) {
+          setSelectedProperty(null);
+          setDeleteConfirmText("");
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Delete Property</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Are you sure you want to permanently delete <strong>{selectedProperty?.name}</strong>? 
+              This action cannot be undone.
+            </p>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <p className="text-sm text-yellow-800 font-medium">
+                Type <code className="bg-yellow-100 px-1 rounded">DELETE</code> to confirm:
+              </p>
+              <Input
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="Type DELETE here"
+                className="mt-2"
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDeleteModalOpen(false);
+                  setSelectedProperty(null);
+                  setDeleteConfirmText("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={deleteConfirmText !== "DELETE" || deletePropertyMutation.isPending}
+                onClick={confirmDeleteProperty}
+              >
+                {deletePropertyMutation.isPending ? "Deleting..." : "Delete Property"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

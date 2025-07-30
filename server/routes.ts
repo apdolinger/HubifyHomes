@@ -276,6 +276,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete property
+  app.delete("/api/properties/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid property ID' });
+      }
+
+      await storage.deleteProperty(id);
+      res.json({ message: 'Property deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting property:', error);
+      res.status(500).json({ message: 'Failed to delete property' });
+    }
+  });
+
   // Task routes
   app.get("/api/tasks", isAuthenticated, async (req, res) => {
     try {
@@ -402,6 +418,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error creating contact:", error);
       res.status(500).json({ message: "Failed to create contact" });
+    }
+  });
+
+  app.patch("/api/contacts/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid contact ID" });
+      }
+
+      const updateData = insertContactSchema.partial().parse(req.body);
+      const contact = await storage.updateContact(id, updateData);
+      res.json(contact);
+    } catch (error) {
+      console.error("Error updating contact:", error);
+      res.status(500).json({ message: "Failed to update contact" });
+    }
+  });
+
+  // Delete contact
+  app.delete("/api/contacts/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid contact ID' });
+      }
+
+      await storage.deleteContact(id);
+      res.json({ message: 'Contact deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting contact:', error);
+      res.status(500).json({ message: 'Failed to delete contact' });
     }
   });
 

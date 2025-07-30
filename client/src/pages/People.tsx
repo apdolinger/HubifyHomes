@@ -51,6 +51,9 @@ export default function People() {
   const [selectedContact, setSelectedContact] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showInactive, setShowInactive] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [contactToDelete, setContactToDelete] = useState<any>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -238,9 +241,14 @@ export default function People() {
     }
   };
 
-  const handleDeleteContact = (id: number) => {
-    if (confirm("Are you sure you want to delete this contact?")) {
-      deleteContactMutation.mutate(id);
+  const handleDeleteContact = (contact: any) => {
+    setContactToDelete(contact);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDeleteContact = () => {
+    if (deleteConfirmText === "DELETE" && contactToDelete) {
+      deleteContactMutation.mutate(contactToDelete.id);
     }
   };
 
@@ -521,7 +529,7 @@ export default function People() {
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDeleteContact(contact.id);
+                        handleDeleteContact(contact);
                       }}
                       className="text-red-600 hover:text-red-700"
                     >
@@ -843,6 +851,57 @@ export default function People() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Contact Confirmation Modal */}
+      <Dialog open={deleteModalOpen} onOpenChange={(open) => {
+        setDeleteModalOpen(open);
+        if (!open) {
+          setContactToDelete(null);
+          setDeleteConfirmText("");
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Delete Contact</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Are you sure you want to permanently delete <strong>{contactToDelete?.firstName} {contactToDelete?.lastName}</strong>? 
+              This action cannot be undone.
+            </p>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <p className="text-sm text-yellow-800 font-medium">
+                Type <code className="bg-yellow-100 px-1 rounded">DELETE</code> to confirm:
+              </p>
+              <Input
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="Type DELETE here"
+                className="mt-2"
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDeleteModalOpen(false);
+                  setContactToDelete(null);
+                  setDeleteConfirmText("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={deleteConfirmText !== "DELETE" || deleteContactMutation.isPending}
+                onClick={confirmDeleteContact}
+              >
+                {deleteContactMutation.isPending ? "Deleting..." : "Delete Contact"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </main>
