@@ -541,7 +541,7 @@ export default function Properties() {
                     <TableRow 
                       key={property.id}
                       className="cursor-pointer hover:bg-slate-50"
-                      onClick={() => setLocation(`/property-profile?id=${property.id}`)}
+                      onClick={() => setLocation(`/property-profile/${property.id}`)}
                     >
                       <TableCell>
                         {property.imageUrl ? (
@@ -608,7 +608,7 @@ export default function Properties() {
                             variant="outline"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setLocation(`/property-profile?id=${property.id}`);
+                              setLocation(`/property-profile/${property.id}`);
                             }}
                           >
                             <Eye className="h-4 w-4" />
@@ -618,7 +618,7 @@ export default function Properties() {
                             variant="outline"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setLocation(`/property-profile?id=${property.id}&edit=true`);
+                              setLocation(`/property-profile/${property.id}?edit=true`);
                             }}
                           >
                             <Edit className="h-4 w-4" />

@@ -283,7 +283,7 @@ export default function PersonProfile() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setLocation(`/property-profile?id=${property.id}`)}
+                      onClick={() => setLocation(`/property-profile/${property.id}`)}
                     >
                       View
                     </Button>
