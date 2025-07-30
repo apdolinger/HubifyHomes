@@ -1017,6 +1017,71 @@ export default function TaskProfile() {
                 </CardContent>
               </Card>
 
+              {/* Property Information - moved up below description */}
+              {(task as any).property && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Building className="w-5 h-5 mr-2" />
+                      Property Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-sm font-medium text-slate-500">Property</Label>
+                        <Button
+                          variant="link"
+                          className="p-0 h-auto font-medium text-blue-600 hover:text-blue-800"
+                          onClick={() => navigate(`/property-profile?id=${(task as any).property.id}`)}
+                        >
+                          {(task as any).property.name}
+                        </Button>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-slate-500">Address</Label>
+                        <p className="text-slate-700">
+                          {(task as any).property ? [
+                            (task as any).property.address1,
+                            (task as any).property.address2,
+                            (task as any).property.city,
+                            (task as any).property.state,
+                            (task as any).property.zip
+                          ].filter(Boolean).join(", ") : "No address"}
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-slate-500">Type</Label>
+                          <p className="text-slate-700 capitalize">{(task as any).property.type}</p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-slate-500">Units</Label>
+                          <p className="text-slate-700">{(task as any).property.units || 1}</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-slate-500">Status</Label>
+                          <Badge variant="outline" className="capitalize">
+                            {(task as any).property.status}
+                          </Badge>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-slate-500">Square Footage</Label>
+                          <p className="text-slate-700">
+                            {(task as any).property.squareFootage ? 
+                              `${(task as any).property.squareFootage.toLocaleString()} sq ft` : 
+                              'Not specified'
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Checklist / Subtasks */}
               <Card>
                 <CardHeader>
@@ -1165,69 +1230,7 @@ export default function TaskProfile() {
                 </CardContent>
               </Card>
 
-              {(task as any).property && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Building className="w-5 h-5 mr-2" />
-                      Property Information
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div>
-                        <Label className="text-sm font-medium text-slate-500">Property</Label>
-                        <Button
-                          variant="link"
-                          className="p-0 h-auto font-medium text-blue-600 hover:text-blue-800"
-                          onClick={() => navigate(`/property-profile?id=${(task as any).property.id}`)}
-                        >
-                          {(task as any).property.name}
-                        </Button>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-slate-500">Address</Label>
-                        <p className="text-slate-700">
-                          {(task as any).property ? [
-                            (task as any).property.address1,
-                            (task as any).property.address2,
-                            (task as any).property.city,
-                            (task as any).property.state,
-                            (task as any).property.zip
-                          ].filter(Boolean).join(", ") : "No address"}
-                        </p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label className="text-sm font-medium text-slate-500">Type</Label>
-                          <p className="text-slate-700 capitalize">{(task as any).property.type}</p>
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium text-slate-500">Units</Label>
-                          <p className="text-slate-700">{(task as any).property.units || 1}</p>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label className="text-sm font-medium text-slate-500">Status</Label>
-                          <Badge variant="outline" className="capitalize">
-                            {(task as any).property.status}
-                          </Badge>
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium text-slate-500">Square Footage</Label>
-                          <p className="text-slate-700">
-                            {(task as any).property.squareFootage ? 
-                              `${(task as any).property.squareFootage.toLocaleString()} sq ft` : 
-                              'Not specified'
-                            }
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+
             </div>
 
             {/* Sidebar */}
