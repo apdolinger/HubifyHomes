@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   Building, 
   AlertTriangle, 
@@ -24,7 +25,12 @@ import {
   Edit2,
   Trash2,
   Check,
-  X
+  X,
+  Reply,
+  Heart,
+  ThumbsUp,
+  Smile,
+  Mail
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -41,6 +47,9 @@ export default function Dashboard() {
   const [isCustomizationModalOpen, setIsCustomizationModalOpen] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
   const [editingContent, setEditingContent] = useState("");
+  const [replyingToId, setReplyingToId] = useState<number | null>(null);
+  const [replyContent, setReplyContent] = useState("");
+  const [emailNotification, setEmailNotification] = useState(false);
   
   // Widget icon mapping for consistent icons
   const getWidgetIcon = (id: string) => {
@@ -180,10 +189,10 @@ export default function Dashboard() {
 
   // Send message mutation
   const sendMessageMutation = useMutation({
-    mutationFn: async (message: string) => {
+    mutationFn: async ({ content, emailNotification }: { content: string; emailNotification: boolean }) => {
       return await apiRequest("/api/team-messages", {
         method: "POST",
-        body: { content: message }
+        body: { content, emailNotification }
       });
     },
     onSuccess: () => {
@@ -323,7 +332,7 @@ export default function Dashboard() {
 
   const handleSendMessage = () => {
     if (!newMessage.trim()) return;
-    sendMessageMutation.mutate(newMessage);
+    sendMessageMutation.mutate({ content: newMessage.trim(), emailNotification });
   };
 
   const handleEditMessage = (message: any) => {
@@ -345,6 +354,99 @@ export default function Dashboard() {
     if (confirm("Are you sure you want to delete this message?")) {
       deleteMessageMutation.mutate(messageId);
     }
+  };
+
+  // Reaction mutation
+  const reactionMutation = useMutation({
+    mutationFn: async ({ messageId, reaction }: { messageId: number; reaction: string }) => {
+      return await apiRequest(`/api/team-messages/${messageId}/reactions`, {
+        method: "POST",
+        body: { reaction }
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/team-messages"] });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to add reaction. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Reply mutation
+  const replyMutation = useMutation({
+    mutationFn: async ({ messageId, content, emailNotification }: { messageId: number; content: string; emailNotification: boolean }) => {
+      return await apiRequest(`/api/team-messages/${messageId}/reply`, {
+        method: "POST",
+        body: { content, emailNotification }
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/team-messages"] });
+      setReplyingToId(null);
+      setReplyContent("");
+      setEmailNotification(false);
+      toast({
+        title: "Reply sent",
+        description: "Your reply has been sent.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to send reply. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleReaction = (messageId: number, reaction: string) => {
+    reactionMutation.mutate({ messageId, reaction });
+  };
+
+  const handleStartReply = (messageId: number) => {
+    setReplyingToId(messageId);
+    setReplyContent("");
+  };
+
+  const handleSendReply = () => {
+    if (!replyContent.trim() || !replyingToId) return;
+    replyMutation.mutate({ 
+      messageId: replyingToId, 
+      content: replyContent.trim(),
+      emailNotification 
+    });
+  };
+
+  const handleCancelReply = () => {
+    setReplyingToId(null);
+    setReplyContent("");
+    setEmailNotification(false);
   };
 
   const handleCompleteTask = (taskId: number) => {
@@ -628,30 +730,176 @@ export default function Dashboard() {
                                   <p className="text-xs text-slate-900">{message.content}</p>
                                   <div className="flex items-center justify-between">
                                     <p className="text-xs text-slate-500">
-                                      {message.authorId} • {formatTimeAgo(message.createdAt)}
+                                      {message.author?.firstName} {message.author?.lastName} • {formatTimeAgo(message.createdAt)}
                                       {message.isEdited && " (edited)"}
+                                      {message.emailNotification && <Mail className="w-3 h-3 inline ml-1" />}
                                     </p>
-                                    {user && message.authorId === user.id && (
+                                    <div className="flex items-center space-x-1">
+                                      {/* Reaction buttons */}
                                       <div className="opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
                                         <Button
                                           size="sm"
                                           variant="ghost"
-                                          onClick={() => handleEditMessage(message)}
-                                          className="h-5 w-5 p-0"
+                                          onClick={() => handleReaction(message.id, "👍")}
+                                          className="h-5 w-5 p-0 text-xs"
+                                          title="Like"
                                         >
-                                          <Edit2 className="w-3 h-3" />
+                                          👍
                                         </Button>
                                         <Button
                                           size="sm"
                                           variant="ghost"
-                                          onClick={() => handleDeleteMessage(message.id)}
-                                          className="h-5 w-5 p-0 text-red-500 hover:text-red-700"
+                                          onClick={() => handleReaction(message.id, "❤️")}
+                                          className="h-5 w-5 p-0 text-xs"
+                                          title="Love"
                                         >
-                                          <Trash2 className="w-3 h-3" />
+                                          ❤️
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => handleReaction(message.id, "😄")}
+                                          className="h-5 w-5 p-0 text-xs"
+                                          title="Laugh"
+                                        >
+                                          😄
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => handleStartReply(message.id)}
+                                          className="h-5 w-5 p-0"
+                                          title="Reply"
+                                        >
+                                          <Reply className="w-3 h-3" />
                                         </Button>
                                       </div>
-                                    )}
+                                      {/* Edit/Delete buttons for message author */}
+                                      {user && message.authorId === user.id && (
+                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => handleEditMessage(message)}
+                                            className="h-5 w-5 p-0"
+                                          >
+                                            <Edit2 className="w-3 h-3" />
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => handleDeleteMessage(message.id)}
+                                            className="h-5 w-5 p-0 text-red-500 hover:text-red-700"
+                                          >
+                                            <Trash2 className="w-3 h-3" />
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
+
+                                  {/* Display reactions */}
+                                  {message.reactions && message.reactions.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      {Object.entries(
+                                        message.reactions.reduce((acc: any, reaction: any) => {
+                                          const key = reaction.reaction;
+                                          if (!acc[key]) acc[key] = [];
+                                          acc[key].push(reaction);
+                                          return acc;
+                                        }, {})
+                                      ).map(([emoji, reactions]: [string, any]) => {
+                                        const userReacted = (reactions as any[]).some((r: any) => r.userId === user?.id);
+                                        return (
+                                          <Button
+                                            key={emoji}
+                                            size="sm"
+                                            variant={userReacted ? "default" : "outline"}
+                                            onClick={() => handleReaction(message.id, emoji)}
+                                            className={`h-5 text-xs px-1 ${userReacted ? 'bg-blue-100 border-blue-300' : ''}`}
+                                          >
+                                            {emoji} {(reactions as any[]).length}
+                                          </Button>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+
+                                  {/* Display replies */}
+                                  {message.replies && message.replies.length > 0 && (
+                                    <div className="mt-2 pl-4 border-l-2 border-slate-200 space-y-2">
+                                      {message.replies.map((reply: any) => (
+                                        <div key={reply.id} className="text-xs">
+                                          <div className="flex items-start space-x-2">
+                                            <Avatar className="h-4 w-4">
+                                              <AvatarImage src={reply.author?.profileImageUrl} />
+                                              <AvatarFallback className="text-xs">
+                                                {reply.author?.firstName?.[0]}{reply.author?.lastName?.[0]}
+                                              </AvatarFallback>
+                                            </Avatar>
+                                            <div className="flex-1">
+                                              <p className="text-slate-900">{reply.content}</p>
+                                              <p className="text-slate-500 text-xs">
+                                                {reply.author?.firstName} {reply.author?.lastName} • {formatTimeAgo(reply.createdAt)}
+                                                {reply.isEdited && " (edited)"}
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {/* Reply input */}
+                                  {replyingToId === message.id && (
+                                    <div className="mt-2 space-y-2">
+                                      <Textarea
+                                        value={replyContent}
+                                        onChange={(e) => setReplyContent(e.target.value)}
+                                        placeholder="Write a reply..."
+                                        className="text-xs resize-none min-h-0 h-16"
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter" && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleSendReply();
+                                          }
+                                          if (e.key === "Escape") {
+                                            handleCancelReply();
+                                          }
+                                        }}
+                                      />
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-2">
+                                          <Checkbox
+                                            id="reply-email"
+                                            checked={emailNotification}
+                                            onCheckedChange={(checked) => setEmailNotification(!!checked)}
+                                          />
+                                          <label htmlFor="reply-email" className="text-xs text-slate-600">
+                                            Email team members
+                                          </label>
+                                        </div>
+                                        <div className="flex space-x-1">
+                                          <Button
+                                            size="sm"
+                                            onClick={handleSendReply}
+                                            disabled={replyMutation.isPending || !replyContent.trim()}
+                                            className="h-6 px-2 text-xs"
+                                          >
+                                            <Check className="w-3 h-3" />
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={handleCancelReply}
+                                            className="h-6 px-2 text-xs"
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
                                 </>
                               )}
                             </div>
@@ -661,12 +909,12 @@ export default function Dashboard() {
                         <p className="text-xs text-slate-500 text-center py-4">No recent messages</p>
                       )}
                       
-                      <div className="flex space-x-2 pt-2">
+                      <div className="pt-2 space-y-2">
                         <Textarea
                           placeholder="Send a message..."
                           value={newMessage}
                           onChange={(e) => setNewMessage(e.target.value)}
-                          className="flex-1 min-h-0 h-8 text-xs resize-none"
+                          className="w-full min-h-0 h-16 text-xs resize-none"
                           onKeyDown={(e) => {
                             if (e.key === "Enter" && !e.shiftKey) {
                               e.preventDefault();
@@ -674,14 +922,26 @@ export default function Dashboard() {
                             }
                           }}
                         />
-                        <Button
-                          size="sm"
-                          onClick={handleSendMessage}
-                          disabled={sendMessageMutation.isPending || !newMessage.trim()}
-                          className="h-8 px-3"
-                        >
-                          Send
-                        </Button>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="message-email"
+                              checked={emailNotification}
+                              onCheckedChange={(checked) => setEmailNotification(!!checked)}
+                            />
+                            <label htmlFor="message-email" className="text-xs text-slate-600">
+                              Email team members
+                            </label>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={handleSendMessage}
+                            disabled={sendMessageMutation.isPending || !newMessage.trim()}
+                            className="h-7 px-3"
+                          >
+                            Send
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </CardContent>

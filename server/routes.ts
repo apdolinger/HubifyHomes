@@ -439,6 +439,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Message reaction routes
+  app.post("/api/team-messages/:id/reactions", isAuthenticated, async (req: any, res) => {
+    try {
+      const messageId = parseInt(req.params.id);
+      const { reaction } = req.body;
+      
+      if (!reaction || typeof reaction !== 'string') {
+        return res.status(400).json({ message: "Reaction is required" });
+      }
+
+      const result = await storage.toggleReaction(messageId, req.user.claims.sub, reaction);
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error toggling reaction:", error);
+      res.status(500).json({ message: "Failed to toggle reaction" });
+    }
+  });
+
+  // Reply to message route
+  app.post("/api/team-messages/:id/reply", isAuthenticated, async (req: any, res) => {
+    try {
+      const parentId = parseInt(req.params.id);
+      const { content, emailNotification = false } = req.body;
+      
+      if (!content || content.trim().length === 0) {
+        return res.status(400).json({ message: "Reply content is required" });
+      }
+
+      const reply = await storage.createTeamMessage({
+        content: content.trim(),
+        authorId: req.user.claims.sub,
+        parentId,
+        emailNotification,
+      });
+
+      res.status(201).json(reply);
+    } catch (error) {
+      console.error("Error creating reply:", error);
+      res.status(500).json({ message: "Failed to create reply" });
+    }
+  });
+
   // Search routes
   app.get("/api/search", isAuthenticated, async (req, res) => {
     try {

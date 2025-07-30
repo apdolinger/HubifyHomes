@@ -114,10 +114,24 @@ export const teamMessages = pgTable("team_messages", {
   id: serial("id").primaryKey(),
   content: text("content").notNull(),
   authorId: varchar("author_id").references(() => users.id),
+  parentId: integer("parent_id").references(() => teamMessages.id), // For replies
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   isEdited: boolean("is_edited").notNull().default(false),
+  emailNotification: boolean("email_notification").notNull().default(false),
 });
+
+// Message Reactions table
+export const messageReactions = pgTable("message_reactions", {
+  id: serial("id").primaryKey(),
+  messageId: integer("message_id").references(() => teamMessages.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  reaction: varchar("reaction").notNull(), // emoji like '👍', '❤️', '😄', etc.
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  // Ensure one reaction per user per message
+  uniqueUserMessageReaction: index("unique_user_message_reaction").on(table.messageId, table.userId, table.reaction),
+}));
 
 // Activity Log table
 export const activityLog = pgTable("activity_log", {
@@ -209,9 +223,29 @@ export const contactsRelations = relations(contacts, ({ one }) => ({
   }),
 }));
 
-export const teamMessagesRelations = relations(teamMessages, ({ one }) => ({
+export const teamMessagesRelations = relations(teamMessages, ({ one, many }) => ({
   author: one(users, {
     fields: [teamMessages.authorId],
+    references: [users.id],
+  }),
+  parent: one(teamMessages, {
+    fields: [teamMessages.parentId],
+    references: [teamMessages.id],
+    relationName: "replies",
+  }),
+  replies: many(teamMessages, {
+    relationName: "replies",
+  }),
+  reactions: many(messageReactions),
+}));
+
+export const messageReactionsRelations = relations(messageReactions, ({ one }) => ({
+  message: one(teamMessages, {
+    fields: [messageReactions.messageId],
+    references: [teamMessages.id],
+  }),
+  user: one(users, {
+    fields: [messageReactions.userId],
     references: [users.id],
   }),
 }));
@@ -276,6 +310,11 @@ export const insertTeamMessageSchema = createInsertSchema(teamMessages).omit({
   isEdited: true,
 });
 
+export const insertMessageReactionSchema = createInsertSchema(messageReactions).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertActivityLogSchema = createInsertSchema(activityLog).omit({
   id: true,
   createdAt: true,
@@ -307,6 +346,8 @@ export type InsertContact = z.infer<typeof insertContactSchema>;
 export type Contact = typeof contacts.$inferSelect;
 export type InsertTeamMessage = z.infer<typeof insertTeamMessageSchema>;
 export type TeamMessage = typeof teamMessages.$inferSelect;
+export type InsertMessageReaction = z.infer<typeof insertMessageReactionSchema>;
+export type MessageReaction = typeof messageReactions.$inferSelect;
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type ActivityLog = typeof activityLog.$inferSelect;
 export type InsertForm = z.infer<typeof insertFormSchema>;

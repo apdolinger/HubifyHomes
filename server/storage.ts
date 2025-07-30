@@ -5,6 +5,7 @@ import {
   tasks,
   contacts,
   teamMessages,
+  messageReactions,
   activityLog,
   forms,
   formSubmissions,
@@ -20,6 +21,8 @@ import {
   type InsertContact,
   type TeamMessage,
   type InsertTeamMessage,
+  type MessageReaction,
+  type InsertMessageReaction,
   type ActivityLog,
   type InsertActivityLog,
   type Form,
@@ -434,12 +437,72 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Team message operations
-  async getTeamMessages(limit: number = 10): Promise<TeamMessage[]> {
-    return await db
-      .select()
+  async getTeamMessages(limit: number = 10): Promise<any[]> {
+    const messages = await db
+      .select({
+        id: teamMessages.id,
+        content: teamMessages.content,
+        authorId: teamMessages.authorId,
+        parentId: teamMessages.parentId,
+        createdAt: teamMessages.createdAt,
+        updatedAt: teamMessages.updatedAt,
+        isEdited: teamMessages.isEdited,
+        emailNotification: teamMessages.emailNotification,
+        author: {
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          profileImageUrl: users.profileImageUrl,
+        }
+      })
       .from(teamMessages)
+      .leftJoin(users, eq(teamMessages.authorId, users.id))
+      .where(sql`${teamMessages.parentId} IS NULL`) // Only top-level messages
       .orderBy(desc(teamMessages.createdAt))
       .limit(limit);
+
+    // Get reactions and replies for each message
+    for (const message of messages) {
+      // Get reactions
+      const reactions = await db
+        .select({
+          id: messageReactions.id,
+          reaction: messageReactions.reaction,
+          userId: messageReactions.userId,
+          user: {
+            firstName: users.firstName,
+            lastName: users.lastName,
+          }
+        })
+        .from(messageReactions)
+        .leftJoin(users, eq(messageReactions.userId, users.id))
+        .where(eq(messageReactions.messageId, message.id));
+
+      // Get replies
+      const replies = await db
+        .select({
+          id: teamMessages.id,
+          content: teamMessages.content,
+          authorId: teamMessages.authorId,
+          createdAt: teamMessages.createdAt,
+          isEdited: teamMessages.isEdited,
+          author: {
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            profileImageUrl: users.profileImageUrl,
+          }
+        })
+        .from(teamMessages)
+        .leftJoin(users, eq(teamMessages.authorId, users.id))
+        .where(eq(teamMessages.parentId, message.id))
+        .orderBy(teamMessages.createdAt);
+
+      message.reactions = reactions;
+      message.replies = replies;
+    }
+
+    return messages;
   }
 
   async createTeamMessage(message: InsertTeamMessage): Promise<TeamMessage> {
@@ -470,6 +533,62 @@ export class DatabaseStorage implements IStorage {
         eq(teamMessages.id, id),
         eq(teamMessages.authorId, userId) // Only allow author to delete their own message
       ));
+  }
+
+  // Message reaction operations
+  async addReaction(messageId: number, userId: string, reaction: string): Promise<MessageReaction> {
+    // Remove existing reaction from this user for this message with same emoji
+    await db
+      .delete(messageReactions)
+      .where(and(
+        eq(messageReactions.messageId, messageId),
+        eq(messageReactions.userId, userId),
+        eq(messageReactions.reaction, reaction)
+      ));
+
+    // Add new reaction
+    const [newReaction] = await db
+      .insert(messageReactions)
+      .values({
+        messageId,
+        userId,
+        reaction,
+      })
+      .returning();
+    
+    return newReaction;
+  }
+
+  async removeReaction(messageId: number, userId: string, reaction: string): Promise<void> {
+    await db
+      .delete(messageReactions)
+      .where(and(
+        eq(messageReactions.messageId, messageId),
+        eq(messageReactions.userId, userId),
+        eq(messageReactions.reaction, reaction)
+      ));
+  }
+
+  async toggleReaction(messageId: number, userId: string, reaction: string): Promise<{ added: boolean }> {
+    // Check if reaction already exists
+    const [existingReaction] = await db
+      .select()
+      .from(messageReactions)
+      .where(and(
+        eq(messageReactions.messageId, messageId),
+        eq(messageReactions.userId, userId),
+        eq(messageReactions.reaction, reaction)
+      ));
+
+    if (existingReaction) {
+      // Remove existing reaction
+      await this.removeReaction(messageId, userId, reaction);
+      return { added: false };
+    } else {
+      // Add new reaction
+      await this.addReaction(messageId, userId, reaction);
+      return { added: true };
+    }
   }
 
   // Activity log operations
