@@ -7,6 +7,8 @@ import {
   insertCommunitySchema,
   insertPropertySchema,
   insertRoomSchema,
+  insertRoomSupplySchema,
+  insertRoomNoteSchema,
   insertTaskSchema, 
   insertContactSchema, 
   insertTeamMessageSchema,
@@ -361,6 +363,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting room:', error);
       res.status(500).json({ message: 'Failed to delete room' });
+    }
+  });
+
+  // Room supply routes
+  app.get("/api/rooms/:roomId/supplies", isAuthenticated, async (req, res) => {
+    try {
+      const roomId = parseInt(req.params.roomId);
+      if (isNaN(roomId)) {
+        return res.status(400).json({ message: 'Invalid room ID' });
+      }
+      
+      const supplies = await storage.getRoomSupplies(roomId);
+      res.json(supplies);
+    } catch (error) {
+      console.error("Error fetching room supplies:", error);
+      res.status(500).json({ message: "Failed to fetch room supplies" });
+    }
+  });
+
+  app.post("/api/room-supplies", isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertRoomSupplySchema.parse(req.body);
+      const supply = await storage.createRoomSupply(validatedData);
+      res.status(201).json(supply);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating room supply:", error);
+      res.status(500).json({ message: "Failed to create room supply" });
+    }
+  });
+
+  app.patch("/api/room-supplies/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid supply ID' });
+      }
+
+      const supply = await storage.updateRoomSupply(id, req.body);
+      res.json(supply);
+    } catch (error) {
+      console.error("Error updating room supply:", error);
+      res.status(500).json({ message: "Failed to update room supply" });
+    }
+  });
+
+  app.delete("/api/room-supplies/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid supply ID' });
+      }
+
+      await storage.deleteRoomSupply(id);
+      res.json({ message: 'Room supply deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting room supply:', error);
+      res.status(500).json({ message: 'Failed to delete room supply' });
+    }
+  });
+
+  // Room note routes
+  app.get("/api/rooms/:roomId/notes", isAuthenticated, async (req, res) => {
+    try {
+      const roomId = parseInt(req.params.roomId);
+      if (isNaN(roomId)) {
+        return res.status(400).json({ message: 'Invalid room ID' });
+      }
+      
+      const notes = await storage.getRoomNotes(roomId);
+      res.json(notes);
+    } catch (error) {
+      console.error("Error fetching room notes:", error);
+      res.status(500).json({ message: "Failed to fetch room notes" });
+    }
+  });
+
+  app.post("/api/room-notes", isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertRoomNoteSchema.parse(req.body);
+      const note = await storage.createRoomNote(validatedData);
+      res.status(201).json(note);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating room note:", error);
+      res.status(500).json({ message: "Failed to create room note" });
+    }
+  });
+
+  app.patch("/api/room-notes/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid note ID' });
+      }
+
+      const note = await storage.updateRoomNote(id, req.body);
+      res.json(note);
+    } catch (error) {
+      console.error("Error updating room note:", error);
+      res.status(500).json({ message: "Failed to update room note" });
+    }
+  });
+
+  app.delete("/api/room-notes/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid note ID' });
+      }
+
+      await storage.deleteRoomNote(id);
+      res.json({ message: 'Room note deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting room note:', error);
+      res.status(500).json({ message: 'Failed to delete room note' });
     }
   });
 

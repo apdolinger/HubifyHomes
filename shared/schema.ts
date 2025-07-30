@@ -90,6 +90,39 @@ export const rooms = pgTable("rooms", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Room Supplies table
+export const roomSupplies = pgTable("room_supplies", {
+  id: serial("id").primaryKey(),
+  roomId: integer("room_id").references(() => rooms.id, { onDelete: "cascade" }).notNull(),
+  name: varchar("name").notNull(),
+  category: varchar("category").notNull(), // 'lighting', 'hardware', 'paint', 'flooring', 'fixtures', 'appliances', 'other'
+  brand: varchar("brand"),
+  model: varchar("model"),
+  quantity: integer("quantity").default(1),
+  unitCost: varchar("unit_cost"), // dollar amount as string
+  totalCost: varchar("total_cost"), // calculated field
+  purchaseDate: timestamp("purchase_date"),
+  warrantyExpires: timestamp("warranty_expires"),
+  vendor: varchar("vendor"),
+  notes: text("notes"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Room Notes table
+export const roomNotes = pgTable("room_notes", {
+  id: serial("id").primaryKey(),
+  roomId: integer("room_id").references(() => rooms.id, { onDelete: "cascade" }).notNull(),
+  title: varchar("title").notNull(),
+  content: text("content").notNull(),
+  category: varchar("category").notNull(), // 'paint', 'dimensions', 'features', 'maintenance', 'history', 'other'
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  isImportant: boolean("is_important").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Tasks table
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
@@ -279,6 +312,26 @@ export const roomsRelations = relations(rooms, ({ one, many }) => ({
     references: [properties.id],
   }),
   tasks: many(tasks),
+  supplies: many(roomSupplies),
+  notes: many(roomNotes),
+}));
+
+export const roomSuppliesRelations = relations(roomSupplies, ({ one }) => ({
+  room: one(rooms, {
+    fields: [roomSupplies.roomId],
+    references: [rooms.id],
+  }),
+}));
+
+export const roomNotesRelations = relations(roomNotes, ({ one }) => ({
+  room: one(rooms, {
+    fields: [roomNotes.roomId],
+    references: [rooms.id],
+  }),
+  createdBy: one(users, {
+    fields: [roomNotes.createdById],
+    references: [users.id],
+  }),
 }));
 
 export const checklistTemplatesRelations = relations(checklistTemplates, ({ one }) => ({
@@ -441,6 +494,18 @@ export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).om
   submittedAt: true,
 });
 
+export const insertRoomSupplySchema = createInsertSchema(roomSupplies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRoomNoteSchema = createInsertSchema(roomNotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -469,3 +534,7 @@ export type InsertChecklistTemplate = z.infer<typeof insertChecklistTemplateSche
 export type ChecklistTemplate = typeof checklistTemplates.$inferSelect;
 export type InsertTaskChecklistItem = z.infer<typeof insertTaskChecklistItemSchema>;
 export type TaskChecklistItem = typeof taskChecklistItems.$inferSelect;
+export type InsertRoomSupply = z.infer<typeof insertRoomSupplySchema>;
+export type RoomSupply = typeof roomSupplies.$inferSelect;
+export type InsertRoomNote = z.infer<typeof insertRoomNoteSchema>;
+export type RoomNote = typeof roomNotes.$inferSelect;

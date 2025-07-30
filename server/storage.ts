@@ -3,6 +3,8 @@ import {
   communities,
   properties,
   rooms,
+  roomSupplies,
+  roomNotes,
   tasks,
   contacts,
   teamMessages,
@@ -18,6 +20,10 @@ import {
   type InsertProperty,
   type Room,
   type InsertRoom,
+  type RoomSupply,
+  type InsertRoomSupply,
+  type RoomNote,
+  type InsertRoomNote,
   type Task,
   type InsertTask,
   type Contact,
@@ -62,6 +68,18 @@ export interface IStorage {
   createRoom(room: InsertRoom): Promise<Room>;
   updateRoom(id: number, room: Partial<InsertRoom>): Promise<Room>;
   deleteRoom(id: number): Promise<void>;
+  
+  // Room supply operations
+  getRoomSupplies(roomId: number): Promise<RoomSupply[]>;
+  createRoomSupply(supply: InsertRoomSupply): Promise<RoomSupply>;
+  updateRoomSupply(id: number, supply: Partial<InsertRoomSupply>): Promise<RoomSupply>;
+  deleteRoomSupply(id: number): Promise<void>;
+  
+  // Room note operations
+  getRoomNotes(roomId: number): Promise<RoomNote[]>;
+  createRoomNote(note: InsertRoomNote): Promise<RoomNote>;
+  updateRoomNote(id: number, note: Partial<InsertRoomNote>): Promise<RoomNote>;
+  deleteRoomNote(id: number): Promise<void>;
   
   // Task operations
   getTasks(): Promise<Task[]>;
@@ -255,6 +273,72 @@ export class DatabaseStorage implements IStorage {
 
   async deleteRoom(id: number): Promise<void> {
     await db.delete(rooms).where(eq(rooms.id, id));
+  }
+
+  // Room supply operations
+  async getRoomSupplies(roomId: number): Promise<RoomSupply[]> {
+    return await db.select().from(roomSupplies).where(eq(roomSupplies.roomId, roomId)).orderBy(desc(roomSupplies.createdAt));
+  }
+
+  async createRoomSupply(supply: InsertRoomSupply): Promise<RoomSupply> {
+    const [newSupply] = await db.insert(roomSupplies).values(supply).returning();
+    return newSupply;
+  }
+
+  async updateRoomSupply(id: number, supply: Partial<InsertRoomSupply>): Promise<RoomSupply> {
+    const [updatedSupply] = await db
+      .update(roomSupplies)
+      .set({ ...supply, updatedAt: new Date() })
+      .where(eq(roomSupplies.id, id))
+      .returning();
+    return updatedSupply;
+  }
+
+  async deleteRoomSupply(id: number): Promise<void> {
+    await db.delete(roomSupplies).where(eq(roomSupplies.id, id));
+  }
+
+  // Room note operations
+  async getRoomNotes(roomId: number): Promise<RoomNote[]> {
+    return await db.select({
+      id: roomNotes.id,
+      roomId: roomNotes.roomId,
+      title: roomNotes.title,
+      content: roomNotes.content,
+      category: roomNotes.category,
+      createdById: roomNotes.createdById,
+      isImportant: roomNotes.isImportant,
+      createdAt: roomNotes.createdAt,
+      updatedAt: roomNotes.updatedAt,
+      createdBy: {
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+      }
+    })
+    .from(roomNotes)
+    .leftJoin(users, eq(roomNotes.createdById, users.id))
+    .where(eq(roomNotes.roomId, roomId))
+    .orderBy(desc(roomNotes.createdAt));
+  }
+
+  async createRoomNote(note: InsertRoomNote): Promise<RoomNote> {
+    const [newNote] = await db.insert(roomNotes).values(note).returning();
+    return newNote;
+  }
+
+  async updateRoomNote(id: number, note: Partial<InsertRoomNote>): Promise<RoomNote> {
+    const [updatedNote] = await db
+      .update(roomNotes)
+      .set({ ...note, updatedAt: new Date() })
+      .where(eq(roomNotes.id, id))
+      .returning();
+    return updatedNote;
+  }
+
+  async deleteRoomNote(id: number): Promise<void> {
+    await db.delete(roomNotes).where(eq(roomNotes.id, id));
   }
 
   // Task operations

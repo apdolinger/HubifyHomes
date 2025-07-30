@@ -78,6 +78,29 @@ export default function PropertyProfile() {
   });
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<any>(null);
+  const [selectedRoom, setSelectedRoom] = useState<any>(null);
+  const [roomSupplyForm, setRoomSupplyForm] = useState({
+    name: "",
+    type: "lightbulb",
+    brand: "",
+    model: "",
+    quantity: 1,
+    unit: "piece",
+    location: "",
+    lastChanged: "",
+    nextReplacement: "",
+    notes: ""
+  });
+  const [roomNoteForm, setRoomNoteForm] = useState({
+    title: "",
+    content: "",
+    category: "general",
+    isImportant: false
+  });
+  const [isSupplyModalOpen, setIsSupplyModalOpen] = useState(false);
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [editingSupply, setEditingSupply] = useState<any>(null);
+  const [editingNote, setEditingNote] = useState<any>(null);
   
   // Get property ID from URL path parameters
   const params = useParams();
@@ -118,6 +141,18 @@ export default function PropertyProfile() {
   const { data: rooms = [], refetch: refetchRooms } = useQuery({
     queryKey: [`/api/properties/${propertyId}/rooms`],
     enabled: isAuthenticated && !!propertyId,
+  });
+
+  // Get room supplies for selected room
+  const { data: roomSupplies = [], refetch: refetchSupplies } = useQuery({
+    queryKey: [`/api/rooms/${selectedRoom?.id}/supplies`],
+    enabled: isAuthenticated && !!selectedRoom?.id,
+  });
+
+  // Get room notes for selected room
+  const { data: roomNotes = [], refetch: refetchNotes } = useQuery({
+    queryKey: [`/api/rooms/${selectedRoom?.id}/notes`],
+    enabled: isAuthenticated && !!selectedRoom?.id,
   });
 
   // Room mutations
@@ -216,6 +251,159 @@ export default function PropertyProfile() {
       }
       toast({
         title: "Failed to delete room",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Room supply mutations
+  const createSupplyMutation = useMutation({
+    mutationFn: async (supplyData: any) => {
+      return await apiRequest("POST", "/api/room-supplies", {
+        ...supplyData,
+        roomId: selectedRoom?.id
+      });
+    },
+    onSuccess: () => {
+      refetchSupplies();
+      setIsSupplyModalOpen(false);
+      setRoomSupplyForm({
+        name: "",
+        type: "lightbulb",
+        brand: "",
+        model: "",
+        quantity: 1,
+        unit: "piece",
+        location: "",
+        lastChanged: "",
+        nextReplacement: "",
+        notes: ""
+      });
+      toast({
+        title: "Supply added",
+        description: "Room supply has been added successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to add supply",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateSupplyMutation = useMutation({
+    mutationFn: async ({ id, ...data }: any) => {
+      return await apiRequest("PATCH", `/api/room-supplies/${id}`, data);
+    },
+    onSuccess: () => {
+      refetchSupplies();
+      setIsSupplyModalOpen(false);
+      setEditingSupply(null);
+      toast({
+        title: "Supply updated",
+        description: "Room supply has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to update supply",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteSupplyMutation = useMutation({
+    mutationFn: async (supplyId: number) => {
+      return await apiRequest("DELETE", `/api/room-supplies/${supplyId}`);
+    },
+    onSuccess: () => {
+      refetchSupplies();
+      toast({
+        title: "Supply deleted",
+        description: "Room supply has been removed.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to delete supply",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Room note mutations
+  const createNoteMutation = useMutation({
+    mutationFn: async (noteData: any) => {
+      return await apiRequest("POST", "/api/room-notes", {
+        ...noteData,
+        roomId: selectedRoom?.id,
+        createdById: "current-user"
+      });
+    },
+    onSuccess: () => {
+      refetchNotes();
+      setIsNoteModalOpen(false);
+      setRoomNoteForm({
+        title: "",
+        content: "",
+        category: "general",
+        isImportant: false
+      });
+      toast({
+        title: "Note added",
+        description: "Room note has been added successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to add note",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateNoteMutation = useMutation({
+    mutationFn: async ({ id, ...data }: any) => {
+      return await apiRequest("PATCH", `/api/room-notes/${id}`, data);
+    },
+    onSuccess: () => {
+      refetchNotes();
+      setIsNoteModalOpen(false);
+      setEditingNote(null);
+      toast({
+        title: "Note updated",
+        description: "Room note has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to update note",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteNoteMutation = useMutation({
+    mutationFn: async (noteId: number) => {
+      return await apiRequest("DELETE", `/api/room-notes/${noteId}`);
+    },
+    onSuccess: () => {
+      refetchNotes();
+      toast({
+        title: "Note deleted",
+        description: "Room note has been removed.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to delete note",
         description: error.message,
         variant: "destructive",
       });
@@ -350,6 +538,120 @@ export default function PropertyProfile() {
     setIsRoomModalOpen(false);
     setEditingRoom(null);
     setRoomForm({ name: "", type: "bedroom", description: "" });
+  };
+
+  // Room supply handlers
+  const handleAddSupply = () => {
+    if (!roomSupplyForm.name.trim()) {
+      toast({
+        title: "Supply name required",
+        description: "Please enter a name for the supply.",
+        variant: "destructive",
+      });
+      return;
+    }
+    createSupplyMutation.mutate(roomSupplyForm);
+  };
+
+  const handleEditSupply = (supply: any) => {
+    setEditingSupply(supply);
+    setRoomSupplyForm({
+      name: supply.name,
+      type: supply.type,
+      brand: supply.brand || "",
+      model: supply.model || "",
+      quantity: supply.quantity,
+      unit: supply.unit,
+      location: supply.location || "",
+      lastChanged: supply.lastChanged || "",
+      nextReplacement: supply.nextReplacement || "",
+      notes: supply.notes || ""
+    });
+    setIsSupplyModalOpen(true);
+  };
+
+  const handleUpdateSupply = () => {
+    if (!roomSupplyForm.name.trim()) {
+      toast({
+        title: "Supply name required",
+        description: "Please enter a name for the supply.",
+        variant: "destructive",
+      });
+      return;
+    }
+    updateSupplyMutation.mutate({ id: editingSupply.id, ...roomSupplyForm });
+  };
+
+  const handleDeleteSupply = (supplyId: number) => {
+    deleteSupplyMutation.mutate(supplyId);
+  };
+
+  const handleCancelSupplyEdit = () => {
+    setIsSupplyModalOpen(false);
+    setEditingSupply(null);
+    setRoomSupplyForm({
+      name: "",
+      type: "lightbulb",
+      brand: "",
+      model: "",
+      quantity: 1,
+      unit: "piece",
+      location: "",
+      lastChanged: "",
+      nextReplacement: "",
+      notes: ""
+    });
+  };
+
+  // Room note handlers
+  const handleAddNote = () => {
+    if (!roomNoteForm.title.trim() || !roomNoteForm.content.trim()) {
+      toast({
+        title: "Note details required",
+        description: "Please enter both title and content for the note.",
+        variant: "destructive",
+      });
+      return;
+    }
+    createNoteMutation.mutate(roomNoteForm);
+  };
+
+  const handleEditNote = (note: any) => {
+    setEditingNote(note);
+    setRoomNoteForm({
+      title: note.title,
+      content: note.content,
+      category: note.category,
+      isImportant: note.isImportant
+    });
+    setIsNoteModalOpen(true);
+  };
+
+  const handleUpdateNote = () => {
+    if (!roomNoteForm.title.trim() || !roomNoteForm.content.trim()) {
+      toast({
+        title: "Note details required",
+        description: "Please enter both title and content for the note.",
+        variant: "destructive",
+      });
+      return;
+    }
+    updateNoteMutation.mutate({ id: editingNote.id, ...roomNoteForm });
+  };
+
+  const handleDeleteNote = (noteId: number) => {
+    deleteNoteMutation.mutate(noteId);
+  };
+
+  const handleCancelNoteEdit = () => {
+    setIsNoteModalOpen(false);
+    setEditingNote(null);
+    setRoomNoteForm({
+      title: "",
+      content: "",
+      category: "general",
+      isImportant: false
+    });
   };
 
   return (
@@ -626,17 +928,19 @@ export default function PropertyProfile() {
           </TabsContent>
 
           <TabsContent value="rooms">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Property Rooms</CardTitle>
-                  <Dialog open={isRoomModalOpen} onOpenChange={setIsRoomModalOpen}>
-                    <DialogTrigger asChild>
-                      <Button>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Room
-                      </Button>
-                    </DialogTrigger>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Room List */}
+              <Card className="lg:col-span-1">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Property Rooms</CardTitle>
+                    <Dialog open={isRoomModalOpen} onOpenChange={setIsRoomModalOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Room
+                        </Button>
+                      </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle>{editingRoom ? 'Edit Room' : 'Add New Room'}</DialogTitle>
@@ -769,6 +1073,7 @@ export default function PropertyProfile() {
                 )}
               </CardContent>
             </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="supplies">
