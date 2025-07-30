@@ -444,7 +444,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(task);
     } catch (error) {
       console.error("Error updating task (ID:", taskId, "):", error);
-      if (error.message?.includes('constraint')) {
+      if (error instanceof Error && error.message?.includes('constraint')) {
         return res.status(400).json({ 
           message: "Database constraint violation", 
           code: "CONSTRAINT_VIOLATION",
@@ -454,7 +454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         message: "Failed to update task", 
         code: "UPDATE_TASK_ERROR",
-        details: error.message 
+        details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   });
