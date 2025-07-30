@@ -268,9 +268,9 @@ export default function TaskProfile() {
       });
       // Task updated successfully
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Task update error:", error);
-      const errorCode = error.code || 'UNKNOWN_ERROR';
+      const errorCode = error?.code || 'UNKNOWN_ERROR';
       toast({
         title: "Error",
         description: `Failed to update task (${errorCode}): ${error.message}`,
@@ -280,19 +280,31 @@ export default function TaskProfile() {
   });
 
   useEffect(() => {
-    if (task && !isEditModalOpen) {
+    if (task) {
+      // Format due date for datetime-local input
+      const formatDateForInput = (dateStr: string) => {
+        if (!dateStr) return "";
+        const date = new Date(dateStr);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+      };
+
       setEditForm({
         title: (task as any).title || "",
         description: (task as any).description || "",
-        priority: (task as any).priority || "",
-        status: (task as any).status || "",
-        dueDate: (task as any).dueDate || "",
-        assignedTo: (task as any).assignedTo || "",
+        priority: (task as any).priority || "normal",
+        status: (task as any).status || "pending",
+        dueDate: formatDateForInput((task as any).dueDate) || "",
+        assignedTo: (task as any).assignedToId || "",
         timeEstimate: (task as any).timeEstimate || "",
         category: (task as any).category || "",
         isRecurring: (task as any).isRecurring || false,
         recurrenceFrequency: (task as any).recurrenceFrequency || "",
-        propertyId: (task as any).propertyId || ""
+        propertyId: (task as any).propertyId?.toString() || ""
       });
       
       // Initialize checklist, attachments, etc. from task data
@@ -301,7 +313,7 @@ export default function TaskProfile() {
       setQuickLinks((task as any).quickLinks || []);
       setComments((task as any).comments || []);
     }
-  }, [task, isEditModalOpen]);
+  }, [task]);
 
   const handleSave = () => {
     const updateData = {
@@ -317,21 +329,7 @@ export default function TaskProfile() {
 
   const handleCancel = () => {
     setIsEditModalOpen(false);
-    if (task) {
-      setEditForm({
-        title: (task as any).title || "",
-        description: (task as any).description || "",
-        priority: (task as any).priority || "",
-        status: (task as any).status || "",
-        dueDate: (task as any).dueDate || "",
-        assignedTo: (task as any).assignedTo || "",
-        timeEstimate: (task as any).timeEstimate || "",
-        category: (task as any).category || "",
-        isRecurring: (task as any).isRecurring || false,
-        recurrenceFrequency: (task as any).recurrenceFrequency || "",
-        propertyId: (task as any).propertyId || ""
-      });
-    }
+    // Form will be reset by useEffect when modal reopens
   };
 
   const handleTemplateSelect = (templateId: string) => {
@@ -659,7 +657,7 @@ export default function TaskProfile() {
                             <span>No property</span>
                           </div>
                         </SelectItem>
-                        {properties?.map((property: any) => (
+                        {Array.isArray(properties) && properties.map((property: any) => (
                           <SelectItem key={property.id} value={property.id.toString()}>
                             <div className="flex items-center space-x-2">
                               <Building className="w-4 h-4 text-slate-500" />
@@ -699,7 +697,7 @@ export default function TaskProfile() {
                             <span>No contact</span>
                           </div>
                         </SelectItem>
-                        {contacts?.map((contact: any) => (
+                        {Array.isArray(contacts) && contacts.map((contact: any) => (
                           <SelectItem key={contact.id} value={contact.id.toString()}>
                             <div className="flex items-center space-x-2">
                               <User className="w-4 h-4 text-slate-500" />
@@ -739,7 +737,7 @@ export default function TaskProfile() {
                             <span>Unassigned</span>
                           </div>
                         </SelectItem>
-                        {users?.map((user: any) => (
+                        {Array.isArray(users) && users.map((user: any) => (
                           <SelectItem key={user.id} value={user.id.toString()}>
                             <div className="flex items-center space-x-2">
                               <User className="w-4 h-4 text-slate-500" />
@@ -895,9 +893,11 @@ export default function TaskProfile() {
                           <SelectValue placeholder="Select team member" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="user1">John Smith</SelectItem>
-                          <SelectItem value="user2">Sarah Johnson</SelectItem>
-                          <SelectItem value="user3">Mike Wilson</SelectItem>
+                          {Array.isArray(users) && users.map((user: any) => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.firstName} {user.lastName}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -914,9 +914,11 @@ export default function TaskProfile() {
                           <SelectValue placeholder="Select property" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="1">Main Office Building</SelectItem>
-                          <SelectItem value="2">Residential Complex A</SelectItem>
-                          <SelectItem value="3">Commercial Plaza</SelectItem>
+                          {Array.isArray(properties) && properties.map((property: any) => (
+                            <SelectItem key={property.id} value={property.id.toString()}>
+                              {property.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
