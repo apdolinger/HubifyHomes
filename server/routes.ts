@@ -354,11 +354,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const taskId = parseInt(req.params.id);
       const updateData = req.body;
       console.log("Updating task:", taskId, "with data:", updateData);
+      
+      if (isNaN(taskId)) {
+        return res.status(400).json({ 
+          message: "Invalid task ID", 
+          code: "INVALID_TASK_ID" 
+        });
+      }
+      
       const task = await storage.updateTask(taskId, updateData);
       res.json(task);
     } catch (error) {
-      console.error("Error updating task:", error);
-      res.status(500).json({ message: "Failed to update task" });
+      console.error("Error updating task (ID:", taskId, "):", error);
+      if (error.message?.includes('constraint')) {
+        return res.status(400).json({ 
+          message: "Database constraint violation", 
+          code: "CONSTRAINT_VIOLATION",
+          details: error.message 
+        });
+      }
+      res.status(500).json({ 
+        message: "Failed to update task", 
+        code: "UPDATE_TASK_ERROR",
+        details: error.message 
+      });
     }
   });
 

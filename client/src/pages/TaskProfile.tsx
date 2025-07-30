@@ -238,9 +238,9 @@ export default function TaskProfile() {
     enabled: isAuthenticated,
   });
 
-  // Fetch contacts for association
-  const { data: contacts } = useQuery({
-    queryKey: ["/api/contacts"],
+  // Fetch users for task assignment
+  const { data: users } = useQuery({
+    queryKey: ["/api/users"],
     enabled: isAuthenticated,
   });
 
@@ -259,9 +259,11 @@ export default function TaskProfile() {
       // Task updated successfully
     },
     onError: (error) => {
+      console.error("Task update error:", error);
+      const errorCode = error.code || 'UNKNOWN_ERROR';
       toast({
         title: "Error",
-        description: "Failed to update task",
+        description: `Failed to update task (${errorCode}): ${error.message}`,
         variant: "destructive",
       });
     },
@@ -458,8 +460,8 @@ export default function TaskProfile() {
     updateTaskMutation.mutate(updatedTask);
   };
 
-  const handlePersonAssociation = (contactId: string) => {
-    const updatedTask = { assignedToId: contactId === "none" ? null : contactId };
+  const handleUserAssignment = (userId: string) => {
+    const updatedTask = { assignedToId: userId === "none" ? null : userId };
     updateTaskMutation.mutate(updatedTask);
   };
 
@@ -657,21 +659,21 @@ export default function TaskProfile() {
                   {/* Person Association */}
                   <div>
                     <Label className="text-sm font-medium text-slate-700 mb-2 block">
-                      Associated Person
+                      Assigned To
                     </Label>
                     <Select
                       value={(task as any).assignedToId?.toString() || "none"}
-                      onValueChange={handlePersonAssociation}
+                      onValueChange={handleUserAssignment}
                     >
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select a person">
+                        <SelectValue placeholder="Select team member">
                           {(task as any).assignedUser ? (
                             <div className="flex items-center space-x-2">
                               <User className="w-4 h-4 text-slate-500" />
                               <span>{(task as any).assignedUser.firstName} {(task as any).assignedUser.lastName}</span>
                             </div>
                           ) : (
-                            <span className="text-slate-500">No person assigned</span>
+                            <span className="text-slate-500">Unassigned</span>
                           )}
                         </SelectValue>
                       </SelectTrigger>
@@ -679,14 +681,14 @@ export default function TaskProfile() {
                         <SelectItem value="none">
                           <div className="flex items-center space-x-2">
                             <X className="w-4 h-4 text-slate-400" />
-                            <span>No person</span>
+                            <span>Unassigned</span>
                           </div>
                         </SelectItem>
-                        {contacts?.map((contact: any) => (
-                          <SelectItem key={contact.id} value={contact.id.toString()}>
+                        {users?.map((user: any) => (
+                          <SelectItem key={user.id} value={user.id.toString()}>
                             <div className="flex items-center space-x-2">
                               <User className="w-4 h-4 text-slate-500" />
-                              <span>{contact.firstName} {contact.lastName}</span>
+                              <span>{user.firstName} {user.lastName}</span>
                             </div>
                           </SelectItem>
                         ))}
