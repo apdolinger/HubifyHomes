@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { useTaskModal } from "@/contexts/TaskModalContext";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +32,7 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 
 export default function PersonProfile() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { openTaskModal } = useTaskModal();
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -69,12 +71,12 @@ export default function PersonProfile() {
     enabled: isAuthenticated,
   });
 
-  const linkedProperties = properties?.filter((property: any) => 
-    property.id === person?.propertyId
+  const linkedProperties = (properties as any[] || []).filter((property: any) => 
+    property.id === (person as any)?.propertyId
   );
 
-  const relatedTasks = tasks?.filter((task: any) => 
-    task.propertyId === person?.propertyId
+  const relatedTasks = (tasks as any[] || []).filter((task: any) => 
+    task.propertyId === (person as any)?.propertyId
   );
 
   const getContactTypeDisplay = (type: string) => {
@@ -172,30 +174,30 @@ export default function PersonProfile() {
           <div className="flex items-center space-x-4">
             <div className="flex-shrink-0">
               <Avatar className="h-20 w-20">
-                <AvatarImage src={person?.profileImageUrl} alt={`${person?.firstName} ${person?.lastName}`} />
+                <AvatarImage src={(person as any)?.profileImageUrl} alt={`${(person as any)?.firstName} ${(person as any)?.lastName}`} />
                 <AvatarFallback className="text-lg">
-                  {getInitials(person?.firstName, person?.lastName)}
+                  {getInitials((person as any)?.firstName, (person as any)?.lastName)}
                 </AvatarFallback>
               </Avatar>
             </div>
             <div>
               <h1 className="text-3xl font-bold text-slate-900">
-                {person?.firstName} {person?.lastName}
+                {(person as any)?.firstName} {(person as any)?.lastName}
               </h1>
               <div className="flex items-center space-x-3 mt-2">
-                <Badge variant={getContactTypeColor(person?.type)}>
-                  {getContactTypeDisplay(person?.type)}
+                <Badge variant={getContactTypeColor((person as any)?.type)}>
+                  {getContactTypeDisplay((person as any)?.type)}
                 </Badge>
-                {person?.email && (
+                {(person as any)?.email && (
                   <div className="flex items-center text-slate-600">
                     <Mail className="w-4 h-4 mr-1" />
-                    {person.email}
+                    {(person as any)?.email}
                   </div>
                 )}
-                {person?.phone && (
+                {(person as any)?.phone && (
                   <div className="flex items-center text-slate-600">
                     <Phone className="w-4 h-4 mr-1" />
-                    {person.phone}
+                    {(person as any)?.phone}
                   </div>
                 )}
               </div>
@@ -207,7 +209,7 @@ export default function PersonProfile() {
               <Edit className="w-4 h-4 mr-2" />
               Edit Person
             </Button>
-            <Button className="bg-primary hover:bg-primary/90">
+            <Button onClick={openTaskModal} className="bg-primary hover:bg-primary/90">
               <Plus className="w-4 h-4 mr-2" />
               Add Task
             </Button>
@@ -228,21 +230,21 @@ export default function PersonProfile() {
           <CardContent className="space-y-4">
             <div className="flex justify-between">
               <span className="text-slate-500">Type:</span>
-              <Badge variant={getContactTypeColor(person?.type)}>
-                {getContactTypeDisplay(person?.type)}
+              <Badge variant={getContactTypeColor((person as any)?.type)}>
+                {getContactTypeDisplay((person as any)?.type)}
               </Badge>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Email:</span>
-              <span className="font-medium">{person?.email || 'Not provided'}</span>
+              <span className="font-medium">{(person as any)?.email || 'Not provided'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Phone:</span>
-              <span className="font-medium">{person?.phone || 'Not provided'}</span>
+              <span className="font-medium">{(person as any)?.phone || 'Not provided'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Added:</span>
-              <span className="font-medium">{formatDate(person?.createdAt)}</span>
+              <span className="font-medium">{formatDate((person as any)?.createdAt)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Last Interaction:</span>
@@ -323,7 +325,7 @@ export default function PersonProfile() {
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Preferred Vendor:</span>
-              <span className="font-medium">{person?.type === 'vendor' ? 'Yes' : 'No'}</span>
+              <span className="font-medium">{(person as any)?.type === 'vendor' ? 'Yes' : 'No'}</span>
             </div>
           </CardContent>
         </Card>
@@ -448,7 +450,7 @@ export default function PersonProfile() {
                     placeholder="Add any notes about this person..."
                     rows={4}
                     className="resize-none"
-                    defaultValue={person?.notes || ""}
+                    defaultValue={(person as any)?.notes || ""}
                   />
                 </div>
                 

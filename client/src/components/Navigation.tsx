@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import { useTaskModal } from "@/contexts/TaskModalContext";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -15,7 +16,8 @@ import {
   Search,
   Menu,
   ChevronDown,
-  Settings
+  Settings,
+  Plus
 } from "lucide-react";
 
 const getNavigationItems = (user: any) => {
@@ -35,6 +37,7 @@ const getNavigationItems = (user: any) => {
 export default function Navigation() {
   const [location] = useLocation();
   const { user } = useAuth();
+  const { openTaskModal } = useTaskModal();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const navigationItems = getNavigationItems(user);

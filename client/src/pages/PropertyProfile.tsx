@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { useTaskModal } from "@/contexts/TaskModalContext";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +43,7 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 
 export default function PropertyProfile() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { openTaskModal } = useTaskModal();
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -597,7 +599,7 @@ export default function PropertyProfile() {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
-                <Button className="bg-primary hover:bg-primary/90">
+                <Button onClick={openTaskModal} className="bg-primary hover:bg-primary/90">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Task
                 </Button>

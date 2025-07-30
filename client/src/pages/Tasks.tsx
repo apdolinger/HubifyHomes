@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { useTaskModal } from "@/contexts/TaskModalContext";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +18,7 @@ type SortDirection = 'asc' | 'desc';
 
 export default function Tasks() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { openTaskModal } = useTaskModal();
   const { toast } = useToast();
   const [location, navigate] = useLocation();
   
@@ -224,7 +226,7 @@ export default function Tasks() {
             </p>
           </div>
           <div className="mt-4 sm:mt-0">
-            <Button>
+            <Button onClick={openTaskModal}>
               <CheckSquare className="w-4 h-4 mr-2" />
               Add Task
             </Button>

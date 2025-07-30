@@ -24,7 +24,20 @@ import Navigation from "@/components/Navigation";
 import QuickSearchModal from "@/components/QuickSearchModal";
 import QuickAddTaskModal from "@/components/QuickAddTaskModal";
 import KeyboardHelpModal from "@/components/KeyboardHelpModal";
+import { TaskModalProvider, useTaskModal } from "@/contexts/TaskModalContext";
 import { useState } from "react";
+
+// Global Task Modal Component
+function GlobalTaskModal() {
+  const { isTaskModalOpen, closeTaskModal } = useTaskModal();
+  
+  return (
+    <QuickAddTaskModal 
+      isOpen={isTaskModalOpen} 
+      onClose={closeTaskModal} 
+    />
+  );
+}
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -57,28 +70,28 @@ function Router() {
 
 function AuthenticatedApp() {
   const [isQuickSearchOpen, setIsQuickSearchOpen] = useState(false);
-  const [isQuickAddTaskOpen, setIsQuickAddTaskOpen] = useState(false);
   const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState(false);
+  const { openTaskModal } = useTaskModal();
 
   useHotkeys({
     "s": () => setIsQuickSearchOpen(true),
     "S": () => setIsQuickSearchOpen(true),
-    "t": () => setIsQuickAddTaskOpen(true),
-    "T": () => setIsQuickAddTaskOpen(true),
+    "t": () => openTaskModal(),
+    "T": () => openTaskModal(),
     "?": () => setIsKeyboardHelpOpen(true),
     "Escape": () => {
       setIsQuickSearchOpen(false);
-      setIsQuickAddTaskOpen(false);
       setIsKeyboardHelpOpen(false);
     },
   });
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      <Navigation />
-      <div className="flex-1">
-        <Router />
-      </div>
+    <TaskModalProvider>
+      <div className="min-h-screen bg-slate-50 flex flex-col">
+        <Navigation />
+        <div className="flex-1">
+          <Router />
+        </div>
       
       {/* Footer - Internal Only */}
       <footer className="bg-white border-t border-slate-200 py-4">
@@ -102,15 +115,13 @@ function AuthenticatedApp() {
         isOpen={isQuickSearchOpen} 
         onClose={() => setIsQuickSearchOpen(false)} 
       />
-      <QuickAddTaskModal 
-        isOpen={isQuickAddTaskOpen} 
-        onClose={() => setIsQuickAddTaskOpen(false)} 
-      />
+      <GlobalTaskModal />
       <KeyboardHelpModal 
         isOpen={isKeyboardHelpOpen} 
         onClose={() => setIsKeyboardHelpOpen(false)} 
       />
-    </div>
+      </div>
+    </TaskModalProvider>
   );
 }
 
