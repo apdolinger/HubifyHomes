@@ -332,8 +332,14 @@ export default function TaskProfile() {
       // Note: checklist, attachments, etc. will be handled later when we implement those features
     };
     console.log("Sending update data:", updateData);
-    updateTaskMutation.mutate(updateData);
-    setIsEditModalOpen(false);
+    updateTaskMutation.mutate(updateData, {
+      onSuccess: () => {
+        // Invalidate queries to refresh the task data on the page
+        queryClient.invalidateQueries({ queryKey: ['/api/tasks', task?.id?.toString()] });
+        queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
+        setIsEditModalOpen(false);
+      }
+    });
   };
 
   const handleCancel = () => {
@@ -875,9 +881,10 @@ export default function TaskProfile() {
                       <Label htmlFor="edit-time-estimate">Time Estimate</Label>
                       <Input
                         id="edit-time-estimate"
+                        type="datetime-local"
                         value={editForm.timeEstimate}
                         onChange={(e) => setEditForm({ ...editForm, timeEstimate: e.target.value })}
-                        placeholder="e.g., 45 minutes"
+                        placeholder="Select estimated completion time"
                       />
                     </div>
                   </div>
