@@ -293,6 +293,23 @@ export default function TaskProfile() {
         return `${year}-${month}-${day}T${hours}:${minutes}`;
       };
 
+      // Convert existing time estimate to duration format if needed
+      let timeEstimate = (task as any).timeEstimate || '';
+      if (timeEstimate && !timeEstimate.includes('days') && !timeEstimate.includes('hours') && !timeEstimate.includes('minutes')) {
+        // Convert old format like "45 minutes" to new format
+        if (timeEstimate.includes('minute')) {
+          const minutes = timeEstimate.match(/\d+/)?.[0] || '0';
+          timeEstimate = `0 days 0 hours ${minutes} minutes`;
+        } else if (timeEstimate.includes('hour')) {
+          const hours = timeEstimate.match(/\d+/)?.[0] || '0';
+          timeEstimate = `0 days ${hours} hours 0 minutes`;
+        } else {
+          timeEstimate = '0 days 0 hours 0 minutes';
+        }
+      } else if (!timeEstimate) {
+        timeEstimate = '0 days 0 hours 0 minutes';
+      }
+
       setEditForm({
         title: (task as any).title || "",
         description: (task as any).description || "",
@@ -300,7 +317,7 @@ export default function TaskProfile() {
         status: (task as any).status || "pending",
         dueDate: formatDateForInput((task as any).dueDate) || "",
         assignedTo: (task as any).assignedToId || "",
-        timeEstimate: (task as any).timeEstimate || "",
+        timeEstimate: timeEstimate,
         category: (task as any).category || "",
         isRecurring: (task as any).isRecurring || false,
         recurrenceFrequency: (task as any).recurrenceFrequency || "",
@@ -879,13 +896,62 @@ export default function TaskProfile() {
                     </div>
                     <div>
                       <Label htmlFor="edit-time-estimate">Time Estimate</Label>
-                      <Input
-                        id="edit-time-estimate"
-                        type="datetime-local"
-                        value={editForm.timeEstimate}
-                        onChange={(e) => setEditForm({ ...editForm, timeEstimate: e.target.value })}
-                        placeholder="Select estimated completion time"
-                      />
+                      <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-1">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="30"
+                            className="w-16"
+                            placeholder="0"
+                            value={editForm.timeEstimate.split(' ')[0] || ''}
+                            onChange={(e) => {
+                              const days = e.target.value || '0';
+                              const currentParts = editForm.timeEstimate.split(' ');
+                              const hours = currentParts[2] || '0';
+                              const minutes = currentParts[4] || '0';
+                              setEditForm({ ...editForm, timeEstimate: `${days} days ${hours} hours ${minutes} minutes` });
+                            }}
+                          />
+                          <span className="text-sm text-slate-600">days</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="23"
+                            className="w-16"
+                            placeholder="0"
+                            value={editForm.timeEstimate.split(' ')[2] || ''}
+                            onChange={(e) => {
+                              const hours = e.target.value || '0';
+                              const currentParts = editForm.timeEstimate.split(' ');
+                              const days = currentParts[0] || '0';
+                              const minutes = currentParts[4] || '0';
+                              setEditForm({ ...editForm, timeEstimate: `${days} days ${hours} hours ${minutes} minutes` });
+                            }}
+                          />
+                          <span className="text-sm text-slate-600">hrs</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="59"
+                            className="w-16"
+                            placeholder="0"
+                            value={editForm.timeEstimate.split(' ')[4] || ''}
+                            onChange={(e) => {
+                              const minutes = e.target.value || '0';
+                              const currentParts = editForm.timeEstimate.split(' ');
+                              const days = currentParts[0] || '0';
+                              const hours = currentParts[2] || '0';
+                              setEditForm({ ...editForm, timeEstimate: `${days} days ${hours} hours ${minutes} minutes` });
+                            }}
+                          />
+                          <span className="text-sm text-slate-600">mins</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
