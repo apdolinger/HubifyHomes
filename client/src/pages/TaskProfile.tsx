@@ -216,7 +216,7 @@ export default function TaskProfile() {
 
   // Fetch task details
   const { data: task, isLoading: taskLoading } = useQuery({
-    queryKey: ["/api/tasks", taskId],
+    queryKey: [`/api/tasks/${taskId}`],
     enabled: isAuthenticated && !!taskId,
   });
 
