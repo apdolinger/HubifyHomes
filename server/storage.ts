@@ -418,11 +418,61 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateTask(id: number, task: Partial<InsertTask>): Promise<Task> {
-    const [updatedTask] = await db
+    // First update the task
+    await db
       .update(tasks)
       .set({ ...task, updatedAt: new Date() })
-      .where(eq(tasks.id, id))
-      .returning();
+      .where(eq(tasks.id, id));
+    
+    // Then return the complete task with joined data
+    const [updatedTask] = await db.select({
+      id: tasks.id,
+      title: tasks.title,
+      description: tasks.description,
+      priority: tasks.priority,
+      status: tasks.status,
+      propertyId: tasks.propertyId,
+      contactId: tasks.contactId,
+      assignedToId: tasks.assignedToId,
+      assignedById: tasks.assignedById,
+      dueDate: tasks.dueDate,
+      completedAt: tasks.completedAt,
+      isArchived: tasks.isArchived,
+      createdAt: tasks.createdAt,
+      updatedAt: tasks.updatedAt,
+      property: {
+        id: properties.id,
+        name: properties.name,
+        address1: properties.address1,
+        address2: properties.address2,
+        city: properties.city,
+        state: properties.state,
+        zip: properties.zip,
+        type: properties.type,
+        status: properties.status,
+      },
+      contact: {
+        id: contacts.id,
+        firstName: contacts.firstName,
+        lastName: contacts.lastName,
+        email: contacts.email,
+        phone: contacts.phone,
+        type: contacts.type,
+      },
+      assignedUser: {
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        profileImageUrl: users.profileImageUrl,
+      }
+    })
+    .from(tasks)
+    .leftJoin(properties, eq(tasks.propertyId, properties.id))
+    .leftJoin(contacts, eq(tasks.contactId, contacts.id))
+    .leftJoin(users, eq(tasks.assignedToId, users.id))
+    .where(eq(tasks.id, id));
+    
     return updatedTask;
   }
 

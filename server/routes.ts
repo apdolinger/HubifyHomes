@@ -361,8 +361,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.patch("/api/tasks/:id", isAuthenticated, async (req, res) => {
+    const taskId = parseInt(req.params.id);
     try {
-      const taskId = parseInt(req.params.id);
       const updateData = req.body;
       console.log("Updating task:", taskId, "with data:", updateData);
       

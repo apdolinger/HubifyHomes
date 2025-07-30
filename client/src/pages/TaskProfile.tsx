@@ -316,13 +316,22 @@ export default function TaskProfile() {
   }, [task]);
 
   const handleSave = () => {
+    // Transform form data to match API expectations
     const updateData = {
-      ...editForm,
-      checklist,
-      attachments,
-      quickLinks,
-      comments
+      title: editForm.title,
+      description: editForm.description,
+      priority: editForm.priority,
+      status: editForm.status,
+      dueDate: editForm.dueDate ? new Date(editForm.dueDate).toISOString() : null,
+      assignedToId: editForm.assignedTo || null,
+      timeEstimate: editForm.timeEstimate,
+      category: editForm.category,
+      isRecurring: editForm.isRecurring,
+      recurrenceFrequency: editForm.recurrenceFrequency,
+      propertyId: editForm.propertyId ? parseInt(editForm.propertyId) : null,
+      // Note: checklist, attachments, etc. will be handled later when we implement those features
     };
+    console.log("Sending update data:", updateData);
     updateTaskMutation.mutate(updateData);
     setIsEditModalOpen(false);
   };
