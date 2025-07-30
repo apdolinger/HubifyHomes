@@ -223,7 +223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/communities", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = (req.user as any)?.claims?.sub;
       const community = await storage.createCommunity(req.body, userId);
       res.status(201).json(community);
     } catch (error) {
@@ -400,6 +400,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/team-messages/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const messageId = parseInt(req.params.id);
+      const { content } = req.body;
+      
+      if (!content || content.trim().length === 0) {
+        return res.status(400).json({ message: "Message content is required" });
+      }
+
+      const updatedMessage = await storage.updateTeamMessage(
+        messageId,
+        content.trim(),
+        req.user.claims.sub
+      );
+
+      if (!updatedMessage) {
+        return res.status(404).json({ message: "Message not found or you don't have permission to edit it" });
+      }
+
+      res.json(updatedMessage);
+    } catch (error) {
+      console.error("Error updating team message:", error);
+      res.status(500).json({ message: "Failed to update message" });
+    }
+  });
+
+  app.delete("/api/team-messages/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const messageId = parseInt(req.params.id);
+      
+      await storage.deleteTeamMessage(messageId, req.user.claims.sub);
+      
+      res.json({ message: "Message deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting team message:", error);
+      res.status(500).json({ message: "Failed to delete message" });
+    }
+  });
+
   // Search routes
   app.get("/api/search", isAuthenticated, async (req, res) => {
     try {
@@ -529,7 +568,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             phone: req.body.phone || null,
             type: 'client',
             isActive: true
-          });
+          }, null);
         } catch (contactError) {
           console.warn("Could not create contact from form submission:", contactError);
         }

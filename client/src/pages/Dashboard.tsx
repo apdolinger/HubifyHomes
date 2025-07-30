@@ -20,7 +20,11 @@ import {
   HelpCircle,
   Calendar,
   Copy,
-  MessageSquare
+  MessageSquare,
+  Edit2,
+  Trash2,
+  Check,
+  X
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -35,6 +39,8 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const [newMessage, setNewMessage] = useState("");
   const [isCustomizationModalOpen, setIsCustomizationModalOpen] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
+  const [editingContent, setEditingContent] = useState("");
   
   // Widget icon mapping for consistent icons
   const getWidgetIcon = (id: string) => {
@@ -208,6 +214,77 @@ export default function Dashboard() {
     },
   });
 
+  // Edit message mutation
+  const editMessageMutation = useMutation({
+    mutationFn: async ({ id, content }: { id: number; content: string }) => {
+      return await apiRequest(`/api/team-messages/${id}`, {
+        method: "PUT",
+        body: { content }
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/team-messages"] });
+      setEditingMessageId(null);
+      setEditingContent("");
+      toast({
+        title: "Message updated",
+        description: "Your message has been updated.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to update message. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete message mutation
+  const deleteMessageMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest(`/api/team-messages/${id}`, {
+        method: "DELETE"
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/team-messages"] });
+      toast({
+        title: "Message deleted",
+        description: "The message has been deleted.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to delete message. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Complete task mutation  
   const completeTaskMutation = useMutation({
     mutationFn: async (taskId: number) => {
@@ -247,6 +324,27 @@ export default function Dashboard() {
   const handleSendMessage = () => {
     if (!newMessage.trim()) return;
     sendMessageMutation.mutate(newMessage);
+  };
+
+  const handleEditMessage = (message: any) => {
+    setEditingMessageId(message.id);
+    setEditingContent(message.content);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingContent.trim() || !editingMessageId) return;
+    editMessageMutation.mutate({ id: editingMessageId, content: editingContent.trim() });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setEditingContent("");
+  };
+
+  const handleDeleteMessage = (messageId: number) => {
+    if (confirm("Are you sure you want to delete this message?")) {
+      deleteMessageMutation.mutate(messageId);
+    }
   };
 
   const handleCompleteTask = (taskId: number) => {
@@ -482,7 +580,7 @@ export default function Dashboard() {
                         </div>
                       ) : teamMessages && Array.isArray(teamMessages) && teamMessages.length > 0 ? (
                         teamMessages.slice(0, 2).map((message: any) => (
-                          <div key={message.id} className="flex space-x-3">
+                          <div key={message.id} className="flex space-x-3 group">
                             <Avatar className="h-6 w-6">
                               <AvatarImage src={message.user?.profileImageUrl} />
                               <AvatarFallback className="text-xs">
@@ -490,10 +588,72 @@ export default function Dashboard() {
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs text-slate-900">{message.content}</p>
-                              <p className="text-xs text-slate-500">
-                                {message.authorId} • {formatTimeAgo(message.createdAt)}
-                              </p>
+                              {editingMessageId === message.id ? (
+                                <div className="space-y-2">
+                                  <Textarea
+                                    value={editingContent}
+                                    onChange={(e) => setEditingContent(e.target.value)}
+                                    className="text-xs resize-none min-h-0 h-16"
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSaveEdit();
+                                      }
+                                      if (e.key === "Escape") {
+                                        handleCancelEdit();
+                                      }
+                                    }}
+                                  />
+                                  <div className="flex space-x-1">
+                                    <Button
+                                      size="sm"
+                                      onClick={handleSaveEdit}
+                                      disabled={editMessageMutation.isPending || !editingContent.trim()}
+                                      className="h-6 px-2 text-xs"
+                                    >
+                                      <Check className="w-3 h-3" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={handleCancelEdit}
+                                      className="h-6 px-2 text-xs"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <p className="text-xs text-slate-900">{message.content}</p>
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-xs text-slate-500">
+                                      {message.authorId} • {formatTimeAgo(message.createdAt)}
+                                      {message.isEdited && " (edited)"}
+                                    </p>
+                                    {user && message.authorId === user.id && (
+                                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => handleEditMessage(message)}
+                                          className="h-5 w-5 p-0"
+                                        >
+                                          <Edit2 className="w-3 h-3" />
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => handleDeleteMessage(message.id)}
+                                          className="h-5 w-5 p-0 text-red-500 hover:text-red-700"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </>
+                              )}
                             </div>
                           </div>
                         ))

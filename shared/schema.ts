@@ -115,6 +115,8 @@ export const teamMessages = pgTable("team_messages", {
   content: text("content").notNull(),
   authorId: varchar("author_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  isEdited: boolean("is_edited").notNull().default(false),
 });
 
 // Activity Log table
@@ -270,6 +272,8 @@ export const insertContactSchema = createInsertSchema(contacts).omit({
 export const insertTeamMessageSchema = createInsertSchema(teamMessages).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
+  isEdited: true,
 });
 
 export const insertActivityLogSchema = createInsertSchema(activityLog).omit({

@@ -447,6 +447,31 @@ export class DatabaseStorage implements IStorage {
     return newMessage;
   }
 
+  async updateTeamMessage(id: number, content: string, userId: string): Promise<TeamMessage> {
+    const [updatedMessage] = await db
+      .update(teamMessages)
+      .set({
+        content,
+        updatedAt: new Date(),
+        isEdited: true,
+      })
+      .where(and(
+        eq(teamMessages.id, id),
+        eq(teamMessages.authorId, userId) // Only allow author to edit their own message
+      ))
+      .returning();
+    return updatedMessage;
+  }
+
+  async deleteTeamMessage(id: number, userId: string): Promise<void> {
+    await db
+      .delete(teamMessages)
+      .where(and(
+        eq(teamMessages.id, id),
+        eq(teamMessages.authorId, userId) // Only allow author to delete their own message
+      ));
+  }
+
   // Activity log operations
   async getRecentActivity(limit: number = 10): Promise<ActivityLog[]> {
     return await db
@@ -518,7 +543,7 @@ export class DatabaseStorage implements IStorage {
         eq(properties.isActive, true),
         or(
           like(properties.name, searchTerm),
-          like(properties.address, searchTerm)
+          like(properties.address1, searchTerm)
         )
       ))
       .limit(5);
