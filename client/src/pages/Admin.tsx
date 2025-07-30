@@ -4,6 +4,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import AdminForms from "./AdminForms";
 import { SupportModal } from "@/components/SupportModal";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,6 +43,223 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState("forms");
   const [isNewTemplateDialogOpen, setIsNewTemplateDialogOpen] = useState(false);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  // Sample CSV data from user's provided file
+  const csvData = [
+    {
+      fullName: "Bruce Wayne",
+      propertyName: "Wayne Manor",
+      streetAddress: "1313 Mockingbird Ln.",
+      city: "Gotham City",
+      county: "Bristol County",
+      state: "NJ",
+      zipCode: "00001",
+      phoneNumber: "(807) 536-1076",
+      email: "bruce.wayne@example.com",
+      tasks: "Replace roof tiles; Inspect security cameras"
+    },
+    {
+      fullName: "Tony Stark",
+      propertyName: "Stark Lake House",
+      streetAddress: "10880 Malibu Point",
+      city: "Malibu",
+      county: "Ventura County",
+      state: "CA",
+      zipCode: "90265",
+      phoneNumber: "(625) 667-8476",
+      email: "tony.stark@example.com",
+      tasks: "Calibrate solar panels; Reset water system"
+    },
+    {
+      fullName: "Bilbo Baggins",
+      propertyName: "Bag End",
+      streetAddress: "111 Bag End, Bagshot Row",
+      city: "Hobbiton, The Shire",
+      county: "Shire County",
+      state: "ME",
+      zipCode: "24791",
+      phoneNumber: "(397) 259-9198",
+      email: "bilbo.baggins@example.com",
+      tasks: "Chimney sweep; Pantry pest control"
+    },
+    {
+      fullName: "Jay Gatsby",
+      propertyName: "Gatsby Estate",
+      streetAddress: "1 Gatsby Lane",
+      city: "West Egg",
+      county: "Nassau County",
+      state: "NY",
+      zipCode: "11560",
+      phoneNumber: "(734) 348-9487",
+      email: "jay.gatsby@example.com",
+      tasks: "Clean pool; Repair ballroom lights"
+    },
+    {
+      fullName: "Elsa Arendelle",
+      propertyName: "Ice Castle",
+      streetAddress: "1 Ice Palace Rd",
+      city: "North Mountain",
+      county: "Northern Peaks County",
+      state: "AK",
+      zipCode: "99686",
+      phoneNumber: "(918) 766-7895",
+      email: "elsa.arendelle@example.com",
+      tasks: "De-ice entry; Inspect HVAC"
+    },
+    {
+      fullName: "Clark Kent",
+      propertyName: "Smallville Farmhouse",
+      streetAddress: "100 Farmhouse Way",
+      city: "Smallville",
+      county: "Republic County",
+      state: "KS",
+      zipCode: "67524",
+      phoneNumber: "(884) 945-4765",
+      email: "clark.kent@example.com",
+      tasks: "Repair barn door; Reset perimeter alert"
+    },
+    {
+      fullName: "Sherlock Holmes",
+      propertyName: "221B Baker Street",
+      streetAddress: "221B Baker Street",
+      city: "London",
+      county: "Greater London",
+      state: "UK",
+      zipCode: "NW1 6XE",
+      phoneNumber: "(366) 722-1185",
+      email: "sherlock.holmes@example.com",
+      tasks: "Check gas line; Fix loose window latch"
+    },
+    {
+      fullName: "Lara Croft",
+      propertyName: "Croft Manor",
+      streetAddress: "1 Croft Manor",
+      city: "Surrey",
+      county: "Surrey County",
+      state: "UK",
+      zipCode: "GU1 1AA",
+      phoneNumber: "(743) 571-6460",
+      email: "lara.croft@example.com",
+      tasks: "Fix surveillance system; Schedule garden trim"
+    },
+    {
+      fullName: "Doc Brown",
+      propertyName: "Hill Valley Garage",
+      streetAddress: "1640 Riverside Drive",
+      city: "Hill Valley",
+      county: "Sierra County",
+      state: "CA",
+      zipCode: "95420",
+      phoneNumber: "(380) 547-9627",
+      email: "doc.brown@example.com",
+      tasks: "Clean flux capacitor bay; Inspect storm damage"
+    },
+    {
+      fullName: "Willy Wonka",
+      propertyName: "Chocolate Factory Guest House",
+      streetAddress: "10 Candy Cane Lane",
+      city: "Candy Town",
+      county: "Sweet County",
+      state: "PA",
+      zipCode: "15001",
+      phoneNumber: "(720) 511-5742",
+      email: "willy.wonka@example.com",
+      tasks: "Sanitize chocolate river filter; Inspect candy wall"
+    }
+  ];
+
+  const importMutation = useMutation({
+    mutationFn: async () => {
+      const importResults = {
+        properties: 0,
+        contacts: 0,
+        tasks: 0
+      };
+
+      for (const record of csvData) {
+        // Split full name
+        const nameParts = record.fullName.split(' ');
+        const firstName = nameParts[0];
+        const lastName = nameParts.slice(1).join(' ');
+
+        // Create property
+        const property = await apiRequest('/api/properties', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: record.propertyName,
+            type: "house",
+            address1: record.streetAddress,
+            address2: "",
+            city: record.city,
+            state: record.state,
+            zipCode: record.zipCode,
+            status: "active",
+            units: 1,
+            squareFootage: 2500,
+            yearBuilt: 1980,
+            isActive: true
+          })
+        });
+        importResults.properties++;
+
+        // Create contact
+        const contact = await apiRequest('/api/contacts', {
+          method: 'POST',
+          body: JSON.stringify({
+            firstName,
+            lastName,
+            email: record.email,
+            phone: record.phoneNumber,
+            type: "owner",
+            propertyId: property.id,
+            isActive: true
+          })
+        });
+        importResults.contacts++;
+
+        // Create tasks
+        const taskList = record.tasks.split(';').map(task => task.trim());
+        for (const taskTitle of taskList) {
+          if (taskTitle) {
+            await apiRequest('/api/tasks', {
+              method: 'POST',
+              body: JSON.stringify({
+                title: taskTitle,
+                description: `Task for ${record.propertyName}`,
+                priority: "normal",
+                status: "pending",
+                propertyId: property.id,
+                dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+              })
+            });
+            importResults.tasks++;
+          }
+        }
+      }
+
+      return importResults;
+    },
+    onSuccess: (results) => {
+      toast({
+        title: "Import Successful!",
+        description: `Imported ${results.properties} properties, ${results.contacts} contacts, and ${results.tasks} tasks from your CSV data.`,
+      });
+      
+      // Invalidate cache to refresh data
+      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
+    },
+    onError: (error) => {
+      console.error('Import error:', error);
+      toast({
+        title: "Import Failed",
+        description: "Failed to import sample data. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
 
   // Redirect if not admin or manager
   useEffect(() => {
@@ -636,12 +855,17 @@ export default function Admin() {
                     Export All Tasks (CSV)
                   </Button>
                   <div className="border-t pt-3">
-                    <Button variant="outline" className="w-full justify-start">
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => importMutation.mutate()}
+                      disabled={importMutation.isPending}
+                    >
                       <Upload className="w-4 h-4 mr-2" />
-                      Import People Template
+                      {importMutation.isPending ? 'Importing...' : 'Import Sample Data'}
                     </Button>
                     <p className="text-xs text-slate-500 mt-1">
-                      Download template first, then upload with your data
+                      Import 10 properties, contacts, and tasks from your CSV dataset
                     </p>
                   </div>
                 </div>

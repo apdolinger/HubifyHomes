@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { importSampleData } from "./import-data";
 import { 
   insertCommunitySchema,
   insertPropertySchema, 
@@ -538,6 +539,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error submitting form:", error);
       res.status(500).json({ message: "Failed to submit form" });
+    }
+  });
+
+  // Data import endpoint (for importing sample data)
+  app.post("/api/import-sample-data", async (req: any, res) => {
+    try {
+
+      const result = await importSampleData();
+      if (result.success) {
+        res.json({ message: result.message });
+      } else {
+        res.status(500).json({ message: result.message });
+      }
+    } catch (error) {
+      console.error("Error importing data:", error);
+      res.status(500).json({ message: "Failed to import data" });
     }
   });
 
