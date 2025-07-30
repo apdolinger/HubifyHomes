@@ -73,7 +73,10 @@ export default function People() {
   // Fetch contacts
   const { data: contacts, isLoading: contactsLoading } = useQuery({
     queryKey: ["/api/contacts", showInactive],
-    queryFn: () => apiRequest(`/api/contacts${showInactive ? '?includeInactive=true' : ''}`),
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/contacts${showInactive ? '?includeInactive=true' : ''}`);
+      return response.json();
+    },
     enabled: isAuthenticated,
   });
 
