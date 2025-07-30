@@ -1191,7 +1191,16 @@ export default function TaskProfile() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-slate-700 whitespace-pre-wrap">
-                    {(task as any).description || "No description provided."}
+                    {(task as any).title && (task as any).property ? 
+                      `${(task as any).title} for ${(task as any).property.name}` :
+                      (task as any).description || "No description provided."
+                    }
+                    {(task as any).description && (task as any).title && (task as any).property && (
+                      <>
+                        <br /><br />
+                        {(task as any).description}
+                      </>
+                    )}
                   </p>
                 </CardContent>
               </Card>
