@@ -86,6 +86,7 @@ export const tasks = pgTable("tasks", {
   priority: varchar("priority").notNull().default("normal"), // urgent, high, normal, low
   status: varchar("status").notNull().default("pending"), // pending, in_progress, completed, cancelled
   propertyId: integer("property_id").references(() => properties.id),
+  contactId: integer("contact_id").references(() => contacts.id),
   assignedToId: varchar("assigned_to_id").references(() => users.id),
   assignedById: varchar("assigned_by_id").references(() => users.id),
   dueDate: timestamp("due_date"),

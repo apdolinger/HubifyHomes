@@ -244,6 +244,12 @@ export default function TaskProfile() {
     enabled: isAuthenticated,
   });
 
+  // Fetch contacts for property association
+  const { data: contacts } = useQuery({
+    queryKey: ["/api/contacts"],
+    enabled: isAuthenticated,
+  });
+
   // Update task mutation
   const updateTaskMutation = useMutation({
     mutationFn: async (updatedTask: any) => {
@@ -465,6 +471,11 @@ export default function TaskProfile() {
     updateTaskMutation.mutate(updatedTask);
   };
 
+  const handleContactAssociation = (contactId: string) => {
+    const updatedTask = { contactId: contactId === "none" ? null : parseInt(contactId) };
+    updateTaskMutation.mutate(updatedTask);
+  };
+
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "urgent":
@@ -614,8 +625,8 @@ export default function TaskProfile() {
                   )}
                 </div>
 
-                {/* Property and Person Associations */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                {/* Property and Contact Associations */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                   {/* Property Association */}
                   <div>
                     <Label className="text-sm font-medium text-slate-700 mb-2 block">
@@ -656,7 +667,47 @@ export default function TaskProfile() {
                     </Select>
                   </div>
 
-                  {/* Person Association */}
+                  {/* Contact Association */}
+                  <div>
+                    <Label className="text-sm font-medium text-slate-700 mb-2 block">
+                      Related Contact
+                    </Label>
+                    <Select
+                      value={(task as any).contactId?.toString() || "none"}
+                      onValueChange={handleContactAssociation}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select contact">
+                          {(task as any).contact ? (
+                            <div className="flex items-center space-x-2">
+                              <User className="w-4 h-4 text-slate-500" />
+                              <span>{(task as any).contact.firstName} {(task as any).contact.lastName}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-500">No contact</span>
+                          )}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">
+                          <div className="flex items-center space-x-2">
+                            <X className="w-4 h-4 text-slate-400" />
+                            <span>No contact</span>
+                          </div>
+                        </SelectItem>
+                        {contacts?.map((contact: any) => (
+                          <SelectItem key={contact.id} value={contact.id.toString()}>
+                            <div className="flex items-center space-x-2">
+                              <User className="w-4 h-4 text-slate-500" />
+                              <span>{contact.firstName} {contact.lastName} ({contact.type})</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Team Assignment */}
                   <div>
                     <Label className="text-sm font-medium text-slate-700 mb-2 block">
                       Assigned To
