@@ -68,7 +68,7 @@ function Router() {
   );
 }
 
-function AuthenticatedApp() {
+function AuthenticatedAppContent() {
   const [isQuickSearchOpen, setIsQuickSearchOpen] = useState(false);
   const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState(false);
   const { openTaskModal } = useTaskModal();
@@ -86,41 +86,47 @@ function AuthenticatedApp() {
   });
 
   return (
-    <TaskModalProvider>
-      <div className="min-h-screen bg-slate-50 flex flex-col">
-        <Navigation />
-        <div className="flex-1">
-          <Router />
-        </div>
-      
-      {/* Footer - Internal Only */}
-      <footer className="bg-white border-t border-slate-200 py-4">
-        <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
-          <div className="text-sm text-slate-600">
-            © 2025 Dwellerly. All rights reserved.
-          </div>
-          <div className="text-xs">
-            <a 
-              href="/dwellerly-admin" 
-              className="text-slate-400 hover:text-slate-600 transition-colors"
-              title="Internal Platform Management"
-            >
-              Platform
-            </a>
-          </div>
-        </div>
-      </footer>
-      
-      <QuickSearchModal 
-        isOpen={isQuickSearchOpen} 
-        onClose={() => setIsQuickSearchOpen(false)} 
-      />
-      <GlobalTaskModal />
-      <KeyboardHelpModal 
-        isOpen={isKeyboardHelpOpen} 
-        onClose={() => setIsKeyboardHelpOpen(false)} 
-      />
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      <Navigation />
+      <div className="flex-1">
+        <Router />
       </div>
+    
+    {/* Footer - Internal Only */}
+    <footer className="bg-white border-t border-slate-200 py-4">
+      <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
+        <div className="text-sm text-slate-600">
+          © 2025 Dwellerly. All rights reserved.
+        </div>
+        <div className="text-xs">
+          <a 
+            href="/dwellerly-admin" 
+            className="text-slate-400 hover:text-slate-600 transition-colors"
+            title="Internal Platform Management"
+          >
+            Platform
+          </a>
+        </div>
+      </div>
+    </footer>
+    
+    <QuickSearchModal 
+      isOpen={isQuickSearchOpen} 
+      onClose={() => setIsQuickSearchOpen(false)} 
+    />
+    <GlobalTaskModal />
+    <KeyboardHelpModal 
+      isOpen={isKeyboardHelpOpen} 
+      onClose={() => setIsKeyboardHelpOpen(false)} 
+    />
+    </div>
+  );
+}
+
+function AuthenticatedApp() {
+  return (
+    <TaskModalProvider>
+      <AuthenticatedAppContent />
     </TaskModalProvider>
   );
 }
