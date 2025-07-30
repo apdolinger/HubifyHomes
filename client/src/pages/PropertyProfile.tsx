@@ -72,6 +72,13 @@ export default function PropertyProfile() {
     billingRate: "",
     description: ""
   });
+  const [roomForm, setRoomForm] = useState({
+    name: "",
+    type: "bedroom",
+    description: ""
+  });
+  const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
+  const [editingRoom, setEditingRoom] = useState<any>(null);
   
   // Get property ID from URL query params
   const urlParams = new URLSearchParams(window.location.search);
@@ -107,6 +114,12 @@ export default function PropertyProfile() {
     enabled: isAuthenticated,
   });
 
+  // Get property rooms
+  const { data: rooms = [], refetch: refetchRooms } = useQuery({
+    queryKey: [`/api/properties/${propertyId}/rooms`],
+    enabled: isAuthenticated && !!propertyId,
+  });
+
   // Property update mutation
   const updatePropertyMutation = useMutation({
     mutationFn: async (updateData: any) => {
@@ -135,6 +148,75 @@ export default function PropertyProfile() {
       toast({
         title: "Update failed",
         description: "Failed to update property details.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Room mutations
+  const createRoomMutation = useMutation({
+    mutationFn: async (roomData: any) => {
+      return await apiRequest("/api/rooms", "POST", {
+        ...roomData,
+        propertyId: parseInt(propertyId || "0"),
+      });
+    },
+    onSuccess: () => {
+      refetchRooms();
+      setIsRoomModalOpen(false);
+      setRoomForm({ name: "", type: "bedroom", description: "" });
+      toast({
+        title: "Room created",
+        description: "Room has been added to the property.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to create room",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateRoomMutation = useMutation({
+    mutationFn: async ({ id, ...roomData }: any) => {
+      return await apiRequest(`/api/rooms/${id}`, "PATCH", roomData);
+    },
+    onSuccess: () => {
+      refetchRooms();
+      setIsRoomModalOpen(false);
+      setEditingRoom(null);
+      setRoomForm({ name: "", type: "bedroom", description: "" });
+      toast({
+        title: "Room updated",
+        description: "Room details have been updated.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to update room",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteRoomMutation = useMutation({
+    mutationFn: async (roomId: number) => {
+      return await apiRequest(`/api/rooms/${roomId}`, "DELETE");
+    },
+    onSuccess: () => {
+      refetchRooms();
+      toast({
+        title: "Room deleted",
+        description: "Room has been removed from the property.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to delete room",
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -307,6 +389,67 @@ export default function PropertyProfile() {
         billingRate: (property as any)?.billingRate?.toString() || "",
         description: (property as any)?.description || ""
       });
+    }
+  };
+
+  // Room handlers
+  const handleCreateRoom = () => {
+    setEditingRoom(null);
+    setRoomForm({ name: "", type: "bedroom", description: "" });
+    setIsRoomModalOpen(true);
+  };
+
+  const handleEditRoom = (room: any) => {
+    setEditingRoom(room);
+    setRoomForm({
+      name: room.name,
+      type: room.type,
+      description: room.description || ""
+    });
+    setIsRoomModalOpen(true);
+  };
+
+  const handleDeleteRoom = (roomId: number) => {
+    if (confirm("Are you sure you want to delete this room?")) {
+      deleteRoomMutation.mutate(roomId);
+    }
+  };
+
+  const handleSaveRoom = () => {
+    if (editingRoom) {
+      updateRoomMutation.mutate({ id: editingRoom.id, ...roomForm });
+    } else {
+      createRoomMutation.mutate(roomForm);
+    }
+  };
+
+  const getRoomTypeIcon = (type: string) => {
+    switch (type) {
+      case "bedroom":
+        return "🛏️";
+      case "bathroom":
+        return "🚿";
+      case "kitchen":
+        return "🍳";
+      case "living_room":
+        return "🛋️";
+      case "office":
+        return "💼";
+      case "storage":
+        return "📦";
+      case "outdoor":
+        return "🌿";
+      default:
+        return "🏠";
+    }
+  };
+
+  const getRoomTypeDisplay = (type: string) => {
+    switch (type) {
+      case "living_room":
+        return "Living Room";
+      default:
+        return type.charAt(0).toUpperCase() + type.slice(1);
     }
   };
 
@@ -736,8 +879,9 @@ export default function PropertyProfile() {
 
       {/* Tabs Section */}
       <Tabs defaultValue="tasks" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="tasks">Tasks & History</TabsTrigger>
+          <TabsTrigger value="rooms">Rooms & Spaces</TabsTrigger>
           <TabsTrigger value="supplies">Supplies Log</TabsTrigger>
           <TabsTrigger value="community">Community Info</TabsTrigger>
           <TabsTrigger value="notes">Notes & Custom</TabsTrigger>
@@ -819,6 +963,154 @@ export default function PropertyProfile() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+        
+        <TabsContent value="rooms">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center">
+                  <Home className="w-5 h-5 mr-2" />
+                  Rooms & Spaces
+                </CardTitle>
+                <Button onClick={handleCreateRoom} className="bg-primary hover:bg-primary/90">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Room
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {rooms && rooms.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {rooms.map((room: any) => (
+                    <Card key={room.id} className="p-4 hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center space-x-3">
+                          <span className="text-2xl">{getRoomTypeIcon(room.type)}</span>
+                          <div>
+                            <h4 className="font-semibold text-slate-800">{room.name}</h4>
+                            <p className="text-sm text-slate-500">{getRoomTypeDisplay(room.type)}</p>
+                          </div>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            <DropdownMenuItem onClick={() => handleEditRoom(room)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Room
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleDeleteRoom(room.id)}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Room
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      {room.description && (
+                        <p className="text-sm text-slate-600 line-clamp-2">
+                          {room.description}
+                        </p>
+                      )}
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-slate-500">
+                  <Home className="w-12 h-12 mx-auto mb-4 text-slate-400" />
+                  <h3 className="text-lg font-medium mb-2">No Rooms Added</h3>
+                  <p className="mb-4">Start organizing your property by adding rooms and spaces.</p>
+                  <Button onClick={handleCreateRoom} className="bg-primary hover:bg-primary/90">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add First Room
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Room Modal */}
+          <Dialog open={isRoomModalOpen} onOpenChange={setIsRoomModalOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  {editingRoom ? "Edit Room" : "Add New Room"}
+                </DialogTitle>
+                <DialogDescription>
+                  {editingRoom 
+                    ? "Update the room details below." 
+                    : "Add a new room or space to this property."
+                  }
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="room-name">Room Name</Label>
+                  <Input
+                    id="room-name"
+                    value={roomForm.name}
+                    onChange={(e) => setRoomForm({ ...roomForm, name: e.target.value })}
+                    placeholder="e.g., Master Bedroom, Living Room"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="room-type">Room Type</Label>
+                  <Select 
+                    value={roomForm.type}
+                    onValueChange={(value) => setRoomForm({ ...roomForm, type: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select room type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bedroom">Bedroom</SelectItem>
+                      <SelectItem value="bathroom">Bathroom</SelectItem>
+                      <SelectItem value="kitchen">Kitchen</SelectItem>
+                      <SelectItem value="living_room">Living Room</SelectItem>
+                      <SelectItem value="office">Office</SelectItem>
+                      <SelectItem value="storage">Storage</SelectItem>
+                      <SelectItem value="outdoor">Outdoor</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="room-description">Description (Optional)</Label>
+                  <Textarea
+                    id="room-description"
+                    value={roomForm.description}
+                    onChange={(e) => setRoomForm({ ...roomForm, description: e.target.value })}
+                    placeholder="Add any notes about this room..."
+                    rows={3}
+                  />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsRoomModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleSaveRoom}
+                  disabled={!roomForm.name.trim() || createRoomMutation.isPending || updateRoomMutation.isPending}
+                >
+                  {editingRoom ? "Update Room" : "Add Room"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
         
         <TabsContent value="supplies">

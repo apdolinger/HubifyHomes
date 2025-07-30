@@ -5,7 +5,8 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { importSampleData } from "./import-data";
 import { 
   insertCommunitySchema,
-  insertPropertySchema, 
+  insertPropertySchema,
+  insertRoomSchema,
   insertTaskSchema, 
   insertContactSchema, 
   insertTeamMessageSchema,
@@ -300,6 +301,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting property:', error);
       res.status(500).json({ message: 'Failed to delete property' });
+    }
+  });
+
+  // Room routes
+  app.get("/api/properties/:propertyId/rooms", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.propertyId);
+      if (isNaN(propertyId)) {
+        return res.status(400).json({ message: 'Invalid property ID' });
+      }
+      
+      const rooms = await storage.getRoomsByProperty(propertyId);
+      res.json(rooms);
+    } catch (error) {
+      console.error("Error fetching rooms:", error);
+      res.status(500).json({ message: "Failed to fetch rooms" });
+    }
+  });
+
+  app.post("/api/rooms", isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertRoomSchema.parse(req.body);
+      const room = await storage.createRoom(validatedData);
+      res.status(201).json(room);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating room:", error);
+      res.status(500).json({ message: "Failed to create room" });
+    }
+  });
+
+  app.patch("/api/rooms/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid room ID' });
+      }
+
+      const room = await storage.updateRoom(id, req.body);
+      res.json(room);
+    } catch (error) {
+      console.error("Error updating room:", error);
+      res.status(500).json({ message: "Failed to update room" });
+    }
+  });
+
+  app.delete("/api/rooms/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid room ID' });
+      }
+
+      await storage.deleteRoom(id);
+      res.json({ message: 'Room deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting room:', error);
+      res.status(500).json({ message: 'Failed to delete room' });
     }
   });
 

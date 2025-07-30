@@ -2,6 +2,7 @@ import {
   users,
   communities,
   properties,
+  rooms,
   tasks,
   contacts,
   teamMessages,
@@ -15,6 +16,8 @@ import {
   type InsertCommunity,
   type Property,
   type InsertProperty,
+  type Room,
+  type InsertRoom,
   type Task,
   type InsertTask,
   type Contact,
@@ -52,6 +55,13 @@ export interface IStorage {
   createProperty(property: InsertProperty, userId: string): Promise<Property>;
   updateProperty(id: number, property: Partial<InsertProperty>): Promise<Property>;
   deleteProperty(id: number): Promise<void>;
+  
+  // Room operations
+  getRoomsByProperty(propertyId: number): Promise<Room[]>;
+  getRoom(id: number): Promise<Room | undefined>;
+  createRoom(room: InsertRoom): Promise<Room>;
+  updateRoom(id: number, room: Partial<InsertRoom>): Promise<Room>;
+  deleteRoom(id: number): Promise<void>;
   
   // Task operations
   getTasks(): Promise<Task[]>;
@@ -217,6 +227,34 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProperty(id: number): Promise<void> {
     await db.update(properties).set({ isActive: false }).where(eq(properties.id, id));
+  }
+
+  // Room operations
+  async getRoomsByProperty(propertyId: number): Promise<Room[]> {
+    return await db.select().from(rooms).where(eq(rooms.propertyId, propertyId));
+  }
+
+  async getRoom(id: number): Promise<Room | undefined> {
+    const [room] = await db.select().from(rooms).where(eq(rooms.id, id));
+    return room;
+  }
+
+  async createRoom(room: InsertRoom): Promise<Room> {
+    const [newRoom] = await db.insert(rooms).values(room).returning();
+    return newRoom;
+  }
+
+  async updateRoom(id: number, room: Partial<InsertRoom>): Promise<Room> {
+    const [updatedRoom] = await db
+      .update(rooms)
+      .set({ ...room, updatedAt: new Date() })
+      .where(eq(rooms.id, id))
+      .returning();
+    return updatedRoom;
+  }
+
+  async deleteRoom(id: number): Promise<void> {
+    await db.delete(rooms).where(eq(rooms.id, id));
   }
 
   // Task operations

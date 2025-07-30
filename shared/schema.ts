@@ -78,6 +78,18 @@ export const properties = pgTable("properties", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Rooms/Spaces table
+export const rooms = pgTable("rooms", {
+  id: serial("id").primaryKey(),
+  propertyId: integer("property_id").references(() => properties.id, { onDelete: "cascade" }).notNull(),
+  name: varchar("name").notNull(),
+  type: varchar("type").notNull(), // 'bedroom', 'bathroom', 'kitchen', 'living_room', 'office', 'storage', 'outdoor', 'other'
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Tasks table
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
@@ -86,6 +98,7 @@ export const tasks = pgTable("tasks", {
   priority: varchar("priority").notNull().default("normal"), // urgent, high, normal, low
   status: varchar("status").notNull().default("pending"), // pending, in_progress, completed, cancelled
   propertyId: integer("property_id").references(() => properties.id),
+  roomId: integer("room_id").references(() => rooms.id),
   contactId: integer("contact_id").references(() => contacts.id),
   assignedToId: varchar("assigned_to_id").references(() => users.id),
   assignedById: varchar("assigned_by_id").references(() => users.id),
@@ -235,12 +248,17 @@ export const propertiesRelations = relations(properties, ({ one, many }) => ({
   }),
   tasks: many(tasks),
   contacts: many(contacts),
+  rooms: many(rooms),
 }));
 
 export const tasksRelations = relations(tasks, ({ one, many }) => ({
   property: one(properties, {
     fields: [tasks.propertyId],
     references: [properties.id],
+  }),
+  room: one(rooms, {
+    fields: [tasks.roomId],
+    references: [rooms.id],
   }),
   assignedTo: one(users, {
     fields: [tasks.assignedToId],
@@ -253,6 +271,14 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
     relationName: "assignedBy",
   }),
   checklistItems: many(taskChecklistItems),
+}));
+
+export const roomsRelations = relations(rooms, ({ one, many }) => ({
+  property: one(properties, {
+    fields: [rooms.propertyId],
+    references: [properties.id],
+  }),
+  tasks: many(tasks),
 }));
 
 export const checklistTemplatesRelations = relations(checklistTemplates, ({ one }) => ({
@@ -366,6 +392,12 @@ export const insertPropertySchema = createInsertSchema(properties).omit({
   updatedAt: true,
 });
 
+export const insertRoomSchema = createInsertSchema(rooms).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertTaskSchema = createInsertSchema(tasks).omit({
   id: true,
   createdAt: true,
@@ -416,6 +448,8 @@ export type InsertCommunity = z.infer<typeof insertCommunitySchema>;
 export type Community = typeof communities.$inferSelect;
 export type InsertProperty = z.infer<typeof insertPropertySchema>;
 export type Property = typeof properties.$inferSelect;
+export type InsertRoom = z.infer<typeof insertRoomSchema>;
+export type Room = typeof rooms.$inferSelect;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type Task = typeof tasks.$inferSelect;
 export type InsertContact = z.infer<typeof insertContactSchema>;

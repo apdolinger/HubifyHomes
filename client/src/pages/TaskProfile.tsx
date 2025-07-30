@@ -267,6 +267,12 @@ export default function TaskProfile() {
     enabled: isAuthenticated,
   });
 
+  // Fetch rooms for the property associated with this task
+  const { data: rooms } = useQuery({
+    queryKey: ["/api/rooms/property", (task as any)?.propertyId],
+    enabled: isAuthenticated && !!(task as any)?.propertyId,
+  });
+
   // Update task mutation
   const updateTaskMutation = useMutation({
     mutationFn: async (updatedTask: any) => {
@@ -339,7 +345,8 @@ export default function TaskProfile() {
         recurrenceFrequency: (task as any).recurrenceFrequency || "",
         propertyId: (task as any).propertyId?.toString() || "",
         billedSeparately: (task as any).billedSeparately || false,
-        billingAmount: (task as any).billingAmount || ""
+        billingAmount: (task as any).billingAmount || "",
+        roomId: (task as any).roomId?.toString() || ""
       });
       
       // Initialize checklist items from task data
@@ -374,6 +381,7 @@ export default function TaskProfile() {
       isRecurring: editForm.isRecurring,
       recurrenceFrequency: editForm.recurrenceFrequency,
       propertyId: editForm.propertyId ? parseInt(editForm.propertyId) : null,
+      roomId: editForm.roomId ? parseInt(editForm.roomId) : null,
       billedSeparately: editForm.billedSeparately,
       billingAmount: editForm.billingAmount,
       // Note: checklist, attachments, etc. will be handled later when we implement those features
@@ -777,6 +785,32 @@ export default function TaskProfile() {
                     </Select>
                   </div>
 
+                  {/* Room/Space Association */}
+                  {(task as any).room && (
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700 mb-2 block">
+                        Room/Space
+                      </Label>
+                      <div className="flex items-center space-x-2 p-2 bg-slate-50 rounded-lg">
+                        <span className="text-lg">
+                          {(task as any).room.type === "bedroom" ? "🛏️" : 
+                           (task as any).room.type === "bathroom" ? "🚿" : 
+                           (task as any).room.type === "kitchen" ? "🍳" : 
+                           (task as any).room.type === "living_room" ? "🛋️" : 
+                           (task as any).room.type === "office" ? "💼" : 
+                           (task as any).room.type === "storage" ? "📦" : 
+                           (task as any).room.type === "outdoor" ? "🌿" : "🏠"}
+                        </span>
+                        <div>
+                          <p className="font-medium text-slate-800">{(task as any).room.name}</p>
+                          <p className="text-xs text-slate-500 capitalize">
+                            {(task as any).room.type.replace('_', ' ')}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Contact Association */}
                   <div>
                     <Label className="text-sm font-medium text-slate-700 mb-2 block">
@@ -1095,7 +1129,9 @@ export default function TaskProfile() {
                       <Label htmlFor="edit-property">Property</Label>
                       <Select 
                         value={editForm.propertyId}
-                        onValueChange={(value) => setEditForm({ ...editForm, propertyId: value })}
+                        onValueChange={(value) => {
+                          setEditForm({ ...editForm, propertyId: value, roomId: "" });
+                        }}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select property" />
@@ -1109,6 +1145,37 @@ export default function TaskProfile() {
                         </SelectContent>
                       </Select>
                     </div>
+                    <div>
+                      <Label htmlFor="edit-room">Room/Space</Label>
+                      <Select 
+                        value={editForm.roomId}
+                        onValueChange={(value) => setEditForm({ ...editForm, roomId: value })}
+                        disabled={!editForm.propertyId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={editForm.propertyId ? "Select room" : "Select property first"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">
+                            <div className="flex items-center space-x-2">
+                              <X className="w-4 h-4 text-slate-400" />
+                              <span>No specific room</span>
+                            </div>
+                          </SelectItem>
+                          {Array.isArray(rooms) && rooms.map((room: any) => (
+                            <SelectItem key={room.id} value={room.id.toString()}>
+                              <div className="flex items-center space-x-2">
+                                <span>{room.type === "bedroom" ? "🛏️" : room.type === "bathroom" ? "🚿" : room.type === "kitchen" ? "🍳" : room.type === "living_room" ? "🛋️" : room.type === "office" ? "💼" : room.type === "storage" ? "📦" : room.type === "outdoor" ? "🌿" : "🏠"}</span>
+                                <span>{room.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4">
                     <div>
                       <Label htmlFor="edit-tags">Tags (Optional)</Label>
                       <Input
