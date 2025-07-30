@@ -250,6 +250,7 @@ export class DatabaseStorage implements IStorage {
     .from(tasks)
     .leftJoin(properties, eq(tasks.propertyId, properties.id))
     .leftJoin(users, eq(tasks.assignedToId, users.id))
+    .where(eq(tasks.isArchived, false))
     .orderBy(desc(tasks.createdAt));
   }
 
@@ -317,6 +318,7 @@ export class DatabaseStorage implements IStorage {
       .from(tasks)
       .where(and(
         eq(tasks.status, "pending"),
+        eq(tasks.isArchived, false),
         or(
           eq(tasks.priority, "urgent"),
           and(
