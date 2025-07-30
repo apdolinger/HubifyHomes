@@ -56,7 +56,7 @@ export default function TaskProfile() {
   const { isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const [location, navigate] = useLocation();
-  const [match, params] = useRoute("/task-profile");
+  const [match, params] = useRoute("/task-profile/:id");
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("details");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -204,8 +204,8 @@ export default function TaskProfile() {
     }
   };
 
-  // Get task ID from URL params or localStorage
-  const taskId = new URLSearchParams(window.location.search).get('id') || localStorage.getItem('selectedTaskId');
+  // Get task ID from route params
+  const taskId = params?.id;
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -363,8 +363,8 @@ export default function TaskProfile() {
     // Check for conflicts before saving
     if (editForm.assignedTo && editForm.dueDate) {
       try {
-        const conflicts = await checkForConflicts(editForm.assignedTo, editForm.dueDate, editForm.timeEstimate, task?.id);
-        if (conflicts && conflicts.length > 0) {
+        const conflicts = await checkForConflicts(editForm.assignedTo, editForm.dueDate, editForm.timeEstimate, (task as any)?.id);
+        if (conflicts && Array.isArray(conflicts) && conflicts.length > 0) {
           setConflictData({ conflicts, updateData });
           setIsConflictModalOpen(true);
           return; // Don't save yet - let user resolve conflicts
@@ -378,7 +378,7 @@ export default function TaskProfile() {
     updateTaskMutation.mutate(updateData, {
       onSuccess: () => {
         // Invalidate queries to refresh the task data on the page
-        queryClient.invalidateQueries({ queryKey: ['/api/tasks', task?.id?.toString()] });
+        queryClient.invalidateQueries({ queryKey: ['/api/tasks', (task as any)?.id?.toString()] });
         queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
         // Invalidate dashboard queries to update statistics
         queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
@@ -392,12 +392,15 @@ export default function TaskProfile() {
     try {
       const response = await apiRequest('/api/tasks/check-conflicts', {
         method: 'POST',
-        body: {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           assignedUserId,
           dueDate,
           timeEstimate,
           excludeTaskId: currentTaskId
-        }
+        })
       });
       return response;
     } catch (error) {
@@ -411,7 +414,7 @@ export default function TaskProfile() {
       console.log("Forcing update despite conflicts:", conflictData.updateData);
       updateTaskMutation.mutate(conflictData.updateData, {
         onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ['/api/tasks', task?.id?.toString()] });
+          queryClient.invalidateQueries({ queryKey: ['/api/tasks', (task as any)?.id?.toString()] });
           queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
           queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
           queryClient.invalidateQueries({ queryKey: ['/api/dashboard/urgent-tasks'] });

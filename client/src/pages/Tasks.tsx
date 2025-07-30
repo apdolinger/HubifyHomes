@@ -198,8 +198,7 @@ export default function Tasks() {
   };
 
   const handleTaskClick = (taskId: string) => {
-    localStorage.setItem('selectedTaskId', taskId);
-    navigate(`/task-profile?id=${taskId}`);
+    navigate(`/task-profile/${taskId}`);
   };
 
   if (isLoading) {
