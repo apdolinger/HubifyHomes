@@ -450,6 +450,7 @@ Preferred communication style: Simple, everyday language.
 - Updated branding in Navigation, Landing page, embedded forms, and all user-facing text
 - Changed team member email addresses to @dwellerly.com domain
 - Updated documentation and comments to reflect new company name
+- Platform will be hosted on dwellerlyonline.com domain with "Dwellerly" branding
 
 Changelog:
 - June 30, 2025. Initial setup and comprehensive feature implementation
