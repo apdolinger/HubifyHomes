@@ -444,6 +444,26 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Updates
 
+### July 30, 2025 - Room Supplies and Notes Management System
+- Implemented comprehensive room-associated items tracking system
+- Added database tables: `room_supplies` and `room_notes` with proper foreign key relationships
+- Enhanced PropertyProfile with advanced room management interface:
+  - Left panel: Clickable room selection with visual feedback
+  - Right panel: Detailed room view with supplies and notes sections
+- Room Supplies Features:
+  - Track lightbulbs, filters, paint, batteries, and other room-specific items
+  - Detailed form fields: name, type, brand, model, quantity, unit, location
+  - Replacement tracking: last changed date and next replacement schedule
+  - Notes field for additional item information
+- Room Notes Features:
+  - Categorized notes: general, maintenance, paint, measurements, warranty, issues
+  - Rich content with title, description, and importance markers
+  - User attribution with creation timestamps
+  - Edit and delete functionality with proper permissions
+- API endpoints added for full CRUD operations on both supplies and notes
+- Real-time UI updates with optimistic loading states
+- Proper error handling and user feedback throughout the system
+
 ### July 30, 2025 - Application Rebranding from Nestive to Dwellerly
 - Updated application name from "Nestive" to "Dwellerly" throughout entire codebase
 - Changed Super Admin route from `/nestive-admin` to `/dwellerly-admin`
