@@ -262,6 +262,9 @@ export default function TaskProfile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] });
+      // Invalidate dashboard queries to update statistics
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/urgent-tasks'] });
       toast({
         title: "Success",
         description: "Task updated successfully",
@@ -354,6 +357,9 @@ export default function TaskProfile() {
         // Invalidate queries to refresh the task data on the page
         queryClient.invalidateQueries({ queryKey: ['/api/tasks', task?.id?.toString()] });
         queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
+        // Invalidate dashboard queries to update statistics
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/urgent-tasks'] });
         setIsEditModalOpen(false);
       }
     });
@@ -386,7 +392,13 @@ export default function TaskProfile() {
   };
 
   const handleStatusChange = (newStatus: string) => {
-    updateTaskMutation.mutate({ status: newStatus });
+    updateTaskMutation.mutate({ status: newStatus }, {
+      onSuccess: () => {
+        // Invalidate dashboard queries when status changes
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/urgent-tasks'] });
+      }
+    });
   };
 
   const addChecklistItem = () => {
