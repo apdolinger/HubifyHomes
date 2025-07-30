@@ -175,9 +175,9 @@ export default function Dashboard() {
   // Send message mutation
   const sendMessageMutation = useMutation({
     mutationFn: async (message: string) => {
-      await apiRequest("/api/dashboard/team-messages", {
+      return await apiRequest("/api/team-messages", {
         method: "POST",
-        body: { message }
+        body: { content: message }
       });
     },
     onSuccess: () => {
@@ -211,7 +211,7 @@ export default function Dashboard() {
   // Complete task mutation  
   const completeTaskMutation = useMutation({
     mutationFn: async (taskId: number) => {
-      await apiRequest(`/api/tasks/${taskId}`, {
+      return await apiRequest(`/api/tasks/${taskId}`, {
         method: "PATCH",
         body: { status: "completed" }
       });
@@ -255,10 +255,10 @@ export default function Dashboard() {
 
   // Get enabled widgets sorted by order
   const enabledWidgets = dashboardWidgets
-    .filter(widget => widget.enabled)
+    .filter((widget) => widget.enabled)
     .sort((a, b) => a.order - b.order);
 
-  const handleSaveWidgets = (newWidgets: any[]) => {
+  const handleSaveWidgets = (newWidgets: typeof dashboardWidgets) => {
     setDashboardWidgets(newWidgets);
     // Save to localStorage for persistence (exclude non-serializable icon property)
     const serializableWidgets = newWidgets.map(widget => ({
@@ -376,7 +376,7 @@ export default function Dashboard() {
                         <div className="h-12 bg-slate-100 rounded animate-pulse"></div>
                         <div className="h-12 bg-slate-100 rounded animate-pulse"></div>
                       </div>
-                    ) : urgentTasks && urgentTasks.length > 0 ? (
+                    ) : urgentTasks && Array.isArray(urgentTasks) && urgentTasks.length > 0 ? (
                       <div className="space-y-3">
                         {urgentTasks.slice(0, 3).map((task: any) => (
                           <div key={task.id} className={`p-3 rounded-lg border ${getTaskCardClass(task.priority)}`}>
@@ -443,19 +443,19 @@ export default function Dashboard() {
                     ) : (
                       <div className="grid grid-cols-2 gap-4">
                         <div className="text-center p-3">
-                          <div className="text-2xl font-bold text-primary">{stats?.totalProperties || 0}</div>
+                          <div className="text-2xl font-bold text-primary">{(stats as any)?.totalProperties || 0}</div>
                           <div className="text-xs text-slate-600">Properties</div>
                         </div>
                         <div className="text-center p-3">
-                          <div className="text-2xl font-bold text-orange-600">{stats?.urgentTasks || 0}</div>
+                          <div className="text-2xl font-bold text-orange-600">{(stats as any)?.urgentTasks || 0}</div>
                           <div className="text-xs text-slate-600">Urgent Tasks</div>
                         </div>
                         <div className="text-center p-3">
-                          <div className="text-2xl font-bold text-green-600">{stats?.completedTasks || 0}</div>
+                          <div className="text-2xl font-bold text-green-600">{(stats as any)?.completedToday || 0}</div>
                           <div className="text-xs text-slate-600">Completed</div>
                         </div>
                         <div className="text-center p-3">
-                          <div className="text-2xl font-bold text-blue-600">{stats?.activeTeamMembers || 0}</div>
+                          <div className="text-2xl font-bold text-blue-600">{(stats as any)?.activeTeam || 0}</div>
                           <div className="text-xs text-slate-600">Team Members</div>
                         </div>
                       </div>
@@ -480,7 +480,7 @@ export default function Dashboard() {
                           <div className="h-8 bg-slate-100 rounded animate-pulse"></div>
                           <div className="h-8 bg-slate-100 rounded animate-pulse"></div>
                         </div>
-                      ) : teamMessages && teamMessages.length > 0 ? (
+                      ) : teamMessages && Array.isArray(teamMessages) && teamMessages.length > 0 ? (
                         teamMessages.slice(0, 2).map((message: any) => (
                           <div key={message.id} className="flex space-x-3">
                             <Avatar className="h-6 w-6">
@@ -490,9 +490,9 @@ export default function Dashboard() {
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs text-slate-900">{message.message}</p>
+                              <p className="text-xs text-slate-900">{message.content}</p>
                               <p className="text-xs text-slate-500">
-                                {message.user?.firstName} • {formatTimeAgo(message.createdAt)}
+                                {message.authorId} • {formatTimeAgo(message.createdAt)}
                               </p>
                             </div>
                           </div>
@@ -549,7 +549,7 @@ export default function Dashboard() {
                         <div className="h-8 bg-slate-100 rounded animate-pulse"></div>
                         <div className="h-8 bg-slate-100 rounded animate-pulse"></div>
                       </div>
-                    ) : recentActivity && recentActivity.length > 0 ? (
+                    ) : recentActivity && Array.isArray(recentActivity) && recentActivity.length > 0 ? (
                       <div className="space-y-3">
                         {recentActivity.slice(0, 4).map((activity: any) => (
                           <div key={activity.id} className="flex items-start space-x-3">
