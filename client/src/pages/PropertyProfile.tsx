@@ -123,7 +123,7 @@ export default function PropertyProfile() {
   // Room mutations
   const createRoomMutation = useMutation({
     mutationFn: async (roomData: any) => {
-      return await apiRequest("/api/rooms", "POST", {
+      return await apiRequest("POST", "/api/rooms", {
         ...roomData,
         propertyId: parseInt(propertyId || "0")
       });
@@ -159,7 +159,7 @@ export default function PropertyProfile() {
 
   const updateRoomMutation = useMutation({
     mutationFn: async ({ id, ...data }: any) => {
-      return await apiRequest(`/api/rooms/${id}`, "PATCH", data);
+      return await apiRequest("PATCH", `/api/rooms/${id}`, data);
     },
     onSuccess: () => {
       refetchRooms();
@@ -193,7 +193,7 @@ export default function PropertyProfile() {
 
   const deleteRoomMutation = useMutation({
     mutationFn: async (roomId: number) => {
-      return await apiRequest(`/api/rooms/${roomId}`, "DELETE");
+      return await apiRequest("DELETE", `/api/rooms/${roomId}`);
     },
     onSuccess: () => {
       refetchRooms();
