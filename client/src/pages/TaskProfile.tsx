@@ -346,7 +346,7 @@ export default function TaskProfile() {
         propertyId: (task as any).propertyId?.toString() || "",
         billedSeparately: (task as any).billedSeparately || false,
         billingAmount: (task as any).billingAmount || "",
-        roomId: (task as any).roomId?.toString() || ""
+        roomId: (task as any).roomId?.toString() || "none"
       });
       
       // Initialize checklist items from task data
@@ -381,7 +381,7 @@ export default function TaskProfile() {
       isRecurring: editForm.isRecurring,
       recurrenceFrequency: editForm.recurrenceFrequency,
       propertyId: editForm.propertyId ? parseInt(editForm.propertyId) : null,
-      roomId: editForm.roomId ? parseInt(editForm.roomId) : null,
+      roomId: editForm.roomId && editForm.roomId !== "none" ? parseInt(editForm.roomId) : null,
       billedSeparately: editForm.billedSeparately,
       billingAmount: editForm.billingAmount,
       // Note: checklist, attachments, etc. will be handled later when we implement those features
@@ -1130,7 +1130,7 @@ export default function TaskProfile() {
                       <Select 
                         value={editForm.propertyId}
                         onValueChange={(value) => {
-                          setEditForm({ ...editForm, propertyId: value, roomId: "" });
+                          setEditForm({ ...editForm, propertyId: value, roomId: "none" });
                         }}
                       >
                         <SelectTrigger>
@@ -1156,7 +1156,7 @@ export default function TaskProfile() {
                           <SelectValue placeholder={editForm.propertyId ? "Select room" : "Select property first"} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">
+                          <SelectItem value="none">
                             <div className="flex items-center space-x-2">
                               <X className="w-4 h-4 text-slate-400" />
                               <span>No specific room</span>
