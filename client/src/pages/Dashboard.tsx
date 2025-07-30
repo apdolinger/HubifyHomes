@@ -296,41 +296,7 @@ export default function Dashboard() {
     },
   });
 
-  // Complete task mutation  
-  const completeTaskMutation = useMutation({
-    mutationFn: async (taskId: number) => {
-      return await apiRequest(`/api/tasks/${taskId}`, {
-        method: "PATCH",
-        body: { status: "completed" }
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/urgent-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
-      toast({
-        title: "Task completed",
-        description: "Task has been marked as completed successfully.",
-      });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Error",
-        description: "Failed to complete task. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
+
 
   const handleSendMessage = () => {
     if (!newMessage.trim()) return;
@@ -451,9 +417,7 @@ export default function Dashboard() {
     setEmailNotification(false);
   };
 
-  const handleCompleteTask = (taskId: number) => {
-    completeTaskMutation.mutate(taskId);
-  };
+
 
   // Get enabled widgets sorted by order
   const enabledWidgets = dashboardWidgets
@@ -581,7 +545,11 @@ export default function Dashboard() {
                     ) : urgentTasks && Array.isArray(urgentTasks) && urgentTasks.length > 0 ? (
                       <div className="space-y-3">
                         {urgentTasks.slice(0, 3).map((task: any) => (
-                          <div key={task.id} className={`p-3 rounded-lg border ${getTaskCardClass(task.priority)}`}>
+                          <div 
+                            key={task.id} 
+                            className={`p-3 rounded-lg border cursor-pointer hover:shadow-md transition-shadow ${getTaskCardClass(task.priority)}`}
+                            onClick={() => setLocation(`/task-profile/${task.id}`)}
+                          >
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
                                 <h4 className="font-medium text-sm">{task.title}</h4>
@@ -589,19 +557,10 @@ export default function Dashboard() {
                                   Due: {new Date(task.dueDate).toLocaleDateString()}
                                 </p>
                               </div>
-                              <div className="flex items-center space-x-2">
+                              <div className="flex items-center">
                                 <Badge variant={getPriorityColor(task.priority)} className="text-xs">
                                   {task.priority}
                                 </Badge>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleCompleteTask(task.id)}
-                                  disabled={completeTaskMutation.isPending}
-                                  className="h-6 w-6 p-0"
-                                >
-                                  <CheckCircle className="w-4 h-4" />
-                                </Button>
                               </div>
                             </div>
                           </div>
