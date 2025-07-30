@@ -50,12 +50,12 @@ function Router() {
         <>
           <Route path="/" component={Dashboard} />
           <Route path="/tasks" component={Tasks} />
-          <Route path="/task-profile" component={TaskProfile} />
+          <Route path="/task-profile/:id" component={TaskProfile} />
           <Route path="/properties" component={Properties} />
-          <Route path="/property-profile" component={PropertyProfile} />
+          <Route path="/property-profile/:id" component={PropertyProfile} />
           <Route path="/team" component={Team} />
           <Route path="/people" component={People} />
-          <Route path="/person-profile" component={PersonProfile} />
+          <Route path="/person-profile/:id" component={PersonProfile} />
           <Route path="/property-center" component={PropertyCenter} />
           <Route path="/admin" component={Admin} />
           <Route path="/super-admin" component={Account} />
