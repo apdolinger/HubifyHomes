@@ -404,24 +404,32 @@ export default function PropertyProfile() {
 
             {/* Location and Status Controls */}
             <div className="flex-shrink-0 flex flex-col space-y-3">
-              {/* Location Display */}
-              <div className="flex items-center space-x-2 text-slate-600">
-                <MapPin className="w-5 h-5" />
+              {/* Location Display - Show actual address */}
+              <div className="flex items-start space-x-2 text-slate-600 max-w-xs">
+                <MapPin className="w-5 h-5 mt-0.5 flex-shrink-0" />
                 <div className="text-sm">
-                  <div className="font-medium">{formatFullAddress(property)}</div>
-                  <div className="text-slate-500">Property Location</div>
+                  <div className="font-medium text-slate-900 leading-tight">
+                    {formatFullAddress(property) || 'No address provided'}
+                  </div>
+                  <div className="text-slate-500 text-xs mt-1">Property Location</div>
                 </div>
               </div>
               
-              {/* Active Status Button */}
+              {/* Active Status Button - Better styling */}
               <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
                 <DialogTrigger asChild>
                   <Button 
-                    variant={(property as any)?.isActive ? "default" : "outline"}
+                    variant={(property as any)?.isActive ? "default" : "secondary"}
                     size="sm"
-                    className="flex items-center space-x-2"
+                    className={`flex items-center space-x-2 min-w-[100px] justify-center ${
+                      (property as any)?.isActive 
+                        ? 'bg-green-600 hover:bg-green-700 text-white' 
+                        : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                    }`}
                   >
-                    <div className={`w-2 h-2 rounded-full ${(property as any)?.isActive ? 'bg-white' : 'bg-green-500'}`} />
+                    <div className={`w-2 h-2 rounded-full ${
+                      (property as any)?.isActive ? 'bg-green-200' : 'bg-slate-500'
+                    }`} />
                     <span>{(property as any)?.isActive ? 'Active' : 'Inactive'}</span>
                   </Button>
                 </DialogTrigger>
@@ -557,7 +565,7 @@ export default function PropertyProfile() {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-600">Rooms:</span>
-                <span className="font-medium">{rooms.length}</span>
+                <span className="font-medium">{Array.isArray(rooms) ? rooms.length : 0}</span>
               </div>
             </CardContent>
           </Card>
@@ -712,7 +720,7 @@ export default function PropertyProfile() {
                 </div>
               </CardHeader>
               <CardContent>
-                {rooms.length === 0 ? (
+                {!Array.isArray(rooms) || rooms.length === 0 ? (
                   <div className="text-center py-8">
                     <Home className="w-12 h-12 mx-auto text-slate-400 mb-4" />
                     <h3 className="text-lg font-medium text-slate-900 mb-2">No rooms added yet</h3>
@@ -724,7 +732,7 @@ export default function PropertyProfile() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {rooms.map((room: any) => (
+                    {Array.isArray(rooms) && rooms.map((room: any) => (
                       <div key={room.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                         <div className="flex items-start justify-between mb-2">
                           <div>
