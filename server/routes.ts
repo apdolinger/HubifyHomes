@@ -373,6 +373,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Convert dueDate string to Date object if provided
+      if (updateData.dueDate && typeof updateData.dueDate === 'string') {
+        updateData.dueDate = new Date(updateData.dueDate);
+        console.log("Converted dueDate to:", updateData.dueDate);
+      }
+      
       const task = await storage.updateTask(taskId, updateData);
       res.json(task);
     } catch (error) {
