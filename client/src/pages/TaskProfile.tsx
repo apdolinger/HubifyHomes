@@ -459,7 +459,7 @@ export default function TaskProfile() {
   };
 
   const handlePersonAssociation = (contactId: string) => {
-    const updatedTask = { contactId: contactId === "none" ? null : parseInt(contactId) };
+    const updatedTask = { assignedToId: contactId === "none" ? null : contactId };
     updateTaskMutation.mutate(updatedTask);
   };
 
@@ -660,15 +660,15 @@ export default function TaskProfile() {
                       Associated Person
                     </Label>
                     <Select
-                      value={(task as any).contactId?.toString() || "none"}
+                      value={(task as any).assignedToId?.toString() || "none"}
                       onValueChange={handlePersonAssociation}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select a person">
-                          {(task as any).contact ? (
+                          {(task as any).assignedUser ? (
                             <div className="flex items-center space-x-2">
                               <User className="w-4 h-4 text-slate-500" />
-                              <span>{(task as any).contact.firstName} {(task as any).contact.lastName}</span>
+                              <span>{(task as any).assignedUser.firstName} {(task as any).assignedUser.lastName}</span>
                             </div>
                           ) : (
                             <span className="text-slate-500">No person assigned</span>
