@@ -15,6 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   Building, 
   MapPin, 
@@ -537,13 +538,7 @@ export default function PropertyProfile() {
     deleteRoomMutation.mutate(roomId);
   };
 
-  const handleCancelRoomEdit = () => {
-    setIsRoomModalOpen(false);
-    setEditingRoom(null);
-    setRoomForm({ name: "", type: "bedroom", description: "" });
-  };
-
-  // Room supply handlers
+  // Supply action handlers
   const handleAddSupply = () => {
     if (!roomSupplyForm.name.trim()) {
       toast({
@@ -553,21 +548,22 @@ export default function PropertyProfile() {
       });
       return;
     }
+
     createSupplyMutation.mutate(roomSupplyForm);
   };
 
   const handleEditSupply = (supply: any) => {
     setEditingSupply(supply);
     setRoomSupplyForm({
-      name: supply.name,
-      type: supply.type,
+      name: supply.name || "",
+      type: supply.type || "lightbulb",
       brand: supply.brand || "",
       model: supply.model || "",
-      quantity: supply.quantity,
-      unit: supply.unit,
+      quantity: supply.quantity || 1,
+      unit: supply.unit || "piece",
       location: supply.location || "",
-      lastChanged: supply.lastChanged || "",
-      nextReplacement: supply.nextReplacement || "",
+      lastChanged: supply.lastChanged ? supply.lastChanged.split('T')[0] : "",
+      nextReplacement: supply.nextReplacement ? supply.nextReplacement.split('T')[0] : "",
       notes: supply.notes || ""
     });
     setIsSupplyModalOpen(true);
@@ -582,11 +578,11 @@ export default function PropertyProfile() {
       });
       return;
     }
-    updateSupplyMutation.mutate({ id: editingSupply.id, ...roomSupplyForm });
-  };
 
-  const handleDeleteSupply = (supplyId: number) => {
-    deleteSupplyMutation.mutate(supplyId);
+    updateSupplyMutation.mutate({
+      id: editingSupply.id,
+      ...roomSupplyForm
+    });
   };
 
   const handleCancelSupplyEdit = () => {
@@ -606,26 +602,31 @@ export default function PropertyProfile() {
     });
   };
 
-  // Room note handlers
+  const handleDeleteSupply = (supplyId: number) => {
+    deleteSupplyMutation.mutate(supplyId);
+  };
+
+  // Note action handlers
   const handleAddNote = () => {
     if (!roomNoteForm.title.trim() || !roomNoteForm.content.trim()) {
       toast({
-        title: "Note details required",
-        description: "Please enter both title and content for the note.",
+        title: "Title and content required",
+        description: "Please enter both a title and content for the note.",
         variant: "destructive",
       });
       return;
     }
+
     createNoteMutation.mutate(roomNoteForm);
   };
 
   const handleEditNote = (note: any) => {
     setEditingNote(note);
     setRoomNoteForm({
-      title: note.title,
-      content: note.content,
-      category: note.category,
-      isImportant: note.isImportant
+      title: note.title || "",
+      content: note.content || "",
+      category: note.category || "general",
+      isImportant: note.isImportant || false
     });
     setIsNoteModalOpen(true);
   };
@@ -633,17 +634,17 @@ export default function PropertyProfile() {
   const handleUpdateNote = () => {
     if (!roomNoteForm.title.trim() || !roomNoteForm.content.trim()) {
       toast({
-        title: "Note details required",
-        description: "Please enter both title and content for the note.",
+        title: "Title and content required",
+        description: "Please enter both a title and content for the note.",
         variant: "destructive",
       });
       return;
     }
-    updateNoteMutation.mutate({ id: editingNote.id, ...roomNoteForm });
-  };
 
-  const handleDeleteNote = (noteId: number) => {
-    deleteNoteMutation.mutate(noteId);
+    updateNoteMutation.mutate({
+      id: editingNote.id,
+      ...roomNoteForm
+    });
   };
 
   const handleCancelNoteEdit = () => {
@@ -656,6 +657,18 @@ export default function PropertyProfile() {
       isImportant: false
     });
   };
+
+  const handleDeleteNote = (noteId: number) => {
+    deleteNoteMutation.mutate(noteId);
+  };
+
+  const handleCancelRoomEdit = () => {
+    setIsRoomModalOpen(false);
+    setEditingRoom(null);
+    setRoomForm({ name: "", type: "bedroom", description: "" });
+  };
+
+
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -1309,6 +1322,258 @@ export default function PropertyProfile() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Supply Modal */}
+        <Dialog open={isSupplyModalOpen} onOpenChange={setIsSupplyModalOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{editingSupply ? 'Edit Supply' : 'Add New Supply'}</DialogTitle>
+              <DialogDescription>
+                {editingSupply 
+                  ? 'Update the supply details and information.'
+                  : `Add a new supply item for ${selectedRoom?.name || 'this room'}.`
+                }
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+              <div>
+                <Label htmlFor="supply-name">Supply Name *</Label>
+                <Input
+                  id="supply-name"
+                  value={roomSupplyForm.name}
+                  onChange={(e) => setRoomSupplyForm({ ...roomSupplyForm, name: e.target.value })}
+                  placeholder="e.g. LED Ceiling Light"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="supply-type">Type</Label>
+                <Select 
+                  value={roomSupplyForm.type}
+                  onValueChange={(value) => setRoomSupplyForm({ ...roomSupplyForm, type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select supply type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="lightbulb">Lightbulb</SelectItem>
+                    <SelectItem value="filter">Filter</SelectItem>
+                    <SelectItem value="paint">Paint</SelectItem>
+                    <SelectItem value="battery">Battery</SelectItem>
+                    <SelectItem value="cleaning">Cleaning Supply</SelectItem>
+                    <SelectItem value="hardware">Hardware</SelectItem>
+                    <SelectItem value="electrical">Electrical</SelectItem>
+                    <SelectItem value="plumbing">Plumbing</SelectItem>
+                    <SelectItem value="hvac">HVAC</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="supply-brand">Brand</Label>
+                <Input
+                  id="supply-brand"
+                  value={roomSupplyForm.brand}
+                  onChange={(e) => setRoomSupplyForm({ ...roomSupplyForm, brand: e.target.value })}
+                  placeholder="e.g. Philips, GE, Duracell"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="supply-model">Model</Label>
+                <Input
+                  id="supply-model"
+                  value={roomSupplyForm.model}
+                  onChange={(e) => setRoomSupplyForm({ ...roomSupplyForm, model: e.target.value })}
+                  placeholder="e.g. 60W Soft White"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="supply-quantity">Quantity *</Label>
+                <Input
+                  id="supply-quantity"
+                  type="number"
+                  min="1"
+                  value={roomSupplyForm.quantity}
+                  onChange={(e) => setRoomSupplyForm({ ...roomSupplyForm, quantity: parseInt(e.target.value) || 1 })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="supply-unit">Unit</Label>
+                <Select 
+                  value={roomSupplyForm.unit}
+                  onValueChange={(value) => setRoomSupplyForm({ ...roomSupplyForm, unit: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select unit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="piece">Piece</SelectItem>
+                    <SelectItem value="gallon">Gallon</SelectItem>
+                    <SelectItem value="quart">Quart</SelectItem>
+                    <SelectItem value="liter">Liter</SelectItem>
+                    <SelectItem value="bottle">Bottle</SelectItem>
+                    <SelectItem value="box">Box</SelectItem>
+                    <SelectItem value="pack">Pack</SelectItem>
+                    <SelectItem value="roll">Roll</SelectItem>
+                    <SelectItem value="tube">Tube</SelectItem>
+                    <SelectItem value="bag">Bag</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="supply-location">Location in Room</Label>
+                <Input
+                  id="supply-location"
+                  value={roomSupplyForm.location}
+                  onChange={(e) => setRoomSupplyForm({ ...roomSupplyForm, location: e.target.value })}
+                  placeholder="e.g. Main ceiling fixture, Under sink"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="supply-last-changed">Last Changed</Label>
+                <Input
+                  id="supply-last-changed"
+                  type="date"
+                  value={roomSupplyForm.lastChanged}
+                  onChange={(e) => setRoomSupplyForm({ ...roomSupplyForm, lastChanged: e.target.value })}
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor="supply-next-replacement">Next Replacement Date</Label>
+                <Input
+                  id="supply-next-replacement"
+                  type="date"
+                  value={roomSupplyForm.nextReplacement}
+                  onChange={(e) => setRoomSupplyForm({ ...roomSupplyForm, nextReplacement: e.target.value })}
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor="supply-notes">Notes</Label>
+                <Textarea
+                  id="supply-notes"
+                  value={roomSupplyForm.notes}
+                  onChange={(e) => setRoomSupplyForm({ ...roomSupplyForm, notes: e.target.value })}
+                  placeholder="Add any additional notes about this supply item..."
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={handleCancelSupplyEdit}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={editingSupply ? handleUpdateSupply : handleAddSupply}
+                disabled={createSupplyMutation.isPending || updateSupplyMutation.isPending}
+              >
+                {createSupplyMutation.isPending || updateSupplyMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    {editingSupply ? 'Updating...' : 'Adding...'}
+                  </>
+                ) : (
+                  editingSupply ? 'Update Supply' : 'Add Supply'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Notes Modal */}
+        <Dialog open={isNoteModalOpen} onOpenChange={setIsNoteModalOpen}>
+          <DialogContent className="max-w-xl">
+            <DialogHeader>
+              <DialogTitle>{editingNote ? 'Edit Note' : 'Add New Note'}</DialogTitle>
+              <DialogDescription>
+                {editingNote 
+                  ? 'Update the note details and information.'
+                  : `Add a new note for ${selectedRoom?.name || 'this room'}.`
+                }
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div>
+                <Label htmlFor="note-title">Title *</Label>
+                <Input
+                  id="note-title"
+                  value={roomNoteForm.title}
+                  onChange={(e) => setRoomNoteForm({ ...roomNoteForm, title: e.target.value })}
+                  placeholder="e.g. Paint Color Reference"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="note-category">Category</Label>
+                <Select 
+                  value={roomNoteForm.category}
+                  onValueChange={(value) => setRoomNoteForm({ ...roomNoteForm, category: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General</SelectItem>
+                    <SelectItem value="maintenance">Maintenance</SelectItem>
+                    <SelectItem value="paint">Paint</SelectItem>
+                    <SelectItem value="measurements">Measurements</SelectItem>
+                    <SelectItem value="warranty">Warranty</SelectItem>
+                    <SelectItem value="issues">Issues</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="note-content">Content *</Label>
+                <Textarea
+                  id="note-content"
+                  value={roomNoteForm.content}
+                  onChange={(e) => setRoomNoteForm({ ...roomNoteForm, content: e.target.value })}
+                  placeholder="Add your note content here..."
+                  rows={4}
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="note-important"
+                  checked={roomNoteForm.isImportant}
+                  onCheckedChange={(checked: boolean) => setRoomNoteForm({ ...roomNoteForm, isImportant: !!checked })}
+                />
+                <Label htmlFor="note-important">Mark as important</Label>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={handleCancelNoteEdit}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={editingNote ? handleUpdateNote : handleAddNote}
+                disabled={createNoteMutation.isPending || updateNoteMutation.isPending}
+              >
+                {createNoteMutation.isPending || updateNoteMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    {editingNote ? 'Updating...' : 'Adding...'}
+                  </>
+                ) : (
+                  editingNote ? 'Update Note' : 'Add Note'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
