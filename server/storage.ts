@@ -36,6 +36,7 @@ import { eq, desc, and, or, like, count, sql } from "drizzle-orm";
 export interface IStorage {
   // User operations - required for Replit Auth
   getUser(id: string): Promise<User | undefined>;
+  getUsers(): Promise<User[]>;
   upsertUser(user: UpsertUser): Promise<User>;
   
   // Community operations
@@ -109,6 +110,10 @@ export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
+  }
+
+  async getUsers(): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.isActive, true)).orderBy(users.firstName, users.lastName);
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
@@ -222,6 +227,7 @@ export class DatabaseStorage implements IStorage {
       priority: tasks.priority,
       status: tasks.status,
       propertyId: tasks.propertyId,
+      contactId: tasks.contactId,
       assignedToId: tasks.assignedToId,
       assignedById: tasks.assignedById,
       dueDate: tasks.dueDate,
@@ -239,6 +245,14 @@ export class DatabaseStorage implements IStorage {
         zip: properties.zip,
         type: properties.type,
       },
+      contact: {
+        id: contacts.id,
+        firstName: contacts.firstName,
+        lastName: contacts.lastName,
+        email: contacts.email,
+        phone: contacts.phone,
+        type: contacts.type,
+      },
       assignedUser: {
         id: users.id,
         firstName: users.firstName,
@@ -249,6 +263,7 @@ export class DatabaseStorage implements IStorage {
     })
     .from(tasks)
     .leftJoin(properties, eq(tasks.propertyId, properties.id))
+    .leftJoin(contacts, eq(tasks.contactId, contacts.id))
     .leftJoin(users, eq(tasks.assignedToId, users.id))
     .where(eq(tasks.isArchived, false))
     .orderBy(desc(tasks.createdAt));
@@ -338,6 +353,7 @@ export class DatabaseStorage implements IStorage {
       priority: tasks.priority,
       status: tasks.status,
       propertyId: tasks.propertyId,
+      contactId: tasks.contactId,
       assignedToId: tasks.assignedToId,
       assignedById: tasks.assignedById,
       dueDate: tasks.dueDate,
@@ -359,6 +375,14 @@ export class DatabaseStorage implements IStorage {
         squareFootage: properties.squareFootage,
         billingType: properties.billingType,
       },
+      contact: {
+        id: contacts.id,
+        firstName: contacts.firstName,
+        lastName: contacts.lastName,
+        email: contacts.email,
+        phone: contacts.phone,
+        type: contacts.type,
+      },
       assignedUser: {
         id: users.id,
         firstName: users.firstName,
@@ -369,6 +393,7 @@ export class DatabaseStorage implements IStorage {
     })
     .from(tasks)
     .leftJoin(properties, eq(tasks.propertyId, properties.id))
+    .leftJoin(contacts, eq(tasks.contactId, contacts.id))
     .leftJoin(users, eq(tasks.assignedToId, users.id))
     .where(eq(tasks.id, id));
     return task;
