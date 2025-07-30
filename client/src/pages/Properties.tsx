@@ -66,7 +66,10 @@ export default function Properties() {
 
   const { data: properties, isLoading: propertiesLoading } = useQuery({
     queryKey: ["/api/properties", showInactive],
-    queryFn: () => apiRequest(`/api/properties${showInactive ? '?includeInactive=true' : ''}`),
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/properties${showInactive ? '?includeInactive=true' : ''}`);
+      return response.json();
+    },
     enabled: isAuthenticated,
   });
 
