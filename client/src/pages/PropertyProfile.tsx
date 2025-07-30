@@ -40,7 +40,8 @@ import {
   Archive,
   Trash2,
   MoreVertical,
-  User
+  User,
+  Package
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -143,17 +144,19 @@ export default function PropertyProfile() {
     enabled: isAuthenticated && !!propertyId,
   });
 
-  // Get room supplies for selected room
-  const { data: roomSupplies = [], refetch: refetchSupplies } = useQuery({
-    queryKey: [`/api/rooms/${selectedRoom?.id}/supplies`],
+  // Get room supplies
+  const { data: supplies = [], isLoading: suppliesLoading, refetch: refetchSupplies } = useQuery({
+    queryKey: [`/api/room-supplies`, selectedRoom?.id],
     enabled: isAuthenticated && !!selectedRoom?.id,
   });
 
-  // Get room notes for selected room
-  const { data: roomNotes = [], refetch: refetchNotes } = useQuery({
-    queryKey: [`/api/rooms/${selectedRoom?.id}/notes`],
+  // Get room notes
+  const { data: notes = [], isLoading: notesLoading, refetch: refetchNotes } = useQuery({
+    queryKey: [`/api/room-notes`, selectedRoom?.id],
     enabled: isAuthenticated && !!selectedRoom?.id,
   });
+
+
 
   // Room mutations
   const createRoomMutation = useMutation({
@@ -1035,17 +1038,29 @@ export default function PropertyProfile() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="space-y-3">
                     {Array.isArray(rooms) && rooms.map((room: any) => (
-                      <div key={room.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div 
+                        key={room.id} 
+                        className={`border rounded-lg p-4 transition-all cursor-pointer ${
+                          selectedRoom?.id === room.id 
+                            ? 'border-blue-500 bg-blue-50 shadow-md' 
+                            : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
+                        }`}
+                        onClick={() => setSelectedRoom(room)}
+                      >
                         <div className="flex items-start justify-between mb-2">
-                          <div>
+                          <div className="flex-1">
                             <h4 className="font-medium text-slate-900">{room.name}</h4>
                             <p className="text-sm text-slate-600 capitalize">{room.type.replace('_', ' ')}</p>
                           </div>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 <MoreVertical className="w-4 h-4" />
                               </Button>
                             </DropdownMenuTrigger>
@@ -1073,6 +1088,202 @@ export default function PropertyProfile() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Selected Room Details Panel */}
+            {selectedRoom && (
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>{selectedRoom.name} - Details</CardTitle>
+                    <Badge variant="secondary" className="capitalize">
+                      {selectedRoom.type.replace('_', ' ')}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Tabs defaultValue="supplies" className="w-full">
+                    <TabsList>
+                      <TabsTrigger value="supplies">Supplies</TabsTrigger>
+                      <TabsTrigger value="notes">Notes</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="supplies" className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-lg font-medium">Room Supplies</h4>
+                        <Button onClick={() => setIsSupplyModalOpen(true)}>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Supply
+                        </Button>
+                      </div>
+
+                      {suppliesLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <RefreshCw className="w-6 h-6 animate-spin text-slate-400" />
+                        </div>
+                      ) : Array.isArray(supplies) && supplies.length > 0 ? (
+                        <div className="grid gap-4">
+                          {supplies.map((supply: any) => (
+                            <Card key={supply.id} className="p-4">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <h5 className="font-medium text-slate-900">{supply.name}</h5>
+                                  <p className="text-sm text-slate-600 capitalize mb-2">{supply.type}</p>
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                                    {supply.brand && (
+                                      <div>
+                                        <span className="font-medium">Brand:</span> {supply.brand}
+                                      </div>
+                                    )}
+                                    {supply.model && (
+                                      <div>
+                                        <span className="font-medium">Model:</span> {supply.model}
+                                      </div>
+                                    )}
+                                    <div>
+                                      <span className="font-medium">Qty:</span> {supply.quantity} {supply.unit}
+                                    </div>
+                                    {supply.location && (
+                                      <div>
+                                        <span className="font-medium">Location:</span> {supply.location}
+                                      </div>
+                                    )}
+                                  </div>
+                                  {supply.lastChanged && (
+                                    <div className="mt-2 text-sm text-slate-600">
+                                      <span className="font-medium">Last Changed:</span> {new Date(supply.lastChanged).toLocaleDateString()}
+                                      {supply.nextReplacement && (
+                                        <span className="ml-4">
+                                          <span className="font-medium">Next:</span> {new Date(supply.nextReplacement).toLocaleDateString()}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                  {supply.notes && (
+                                    <p className="mt-2 text-sm text-slate-700 italic">{supply.notes}</p>
+                                  )}
+                                </div>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <MoreVertical className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleEditSupply(supply)}>
+                                      <Edit className="w-4 h-4 mr-2" />
+                                      Edit Supply
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      className="text-red-600"
+                                      onClick={() => handleDeleteSupply(supply.id)}
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Delete Supply
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <Package className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                          <h3 className="text-lg font-medium text-slate-900 mb-2">No supplies tracked</h3>
+                          <p className="text-slate-600 mb-4">Start tracking supplies for this room.</p>
+                          <Button onClick={() => setIsSupplyModalOpen(true)}>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add First Supply
+                          </Button>
+                        </div>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="notes" className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-lg font-medium">Room Notes</h4>
+                        <Button onClick={() => setIsNoteModalOpen(true)}>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Note
+                        </Button>
+                      </div>
+
+                      {notesLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <RefreshCw className="w-6 h-6 animate-spin text-slate-400" />
+                        </div>
+                      ) : Array.isArray(notes) && notes.length > 0 ? (
+                        <div className="space-y-4">
+                          {notes.map((note: any) => (
+                            <Card key={note.id} className="p-4">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <h5 className="font-medium text-slate-900">{note.title}</h5>
+                                    {note.isImportant && (
+                                      <Badge variant="destructive" className="text-xs">Important</Badge>
+                                    )}
+                                    <Badge variant="outline" className="text-xs capitalize">
+                                      {note.category}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm text-slate-700 mb-3">{note.content}</p>
+                                  <div className="text-xs text-slate-500">
+                                    Added {new Date(note.createdAt).toLocaleDateString()} by {note.createdById}
+                                  </div>
+                                </div>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <MoreVertical className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleEditNote(note)}>
+                                      <Edit className="w-4 h-4 mr-2" />
+                                      Edit Note
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      className="text-red-600"
+                                      onClick={() => handleDeleteNote(note.id)}
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Delete Note
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <FileText className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                          <h3 className="text-lg font-medium text-slate-900 mb-2">No notes added</h3>
+                          <p className="text-slate-600 mb-4">Add notes and observations for this room.</p>
+                          <Button onClick={() => setIsNoteModalOpen(true)}>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add First Note
+                          </Button>
+                        </div>
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
+            )}
+
+            {!selectedRoom && (
+              <Card className="lg:col-span-2">
+                <CardContent className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <Home className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                    <h3 className="text-lg font-medium text-slate-900 mb-2">Select a room</h3>
+                    <p className="text-slate-600">Click on a room from the left to view its supplies and notes.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             </div>
           </TabsContent>
 
