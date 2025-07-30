@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation, useRoute } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
+import EnhancedChecklist from "@/components/EnhancedChecklist";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -75,8 +76,16 @@ export default function TaskProfile() {
     billedSeparately: false,
     billingAmount: ""
   });
-  const [checklist, setChecklist] = useState<Array<{id: string, text: string, completed: boolean}>>([]);
-  const [newChecklistItem, setNewChecklistItem] = useState("");
+  const [checklistItems, setChecklistItems] = useState<Array<{
+    id: string;
+    text: string;
+    completed: boolean;
+    dueDate?: Date;
+    assignedToId?: string;
+    priority: 'urgent' | 'high' | 'normal' | 'low';
+    notes?: string;
+    sortOrder: number;
+  }>>([]);
   const [attachments, setAttachments] = useState<Array<{id: string, name: string, size: string, type: string}>>([]);
   const [quickLinks, setQuickLinks] = useState<Array<{id: string, label: string, url: string}>>([]);
   const [newQuickLink, setNewQuickLink] = useState({label: "", url: ""});
@@ -333,8 +342,18 @@ export default function TaskProfile() {
         billingAmount: (task as any).billingAmount || ""
       });
       
-      // Initialize checklist, attachments, etc. from task data
-      setChecklist((task as any).checklist || []);
+      // Initialize checklist items from task data
+      const taskChecklist = (task as any).checklist || [];
+      setChecklistItems(taskChecklist.map((item: any, index: number) => ({
+        id: item.id || `item-${index}`,
+        text: item.text,
+        completed: item.completed || false,
+        dueDate: item.dueDate ? new Date(item.dueDate) : undefined,
+        assignedToId: item.assignedToId,
+        priority: item.priority || 'normal',
+        notes: item.notes,
+        sortOrder: index
+      })));
       setAttachments((task as any).attachments || []);
       setQuickLinks((task as any).quickLinks || []);
       setComments((task as any).comments || []);
@@ -390,17 +409,11 @@ export default function TaskProfile() {
 
   const checkForConflicts = async (assignedUserId: string, dueDate: string, timeEstimate: string, currentTaskId?: number) => {
     try {
-      const response = await apiRequest('/api/tasks/check-conflicts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          assignedUserId,
-          dueDate,
-          timeEstimate,
-          excludeTaskId: currentTaskId
-        })
+      const response = await apiRequest('POST', '/api/tasks/check-conflicts', {
+        assignedUserId,
+        dueDate,
+        timeEstimate,
+        excludeTaskId: currentTaskId
       });
       return response;
     } catch (error) {
@@ -448,7 +461,13 @@ export default function TaskProfile() {
         priority: template.priority,
         timeEstimate: template.timeEstimate
       });
-      setChecklist(template.checklist);
+      setChecklistItems(template.checklist.map((item, index) => ({
+        id: item.id,
+        text: item.text,
+        completed: item.completed,
+        priority: 'normal',
+        sortOrder: index
+      })));
       toast({
         title: "Template Applied",
         description: `${template.title} template has been applied to the task.`,
@@ -466,27 +485,7 @@ export default function TaskProfile() {
     });
   };
 
-  const addChecklistItem = () => {
-    if (newChecklistItem.trim()) {
-      const newItem = {
-        id: Date.now().toString(),
-        text: newChecklistItem.trim(),
-        completed: false
-      };
-      setChecklist([...checklist, newItem]);
-      setNewChecklistItem("");
-    }
-  };
 
-  const toggleChecklistItem = (id: string) => {
-    setChecklist(checklist.map(item => 
-      item.id === id ? { ...item, completed: !item.completed } : item
-    ));
-  };
-
-  const removeChecklistItem = (id: string) => {
-    setChecklist(checklist.filter(item => item.id !== id));
-  };
 
   const addQuickLink = () => {
     if (newQuickLink.label.trim() && newQuickLink.url.trim()) {
@@ -1300,48 +1299,15 @@ export default function TaskProfile() {
                 )}
               </div>
 
-              {/* Checklist / Subtasks */}
+              {/* Enhanced Checklist / Subtasks */}
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <CheckSquare className="w-5 h-5 mr-2" />
-                    Checklist / Subtasks
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {checklist.map((item) => (
-                      <div key={item.id} className="flex items-center space-x-3">
-                        <Checkbox
-                          checked={item.completed}
-                          onCheckedChange={() => toggleChecklistItem(item.id)}
-                        />
-                        <span className={`flex-1 ${item.completed ? 'line-through text-slate-500' : ''}`}>
-                          {item.text}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeChecklistItem(item.id)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    
-                    <div className="flex items-center space-x-2 mt-4">
-                      <Input
-                        value={newChecklistItem}
-                        onChange={(e) => setNewChecklistItem(e.target.value)}
-                        placeholder="Add new checklist item..."
-                        onKeyPress={(e) => e.key === 'Enter' && addChecklistItem()}
-                      />
-                      <Button onClick={addChecklistItem} disabled={!newChecklistItem.trim()}>
-                        <Plus className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
+                <CardContent className="pt-6">
+                  <EnhancedChecklist
+                    items={checklistItems}
+                    onItemsChange={setChecklistItems}
+                    users={users as Array<{ id: string; firstName: string; lastName: string; profileImageUrl?: string }> || []}
+                    taskDueDate={(task as any)?.dueDate ? new Date((task as any).dueDate) : undefined}
+                  />
                 </CardContent>
               </Card>
 

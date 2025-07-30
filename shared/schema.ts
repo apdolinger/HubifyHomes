@@ -9,7 +9,7 @@ import {
   boolean,
   serial,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -173,6 +173,36 @@ export const formSubmissions = pgTable("form_submissions", {
   submittedAt: timestamp("submitted_at").defaultNow(),
 });
 
+// Checklist Templates (Admin-managed)
+export const checklistTemplates = pgTable("checklist_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  category: varchar("category").notNull(), // 'inspection', 'maintenance', 'cleaning', etc.
+  items: jsonb("items").notNull().default('[]'), // Array of template items
+  isActive: boolean("is_active").default(true),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Task Checklist Items (Enhanced)
+export const taskChecklistItems = pgTable("task_checklist_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: integer("task_id").references(() => tasks.id, { onDelete: "cascade" }).notNull(),
+  text: text("text").notNull(),
+  completed: boolean("completed").default(false),
+  dueDate: timestamp("due_date"),
+  assignedToId: varchar("assigned_to_id").references(() => users.id),
+  priority: varchar("priority").default("normal"), // 'urgent', 'high', 'normal', 'low'
+  sortOrder: integer("sort_order").notNull().default(0),
+  notes: text("notes"),
+  completedAt: timestamp("completed_at"),
+  completedBy: varchar("completed_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   managedProperties: many(properties),
@@ -207,7 +237,7 @@ export const propertiesRelations = relations(properties, ({ one, many }) => ({
   contacts: many(contacts),
 }));
 
-export const tasksRelations = relations(tasks, ({ one }) => ({
+export const tasksRelations = relations(tasks, ({ one, many }) => ({
   property: one(properties, {
     fields: [tasks.propertyId],
     references: [properties.id],
@@ -221,6 +251,31 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
     fields: [tasks.assignedById],
     references: [users.id],
     relationName: "assignedBy",
+  }),
+  checklistItems: many(taskChecklistItems),
+}));
+
+export const checklistTemplatesRelations = relations(checklistTemplates, ({ one }) => ({
+  createdBy: one(users, {
+    fields: [checklistTemplates.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const taskChecklistItemsRelations = relations(taskChecklistItems, ({ one }) => ({
+  task: one(tasks, {
+    fields: [taskChecklistItems.taskId],
+    references: [tasks.id],
+  }),
+  assignedTo: one(users, {
+    fields: [taskChecklistItems.assignedToId],
+    references: [users.id],
+    relationName: "checklistAssignedTo",
+  }),
+  completedBy: one(users, {
+    fields: [taskChecklistItems.completedBy],
+    references: [users.id],
+    relationName: "checklistCompletedBy",
   }),
 }));
 
@@ -284,6 +339,19 @@ export const formSubmissionsRelations = relations(formSubmissions, ({ one }) => 
 export const insertUserSchema = createInsertSchema(users).omit({
   createdAt: true,
   updatedAt: true,
+});
+
+export const insertChecklistTemplateSchema = createInsertSchema(checklistTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTaskChecklistItemSchema = createInsertSchema(taskChecklistItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  completedAt: true,
 });
 
 export const insertCommunitySchema = createInsertSchema(communities).omit({
@@ -363,3 +431,7 @@ export type Form = typeof forms.$inferSelect;
 
 export type InsertFormSubmission = z.infer<typeof insertFormSubmissionSchema>;
 export type FormSubmission = typeof formSubmissions.$inferSelect;
+export type InsertChecklistTemplate = z.infer<typeof insertChecklistTemplateSchema>;
+export type ChecklistTemplate = typeof checklistTemplates.$inferSelect;
+export type InsertTaskChecklistItem = z.infer<typeof insertTaskChecklistItemSchema>;
+export type TaskChecklistItem = typeof taskChecklistItems.$inferSelect;
