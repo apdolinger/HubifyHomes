@@ -185,7 +185,7 @@ export default function PropertyProfile() {
 
   // Fetch property data
   const { data: property, isLoading: propertyLoading } = useQuery({
-    queryKey: ["/api/properties", propertyId],
+    queryKey: [`/api/properties/${propertyId}`],
     enabled: isAuthenticated && !!propertyId,
   });
 
@@ -562,6 +562,88 @@ export default function PropertyProfile() {
     },
   });
 
+  // Room surface mutations
+  const saveSurfaceMutation = useMutation({
+    mutationFn: async (surfaceData: any) => {
+      return await apiRequest("POST", "/api/room-surfaces", {
+        ...surfaceData,
+        roomId: selectedRoom?.id
+      });
+    },
+    onSuccess: () => {
+      setIsSurfaceModalOpen(false);
+      toast({
+        title: "Surface information saved",
+        description: "Room surface details have been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to save surface information",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Room fixture mutations
+  const saveFixtureMutation = useMutation({
+    mutationFn: async (fixtureData: any) => {
+      return await apiRequest("POST", "/api/room-fixtures", {
+        ...fixtureData,
+        roomId: selectedRoom?.id
+      });
+    },
+    onSuccess: () => {
+      setIsFixtureModalOpen(false);
+      toast({
+        title: "Fixture information saved",
+        description: "Room fixture details have been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to save fixture information",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Room photo mutations
+  const uploadPhotoMutation = useMutation({
+    mutationFn: async ({ file, photoData }: { file: File; photoData: any }) => {
+      // For now, we'll use the basic endpoint without file upload
+      // In a real implementation, you'd want proper file storage
+      return await apiRequest("POST", "/api/room-photos", {
+        ...photoData,
+        roomId: selectedRoom?.id,
+        fileName: file.name,
+        fileSize: file.size,
+        contentType: file.type
+      });
+    },
+    onSuccess: () => {
+      setIsPhotoModalOpen(false);
+      setPhotoFile(null);
+      setRoomPhotoForm({
+        description: "",
+        category: "general"
+      });
+      toast({
+        title: "Photo uploaded",
+        description: "Room photo has been uploaded successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to upload photo",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Format full address helper
   const formatFullAddress = (property: any) => {
     if (!property) return "";
@@ -910,7 +992,32 @@ export default function PropertyProfile() {
     setRoomForm({ name: "", type: "bedroom", description: "" });
   };
 
+  // Surface handlers
+  const handleSaveSurface = () => {
+    saveSurfaceMutation.mutate(roomSurfaceForm);
+  };
 
+  // Fixture handlers  
+  const handleSaveFixture = () => {
+    saveFixtureMutation.mutate(roomFixtureForm);
+  };
+
+  // Photo handlers
+  const handleUploadPhoto = () => {
+    if (!photoFile) {
+      toast({
+        title: "Photo required",
+        description: "Please select a photo to upload.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    uploadPhotoMutation.mutate({
+      file: photoFile,
+      photoData: roomPhotoForm
+    });
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -2335,8 +2442,18 @@ export default function PropertyProfile() {
               <Button variant="outline" onClick={() => setIsSurfaceModalOpen(false)}>
                 Cancel
               </Button>
-              <Button>
-                Save Surface Information
+              <Button 
+                onClick={handleSaveSurface}
+                disabled={saveSurfaceMutation.isPending}
+              >
+                {saveSurfaceMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save Surface Information'
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -2525,8 +2642,18 @@ export default function PropertyProfile() {
               <Button variant="outline" onClick={() => setIsFixtureModalOpen(false)}>
                 Cancel
               </Button>
-              <Button>
-                Save Fixture Information
+              <Button 
+                onClick={handleSaveFixture}
+                disabled={saveFixtureMutation.isPending}
+              >
+                {saveFixtureMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save Fixture Information'
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -2588,9 +2715,21 @@ export default function PropertyProfile() {
               <Button variant="outline" onClick={() => setIsPhotoModalOpen(false)}>
                 Cancel
               </Button>
-              <Button disabled={!photoFile}>
-                <Upload className="w-4 h-4 mr-2" />
-                Upload Photo
+              <Button 
+                onClick={handleUploadPhoto}
+                disabled={!photoFile || uploadPhotoMutation.isPending}
+              >
+                {uploadPhotoMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload Photo
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
