@@ -9,6 +9,7 @@ import {
   insertRoomSchema,
   insertRoomSupplySchema,
   insertRoomNoteSchema,
+  insertRoomDeviceSchema,
   insertTaskSchema, 
   insertContactSchema, 
   insertTeamMessageSchema,
@@ -483,6 +484,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting room note:', error);
       res.status(500).json({ message: 'Failed to delete room note' });
+    }
+  });
+
+  // Room device routes
+  app.get("/api/rooms/:roomId/devices", isAuthenticated, async (req, res) => {
+    try {
+      const roomId = parseInt(req.params.roomId);
+      if (isNaN(roomId)) {
+        return res.status(400).json({ message: 'Invalid room ID' });
+      }
+      
+      const devices = await storage.getRoomDevices(roomId);
+      res.json(devices);
+    } catch (error) {
+      console.error("Error fetching room devices:", error);
+      res.status(500).json({ message: "Failed to fetch room devices" });
+    }
+  });
+
+  app.post("/api/room-devices", isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertRoomDeviceSchema.parse(req.body);
+      const device = await storage.createRoomDevice(validatedData);
+      res.status(201).json(device);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating room device:", error);
+      res.status(500).json({ message: "Failed to create room device" });
+    }
+  });
+
+  app.patch("/api/room-devices/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid device ID' });
+      }
+
+      const device = await storage.updateRoomDevice(id, req.body);
+      res.json(device);
+    } catch (error) {
+      console.error("Error updating room device:", error);
+      res.status(500).json({ message: "Failed to update room device" });
+    }
+  });
+
+  app.delete("/api/room-devices/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid device ID' });
+      }
+
+      await storage.deleteRoomDevice(id);
+      res.json({ message: 'Room device deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting room device:', error);
+      res.status(500).json({ message: 'Failed to delete room device' });
     }
   });
 

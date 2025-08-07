@@ -5,6 +5,7 @@ import {
   rooms,
   roomSupplies,
   roomNotes,
+  roomDevices,
   tasks,
   contacts,
   teamMessages,
@@ -24,6 +25,8 @@ import {
   type InsertRoomSupply,
   type RoomNote,
   type InsertRoomNote,
+  type RoomDevice,
+  type InsertRoomDevice,
   type Task,
   type InsertTask,
   type Contact,
@@ -80,6 +83,12 @@ export interface IStorage {
   createRoomNote(note: InsertRoomNote): Promise<RoomNote>;
   updateRoomNote(id: number, note: Partial<InsertRoomNote>): Promise<RoomNote>;
   deleteRoomNote(id: number): Promise<void>;
+  
+  // Room device operations
+  getRoomDevices(roomId: number): Promise<RoomDevice[]>;
+  createRoomDevice(device: InsertRoomDevice): Promise<RoomDevice>;
+  updateRoomDevice(id: number, device: Partial<InsertRoomDevice>): Promise<RoomDevice>;
+  deleteRoomDevice(id: number): Promise<void>;
   
   // Task operations
   getTasks(): Promise<Task[]>;
@@ -339,6 +348,58 @@ export class DatabaseStorage implements IStorage {
 
   async deleteRoomNote(id: number): Promise<void> {
     await db.delete(roomNotes).where(eq(roomNotes.id, id));
+  }
+
+  // Room device operations
+  async getRoomDevices(roomId: number): Promise<RoomDevice[]> {
+    return await db.select({
+      id: roomDevices.id,
+      roomId: roomDevices.roomId,
+      name: roomDevices.name,
+      type: roomDevices.type,
+      brand: roomDevices.brand,
+      model: roomDevices.model,
+      serialNumber: roomDevices.serialNumber,
+      macAddress: roomDevices.macAddress,
+      ipAddress: roomDevices.ipAddress,
+      locationInRoom: roomDevices.locationInRoom,
+      installDate: roomDevices.installDate,
+      lastServiced: roomDevices.lastServiced,
+      nextServiceDue: roomDevices.nextServiceDue,
+      notes: roomDevices.notes,
+      isActive: roomDevices.isActive,
+      createdById: roomDevices.createdById,
+      createdAt: roomDevices.createdAt,
+      updatedAt: roomDevices.updatedAt,
+      createdBy: {
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+      }
+    })
+    .from(roomDevices)
+    .leftJoin(users, eq(roomDevices.createdById, users.id))
+    .where(eq(roomDevices.roomId, roomId))
+    .orderBy(desc(roomDevices.createdAt));
+  }
+
+  async createRoomDevice(device: InsertRoomDevice): Promise<RoomDevice> {
+    const [newDevice] = await db.insert(roomDevices).values(device).returning();
+    return newDevice;
+  }
+
+  async updateRoomDevice(id: number, device: Partial<InsertRoomDevice>): Promise<RoomDevice> {
+    const [updatedDevice] = await db
+      .update(roomDevices)
+      .set({ ...device, updatedAt: new Date() })
+      .where(eq(roomDevices.id, id))
+      .returning();
+    return updatedDevice;
+  }
+
+  async deleteRoomDevice(id: number): Promise<void> {
+    await db.delete(roomDevices).where(eq(roomDevices.id, id));
   }
 
   // Task operations

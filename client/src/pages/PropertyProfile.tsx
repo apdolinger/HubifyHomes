@@ -42,7 +42,13 @@ import {
   Trash2,
   MoreVertical,
   User,
-  Package
+  Package,
+  Monitor,
+  Smartphone,
+  Router,
+  Thermometer,
+  Camera,
+  Speaker
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -99,10 +105,26 @@ export default function PropertyProfile() {
     category: "general",
     isImportant: false
   });
+  const [roomDeviceForm, setRoomDeviceForm] = useState({
+    name: "",
+    type: "thermostat",
+    brand: "",
+    model: "",
+    serialNumber: "",
+    macAddress: "",
+    ipAddress: "",
+    locationInRoom: "",
+    installDate: "",
+    lastServiced: "",
+    nextServiceDue: "",
+    notes: ""
+  });
   const [isSupplyModalOpen, setIsSupplyModalOpen] = useState(false);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
   const [editingSupply, setEditingSupply] = useState<any>(null);
   const [editingNote, setEditingNote] = useState<any>(null);
+  const [editingDevice, setEditingDevice] = useState<any>(null);
   
   // Get property ID from URL path parameters
   const params = useParams();
@@ -154,6 +176,12 @@ export default function PropertyProfile() {
   // Get room notes
   const { data: notes = [], isLoading: notesLoading, refetch: refetchNotes } = useQuery({
     queryKey: [`/api/room-notes`, selectedRoom?.id],
+    enabled: isAuthenticated && !!selectedRoom?.id,
+  });
+
+  // Get room devices
+  const { data: devices = [], isLoading: devicesLoading, refetch: refetchDevices } = useQuery({
+    queryKey: [`/api/rooms/${selectedRoom?.id}/devices`],
     enabled: isAuthenticated && !!selectedRoom?.id,
   });
 
@@ -414,6 +442,88 @@ export default function PropertyProfile() {
     },
   });
 
+  // Room device mutations
+  const createDeviceMutation = useMutation({
+    mutationFn: async (deviceData: any) => {
+      return await apiRequest("POST", "/api/room-devices", {
+        ...deviceData,
+        roomId: selectedRoom?.id,
+        createdById: "current-user"
+      });
+    },
+    onSuccess: () => {
+      refetchDevices();
+      setIsDeviceModalOpen(false);
+      setRoomDeviceForm({
+        name: "",
+        type: "thermostat",
+        brand: "",
+        model: "",
+        serialNumber: "",
+        macAddress: "",
+        ipAddress: "",
+        locationInRoom: "",
+        installDate: "",
+        lastServiced: "",
+        nextServiceDue: "",
+        notes: ""
+      });
+      toast({
+        title: "Device added",
+        description: "Room device has been added successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to add device",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateDeviceMutation = useMutation({
+    mutationFn: async ({ id, ...data }: any) => {
+      return await apiRequest("PATCH", `/api/room-devices/${id}`, data);
+    },
+    onSuccess: () => {
+      refetchDevices();
+      setIsDeviceModalOpen(false);
+      setEditingDevice(null);
+      toast({
+        title: "Device updated",
+        description: "Room device has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to update device",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteDeviceMutation = useMutation({
+    mutationFn: async (deviceId: number) => {
+      return await apiRequest("DELETE", `/api/room-devices/${deviceId}`);
+    },
+    onSuccess: () => {
+      refetchDevices();
+      toast({
+        title: "Device deleted",
+        description: "Room device has been removed.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to delete device",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Format full address helper
   const formatFullAddress = (property: any) => {
     if (!property) return "";
@@ -660,6 +770,100 @@ export default function PropertyProfile() {
 
   const handleDeleteNote = (noteId: number) => {
     deleteNoteMutation.mutate(noteId);
+  };
+
+  // Device action handlers
+  const handleAddDevice = () => {
+    if (!roomDeviceForm.name.trim()) {
+      toast({
+        title: "Device name required",
+        description: "Please enter a name for the device.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createDeviceMutation.mutate(roomDeviceForm);
+  };
+
+  const handleEditDevice = (device: any) => {
+    setEditingDevice(device);
+    setRoomDeviceForm({
+      name: device.name || "",
+      type: device.type || "thermostat",
+      brand: device.brand || "",
+      model: device.model || "",
+      serialNumber: device.serialNumber || "",
+      macAddress: device.macAddress || "",
+      ipAddress: device.ipAddress || "",
+      locationInRoom: device.locationInRoom || "",
+      installDate: device.installDate ? device.installDate.split('T')[0] : "",
+      lastServiced: device.lastServiced ? device.lastServiced.split('T')[0] : "",
+      nextServiceDue: device.nextServiceDue ? device.nextServiceDue.split('T')[0] : "",
+      notes: device.notes || ""
+    });
+    setIsDeviceModalOpen(true);
+  };
+
+  const handleUpdateDevice = () => {
+    if (!roomDeviceForm.name.trim()) {
+      toast({
+        title: "Device name required",
+        description: "Please enter a name for the device.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    updateDeviceMutation.mutate({
+      id: editingDevice.id,
+      ...roomDeviceForm
+    });
+  };
+
+  const handleCancelDeviceEdit = () => {
+    setIsDeviceModalOpen(false);
+    setEditingDevice(null);
+    setRoomDeviceForm({
+      name: "",
+      type: "thermostat",
+      brand: "",
+      model: "",
+      serialNumber: "",
+      macAddress: "",
+      ipAddress: "",
+      locationInRoom: "",
+      installDate: "",
+      lastServiced: "",
+      nextServiceDue: "",
+      notes: ""
+    });
+  };
+
+  const handleDeleteDevice = (deviceId: number) => {
+    deleteDeviceMutation.mutate(deviceId);
+  };
+
+  // Helper function to get device icon
+  const getDeviceIcon = (type: string) => {
+    switch (type) {
+      case "thermostat":
+        return Thermometer;
+      case "smart_tv":
+        return Monitor;
+      case "security_camera":
+        return Camera;
+      case "router":
+        return Router;
+      case "smart_speaker":
+        return Speaker;
+      case "smart_phone":
+        return Smartphone;
+      case "tablet":
+        return Monitor;
+      default:
+        return Monitor;
+    }
   };
 
   const handleCancelRoomEdit = () => {
@@ -1117,6 +1321,7 @@ export default function PropertyProfile() {
                   <Tabs defaultValue="supplies" className="w-full">
                     <TabsList>
                       <TabsTrigger value="supplies">Supplies</TabsTrigger>
+                      <TabsTrigger value="devices">Devices</TabsTrigger>
                       <TabsTrigger value="notes">Notes</TabsTrigger>
                     </TabsList>
 
@@ -1207,6 +1412,121 @@ export default function PropertyProfile() {
                           <Button onClick={() => setIsSupplyModalOpen(true)}>
                             <Plus className="w-4 h-4 mr-2" />
                             Add First Supply
+                          </Button>
+                        </div>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="devices" className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-lg font-medium">Room Devices</h4>
+                        <Button onClick={() => setIsDeviceModalOpen(true)}>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Device
+                        </Button>
+                      </div>
+
+                      {devicesLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <RefreshCw className="w-6 h-6 animate-spin text-slate-400" />
+                        </div>
+                      ) : Array.isArray(devices) && devices.length > 0 ? (
+                        <div className="grid gap-4">
+                          {devices.map((device: any) => {
+                            const DeviceIcon = getDeviceIcon(device.type);
+                            return (
+                              <Card key={device.id} className="p-4">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex items-start gap-3 flex-1">
+                                    <DeviceIcon className="w-5 h-5 text-slate-600 mt-1" />
+                                    <div className="flex-1">
+                                      <h5 className="font-medium text-slate-900">{device.name}</h5>
+                                      <p className="text-sm text-slate-600 capitalize mb-2">{device.type}</p>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
+                                        {device.brand && (
+                                          <div>
+                                            <span className="font-medium">Brand:</span> {device.brand}
+                                          </div>
+                                        )}
+                                        {device.model && (
+                                          <div>
+                                            <span className="font-medium">Model:</span> {device.model}
+                                          </div>
+                                        )}
+                                        {device.serialNumber && (
+                                          <div>
+                                            <span className="font-medium">Serial:</span> {device.serialNumber}
+                                          </div>
+                                        )}
+                                        {device.macAddress && (
+                                          <div>
+                                            <span className="font-medium">MAC:</span> {device.macAddress}
+                                          </div>
+                                        )}
+                                        {device.ipAddress && (
+                                          <div>
+                                            <span className="font-medium">IP:</span> {device.ipAddress}
+                                          </div>
+                                        )}
+                                        {device.locationInRoom && (
+                                          <div>
+                                            <span className="font-medium">Location:</span> {device.locationInRoom}
+                                          </div>
+                                        )}
+                                      </div>
+                                      {device.installDate && (
+                                        <div className="mt-2 text-sm text-slate-600">
+                                          <span className="font-medium">Installed:</span> {new Date(device.installDate).toLocaleDateString()}
+                                          {device.lastServiced && (
+                                            <span className="ml-4">
+                                              <span className="font-medium">Last Service:</span> {new Date(device.lastServiced).toLocaleDateString()}
+                                            </span>
+                                          )}
+                                          {device.nextServiceDue && (
+                                            <span className="ml-4">
+                                              <span className="font-medium">Next Service:</span> {new Date(device.nextServiceDue).toLocaleDateString()}
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                      {device.notes && (
+                                        <p className="mt-2 text-sm text-slate-700 italic">{device.notes}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="sm">
+                                        <MoreVertical className="w-4 h-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => handleEditDevice(device)}>
+                                        <Edit className="w-4 h-4 mr-2" />
+                                        Edit Device
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem 
+                                        className="text-red-600"
+                                        onClick={() => handleDeleteDevice(device.id)}
+                                      >
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        Delete Device
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </Card>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <Monitor className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                          <h3 className="text-lg font-medium text-slate-900 mb-2">No devices tracked</h3>
+                          <p className="text-slate-600 mb-4">Start tracking devices for this room.</p>
+                          <Button onClick={() => setIsDeviceModalOpen(true)}>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add First Device
                           </Button>
                         </div>
                       )}
@@ -1569,6 +1889,178 @@ export default function PropertyProfile() {
                   </>
                 ) : (
                   editingNote ? 'Update Note' : 'Add Note'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Device Modal */}
+        <Dialog open={isDeviceModalOpen} onOpenChange={setIsDeviceModalOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{editingDevice ? 'Edit Device' : 'Add New Device'}</DialogTitle>
+              <DialogDescription>
+                {editingDevice 
+                  ? 'Update device details and information.'
+                  : `Add a new device for ${selectedRoom?.name || 'this room'}.`
+                }
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+              <div>
+                <Label htmlFor="device-name">Device Name *</Label>
+                <Input
+                  id="device-name"
+                  value={roomDeviceForm.name}
+                  onChange={(e) => setRoomDeviceForm({ ...roomDeviceForm, name: e.target.value })}
+                  placeholder="e.g. Living Room Thermostat"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="device-type">Device Type</Label>
+                <Select 
+                  value={roomDeviceForm.type}
+                  onValueChange={(value) => setRoomDeviceForm({ ...roomDeviceForm, type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select device type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="thermostat">Thermostat</SelectItem>
+                    <SelectItem value="smart_tv">Smart TV</SelectItem>
+                    <SelectItem value="security_camera">Security Camera</SelectItem>
+                    <SelectItem value="router">Router</SelectItem>
+                    <SelectItem value="smart_speaker">Smart Speaker</SelectItem>
+                    <SelectItem value="smart_phone">Smart Phone</SelectItem>
+                    <SelectItem value="tablet">Tablet</SelectItem>
+                    <SelectItem value="smoke_detector">Smoke Detector</SelectItem>
+                    <SelectItem value="doorbell">Smart Doorbell</SelectItem>
+                    <SelectItem value="smart_lock">Smart Lock</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="device-brand">Brand</Label>
+                <Input
+                  id="device-brand"
+                  value={roomDeviceForm.brand}
+                  onChange={(e) => setRoomDeviceForm({ ...roomDeviceForm, brand: e.target.value })}
+                  placeholder="e.g. Nest, Samsung, Ring"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="device-model">Model</Label>
+                <Input
+                  id="device-model"
+                  value={roomDeviceForm.model}
+                  onChange={(e) => setRoomDeviceForm({ ...roomDeviceForm, model: e.target.value })}
+                  placeholder="e.g. Model number or name"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="device-serial">Serial Number</Label>
+                <Input
+                  id="device-serial"
+                  value={roomDeviceForm.serialNumber}
+                  onChange={(e) => setRoomDeviceForm({ ...roomDeviceForm, serialNumber: e.target.value })}
+                  placeholder="Device serial number"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="device-mac">MAC Address</Label>
+                <Input
+                  id="device-mac"
+                  value={roomDeviceForm.macAddress}
+                  onChange={(e) => setRoomDeviceForm({ ...roomDeviceForm, macAddress: e.target.value })}
+                  placeholder="00:00:00:00:00:00"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="device-ip">IP Address</Label>
+                <Input
+                  id="device-ip"
+                  value={roomDeviceForm.ipAddress}
+                  onChange={(e) => setRoomDeviceForm({ ...roomDeviceForm, ipAddress: e.target.value })}
+                  placeholder="192.168.1.100"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="device-location">Location in Room</Label>
+                <Input
+                  id="device-location"
+                  value={roomDeviceForm.locationInRoom}
+                  onChange={(e) => setRoomDeviceForm({ ...roomDeviceForm, locationInRoom: e.target.value })}
+                  placeholder="e.g. North wall, ceiling mount"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="device-install-date">Install Date</Label>
+                <Input
+                  id="device-install-date"
+                  type="date"
+                  value={roomDeviceForm.installDate}
+                  onChange={(e) => setRoomDeviceForm({ ...roomDeviceForm, installDate: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="device-last-serviced">Last Serviced</Label>
+                <Input
+                  id="device-last-serviced"
+                  type="date"
+                  value={roomDeviceForm.lastServiced}
+                  onChange={(e) => setRoomDeviceForm({ ...roomDeviceForm, lastServiced: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="device-next-service">Next Service Due</Label>
+                <Input
+                  id="device-next-service"
+                  type="date"
+                  value={roomDeviceForm.nextServiceDue}
+                  onChange={(e) => setRoomDeviceForm({ ...roomDeviceForm, nextServiceDue: e.target.value })}
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor="device-notes">Notes</Label>
+                <Textarea
+                  id="device-notes"
+                  value={roomDeviceForm.notes}
+                  onChange={(e) => setRoomDeviceForm({ ...roomDeviceForm, notes: e.target.value })}
+                  placeholder="Add any additional notes about this device..."
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={handleCancelDeviceEdit}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={editingDevice ? handleUpdateDevice : handleAddDevice}
+                disabled={createDeviceMutation.isPending || updateDeviceMutation.isPending}
+              >
+                {createDeviceMutation.isPending || updateDeviceMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    {editingDevice ? 'Updating...' : 'Adding...'}
+                  </>
+                ) : (
+                  editingDevice ? 'Update Device' : 'Add Device'
                 )}
               </Button>
             </DialogFooter>

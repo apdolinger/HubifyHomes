@@ -123,6 +123,28 @@ export const roomNotes = pgTable("room_notes", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Room Devices table
+export const roomDevices = pgTable("room_devices", {
+  id: serial("id").primaryKey(),
+  roomId: integer("room_id").references(() => rooms.id, { onDelete: "cascade" }).notNull(),
+  name: varchar("name").notNull(), // e.g. "Nest Thermostat", "Samsung Smart TV"
+  type: varchar("type").notNull(), // thermostat, TV, network, alarm, speaker, camera
+  brand: varchar("brand"), // e.g. LG, Google, Sony
+  model: varchar("model"), // e.g. T3007ES, OLED55CXPUA
+  serialNumber: varchar("serial_number"),
+  macAddress: varchar("mac_address"), // For networked devices
+  ipAddress: varchar("ip_address"), // For networked devices
+  locationInRoom: varchar("location_in_room"), // e.g. "On west wall", "Mounted above bed"
+  installDate: timestamp("install_date"),
+  lastServiced: timestamp("last_serviced"),
+  nextServiceDue: timestamp("next_service_due"),
+  notes: text("notes"), // Troubleshooting tips, remote control info, special access notes
+  isActive: boolean("is_active").default(true),
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Tasks table
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
@@ -314,6 +336,7 @@ export const roomsRelations = relations(rooms, ({ one, many }) => ({
   tasks: many(tasks),
   supplies: many(roomSupplies),
   notes: many(roomNotes),
+  devices: many(roomDevices),
 }));
 
 export const roomSuppliesRelations = relations(roomSupplies, ({ one }) => ({
@@ -330,6 +353,17 @@ export const roomNotesRelations = relations(roomNotes, ({ one }) => ({
   }),
   createdBy: one(users, {
     fields: [roomNotes.createdById],
+    references: [users.id],
+  }),
+}));
+
+export const roomDevicesRelations = relations(roomDevices, ({ one }) => ({
+  room: one(rooms, {
+    fields: [roomDevices.roomId],
+    references: [rooms.id],
+  }),
+  createdBy: one(users, {
+    fields: [roomDevices.createdById],
     references: [users.id],
   }),
 }));
@@ -506,6 +540,12 @@ export const insertRoomNoteSchema = createInsertSchema(roomNotes).omit({
   updatedAt: true,
 });
 
+export const insertRoomDeviceSchema = createInsertSchema(roomDevices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -538,3 +578,5 @@ export type InsertRoomSupply = z.infer<typeof insertRoomSupplySchema>;
 export type RoomSupply = typeof roomSupplies.$inferSelect;
 export type InsertRoomNote = z.infer<typeof insertRoomNoteSchema>;
 export type RoomNote = typeof roomNotes.$inferSelect;
+export type InsertRoomDevice = z.infer<typeof insertRoomDeviceSchema>;
+export type RoomDevice = typeof roomDevices.$inferSelect;
