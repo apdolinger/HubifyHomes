@@ -1,5 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import express from "express";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { importSampleData } from "./import-data";
@@ -161,9 +165,45 @@ function generateFormHTML(form: Form, isEmbed: boolean): string {
   `;
 }
 
+// Configure multer for file uploads
+const storage_multer = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = 'uploads/photos';
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'photo-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage: storage_multer,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+  
+  // Serve uploaded photos
+  app.use('/uploads', (req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    next();
+  });
+  app.use('/uploads', express.static('uploads'));
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
@@ -687,17 +727,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/room-photos", isAuthenticated, async (req, res) => {
+  app.post("/api/room-photos", isAuthenticated, upload.single('photo'), async (req: any, res) => {
     try {
-      const validatedData = insertRoomPhotoSchema.parse(req.body);
-      const photo = await storage.createRoomPhoto(validatedData);
-      res.status(201).json(photo);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      if (!req.file) {
+        return res.status(400).json({ message: "No photo file provided" });
       }
-      console.error("Error creating room photo:", error);
-      res.status(500).json({ message: "Failed to create room photo" });
+
+      const { roomId, category, description } = req.body;
+      
+      if (!roomId) {
+        return res.status(400).json({ message: "Room ID is required" });
+      }
+
+      const userId = req.user.claims.sub;
+      const photoData = {
+        roomId: parseInt(roomId),
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        url: `/uploads/photos/${req.file.filename}`,
+        category: category || 'general',
+        description: description || '',
+        uploadedById: userId,
+      };
+
+      const photo = await storage.createRoomPhoto(photoData);
+      
+      // Return photo with accessible URL
+      res.status(201).json({
+        ...photo,
+        photoUrl: `/uploads/photos/${req.file.filename}`
+      });
+    } catch (error) {
+      console.error("Error uploading room photo:", error);
+      // Clean up uploaded file if database save failed
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      res.status(500).json({ message: "Failed to upload room photo" });
     }
   });
 

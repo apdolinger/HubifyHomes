@@ -3,6 +3,13 @@
 ## Overview
 Dwellerly is a professional property management platform for home watch and HOA companies. It offers a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface. The platform aims to streamline property operations, enhance team efficiency, and improve client communication.
 
+## Recent Changes (August 2025)
+- **Photo Upload System**: Implemented complete file upload functionality using multer middleware, server-side storage, and proper file serving
+- **Property Interface Cleanup**: Removed property-level Supplies tab since supplies are managed per room (4 tabs: Tasks, Contacts, Rooms, Notes)
+- **7-Tab Room Management**: Full room management system with Supplies, Devices, Notes, Surfaces, Fixtures, Photos, and History tabs
+- **Database Schema**: Fixed missing room_devices table and updated photo schema to match file upload requirements
+- **Technical Issue**: Currently experiencing lucide-react DatabaseBackup icon import error that needs resolution
+
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 

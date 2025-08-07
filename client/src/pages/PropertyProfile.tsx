@@ -613,15 +613,24 @@ export default function PropertyProfile() {
   // Room photo mutations
   const uploadPhotoMutation = useMutation({
     mutationFn: async ({ file, photoData }: { file: File; photoData: any }) => {
-      // For now, we'll use the basic endpoint without file upload
-      // In a real implementation, you'd want proper file storage
-      return await apiRequest("POST", "/api/room-photos", {
-        ...photoData,
-        roomId: selectedRoom?.id,
-        fileName: file.name,
-        fileSize: file.size,
-        contentType: file.type
+      const formData = new FormData();
+      formData.append('photo', file);
+      formData.append('roomId', selectedRoom?.id?.toString() || '');
+      formData.append('category', photoData.category || 'general');
+      formData.append('description', photoData.description || '');
+
+      const response = await fetch('/api/room-photos', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData
       });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to upload photo');
+      }
+
+      return response.json();
     },
     onSuccess: () => {
       setIsPhotoModalOpen(false);
@@ -630,6 +639,10 @@ export default function PropertyProfile() {
         description: "",
         category: "general"
       });
+      // Refetch photos
+      if (selectedRoom?.id) {
+        queryClient.invalidateQueries({ queryKey: ["/api/rooms", selectedRoom.id, "photos"] });
+      }
       toast({
         title: "Photo uploaded",
         description: "Room photo has been uploaded successfully.",
@@ -638,6 +651,28 @@ export default function PropertyProfile() {
     onError: (error) => {
       toast({
         title: "Failed to upload photo",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deletePhotoMutation = useMutation({
+    mutationFn: async (photoId: number) => {
+      return await apiRequest("DELETE", `/api/room-photos/${photoId}`);
+    },
+    onSuccess: () => {
+      if (selectedRoom?.id) {
+        queryClient.invalidateQueries({ queryKey: ["/api/rooms", selectedRoom.id, "photos"] });
+      }
+      toast({
+        title: "Photo deleted",
+        description: "Room photo has been removed successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to delete photo",
         description: error.message,
         variant: "destructive",
       });
@@ -1017,6 +1052,10 @@ export default function PropertyProfile() {
       file: photoFile,
       photoData: roomPhotoForm
     });
+  };
+
+  const handleDeletePhoto = (photoId: number) => {
+    deletePhotoMutation.mutate(photoId);
   };
 
   return (
@@ -1803,15 +1842,76 @@ export default function PropertyProfile() {
                         </Button>
                       </div>
 
-                      <div className="text-center py-8">
-                        <Camera className="w-12 h-12 mx-auto text-slate-400 mb-4" />
-                        <h3 className="text-lg font-medium text-slate-900 mb-2">No photos uploaded</h3>
-                        <p className="text-slate-600 mb-4">Add photos to document the current state of this room.</p>
-                        <Button onClick={() => setIsPhotoModalOpen(true)}>
-                          <Upload className="w-4 h-4 mr-2" />
-                          Upload First Photo
-                        </Button>
-                      </div>
+                      {photosLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <RefreshCw className="w-6 h-6 animate-spin text-slate-400" />
+                        </div>
+                      ) : Array.isArray(photos) && photos.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {photos.map((photo: any) => (
+                            <Card key={photo.id} className="overflow-hidden">
+                              <div className="aspect-video relative">
+                                <img 
+                                  src={photo.url || photo.photoUrl} 
+                                  alt={photo.description || photo.originalName}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23f1f5f9'/%3E%3Ctext x='50' y='50' font-family='sans-serif' font-size='14' fill='%2394a3b8' text-anchor='middle' dy='.3em'%3EImage not found%3C/text%3E%3C/svg%3E";
+                                  }}
+                                />
+                                <Badge 
+                                  className="absolute top-2 right-2 text-xs"
+                                  variant={photo.category === 'issue' ? 'destructive' : 'secondary'}
+                                >
+                                  {photo.category}
+                                </Badge>
+                              </div>
+                              <CardContent className="p-3">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium text-slate-900 mb-1">
+                                      {photo.originalName}
+                                    </p>
+                                    {photo.description && (
+                                      <p className="text-xs text-slate-600 mb-2">{photo.description}</p>
+                                    )}
+                                    <p className="text-xs text-slate-500">
+                                      {new Date(photo.createdAt).toLocaleDateString()}
+                                    </p>
+                                  </div>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                        <MoreVertical className="w-4 h-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem 
+                                        className="text-red-600"
+                                        onClick={() => handleDeletePhoto(photo.id)}
+                                      >
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        Delete Photo
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <Camera className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                          <h3 className="text-lg font-medium text-slate-900 mb-2">No photos uploaded</h3>
+                          <p className="text-slate-600 mb-4">Add photos to document the current state of this room.</p>
+                          <Button onClick={() => setIsPhotoModalOpen(true)}>
+                            <Upload className="w-4 h-4 mr-2" />
+                            Upload First Photo
+                          </Button>
+                        </div>
+                      )}
                     </TabsContent>
 
                     <TabsContent value="history" className="space-y-4">
