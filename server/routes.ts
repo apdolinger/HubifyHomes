@@ -18,6 +18,9 @@ import {
   insertRoomFixtureSchema,
   insertRoomPhotoSchema,
   insertRoomChecklistSchema,
+  insertVehicleSchema,
+  insertVehicleMaintenanceSchema,
+  insertVehicleNoteSchema,
   insertTaskSchema, 
   insertContactSchema, 
   insertTeamMessageSchema,
@@ -839,6 +842,204 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting room checklist:', error);
       res.status(500).json({ message: 'Failed to delete room checklist' });
+    }
+  });
+
+  // Vehicle routes
+  app.get("/api/properties/:propertyId/vehicles", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.propertyId);
+      if (isNaN(propertyId)) {
+        return res.status(400).json({ message: 'Invalid property ID' });
+      }
+      
+      const vehicles = await storage.getVehicles(propertyId);
+      res.json(vehicles);
+    } catch (error) {
+      console.error("Error fetching vehicles:", error);
+      res.status(500).json({ message: "Failed to fetch vehicles" });
+    }
+  });
+
+  app.get("/api/vehicles/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid vehicle ID' });
+      }
+      
+      const vehicle = await storage.getVehicle(id);
+      if (!vehicle) {
+        return res.status(404).json({ message: 'Vehicle not found' });
+      }
+      res.json(vehicle);
+    } catch (error) {
+      console.error("Error fetching vehicle:", error);
+      res.status(500).json({ message: "Failed to fetch vehicle" });
+    }
+  });
+
+  app.post("/api/vehicles", isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertVehicleSchema.parse(req.body);
+      const vehicle = await storage.createVehicle(validatedData);
+      res.status(201).json(vehicle);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating vehicle:", error);
+      res.status(500).json({ message: "Failed to create vehicle" });
+    }
+  });
+
+  app.patch("/api/vehicles/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid vehicle ID' });
+      }
+
+      const vehicle = await storage.updateVehicle(id, req.body);
+      res.json(vehicle);
+    } catch (error) {
+      console.error("Error updating vehicle:", error);
+      res.status(500).json({ message: "Failed to update vehicle" });
+    }
+  });
+
+  app.delete("/api/vehicles/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid vehicle ID' });
+      }
+
+      await storage.deleteVehicle(id);
+      res.json({ message: 'Vehicle deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting vehicle:', error);
+      res.status(500).json({ message: 'Failed to delete vehicle' });
+    }
+  });
+
+  // Vehicle maintenance routes
+  app.get("/api/vehicles/:vehicleId/maintenance", isAuthenticated, async (req, res) => {
+    try {
+      const vehicleId = parseInt(req.params.vehicleId);
+      if (isNaN(vehicleId)) {
+        return res.status(400).json({ message: 'Invalid vehicle ID' });
+      }
+      
+      const maintenance = await storage.getVehicleMaintenance(vehicleId);
+      res.json(maintenance);
+    } catch (error) {
+      console.error("Error fetching vehicle maintenance:", error);
+      res.status(500).json({ message: "Failed to fetch vehicle maintenance" });
+    }
+  });
+
+  app.post("/api/vehicle-maintenance", isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertVehicleMaintenanceSchema.parse(req.body);
+      const maintenance = await storage.createVehicleMaintenance(validatedData);
+      res.status(201).json(maintenance);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating vehicle maintenance:", error);
+      res.status(500).json({ message: "Failed to create vehicle maintenance" });
+    }
+  });
+
+  app.patch("/api/vehicle-maintenance/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid maintenance ID' });
+      }
+
+      const maintenance = await storage.updateVehicleMaintenance(id, req.body);
+      res.json(maintenance);
+    } catch (error) {
+      console.error("Error updating vehicle maintenance:", error);
+      res.status(500).json({ message: "Failed to update vehicle maintenance" });
+    }
+  });
+
+  app.delete("/api/vehicle-maintenance/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid maintenance ID' });
+      }
+
+      await storage.deleteVehicleMaintenance(id);
+      res.json({ message: 'Vehicle maintenance deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting vehicle maintenance:', error);
+      res.status(500).json({ message: 'Failed to delete vehicle maintenance' });
+    }
+  });
+
+  // Vehicle notes routes
+  app.get("/api/vehicles/:vehicleId/notes", isAuthenticated, async (req, res) => {
+    try {
+      const vehicleId = parseInt(req.params.vehicleId);
+      if (isNaN(vehicleId)) {
+        return res.status(400).json({ message: 'Invalid vehicle ID' });
+      }
+      
+      const notes = await storage.getVehicleNotes(vehicleId);
+      res.json(notes);
+    } catch (error) {
+      console.error("Error fetching vehicle notes:", error);
+      res.status(500).json({ message: "Failed to fetch vehicle notes" });
+    }
+  });
+
+  app.post("/api/vehicle-notes", isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertVehicleNoteSchema.parse(req.body);
+      const note = await storage.createVehicleNote(validatedData);
+      res.status(201).json(note);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating vehicle note:", error);
+      res.status(500).json({ message: "Failed to create vehicle note" });
+    }
+  });
+
+  app.patch("/api/vehicle-notes/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid note ID' });
+      }
+
+      const note = await storage.updateVehicleNote(id, req.body);
+      res.json(note);
+    } catch (error) {
+      console.error("Error updating vehicle note:", error);
+      res.status(500).json({ message: "Failed to update vehicle note" });
+    }
+  });
+
+  app.delete("/api/vehicle-notes/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid note ID' });
+      }
+
+      await storage.deleteVehicleNote(id);
+      res.json({ message: 'Vehicle note deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting vehicle note:', error);
+      res.status(500).json({ message: 'Failed to delete vehicle note' });
     }
   });
 

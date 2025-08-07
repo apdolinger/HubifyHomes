@@ -48,7 +48,8 @@ import {
   Router,
   Thermometer,
   Camera,
-  Speaker
+  Speaker,
+  Car
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -1301,10 +1302,11 @@ export default function PropertyProfile() {
 
         {/* Tabs for detailed information */}
         <Tabs defaultValue="tasks" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="tasks">Tasks</TabsTrigger>
             <TabsTrigger value="contacts">Contacts</TabsTrigger>
             <TabsTrigger value="rooms">Rooms</TabsTrigger>
+            <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
             <TabsTrigger value="notes">Notes</TabsTrigger>
           </TabsList>
 
@@ -1944,7 +1946,44 @@ export default function PropertyProfile() {
             </div>
           </TabsContent>
 
+          <TabsContent value="vehicles">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Vehicle List */}
+              <Card className="lg:col-span-1">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Property Vehicles</CardTitle>
+                    <Button size="sm" disabled>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Vehicle
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <p className="text-slate-600 text-sm">
+                      Vehicles associated with this property will be displayed here. Each vehicle can have maintenance records, notes, and other tracking information.
+                    </p>
+                    <div className="text-center py-8">
+                      <Car className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                      <p className="text-slate-600">No vehicles registered yet</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
+              {/* Vehicle Details Placeholder */}
+              <Card className="lg:col-span-2">
+                <CardContent className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <Car className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                    <h3 className="text-lg font-medium text-slate-900 mb-2">Select a vehicle</h3>
+                    <p className="text-slate-600">Click on a vehicle from the left to view its maintenance records and details.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
 
           <TabsContent value="notes">
             <Card>

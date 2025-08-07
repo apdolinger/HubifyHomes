@@ -10,6 +10,9 @@ import {
   roomFixtures,
   roomPhotos,
   roomChecklists,
+  vehicles,
+  vehicleMaintenance,
+  vehicleNotes,
   tasks,
   contacts,
   teamMessages,
@@ -39,6 +42,12 @@ import {
   type InsertRoomPhoto,
   type RoomChecklist,
   type InsertRoomChecklist,
+  type Vehicle,
+  type InsertVehicle,
+  type VehicleMaintenance,
+  type InsertVehicleMaintenance,
+  type VehicleNote,
+  type InsertVehicleNote,
   type Task,
   type InsertTask,
   type Contact,
@@ -124,6 +133,25 @@ export interface IStorage {
   createRoomChecklist(checklist: InsertRoomChecklist): Promise<RoomChecklist>;
   updateRoomChecklist(id: number, checklist: Partial<InsertRoomChecklist>): Promise<RoomChecklist>;
   deleteRoomChecklist(id: number): Promise<void>;
+  
+  // Vehicle operations
+  getVehicles(propertyId: number): Promise<Vehicle[]>;
+  getVehicle(id: number): Promise<Vehicle | undefined>;
+  createVehicle(vehicle: InsertVehicle): Promise<Vehicle>;
+  updateVehicle(id: number, vehicle: Partial<InsertVehicle>): Promise<Vehicle>;
+  deleteVehicle(id: number): Promise<void>;
+  
+  // Vehicle maintenance operations
+  getVehicleMaintenance(vehicleId: number): Promise<VehicleMaintenance[]>;
+  createVehicleMaintenance(maintenance: InsertVehicleMaintenance): Promise<VehicleMaintenance>;
+  updateVehicleMaintenance(id: number, maintenance: Partial<InsertVehicleMaintenance>): Promise<VehicleMaintenance>;
+  deleteVehicleMaintenance(id: number): Promise<void>;
+  
+  // Vehicle note operations
+  getVehicleNotes(vehicleId: number): Promise<VehicleNote[]>;
+  createVehicleNote(note: InsertVehicleNote): Promise<VehicleNote>;
+  updateVehicleNote(id: number, note: Partial<InsertVehicleNote>): Promise<VehicleNote>;
+  deleteVehicleNote(id: number): Promise<void>;
   
   // Task operations
   getTasks(): Promise<Task[]>;
@@ -1335,6 +1363,111 @@ export class DatabaseStorage implements IStorage {
       .values(submissionData)
       .returning();
     return submission;
+  }
+
+  // Vehicle operations
+  async getVehicles(propertyId: number): Promise<Vehicle[]> {
+    return await db
+      .select()
+      .from(vehicles)
+      .where(and(eq(vehicles.propertyId, propertyId), eq(vehicles.isActive, true)))
+      .orderBy(vehicles.make, vehicles.model);
+  }
+
+  async getVehicle(id: number): Promise<Vehicle | undefined> {
+    const [vehicle] = await db
+      .select()
+      .from(vehicles)
+      .where(eq(vehicles.id, id));
+    return vehicle;
+  }
+
+  async createVehicle(vehicleData: InsertVehicle): Promise<Vehicle> {
+    const [vehicle] = await db
+      .insert(vehicles)
+      .values(vehicleData)
+      .returning();
+    return vehicle;
+  }
+
+  async updateVehicle(id: number, vehicleData: Partial<InsertVehicle>): Promise<Vehicle> {
+    const [vehicle] = await db
+      .update(vehicles)
+      .set({ ...vehicleData, updatedAt: new Date() })
+      .where(eq(vehicles.id, id))
+      .returning();
+    return vehicle;
+  }
+
+  async deleteVehicle(id: number): Promise<void> {
+    await db
+      .update(vehicles)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(vehicles.id, id));
+  }
+
+  // Vehicle maintenance operations
+  async getVehicleMaintenance(vehicleId: number): Promise<VehicleMaintenance[]> {
+    return await db
+      .select()
+      .from(vehicleMaintenance)
+      .where(eq(vehicleMaintenance.vehicleId, vehicleId))
+      .orderBy(desc(vehicleMaintenance.serviceDate));
+  }
+
+  async createVehicleMaintenance(maintenanceData: InsertVehicleMaintenance): Promise<VehicleMaintenance> {
+    const [maintenance] = await db
+      .insert(vehicleMaintenance)
+      .values(maintenanceData)
+      .returning();
+    return maintenance;
+  }
+
+  async updateVehicleMaintenance(id: number, maintenanceData: Partial<InsertVehicleMaintenance>): Promise<VehicleMaintenance> {
+    const [maintenance] = await db
+      .update(vehicleMaintenance)
+      .set({ ...maintenanceData, updatedAt: new Date() })
+      .where(eq(vehicleMaintenance.id, id))
+      .returning();
+    return maintenance;
+  }
+
+  async deleteVehicleMaintenance(id: number): Promise<void> {
+    await db
+      .delete(vehicleMaintenance)
+      .where(eq(vehicleMaintenance.id, id));
+  }
+
+  // Vehicle note operations
+  async getVehicleNotes(vehicleId: number): Promise<VehicleNote[]> {
+    return await db
+      .select()
+      .from(vehicleNotes)
+      .where(eq(vehicleNotes.vehicleId, vehicleId))
+      .orderBy(desc(vehicleNotes.createdAt));
+  }
+
+  async createVehicleNote(noteData: InsertVehicleNote): Promise<VehicleNote> {
+    const [note] = await db
+      .insert(vehicleNotes)
+      .values(noteData)
+      .returning();
+    return note;
+  }
+
+  async updateVehicleNote(id: number, noteData: Partial<InsertVehicleNote>): Promise<VehicleNote> {
+    const [note] = await db
+      .update(vehicleNotes)
+      .set({ ...noteData, updatedAt: new Date() })
+      .where(eq(vehicleNotes.id, id))
+      .returning();
+    return note;
+  }
+
+  async deleteVehicleNote(id: number): Promise<void> {
+    await db
+      .delete(vehicleNotes)
+      .where(eq(vehicleNotes.id, id));
   }
 }
 

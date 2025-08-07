@@ -90,6 +90,53 @@ export const rooms = pgTable("rooms", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Vehicles table
+export const vehicles = pgTable("vehicles", {
+  id: serial("id").primaryKey(),
+  propertyId: integer("property_id").references(() => properties.id, { onDelete: "cascade" }).notNull(),
+  make: varchar("make").notNull(),
+  model: varchar("model").notNull(),
+  year: integer("year"),
+  color: varchar("color"),
+  licensePlate: varchar("license_plate"),
+  vin: varchar("vin"),
+  type: varchar("type").notNull(), // 'car', 'truck', 'motorcycle', 'boat', 'rv', 'trailer', 'other'
+  details: text("details"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Vehicle Maintenance table
+export const vehicleMaintenance = pgTable("vehicle_maintenance", {
+  id: serial("id").primaryKey(),
+  vehicleId: integer("vehicle_id").references(() => vehicles.id, { onDelete: "cascade" }).notNull(),
+  type: varchar("type").notNull(), // 'oil_change', 'inspection', 'registration', 'repair', 'service', 'other'
+  description: text("description").notNull(),
+  cost: varchar("cost"), // dollar amount as string
+  serviceDate: timestamp("service_date"),
+  nextDueDate: timestamp("next_due_date"),
+  mileage: integer("mileage"),
+  vendor: varchar("vendor"),
+  notes: text("notes"),
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Vehicle Notes table
+export const vehicleNotes = pgTable("vehicle_notes", {
+  id: serial("id").primaryKey(),
+  vehicleId: integer("vehicle_id").references(() => vehicles.id, { onDelete: "cascade" }).notNull(),
+  title: varchar("title").notNull(),
+  content: text("content").notNull(),
+  category: varchar("category").notNull(), // 'insurance', 'registration', 'condition', 'history', 'other'
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  isImportant: boolean("is_important").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Room Supplies table
 export const roomSupplies = pgTable("room_supplies", {
   id: serial("id").primaryKey(),
@@ -377,6 +424,7 @@ export const propertiesRelations = relations(properties, ({ one, many }) => ({
   tasks: many(tasks),
   contacts: many(contacts),
   rooms: many(rooms),
+  vehicles: many(vehicles),
 }));
 
 export const tasksRelations = relations(tasks, ({ one, many }) => ({
@@ -558,6 +606,37 @@ export const activityLogRelations = relations(activityLog, ({ one }) => ({
   }),
 }));
 
+export const vehiclesRelations = relations(vehicles, ({ one, many }) => ({
+  property: one(properties, {
+    fields: [vehicles.propertyId],
+    references: [properties.id],
+  }),
+  maintenance: many(vehicleMaintenance),
+  notes: many(vehicleNotes),
+}));
+
+export const vehicleMaintenanceRelations = relations(vehicleMaintenance, ({ one }) => ({
+  vehicle: one(vehicles, {
+    fields: [vehicleMaintenance.vehicleId],
+    references: [vehicles.id],
+  }),
+  createdBy: one(users, {
+    fields: [vehicleMaintenance.createdById],
+    references: [users.id],
+  }),
+}));
+
+export const vehicleNotesRelations = relations(vehicleNotes, ({ one }) => ({
+  vehicle: one(vehicles, {
+    fields: [vehicleNotes.vehicleId],
+    references: [vehicles.id],
+  }),
+  createdBy: one(users, {
+    fields: [vehicleNotes.createdById],
+    references: [users.id],
+  }),
+}));
+
 export const formsRelations = relations(forms, ({ many, one }) => ({
   submissions: many(formSubmissions),
   createdBy: one(users, {
@@ -653,6 +732,24 @@ export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).om
   submittedAt: true,
 });
 
+export const insertVehicleSchema = createInsertSchema(vehicles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertVehicleMaintenanceSchema = createInsertSchema(vehicleMaintenance).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertVehicleNoteSchema = createInsertSchema(vehicleNotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertRoomSupplySchema = createInsertSchema(roomSupplies).omit({
   id: true,
   createdAt: true,
@@ -736,3 +833,9 @@ export type InsertRoomPhoto = z.infer<typeof insertRoomPhotoSchema>;
 export type RoomPhoto = typeof roomPhotos.$inferSelect;
 export type InsertRoomChecklist = z.infer<typeof insertRoomChecklistSchema>;
 export type RoomChecklist = typeof roomChecklists.$inferSelect;
+export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
+export type Vehicle = typeof vehicles.$inferSelect;
+export type InsertVehicleMaintenance = z.infer<typeof insertVehicleMaintenanceSchema>;
+export type VehicleMaintenance = typeof vehicleMaintenance.$inferSelect;
+export type InsertVehicleNote = z.infer<typeof insertVehicleNoteSchema>;
+export type VehicleNote = typeof vehicleNotes.$inferSelect;
