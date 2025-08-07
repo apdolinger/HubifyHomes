@@ -145,6 +145,79 @@ export const roomDevices = pgTable("room_devices", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Room surfaces and structure table
+export const roomSurfaces = pgTable("room_surfaces", {
+  id: serial("id").primaryKey(),
+  roomId: integer("room_id").references(() => rooms.id, { onDelete: "cascade" }).notNull(),
+  flooringType: varchar("flooring_type"), // carpet, hardwood, tile, laminate, vinyl, etc.
+  flooringNotes: text("flooring_notes"),
+  paintColor: varchar("paint_color"),
+  paintCode: varchar("paint_code"), // e.g. SW 7005
+  paintBrand: varchar("paint_brand"), // e.g. Sherwin-Williams
+  wallTreatment: varchar("wall_treatment"), // wallpaper, paneling, etc.
+  wallTreatmentNotes: text("wall_treatment_notes"),
+  ceilingType: varchar("ceiling_type"), // standard, tray, vaulted, popcorn, etc.
+  ceilingHeight: varchar("ceiling_height"),
+  ceilingNotes: text("ceiling_notes"),
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Room fixtures and features table
+export const roomFixtures = pgTable("room_fixtures", {
+  id: serial("id").primaryKey(),
+  roomId: integer("room_id").references(() => rooms.id, { onDelete: "cascade" }).notNull(),
+  windowCount: integer("window_count"),
+  windowType: varchar("window_type"), // single-hung, double-hung, casement, etc.
+  windowTreatments: varchar("window_treatments"), // blinds, curtains, shutters
+  doorCount: integer("door_count"),
+  doorTypes: varchar("door_types"), // interior, exterior, sliding, etc.
+  lockTypes: varchar("lock_types"),
+  lightingType: varchar("lighting_type"), // overhead, recessed, pendant, etc.
+  lightingNotes: text("lighting_notes"),
+  hasDimmer: boolean("has_dimmer").default(false),
+  hvacVents: integer("hvac_vents"),
+  hvacFilterSize: varchar("hvac_filter_size"),
+  hvacNotes: text("hvac_notes"),
+  plumbingAccess: varchar("plumbing_access"), // none, sink, toilet, shower, etc.
+  plumbingNotes: text("plumbing_notes"),
+  electricalOutlets: integer("electrical_outlets"),
+  electricalNotes: text("electrical_notes"),
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Room photos table
+export const roomPhotos = pgTable("room_photos", {
+  id: serial("id").primaryKey(),
+  roomId: integer("room_id").references(() => rooms.id, { onDelete: "cascade" }).notNull(),
+  filename: varchar("filename").notNull(),
+  originalName: varchar("original_name").notNull(),
+  url: varchar("url").notNull(),
+  description: text("description"),
+  category: varchar("category").default("general"), // general, before, after, issue, etc.
+  uploadedById: varchar("uploaded_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Room checklists table
+export const roomChecklists = pgTable("room_checklists", {
+  id: serial("id").primaryKey(),
+  roomId: integer("room_id").references(() => rooms.id, { onDelete: "cascade" }).notNull(),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  template: varchar("template"), // bedroom_turnover, bathroom_deep_clean, etc.
+  items: jsonb("items"), // array of checklist items with completion status
+  isCompleted: boolean("is_completed").default(false),
+  completedById: varchar("completed_by_id").references(() => users.id),
+  completedAt: timestamp("completed_at"),
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Tasks table
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
@@ -337,6 +410,10 @@ export const roomsRelations = relations(rooms, ({ one, many }) => ({
   supplies: many(roomSupplies),
   notes: many(roomNotes),
   devices: many(roomDevices),
+  surfaces: many(roomSurfaces),
+  fixtures: many(roomFixtures),
+  photos: many(roomPhotos),
+  checklists: many(roomChecklists),
 }));
 
 export const roomSuppliesRelations = relations(roomSupplies, ({ one }) => ({
@@ -364,6 +441,54 @@ export const roomDevicesRelations = relations(roomDevices, ({ one }) => ({
   }),
   createdBy: one(users, {
     fields: [roomDevices.createdById],
+    references: [users.id],
+  }),
+}));
+
+export const roomSurfacesRelations = relations(roomSurfaces, ({ one }) => ({
+  room: one(rooms, {
+    fields: [roomSurfaces.roomId],
+    references: [rooms.id],
+  }),
+  createdBy: one(users, {
+    fields: [roomSurfaces.createdById],
+    references: [users.id],
+  }),
+}));
+
+export const roomFixturesRelations = relations(roomFixtures, ({ one }) => ({
+  room: one(rooms, {
+    fields: [roomFixtures.roomId],
+    references: [rooms.id],
+  }),
+  createdBy: one(users, {
+    fields: [roomFixtures.createdById],
+    references: [users.id],
+  }),
+}));
+
+export const roomPhotosRelations = relations(roomPhotos, ({ one }) => ({
+  room: one(rooms, {
+    fields: [roomPhotos.roomId],
+    references: [rooms.id],
+  }),
+  uploadedBy: one(users, {
+    fields: [roomPhotos.uploadedById],
+    references: [users.id],
+  }),
+}));
+
+export const roomChecklistsRelations = relations(roomChecklists, ({ one }) => ({
+  room: one(rooms, {
+    fields: [roomChecklists.roomId],
+    references: [rooms.id],
+  }),
+  createdBy: one(users, {
+    fields: [roomChecklists.createdById],
+    references: [users.id],
+  }),
+  completedBy: one(users, {
+    fields: [roomChecklists.completedById],
     references: [users.id],
   }),
 }));
@@ -546,6 +671,29 @@ export const insertRoomDeviceSchema = createInsertSchema(roomDevices).omit({
   updatedAt: true,
 });
 
+export const insertRoomSurfaceSchema = createInsertSchema(roomSurfaces).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRoomFixtureSchema = createInsertSchema(roomFixtures).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRoomPhotoSchema = createInsertSchema(roomPhotos).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertRoomChecklistSchema = createInsertSchema(roomChecklists).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -580,3 +728,11 @@ export type InsertRoomNote = z.infer<typeof insertRoomNoteSchema>;
 export type RoomNote = typeof roomNotes.$inferSelect;
 export type InsertRoomDevice = z.infer<typeof insertRoomDeviceSchema>;
 export type RoomDevice = typeof roomDevices.$inferSelect;
+export type InsertRoomSurface = z.infer<typeof insertRoomSurfaceSchema>;
+export type RoomSurface = typeof roomSurfaces.$inferSelect;
+export type InsertRoomFixture = z.infer<typeof insertRoomFixtureSchema>;
+export type RoomFixture = typeof roomFixtures.$inferSelect;
+export type InsertRoomPhoto = z.infer<typeof insertRoomPhotoSchema>;
+export type RoomPhoto = typeof roomPhotos.$inferSelect;
+export type InsertRoomChecklist = z.infer<typeof insertRoomChecklistSchema>;
+export type RoomChecklist = typeof roomChecklists.$inferSelect;

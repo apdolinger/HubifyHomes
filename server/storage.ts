@@ -6,6 +6,10 @@ import {
   roomSupplies,
   roomNotes,
   roomDevices,
+  roomSurfaces,
+  roomFixtures,
+  roomPhotos,
+  roomChecklists,
   tasks,
   contacts,
   teamMessages,
@@ -27,6 +31,14 @@ import {
   type InsertRoomNote,
   type RoomDevice,
   type InsertRoomDevice,
+  type RoomSurface,
+  type InsertRoomSurface,
+  type RoomFixture,
+  type InsertRoomFixture,
+  type RoomPhoto,
+  type InsertRoomPhoto,
+  type RoomChecklist,
+  type InsertRoomChecklist,
   type Task,
   type InsertTask,
   type Contact,
@@ -89,6 +101,29 @@ export interface IStorage {
   createRoomDevice(device: InsertRoomDevice): Promise<RoomDevice>;
   updateRoomDevice(id: number, device: Partial<InsertRoomDevice>): Promise<RoomDevice>;
   deleteRoomDevice(id: number): Promise<void>;
+  
+  // Room surface operations
+  getRoomSurfaces(roomId: number): Promise<RoomSurface[]>;
+  createRoomSurface(surface: InsertRoomSurface): Promise<RoomSurface>;
+  updateRoomSurface(id: number, surface: Partial<InsertRoomSurface>): Promise<RoomSurface>;
+  deleteRoomSurface(id: number): Promise<void>;
+  
+  // Room fixture operations
+  getRoomFixtures(roomId: number): Promise<RoomFixture[]>;
+  createRoomFixture(fixture: InsertRoomFixture): Promise<RoomFixture>;
+  updateRoomFixture(id: number, fixture: Partial<InsertRoomFixture>): Promise<RoomFixture>;
+  deleteRoomFixture(id: number): Promise<void>;
+  
+  // Room photo operations
+  getRoomPhotos(roomId: number): Promise<RoomPhoto[]>;
+  createRoomPhoto(photo: InsertRoomPhoto): Promise<RoomPhoto>;
+  deleteRoomPhoto(id: number): Promise<void>;
+  
+  // Room checklist operations
+  getRoomChecklists(roomId: number): Promise<RoomChecklist[]>;
+  createRoomChecklist(checklist: InsertRoomChecklist): Promise<RoomChecklist>;
+  updateRoomChecklist(id: number, checklist: Partial<InsertRoomChecklist>): Promise<RoomChecklist>;
+  deleteRoomChecklist(id: number): Promise<void>;
   
   // Task operations
   getTasks(): Promise<Task[]>;
@@ -400,6 +435,89 @@ export class DatabaseStorage implements IStorage {
 
   async deleteRoomDevice(id: number): Promise<void> {
     await db.delete(roomDevices).where(eq(roomDevices.id, id));
+  }
+
+  // Room surface operations
+  async getRoomSurfaces(roomId: number): Promise<RoomSurface[]> {
+    return await db.select().from(roomSurfaces).where(eq(roomSurfaces.roomId, roomId));
+  }
+
+  async createRoomSurface(surface: InsertRoomSurface): Promise<RoomSurface> {
+    const [newSurface] = await db.insert(roomSurfaces).values(surface).returning();
+    return newSurface;
+  }
+
+  async updateRoomSurface(id: number, surface: Partial<InsertRoomSurface>): Promise<RoomSurface> {
+    const [updatedSurface] = await db
+      .update(roomSurfaces)
+      .set({ ...surface, updatedAt: new Date() })
+      .where(eq(roomSurfaces.id, id))
+      .returning();
+    return updatedSurface;
+  }
+
+  async deleteRoomSurface(id: number): Promise<void> {
+    await db.delete(roomSurfaces).where(eq(roomSurfaces.id, id));
+  }
+
+  // Room fixture operations
+  async getRoomFixtures(roomId: number): Promise<RoomFixture[]> {
+    return await db.select().from(roomFixtures).where(eq(roomFixtures.roomId, roomId));
+  }
+
+  async createRoomFixture(fixture: InsertRoomFixture): Promise<RoomFixture> {
+    const [newFixture] = await db.insert(roomFixtures).values(fixture).returning();
+    return newFixture;
+  }
+
+  async updateRoomFixture(id: number, fixture: Partial<InsertRoomFixture>): Promise<RoomFixture> {
+    const [updatedFixture] = await db
+      .update(roomFixtures)
+      .set({ ...fixture, updatedAt: new Date() })
+      .where(eq(roomFixtures.id, id))
+      .returning();
+    return updatedFixture;
+  }
+
+  async deleteRoomFixture(id: number): Promise<void> {
+    await db.delete(roomFixtures).where(eq(roomFixtures.id, id));
+  }
+
+  // Room photo operations
+  async getRoomPhotos(roomId: number): Promise<RoomPhoto[]> {
+    return await db.select().from(roomPhotos).where(eq(roomPhotos.roomId, roomId)).orderBy(desc(roomPhotos.createdAt));
+  }
+
+  async createRoomPhoto(photo: InsertRoomPhoto): Promise<RoomPhoto> {
+    const [newPhoto] = await db.insert(roomPhotos).values(photo).returning();
+    return newPhoto;
+  }
+
+  async deleteRoomPhoto(id: number): Promise<void> {
+    await db.delete(roomPhotos).where(eq(roomPhotos.id, id));
+  }
+
+  // Room checklist operations
+  async getRoomChecklists(roomId: number): Promise<RoomChecklist[]> {
+    return await db.select().from(roomChecklists).where(eq(roomChecklists.roomId, roomId)).orderBy(desc(roomChecklists.createdAt));
+  }
+
+  async createRoomChecklist(checklist: InsertRoomChecklist): Promise<RoomChecklist> {
+    const [newChecklist] = await db.insert(roomChecklists).values(checklist).returning();
+    return newChecklist;
+  }
+
+  async updateRoomChecklist(id: number, checklist: Partial<InsertRoomChecklist>): Promise<RoomChecklist> {
+    const [updatedChecklist] = await db
+      .update(roomChecklists)
+      .set({ ...checklist, updatedAt: new Date() })
+      .where(eq(roomChecklists.id, id))
+      .returning();
+    return updatedChecklist;
+  }
+
+  async deleteRoomChecklist(id: number): Promise<void> {
+    await db.delete(roomChecklists).where(eq(roomChecklists.id, id));
   }
 
   // Task operations

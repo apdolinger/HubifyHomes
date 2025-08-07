@@ -122,9 +122,47 @@ export default function PropertyProfile() {
   const [isSupplyModalOpen, setIsSupplyModalOpen] = useState(false);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
+  const [isSurfaceModalOpen, setIsSurfaceModalOpen] = useState(false);
+  const [isFixtureModalOpen, setIsFixtureModalOpen] = useState(false);
+  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
   const [editingSupply, setEditingSupply] = useState<any>(null);
   const [editingNote, setEditingNote] = useState<any>(null);
   const [editingDevice, setEditingDevice] = useState<any>(null);
+  const [roomSurfaceForm, setRoomSurfaceForm] = useState({
+    flooringType: "",
+    flooringNotes: "",
+    paintColor: "",
+    paintCode: "",
+    paintBrand: "",
+    wallTreatment: "",
+    wallTreatmentNotes: "",
+    ceilingType: "",
+    ceilingHeight: "",
+    ceilingNotes: ""
+  });
+  const [roomFixtureForm, setRoomFixtureForm] = useState({
+    windowCount: 0,
+    windowType: "",
+    windowTreatments: "",
+    doorCount: 0,
+    doorTypes: "",
+    lockTypes: "",
+    lightingType: "",
+    lightingNotes: "",
+    hasDimmer: false,
+    hvacVents: 0,
+    hvacFilterSize: "",
+    hvacNotes: "",
+    plumbingAccess: "",
+    plumbingNotes: "",
+    electricalOutlets: 0,
+    electricalNotes: ""
+  });
+  const [roomPhotoForm, setRoomPhotoForm] = useState({
+    description: "",
+    category: "general"
+  });
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   
   // Get property ID from URL path parameters
   const params = useParams();
@@ -1319,10 +1357,14 @@ export default function PropertyProfile() {
                 </CardHeader>
                 <CardContent>
                   <Tabs defaultValue="supplies" className="w-full">
-                    <TabsList>
+                    <TabsList className="grid w-full grid-cols-7">
                       <TabsTrigger value="supplies">Supplies</TabsTrigger>
                       <TabsTrigger value="devices">Devices</TabsTrigger>
+                      <TabsTrigger value="surfaces">Surfaces</TabsTrigger>
+                      <TabsTrigger value="fixtures">Fixtures</TabsTrigger>
+                      <TabsTrigger value="photos">Photos</TabsTrigger>
                       <TabsTrigger value="notes">Notes</TabsTrigger>
+                      <TabsTrigger value="history">History</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="supplies" className="space-y-4">
@@ -1600,6 +1642,82 @@ export default function PropertyProfile() {
                           </Button>
                         </div>
                       )}
+                    </TabsContent>
+
+                    <TabsContent value="surfaces" className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-lg font-medium">Room Surfaces</h4>
+                        <Button onClick={() => setIsSurfaceModalOpen(true)}>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Edit Surfaces
+                        </Button>
+                      </div>
+
+                      <div className="text-center py-8">
+                        <div className="w-12 h-12 mx-auto text-slate-400 mb-4 bg-slate-100 rounded-lg flex items-center justify-center">
+                          <Home className="w-6 h-6" />
+                        </div>
+                        <h3 className="text-lg font-medium text-slate-900 mb-2">Surface Information</h3>
+                        <p className="text-slate-600 mb-4">Track flooring, paint, wallpaper, and ceiling details for this room.</p>
+                        <Button onClick={() => setIsSurfaceModalOpen(true)} variant="outline">
+                          <Edit className="w-4 h-4 mr-2" />
+                          Configure Surfaces
+                        </Button>
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="fixtures" className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-lg font-medium">Room Fixtures</h4>
+                        <Button onClick={() => setIsFixtureModalOpen(true)}>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Edit Fixtures
+                        </Button>
+                      </div>
+
+                      <div className="text-center py-8">
+                        <div className="w-12 h-12 mx-auto text-slate-400 mb-4 bg-slate-100 rounded-lg flex items-center justify-center">
+                          <Lightbulb className="w-6 h-6" />
+                        </div>
+                        <h3 className="text-lg font-medium text-slate-900 mb-2">Fixture Information</h3>
+                        <p className="text-slate-600 mb-4">Track windows, doors, lighting, HVAC, plumbing, and electrical fixtures.</p>
+                        <Button onClick={() => setIsFixtureModalOpen(true)} variant="outline">
+                          <Edit className="w-4 h-4 mr-2" />
+                          Configure Fixtures
+                        </Button>
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="photos" className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-lg font-medium">Room Photos</h4>
+                        <Button onClick={() => setIsPhotoModalOpen(true)}>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Photo
+                        </Button>
+                      </div>
+
+                      <div className="text-center py-8">
+                        <Camera className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                        <h3 className="text-lg font-medium text-slate-900 mb-2">No photos uploaded</h3>
+                        <p className="text-slate-600 mb-4">Add photos to document the current state of this room.</p>
+                        <Button onClick={() => setIsPhotoModalOpen(true)}>
+                          <Upload className="w-4 h-4 mr-2" />
+                          Upload First Photo
+                        </Button>
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="history" className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-lg font-medium">Maintenance History</h4>
+                      </div>
+
+                      <div className="text-center py-8">
+                        <History className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                        <h3 className="text-lg font-medium text-slate-900 mb-2">No maintenance history</h3>
+                        <p className="text-slate-600 mb-4">Completed tasks and maintenance activities for this room will appear here.</p>
+                      </div>
                     </TabsContent>
                   </Tabs>
                 </CardContent>
@@ -2062,6 +2180,417 @@ export default function PropertyProfile() {
                 ) : (
                   editingDevice ? 'Update Device' : 'Add Device'
                 )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Surface Modal */}
+        <Dialog open={isSurfaceModalOpen} onOpenChange={setIsSurfaceModalOpen}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Configure Room Surfaces</DialogTitle>
+              <DialogDescription>
+                Update flooring, paint, wall treatment, and ceiling information for {selectedRoom?.name || 'this room'}.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+              <div>
+                <Label htmlFor="flooring-type">Flooring Type</Label>
+                <Select 
+                  value={roomSurfaceForm.flooringType}
+                  onValueChange={(value) => setRoomSurfaceForm({ ...roomSurfaceForm, flooringType: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select flooring type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="carpet">Carpet</SelectItem>
+                    <SelectItem value="hardwood">Hardwood</SelectItem>
+                    <SelectItem value="tile">Tile</SelectItem>
+                    <SelectItem value="laminate">Laminate</SelectItem>
+                    <SelectItem value="vinyl">Vinyl</SelectItem>
+                    <SelectItem value="concrete">Concrete</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="flooring-notes">Flooring Notes</Label>
+                <Input
+                  id="flooring-notes"
+                  value={roomSurfaceForm.flooringNotes}
+                  onChange={(e) => setRoomSurfaceForm({ ...roomSurfaceForm, flooringNotes: e.target.value })}
+                  placeholder="Brand, condition, special notes"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="paint-color">Paint Color</Label>
+                <Input
+                  id="paint-color"
+                  value={roomSurfaceForm.paintColor}
+                  onChange={(e) => setRoomSurfaceForm({ ...roomSurfaceForm, paintColor: e.target.value })}
+                  placeholder="e.g. Beige, Off-white"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="paint-code">Paint Code</Label>
+                <Input
+                  id="paint-code"
+                  value={roomSurfaceForm.paintCode}
+                  onChange={(e) => setRoomSurfaceForm({ ...roomSurfaceForm, paintCode: e.target.value })}
+                  placeholder="e.g. SW 7005, BM CC-40"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="paint-brand">Paint Brand</Label>
+                <Input
+                  id="paint-brand"
+                  value={roomSurfaceForm.paintBrand}
+                  onChange={(e) => setRoomSurfaceForm({ ...roomSurfaceForm, paintBrand: e.target.value })}
+                  placeholder="e.g. Sherwin-Williams, Benjamin Moore"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="wall-treatment">Wall Treatment</Label>
+                <Select 
+                  value={roomSurfaceForm.wallTreatment}
+                  onValueChange={(value) => setRoomSurfaceForm({ ...roomSurfaceForm, wallTreatment: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select wall treatment" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="paint">Paint Only</SelectItem>
+                    <SelectItem value="wallpaper">Wallpaper</SelectItem>
+                    <SelectItem value="paneling">Wood Paneling</SelectItem>
+                    <SelectItem value="tile">Tile</SelectItem>
+                    <SelectItem value="stone">Stone/Brick</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor="wall-treatment-notes">Wall Treatment Notes</Label>
+                <Textarea
+                  id="wall-treatment-notes"
+                  value={roomSurfaceForm.wallTreatmentNotes}
+                  onChange={(e) => setRoomSurfaceForm({ ...roomSurfaceForm, wallTreatmentNotes: e.target.value })}
+                  placeholder="Additional details about wall treatments"
+                  rows={2}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="ceiling-type">Ceiling Type</Label>
+                <Select 
+                  value={roomSurfaceForm.ceilingType}
+                  onValueChange={(value) => setRoomSurfaceForm({ ...roomSurfaceForm, ceilingType: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select ceiling type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="standard">Standard Flat</SelectItem>
+                    <SelectItem value="tray">Tray Ceiling</SelectItem>
+                    <SelectItem value="vaulted">Vaulted</SelectItem>
+                    <SelectItem value="coffered">Coffered</SelectItem>
+                    <SelectItem value="popcorn">Popcorn/Textured</SelectItem>
+                    <SelectItem value="exposed">Exposed Beams</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="ceiling-height">Ceiling Height</Label>
+                <Input
+                  id="ceiling-height"
+                  value={roomSurfaceForm.ceilingHeight}
+                  onChange={(e) => setRoomSurfaceForm({ ...roomSurfaceForm, ceilingHeight: e.target.value })}
+                  placeholder="e.g. 8', 9', 10'"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor="ceiling-notes">Ceiling Notes</Label>
+                <Textarea
+                  id="ceiling-notes"
+                  value={roomSurfaceForm.ceilingNotes}
+                  onChange={(e) => setRoomSurfaceForm({ ...roomSurfaceForm, ceilingNotes: e.target.value })}
+                  placeholder="Additional ceiling details and notes"
+                  rows={2}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsSurfaceModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button>
+                Save Surface Information
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Fixture Modal */}
+        <Dialog open={isFixtureModalOpen} onOpenChange={setIsFixtureModalOpen}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Configure Room Fixtures</DialogTitle>
+              <DialogDescription>
+                Update windows, doors, lighting, HVAC, plumbing, and electrical fixtures for {selectedRoom?.name || 'this room'}.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4">
+              <div>
+                <Label htmlFor="window-count">Window Count</Label>
+                <Input
+                  id="window-count"
+                  type="number"
+                  min="0"
+                  value={roomFixtureForm.windowCount}
+                  onChange={(e) => setRoomFixtureForm({ ...roomFixtureForm, windowCount: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="window-type">Window Type</Label>
+                <Input
+                  id="window-type"
+                  value={roomFixtureForm.windowType}
+                  onChange={(e) => setRoomFixtureForm({ ...roomFixtureForm, windowType: e.target.value })}
+                  placeholder="e.g. Double-hung, Casement"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="window-treatments">Window Treatments</Label>
+                <Input
+                  id="window-treatments"
+                  value={roomFixtureForm.windowTreatments}
+                  onChange={(e) => setRoomFixtureForm({ ...roomFixtureForm, windowTreatments: e.target.value })}
+                  placeholder="e.g. Blinds, Curtains"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="door-count">Door Count</Label>
+                <Input
+                  id="door-count"
+                  type="number"
+                  min="0"
+                  value={roomFixtureForm.doorCount}
+                  onChange={(e) => setRoomFixtureForm({ ...roomFixtureForm, doorCount: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="door-types">Door Types</Label>
+                <Input
+                  id="door-types"
+                  value={roomFixtureForm.doorTypes}
+                  onChange={(e) => setRoomFixtureForm({ ...roomFixtureForm, doorTypes: e.target.value })}
+                  placeholder="e.g. Interior, Sliding, French"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="lock-types">Lock Types</Label>
+                <Input
+                  id="lock-types"
+                  value={roomFixtureForm.lockTypes}
+                  onChange={(e) => setRoomFixtureForm({ ...roomFixtureForm, lockTypes: e.target.value })}
+                  placeholder="e.g. Deadbolt, Keypad"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="lighting-type">Lighting Type</Label>
+                <Input
+                  id="lighting-type"
+                  value={roomFixtureForm.lightingType}
+                  onChange={(e) => setRoomFixtureForm({ ...roomFixtureForm, lightingType: e.target.value })}
+                  placeholder="e.g. Recessed, Pendant"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="has-dimmer">Has Dimmer Switch</Label>
+                <Checkbox
+                  id="has-dimmer"
+                  checked={roomFixtureForm.hasDimmer}
+                  onCheckedChange={(checked) => setRoomFixtureForm({ ...roomFixtureForm, hasDimmer: checked as boolean })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="hvac-vents">HVAC Vents</Label>
+                <Input
+                  id="hvac-vents"
+                  type="number"
+                  min="0"
+                  value={roomFixtureForm.hvacVents}
+                  onChange={(e) => setRoomFixtureForm({ ...roomFixtureForm, hvacVents: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="hvac-filter-size">HVAC Filter Size</Label>
+                <Input
+                  id="hvac-filter-size"
+                  value={roomFixtureForm.hvacFilterSize}
+                  onChange={(e) => setRoomFixtureForm({ ...roomFixtureForm, hvacFilterSize: e.target.value })}
+                  placeholder="e.g. 16x20x1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="plumbing-access">Plumbing Access</Label>
+                <Input
+                  id="plumbing-access"
+                  value={roomFixtureForm.plumbingAccess}
+                  onChange={(e) => setRoomFixtureForm({ ...roomFixtureForm, plumbingAccess: e.target.value })}
+                  placeholder="e.g. Sink, Toilet, Shower"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="electrical-outlets">Electrical Outlets</Label>
+                <Input
+                  id="electrical-outlets"
+                  type="number"
+                  min="0"
+                  value={roomFixtureForm.electricalOutlets}
+                  onChange={(e) => setRoomFixtureForm({ ...roomFixtureForm, electricalOutlets: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+
+              <div className="md:col-span-3">
+                <Label htmlFor="lighting-notes">Lighting Notes</Label>
+                <Textarea
+                  id="lighting-notes"
+                  value={roomFixtureForm.lightingNotes}
+                  onChange={(e) => setRoomFixtureForm({ ...roomFixtureForm, lightingNotes: e.target.value })}
+                  placeholder="Additional lighting details"
+                  rows={2}
+                />
+              </div>
+
+              <div className="md:col-span-3">
+                <Label htmlFor="hvac-notes">HVAC Notes</Label>
+                <Textarea
+                  id="hvac-notes"
+                  value={roomFixtureForm.hvacNotes}
+                  onChange={(e) => setRoomFixtureForm({ ...roomFixtureForm, hvacNotes: e.target.value })}
+                  placeholder="Additional HVAC details"
+                  rows={2}
+                />
+              </div>
+
+              <div className="md:col-span-3">
+                <Label htmlFor="plumbing-notes">Plumbing Notes</Label>
+                <Textarea
+                  id="plumbing-notes"
+                  value={roomFixtureForm.plumbingNotes}
+                  onChange={(e) => setRoomFixtureForm({ ...roomFixtureForm, plumbingNotes: e.target.value })}
+                  placeholder="Additional plumbing details"
+                  rows={2}
+                />
+              </div>
+
+              <div className="md:col-span-3">
+                <Label htmlFor="electrical-notes">Electrical Notes</Label>
+                <Textarea
+                  id="electrical-notes"
+                  value={roomFixtureForm.electricalNotes}
+                  onChange={(e) => setRoomFixtureForm({ ...roomFixtureForm, electricalNotes: e.target.value })}
+                  placeholder="Additional electrical details"
+                  rows={2}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsFixtureModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button>
+                Save Fixture Information
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Photo Modal */}
+        <Dialog open={isPhotoModalOpen} onOpenChange={setIsPhotoModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add Room Photo</DialogTitle>
+              <DialogDescription>
+                Upload a photo for {selectedRoom?.name || 'this room'}.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div>
+                <Label htmlFor="photo-file">Photo File</Label>
+                <Input
+                  id="photo-file"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="photo-category">Category</Label>
+                <Select 
+                  value={roomPhotoForm.category}
+                  onValueChange={(value) => setRoomPhotoForm({ ...roomPhotoForm, category: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select photo category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General</SelectItem>
+                    <SelectItem value="before">Before</SelectItem>
+                    <SelectItem value="after">After</SelectItem>
+                    <SelectItem value="issue">Issue/Problem</SelectItem>
+                    <SelectItem value="completed">Completed Work</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="photo-description">Description</Label>
+                <Textarea
+                  id="photo-description"
+                  value={roomPhotoForm.description}
+                  onChange={(e) => setRoomPhotoForm({ ...roomPhotoForm, description: e.target.value })}
+                  placeholder="Optional description of what this photo shows"
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsPhotoModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button disabled={!photoFile}>
+                <Upload className="w-4 h-4 mr-2" />
+                Upload Photo
               </Button>
             </DialogFooter>
           </DialogContent>

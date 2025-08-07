@@ -10,6 +10,10 @@ import {
   insertRoomSupplySchema,
   insertRoomNoteSchema,
   insertRoomDeviceSchema,
+  insertRoomSurfaceSchema,
+  insertRoomFixtureSchema,
+  insertRoomPhotoSchema,
+  insertRoomChecklistSchema,
   insertTaskSchema, 
   insertContactSchema, 
   insertTeamMessageSchema,
@@ -544,6 +548,231 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting room device:', error);
       res.status(500).json({ message: 'Failed to delete room device' });
+    }
+  });
+
+  // Room surface routes
+  app.get("/api/rooms/:roomId/surfaces", isAuthenticated, async (req, res) => {
+    try {
+      const roomId = parseInt(req.params.roomId);
+      if (isNaN(roomId)) {
+        return res.status(400).json({ message: 'Invalid room ID' });
+      }
+      
+      const surfaces = await storage.getRoomSurfaces(roomId);
+      res.json(surfaces);
+    } catch (error) {
+      console.error("Error fetching room surfaces:", error);
+      res.status(500).json({ message: "Failed to fetch room surfaces" });
+    }
+  });
+
+  app.post("/api/room-surfaces", isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertRoomSurfaceSchema.parse(req.body);
+      const surface = await storage.createRoomSurface(validatedData);
+      res.status(201).json(surface);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating room surface:", error);
+      res.status(500).json({ message: "Failed to create room surface" });
+    }
+  });
+
+  app.patch("/api/room-surfaces/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid surface ID' });
+      }
+
+      const surface = await storage.updateRoomSurface(id, req.body);
+      res.json(surface);
+    } catch (error) {
+      console.error("Error updating room surface:", error);
+      res.status(500).json({ message: "Failed to update room surface" });
+    }
+  });
+
+  app.delete("/api/room-surfaces/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid surface ID' });
+      }
+
+      await storage.deleteRoomSurface(id);
+      res.json({ message: 'Room surface deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting room surface:', error);
+      res.status(500).json({ message: 'Failed to delete room surface' });
+    }
+  });
+
+  // Room fixture routes
+  app.get("/api/rooms/:roomId/fixtures", isAuthenticated, async (req, res) => {
+    try {
+      const roomId = parseInt(req.params.roomId);
+      if (isNaN(roomId)) {
+        return res.status(400).json({ message: 'Invalid room ID' });
+      }
+      
+      const fixtures = await storage.getRoomFixtures(roomId);
+      res.json(fixtures);
+    } catch (error) {
+      console.error("Error fetching room fixtures:", error);
+      res.status(500).json({ message: "Failed to fetch room fixtures" });
+    }
+  });
+
+  app.post("/api/room-fixtures", isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertRoomFixtureSchema.parse(req.body);
+      const fixture = await storage.createRoomFixture(validatedData);
+      res.status(201).json(fixture);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating room fixture:", error);
+      res.status(500).json({ message: "Failed to create room fixture" });
+    }
+  });
+
+  app.patch("/api/room-fixtures/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid fixture ID' });
+      }
+
+      const fixture = await storage.updateRoomFixture(id, req.body);
+      res.json(fixture);
+    } catch (error) {
+      console.error("Error updating room fixture:", error);
+      res.status(500).json({ message: "Failed to update room fixture" });
+    }
+  });
+
+  app.delete("/api/room-fixtures/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid fixture ID' });
+      }
+
+      await storage.deleteRoomFixture(id);
+      res.json({ message: 'Room fixture deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting room fixture:', error);
+      res.status(500).json({ message: 'Failed to delete room fixture' });
+    }
+  });
+
+  // Room photo routes
+  app.get("/api/rooms/:roomId/photos", isAuthenticated, async (req, res) => {
+    try {
+      const roomId = parseInt(req.params.roomId);
+      if (isNaN(roomId)) {
+        return res.status(400).json({ message: 'Invalid room ID' });
+      }
+      
+      const photos = await storage.getRoomPhotos(roomId);
+      res.json(photos);
+    } catch (error) {
+      console.error("Error fetching room photos:", error);
+      res.status(500).json({ message: "Failed to fetch room photos" });
+    }
+  });
+
+  app.post("/api/room-photos", isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertRoomPhotoSchema.parse(req.body);
+      const photo = await storage.createRoomPhoto(validatedData);
+      res.status(201).json(photo);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating room photo:", error);
+      res.status(500).json({ message: "Failed to create room photo" });
+    }
+  });
+
+  app.delete("/api/room-photos/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid photo ID' });
+      }
+
+      await storage.deleteRoomPhoto(id);
+      res.json({ message: 'Room photo deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting room photo:', error);
+      res.status(500).json({ message: 'Failed to delete room photo' });
+    }
+  });
+
+  // Room checklist routes
+  app.get("/api/rooms/:roomId/checklists", isAuthenticated, async (req, res) => {
+    try {
+      const roomId = parseInt(req.params.roomId);
+      if (isNaN(roomId)) {
+        return res.status(400).json({ message: 'Invalid room ID' });
+      }
+      
+      const checklists = await storage.getRoomChecklists(roomId);
+      res.json(checklists);
+    } catch (error) {
+      console.error("Error fetching room checklists:", error);
+      res.status(500).json({ message: "Failed to fetch room checklists" });
+    }
+  });
+
+  app.post("/api/room-checklists", isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertRoomChecklistSchema.parse(req.body);
+      const checklist = await storage.createRoomChecklist(validatedData);
+      res.status(201).json(checklist);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating room checklist:", error);
+      res.status(500).json({ message: "Failed to create room checklist" });
+    }
+  });
+
+  app.patch("/api/room-checklists/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid checklist ID' });
+      }
+
+      const checklist = await storage.updateRoomChecklist(id, req.body);
+      res.json(checklist);
+    } catch (error) {
+      console.error("Error updating room checklist:", error);
+      res.status(500).json({ message: "Failed to update room checklist" });
+    }
+  });
+
+  app.delete("/api/room-checklists/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid checklist ID' });
+      }
+
+      await storage.deleteRoomChecklist(id);
+      res.json({ message: 'Room checklist deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting room checklist:', error);
+      res.status(500).json({ message: 'Failed to delete room checklist' });
     }
   });
 
