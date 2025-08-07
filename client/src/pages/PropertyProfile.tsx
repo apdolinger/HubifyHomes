@@ -1262,11 +1262,10 @@ export default function PropertyProfile() {
 
         {/* Tabs for detailed information */}
         <Tabs defaultValue="tasks" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="tasks">Tasks</TabsTrigger>
             <TabsTrigger value="contacts">Contacts</TabsTrigger>
             <TabsTrigger value="rooms">Rooms</TabsTrigger>
-            <TabsTrigger value="supplies">Supplies</TabsTrigger>
             <TabsTrigger value="notes">Notes</TabsTrigger>
           </TabsList>
 
@@ -1845,16 +1844,7 @@ export default function PropertyProfile() {
             </div>
           </TabsContent>
 
-          <TabsContent value="supplies">
-            <Card>
-              <CardHeader>
-                <CardTitle>Supplies Log</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-slate-600">Supply usage and inventory for this property will be displayed here.</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
+
 
           <TabsContent value="notes">
             <Card>
