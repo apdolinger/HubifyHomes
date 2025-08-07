@@ -129,6 +129,19 @@ export default function PropertyProfile() {
   const [editingSupply, setEditingSupply] = useState<any>(null);
   const [editingNote, setEditingNote] = useState<any>(null);
   const [editingDevice, setEditingDevice] = useState<any>(null);
+  const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
+  const [editingVehicle, setEditingVehicle] = useState<any>(null);
+  const [vehicleForm, setVehicleForm] = useState({
+    make: "",
+    model: "",
+    year: "",
+    vin: "",
+    licensePlate: "",
+    color: "",
+    type: "car",
+    description: ""
+  });
   const [roomSurfaceForm, setRoomSurfaceForm] = useState({
     flooringType: "",
     flooringNotes: "",
@@ -222,6 +235,12 @@ export default function PropertyProfile() {
   const { data: devices = [], isLoading: devicesLoading, refetch: refetchDevices } = useQuery({
     queryKey: [`/api/rooms/${selectedRoom?.id}/devices`],
     enabled: isAuthenticated && !!selectedRoom?.id,
+  });
+
+  // Get property vehicles
+  const { data: vehicles = [], isLoading: vehiclesLoading, refetch: refetchVehicles } = useQuery({
+    queryKey: [`/api/properties/${propertyId}/vehicles`],
+    enabled: isAuthenticated && !!propertyId,
   });
 
 
@@ -322,6 +341,52 @@ export default function PropertyProfile() {
       }
       toast({
         title: "Failed to delete room",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Vehicle mutations
+  const createVehicleMutation = useMutation({
+    mutationFn: async (vehicleData: any) => {
+      return await apiRequest("POST", "/api/vehicles", {
+        ...vehicleData,
+        propertyId: parseInt(propertyId || "0")
+      });
+    },
+    onSuccess: () => {
+      refetchVehicles();
+      setIsVehicleModalOpen(false);
+      setVehicleForm({
+        make: "",
+        model: "",
+        year: "",
+        vin: "",
+        licensePlate: "",
+        color: "",
+        type: "car",
+        description: ""
+      });
+      toast({
+        title: "Vehicle added",
+        description: "New vehicle has been registered to the property.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Failed to add vehicle",
         description: error.message,
         variant: "destructive",
       });
@@ -1953,21 +2018,57 @@ export default function PropertyProfile() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle>Property Vehicles</CardTitle>
-                    <Button size="sm" disabled>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Vehicle
-                    </Button>
+                    <Dialog open={isVehicleModalOpen} onOpenChange={setIsVehicleModalOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Vehicle
+                        </Button>
+                      </DialogTrigger>
+                    </Dialog>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    <p className="text-slate-600 text-sm">
-                      Vehicles associated with this property will be displayed here. Each vehicle can have maintenance records, notes, and other tracking information.
-                    </p>
-                    <div className="text-center py-8">
-                      <Car className="w-12 h-12 mx-auto text-slate-400 mb-4" />
-                      <p className="text-slate-600">No vehicles registered yet</p>
-                    </div>
+                    {vehiclesLoading ? (
+                      <div className="text-center py-8">
+                        <RefreshCw className="w-6 h-6 mx-auto animate-spin text-slate-400 mb-2" />
+                        <p className="text-slate-600">Loading vehicles...</p>
+                      </div>
+                    ) : vehicles && vehicles.length > 0 ? (
+                      <div className="space-y-2">
+                        {vehicles.map((vehicle: any) => (
+                          <div
+                            key={vehicle.id}
+                            className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                              selectedVehicle?.id === vehicle.id
+                                ? "border-blue-200 bg-blue-50"
+                                : "border-slate-200 hover:border-slate-300"
+                            }`}
+                            onClick={() => setSelectedVehicle(vehicle)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h4 className="font-medium">{vehicle.year} {vehicle.make} {vehicle.model}</h4>
+                                <p className="text-sm text-slate-600">{vehicle.licensePlate || 'No plate'}</p>
+                                {vehicle.color && (
+                                  <p className="text-xs text-slate-500">{vehicle.color}</p>
+                                )}
+                              </div>
+                              <Car className="w-5 h-5 text-slate-400" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <Car className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                        <p className="text-slate-600">No vehicles registered yet</p>
+                        <p className="text-slate-500 text-sm mt-2">
+                          Click "Add Vehicle" to register a new vehicle for this property
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -2857,6 +2958,149 @@ export default function PropertyProfile() {
                   <>
                     <Upload className="w-4 h-4 mr-2" />
                     Upload Photo
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Vehicle Modal */}
+        <Dialog open={isVehicleModalOpen} onOpenChange={setIsVehicleModalOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{editingVehicle ? 'Edit Vehicle' : 'Add New Vehicle'}</DialogTitle>
+              <DialogDescription>
+                {editingVehicle 
+                  ? 'Update the vehicle details and information.'
+                  : 'Register a new vehicle for this property.'
+                }
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+              <div>
+                <Label htmlFor="vehicle-make">Make *</Label>
+                <Input
+                  id="vehicle-make"
+                  value={vehicleForm.make}
+                  onChange={(e) => setVehicleForm({ ...vehicleForm, make: e.target.value })}
+                  placeholder="e.g. Toyota, Honda, Ford"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="vehicle-model">Model *</Label>
+                <Input
+                  id="vehicle-model"
+                  value={vehicleForm.model}
+                  onChange={(e) => setVehicleForm({ ...vehicleForm, model: e.target.value })}
+                  placeholder="e.g. Camry, Civic, F-150"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="vehicle-year">Year</Label>
+                <Input
+                  id="vehicle-year"
+                  value={vehicleForm.year}
+                  onChange={(e) => setVehicleForm({ ...vehicleForm, year: e.target.value })}
+                  placeholder="e.g. 2020"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="vehicle-color">Color</Label>
+                <Input
+                  id="vehicle-color"
+                  value={vehicleForm.color}
+                  onChange={(e) => setVehicleForm({ ...vehicleForm, color: e.target.value })}
+                  placeholder="e.g. White, Blue, Red"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="vehicle-license">License Plate</Label>
+                <Input
+                  id="vehicle-license"
+                  value={vehicleForm.licensePlate}
+                  onChange={(e) => setVehicleForm({ ...vehicleForm, licensePlate: e.target.value })}
+                  placeholder="e.g. ABC-1234"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="vehicle-type">Vehicle Type</Label>
+                <Select 
+                  value={vehicleForm.type}
+                  onValueChange={(value) => setVehicleForm({ ...vehicleForm, type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select vehicle type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="car">Car</SelectItem>
+                    <SelectItem value="truck">Truck</SelectItem>
+                    <SelectItem value="suv">SUV</SelectItem>
+                    <SelectItem value="van">Van</SelectItem>
+                    <SelectItem value="motorcycle">Motorcycle</SelectItem>
+                    <SelectItem value="boat">Boat</SelectItem>
+                    <SelectItem value="rv">RV</SelectItem>
+                    <SelectItem value="trailer">Trailer</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor="vehicle-vin">VIN</Label>
+                <Input
+                  id="vehicle-vin"
+                  value={vehicleForm.vin}
+                  onChange={(e) => setVehicleForm({ ...vehicleForm, vin: e.target.value })}
+                  placeholder="17-character Vehicle Identification Number"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor="vehicle-description">Description</Label>
+                <Textarea
+                  id="vehicle-description"
+                  value={vehicleForm.description}
+                  onChange={(e) => setVehicleForm({ ...vehicleForm, description: e.target.value })}
+                  placeholder="Additional notes or description about this vehicle"
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsVehicleModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => {
+                  if (!vehicleForm.make || !vehicleForm.model) {
+                    toast({
+                      title: "Missing information",
+                      description: "Please provide at least the vehicle make and model.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  createVehicleMutation.mutate(vehicleForm);
+                }}
+                disabled={createVehicleMutation.isPending}
+              >
+                {createVehicleMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Vehicle
                   </>
                 )}
               </Button>
