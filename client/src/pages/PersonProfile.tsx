@@ -96,10 +96,6 @@ export default function PersonProfile() {
   });
 
   const linkedProperties = (contactProperties as any[]) || [];
-  
-  // Debug logging
-  console.log('Contact Properties Data:', contactProperties);
-  console.log('Linked Properties:', linkedProperties);
 
   const relatedTasks = (tasks as any[] || []).filter((task: any) => 
     task.propertyId === (person as any)?.propertyId
@@ -139,6 +135,43 @@ export default function PersonProfile() {
       toast({
         title: "Failed to link property",
         description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Unlink property mutation
+  const unlinkPropertyMutation = useMutation({
+    mutationFn: async (contactPropertyId: number) => {
+      await apiRequest("DELETE", `/api/contacts/${personId}/properties/${contactPropertyId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/contacts/${personId}/properties`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      // Adjust current property index if needed
+      if (currentPropertyIndex >= linkedProperties.length - 1) {
+        setCurrentPropertyIndex(Math.max(0, linkedProperties.length - 2));
+      }
+      toast({
+        title: "Property unlinked",
+        description: "Contact has been successfully unlinked from the property.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to unlink property. Please try again.",
         variant: "destructive",
       });
     },
@@ -389,7 +422,10 @@ export default function PersonProfile() {
                             <Badge variant="secondary" className="text-xs">Primary</Badge>
                           )}
                         </div>
-                        <p className="text-sm text-slate-500 flex items-center">
+                        <p 
+                          className="text-sm text-slate-500 flex items-center hover:text-primary cursor-pointer transition-colors"
+                          onClick={() => setLocation(`/property-profile/${linkedProperties[currentPropertyIndex].property?.id}`)}
+                        >
                           <MapPin className="w-3 h-3 mr-1" />
                           {[
                             linkedProperties[currentPropertyIndex].property?.address1,
@@ -407,6 +443,14 @@ export default function PersonProfile() {
                           onClick={() => setLocation(`/property-profile/${linkedProperties[currentPropertyIndex].property?.id}`)}
                         >
                           View
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => unlinkPropertyMutation.mutate(linkedProperties[currentPropertyIndex].id)}
+                          disabled={unlinkPropertyMutation.isPending}
+                        >
+                          {unlinkPropertyMutation.isPending ? "Removing..." : "Remove"}
                         </Button>
                       </div>
                     </div>

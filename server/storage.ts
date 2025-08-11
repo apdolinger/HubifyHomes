@@ -182,6 +182,7 @@ export interface IStorage {
   getContactProperties(contactId: number): Promise<any[]>;
   linkContactToProperty(contactId: number, propertyId: number, isPrimary?: boolean, relationship?: string): Promise<ContactProperty>;
   unlinkContactFromProperty(contactId: number, propertyId: number): Promise<void>;
+  deleteContactProperty(relationshipId: number): Promise<void>;
   setPrimaryProperty(contactId: number, propertyId: number): Promise<void>;
   
   // Team message operations
@@ -1149,6 +1150,11 @@ export class DatabaseStorage implements IStorage {
           eq(contactProperties.propertyId, propertyId)
         )
       );
+  }
+
+  async deleteContactProperty(relationshipId: number): Promise<void> {
+    await db.delete(contactProperties)
+      .where(eq(contactProperties.id, relationshipId));
   }
 
   async setPrimaryProperty(contactId: number, propertyId: number): Promise<void> {

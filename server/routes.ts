@@ -1282,17 +1282,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/contacts/:contactId/properties/:propertyId", isAuthenticated, async (req, res) => {
+  // Delete contact-property relationship by relationship ID
+  app.delete("/api/contacts/:contactId/properties/:relationshipId", isAuthenticated, async (req, res) => {
     try {
       const contactId = parseInt(req.params.contactId);
-      const propertyId = parseInt(req.params.propertyId);
+      const relationshipId = parseInt(req.params.relationshipId);
       
-      if (isNaN(contactId) || isNaN(propertyId)) {
-        return res.status(400).json({ message: "Invalid contact ID or property ID" });
+      if (isNaN(contactId) || isNaN(relationshipId)) {
+        return res.status(400).json({ message: "Invalid contact ID or relationship ID" });
       }
 
-      await storage.unlinkContactFromProperty(contactId, propertyId);
-      res.status(204).send();
+      await storage.deleteContactProperty(relationshipId);
+      res.json({ message: "Property unlinked successfully" });
     } catch (error) {
       console.error("Error unlinking contact from property:", error);
       res.status(500).json({ message: "Failed to unlink contact from property" });
