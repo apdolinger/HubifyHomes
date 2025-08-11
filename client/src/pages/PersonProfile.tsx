@@ -35,7 +35,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Star,
-  MoreVertical
+  MoreVertical,
+  Trash2
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -58,6 +59,10 @@ export default function PersonProfile() {
   
   // Multiple properties navigation state
   const [currentPropertyIndex, setCurrentPropertyIndex] = useState(0);
+  
+  // Delete modal state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   
   // Redirect if not authenticated
   useEffect(() => {
@@ -211,6 +216,47 @@ export default function PersonProfile() {
       });
     },
   });
+
+  // Delete contact mutation
+  const deleteContactMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", `/api/contacts/${personId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      toast({
+        title: "Contact Deleted",
+        description: "Contact has been deleted successfully.",
+      });
+      setLocation("/people");
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to delete contact. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteContact = () => {
+    if (deleteConfirmText === "DELETE") {
+      deleteContactMutation.mutate();
+      setDeleteModalOpen(false);
+      setDeleteConfirmText("");
+    }
+  };
 
   // Filter properties for search and exclude already linked properties
   const alreadyLinkedPropertyIds = linkedProperties.map((lp: any) => lp.property?.id);
@@ -391,6 +437,14 @@ export default function PersonProfile() {
             <Button onClick={openTaskModal} className="bg-primary hover:bg-primary/90">
               <Plus className="w-4 h-4 mr-2" />
               Add Task
+            </Button>
+            <Button 
+              variant="outline" 
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              onClick={() => setDeleteModalOpen(true)}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete Person
             </Button>
           </div>
         </div>
@@ -1006,6 +1060,58 @@ export default function PersonProfile() {
                 <>
                   <Plus className="w-4 h-4 mr-2" />
                   Add Properties ({selectedProperties.length})
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Contact</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. This will permanently delete {(person as any)?.firstName} {(person as any)?.lastName} and all associated data.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="delete-confirm">
+              Type <strong>DELETE</strong> to confirm:
+            </Label>
+            <Input
+              id="delete-confirm"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="Type DELETE to confirm"
+              className="mt-2"
+            />
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setDeleteModalOpen(false);
+                setDeleteConfirmText("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteContact}
+              disabled={deleteConfirmText !== "DELETE" || deleteContactMutation.isPending}
+            >
+              {deleteContactMutation.isPending ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Contact
                 </>
               )}
             </Button>
