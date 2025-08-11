@@ -416,8 +416,8 @@ export default function PersonProfile() {
                   variant="outline"
                   onClick={() => setIsLinkPropertyModalOpen(true)}
                 >
-                  <Plus className="w-4 h-4 mr-1" />
-                  Add Property
+                  <Settings className="w-4 h-4 mr-1" />
+                  Manage Properties
                 </Button>
               )}
             </div>
@@ -463,14 +463,6 @@ export default function PersonProfile() {
                           onClick={() => setLocation(`/property-profile/${linkedProperties[currentPropertyIndex].property?.id}`)}
                         >
                           View
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => unlinkPropertyMutation.mutate(linkedProperties[currentPropertyIndex].id)}
-                          disabled={unlinkPropertyMutation.isPending}
-                        >
-                          {unlinkPropertyMutation.isPending ? "Removing..." : "Remove"}
                         </Button>
                       </div>
                     </div>
@@ -523,8 +515,8 @@ export default function PersonProfile() {
                   className="mt-2"
                   onClick={() => setIsLinkPropertyModalOpen(true)}
                 >
-                  <Link className="w-4 h-4 mr-1" />
-                  Link Property
+                  <Settings className="w-4 h-4 mr-1" />
+                  Manage Properties
                 </Button>
               </div>
             )}
@@ -754,32 +746,92 @@ export default function PersonProfile() {
 
       {/* Link Property Modal */}
       <Dialog open={isLinkPropertyModalOpen} onOpenChange={setIsLinkPropertyModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh]">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
           <DialogHeader>
-            <DialogTitle>Link Properties to Contact</DialogTitle>
+            <DialogTitle>Manage Properties for {(person as any)?.firstName} {(person as any)?.lastName}</DialogTitle>
             <DialogDescription>
-              Search and select one or more properties to link to {(person as any)?.firstName} {(person as any)?.lastName}. Click properties to select/deselect them.
+              Add or remove property associations for this contact.
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4">
+          <div className="space-y-6 overflow-y-auto max-h-[60vh]">
+            {/* Current Linked Properties Section */}
+            {linkedProperties?.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold">Linked Properties ({linkedProperties.length})</h3>
+                </div>
+                <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-3 bg-slate-50">
+                  {linkedProperties.map((linkedProperty: any) => (
+                    <div key={linkedProperty.id} className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                      <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-2">
+                          <Building className="w-4 h-4 text-slate-400" />
+                          {linkedProperty.isPrimary && (
+                            <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-medium">{linkedProperty.property?.name}</p>
+                          <p className="text-sm text-slate-500 flex items-center">
+                            <MapPin className="w-3 h-3 mr-1" />
+                            {[
+                              linkedProperty.property?.address1,
+                              linkedProperty.property?.address2,
+                              linkedProperty.property?.city,
+                              linkedProperty.property?.state,
+                              linkedProperty.property?.zip
+                            ].filter(Boolean).join(", ")}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {linkedProperty.isPrimary && (
+                          <Badge variant="secondary" className="text-xs">Primary</Badge>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => unlinkPropertyMutation.mutate(linkedProperty.id)}
+                          disabled={unlinkPropertyMutation.isPending}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Add New Properties Section */}
             <div>
-              <Label htmlFor="property-search">Search Properties</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <Input
-                  id="property-search"
-                  value={propertySearchTerm}
-                  onChange={(e) => setPropertySearchTerm(e.target.value)}
-                  placeholder="Search by property name, address, city..."
-                  className="pl-10"
-                />
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold">Add New Properties</h3>
+              </div>
+              <div>
+                <Label htmlFor="property-search">Search Available Properties</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                  <Input
+                    id="property-search"
+                    value={propertySearchTerm}
+                    onChange={(e) => setPropertySearchTerm(e.target.value)}
+                    placeholder="Search by property name, address, city..."
+                    className="pl-10"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="max-h-96 overflow-y-auto space-y-2 border rounded-lg p-2">
-              {filteredProperties.length > 0 ? (
-                filteredProperties.map((property: any) => {
+            <div className="max-h-64 overflow-y-auto space-y-2 border rounded-lg p-2">
+              {filteredProperties.filter((property: any) => 
+                !linkedProperties.some((linked: any) => linked.property?.id === property.id)
+              ).length > 0 ? (
+                filteredProperties.filter((property: any) => 
+                  !linkedProperties.some((linked: any) => linked.property?.id === property.id)
+                ).map((property: any) => {
                   const isSelected = selectedProperties.some(p => p.id === property.id);
                   return (
                     <div
@@ -822,7 +874,12 @@ export default function PersonProfile() {
               ) : (
                 <div className="text-center py-8 text-slate-500">
                   <Building className="w-8 h-8 mx-auto mb-2 text-slate-400" />
-                  <p>No properties found</p>
+                  <p>
+                    {filteredProperties.length === 0 
+                      ? "No properties found" 
+                      : "All matching properties are already linked"
+                    }
+                  </p>
                   {propertySearchTerm && (
                     <p className="text-sm">Try adjusting your search terms</p>
                   )}
@@ -892,12 +949,12 @@ export default function PersonProfile() {
               {linkPropertyMutation.isPending ? (
                 <>
                   <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Linking...
+                  Adding...
                 </>
               ) : (
                 <>
-                  <Link className="w-4 h-4 mr-2" />
-                  Link Properties ({selectedProperties.length})
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Properties ({selectedProperties.length})
                 </>
               )}
             </Button>
