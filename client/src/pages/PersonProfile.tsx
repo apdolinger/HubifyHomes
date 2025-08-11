@@ -796,7 +796,7 @@ export default function PersonProfile() {
                           onClick={() => unlinkPropertyMutation.mutate(linkedProperty.id)}
                           disabled={unlinkPropertyMutation.isPending}
                         >
-                          <X className="w-4 h-4" />
+                          ×
                         </Button>
                       </div>
                     </div>
