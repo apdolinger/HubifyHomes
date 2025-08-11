@@ -75,7 +75,7 @@ export default function PersonProfile() {
   }, [isAuthenticated, isLoading, toast]);
 
   const { data: person, isLoading: personLoading } = useQuery({
-    queryKey: ["/api/contacts", personId],
+    queryKey: [`/api/contacts/${personId}`],
     enabled: isAuthenticated && !!personId,
   });
 
@@ -96,6 +96,10 @@ export default function PersonProfile() {
   });
 
   const linkedProperties = (contactProperties as any[]) || [];
+
+  // Debug logging
+  console.log('Person data:', person);
+  console.log('Person ID:', personId);
 
   const relatedTasks = (tasks as any[] || []).filter((task: any) => 
     task.propertyId === (person as any)?.propertyId
