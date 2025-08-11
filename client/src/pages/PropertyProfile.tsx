@@ -178,6 +178,19 @@ export default function PropertyProfile() {
   });
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   
+  // Contact state
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<any>(null);
+  const [editingContact, setEditingContact] = useState<any>(null);
+  const [contactForm, setContactForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    type: "tenant",
+    notes: ""
+  });
+  
   // Get property ID from URL path parameters
   const params = useParams();
   const propertyId = params.id;
@@ -243,7 +256,11 @@ export default function PropertyProfile() {
     enabled: isAuthenticated && !!propertyId,
   });
 
-
+  // Get property contacts
+  const { data: propertyContacts = [], isLoading: contactsLoading, refetch: refetchContacts } = useQuery({
+    queryKey: [`/api/properties/${propertyId}/contacts`],
+    enabled: isAuthenticated && !!propertyId,
+  });
 
   // Room mutations
   const createRoomMutation = useMutation({
@@ -387,6 +404,50 @@ export default function PropertyProfile() {
       }
       toast({
         title: "Failed to add vehicle",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Contact mutations
+  const createContactMutation = useMutation({
+    mutationFn: async (contactData: any) => {
+      return await apiRequest("POST", "/api/contacts", {
+        ...contactData,
+        propertyId: parseInt(propertyId || "0")
+      });
+    },
+    onSuccess: () => {
+      refetchContacts();
+      setIsContactModalOpen(false);
+      setContactForm({
+        firstName: "",
+        lastName: "",
+        email: "",
+        phone: "",
+        type: "tenant",
+        notes: ""
+      });
+      toast({
+        title: "Contact added",
+        description: "New contact has been added to the property.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Failed to add contact",
         description: error.message,
         variant: "destructive",
       });
@@ -817,9 +878,7 @@ export default function PropertyProfile() {
     );
   }
 
-  const propertyContacts = Array.isArray(contacts) ? contacts?.filter((contact: any) => 
-    contact.propertyId === parseInt(propertyId || "0")
-  ) : [];
+  // Use the direct property contacts query instead of filtering global contacts
 
   const propertyTasks = Array.isArray(tasks) ? tasks?.filter((task: any) => 
     task.propertyId === parseInt(propertyId || "0")
@@ -1387,14 +1446,158 @@ export default function PropertyProfile() {
           </TabsContent>
 
           <TabsContent value="contacts">
-            <Card>
-              <CardHeader>
-                <CardTitle>Property Contacts</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-slate-600">Contacts for this property will be displayed here.</p>
-              </CardContent>
-            </Card>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Contact List */}
+              <Card className="lg:col-span-1">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Property Contacts</CardTitle>
+                    <Dialog open={isContactModalOpen} onOpenChange={setIsContactModalOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Contact
+                        </Button>
+                      </DialogTrigger>
+                    </Dialog>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {contactsLoading ? (
+                      <div className="text-center py-8">
+                        <RefreshCw className="w-6 h-6 mx-auto animate-spin text-slate-400 mb-2" />
+                        <p className="text-slate-600">Loading contacts...</p>
+                      </div>
+                    ) : propertyContacts && propertyContacts.length > 0 ? (
+                      <div className="space-y-2">
+                        {/* Primary Contact */}
+                        {propertyContacts.find((contact: any) => contact.type === 'owner') && (
+                          <div className="mb-4">
+                            <h4 className="text-sm font-medium text-slate-700 mb-2">Primary Contact</h4>
+                            {propertyContacts
+                              .filter((contact: any) => contact.type === 'owner')
+                              .map((contact: any) => (
+                              <div
+                                key={contact.id}
+                                className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                                  selectedContact?.id === contact.id
+                                    ? "border-blue-200 bg-blue-50"
+                                    : "border-green-200 bg-green-50 hover:border-green-300"
+                                }`}
+                                onClick={() => setSelectedContact(contact)}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <h4 className="font-medium">{contact.firstName} {contact.lastName}</h4>
+                                    <p className="text-sm text-slate-600 capitalize">{contact.type}</p>
+                                    {contact.phone && (
+                                      <p className="text-xs text-slate-500">{contact.phone}</p>
+                                    )}
+                                  </div>
+                                  <User className="w-5 h-5 text-green-600" />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Household Members/Tenants */}
+                        {propertyContacts.filter((contact: any) => contact.type !== 'owner').length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium text-slate-700 mb-2">Household Members & Tenants</h4>
+                            {propertyContacts
+                              .filter((contact: any) => contact.type !== 'owner')
+                              .map((contact: any) => (
+                              <div
+                                key={contact.id}
+                                className={`p-3 rounded-lg border cursor-pointer transition-colors mb-2 ${
+                                  selectedContact?.id === contact.id
+                                    ? "border-blue-200 bg-blue-50"
+                                    : "border-slate-200 hover:border-slate-300"
+                                }`}
+                                onClick={() => setSelectedContact(contact)}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <h4 className="font-medium">{contact.firstName} {contact.lastName}</h4>
+                                    <p className="text-sm text-slate-600 capitalize">{contact.type}</p>
+                                    {contact.email && (
+                                      <p className="text-xs text-slate-500">{contact.email}</p>
+                                    )}
+                                  </div>
+                                  <User className="w-5 h-5 text-slate-400" />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <User className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                        <p className="text-slate-600">No contacts added yet</p>
+                        <p className="text-slate-500 text-sm mt-2">
+                          Add property owners, tenants, or household members
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Contact Details */}
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle>
+                    {selectedContact 
+                      ? `${selectedContact.firstName} ${selectedContact.lastName}` 
+                      : 'Contact Details'
+                    }
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {selectedContact ? (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-slate-700">Type</Label>
+                          <p className="text-slate-900 capitalize">{selectedContact.type}</p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-slate-700">Full Name</Label>
+                          <p className="text-slate-900">{selectedContact.firstName} {selectedContact.lastName}</p>
+                        </div>
+                        {selectedContact.email && (
+                          <div>
+                            <Label className="text-sm font-medium text-slate-700">Email</Label>
+                            <p className="text-slate-900">{selectedContact.email}</p>
+                          </div>
+                        )}
+                        {selectedContact.phone && (
+                          <div>
+                            <Label className="text-sm font-medium text-slate-700">Phone</Label>
+                            <p className="text-slate-900">{selectedContact.phone}</p>
+                          </div>
+                        )}
+                      </div>
+                      {selectedContact.notes && (
+                        <div>
+                          <Label className="text-sm font-medium text-slate-700">Notes</Label>
+                          <p className="text-slate-900">{selectedContact.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <User className="w-16 h-16 mx-auto text-slate-300 mb-4" />
+                      <h3 className="text-lg font-medium text-slate-900 mb-2">Select a Contact</h3>
+                      <p className="text-slate-600">Choose a contact from the list to view their details</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="rooms">
@@ -3101,6 +3304,127 @@ export default function PropertyProfile() {
                   <>
                     <Plus className="w-4 h-4 mr-2" />
                     Add Vehicle
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Contact Modal */}
+        <Dialog open={isContactModalOpen} onOpenChange={setIsContactModalOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{editingContact ? 'Edit Contact' : 'Add New Contact'}</DialogTitle>
+              <DialogDescription>
+                {editingContact 
+                  ? 'Update the contact details and information.'
+                  : 'Add a new property owner, tenant, or household member.'
+                }
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="contact-firstName">First Name *</Label>
+                  <Input
+                    id="contact-firstName"
+                    value={contactForm.firstName}
+                    onChange={(e) => setContactForm({ ...contactForm, firstName: e.target.value })}
+                    placeholder="Enter first name"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="contact-lastName">Last Name *</Label>
+                  <Input
+                    id="contact-lastName"
+                    value={contactForm.lastName}
+                    onChange={(e) => setContactForm({ ...contactForm, lastName: e.target.value })}
+                    placeholder="Enter last name"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="contact-type">Contact Type</Label>
+                <Select 
+                  value={contactForm.type}
+                  onValueChange={(value) => setContactForm({ ...contactForm, type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select contact type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="owner">Property Owner</SelectItem>
+                    <SelectItem value="tenant">Tenant</SelectItem>
+                    <SelectItem value="vendor">Vendor/Contractor</SelectItem>
+                    <SelectItem value="emergency_contact">Emergency Contact</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="contact-email">Email</Label>
+                <Input
+                  id="contact-email"
+                  type="email"
+                  value={contactForm.email}
+                  onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                  placeholder="Enter email address"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="contact-phone">Phone</Label>
+                <Input
+                  id="contact-phone"
+                  value={contactForm.phone}
+                  onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                  placeholder="Enter phone number"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="contact-notes">Notes</Label>
+                <Textarea
+                  id="contact-notes"
+                  value={contactForm.notes}
+                  onChange={(e) => setContactForm({ ...contactForm, notes: e.target.value })}
+                  placeholder="Additional notes or details about this contact"
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsContactModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => {
+                  if (!contactForm.firstName || !contactForm.lastName) {
+                    toast({
+                      title: "Missing information",
+                      description: "Please provide at least the first and last name.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  createContactMutation.mutate(contactForm);
+                }}
+                disabled={createContactMutation.isPending}
+              >
+                {createContactMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Contact
                   </>
                 )}
               </Button>

@@ -845,6 +845,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Property contacts routes
+  app.get("/api/properties/:propertyId/contacts", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.propertyId);
+      if (isNaN(propertyId)) {
+        return res.status(400).json({ message: 'Invalid property ID' });
+      }
+      
+      const contacts = await storage.getContactsByProperty(propertyId);
+      res.json(contacts);
+    } catch (error) {
+      console.error("Error fetching property contacts:", error);
+      res.status(500).json({ message: "Failed to fetch property contacts" });
+    }
+  });
+
   // Vehicle routes
   app.get("/api/properties/:propertyId/vehicles", isAuthenticated, async (req, res) => {
     try {
