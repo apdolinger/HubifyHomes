@@ -179,6 +179,39 @@ export default function PersonProfile() {
     },
   });
 
+  // Set primary property mutation
+  const setPrimaryMutation = useMutation({
+    mutationFn: async (propertyId: number) => {
+      await apiRequest("PATCH", `/api/contacts/${personId}/properties/${propertyId}/primary`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/contacts/${personId}/properties`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      toast({
+        title: "Primary property updated",
+        description: "The selected property is now set as primary.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to set primary property. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Filter properties for search and exclude already linked properties
   const alreadyLinkedPropertyIds = linkedProperties.map((lp: any) => lp.property?.id);
   const filteredProperties = (properties as any[] || []).filter((property: any) => {
@@ -767,9 +800,18 @@ export default function PersonProfile() {
                       <div className="flex items-center space-x-3">
                         <div className="flex items-center space-x-2">
                           <Building className="w-4 h-4 text-slate-400" />
-                          {linkedProperty.isPrimary && (
-                            <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                          )}
+                          <button
+                            onClick={() => setPrimaryMutation.mutate(linkedProperty.property?.id)}
+                            disabled={setPrimaryMutation.isPending}
+                            className={`transition-colors ${
+                              linkedProperty.isPrimary
+                                ? "text-yellow-500"
+                                : "text-slate-300 hover:text-yellow-400"
+                            }`}
+                            title={linkedProperty.isPrimary ? "Primary property" : "Set as primary"}
+                          >
+                            <Star className={`w-4 h-4 ${linkedProperty.isPrimary ? "fill-current" : ""}`} />
+                          </button>
                         </div>
                         <div>
                           <p className="font-medium">{linkedProperty.property?.name}</p>
