@@ -54,7 +54,7 @@ export default function PersonProfile() {
   // Link property modal state
   const [isLinkPropertyModalOpen, setIsLinkPropertyModalOpen] = useState(false);
   const [propertySearchTerm, setPropertySearchTerm] = useState("");
-  const [selectedProperty, setSelectedProperty] = useState<any>(null);
+  const [selectedProperties, setSelectedProperties] = useState<any[]>([]);
   
   // Multiple properties navigation state
   const [currentPropertyIndex, setCurrentPropertyIndex] = useState(0);
@@ -95,26 +95,29 @@ export default function PersonProfile() {
     enabled: isAuthenticated && !!personId,
   });
 
-  const linkedProperties = contactProperties || [];
+  const linkedProperties = (contactProperties as any[]) || [];
 
   const relatedTasks = (tasks as any[] || []).filter((task: any) => 
     task.propertyId === (person as any)?.propertyId
   );
 
-  // Link property mutation
+  // Link multiple properties mutation
   const linkPropertyMutation = useMutation({
-    mutationFn: async (data: { propertyId: number; isPrimary?: boolean }) => {
-      return await apiRequest("POST", `/api/contacts/${personId}/properties`, data);
+    mutationFn: async (properties: { propertyId: number; isPrimary?: boolean }[]) => {
+      // Link each property sequentially
+      for (const property of properties) {
+        await apiRequest("POST", `/api/contacts/${personId}/properties`, property);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contacts", personId, "properties"] });
       queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
       setIsLinkPropertyModalOpen(false);
-      setSelectedProperty(null);
+      setSelectedProperties([]);
       setPropertySearchTerm("");
       toast({
-        title: "Property linked",
-        description: "Contact has been successfully linked to the property.",
+        title: "Properties linked",
+        description: "Contact has been successfully linked to the selected properties.",
       });
     },
     onError: (error) => {
@@ -137,8 +140,12 @@ export default function PersonProfile() {
     },
   });
 
-  // Filter properties for search
+  // Filter properties for search and exclude already linked properties
+  const alreadyLinkedPropertyIds = linkedProperties.map((lp: any) => lp.property?.id);
   const filteredProperties = (properties as any[] || []).filter((property: any) => {
+    // Exclude already linked properties
+    if (alreadyLinkedPropertyIds.includes(property.id)) return false;
+    
     if (!propertySearchTerm) return true;
     const searchLower = propertySearchTerm.toLowerCase();
     return (
@@ -148,6 +155,18 @@ export default function PersonProfile() {
       property.state?.toLowerCase().includes(searchLower)
     );
   });
+
+  // Handle property selection/deselection
+  const togglePropertySelection = (property: any) => {
+    setSelectedProperties(prev => {
+      const isSelected = prev.some(p => p.id === property.id);
+      if (isSelected) {
+        return prev.filter(p => p.id !== property.id);
+      } else {
+        return [...prev, property];
+      }
+    });
+  };
 
   const getContactTypeDisplay = (type: string) => {
     switch (type) {
@@ -671,9 +690,9 @@ export default function PersonProfile() {
       <Dialog open={isLinkPropertyModalOpen} onOpenChange={setIsLinkPropertyModalOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh]">
           <DialogHeader>
-            <DialogTitle>Link Property to Contact</DialogTitle>
+            <DialogTitle>Link Properties to Contact</DialogTitle>
             <DialogDescription>
-              Search and select a property to link to {(person as any)?.firstName} {(person as any)?.lastName}.
+              Search and select one or more properties to link to {(person as any)?.firstName} {(person as any)?.lastName}. Click properties to select/deselect them.
             </DialogDescription>
           </DialogHeader>
           
@@ -694,43 +713,46 @@ export default function PersonProfile() {
 
             <div className="max-h-96 overflow-y-auto space-y-2 border rounded-lg p-2">
               {filteredProperties.length > 0 ? (
-                filteredProperties.map((property: any) => (
-                  <div
-                    key={property.id}
-                    onClick={() => setSelectedProperty(property)}
-                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selectedProperty?.id === property.id
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <p className="font-medium text-slate-900">{property.name}</p>
-                        <p className="text-sm text-slate-500 flex items-center">
-                          <MapPin className="w-3 h-3 mr-1" />
-                          {[
-                            property.address1,
-                            property.address2,
-                            property.city,
-                            property.state,
-                            property.zip
-                          ].filter(Boolean).join(", ")}
-                        </p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant="outline">
-                          {property.type?.replace('_', ' ') || 'Property'}
-                        </Badge>
-                        {selectedProperty?.id === property.id && (
-                          <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
-                            <CheckSquare className="w-3 h-3 text-white" />
-                          </div>
-                        )}
+                filteredProperties.map((property: any) => {
+                  const isSelected = selectedProperties.some(p => p.id === property.id);
+                  return (
+                    <div
+                      key={property.id}
+                      onClick={() => togglePropertySelection(property)}
+                      className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                        isSelected
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium text-slate-900">{property.name}</p>
+                          <p className="text-sm text-slate-500 flex items-center">
+                            <MapPin className="w-3 h-3 mr-1" />
+                            {[
+                              property.address1,
+                              property.address2,
+                              property.city,
+                              property.state,
+                              property.zip
+                            ].filter(Boolean).join(", ")}
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="outline">
+                            {property.type?.replace('_', ' ') || 'Property'}
+                          </Badge>
+                          {isSelected && (
+                            <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                              <CheckSquare className="w-3 h-3 text-white" />
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="text-center py-8 text-slate-500">
                   <Building className="w-8 h-8 mx-auto mb-2 text-slate-400" />
@@ -742,20 +764,41 @@ export default function PersonProfile() {
               )}
             </div>
 
-            {selectedProperty && (
+            {selectedProperties.length > 0 && (
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm font-medium text-blue-900">Selected Property:</p>
-                <p className="text-sm text-blue-700">{selectedProperty.name}</p>
-                <p className="text-xs text-blue-600 flex items-center">
-                  <MapPin className="w-3 h-3 mr-1" />
-                  {[
-                    selectedProperty.address1,
-                    selectedProperty.address2,
-                    selectedProperty.city,
-                    selectedProperty.state,
-                    selectedProperty.zip
-                  ].filter(Boolean).join(", ")}
+                <p className="text-sm font-medium text-blue-900">
+                  Selected Properties ({selectedProperties.length}):
                 </p>
+                <div className="space-y-1 mt-2">
+                  {selectedProperties.map((property: any) => (
+                    <div key={property.id} className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-blue-700">{property.name}</p>
+                        <p className="text-xs text-blue-600 flex items-center">
+                          <MapPin className="w-3 h-3 mr-1" />
+                          {[
+                            property.address1,
+                            property.address2,
+                            property.city,
+                            property.state,
+                            property.zip
+                          ].filter(Boolean).join(", ")}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          togglePropertySelection(property);
+                        }}
+                        className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -763,21 +806,22 @@ export default function PersonProfile() {
           <DialogFooter>
             <Button variant="outline" onClick={() => {
               setIsLinkPropertyModalOpen(false);
-              setSelectedProperty(null);
+              setSelectedProperties([]);
               setPropertySearchTerm("");
             }}>
               Cancel
             </Button>
             <Button 
               onClick={() => {
-                if (selectedProperty) {
-                  linkPropertyMutation.mutate({ 
-                    propertyId: selectedProperty.id,
-                    isPrimary: linkedProperties?.length === 0 // Make it primary if it's the first property
-                  });
+                if (selectedProperties.length > 0) {
+                  const propertiesToLink = selectedProperties.map((property, index) => ({
+                    propertyId: property.id,
+                    isPrimary: linkedProperties.length === 0 && index === 0 // Make first property primary if no existing properties
+                  }));
+                  linkPropertyMutation.mutate(propertiesToLink);
                 }
               }}
-              disabled={!selectedProperty || linkPropertyMutation.isPending}
+              disabled={selectedProperties.length === 0 || linkPropertyMutation.isPending}
             >
               {linkPropertyMutation.isPending ? (
                 <>
@@ -787,7 +831,7 @@ export default function PersonProfile() {
               ) : (
                 <>
                   <Link className="w-4 h-4 mr-2" />
-                  Link Property
+                  Link Properties ({selectedProperties.length})
                 </>
               )}
             </Button>
