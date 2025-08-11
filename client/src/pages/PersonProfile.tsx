@@ -464,9 +464,18 @@ export default function PersonProfile() {
                     <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-lg">
                       <div className="flex items-center space-x-2">
                         <Building className="w-5 h-5 text-slate-400" />
-                        {linkedProperties[currentPropertyIndex].isPrimary && (
-                          <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                        )}
+                        <button
+                          onClick={() => setPrimaryMutation.mutate(linkedProperties[currentPropertyIndex].property?.id)}
+                          disabled={setPrimaryMutation.isPending}
+                          className={`transition-colors ${
+                            linkedProperties[currentPropertyIndex].isPrimary
+                              ? "text-yellow-500"
+                              : "text-slate-300 hover:text-yellow-400"
+                          }`}
+                          title={linkedProperties[currentPropertyIndex].isPrimary ? "Primary property" : "Set as primary"}
+                        >
+                          <Star className={`w-4 h-4 ${linkedProperties[currentPropertyIndex].isPrimary ? "fill-current" : ""}`} />
+                        </button>
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center space-x-2">
