@@ -305,6 +305,20 @@ export const contacts = pgTable("contacts", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Contact Properties junction table - many-to-many relationship
+export const contactProperties = pgTable("contact_properties", {
+  id: serial("id").primaryKey(),
+  contactId: integer("contact_id").references(() => contacts.id, { onDelete: "cascade" }).notNull(),
+  propertyId: integer("property_id").references(() => properties.id, { onDelete: "cascade" }).notNull(),
+  isPrimary: boolean("is_primary").default(false),
+  relationship: varchar("relationship"), // tenant, owner, vendor, emergency_contact
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Team Messages table
 export const teamMessages = pgTable("team_messages", {
   id: serial("id").primaryKey(),
@@ -791,6 +805,12 @@ export const insertRoomChecklistSchema = createInsertSchema(roomChecklists).omit
   updatedAt: true,
 });
 
+export const insertContactPropertySchema = createInsertSchema(contactProperties).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -804,6 +824,8 @@ export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type Task = typeof tasks.$inferSelect;
 export type InsertContact = z.infer<typeof insertContactSchema>;
 export type Contact = typeof contacts.$inferSelect;
+export type InsertContactProperty = z.infer<typeof insertContactPropertySchema>;
+export type ContactProperty = typeof contactProperties.$inferSelect;
 export type InsertTeamMessage = z.infer<typeof insertTeamMessageSchema>;
 export type TeamMessage = typeof teamMessages.$inferSelect;
 export type InsertMessageReaction = z.infer<typeof insertMessageReactionSchema>;

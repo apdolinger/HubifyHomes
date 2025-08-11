@@ -1241,6 +1241,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Contact-Property relationship endpoints
+  app.get("/api/contacts/:contactId/properties", isAuthenticated, async (req, res) => {
+    try {
+      const contactId = parseInt(req.params.contactId);
+      if (isNaN(contactId)) {
+        return res.status(400).json({ message: "Invalid contact ID" });
+      }
+
+      const properties = await storage.getContactProperties(contactId);
+      res.json(properties);
+    } catch (error) {
+      console.error("Error fetching contact properties:", error);
+      res.status(500).json({ message: "Failed to fetch contact properties" });
+    }
+  });
+
+  app.post("/api/contacts/:contactId/properties", isAuthenticated, async (req, res) => {
+    try {
+      const contactId = parseInt(req.params.contactId);
+      if (isNaN(contactId)) {
+        return res.status(400).json({ message: "Invalid contact ID" });
+      }
+
+      const { propertyId, isPrimary, relationship } = req.body;
+      if (!propertyId || isNaN(parseInt(propertyId))) {
+        return res.status(400).json({ message: "Valid property ID is required" });
+      }
+
+      const contactProperty = await storage.linkContactToProperty(
+        contactId, 
+        parseInt(propertyId), 
+        isPrimary || false, 
+        relationship
+      );
+      res.status(201).json(contactProperty);
+    } catch (error) {
+      console.error("Error linking contact to property:", error);
+      res.status(500).json({ message: "Failed to link contact to property" });
+    }
+  });
+
+  app.delete("/api/contacts/:contactId/properties/:propertyId", isAuthenticated, async (req, res) => {
+    try {
+      const contactId = parseInt(req.params.contactId);
+      const propertyId = parseInt(req.params.propertyId);
+      
+      if (isNaN(contactId) || isNaN(propertyId)) {
+        return res.status(400).json({ message: "Invalid contact ID or property ID" });
+      }
+
+      await storage.unlinkContactFromProperty(contactId, propertyId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error unlinking contact from property:", error);
+      res.status(500).json({ message: "Failed to unlink contact from property" });
+    }
+  });
+
+  app.patch("/api/contacts/:contactId/properties/:propertyId/primary", isAuthenticated, async (req, res) => {
+    try {
+      const contactId = parseInt(req.params.contactId);
+      const propertyId = parseInt(req.params.propertyId);
+      
+      if (isNaN(contactId) || isNaN(propertyId)) {
+        return res.status(400).json({ message: "Invalid contact ID or property ID" });
+      }
+
+      await storage.setPrimaryProperty(contactId, propertyId);
+      res.json({ message: "Primary property updated successfully" });
+    } catch (error) {
+      console.error("Error setting primary property:", error);
+      res.status(500).json({ message: "Failed to set primary property" });
+    }
+  });
+
   // Delete contact
   app.delete("/api/contacts/:id", isAuthenticated, async (req, res) => {
     try {

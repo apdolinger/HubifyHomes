@@ -15,6 +15,7 @@ import {
   vehicleNotes,
   tasks,
   contacts,
+  contactProperties,
   teamMessages,
   messageReactions,
   activityLog,
@@ -52,6 +53,8 @@ import {
   type InsertTask,
   type Contact,
   type InsertContact,
+  type ContactProperty,
+  type InsertContactProperty,
   type TeamMessage,
   type InsertTeamMessage,
   type MessageReaction,
@@ -174,6 +177,12 @@ export interface IStorage {
   createContact(contact: InsertContact, userId: string): Promise<Contact>;
   updateContact(id: number, contact: Partial<InsertContact>): Promise<Contact>;
   deleteContact(id: number): Promise<void>;
+  
+  // Contact-Property relationship operations
+  getContactProperties(contactId: number): Promise<any[]>;
+  linkContactToProperty(contactId: number, propertyId: number, isPrimary?: boolean, relationship?: string): Promise<ContactProperty>;
+  unlinkContactFromProperty(contactId: number, propertyId: number): Promise<void>;
+  setPrimaryProperty(contactId: number, propertyId: number): Promise<void>;
   
   // Team message operations
   getTeamMessages(limit?: number): Promise<TeamMessage[]>;
@@ -1069,6 +1078,96 @@ export class DatabaseStorage implements IStorage {
 
   async deleteContact(id: number): Promise<void> {
     await db.update(contacts).set({ isActive: false }).where(eq(contacts.id, id));
+  }
+
+  // Contact-Property relationship operations
+  async getContactProperties(contactId: number): Promise<any[]> {
+    const contactProps = await db
+      .select({
+        id: contactProperties.id,
+        contactId: contactProperties.contactId,
+        propertyId: contactProperties.propertyId,
+        isPrimary: contactProperties.isPrimary,
+        relationship: contactProperties.relationship,
+        startDate: contactProperties.startDate,
+        endDate: contactProperties.endDate,
+        notes: contactProperties.notes,
+        createdAt: contactProperties.createdAt,
+        property: {
+          id: properties.id,
+          name: properties.name,
+          address1: properties.address1,
+          address2: properties.address2,
+          city: properties.city,
+          state: properties.state,
+          zip: properties.zip,
+          type: properties.type,
+          status: properties.status,
+        }
+      })
+      .from(contactProperties)
+      .leftJoin(properties, eq(contactProperties.propertyId, properties.id))
+      .where(eq(contactProperties.contactId, contactId))
+      .orderBy(desc(contactProperties.isPrimary), contactProperties.createdAt);
+    
+    return contactProps;
+  }
+
+  async linkContactToProperty(
+    contactId: number, 
+    propertyId: number, 
+    isPrimary: boolean = false, 
+    relationship?: string
+  ): Promise<ContactProperty> {
+    // If setting as primary, unset any existing primary properties for this contact
+    if (isPrimary) {
+      await db
+        .update(contactProperties)
+        .set({ isPrimary: false })
+        .where(eq(contactProperties.contactId, contactId));
+    }
+
+    const [newContactProperty] = await db
+      .insert(contactProperties)
+      .values({
+        contactId,
+        propertyId,
+        isPrimary,
+        relationship,
+      })
+      .returning();
+
+    return newContactProperty;
+  }
+
+  async unlinkContactFromProperty(contactId: number, propertyId: number): Promise<void> {
+    await db
+      .delete(contactProperties)
+      .where(
+        and(
+          eq(contactProperties.contactId, contactId),
+          eq(contactProperties.propertyId, propertyId)
+        )
+      );
+  }
+
+  async setPrimaryProperty(contactId: number, propertyId: number): Promise<void> {
+    // First, unset all primary flags for this contact
+    await db
+      .update(contactProperties)
+      .set({ isPrimary: false })
+      .where(eq(contactProperties.contactId, contactId));
+
+    // Then set the specified property as primary
+    await db
+      .update(contactProperties)
+      .set({ isPrimary: true })
+      .where(
+        and(
+          eq(contactProperties.contactId, contactId),
+          eq(contactProperties.propertyId, propertyId)
+        )
+      );
   }
 
   // Team message operations

@@ -31,7 +31,11 @@ import {
   DollarSign,
   Search,
   RefreshCw,
-  Link
+  Link,
+  ChevronLeft,
+  ChevronRight,
+  Star,
+  MoreVertical
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -51,6 +55,9 @@ export default function PersonProfile() {
   const [isLinkPropertyModalOpen, setIsLinkPropertyModalOpen] = useState(false);
   const [propertySearchTerm, setPropertySearchTerm] = useState("");
   const [selectedProperty, setSelectedProperty] = useState<any>(null);
+  
+  // Multiple properties navigation state
+  const [currentPropertyIndex, setCurrentPropertyIndex] = useState(0);
   
   // Redirect if not authenticated
   useEffect(() => {
@@ -82,9 +89,13 @@ export default function PersonProfile() {
     enabled: isAuthenticated,
   });
 
-  const linkedProperties = (properties as any[] || []).filter((property: any) => 
-    property.id === (person as any)?.propertyId
-  );
+  // Get contact properties using the new endpoint
+  const { data: contactProperties } = useQuery({
+    queryKey: ["/api/contacts", personId, "properties"],
+    enabled: isAuthenticated && !!personId,
+  });
+
+  const linkedProperties = contactProperties || [];
 
   const relatedTasks = (tasks as any[] || []).filter((task: any) => 
     task.propertyId === (person as any)?.propertyId
@@ -92,11 +103,11 @@ export default function PersonProfile() {
 
   // Link property mutation
   const linkPropertyMutation = useMutation({
-    mutationFn: async (propertyId: number) => {
-      return await apiRequest("PATCH", `/api/contacts/${personId}`, { propertyId });
+    mutationFn: async (data: { propertyId: number; isPrimary?: boolean }) => {
+      return await apiRequest("POST", `/api/contacts/${personId}/properties`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contacts", personId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts", personId, "properties"] });
       queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
       setIsLinkPropertyModalOpen(false);
       setSelectedProperty(null);
@@ -315,39 +326,108 @@ export default function PersonProfile() {
         {/* Linked Properties */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <Building className="w-5 h-5 mr-2" />
-              Linked Properties
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center">
+                <Building className="w-5 h-5 mr-2" />
+                Linked Properties
+                {linkedProperties?.length > 0 && (
+                  <span className="ml-2 text-sm text-slate-500">({linkedProperties.length})</span>
+                )}
+              </CardTitle>
+              {linkedProperties?.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsLinkPropertyModalOpen(true)}
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add Property
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {linkedProperties?.length > 0 ? (
               <div className="space-y-3">
-                {linkedProperties.map((property: any) => (
-                  <div key={property.id} className="flex items-center space-x-3 p-3 bg-slate-50 rounded-lg">
-                    <Building className="w-5 h-5 text-slate-400" />
-                    <div className="flex-1">
-                      <p className="font-medium">{property.name}</p>
-                      <p className="text-sm text-slate-500 flex items-center">
-                        <MapPin className="w-3 h-3 mr-1" />
-                        {[
-                          property.address1,
-                          property.address2,
-                          property.city,
-                          property.state,
-                          property.zip
-                        ].filter(Boolean).join(", ")}
-                      </p>
+                {/* Current Property Display */}
+                {linkedProperties[currentPropertyIndex] && (
+                  <div className="relative">
+                    <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <Building className="w-5 h-5 text-slate-400" />
+                        {linkedProperties[currentPropertyIndex].isPrimary && (
+                          <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <p className="font-medium">{linkedProperties[currentPropertyIndex].property?.name}</p>
+                          {linkedProperties[currentPropertyIndex].isPrimary && (
+                            <Badge variant="secondary" className="text-xs">Primary</Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-slate-500 flex items-center">
+                          <MapPin className="w-3 h-3 mr-1" />
+                          {[
+                            linkedProperties[currentPropertyIndex].property?.address1,
+                            linkedProperties[currentPropertyIndex].property?.address2,
+                            linkedProperties[currentPropertyIndex].property?.city,
+                            linkedProperties[currentPropertyIndex].property?.state,
+                            linkedProperties[currentPropertyIndex].property?.zip
+                          ].filter(Boolean).join(", ")}
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setLocation(`/property-profile/${linkedProperties[currentPropertyIndex].property?.id}`)}
+                        >
+                          View
+                        </Button>
+                      </div>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setLocation(`/property-profile/${property.id}`)}
-                    >
-                      View
-                    </Button>
+
+                    {/* Navigation Controls for Multiple Properties */}
+                    {linkedProperties.length > 1 && (
+                      <div className="flex items-center justify-between mt-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setCurrentPropertyIndex(Math.max(0, currentPropertyIndex - 1))}
+                          disabled={currentPropertyIndex === 0}
+                        >
+                          <ChevronLeft className="w-4 h-4 mr-1" />
+                          Previous
+                        </Button>
+                        
+                        <div className="flex items-center space-x-1">
+                          {linkedProperties.map((_: any, index: number) => (
+                            <button
+                              key={index}
+                              onClick={() => setCurrentPropertyIndex(index)}
+                              className={`w-2 h-2 rounded-full transition-colors ${
+                                index === currentPropertyIndex 
+                                  ? 'bg-blue-500' 
+                                  : 'bg-slate-300 hover:bg-slate-400'
+                              }`}
+                            />
+                          ))}
+                        </div>
+
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setCurrentPropertyIndex(Math.min(linkedProperties.length - 1, currentPropertyIndex + 1))}
+                          disabled={currentPropertyIndex === linkedProperties.length - 1}
+                        >
+                          Next
+                          <ChevronRight className="w-4 h-4 ml-1" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                ))}
+                )}
               </div>
             ) : (
               <div className="text-center py-4 text-slate-500">
@@ -691,7 +771,10 @@ export default function PersonProfile() {
             <Button 
               onClick={() => {
                 if (selectedProperty) {
-                  linkPropertyMutation.mutate(selectedProperty.id);
+                  linkPropertyMutation.mutate({ 
+                    propertyId: selectedProperty.id,
+                    isPrimary: linkedProperties?.length === 0 // Make it primary if it's the first property
+                  });
                 }
               }}
               disabled={!selectedProperty || linkPropertyMutation.isPending}
