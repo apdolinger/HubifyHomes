@@ -461,8 +461,7 @@ export default function PersonProfile() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => setCurrentPropertyIndex(Math.max(0, currentPropertyIndex - 1))}
-                          disabled={currentPropertyIndex === 0}
+                          onClick={() => setCurrentPropertyIndex(currentPropertyIndex === 0 ? linkedProperties.length - 1 : currentPropertyIndex - 1)}
                         >
                           <ChevronLeft className="w-4 h-4 mr-1" />
                           Previous
@@ -485,8 +484,7 @@ export default function PersonProfile() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => setCurrentPropertyIndex(Math.min(linkedProperties.length - 1, currentPropertyIndex + 1))}
-                          disabled={currentPropertyIndex === linkedProperties.length - 1}
+                          onClick={() => setCurrentPropertyIndex(currentPropertyIndex === linkedProperties.length - 1 ? 0 : currentPropertyIndex + 1)}
                         >
                           Next
                           <ChevronRight className="w-4 h-4 ml-1" />
