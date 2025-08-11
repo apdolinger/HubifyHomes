@@ -91,11 +91,15 @@ export default function PersonProfile() {
 
   // Get contact properties using the new endpoint
   const { data: contactProperties } = useQuery({
-    queryKey: ["/api/contacts", personId, "properties"],
+    queryKey: [`/api/contacts/${personId}/properties`],
     enabled: isAuthenticated && !!personId,
   });
 
   const linkedProperties = (contactProperties as any[]) || [];
+  
+  // Debug logging
+  console.log('Contact Properties Data:', contactProperties);
+  console.log('Linked Properties:', linkedProperties);
 
   const relatedTasks = (tasks as any[] || []).filter((task: any) => 
     task.propertyId === (person as any)?.propertyId
@@ -110,7 +114,7 @@ export default function PersonProfile() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contacts", personId, "properties"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/contacts/${personId}/properties`] });
       queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
       setIsLinkPropertyModalOpen(false);
       setSelectedProperties([]);
