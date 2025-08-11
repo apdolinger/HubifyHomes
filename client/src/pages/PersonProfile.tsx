@@ -97,9 +97,7 @@ export default function PersonProfile() {
 
   const linkedProperties = (contactProperties as any[]) || [];
 
-  // Debug logging
-  console.log('Person data:', person);
-  console.log('Person ID:', personId);
+
 
   const relatedTasks = (tasks as any[] || []).filter((task: any) => 
     task.propertyId === (person as any)?.propertyId
@@ -301,20 +299,38 @@ export default function PersonProfile() {
         </div>
         
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-6">
+            {/* Photo Section */}
             <div className="flex-shrink-0">
-              <Avatar className="h-20 w-20">
-                <AvatarImage src={(person as any)?.profileImageUrl} alt={`${(person as any)?.firstName} ${(person as any)?.lastName}`} />
-                <AvatarFallback className="text-lg">
-                  {getInitials((person as any)?.firstName, (person as any)?.lastName)}
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative">
+                <Avatar className="h-24 w-24">
+                  <AvatarImage src={(person as any)?.profileImageUrl} alt={`${(person as any)?.firstName} ${(person as any)?.lastName}`} />
+                  <AvatarFallback className="text-xl font-semibold">
+                    {getInitials((person as any)?.firstName, (person as any)?.lastName)}
+                  </AvatarFallback>
+                </Avatar>
+                {/* Edit photo button overlay */}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full bg-white border shadow-sm hover:bg-gray-50"
+                >
+                  <Edit className="w-3 h-3" />
+                </Button>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">
-                {(person as any)?.firstName} {(person as any)?.lastName}
-              </h1>
-              <div className="flex items-center space-x-3 mt-2">
+            
+            {/* Name and Basic Info Section */}
+            <div className="flex-1">
+              <div className="flex items-center space-x-3 mb-2">
+                <h1 className="text-3xl font-bold text-slate-900">
+                  {(person as any)?.firstName} {(person as any)?.lastName}
+                </h1>
+                <Button size="sm" variant="ghost" className="text-slate-500 hover:text-slate-700">
+                  <Edit className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="flex items-center space-x-4 flex-wrap">
                 <Badge variant={getContactTypeColor((person as any)?.type)}>
                   {getContactTypeDisplay((person as any)?.type)}
                 </Badge>
