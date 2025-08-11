@@ -10,6 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { 
   User,
   Mail,
@@ -25,7 +28,10 @@ import {
   CheckSquare,
   Settings,
   UserCheck,
-  DollarSign
+  DollarSign,
+  Search,
+  RefreshCw,
+  Link
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -40,6 +46,11 @@ export default function PersonProfile() {
   
   // Get person ID from URL path params
   const personId = params.id;
+  
+  // Link property modal state
+  const [isLinkPropertyModalOpen, setIsLinkPropertyModalOpen] = useState(false);
+  const [propertySearchTerm, setPropertySearchTerm] = useState("");
+  const [selectedProperty, setSelectedProperty] = useState<any>(null);
   
   // Redirect if not authenticated
   useEffect(() => {
@@ -78,6 +89,54 @@ export default function PersonProfile() {
   const relatedTasks = (tasks as any[] || []).filter((task: any) => 
     task.propertyId === (person as any)?.propertyId
   );
+
+  // Link property mutation
+  const linkPropertyMutation = useMutation({
+    mutationFn: async (propertyId: number) => {
+      return await apiRequest("PATCH", `/api/contacts/${personId}`, { propertyId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts", personId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      setIsLinkPropertyModalOpen(false);
+      setSelectedProperty(null);
+      setPropertySearchTerm("");
+      toast({
+        title: "Property linked",
+        description: "Contact has been successfully linked to the property.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Failed to link property",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Filter properties for search
+  const filteredProperties = (properties as any[] || []).filter((property: any) => {
+    if (!propertySearchTerm) return true;
+    const searchLower = propertySearchTerm.toLowerCase();
+    return (
+      property.name?.toLowerCase().includes(searchLower) ||
+      property.address1?.toLowerCase().includes(searchLower) ||
+      property.city?.toLowerCase().includes(searchLower) ||
+      property.state?.toLowerCase().includes(searchLower)
+    );
+  });
 
   const getContactTypeDisplay = (type: string) => {
     switch (type) {
@@ -294,7 +353,12 @@ export default function PersonProfile() {
               <div className="text-center py-4 text-slate-500">
                 <Building className="w-8 h-8 mx-auto mb-2 text-slate-400" />
                 <p className="text-sm">No linked properties</p>
-                <Button size="sm" className="mt-2">
+                <Button 
+                  size="sm" 
+                  className="mt-2"
+                  onClick={() => setIsLinkPropertyModalOpen(true)}
+                >
+                  <Link className="w-4 h-4 mr-1" />
                   Link Property
                 </Button>
               </div>
@@ -522,6 +586,131 @@ export default function PersonProfile() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Link Property Modal */}
+      <Dialog open={isLinkPropertyModalOpen} onOpenChange={setIsLinkPropertyModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>Link Property to Contact</DialogTitle>
+            <DialogDescription>
+              Search and select a property to link to {(person as any)?.firstName} {(person as any)?.lastName}.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="property-search">Search Properties</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Input
+                  id="property-search"
+                  value={propertySearchTerm}
+                  onChange={(e) => setPropertySearchTerm(e.target.value)}
+                  placeholder="Search by property name, address, city..."
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            <div className="max-h-96 overflow-y-auto space-y-2 border rounded-lg p-2">
+              {filteredProperties.length > 0 ? (
+                filteredProperties.map((property: any) => (
+                  <div
+                    key={property.id}
+                    onClick={() => setSelectedProperty(property)}
+                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                      selectedProperty?.id === property.id
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <p className="font-medium text-slate-900">{property.name}</p>
+                        <p className="text-sm text-slate-500 flex items-center">
+                          <MapPin className="w-3 h-3 mr-1" />
+                          {[
+                            property.address1,
+                            property.address2,
+                            property.city,
+                            property.state,
+                            property.zip
+                          ].filter(Boolean).join(", ")}
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="outline">
+                          {property.type?.replace('_', ' ') || 'Property'}
+                        </Badge>
+                        {selectedProperty?.id === property.id && (
+                          <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                            <CheckSquare className="w-3 h-3 text-white" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-slate-500">
+                  <Building className="w-8 h-8 mx-auto mb-2 text-slate-400" />
+                  <p>No properties found</p>
+                  {propertySearchTerm && (
+                    <p className="text-sm">Try adjusting your search terms</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {selectedProperty && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm font-medium text-blue-900">Selected Property:</p>
+                <p className="text-sm text-blue-700">{selectedProperty.name}</p>
+                <p className="text-xs text-blue-600 flex items-center">
+                  <MapPin className="w-3 h-3 mr-1" />
+                  {[
+                    selectedProperty.address1,
+                    selectedProperty.address2,
+                    selectedProperty.city,
+                    selectedProperty.state,
+                    selectedProperty.zip
+                  ].filter(Boolean).join(", ")}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setIsLinkPropertyModalOpen(false);
+              setSelectedProperty(null);
+              setPropertySearchTerm("");
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (selectedProperty) {
+                  linkPropertyMutation.mutate(selectedProperty.id);
+                }
+              }}
+              disabled={!selectedProperty || linkPropertyMutation.isPending}
+            >
+              {linkPropertyMutation.isPending ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Linking...
+                </>
+              ) : (
+                <>
+                  <Link className="w-4 h-4 mr-2" />
+                  Link Property
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
