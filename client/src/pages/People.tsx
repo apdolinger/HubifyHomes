@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
   UserCheck, 
   Plus, 
@@ -24,7 +25,11 @@ import {
   Trash2,
   Search,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Filter
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -54,6 +59,10 @@ export default function People() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [contactToDelete, setContactToDelete] = useState<any>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [sortField, setSortField] = useState<string>("lastName");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [propertyFilter, setPropertyFilter] = useState<string>("all");
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -276,16 +285,73 @@ export default function People() {
     return property?.name || "Unknown property";
   };
 
-  const filteredContacts = contacts?.filter((contact: any) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      contact.firstName.toLowerCase().includes(query) ||
-      contact.lastName.toLowerCase().includes(query) ||
-      contact.email?.toLowerCase().includes(query) ||
-      contact.type.toLowerCase().includes(query)
-    );
-  });
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const getSortIcon = (field: string) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="w-4 h-4 text-slate-400" />;
+    }
+    return sortDirection === "asc" 
+      ? <ArrowUp className="w-4 h-4 text-blue-600" />
+      : <ArrowDown className="w-4 h-4 text-blue-600" />;
+  };
+
+  const filteredAndSortedContacts = contacts
+    ?.filter((contact: any) => {
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesSearch = (
+          contact.firstName.toLowerCase().includes(query) ||
+          contact.lastName.toLowerCase().includes(query) ||
+          contact.email?.toLowerCase().includes(query) ||
+          contact.type.toLowerCase().includes(query)
+        );
+        if (!matchesSearch) return false;
+      }
+
+      // Type filter
+      if (typeFilter !== "all" && contact.type !== typeFilter) {
+        return false;
+      }
+
+      // Property filter
+      if (propertyFilter !== "all" && contact.propertyId?.toString() !== propertyFilter) {
+        return false;
+      }
+
+      return true;
+    })
+    ?.sort((a: any, b: any) => {
+      let aValue = a[sortField];
+      let bValue = b[sortField];
+
+      // Handle special cases
+      if (sortField === "name") {
+        aValue = `${a.firstName} ${a.lastName}`;
+        bValue = `${b.firstName} ${b.lastName}`;
+      } else if (sortField === "property") {
+        aValue = getPropertyName(a.propertyId);
+        bValue = getPropertyName(b.propertyId);
+      }
+
+      // Convert to string for comparison
+      aValue = aValue?.toString().toLowerCase() || "";
+      bValue = bValue?.toString().toLowerCase() || "";
+
+      if (sortDirection === "asc") {
+        return aValue.localeCompare(bValue);
+      } else {
+        return bValue.localeCompare(aValue);
+      }
+    });
 
   const getContactStats = () => {
     if (!contacts) return { total: 0, tenants: 0, owners: 0, vendors: 0 };
@@ -441,7 +507,7 @@ export default function People() {
       {/* Search and Filters */}
       <Card className="mb-6">
         <CardContent className="p-6">
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
               <Input
@@ -451,109 +517,222 @@ export default function People() {
                 className="pl-10"
               />
             </div>
+            
+            <div className="flex items-center gap-4">
+              <div className="min-w-[140px]">
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="owner">Owners</SelectItem>
+                    <SelectItem value="tenant">Tenants</SelectItem>
+                    <SelectItem value="vendor">Vendors</SelectItem>
+                    <SelectItem value="emergency_contact">Emergency Contacts</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="min-w-[160px]">
+                <Select value={propertyFilter} onValueChange={setPropertyFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Properties" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Properties</SelectItem>
+                    {properties?.map((property: any) => (
+                      <SelectItem key={property.id} value={property.id.toString()}>
+                        {property.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {(searchQuery || typeFilter !== "all" || propertyFilter !== "all") && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setTypeFilter("all");
+                    setPropertyFilter("all");
+                  }}
+                  className="whitespace-nowrap"
+                >
+                  Clear Filters
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Contacts List */}
+      {/* Contacts Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Contacts</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Contacts</CardTitle>
+            <div className="text-sm text-slate-600">
+              {filteredAndSortedContacts?.length || 0} of {contacts?.length || 0} contacts
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {contactsLoading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
-          ) : filteredContacts?.length > 0 ? (
-            <div className="space-y-4">
-              {filteredContacts.map((contact: any) => (
-                <div
-                  key={contact.id}
-                  className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => setLocation(`/person-profile?id=${contact.id}`)}
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <h3 className="text-lg font-medium text-slate-900">
-                        {contact.firstName} {contact.lastName}
-                      </h3>
-                      <div className="flex items-center gap-2">
+          ) : filteredAndSortedContacts?.length > 0 ? (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-slate-50 select-none"
+                      onClick={() => handleSort("name")}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <span>Name</span>
+                        {getSortIcon("name")}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-slate-50 select-none"
+                      onClick={() => handleSort("type")}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <span>Type</span>
+                        {getSortIcon("type")}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-slate-50 select-none"
+                      onClick={() => handleSort("email")}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <span>Email</span>
+                        {getSortIcon("email")}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-slate-50 select-none"
+                      onClick={() => handleSort("phone")}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <span>Phone</span>
+                        {getSortIcon("phone")}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-slate-50 select-none"
+                      onClick={() => handleSort("property")}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <span>Property</span>
+                        {getSortIcon("property")}
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredAndSortedContacts.map((contact: any) => (
+                    <TableRow 
+                      key={contact.id}
+                      className="cursor-pointer hover:bg-slate-50"
+                      onClick={() => setLocation(`/person-profile?id=${contact.id}`)}
+                    >
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          <div>
+                            <div className="font-medium text-slate-900">
+                              {contact.firstName} {contact.lastName}
+                            </div>
+                            {!contact.isActive && (
+                              <Badge variant="secondary" className="bg-red-100 text-red-800 border-red-200 text-xs">
+                                Inactive
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         <Badge variant={getTypeColor(contact.type)}>
                           {contact.type.replace('_', ' ')}
                         </Badge>
-                        {!contact.isActive && (
-                          <Badge variant="secondary" className="bg-red-100 text-red-800 border-red-200">Inactive</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {contact.email ? (
+                          <div className="flex items-center space-x-2">
+                            <Mail className="w-4 h-4 text-slate-400" />
+                            <span className="text-sm">{contact.email}</span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-sm">—</span>
                         )}
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-slate-600">
-                      {contact.email && (
+                      </TableCell>
+                      <TableCell>
+                        {contact.phone ? (
+                          <div className="flex items-center space-x-2">
+                            <Phone className="w-4 h-4 text-slate-400" />
+                            <span className="text-sm">{contact.phone}</span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-sm">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <div className="flex items-center space-x-2">
-                          <Mail className="w-4 h-4" />
-                          <span>{contact.email}</span>
+                          <Building className="w-4 h-4 text-slate-400" />
+                          <span className="text-sm">{getPropertyName(contact.propertyId)}</span>
                         </div>
-                      )}
-                      
-                      {contact.phone && (
-                        <div className="flex items-center space-x-2">
-                          <Phone className="w-4 h-4" />
-                          <span>{contact.phone}</span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditContact(contact);
+                            }}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteContact(contact);
+                            }}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
-                      )}
-                      
-                      <div className="flex items-center space-x-2">
-                        <Building className="w-4 h-4" />
-                        <span>{getPropertyName(contact.propertyId)}</span>
-                      </div>
-                    </div>
-                    
-                    {contact.notes && (
-                      <p className="text-sm text-slate-600 mt-2">
-                        {contact.notes}
-                      </p>
-                    )}
-                  </div>
-                  
-                  <div className="flex items-center space-x-2 ml-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditContact(contact);
-                      }}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteContact(contact);
-                      }}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           ) : (
             <div className="text-center py-12">
               <UserCheck className="w-12 h-12 text-slate-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-slate-900 mb-2">
-                {searchQuery ? "No contacts found" : "No contacts yet"}
+                {searchQuery || typeFilter !== "all" || propertyFilter !== "all" 
+                  ? "No contacts found" 
+                  : "No contacts yet"}
               </h3>
               <p className="text-slate-600 mb-4">
-                {searchQuery
-                  ? "Try adjusting your search terms"
+                {searchQuery || typeFilter !== "all" || propertyFilter !== "all"
+                  ? "Try adjusting your search terms or filters"
                   : "Add your first contact to get started"}
               </p>
-              {!searchQuery && (
+              {!(searchQuery || typeFilter !== "all" || propertyFilter !== "all") && (
                 <Button onClick={() => setIsAddModalOpen(true)}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add Contact
