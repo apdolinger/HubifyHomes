@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useTaskModal } from "@/contexts/TaskModalContext";
 import { useToast } from "@/hooks/use-toast";
-import { useLocation } from "wouter";
+import { useLocation, useParams } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,10 +36,10 @@ export default function PersonProfile() {
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const params = useParams();
   
-  // Get person ID from URL query params
-  const urlParams = new URLSearchParams(window.location.search);
-  const personId = urlParams.get('id');
+  // Get person ID from URL path params
+  const personId = params.id;
   
   // Redirect if not authenticated
   useEffect(() => {

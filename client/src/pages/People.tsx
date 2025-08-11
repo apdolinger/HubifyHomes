@@ -137,7 +137,7 @@ export default function People() {
       addForm.reset();
       // Redirect to contact profile page after creation
       setTimeout(() => {
-        setLocation(`/person-profile?id=${newContact.id}`);
+        setLocation(`/person-profile/${newContact.id}`);
       }, 1000);
     },
     onError: (error) => {
@@ -642,7 +642,7 @@ export default function People() {
                     <TableRow 
                       key={contact.id}
                       className="cursor-pointer hover:bg-slate-50"
-                      onClick={() => setLocation(`/person-profile?id=${contact.id}`)}
+                      onClick={() => setLocation(`/person-profile/${contact.id}`)}
                     >
                       <TableCell>
                         <div className="flex items-center space-x-3">
