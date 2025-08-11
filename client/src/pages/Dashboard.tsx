@@ -612,8 +612,8 @@ export default function Dashboard() {
                           <div className="text-xs text-slate-600">Urgent Tasks</div>
                         </div>
                         <div className="text-center p-3">
-                          <div className="text-2xl font-bold text-green-600">{(stats as any)?.completedToday || 0}</div>
-                          <div className="text-xs text-slate-600">Completed</div>
+                          <div className="text-2xl font-bold text-red-600">{(stats as any)?.overdueTasks || 0}</div>
+                          <div className="text-xs text-slate-600">Overdue</div>
                         </div>
                         <div className="text-center p-3">
                           <div className="text-2xl font-bold text-blue-600">{(stats as any)?.activeTeam || 0}</div>

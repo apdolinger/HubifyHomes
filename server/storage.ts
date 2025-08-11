@@ -1361,12 +1361,13 @@ export class DatabaseStorage implements IStorage {
         eq(tasks.priority, "urgent")
       ));
 
-    const [completedTodayCount] = await db
+    const [overdueTasksCount] = await db
       .select({ count: count() })
       .from(tasks)
       .where(and(
-        eq(tasks.status, "completed"),
-        sql`DATE(${tasks.completedAt}) = CURRENT_DATE`
+        or(eq(tasks.status, "pending"), eq(tasks.status, "in_progress")),
+        eq(tasks.isArchived, false),
+        sql`DATE(${tasks.dueDate}) < CURRENT_DATE`
       ));
 
     const [activeTeamCount] = await db
@@ -1384,7 +1385,7 @@ export class DatabaseStorage implements IStorage {
     return {
       totalProperties: propertiesCount.count,
       urgentTasks: urgentTasksCount.count,
-      completedToday: completedTodayCount.count,
+      overdueTasks: overdueTasksCount.count,
       activeTeam: activeTeamCount.count,
     };
   }
