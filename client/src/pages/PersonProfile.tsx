@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useAuth } from "@/hooks/useAuth";
 import { useTaskModal } from "@/contexts/TaskModalContext";
 import { useToast } from "@/hooks/use-toast";
@@ -12,6 +15,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { 
   User,
@@ -41,6 +46,19 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 
+// Form schema for editing contact
+const editContactSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  email: z.string().email("Invalid email").optional().or(z.literal("")),
+  phone: z.string().optional(),
+  type: z.enum(["tenant", "owner", "vendor", "emergency_contact"]),
+  propertyId: z.number().optional(),
+  notes: z.string().optional(),
+});
+
+type EditContactFormData = z.infer<typeof editContactSchema>;
+
 export default function PersonProfile() {
   const { isAuthenticated, isLoading } = useAuth();
   const { openTaskModal } = useTaskModal();
@@ -63,6 +81,23 @@ export default function PersonProfile() {
   // Delete modal state
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  
+  // Edit modal state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  // Edit form
+  const editForm = useForm<EditContactFormData>({
+    resolver: zodResolver(editContactSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+      type: "tenant",
+      propertyId: undefined,
+      notes: "",
+    },
+  });
   
   // Redirect if not authenticated
   useEffect(() => {
@@ -258,6 +293,60 @@ export default function PersonProfile() {
     }
   };
 
+  // Update contact mutation
+  const updateContactMutation = useMutation({
+    mutationFn: async (data: EditContactFormData) => {
+      await apiRequest("PATCH", `/api/contacts/${personId}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/contacts/${personId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      setIsEditModalOpen(false);
+      editForm.reset();
+      toast({
+        title: "Contact Updated",
+        description: "Contact has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to update contact. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEditContact = () => {
+    if (person) {
+      editForm.reset({
+        firstName: (person as any).firstName || "",
+        lastName: (person as any).lastName || "",
+        email: (person as any).email || "",
+        phone: (person as any).phone || "",
+        type: (person as any).type || "tenant",
+        propertyId: (person as any).propertyId || undefined,
+        notes: (person as any).notes || "",
+      });
+      setIsEditModalOpen(true);
+    }
+  };
+
+  const handleUpdateContact = (data: EditContactFormData) => {
+    updateContactMutation.mutate(data);
+  };
+
   // Filter properties for search and exclude already linked properties
   const alreadyLinkedPropertyIds = linkedProperties.map((lp: any) => lp.property?.id);
   const filteredProperties = (properties as any[] || []).filter((property: any) => {
@@ -405,7 +494,7 @@ export default function PersonProfile() {
                 <h1 className="text-3xl font-bold text-slate-900">
                   {(person as any)?.firstName} {(person as any)?.lastName}
                 </h1>
-                <Button size="sm" variant="ghost" className="text-slate-500 hover:text-slate-700">
+                <Button size="sm" variant="ghost" className="text-slate-500 hover:text-slate-700" onClick={handleEditContact}>
                   <Edit className="w-4 h-4" />
                 </Button>
               </div>
@@ -430,7 +519,7 @@ export default function PersonProfile() {
           </div>
           
           <div className="mt-4 lg:mt-0 flex space-x-2">
-            <Button variant="outline">
+            <Button variant="outline" onClick={handleEditContact}>
               <Edit className="w-4 h-4 mr-2" />
               Edit Person
             </Button>
@@ -1116,6 +1205,154 @@ export default function PersonProfile() {
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Contact Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Contact</DialogTitle>
+          </DialogHeader>
+          
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(handleUpdateContact)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={editForm.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <FormField
+                control={editForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input {...field} type="email" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editForm.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Type</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="tenant">Tenant</SelectItem>
+                          <SelectItem value="owner">Owner</SelectItem>
+                          <SelectItem value="vendor">Vendor</SelectItem>
+                          <SelectItem value="emergency_contact">Emergency Contact</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={editForm.control}
+                  name="propertyId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Property</FormLabel>
+                      <Select 
+                        onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
+                        value={field.value?.toString()}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select property..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {properties?.map((property: any) => (
+                            <SelectItem key={property.id} value={property.id.toString()}>
+                              {property.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <FormField
+                control={editForm.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} rows={3} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateContactMutation.isPending}>
+                  {updateContactMutation.isPending ? "Updating..." : "Update Contact"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </main>
