@@ -214,6 +214,10 @@ export interface IStorage {
   createForm(form: InsertForm): Promise<Form>;
   deleteForm(formId: number, userId: string): Promise<void>;
   createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission>;
+  
+  // Duplicate detection operations
+  scanForDuplicates(criteria: any): Promise<any[]>;
+  getDuplicates(): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1574,6 +1578,317 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(vehicleNotes)
       .where(eq(vehicleNotes.id, id));
+  }
+
+  // Duplicate detection operations
+  async scanForDuplicates(criteria: any): Promise<any[]> {
+    const duplicates = [];
+    
+    if (criteria.includeContacts) {
+      const contactDuplicates = await this.findContactDuplicates(criteria);
+      duplicates.push(...contactDuplicates);
+    }
+    
+    if (criteria.includeProperties) {
+      const propertyDuplicates = await this.findPropertyDuplicates(criteria);
+      duplicates.push(...propertyDuplicates);
+    }
+    
+    // Filter by minimum confidence threshold
+    return duplicates.filter(group => group.confidence >= criteria.minimumConfidence);
+  }
+
+  async getDuplicates(): Promise<any[]> {
+    // Return cached/stored duplicates from a previous scan
+    // For now, just return the result of a default scan
+    const defaultCriteria = {
+      nameThreshold: 85,
+      emailExact: true,
+      phoneNormalized: true,
+      addressThreshold: 80,
+      includeContacts: true,
+      includeProperties: true,
+      minimumConfidence: 70
+    };
+    
+    return await this.scanForDuplicates(defaultCriteria);
+  }
+
+  private async findContactDuplicates(criteria: any): Promise<any[]> {
+    const allContacts = await db.select().from(contacts);
+    const duplicateGroups = [];
+    const processedIds = new Set();
+
+    for (let i = 0; i < allContacts.length; i++) {
+      if (processedIds.has(allContacts[i].id)) continue;
+      
+      const potentialDuplicates = [];
+      
+      for (let j = i + 1; j < allContacts.length; j++) {
+        if (processedIds.has(allContacts[j].id)) continue;
+        
+        const confidence = this.calculateContactSimilarity(allContacts[i], allContacts[j], criteria);
+        
+        if (confidence >= criteria.minimumConfidence) {
+          potentialDuplicates.push({
+            record: allContacts[j],
+            confidence
+          });
+          processedIds.add(allContacts[j].id);
+        }
+      }
+      
+      if (potentialDuplicates.length > 0) {
+        const matchFields = this.getContactMatchFields(allContacts[i], potentialDuplicates[0].record, criteria);
+        
+        duplicateGroups.push({
+          id: duplicateGroups.length + 1,
+          type: 'contact',
+          confidence: Math.max(...potentialDuplicates.map(d => d.confidence)),
+          matchFields,
+          records: [allContacts[i], ...potentialDuplicates.map(d => d.record)],
+          createdAt: new Date().toISOString()
+        });
+        
+        processedIds.add(allContacts[i].id);
+      }
+    }
+
+    return duplicateGroups;
+  }
+
+  private async findPropertyDuplicates(criteria: any): Promise<any[]> {
+    const allProperties = await db.select().from(properties);
+    const duplicateGroups = [];
+    const processedIds = new Set();
+
+    for (let i = 0; i < allProperties.length; i++) {
+      if (processedIds.has(allProperties[i].id)) continue;
+      
+      const potentialDuplicates = [];
+      
+      for (let j = i + 1; j < allProperties.length; j++) {
+        if (processedIds.has(allProperties[j].id)) continue;
+        
+        const confidence = this.calculatePropertySimilarity(allProperties[i], allProperties[j], criteria);
+        
+        if (confidence >= criteria.minimumConfidence) {
+          potentialDuplicates.push({
+            record: allProperties[j],
+            confidence
+          });
+          processedIds.add(allProperties[j].id);
+        }
+      }
+      
+      if (potentialDuplicates.length > 0) {
+        const matchFields = this.getPropertyMatchFields(allProperties[i], potentialDuplicates[0].record, criteria);
+        
+        duplicateGroups.push({
+          id: duplicateGroups.length + 1000, // Offset to avoid conflicts with contact IDs
+          type: 'property',
+          confidence: Math.max(...potentialDuplicates.map(d => d.confidence)),
+          matchFields,
+          records: [allProperties[i], ...potentialDuplicates.map(d => d.record)],
+          createdAt: new Date().toISOString()
+        });
+        
+        processedIds.add(allProperties[i].id);
+      }
+    }
+
+    return duplicateGroups;
+  }
+
+  private calculateContactSimilarity(contact1: any, contact2: any, criteria: any): number {
+    let totalScore = 0;
+    let totalWeights = 0;
+
+    // Name similarity (weight: 40%)
+    const nameWeight = 40;
+    const name1 = `${contact1.first_name || ''} ${contact1.last_name || ''}`.trim().toLowerCase();
+    const name2 = `${contact2.first_name || ''} ${contact2.last_name || ''}`.trim().toLowerCase();
+    const nameScore = this.calculateStringSimilarity(name1, name2);
+    
+    if (nameScore >= criteria.nameThreshold / 100) {
+      totalScore += nameScore * nameWeight;
+      totalWeights += nameWeight;
+    }
+
+    // Email similarity (weight: 30%)
+    const emailWeight = 30;
+    if (contact1.email && contact2.email) {
+      const emailScore = criteria.emailExact 
+        ? (contact1.email.toLowerCase() === contact2.email.toLowerCase() ? 1.0 : 0.0)
+        : this.calculateStringSimilarity(contact1.email.toLowerCase(), contact2.email.toLowerCase());
+      
+      if (emailScore > 0.7) {
+        totalScore += emailScore * emailWeight;
+        totalWeights += emailWeight;
+      }
+    }
+
+    // Phone similarity (weight: 20%)
+    const phoneWeight = 20;
+    if (contact1.phone && contact2.phone) {
+      const phone1 = this.normalizePhone(contact1.phone);
+      const phone2 = this.normalizePhone(contact2.phone);
+      const phoneScore = phone1 === phone2 ? 1.0 : 0.0;
+      
+      if (phoneScore > 0) {
+        totalScore += phoneScore * phoneWeight;
+        totalWeights += phoneWeight;
+      }
+    }
+
+    // Address similarity (weight: 10%)
+    const addressWeight = 10;
+    if (contact1.address && contact2.address) {
+      const addressScore = this.calculateStringSimilarity(
+        contact1.address.toLowerCase(), 
+        contact2.address.toLowerCase()
+      );
+      
+      if (addressScore >= criteria.addressThreshold / 100) {
+        totalScore += addressScore * addressWeight;
+        totalWeights += addressWeight;
+      }
+    }
+
+    return totalWeights > 0 ? Math.round((totalScore / totalWeights) * 100) : 0;
+  }
+
+  private calculatePropertySimilarity(property1: any, property2: any, criteria: any): number {
+    let totalScore = 0;
+    let totalWeights = 0;
+
+    // Address similarity (weight: 60%)
+    const addressWeight = 60;
+    if (property1.address && property2.address) {
+      const addressScore = this.calculateStringSimilarity(
+        property1.address.toLowerCase(), 
+        property2.address.toLowerCase()
+      );
+      
+      if (addressScore >= criteria.addressThreshold / 100) {
+        totalScore += addressScore * addressWeight;
+        totalWeights += addressWeight;
+      }
+    }
+
+    // Property name similarity (weight: 40%)
+    const nameWeight = 40;
+    if (property1.name && property2.name) {
+      const nameScore = this.calculateStringSimilarity(
+        property1.name.toLowerCase(), 
+        property2.name.toLowerCase()
+      );
+      
+      if (nameScore >= criteria.nameThreshold / 100) {
+        totalScore += nameScore * nameWeight;
+        totalWeights += nameWeight;
+      }
+    }
+
+    return totalWeights > 0 ? Math.round((totalScore / totalWeights) * 100) : 0;
+  }
+
+  private calculateStringSimilarity(str1: string, str2: string): number {
+    // Levenshtein distance-based similarity
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+    
+    if (longer.length === 0) {
+      return 1.0;
+    }
+    
+    const distance = this.levenshteinDistance(longer, shorter);
+    return (longer.length - distance) / longer.length;
+  }
+
+  private levenshteinDistance(str1: string, str2: string): number {
+    const matrix = [];
+    
+    for (let i = 0; i <= str2.length; i++) {
+      matrix[i] = [i];
+    }
+    
+    for (let j = 0; j <= str1.length; j++) {
+      matrix[0][j] = j;
+    }
+    
+    for (let i = 1; i <= str2.length; i++) {
+      for (let j = 1; j <= str1.length; j++) {
+        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+    
+    return matrix[str2.length][str1.length];
+  }
+
+  private normalizePhone(phone: string): string {
+    // Remove all non-digit characters
+    return phone.replace(/\D/g, '');
+  }
+
+  private getContactMatchFields(contact1: any, contact2: any, criteria: any): string[] {
+    const matchFields = [];
+
+    const name1 = `${contact1.first_name || ''} ${contact1.last_name || ''}`.trim().toLowerCase();
+    const name2 = `${contact2.first_name || ''} ${contact2.last_name || ''}`.trim().toLowerCase();
+    if (this.calculateStringSimilarity(name1, name2) >= criteria.nameThreshold / 100) {
+      matchFields.push('name');
+    }
+
+    if (contact1.email && contact2.email) {
+      const emailMatch = criteria.emailExact 
+        ? contact1.email.toLowerCase() === contact2.email.toLowerCase()
+        : this.calculateStringSimilarity(contact1.email.toLowerCase(), contact2.email.toLowerCase()) > 0.8;
+      
+      if (emailMatch) {
+        matchFields.push('email');
+      }
+    }
+
+    if (contact1.phone && contact2.phone) {
+      if (this.normalizePhone(contact1.phone) === this.normalizePhone(contact2.phone)) {
+        matchFields.push('phone');
+      }
+    }
+
+    if (contact1.address && contact2.address) {
+      if (this.calculateStringSimilarity(contact1.address.toLowerCase(), contact2.address.toLowerCase()) >= criteria.addressThreshold / 100) {
+        matchFields.push('address');
+      }
+    }
+
+    return matchFields;
+  }
+
+  private getPropertyMatchFields(property1: any, property2: any, criteria: any): string[] {
+    const matchFields = [];
+
+    if (property1.address && property2.address) {
+      if (this.calculateStringSimilarity(property1.address.toLowerCase(), property2.address.toLowerCase()) >= criteria.addressThreshold / 100) {
+        matchFields.push('address');
+      }
+    }
+
+    if (property1.name && property2.name) {
+      if (this.calculateStringSimilarity(property1.name.toLowerCase(), property2.name.toLowerCase()) >= criteria.nameThreshold / 100) {
+        matchFields.push('name');
+      }
+    }
+
+    return matchFields;
   }
 }
 

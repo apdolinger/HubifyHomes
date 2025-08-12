@@ -1467,6 +1467,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Duplicate detection and management
+  app.post("/api/duplicates/scan", isAuthenticated, async (req, res) => {
+    try {
+      const criteria = req.body.criteria || {
+        nameThreshold: 85,
+        emailExact: true,
+        phoneNormalized: true,
+        addressThreshold: 80,
+        includeContacts: true,
+        includeProperties: true,
+        minimumConfidence: 70
+      };
+
+      const duplicates = await storage.scanForDuplicates(criteria);
+      res.json({ duplicates, scanTime: new Date().toISOString() });
+    } catch (error) {
+      console.error("Error scanning for duplicates:", error);
+      res.status(500).json({ message: "Failed to scan for duplicates" });
+    }
+  });
+
+  app.get("/api/duplicates", isAuthenticated, async (req, res) => {
+    try {
+      const duplicates = await storage.getDuplicates();
+      res.json(duplicates);
+    } catch (error) {
+      console.error("Error fetching duplicates:", error);
+      res.status(500).json({ message: "Failed to fetch duplicates" });
+    }
+  });
+
   // Forms API routes
   app.get("/api/forms", isAuthenticated, async (req: any, res) => {
     try {
