@@ -22,7 +22,12 @@ import {
   Calendar,
   CheckCircle,
   X,
-  AlertTriangle
+  AlertTriangle,
+  RefreshCw,
+  Search,
+  Clock as ClockIcon,
+  Settings,
+  TrendingUp
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -37,6 +42,18 @@ export default function DuplicatesManagement() {
   const [selectedPrimary, setSelectedPrimary] = useState<any>(null);
   const [selectedDuplicate, setSelectedDuplicate] = useState<any>(null);
   const [mergeNotes, setMergeNotes] = useState("");
+  const [isScanning, setIsScanning] = useState(false);
+  const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
+  const [scanConfigOpen, setScanConfigOpen] = useState(false);
+  const [scanConfig, setScanConfig] = useState({
+    nameThreshold: 85,
+    emailExact: true,
+    phoneNormalized: true,
+    addressThreshold: 80,
+    includeContacts: true,
+    includeProperties: true,
+    minimumConfidence: 70
+  });
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -165,9 +182,24 @@ export default function DuplicatesManagement() {
   };
 
   const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 90) return "bg-red-100 text-red-800 border-red-200";
-    if (confidence >= 75) return "bg-orange-100 text-orange-800 border-orange-200";
-    return "bg-yellow-100 text-yellow-800 border-yellow-200";
+    if (confidence >= 95) return "bg-red-100 text-red-800 border-red-200";
+    if (confidence >= 85) return "bg-orange-100 text-orange-800 border-orange-200";
+    if (confidence >= 70) return "bg-yellow-100 text-yellow-800 border-yellow-200";
+    return "bg-gray-100 text-gray-800 border-gray-200";
+  };
+
+  const getConfidenceIcon = (confidence: number) => {
+    if (confidence >= 95) return <AlertTriangle className="w-4 h-4 text-red-600" />;
+    if (confidence >= 85) return <AlertTriangle className="w-4 h-4 text-orange-600" />;
+    if (confidence >= 70) return <AlertTriangle className="w-4 h-4 text-yellow-600" />;
+    return <AlertTriangle className="w-4 h-4 text-gray-600" />;
+  };
+
+  const getConfidenceLabel = (confidence: number) => {
+    if (confidence >= 95) return "Very High";
+    if (confidence >= 85) return "High";
+    if (confidence >= 70) return "Medium";
+    return "Low";
   };
 
   const handleMergeContacts = (primary: any, duplicate: any) => {
@@ -303,6 +335,79 @@ export default function DuplicatesManagement() {
 
   const handleConfirmMerge = () => {
     mergeMutation.mutate();
+  };
+
+  // Duplicate scanning mutation
+  const scanForDuplicatesMutation = useMutation({
+    mutationFn: async () => {
+      setIsScanning(true);
+      
+      // In real app, this would call the API to scan for duplicates with configurable criteria
+      // The API would compare records based on:
+      // - Name similarity (phonetic matching, fuzzy string matching)
+      // - Email addresses (exact and domain matching)
+      // - Phone numbers (normalized comparison)
+      // - Address similarity (normalized addresses, zip codes)
+      // - Custom business rules
+      
+      await apiRequest("POST", "/api/duplicates/scan", {
+        criteria: scanConfig
+      });
+      
+      // Simulate scanning time
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    },
+    onSuccess: () => {
+      setIsScanning(false);
+      setLastScanTime(new Date());
+      toast({
+        title: "Scan Complete",
+        description: "Duplicate scan completed. New duplicates have been identified.",
+      });
+      // Refresh duplicates data
+      queryClient.invalidateQueries({ queryKey: ["/api/duplicates"] });
+    },
+    onError: (error) => {
+      setIsScanning(false);
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      
+      toast({
+        title: "Scan Failed",
+        description: "Failed to scan for duplicates. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleScanForDuplicates = () => {
+    scanForDuplicatesMutation.mutate();
+  };
+
+  const handleQuickScan = () => {
+    setScanConfig({
+      nameThreshold: 85,
+      emailExact: true,
+      phoneNormalized: true,
+      addressThreshold: 80,
+      includeContacts: true,
+      includeProperties: true,
+      minimumConfidence: 70
+    });
+    scanForDuplicatesMutation.mutate();
+  };
+
+  const handleConfiguredScan = () => {
+    setScanConfigOpen(true);
   };
 
   const renderContactCard = (contact: any, isPrimary: boolean, onSetPrimary: () => void, onMerge: () => void) => (
@@ -487,10 +592,46 @@ export default function DuplicatesManagement() {
             <p className="text-slate-600 mt-2">
               Review and merge duplicate contacts and properties
             </p>
+            {lastScanTime && (
+              <div className="flex items-center text-sm text-slate-500 mt-1">
+                <ClockIcon className="w-3 h-3 mr-1" />
+                Last scan: {lastScanTime.toLocaleString()}
+              </div>
+            )}
           </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold text-slate-900">{duplicateGroups.length}</div>
-            <div className="text-sm text-slate-600">Duplicate Groups</div>
+          <div className="flex items-center space-x-4">
+            <div className="text-right">
+              <div className="text-2xl font-bold text-slate-900">{duplicateGroups.length}</div>
+              <div className="text-sm text-slate-600">Duplicate Groups</div>
+            </div>
+            <div className="flex space-x-2">
+              <Button 
+                onClick={handleQuickScan}
+                disabled={isScanning}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {isScanning ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Scanning...
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-4 h-4 mr-2" />
+                    Quick Scan
+                  </>
+                )}
+              </Button>
+              <Button 
+                onClick={handleConfiguredScan}
+                disabled={isScanning}
+                variant="outline"
+                className="border-blue-600 text-blue-600 hover:bg-blue-50"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Configure Scan
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -515,13 +656,24 @@ export default function DuplicatesManagement() {
                         Duplicate {group.type === 'contact' ? 'Contacts' : 'Properties'} #{group.id}
                       </h2>
                     </div>
-                    <Badge className={`${getConfidenceColor(group.confidence)} border`}>
-                      {group.confidence}% Match
-                    </Badge>
+                    <div className="flex items-center space-x-2">
+                      <Badge className={`${getConfidenceColor(group.confidence)} border`}>
+                        {getConfidenceIcon(group.confidence)}
+                        <span className="ml-1">{group.confidence}% - {getConfidenceLabel(group.confidence)}</span>
+                      </Badge>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2 text-sm text-slate-600">
-                    <AlertTriangle className="w-4 h-4" />
-                    <span>Matched on: {group.matchFields.join(", ")}</span>
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-2 text-sm text-slate-600">
+                      <Search className="w-4 h-4" />
+                      <span>Matched on: <strong>{group.matchFields.join(", ")}</strong></span>
+                    </div>
+                    {group.confidence >= 90 && (
+                      <div className="flex items-center space-x-1 text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
+                        <AlertTriangle className="w-3 h-3" />
+                        <span>Action Required</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -670,6 +822,155 @@ export default function DuplicatesManagement() {
               className="bg-red-600 hover:bg-red-700"
             >
               {mergeMutation.isPending ? "Merging..." : "Confirm Merge"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Scan Configuration Modal */}
+      <Dialog open={scanConfigOpen} onOpenChange={setScanConfigOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center">
+              <Settings className="w-5 h-5 mr-2" />
+              Configure Duplicate Scan
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h3 className="font-medium text-slate-900">Matching Criteria</h3>
+                
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">Name Similarity Threshold</label>
+                    <div className="flex items-center space-x-3 mt-1">
+                      <input
+                        type="range"
+                        min="50"
+                        max="100"
+                        value={scanConfig.nameThreshold}
+                        onChange={(e) => setScanConfig(prev => ({ ...prev, nameThreshold: parseInt(e.target.value) }))}
+                        className="flex-1"
+                      />
+                      <span className="text-sm font-medium w-12">{scanConfig.nameThreshold}%</span>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">Address Similarity Threshold</label>
+                    <div className="flex items-center space-x-3 mt-1">
+                      <input
+                        type="range"
+                        min="50"
+                        max="100"
+                        value={scanConfig.addressThreshold}
+                        onChange={(e) => setScanConfig(prev => ({ ...prev, addressThreshold: parseInt(e.target.value) }))}
+                        className="flex-1"
+                      />
+                      <span className="text-sm font-medium w-12">{scanConfig.addressThreshold}%</span>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">Minimum Overall Confidence</label>
+                    <div className="flex items-center space-x-3 mt-1">
+                      <input
+                        type="range"
+                        min="50"
+                        max="100"
+                        value={scanConfig.minimumConfidence}
+                        onChange={(e) => setScanConfig(prev => ({ ...prev, minimumConfidence: parseInt(e.target.value) }))}
+                        className="flex-1"
+                      />
+                      <span className="text-sm font-medium w-12">{scanConfig.minimumConfidence}%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <h3 className="font-medium text-slate-900">Options</h3>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="emailExact"
+                      checked={scanConfig.emailExact}
+                      onChange={(e) => setScanConfig(prev => ({ ...prev, emailExact: e.target.checked }))}
+                      className="rounded"
+                    />
+                    <label htmlFor="emailExact" className="text-sm text-slate-700">Exact email matching</label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="phoneNormalized"
+                      checked={scanConfig.phoneNormalized}
+                      onChange={(e) => setScanConfig(prev => ({ ...prev, phoneNormalized: e.target.checked }))}
+                      className="rounded"
+                    />
+                    <label htmlFor="phoneNormalized" className="text-sm text-slate-700">Normalized phone matching</label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="includeContacts"
+                      checked={scanConfig.includeContacts}
+                      onChange={(e) => setScanConfig(prev => ({ ...prev, includeContacts: e.target.checked }))}
+                      className="rounded"
+                    />
+                    <label htmlFor="includeContacts" className="text-sm text-slate-700">Scan contacts</label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="includeProperties"
+                      checked={scanConfig.includeProperties}
+                      onChange={(e) => setScanConfig(prev => ({ ...prev, includeProperties: e.target.checked }))}
+                      className="rounded"
+                    />
+                    <label htmlFor="includeProperties" className="text-sm text-slate-700">Scan properties</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <div className="flex items-center space-x-2 mb-2">
+                <TrendingUp className="w-4 h-4 text-blue-600" />
+                <span className="font-medium text-blue-900">Scan Preview</span>
+              </div>
+              <div className="text-sm text-blue-800">
+                This scan will look for {scanConfig.includeContacts && scanConfig.includeProperties ? 'contacts and properties' : 
+                scanConfig.includeContacts ? 'contacts' : scanConfig.includeProperties ? 'properties' : 'nothing'} with 
+                at least {scanConfig.minimumConfidence}% confidence level.
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setScanConfigOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                setScanConfigOpen(false);
+                scanForDuplicatesMutation.mutate();
+              }}
+              disabled={isScanning || (!scanConfig.includeContacts && !scanConfig.includeProperties)}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Search className="w-4 h-4 mr-2" />
+              Start Scan
             </Button>
           </DialogFooter>
         </DialogContent>
