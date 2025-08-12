@@ -10,9 +10,12 @@ import {
   ExternalLink,
   BookOpen,
   Lightbulb,
-  Users
+  Users,
+  Eye,
+  ArrowRight
 } from "lucide-react";
 import { useState } from "react";
+import { useLocation } from "wouter";
 
 interface CalendarWidgetProps {
   className?: string;
@@ -152,6 +155,23 @@ interface DuplicatesWidgetProps {
 }
 
 export function DuplicatesWidget({ className }: DuplicatesWidgetProps) {
+  const [, setLocation] = useLocation();
+
+  const handleReviewContact = (contactName: string) => {
+    // Navigate to people page to find and review the duplicate contact
+    setLocation("/people");
+  };
+
+  const handleReviewProperty = (propertyAddress: string) => {
+    // Navigate to properties page to find and review the duplicate property
+    setLocation("/properties");
+  };
+
+  const handleViewAllDuplicates = () => {
+    // Navigate to a dedicated duplicates management page or people page
+    setLocation("/people");
+  };
+
   return (
     <Card className={className}>
       <CardHeader>
@@ -170,7 +190,13 @@ export function DuplicatesWidget({ className }: DuplicatesWidgetProps) {
               <p className="font-medium text-orange-900">John Smith</p>
               <p className="text-sm text-orange-700">Possible duplicate contact</p>
             </div>
-            <Button size="sm" variant="outline">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={() => handleReviewContact("John Smith")}
+              className="hover:bg-orange-100"
+            >
+              <Eye className="w-3 h-3 mr-1" />
               Review
             </Button>
           </div>
@@ -180,7 +206,13 @@ export function DuplicatesWidget({ className }: DuplicatesWidgetProps) {
               <p className="font-medium text-red-900">456 Oak Street</p>
               <p className="text-sm text-red-700">Similar property address</p>
             </div>
-            <Button size="sm" variant="outline">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={() => handleReviewProperty("456 Oak Street")}
+              className="hover:bg-red-100"
+            >
+              <Eye className="w-3 h-3 mr-1" />
               Review
             </Button>
           </div>
@@ -190,13 +222,23 @@ export function DuplicatesWidget({ className }: DuplicatesWidgetProps) {
               <p className="font-medium text-yellow-900">Sarah Johnson</p>
               <p className="text-sm text-yellow-700">Phone number match</p>
             </div>
-            <Button size="sm" variant="outline">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={() => handleReviewContact("Sarah Johnson")}
+              className="hover:bg-yellow-100"
+            >
+              <Eye className="w-3 h-3 mr-1" />
               Review
             </Button>
           </div>
           
-          <Button variant="outline" className="w-full">
-            <Clock className="w-4 h-4 mr-2" />
+          <Button 
+            variant="outline" 
+            className="w-full hover:bg-slate-50" 
+            onClick={handleViewAllDuplicates}
+          >
+            <ArrowRight className="w-4 h-4 mr-2" />
             View All Duplicates
           </Button>
         </div>
