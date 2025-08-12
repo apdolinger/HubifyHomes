@@ -15,6 +15,7 @@ import PropertyProfile from "@/pages/PropertyProfile";
 import Team from "@/pages/Team";
 import People from "@/pages/People";
 import PersonProfile from "@/pages/PersonProfile";
+import DuplicatesManagement from "@/pages/DuplicatesManagement";
 import PropertyCenter from "@/pages/PropertyCenter";
 import Admin from "@/pages/Admin";
 import Account from "@/pages/Account";
@@ -56,6 +57,7 @@ function Router() {
           <Route path="/team" component={Team} />
           <Route path="/people" component={People} />
           <Route path="/person-profile/:id" component={PersonProfile} />
+          <Route path="/duplicates" component={DuplicatesManagement} />
           <Route path="/property-center" component={PropertyCenter} />
           <Route path="/admin" component={Admin} />
           <Route path="/super-admin" component={Account} />

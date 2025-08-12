@@ -158,18 +158,18 @@ export function DuplicatesWidget({ className }: DuplicatesWidgetProps) {
   const [, setLocation] = useLocation();
 
   const handleReviewContact = (contactName: string) => {
-    // Navigate to people page to find and review the duplicate contact
-    setLocation("/people");
+    // Navigate to duplicates management page to review the specific contact duplicate
+    setLocation("/duplicates");
   };
 
   const handleReviewProperty = (propertyAddress: string) => {
-    // Navigate to properties page to find and review the duplicate property
-    setLocation("/properties");
+    // Navigate to duplicates management page to review the specific property duplicate
+    setLocation("/duplicates");
   };
 
   const handleViewAllDuplicates = () => {
-    // Navigate to a dedicated duplicates management page or people page
-    setLocation("/people");
+    // Navigate to the dedicated duplicates management page
+    setLocation("/duplicates");
   };
 
   return (
