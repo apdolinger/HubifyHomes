@@ -8,6 +8,8 @@ Dwellerly is a professional property management platform for home watch and HOA 
 - **Property Interface Cleanup**: Removed property-level Supplies tab since supplies are managed per room (4 tabs: Tasks, Contacts, Rooms, Notes)
 - **7-Tab Room Management**: Full room management system with Supplies, Devices, Notes, Surfaces, Fixtures, Photos, and History tabs
 - **Database Schema**: Fixed missing room_devices table and updated photo schema to match file upload requirements
+- **Duplicates Management System**: Created dedicated /duplicates page with side-by-side comparison, smart merge logic that preserves primary data while filling missing fields from duplicate, and detailed merge preview
+- **Edit Contact Functionality**: Fixed edit buttons in PersonProfile page with complete modal form and validation
 - **Technical Issue**: Currently experiencing lucide-react DatabaseBackup icon import error that needs resolution
 
 ## User Preferences

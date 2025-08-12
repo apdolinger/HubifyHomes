@@ -176,24 +176,101 @@ export default function DuplicatesManagement() {
     setMergeModalOpen(true);
   };
 
+  const createMergedData = (primary: any, duplicate: any) => {
+    // Smart merge logic: primary takes precedence, but fill in missing fields from duplicate
+    const merged = { ...primary };
+    
+    // Fill in missing or empty fields from duplicate
+    Object.keys(duplicate).forEach(key => {
+      if (key === 'id' || key === 'createdAt') return; // Don't override these
+      
+      const primaryValue = primary[key];
+      const duplicateValue = duplicate[key];
+      
+      // If primary field is empty/null/undefined and duplicate has a value, use duplicate's value
+      if ((!primaryValue || primaryValue === '') && duplicateValue && duplicateValue !== '') {
+        merged[key] = duplicateValue;
+      }
+      
+      // Special handling for arrays (like properties)
+      if (Array.isArray(primaryValue) && Array.isArray(duplicateValue)) {
+        // Combine arrays and remove duplicates
+        const combined = [...primaryValue, ...duplicateValue];
+        merged[key] = [...new Set(combined)];
+      }
+    });
+    
+    return merged;
+  };
+
   const mergeMutation = useMutation({
     mutationFn: async () => {
-      // In real app, this would call the API to merge contacts
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (!selectedPrimary || !selectedDuplicate) return;
+      
+      // Create the merged data
+      const mergedData = createMergedData(selectedPrimary, selectedDuplicate);
+      
+      // In real app, this would call the API to:
+      // 1. Update the primary record with merged data
+      // 2. Transfer any relationships/dependencies from duplicate to primary
+      // 3. Delete the duplicate record
+      // 4. Log the merge operation for audit trail
+      
+      await apiRequest("PATCH", `/api/contacts/${selectedPrimary.id}`, {
+        ...mergedData,
+        mergeNotes,
+        mergedFromId: selectedDuplicate.id,
+        mergedAt: new Date().toISOString()
+      });
+      
+      await apiRequest("DELETE", `/api/contacts/${selectedDuplicate.id}`);
+      
+      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate processing time
     },
     onSuccess: () => {
+      const filledFields = [];
+      
+      // Check what fields were filled from duplicate
+      Object.keys(selectedDuplicate).forEach(key => {
+        if (key === 'id' || key === 'createdAt') return;
+        
+        const primaryValue = selectedPrimary[key];
+        const duplicateValue = selectedDuplicate[key];
+        
+        if ((!primaryValue || primaryValue === '') && duplicateValue && duplicateValue !== '') {
+          filledFields.push(key);
+        }
+      });
+      
       toast({
         title: "Merge Successful",
-        description: "Duplicates have been merged successfully.",
+        description: filledFields.length > 0 
+          ? `Merged successfully. Filled ${filledFields.length} missing fields from duplicate.`
+          : "Duplicates have been merged successfully.",
       });
+      
       setMergeModalOpen(false);
       setSelectedPrimary(null);
       setSelectedDuplicate(null);
       setMergeNotes("");
-      // Refresh duplicates data
+      
+      // Refresh data
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/duplicates"] });
     },
     onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      
       toast({
         title: "Merge Failed",
         description: "Failed to merge duplicates. Please try again.",
@@ -201,6 +278,28 @@ export default function DuplicatesManagement() {
       });
     },
   });
+
+  const getFieldsToMerge = () => {
+    if (!selectedPrimary || !selectedDuplicate) return [];
+    
+    const fieldsToFill = [];
+    Object.keys(selectedDuplicate).forEach(key => {
+      if (key === 'id' || key === 'createdAt') return;
+      
+      const primaryValue = selectedPrimary[key];
+      const duplicateValue = selectedDuplicate[key];
+      
+      if ((!primaryValue || primaryValue === '') && duplicateValue && duplicateValue !== '') {
+        fieldsToFill.push({
+          field: key,
+          value: duplicateValue,
+          displayName: key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')
+        });
+      }
+    });
+    
+    return fieldsToFill;
+  };
 
   const handleConfirmMerge = () => {
     mergeMutation.mutate();
@@ -505,6 +604,39 @@ export default function DuplicatesManagement() {
                 {selectedDuplicate?.email && ` - ${selectedDuplicate.email}`}
               </div>
             </div>
+
+            {/* Show fields that will be filled from duplicate */}
+            {getFieldsToMerge().length > 0 && (
+              <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                <div className="flex items-center space-x-2 mb-3">
+                  <Merge className="w-4 h-4 text-green-600" />
+                  <span className="font-medium text-green-900">
+                    Missing Data to be Filled ({getFieldsToMerge().length} fields)
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {getFieldsToMerge().map((field, index) => (
+                    <div key={index} className="flex justify-between items-center text-sm">
+                      <span className="text-green-700 font-medium">{field.displayName}:</span>
+                      <span className="text-green-800 bg-green-100 px-2 py-1 rounded text-xs">
+                        {field.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 text-xs text-green-600">
+                  These empty fields in the primary record will be filled with data from the duplicate.
+                </div>
+              </div>
+            )}
+
+            {getFieldsToMerge().length === 0 && (
+              <div className="p-3 bg-gray-50 rounded-lg border">
+                <div className="text-sm text-gray-600 text-center">
+                  No missing data to merge - primary record is complete.
+                </div>
+              </div>
+            )}
             
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
