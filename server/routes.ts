@@ -1498,6 +1498,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Smart merge multiple duplicates
+  app.post("/api/duplicates/merge-multiple", isAuthenticated, async (req, res) => {
+    try {
+      const { recordIds, type, mergeNotes } = req.body;
+      
+      if (!recordIds || recordIds.length < 2) {
+        return res.status(400).json({ message: "At least 2 records required for merge" });
+      }
+      
+      if (type === 'contact') {
+        // Get all contacts to merge
+        const allContacts = await db.select().from(contacts);
+        const contactsToMerge = allContacts.filter(c => recordIds.includes(c.id));
+        
+        if (contactsToMerge.length !== recordIds.length) {
+          return res.status(404).json({ message: "Some contacts not found" });
+        }
+        
+        // Sort by completeness - most complete becomes primary
+        const calculateCompleteness = (contact: any): number => {
+          let score = 0;
+          if (contact.first_name) score += 20;
+          if (contact.last_name) score += 20;
+          if (contact.email) score += 25;
+          if (contact.phone) score += 20;
+          if (contact.address) score += 10;
+          if (contact.type) score += 5;
+          return score;
+        };
+        
+        const sortedContacts = contactsToMerge.sort((a, b) => {
+          const scoreA = calculateCompleteness(a);
+          const scoreB = calculateCompleteness(b);
+          return scoreB - scoreA;
+        });
+        
+        const primary = sortedContacts[0];
+        const duplicates = sortedContacts.slice(1);
+        
+        // Create smart merged record
+        const mergedData = { ...primary };
+        
+        duplicates.forEach(duplicate => {
+          // Fill in missing fields from duplicates
+          Object.keys(duplicate).forEach(key => {
+            if (key === 'id') return;
+            
+            if (!mergedData[key] && duplicate[key]) {
+              mergedData[key] = duplicate[key];
+            }
+            
+            // For strings, prefer longer/more complete versions
+            if (typeof mergedData[key] === 'string' && typeof duplicate[key] === 'string') {
+              if (duplicate[key].length > mergedData[key].length) {
+                mergedData[key] = duplicate[key];
+              }
+            }
+          });
+        });
+        
+        // Update primary record with merged data
+        await db.update(contacts)
+          .set({
+            ...mergedData,
+            updated_at: new Date()
+          })
+          .where(eq(contacts.id, primary.id));
+        
+        // Delete duplicate records
+        const duplicateIds = duplicates.map(d => d.id);
+        for (const duplicateId of duplicateIds) {
+          await db.delete(contacts).where(eq(contacts.id, duplicateId));
+        }
+        
+        // Log the merge activity
+        await storage.createActivity({
+          user_id: req.user?.claims?.sub,
+          type: 'contact_merge',
+          entity_type: 'contact',
+          entity_id: primary.id,
+          description: `Merged ${duplicates.length} duplicate contacts into primary record`,
+          details: JSON.stringify({ 
+            mergedContactIds: duplicateIds,
+            mergeNotes,
+            totalRecords: contactsToMerge.length 
+          })
+        });
+        
+        res.json({ 
+          success: true, 
+          primaryId: primary.id, 
+          deletedIds: duplicateIds,
+          mergedRecords: contactsToMerge.length 
+        });
+        
+      } else {
+        res.status(400).json({ message: "Property merge not yet implemented" });
+      }
+      
+    } catch (error) {
+      console.error("Error merging duplicates:", error);
+      res.status(500).json({ message: "Failed to merge duplicates" });
+    }
+  });
+
   // Forms API routes
   app.get("/api/forms", isAuthenticated, async (req: any, res) => {
     try {

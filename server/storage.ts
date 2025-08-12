@@ -1622,39 +1622,79 @@ export class DatabaseStorage implements IStorage {
     for (let i = 0; i < allContacts.length; i++) {
       if (processedIds.has(allContacts[i].id)) continue;
       
-      const potentialDuplicates = [];
+      const duplicateCluster = [allContacts[i]];
+      const confidenceScores = [];
       
+      // Find all related duplicates for this contact
       for (let j = i + 1; j < allContacts.length; j++) {
         if (processedIds.has(allContacts[j].id)) continue;
         
         const confidence = this.calculateContactSimilarity(allContacts[i], allContacts[j], criteria);
         
         if (confidence >= criteria.minimumConfidence) {
-          potentialDuplicates.push({
-            record: allContacts[j],
-            confidence
-          });
+          duplicateCluster.push(allContacts[j]);
+          confidenceScores.push(confidence);
           processedIds.add(allContacts[j].id);
         }
       }
       
-      if (potentialDuplicates.length > 0) {
-        const matchFields = this.getContactMatchFields(allContacts[i], potentialDuplicates[0].record, criteria);
+      // Check for transitive duplicates (duplicates of duplicates)
+      for (let k = 1; k < duplicateCluster.length; k++) {
+        for (let l = k + 1; l < allContacts.length; l++) {
+          if (processedIds.has(allContacts[l].id)) continue;
+          
+          const confidence = this.calculateContactSimilarity(duplicateCluster[k], allContacts[l], criteria);
+          
+          if (confidence >= criteria.minimumConfidence) {
+            duplicateCluster.push(allContacts[l]);
+            confidenceScores.push(confidence);
+            processedIds.add(allContacts[l].id);
+          }
+        }
+      }
+      
+      if (duplicateCluster.length > 1) {
+        // Sort duplicates by completeness (more complete records first)
+        const sortedCluster = duplicateCluster.sort((a, b) => {
+          const scoreA = this.calculateRecordCompleteness(a);
+          const scoreB = this.calculateRecordCompleteness(b);
+          return scoreB - scoreA;
+        });
+        
+        const avgConfidence = confidenceScores.length > 0 
+          ? Math.round(confidenceScores.reduce((sum, conf) => sum + conf, 0) / confidenceScores.length)
+          : 100;
+        
+        const matchFields = this.getContactMatchFields(sortedCluster[0], sortedCluster[1], criteria);
         
         duplicateGroups.push({
           id: duplicateGroups.length + 1,
           type: 'contact',
-          confidence: Math.max(...potentialDuplicates.map(d => d.confidence)),
+          confidence: avgConfidence,
           matchFields,
-          records: [allContacts[i], ...potentialDuplicates.map(d => d.record)],
+          records: sortedCluster,
+          totalRecords: sortedCluster.length,
           createdAt: new Date().toISOString()
         });
         
-        processedIds.add(allContacts[i].id);
+        // Mark all records in cluster as processed
+        sortedCluster.forEach(record => processedIds.add(record.id));
       }
     }
 
     return duplicateGroups;
+  }
+
+  // Calculate how complete a contact record is (more fields = higher score)
+  private calculateRecordCompleteness(contact: any): number {
+    let score = 0;
+    if (contact.first_name) score += 20;
+    if (contact.last_name) score += 20;
+    if (contact.email) score += 25;
+    if (contact.phone) score += 20;
+    if (contact.address) score += 10;
+    if (contact.type) score += 5;
+    return score;
   }
 
   private async findPropertyDuplicates(criteria: any): Promise<any[]> {

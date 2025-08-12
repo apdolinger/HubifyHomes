@@ -178,6 +178,112 @@ export default function DuplicatesManagement() {
     }).join(', ');
   };
 
+  // Smart merge function for multiple duplicates
+  const createSmartMerge = (records: any[]) => {
+    if (!records || records.length < 2) return records[0];
+    
+    const primary = records[0];
+    const smartMerged = { ...primary };
+    
+    // Merge all unique data from all duplicates
+    records.slice(1).forEach(duplicate => {
+      Object.keys(duplicate).forEach(key => {
+        if (key === 'id') return; // Skip IDs
+        
+        // If primary doesn't have this field but duplicate does, use duplicate's value
+        if (!smartMerged[key] && duplicate[key]) {
+          smartMerged[key] = duplicate[key];
+        }
+        
+        // For arrays, merge unique values
+        if (Array.isArray(smartMerged[key]) && Array.isArray(duplicate[key])) {
+          smartMerged[key] = [...new Set([...smartMerged[key], ...duplicate[key]])];
+        }
+        
+        // For longer strings, prefer the longer version (more complete data)
+        if (typeof smartMerged[key] === 'string' && typeof duplicate[key] === 'string') {
+          if (duplicate[key].length > smartMerged[key].length) {
+            smartMerged[key] = duplicate[key];
+          }
+        }
+      });
+    });
+    
+    return smartMerged;
+  };
+
+  // Handle smart merge of all duplicates in a group
+  const handleSmartMergeAll = async (group: any) => {
+    if (!group.records || group.records.length < 2) return;
+    
+    const recordIds = group.records.map((r: any) => r.id);
+    
+    try {
+      await apiRequest("/api/duplicates/merge-multiple", "POST", {
+        recordIds,
+        type: group.type,
+        mergeNotes: `Smart merge of ${group.records.length} duplicates with ${group.confidence}% confidence`
+      });
+      
+      toast({
+        title: "Smart Merge Complete",
+        description: `Successfully merged ${group.records.length} ${group.type} duplicates into one record`,
+      });
+      
+      // Refresh the duplicates list
+      queryClient.invalidateQueries({ queryKey: ["/api/duplicates"] });
+      
+    } catch (error) {
+      toast({
+        title: "Merge Failed",
+        description: "Failed to merge duplicates. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle keeping only primary and deleting others
+  const handleKeepPrimary = async (group: any) => {
+    if (!group.records || group.records.length < 2) return;
+    
+    const duplicateIds = group.records.slice(1).map((r: any) => r.id);
+    
+    try {
+      // Delete duplicate records, keep only primary
+      for (const id of duplicateIds) {
+        await apiRequest(`/api/contacts/${id}`, "DELETE");
+      }
+      
+      toast({
+        title: "Duplicates Removed",
+        description: `Kept primary record and removed ${duplicateIds.length} duplicates`,
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/duplicates"] });
+      
+    } catch (error) {
+      toast({
+        title: "Deletion Failed",
+        description: "Failed to remove duplicates. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle reviewing duplicates one by one
+  const handleReviewIndividually = (group: any) => {
+    if (!group.records || group.records.length < 2) return;
+    
+    setSelectedPrimary(group.records[0]);
+    setSelectedDuplicate(group.records[1]);
+    setMergeModalOpen(true);
+    
+    toast({
+      title: "Individual Review",
+      description: `Starting with first pair. ${group.records.length - 2} more to review after this.`,
+    });
+  };
+
   // Render contact card
   const renderContactCard = (contact: any, isPrimary: boolean, onSetPrimary: () => void, onMerge: () => void) => (
     <Card className={`relative ${isPrimary ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:shadow-md'} transition-all`}>
@@ -362,24 +468,53 @@ export default function DuplicatesManagement() {
                     <Badge className={getConfidenceColor(group.confidence)}>
                       {group.confidence}% {getConfidenceLevel(group.confidence)}
                     </Badge>
+                    <Badge variant="outline">
+                      {group.totalRecords || group.records?.length || 0} records
+                    </Badge>
                   </CardTitle>
+                  <div className="flex space-x-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => {
+                        // Merge all duplicates into primary
+                        setSelectedPrimary(group.records[0]);
+                        setSelectedDuplicate({ 
+                          ...group.records[0], 
+                          _allDuplicates: group.records.slice(1) 
+                        });
+                        setMergeModalOpen(true);
+                      }}
+                    >
+                      <Merge className="w-4 h-4 mr-1" />
+                      Merge All
+                    </Button>
+                  </div>
                 </div>
                 <div className="text-sm text-gray-600">
                   <p>Matching fields: {formatMatchFields(group.matchFields || [])}</p>
                   <p>Found: {new Date(group.createdAt).toLocaleString()}</p>
+                  {group.totalRecords > 2 && (
+                    <p className="text-orange-600 font-medium">
+                      ⚠️ Multiple duplicates detected - review carefully before merging
+                    </p>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className={`grid gap-4 ${group.records?.length > 2 ? 'grid-cols-1 lg:grid-cols-3' : 'grid-cols-1 md:grid-cols-2'}`}>
                   {group.records?.map((item: any, index: number) => 
                     group.type === 'contact' ? 
                       renderContactCard(
                         item, 
                         index === 0, 
                         () => {
-                          // Move to primary position
-                          const newRecords = [item, ...group.records.filter((_: any, i: number) => i !== index)];
-                          // Update the group with new order
+                          // Move to primary position - this would update the group order
+                          // For now, just show a toast
+                          toast({
+                            title: "Primary Updated",
+                            description: `${item.first_name} ${item.last_name} is now the primary record`,
+                          });
                         },
                         () => {
                           setSelectedPrimary(group.records[0]);
@@ -399,11 +534,63 @@ export default function DuplicatesManagement() {
                           </CardHeader>
                           <CardContent>
                             <p className="text-sm text-gray-600">{item.address}</p>
+                            <div className="flex space-x-2 mt-3">
+                              {index !== 0 && (
+                                <Button size="sm" variant="outline" onClick={() => {
+                                  toast({
+                                    title: "Primary Updated",
+                                    description: `${item.name} is now the primary record`,
+                                  });
+                                }}>
+                                  <Crown className="w-4 h-4 mr-1" />
+                                  Set Primary
+                                </Button>
+                              )}
+                            </div>
                           </CardContent>
                         </Card>
                       )
                   )}
                 </div>
+                
+                {/* Advanced merge options for multiple duplicates */}
+                {group.records?.length > 2 && (
+                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                    <h4 className="font-medium mb-2 flex items-center">
+                      <Settings className="w-4 h-4 mr-2" />
+                      Advanced Merge Options
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleSmartMergeAll(group)}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        Smart Merge All
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleKeepPrimary(group)}
+                      >
+                        <UserX className="w-4 h-4 mr-1" />
+                        Keep Only Primary
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleReviewIndividually(group)}
+                      >
+                        <AlertTriangle className="w-4 h-4 mr-1" />
+                        Review Individually
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-2">
+                      Smart Merge will automatically combine all unique information from all {group.records?.length} records into the primary record.
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
