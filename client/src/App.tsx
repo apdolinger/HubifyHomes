@@ -3,8 +3,10 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useHotkeys } from "@/hooks/useHotkeys";
+import { RefreshCw } from "lucide-react";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
@@ -45,8 +47,52 @@ function Router() {
 
   return (
     <Switch>
-      {isLoading || !isAuthenticated ? (
-        <Route path="/" component={Landing} />
+      {isLoading ? (
+        <Route>
+          <div className="min-h-screen flex items-center justify-center">
+            <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
+          </div>
+        </Route>
+      ) : !isAuthenticated ? (
+        <>
+          <Route path="/" component={Landing} />
+          <Route>
+            <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+              <header className="bg-blue-600 shadow-sm">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                  <div className="flex justify-between items-center h-16">
+                    <div className="flex items-center">
+                      <h1 className="text-xl font-bold text-white">Dwellerly</h1>
+                    </div>
+                    <div>
+                      <Button 
+                        onClick={() => window.location.href = "/api/login"}
+                        variant="ghost"
+                        className="text-white hover:bg-blue-700 hover:text-white"
+                      >
+                        Login
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </header>
+              <div className="max-w-4xl mx-auto px-6 py-16 text-center">
+                <h1 className="text-3xl font-bold text-slate-900 mb-4">
+                  Please Log In
+                </h1>
+                <p className="text-lg text-slate-600 mb-8">
+                  You need to be logged in to access this page.
+                </p>
+                <Button 
+                  onClick={() => window.location.href = "/api/login"}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Login to Continue
+                </Button>
+              </div>
+            </div>
+          </Route>
+        </>
       ) : (
         <>
           <Route path="/" component={Dashboard} />
