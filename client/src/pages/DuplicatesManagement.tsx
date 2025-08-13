@@ -167,12 +167,33 @@ export default function DuplicatesManagement() {
   // Handle ignoring a duplicate
   const handleIgnoreDuplicate = async (groupId: number) => {
     try {
+      const recordIds = selectedDuplicateGroup.records.map((record: any) => record.id);
+      
+      await apiRequest("/api/duplicates/ignore", "POST", {
+        recordType: selectedDuplicateGroup.type,
+        recordIds: recordIds,
+        reason: "User manually ignored this duplicate group"
+      });
+      
       toast({
         title: "Duplicate Ignored",
         description: "This duplicate will not appear in future scans",
       });
+      
+      setMergeScreenOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/duplicates"] });
     } catch (error) {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
       toast({
         title: "Error",
         description: "Failed to ignore duplicate",

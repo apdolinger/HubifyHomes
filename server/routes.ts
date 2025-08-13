@@ -1498,6 +1498,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/duplicates/ignore", isAuthenticated, async (req: any, res) => {
+    try {
+      const { recordType, recordIds, reason } = req.body;
+      
+      if (!recordType || !recordIds || !Array.isArray(recordIds)) {
+        return res.status(400).json({ message: "recordType and recordIds array are required" });
+      }
+      
+      await storage.ignoreDuplicate(recordType, recordIds, req.user.claims.sub, reason);
+      res.json({ message: "Duplicate ignored successfully" });
+    } catch (error) {
+      console.error("Error ignoring duplicate:", error);
+      res.status(500).json({ message: "Failed to ignore duplicate" });
+    }
+  });
+
   // Smart merge multiple duplicates
   app.post("/api/duplicates/merge-multiple", isAuthenticated, async (req, res) => {
     try {

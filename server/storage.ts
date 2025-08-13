@@ -21,6 +21,7 @@ import {
   activityLog,
   forms,
   formSubmissions,
+  ignoredDuplicates,
   type User,
   type UpsertUser,
   type Community,
@@ -218,6 +219,7 @@ export interface IStorage {
   // Duplicate detection operations
   scanForDuplicates(criteria: any): Promise<any[]>;
   getDuplicates(): Promise<any[]>;
+  ignoreDuplicate(recordType: string, recordIds: number[], userId: string, reason?: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1929,6 +1931,15 @@ export class DatabaseStorage implements IStorage {
     }
 
     return matchFields;
+  }
+
+  async ignoreDuplicate(recordType: string, recordIds: number[], userId: string, reason?: string): Promise<void> {
+    await db.insert(ignoredDuplicates).values({
+      recordType,
+      recordIds: recordIds.map(id => id.toString()),
+      ignoredBy: userId,
+      reason: reason || null,
+    });
   }
 }
 

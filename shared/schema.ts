@@ -405,6 +405,16 @@ export const taskChecklistItems = pgTable("task_checklist_items", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Ignored duplicates table for tracking duplicates that should be ignored
+export const ignoredDuplicates = pgTable("ignored_duplicates", {
+  id: serial("id").primaryKey(),
+  recordType: varchar("record_type").notNull(), // 'contact' or 'property'
+  recordIds: text("record_ids").array().notNull(), // Array of record IDs in this duplicate group
+  ignoredBy: varchar("ignored_by").notNull().references(() => users.id),
+  reason: text("reason"), // Optional reason for ignoring
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   managedProperties: many(properties),
