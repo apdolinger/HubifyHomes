@@ -22,6 +22,7 @@ import {
   forms,
   formSubmissions,
   ignoredDuplicates,
+  duplicateHistory,
   type User,
   type UpsertUser,
   type Community,
@@ -66,6 +67,8 @@ import {
   type InsertForm,
   type FormSubmission,
   type InsertFormSubmission,
+  type DuplicateHistory,
+  type InsertDuplicateHistory,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, like, count, sql } from "drizzle-orm";
@@ -220,6 +223,8 @@ export interface IStorage {
   scanForDuplicates(criteria: any): Promise<any[]>;
   getDuplicates(): Promise<any[]>;
   ignoreDuplicate(recordType: string, recordIds: number[], userId: string, reason?: string): Promise<void>;
+  getDuplicateHistory(): Promise<DuplicateHistory[]>;
+  addDuplicateHistory(action: string, recordType: string, recordIds: number[], userId: string, primaryRecordId?: string, details?: any): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1939,6 +1944,44 @@ export class DatabaseStorage implements IStorage {
       recordIds: recordIds.map(id => id.toString()),
       ignoredBy: userId,
       reason: reason || null,
+    });
+
+    // Add to history
+    await this.addDuplicateHistory('ignore', recordType, recordIds, userId, undefined, { reason });
+  }
+
+  async getDuplicateHistory(): Promise<DuplicateHistory[]> {
+    const results = await db
+      .select({
+        id: duplicateHistory.id,
+        action: duplicateHistory.action,
+        recordType: duplicateHistory.recordType,
+        recordIds: duplicateHistory.recordIds,
+        primaryRecordId: duplicateHistory.primaryRecordId,
+        performedBy: duplicateHistory.performedBy,
+        performedAt: duplicateHistory.performedAt,
+        details: duplicateHistory.details,
+        userFirstName: users.firstName,
+        userLastName: users.lastName,
+      })
+      .from(duplicateHistory)
+      .leftJoin(users, eq(duplicateHistory.performedBy, users.id))
+      .orderBy(desc(duplicateHistory.performedAt));
+
+    return results.map(row => ({
+      ...row,
+      performedByName: `${row.userFirstName || ''} ${row.userLastName || ''}`.trim() || 'Unknown User'
+    }));
+  }
+
+  async addDuplicateHistory(action: string, recordType: string, recordIds: number[], userId: string, primaryRecordId?: string, details?: any): Promise<void> {
+    await db.insert(duplicateHistory).values({
+      action,
+      recordType,
+      recordIds: recordIds.map(id => id.toString()),
+      primaryRecordId,
+      performedBy: userId,
+      details: details || null,
     });
   }
 }

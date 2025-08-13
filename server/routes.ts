@@ -1514,6 +1514,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/duplicates/history", isAuthenticated, async (req, res) => {
+    try {
+      const history = await storage.getDuplicateHistory();
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching duplicate history:", error);
+      res.status(500).json({ message: "Failed to fetch duplicate history" });
+    }
+  });
+
   // Smart merge multiple duplicates
   app.post("/api/duplicates/merge-multiple", isAuthenticated, async (req, res) => {
     try {

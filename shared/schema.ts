@@ -415,6 +415,18 @@ export const ignoredDuplicates = pgTable("ignored_duplicates", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Duplicate history table for tracking all duplicate actions
+export const duplicateHistory = pgTable("duplicate_history", {
+  id: serial("id").primaryKey(),
+  action: varchar("action", { length: 20 }).notNull(), // 'merge' or 'ignore'
+  recordType: varchar("record_type", { length: 50 }).notNull(), // 'contact' or 'property'
+  recordIds: text("record_ids").array().notNull(), // Array of record IDs involved
+  primaryRecordId: varchar("primary_record_id", { length: 255 }), // The primary record kept (for merges)
+  performedBy: varchar("performed_by", { length: 255 }).notNull().references(() => users.id),
+  performedAt: timestamp("performed_at").defaultNow(),
+  details: jsonb("details"), // Additional details about the action
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   managedProperties: many(properties),
@@ -871,3 +883,7 @@ export type InsertVehicleMaintenance = z.infer<typeof insertVehicleMaintenanceSc
 export type VehicleMaintenance = typeof vehicleMaintenance.$inferSelect;
 export type InsertVehicleNote = z.infer<typeof insertVehicleNoteSchema>;
 export type VehicleNote = typeof vehicleNotes.$inferSelect;
+export type IgnoredDuplicate = typeof ignoredDuplicates.$inferSelect;
+export type InsertIgnoredDuplicate = typeof ignoredDuplicates.$inferInsert;
+export type DuplicateHistory = typeof duplicateHistory.$inferSelect;
+export type InsertDuplicateHistory = typeof duplicateHistory.$inferInsert;

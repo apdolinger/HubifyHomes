@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   ArrowLeft, 
   Users, 
@@ -32,7 +33,8 @@ import {
   Settings,
   TrendingUp,
   Eye,
-  RotateCcw
+  RotateCcw,
+  History
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -51,6 +53,7 @@ export default function DuplicatesManagement() {
   const [isScanning, setIsScanning] = useState(false);
   const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
   const [scanConfigOpen, setScanConfigOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("people");
   
   const [scanConfig, setScanConfig] = useState({
     nameThreshold: 85,
@@ -80,6 +83,13 @@ export default function DuplicatesManagement() {
   // Fetch duplicates
   const { data: duplicateGroups, isLoading: duplicatesLoading, error: duplicatesError } = useQuery({
     queryKey: ["/api/duplicates"],
+    retry: false,
+    enabled: isAuthenticated
+  });
+
+  // Fetch duplicate history
+  const { data: duplicateHistory, isLoading: historyLoading } = useQuery({
+    queryKey: ["/api/duplicates/history"],
     retry: false,
     enabled: isAuthenticated
   });
@@ -320,103 +330,249 @@ export default function DuplicatesManagement() {
         </div>
       </div>
 
-      {/* Duplicates Table */}
-      {duplicatesLoading ? (
-        <Card>
-          <CardContent className="text-center py-8">
-            <RefreshCw className="w-6 h-6 animate-spin mr-2" />
-            Loading duplicates...
-          </CardContent>
-        </Card>
-      ) : (duplicateGroups as any[])?.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-8">
-            <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Duplicates Found</h3>
-            <p className="text-gray-600">Your database is clean! Run a scan to check for new duplicates.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
+      {/* Duplicates with Tabs */}
+      <div className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="people" className="flex items-center space-x-2">
+              <Users className="w-4 h-4" />
+              <span>People Duplicates</span>
+            </TabsTrigger>
+            <TabsTrigger value="properties" className="flex items-center space-x-2">
+              <Building className="w-4 h-4" />
+              <span>Property Duplicates</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="people" className="space-y-4">
+            {duplicatesLoading ? (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <RefreshCw className="w-6 h-6 animate-spin mr-2" />
+                  Loading people duplicates...
+                </CardContent>
+              </Card>
+            ) : (duplicateGroups as any[])?.filter(g => g.type === 'contact')?.length === 0 ? (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No People Duplicates Found</h3>
+                  <p className="text-gray-600">No duplicate contacts were found in your database.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Contact Duplicates ({(duplicateGroups as any[])?.filter(g => g.type === 'contact')?.length || 0})</span>
+                    <Badge variant="outline" className="text-sm">
+                      Click a row to review and merge
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {(duplicateGroups as any[])?.filter(g => g.type === 'contact')?.map((group: any, index: number) => (
+                      <div
+                        key={group.id || index}
+                        onClick={() => handleSelectDuplicate(group)}
+                        className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-2">
+                              <Users className="w-5 h-5 text-blue-600" />
+                              <Badge className={getConfidenceColor(group.confidence)}>
+                                {group.confidence}% {getConfidenceLevel(group.confidence)}
+                              </Badge>
+                              <span className="text-sm text-gray-500">
+                                Matching: {group.matchFields?.join(', ') || 'Name'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-3">
+                            <span className="text-sm text-gray-500">
+                              {group.records?.length || 0} records
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSelectDuplicate(group);
+                              }}
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              Review
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 text-sm text-gray-600">
+                          {group.records?.slice(0, 2).map((record: any, idx: number) => (
+                            <span key={idx} className="mr-3">
+                              ({record.email || record.phone}) → {record.first_name} {record.last_name}
+                              {idx < Math.min(1, (group.records?.length || 1) - 1) && ' | '}
+                            </span>
+                          ))}
+                          {(group.records?.length || 0) > 2 && ` +${(group.records?.length || 0) - 2} more`}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="properties" className="space-y-4">
+            {duplicatesLoading ? (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <RefreshCw className="w-6 h-6 animate-spin mr-2" />
+                  Loading property duplicates...
+                </CardContent>
+              </Card>
+            ) : (duplicateGroups as any[])?.filter(g => g.type === 'property')?.length === 0 ? (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No Property Duplicates Found</h3>
+                  <p className="text-gray-600">No duplicate properties were found in your database.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Property Duplicates ({(duplicateGroups as any[])?.filter(g => g.type === 'property')?.length || 0})</span>
+                    <Badge variant="outline" className="text-sm">
+                      Click a row to review and merge
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {(duplicateGroups as any[])?.filter(g => g.type === 'property')?.map((group: any, index: number) => (
+                      <div
+                        key={group.id || index}
+                        onClick={() => handleSelectDuplicate(group)}
+                        className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-2">
+                              <Building className="w-5 h-5 text-green-600" />
+                              <Badge className={getConfidenceColor(group.confidence)}>
+                                {group.confidence}% {getConfidenceLevel(group.confidence)}
+                              </Badge>
+                              <span className="text-sm text-gray-500">
+                                Matching: {group.matchFields?.join(', ') || 'Name'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-3">
+                            <span className="text-sm text-gray-500">
+                              {group.records?.length || 0} records
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSelectDuplicate(group);
+                              }}
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              Review
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 text-sm text-gray-600">
+                          {group.records?.slice(0, 2).map((record: any, idx: number) => (
+                            <span key={idx} className="mr-3">
+                              {record.name || record.address}
+                              {idx < Math.min(1, (group.records?.length || 1) - 1) && ' → '}
+                            </span>
+                          ))}
+                          {(group.records?.length || 0) > 2 && ` +${(group.records?.length || 0) - 2} more`}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
+
+        {/* Duplicate History Section */}
+        <Card className="mt-8">
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Duplicate Groups ({(duplicateGroups as any[])?.length || 0})</span>
-              <Badge variant="outline" className="text-sm">
-                Click a row to review and merge
-              </Badge>
+            <CardTitle className="flex items-center space-x-2">
+              <History className="w-5 h-5" />
+              <span>Duplicate Action History</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {(duplicateGroups as any[])?.map((group: any, index: number) => (
-                <div
-                  key={group.id || index}
-                  onClick={() => handleSelectDuplicate(group)}
-                  className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center space-x-2">
-                        {group.type === 'contact' ? (
-                          <Users className="w-5 h-5 text-blue-600" />
-                        ) : (
-                          <Building className="w-5 h-5 text-green-600" />
-                        )}
+            {historyLoading ? (
+              <div className="text-center py-8">
+                <RefreshCw className="w-6 h-6 animate-spin mr-2" />
+                Loading history...
+              </div>
+            ) : !duplicateHistory || duplicateHistory.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <History className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <p>No duplicate actions recorded yet.</p>
+                <p className="text-sm mt-1">Merge or ignore actions will appear here.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {duplicateHistory.map((entry: any) => (
+                  <div key={entry.id} className="border rounded-lg p-4 bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <Badge variant={entry.action === 'merge' ? 'default' : 'secondary'}>
+                          {entry.action === 'merge' ? (
+                            <>
+                              <Merge className="w-3 h-3 mr-1" />
+                              Merged
+                            </>
+                          ) : (
+                            <>
+                              <X className="w-3 h-3 mr-1" />
+                              Ignored
+                            </>
+                          )}
+                        </Badge>
                         <span className="font-medium">
-                          {group.type === 'contact' ? 'Contact' : 'Property'} Duplicates
+                          {entry.recordType === 'contact' ? 'Contact' : 'Property'} Duplicates
+                        </span>
+                        <span className="text-sm text-gray-500">
+                          {entry.recordIds?.length || 0} records involved
                         </span>
                       </div>
-                      
-                      <Badge className={getConfidenceColor(group.confidence)}>
-                        {group.confidence}% {getConfidenceLevel(group.confidence)}
-                      </Badge>
-                      
-                      <Badge variant="outline">
-                        {group.totalRecords || group.records?.length || 0} records
-                      </Badge>
-                    </div>
-                    
-                    <div className="flex items-center space-x-4">
-                      <div className="text-sm text-gray-600">
-                        Matching: {formatMatchFields(group.matchFields || [])}
+                      <div className="text-sm text-gray-500">
+                        {new Date(entry.performedAt).toLocaleDateString()} by {entry.performedByName || 'Unknown'}
                       </div>
-                      <Button size="sm" variant="outline">
-                        <Eye className="w-4 h-4 mr-1" />
-                        Review
-                      </Button>
                     </div>
-                  </div>
-                  
-                  {/* Preview of duplicate records */}
-                  <div className="mt-3 flex items-center space-x-4 text-sm text-gray-600">
-                    {group.records?.slice(0, 2).map((record: any, recordIndex: number) => (
-                      <div key={recordIndex} className="flex items-center space-x-2">
-                        {group.type === 'contact' ? (
-                          <>
-                            <Avatar className="h-6 w-6">
-                              <AvatarFallback className="text-xs">
-                                {getInitials(record.first_name, record.last_name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span>{record.first_name} {record.last_name}</span>
-                            {record.email && <span className="text-gray-500">({record.email})</span>}
-                          </>
-                        ) : (
-                          <span>{record.name}</span>
-                        )}
-                        {recordIndex === 0 && <ArrowRight className="w-4 h-4 text-gray-400" />}
+                    {entry.details?.reason && (
+                      <div className="mt-2 text-sm text-gray-600">
+                        <strong>Reason:</strong> {entry.details.reason}
                       </div>
-                    ))}
-                    {group.records?.length > 2 && (
-                      <span className="text-gray-500">+{group.records.length - 2} more</span>
                     )}
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
-      )}
+      </div>
+
+
 
       {/* Merge Screen Dialog */}
       <Dialog open={mergeScreenOpen} onOpenChange={setMergeScreenOpen}>
