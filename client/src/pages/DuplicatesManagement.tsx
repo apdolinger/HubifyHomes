@@ -175,8 +175,10 @@ export default function DuplicatesManagement() {
   };
 
   // Handle ignoring a duplicate
-  const handleIgnoreDuplicate = async (groupId: number) => {
+  const handleIgnoreDuplicate = async () => {
     try {
+      if (!selectedDuplicateGroup) return;
+      
       const recordIds = selectedDuplicateGroup.records.map((record: any) => record.id);
       
       await apiRequest("/api/duplicates/ignore", "POST", {
@@ -192,8 +194,9 @@ export default function DuplicatesManagement() {
       
       setMergeScreenOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/duplicates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/duplicates/history"] });
     } catch (error) {
-      if (isUnauthorizedError(error)) {
+      if (isUnauthorizedError(error as Error)) {
         toast({
           title: "Unauthorized",
           description: "You are logged out. Logging in again...",
@@ -523,7 +526,7 @@ export default function DuplicatesManagement() {
                 <RefreshCw className="w-6 h-6 animate-spin mr-2" />
                 Loading history...
               </div>
-            ) : !duplicateHistory || duplicateHistory.length === 0 ? (
+            ) : !duplicateHistory || (duplicateHistory as any[]).length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <History className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                 <p>No duplicate actions recorded yet.</p>
@@ -531,7 +534,7 @@ export default function DuplicatesManagement() {
               </div>
             ) : (
               <div className="space-y-3">
-                {duplicateHistory.map((entry: any) => (
+                {(duplicateHistory as any[]).map((entry: any) => (
                   <div key={entry.id} className="border rounded-lg p-4 bg-gray-50">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
@@ -726,7 +729,7 @@ export default function DuplicatesManagement() {
             <div className="flex space-x-2">
               <Button
                 variant="outline"
-                onClick={() => handleIgnoreDuplicate(selectedDuplicateGroup?.id)}
+                onClick={handleIgnoreDuplicate}
               >
                 <X className="w-4 h-4 mr-1" />
                 Ignore Duplicate

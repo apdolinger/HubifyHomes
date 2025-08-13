@@ -420,9 +420,9 @@ export const duplicateHistory = pgTable("duplicate_history", {
   id: serial("id").primaryKey(),
   action: varchar("action", { length: 20 }).notNull(), // 'merge' or 'ignore'
   recordType: varchar("record_type", { length: 50 }).notNull(), // 'contact' or 'property'
-  recordIds: text("record_ids").array().notNull(), // Array of record IDs involved
-  primaryRecordId: varchar("primary_record_id", { length: 255 }), // The primary record kept (for merges)
+  recordIds: jsonb("record_ids").notNull(), // Array of record IDs involved
   performedBy: varchar("performed_by", { length: 255 }).notNull().references(() => users.id),
+  performedByName: varchar("performed_by_name", { length: 255 }), // Cache the user name
   performedAt: timestamp("performed_at").defaultNow(),
   details: jsonb("details"), // Additional details about the action
 });
