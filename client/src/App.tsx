@@ -20,6 +20,8 @@ import PersonProfile from "@/pages/PersonProfile";
 import DuplicatesManagement from "@/pages/DuplicatesManagement";
 import PropertyCenter from "@/pages/PropertyCenter";
 import PropertyPortalSettings from "@/pages/PropertyPortalSettings";
+import AdminClientPortal from "@/pages/AdminClientPortal";
+import AdminClientPortalProperty from "@/pages/AdminClientPortalProperty";
 import Admin from "@/pages/Admin";
 import Account from "@/pages/Account";
 import SuperAdmin from "@/pages/SuperAdmin";
@@ -106,8 +108,8 @@ function Router() {
           <Route path="/person-profile/:id" component={PersonProfile} />
           <Route path="/duplicates" component={DuplicatesManagement} />
           <Route path="/admin" component={Admin} />
-          <Route path="/admin/client-portal" component={PropertyCenter} />
-          <Route path="/admin/client-portal/:propertyId" component={PropertyPortalSettings} />
+          <Route path="/admin/client-portal" component={AdminClientPortal} />
+          <Route path="/admin/client-portal/:propertyId" component={AdminClientPortalProperty} />
           
           {/* Backward compatibility redirects */}
           <Route path="/property-center">
