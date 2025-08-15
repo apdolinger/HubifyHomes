@@ -1,0 +1,57 @@
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/db/client";
+import { propertyPortalSettings } from "@/db/schema";
+import { eq, and, desc } from "drizzle-orm";
+import { requireTenant } from "@/lib/tenant";
+import { getBrandingLevel, enforceBrandingPolicy } from "@/lib/features";
+
+export async function PUT(req: NextRequest, { params }: { params: { propertyId: string } }) {
+  // TODO: staff auth
+  const { orgId } = requireTenant(req.headers);
+  const incoming = await req.json();
+
+  const level = await getBrandingLevel(orgId);
+  const sanitized = enforceBrandingPolicy(level, incoming);
+
+  const drafts = await db.select().from(propertyPortalSettings).where(and(
+    eq(propertyPortalSettings.orgId, orgId),
+    eq(propertyPortalSettings.propertyId, params.propertyId),
+    eq(propertyPortalSettings.status, "draft")
+  )).orderBy(desc(propertyPortalSettings.version)).limit(1);
+
+  if (drafts[0]) {
+    await db.update(propertyPortalSettings)
+      .set({
+        branding: sanitized.branding,
+        theme: sanitized.theme,
+        layout: sanitized.layout,
+        modulesEnabled: sanitized.modulesEnabled,
+        copy: sanitized.copy,
+        legal: sanitized.legal,
+        i18n: sanitized.i18n,
+        featureFlags: sanitized.featureFlags,
+        authOptions: sanitized.authOptions,
+        updatedAt: new Date(),
+      })
+      .where(eq(propertyPortalSettings.id, drafts[0].id));
+    return NextResponse.json({ status: "ok", version: drafts[0].version, branding_level: level });
+  } else {
+    const inserted = await db.insert(propertyPortalSettings).values({
+      orgId,
+      propertyId: params.propertyId,
+      version: 1,
+      status: "draft",
+      branding: sanitized.branding,
+      theme: sanitized.theme,
+      layout: sanitized.layout,
+      modulesEnabled: sanitized.modulesEnabled ?? { task_requests: true, messages: true },
+      copy: sanitized.copy,
+      legal: sanitized.legal,
+      i18n: sanitized.i18n,
+      featureFlags: sanitized.featureFlags ?? [],
+      authOptions: sanitized.authOptions ?? { allowed_login: "both", mfa: "sms" },
+      updatedAt: new Date(),
+    }).returning({ version: propertyPortalSettings.version });
+    return NextResponse.json({ status: "ok", version: inserted[0].version, branding_level: level });
+  }
+}

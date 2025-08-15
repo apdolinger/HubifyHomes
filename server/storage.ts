@@ -25,6 +25,7 @@ import {
   forms,
   propertyForms,
   formSubmissions,
+  propertyPortalSettings,
   ignoredDuplicates,
   duplicateHistory,
   type User,
@@ -79,6 +80,8 @@ import {
   type InsertPropertyForm,
   type FormSubmission,
   type InsertFormSubmission,
+  type PropertyPortalSettings,
+  type InsertPropertyPortalSettings,
   type DuplicateHistory,
   type InsertDuplicateHistory,
 } from "@shared/schema";
@@ -245,6 +248,13 @@ export interface IStorage {
   createForm(form: InsertForm): Promise<Form>;
   deleteForm(formId: number, userId: string): Promise<void>;
   createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission>;
+  
+  // Property Portal Settings operations
+  getPropertyPortalSettings(orgId: string, propertyId: number): Promise<PropertyPortalSettings[]>;
+  getLatestPropertyPortalSettings(orgId: string, propertyId: number, status?: string): Promise<PropertyPortalSettings | undefined>;
+  createPropertyPortalSettings(settings: InsertPropertyPortalSettings): Promise<PropertyPortalSettings>;
+  updatePropertyPortalSettings(id: string, settings: Partial<InsertPropertyPortalSettings>): Promise<PropertyPortalSettings>;
+  publishPropertyPortalSettings(orgId: string, propertyId: number, version: number): Promise<PropertyPortalSettings>;
   
   // Duplicate detection operations
   scanForDuplicates(criteria: any): Promise<any[]>;
@@ -2076,6 +2086,68 @@ export class DatabaseStorage implements IStorage {
       performedByName: userName,
       details: details || null,
     });
+  }
+
+  // Property Portal Settings operations
+  async getPropertyPortalSettings(orgId: string, propertyId: number): Promise<PropertyPortalSettings[]> {
+    return await db
+      .select()
+      .from(propertyPortalSettings)
+      .where(and(eq(propertyPortalSettings.orgId, orgId), eq(propertyPortalSettings.propertyId, propertyId)))
+      .orderBy(desc(propertyPortalSettings.version));
+  }
+
+  async getLatestPropertyPortalSettings(orgId: string, propertyId: number, status: string = "draft"): Promise<PropertyPortalSettings | undefined> {
+    const [settings] = await db
+      .select()
+      .from(propertyPortalSettings)
+      .where(and(
+        eq(propertyPortalSettings.orgId, orgId),
+        eq(propertyPortalSettings.propertyId, propertyId),
+        eq(propertyPortalSettings.status, status)
+      ))
+      .orderBy(desc(propertyPortalSettings.version))
+      .limit(1);
+    return settings;
+  }
+
+  async createPropertyPortalSettings(settingsData: InsertPropertyPortalSettings): Promise<PropertyPortalSettings> {
+    const [settings] = await db.insert(propertyPortalSettings).values(settingsData).returning();
+    return settings;
+  }
+
+  async updatePropertyPortalSettings(id: string, settingsData: Partial<InsertPropertyPortalSettings>): Promise<PropertyPortalSettings> {
+    const [settings] = await db
+      .update(propertyPortalSettings)
+      .set({ ...settingsData, updatedAt: new Date() })
+      .where(eq(propertyPortalSettings.id, id))
+      .returning();
+    return settings;
+  }
+
+  async publishPropertyPortalSettings(orgId: string, propertyId: number, version: number): Promise<PropertyPortalSettings> {
+    // First, archive any existing published settings
+    await db
+      .update(propertyPortalSettings)
+      .set({ status: "archived", updatedAt: new Date() })
+      .where(and(
+        eq(propertyPortalSettings.orgId, orgId),
+        eq(propertyPortalSettings.propertyId, propertyId),
+        eq(propertyPortalSettings.status, "published")
+      ));
+
+    // Then publish the specified version
+    const [settings] = await db
+      .update(propertyPortalSettings)
+      .set({ status: "published", updatedAt: new Date() })
+      .where(and(
+        eq(propertyPortalSettings.orgId, orgId),
+        eq(propertyPortalSettings.propertyId, propertyId),
+        eq(propertyPortalSettings.version, version)
+      ))
+      .returning();
+
+    return settings;
   }
 }
 

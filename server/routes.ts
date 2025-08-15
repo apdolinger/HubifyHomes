@@ -27,6 +27,7 @@ import {
   insertTeamMessageSchema,
   insertFormSchema,
   insertFormSubmissionSchema,
+  insertPropertyPortalSettingsSchema,
   type Form
 } from "@shared/schema";
 import { z } from "zod";
@@ -2068,6 +2069,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching organization subscription:", error);
       res.status(500).json({ message: "Failed to fetch organization subscription" });
+    }
+  });
+
+  // Property Portal Settings routes
+  app.get("/api/orgs/:orgId/properties/:propertyId/portal-settings", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, propertyId } = req.params;
+      const { status } = req.query;
+      
+      if (status) {
+        // Get latest settings for specific status
+        const settings = await storage.getLatestPropertyPortalSettings(orgId, parseInt(propertyId), status as string);
+        return res.json(settings || null);
+      } else {
+        // Get all settings versions
+        const allSettings = await storage.getPropertyPortalSettings(orgId, parseInt(propertyId));
+        return res.json(allSettings);
+      }
+    } catch (error) {
+      console.error("Error fetching property portal settings:", error);
+      res.status(500).json({ message: "Failed to fetch property portal settings" });
+    }
+  });
+
+  app.post("/api/orgs/:orgId/properties/:propertyId/portal-settings", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, propertyId } = req.params;
+      
+      // Get current branding level to enforce policy
+      const brandingLevel = await getBrandingLevel(orgId);
+      
+      // Extract branding data and enforce policy
+      const brandingData = {
+        branding: req.body.branding || {},
+        theme: req.body.theme || {}
+      };
+      const allowedBranding = enforceBrandingPolicy(brandingLevel, brandingData);
+      
+      // Get the next version number
+      const existingSettings = await storage.getPropertyPortalSettings(orgId, parseInt(propertyId));
+      const nextVersion = existingSettings.length > 0 ? Math.max(...existingSettings.map(s => s.version)) + 1 : 1;
+      
+      const settingsData = {
+        orgId,
+        propertyId: parseInt(propertyId),
+        version: nextVersion,
+        status: req.body.status || "draft",
+        branding: allowedBranding.branding,
+        theme: allowedBranding.theme,
+        layout: req.body.layout || {},
+        modulesEnabled: req.body.modulesEnabled || { taskRequests: true, messages: true },
+        copy: req.body.copy || {},
+        legal: req.body.legal || {},
+        i18n: req.body.i18n || { defaultLocale: "en", supportedLocales: ["en"] },
+        featureFlags: req.body.featureFlags || [],
+        authOptions: req.body.authOptions || { allowedLogin: "both", mfa: "sms" }
+      };
+      
+      const parsedData = insertPropertyPortalSettingsSchema.parse(settingsData);
+      const settings = await storage.createPropertyPortalSettings(parsedData);
+      
+      res.status(201).json(settings);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error creating property portal settings:", error);
+      res.status(500).json({ message: "Failed to create property portal settings" });
+    }
+  });
+
+  app.patch("/api/orgs/:orgId/properties/:propertyId/portal-settings/:settingsId", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, settingsId } = req.params;
+      
+      // Get current branding level to enforce policy
+      const brandingLevel = await getBrandingLevel(orgId);
+      
+      // Extract branding data and enforce policy if provided
+      const updateData: any = { ...req.body };
+      if (req.body.branding || req.body.theme) {
+        const brandingData = {
+          branding: req.body.branding || {},
+          theme: req.body.theme || {}
+        };
+        const allowedBranding = enforceBrandingPolicy(brandingLevel, brandingData);
+        updateData.branding = allowedBranding.branding;
+        updateData.theme = allowedBranding.theme;
+      }
+      
+      const settings = await storage.updatePropertyPortalSettings(settingsId, updateData);
+      res.json(settings);
+    } catch (error) {
+      console.error("Error updating property portal settings:", error);
+      res.status(500).json({ message: "Failed to update property portal settings" });
+    }
+  });
+
+  app.post("/api/orgs/:orgId/properties/:propertyId/portal-settings/publish", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, propertyId } = req.params;
+      const { version } = req.body;
+      
+      if (!version) {
+        return res.status(400).json({ message: "Version is required" });
+      }
+      
+      const settings = await storage.publishPropertyPortalSettings(orgId, parseInt(propertyId), version);
+      res.json(settings);
+    } catch (error) {
+      console.error("Error publishing property portal settings:", error);
+      res.status(500).json({ message: "Failed to publish property portal settings" });
     }
   });
 

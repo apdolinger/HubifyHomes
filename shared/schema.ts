@@ -454,6 +454,62 @@ export const formSubmissions = pgTable("form_submissions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Property portal settings for tenant/client portals with branding and configuration
+export const propertyPortalSettings = pgTable("property_portal_settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  propertyId: integer("property_id").references(() => properties.id).notNull(),
+  version: integer("version").notNull().default(1),
+  status: varchar("status").notNull().default("draft"), // draft, published, archived
+  branding: jsonb("branding").$type<{
+    logo?: string;
+    primaryColor?: string;
+    secondaryColor?: string;
+    accentColor?: string;
+  }>().default({}),
+  theme: jsonb("theme").$type<{
+    tokens?: Record<string, string>;
+    customCss?: string;
+  }>().default({}),
+  layout: jsonb("layout").$type<{
+    headerType?: "minimal" | "standard" | "custom";
+    sidebarEnabled?: boolean;
+    footerText?: string;
+  }>().default({}),
+  modulesEnabled: jsonb("modules_enabled").$type<{
+    taskRequests?: boolean;
+    messages?: boolean;
+    documentLibrary?: boolean;
+    maintenanceRequests?: boolean;
+    announcements?: boolean;
+    billingPortal?: boolean;
+  }>().default({ taskRequests: true, messages: true }),
+  copy: jsonb("copy").$type<{
+    welcomeMessage?: string;
+    portalTitle?: string;
+    footerText?: string;
+  }>().default({}),
+  legal: jsonb("legal").$type<{
+    termsUrl?: string;
+    privacyUrl?: string;
+    disclaimerText?: string;
+  }>().default({}),
+  i18n: jsonb("i18n").$type<{
+    defaultLocale?: string;
+    supportedLocales?: string[];
+  }>().default({ defaultLocale: "en", supportedLocales: ["en"] }),
+  featureFlags: jsonb("feature_flags").$type<string[]>().default([]),
+  authOptions: jsonb("auth_options").$type<{
+    allowedLogin?: "email" | "phone" | "both";
+    mfa?: "none" | "sms" | "email" | "app";
+    sessionTimeout?: number;
+  }>().default({ allowedLogin: "both", mfa: "sms" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  uniqueOrgPropertyVersion: unique().on(table.orgId, table.propertyId, table.version),
+}));
+
 // Checklist Templates (Admin-managed)
 export const checklistTemplates = pgTable("checklist_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -515,6 +571,7 @@ export const orgsRelations = relations(orgs, ({ one, many }) => ({
   forms: many(forms),
   propertyForms: many(propertyForms),
   formSubmissions: many(formSubmissions),
+  propertyPortalSettings: many(propertyPortalSettings),
 }));
 
 export const orgSubscriptionsRelations = relations(orgSubscriptions, ({ one }) => ({
@@ -929,6 +986,12 @@ export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).om
   updatedAt: true,
 });
 
+export const insertPropertyPortalSettingsSchema = createInsertSchema(propertyPortalSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertVehicleSchema = createInsertSchema(vehicles).omit({
   id: true,
   createdAt: true,
@@ -1056,3 +1119,5 @@ export type IgnoredDuplicate = typeof ignoredDuplicates.$inferSelect;
 export type InsertIgnoredDuplicate = typeof ignoredDuplicates.$inferInsert;
 export type DuplicateHistory = typeof duplicateHistory.$inferSelect;
 export type InsertDuplicateHistory = typeof duplicateHistory.$inferInsert;
+export type InsertPropertyPortalSettings = z.infer<typeof insertPropertyPortalSettingsSchema>;
+export type PropertyPortalSettings = typeof propertyPortalSettings.$inferSelect;

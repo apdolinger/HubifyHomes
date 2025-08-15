@@ -19,6 +19,7 @@ import People from "@/pages/People";
 import PersonProfile from "@/pages/PersonProfile";
 import DuplicatesManagement from "@/pages/DuplicatesManagement";
 import PropertyCenter from "@/pages/PropertyCenter";
+import PropertyPortalSettings from "@/pages/PropertyPortalSettings";
 import Admin from "@/pages/Admin";
 import Account from "@/pages/Account";
 import SuperAdmin from "@/pages/SuperAdmin";
@@ -100,6 +101,7 @@ function Router() {
           <Route path="/task-profile/:id" component={TaskProfile} />
           <Route path="/properties" component={Properties} />
           <Route path="/property-profile/:id" component={PropertyProfile} />
+          <Route path="/properties/:propertyId/portal-settings" component={PropertyPortalSettings} />
           <Route path="/team" component={Team} />
           <Route path="/people" component={People} />
           <Route path="/person-profile/:id" component={PersonProfile} />
