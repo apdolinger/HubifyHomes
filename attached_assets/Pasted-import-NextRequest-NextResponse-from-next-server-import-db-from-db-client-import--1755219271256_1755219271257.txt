@@ -1,0 +1,44 @@
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/db/client";
+import { forms, formSubmissions, propertyForms } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
+import jwt from "jsonwebtoken";
+
+function requireClient(req: NextRequest) {
+  const auth = req.headers.get("authorization") || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  const payload = jwt.verify(token, process.env.JWT_SECRET!) as any;
+  if (!payload || payload.typ !== "client") throw new Error("Unauthorized");
+  return payload.sub as string;
+}
+
+export async function POST(req: NextRequest, { params }: { params: { formId: string }}) {
+  const clientId = requireClient(req);
+  const orgId = req.headers.get("x-tenant-org")!;
+  const { property_id, answers, files } = await req.json();
+
+  const [pf] = await db.select().from(propertyForms)
+    .where(and(eq(propertyForms.orgId, orgId), eq(propertyForms.propertyId, property_id), eq(propertyForms.formId, params.formId)))
+    .limit(1);
+  if (!pf) return NextResponse.json({ error: "Form not assigned to this property" }, { status: 404 });
+
+  const [formDef] = await db.select().from(forms).where(and(eq(forms.id, params.formId), eq(forms.orgId, orgId))).limit(1);
+  if (!formDef) return NextResponse.json({ error: "Form not found" }, { status: 404 });
+
+  const requiredIds = formDef.schema.fields.filter((f:any) => f.required).map((f:any) => f.id);
+  for (const fid of requiredIds) {
+    if (!(fid in answers) || answers[fid] === "" || answers[fid] == null) {
+      return NextResponse.json({ error: `Missing required field: ${fid}` }, { status: 400 });
+    }
+  }
+
+  const created = await db.insert(formSubmissions).values({
+    orgId, propertyId: property_id, formId: params.formId,
+    submittedByClientId: clientId,
+    answers, files: files ?? [],
+    status: "received",
+  }).returning({ id: formSubmissions.id });
+
+  // TODO: notify staff about new submission
+  return NextResponse.json({ ok: true, submission_id: created[0].id });
+}

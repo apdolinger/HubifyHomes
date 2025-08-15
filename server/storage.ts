@@ -2208,6 +2208,107 @@ export class DatabaseStorage implements IStorage {
     
     return assignment;
   }
+
+  // Form Submissions operations
+  async createFormSubmission(submissionData: {
+    orgId: string;
+    propertyId: string;
+    formId: string;
+    submittedByClientId: string;
+    answers: Record<string, any>;
+    files?: Array<{fieldId: string; name: string; url: string; size: number}>;
+    status?: string;
+  }): Promise<FormSubmission> {
+    const [submission] = await db
+      .insert(formSubmissions)
+      .values({
+        ...submissionData,
+        files: submissionData.files || [],
+        status: submissionData.status || "received",
+      })
+      .returning();
+    
+    return submission;
+  }
+
+  async getFormSubmissions(orgId: string, propertyId?: string, formId?: string): Promise<FormSubmission[]> {
+    let query = db.select().from(formSubmissions).where(eq(formSubmissions.orgId, orgId));
+    
+    if (propertyId) {
+      query = query.where(and(eq(formSubmissions.orgId, orgId), eq(formSubmissions.propertyId, propertyId)));
+    }
+    
+    if (formId) {
+      const conditions = [eq(formSubmissions.orgId, orgId)];
+      if (propertyId) conditions.push(eq(formSubmissions.propertyId, propertyId));
+      conditions.push(eq(formSubmissions.formId, formId));
+      query = query.where(and(...conditions));
+    }
+
+    return await query.orderBy(desc(formSubmissions.createdAt));
+  }
+
+  async getFormSubmission(orgId: string, submissionId: string): Promise<FormSubmission | undefined> {
+    const [submission] = await db
+      .select()
+      .from(formSubmissions)
+      .where(and(eq(formSubmissions.orgId, orgId), eq(formSubmissions.id, submissionId)))
+      .limit(1);
+    
+    return submission;
+  }
+
+  async updateFormSubmissionStatus(orgId: string, submissionId: string, status: string): Promise<FormSubmission> {
+    const [submission] = await db
+      .update(formSubmissions)
+      .set({ status, updatedAt: new Date() })
+      .where(and(eq(formSubmissions.orgId, orgId), eq(formSubmissions.id, submissionId)))
+      .returning();
+    
+    return submission;
+  }
+
+  // Form validation helper
+  async validateFormSubmission(orgId: string, propertyId: string, formId: string, answers: Record<string, any>): Promise<{isValid: boolean; errors: string[]}> {
+    // Check if form is assigned to property
+    const [propertyForm] = await db
+      .select()
+      .from(propertyForms)
+      .where(and(
+        eq(propertyForms.orgId, orgId),
+        eq(propertyForms.propertyId, propertyId),
+        eq(propertyForms.formId, formId)
+      ))
+      .limit(1);
+    
+    if (!propertyForm) {
+      return { isValid: false, errors: ["Form not assigned to this property"] };
+    }
+
+    // Get form definition
+    const [form] = await db
+      .select()
+      .from(forms)
+      .where(and(eq(forms.id, formId), eq(forms.orgId, orgId)))
+      .limit(1);
+    
+    if (!form) {
+      return { isValid: false, errors: ["Form not found"] };
+    }
+
+    // Validate required fields
+    const errors: string[] = [];
+    const requiredFields = form.schema.fields.filter((f: any) => f.required);
+    
+    for (const field of requiredFields) {
+      const value = answers[field.id];
+      if (value === undefined || value === null || value === "") {
+        errors.push(`Missing required field: ${field.label || field.id}`);
+      }
+    }
+
+    return { isValid: errors.length === 0, errors };
+  }
 }
 
 export const storage = new DatabaseStorage();

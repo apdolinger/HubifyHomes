@@ -2257,6 +2257,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Form Submissions routes (client-facing)
+  app.post("/api/orgs/:orgId/forms/:formId/submit", async (req, res) => {
+    try {
+      const { orgId, formId } = req.params;
+      const { property_id, answers, files, client_id } = req.body;
+
+      // In a real implementation, you would extract client_id from JWT token
+      // For now, we'll use the provided client_id for testing
+      if (!client_id) {
+        return res.status(401).json({ error: "Client authentication required" });
+      }
+
+      if (!property_id || !answers) {
+        return res.status(400).json({ error: "property_id and answers are required" });
+      }
+
+      // Validate form submission
+      const validation = await storage.validateFormSubmission(orgId, property_id, formId, answers);
+      if (!validation.isValid) {
+        return res.status(400).json({ error: validation.errors.join(", ") });
+      }
+
+      // Create submission
+      const submission = await storage.createFormSubmission({
+        orgId,
+        propertyId: property_id,
+        formId,
+        submittedByClientId: client_id,
+        answers,
+        files: files || [],
+        status: "received"
+      });
+
+      res.status(201).json({ ok: true, submission_id: submission.id });
+    } catch (error) {
+      console.error("Error creating form submission:", error);
+      res.status(500).json({ message: "Failed to create form submission" });
+    }
+  });
+
+  // Form Submissions management routes (staff-facing)
+  app.get("/api/orgs/:orgId/form-submissions", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const { property_id, form_id } = req.query;
+      
+      const submissions = await storage.getFormSubmissions(
+        orgId, 
+        property_id as string, 
+        form_id as string
+      );
+      res.json(submissions);
+    } catch (error) {
+      console.error("Error fetching form submissions:", error);
+      res.status(500).json({ message: "Failed to fetch form submissions" });
+    }
+  });
+
+  app.get("/api/orgs/:orgId/form-submissions/:submissionId", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, submissionId } = req.params;
+      const submission = await storage.getFormSubmission(orgId, submissionId);
+      
+      if (!submission) {
+        return res.status(404).json({ message: "Form submission not found" });
+      }
+      
+      res.json(submission);
+    } catch (error) {
+      console.error("Error fetching form submission:", error);
+      res.status(500).json({ message: "Failed to fetch form submission" });
+    }
+  });
+
+  app.patch("/api/orgs/:orgId/form-submissions/:submissionId/status", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, submissionId } = req.params;
+      const { status } = req.body;
+      
+      if (!["received", "in_review", "accepted", "rejected"].includes(status)) {
+        return res.status(400).json({ error: "Invalid status value" });
+      }
+
+      const submission = await storage.updateFormSubmissionStatus(orgId, submissionId, status);
+      res.json(submission);
+    } catch (error) {
+      console.error("Error updating form submission status:", error);
+      res.status(500).json({ message: "Failed to update form submission status" });
+    }
+  });
+
   // Client portal routes
   app.get("/api/orgs/:orgId/clients", isAuthenticated, async (req, res) => {
     try {

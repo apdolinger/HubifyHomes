@@ -43,6 +43,12 @@ Hubify is a professional property management platform for home watch and HOA com
   - Organization-scoped validation and form verification
   - API endpoints: /api/orgs/:orgId/properties/:propertyId/forms
   - Full compatibility with existing forms and propertyForms schema
+- **Form Submissions System (August 15, 2025)**: Complete client-facing form submission workflow with validation:
+  - Client form submission endpoint: POST /api/orgs/:orgId/forms/:formId/submit
+  - Server-side form validation with required field checking
+  - Staff management endpoints for submission review and status updates
+  - Status workflow: received → in_review → accepted/rejected
+  - Integration with existing forms and property assignment system
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
