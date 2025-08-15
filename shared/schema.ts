@@ -31,6 +31,16 @@ export const orgs = pgTable("orgs", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: varchar("name").notNull(),
   domain: varchar("domain"), // Custom domain for the org
+  branding: jsonb("branding").$type<{
+    logo?: string;
+    primaryColor?: string;
+    secondaryColor?: string;
+    accentColor?: string;
+  }>().default({}),
+  theme: jsonb("theme").$type<{
+    tokens?: Record<string, string>;
+    customCss?: string;
+  }>().default({}),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

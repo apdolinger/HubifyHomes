@@ -1,5 +1,8 @@
 import {
   users,
+  orgs,
+  orgSubscriptions,
+  clients,
   communities,
   properties,
   rooms,
@@ -20,11 +23,18 @@ import {
   messageReactions,
   activityLog,
   forms,
+  propertyForms,
   formSubmissions,
   ignoredDuplicates,
   duplicateHistory,
   type User,
   type UpsertUser,
+  type Org,
+  type InsertOrg,
+  type OrgSubscription,
+  type InsertOrgSubscription,
+  type Client,
+  type InsertClient,
   type Community,
   type InsertCommunity,
   type Property,
@@ -65,6 +75,8 @@ import {
   type InsertActivityLog,
   type Form,
   type InsertForm,
+  type PropertyForm,
+  type InsertPropertyForm,
   type FormSubmission,
   type InsertFormSubmission,
   type DuplicateHistory,
@@ -79,6 +91,20 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUsers(): Promise<User[]>;
   upsertUser(user: UpsertUser): Promise<User>;
+  
+  // Organization operations
+  getOrgs(): Promise<Org[]>;
+  getOrg(id: string): Promise<Org | undefined>;
+  createOrg(org: InsertOrg): Promise<Org>;
+  updateOrg(id: string, org: Partial<InsertOrg>): Promise<Org>;
+  getOrgSubscription(orgId: string): Promise<OrgSubscription | undefined>;
+  upsertOrgSubscription(subscription: InsertOrgSubscription): Promise<OrgSubscription>;
+  
+  // Client operations
+  getClients(orgId: string): Promise<Client[]>;
+  getClient(id: string): Promise<Client | undefined>;
+  createClient(client: InsertClient): Promise<Client>;
+  updateClient(id: string, client: Partial<InsertClient>): Promise<Client>;
   
   // Community operations
   getCommunities(): Promise<Community[]>;
@@ -258,6 +284,78 @@ export class DatabaseStorage implements IStorage {
       const [user] = await db.insert(users).values(userData).returning();
       return user;
     }
+  }
+
+  // Organization operations
+  async getOrgs(): Promise<Org[]> {
+    return await db.select().from(orgs).where(eq(orgs.isActive, true)).orderBy(orgs.name);
+  }
+
+  async getOrg(id: string): Promise<Org | undefined> {
+    const [org] = await db.select().from(orgs).where(eq(orgs.id, id));
+    return org;
+  }
+
+  async createOrg(orgData: InsertOrg): Promise<Org> {
+    const [org] = await db.insert(orgs).values(orgData).returning();
+    return org;
+  }
+
+  async updateOrg(id: string, orgData: Partial<InsertOrg>): Promise<Org> {
+    const [org] = await db
+      .update(orgs)
+      .set({ ...orgData, updatedAt: new Date() })
+      .where(eq(orgs.id, id))
+      .returning();
+    return org;
+  }
+
+  async getOrgSubscription(orgId: string): Promise<OrgSubscription | undefined> {
+    const [subscription] = await db
+      .select()
+      .from(orgSubscriptions)
+      .where(eq(orgSubscriptions.orgId, orgId));
+    return subscription;
+  }
+
+  async upsertOrgSubscription(subscriptionData: InsertOrgSubscription): Promise<OrgSubscription> {
+    const [subscription] = await db
+      .insert(orgSubscriptions)
+      .values(subscriptionData)
+      .onConflictDoUpdate({
+        target: orgSubscriptions.orgId,
+        set: subscriptionData,
+      })
+      .returning();
+    return subscription;
+  }
+
+  // Client operations
+  async getClients(orgId: string): Promise<Client[]> {
+    return await db
+      .select()
+      .from(clients)
+      .where(and(eq(clients.orgId, orgId), eq(clients.isActive, true)))
+      .orderBy(clients.firstName, clients.lastName);
+  }
+
+  async getClient(id: string): Promise<Client | undefined> {
+    const [client] = await db.select().from(clients).where(eq(clients.id, id));
+    return client;
+  }
+
+  async createClient(clientData: InsertClient): Promise<Client> {
+    const [client] = await db.insert(clients).values(clientData).returning();
+    return client;
+  }
+
+  async updateClient(id: string, clientData: Partial<InsertClient>): Promise<Client> {
+    const [client] = await db
+      .update(clients)
+      .set({ ...clientData, updatedAt: new Date() })
+      .where(eq(clients.id, id))
+      .returning();
+    return client;
   }
 
   // Community operations

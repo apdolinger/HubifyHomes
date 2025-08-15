@@ -7,6 +7,7 @@ import express from "express";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { importSampleData } from "./import-data";
+import { getBrandingLevel, enforceBrandingPolicy, getBrandingCapabilities } from "./branding";
 import { 
   insertCommunitySchema,
   insertPropertySchema,
@@ -1988,6 +1989,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: false, 
         message: `Failed to import data: ${error}` 
       });
+    }
+  });
+
+  // Organization and Branding routes
+  app.get("/api/orgs/:orgId/branding", isAuthenticated, async (req, res) => {
+    try {
+      const orgId = req.params.orgId;
+      const org = await storage.getOrg(orgId);
+      
+      if (!org) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+
+      const subscription = await storage.getOrgSubscription(orgId);
+      const tier = subscription?.tier || "starter";
+      const capabilities = getBrandingCapabilities(tier as any);
+
+      res.json({
+        branding: org.branding || {},
+        theme: org.theme || {},
+        capabilities,
+        tier
+      });
+    } catch (error) {
+      console.error("Error fetching organization branding:", error);
+      res.status(500).json({ message: "Failed to fetch organization branding" });
+    }
+  });
+
+  app.patch("/api/orgs/:orgId/branding", isAuthenticated, async (req, res) => {
+    try {
+      const orgId = req.params.orgId;
+      const org = await storage.getOrg(orgId);
+      
+      if (!org) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+
+      // Get current branding level based on subscription
+      const brandingLevel = await getBrandingLevel(orgId);
+      
+      // Enforce branding policy
+      const allowedData = enforceBrandingPolicy(brandingLevel, req.body);
+      
+      // Update organization with enforced branding
+      const updatedOrg = await storage.updateOrg(orgId, {
+        branding: allowedData.branding,
+        theme: allowedData.theme,
+      });
+
+      res.json({
+        branding: updatedOrg.branding,
+        theme: updatedOrg.theme,
+        level: brandingLevel
+      });
+    } catch (error) {
+      console.error("Error updating organization branding:", error);
+      res.status(500).json({ message: "Failed to update organization branding" });
+    }
+  });
+
+  app.get("/api/orgs/:orgId/subscription", isAuthenticated, async (req, res) => {
+    try {
+      const orgId = req.params.orgId;
+      const subscription = await storage.getOrgSubscription(orgId);
+      
+      if (!subscription) {
+        return res.status(404).json({ message: "Subscription not found" });
+      }
+
+      const capabilities = getBrandingCapabilities(subscription.tier as any);
+      
+      res.json({
+        ...subscription,
+        capabilities
+      });
+    } catch (error) {
+      console.error("Error fetching organization subscription:", error);
+      res.status(500).json({ message: "Failed to fetch organization subscription" });
+    }
+  });
+
+  // Client portal routes
+  app.get("/api/orgs/:orgId/clients", isAuthenticated, async (req, res) => {
+    try {
+      const orgId = req.params.orgId;
+      const clients = await storage.getClients(orgId);
+      res.json(clients);
+    } catch (error) {
+      console.error("Error fetching clients:", error);
+      res.status(500).json({ message: "Failed to fetch clients" });
+    }
+  });
+
+  app.post("/api/orgs/:orgId/clients", isAuthenticated, async (req, res) => {
+    try {
+      const orgId = req.params.orgId;
+      const clientData = { ...req.body, orgId };
+      
+      const client = await storage.createClient(clientData);
+      res.status(201).json(client);
+    } catch (error) {
+      console.error("Error creating client:", error);
+      res.status(500).json({ message: "Failed to create client" });
     }
   });
 

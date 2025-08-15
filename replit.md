@@ -25,6 +25,12 @@ Hubify is a professional property management platform for home watch and HOA com
 - **Smart Merge Logic**: Created intelligent merge system that preserves primary record data while filling missing fields from duplicates, with detailed merge preview
 - **Edit Contact Functionality**: Fixed edit buttons in PersonProfile page with complete modal form and validation
 - **Backend Duplicate Detection**: Added `/api/duplicates/scan` and `/api/duplicates` endpoints with advanced matching criteria for names, emails, phones, and addresses
+- **Tier-Based Branding System**: Implemented sophisticated branding policy enforcement with subscription-based feature restrictions:
+  - Starter tier: Logo upload only  
+  - Pro tier: Logo + primary color customization
+  - Grow/Enterprise tiers: Full theming capabilities including custom CSS and secondary colors
+- **Branding API Integration**: Added comprehensive branding management endpoints with policy enforcement and capabilities validation
+- **Organization Architecture**: Enhanced organizations table with branding and theme JSONB columns for flexible customization storage
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
