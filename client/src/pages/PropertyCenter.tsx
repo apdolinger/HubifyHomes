@@ -58,12 +58,12 @@ export default function PropertyCenter() {
   });
 
   const getTasksForProperty = (propertyId: number) => {
-    if (!tasks) return [];
+    if (!tasks || !Array.isArray(tasks)) return [];
     return tasks.filter((task: any) => task.propertyId === propertyId);
   };
 
   const getContactsForProperty = (propertyId: number) => {
-    if (!contacts) return [];
+    if (!contacts || !Array.isArray(contacts)) return [];
     return contacts.filter((contact: any) => contact.propertyId === propertyId);
   };
 
@@ -110,7 +110,7 @@ export default function PropertyCenter() {
         <div className="text-center">
           <h1 className="text-3xl font-bold text-slate-900">Client Portal</h1>
           <p className="mt-2 text-lg text-slate-600">
-            Manage property portal settings and client access
+            Manage client portal settings and property access
           </p>
         </div>
       </div>
@@ -124,7 +124,7 @@ export default function PropertyCenter() {
             </div>
             <h3 className="text-lg font-semibold text-slate-900">Properties</h3>
             <p className="text-3xl font-bold text-blue-600">
-              {propertiesLoading ? "..." : properties?.length || 0}
+              {propertiesLoading ? "..." : Array.isArray(properties) ? properties.length : 0}
             </p>
           </CardContent>
         </Card>
@@ -136,7 +136,7 @@ export default function PropertyCenter() {
             </div>
             <h3 className="text-lg font-semibold text-slate-900">Active Tasks</h3>
             <p className="text-3xl font-bold text-green-600">
-              {tasksLoading ? "..." : tasks?.filter((t: any) => t.status !== "completed").length || 0}
+              {tasksLoading ? "..." : Array.isArray(tasks) ? tasks.filter((t: any) => t.status !== "completed").length : 0}
             </p>
           </CardContent>
         </Card>
@@ -148,7 +148,7 @@ export default function PropertyCenter() {
             </div>
             <h3 className="text-lg font-semibold text-slate-900">Contacts</h3>
             <p className="text-3xl font-bold text-purple-600">
-              {contactsLoading ? "..." : contacts?.length || 0}
+              {contactsLoading ? "..." : Array.isArray(contacts) ? contacts.length : 0}
             </p>
           </CardContent>
         </Card>
@@ -160,7 +160,7 @@ export default function PropertyCenter() {
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
-        ) : properties?.length > 0 ? (
+        ) : Array.isArray(properties) && properties.length > 0 ? (
           properties.map((property: any) => {
             const propertyTasks = getTasksForProperty(property.id);
             const propertyContacts = getContactsForProperty(property.id);
@@ -326,7 +326,7 @@ export default function PropertyCenter() {
                         onClick={() => window.location.href = `/admin/client-portal/${property.id}`}
                       >
                         <Home className="w-4 h-4 mr-2" />
-                        Portal Settings
+                        Client Portal Settings
                       </Button>
                     </div>
                   </div>

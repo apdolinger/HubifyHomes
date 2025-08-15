@@ -62,6 +62,8 @@ Hubify is a professional property management platform for home watch and HOA com
   - Updated API endpoints: New /api/admin/client-portal/* endpoints with automatic redirects from old /api/property-centers/* paths
   - Enhanced PropertyCenter page: Renamed to "Client Portal" with updated description and Portal Settings buttons per property
   - Created admin component aliases: AdminClientPortal and AdminClientPortalProperty components that forward to existing PropertyCenter and PropertyPortalSettings
+  - Updated UI copy: Consistently renamed all "Property Center" references to "Client Portal" throughout the application
+  - Enhanced mobile navigation: Added dedicated Admin section with proper Client Portal access
   - Complete functionality preservation: All existing features work identically under new navigation structure with clean admin organization
 
 ## User Preferences

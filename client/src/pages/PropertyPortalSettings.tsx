@@ -122,7 +122,7 @@ export default function PropertyPortalSettings() {
     onSuccess: () => {
       toast({
         title: "Settings Saved",
-        description: "Portal settings have been saved as draft",
+        description: "Client portal settings have been saved as draft",
       });
       queryClient.invalidateQueries({
         queryKey: [`/api/admin/client-portal/${orgId}/${propertyId}/settings`]
@@ -145,7 +145,7 @@ export default function PropertyPortalSettings() {
     onSuccess: () => {
       toast({
         title: "Settings Published",
-        description: "Portal settings are now live",
+        description: "Client portal settings are now live",
       });
       queryClient.invalidateQueries({
         queryKey: [`/api/admin/client-portal/${orgId}/${propertyId}/settings`]
@@ -251,7 +251,7 @@ export default function PropertyPortalSettings() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading portal settings...</p>
+          <p className="mt-4 text-gray-600">Loading client portal settings...</p>
         </div>
       </div>
     );
@@ -263,8 +263,8 @@ export default function PropertyPortalSettings() {
     <div className="container mx-auto p-6 max-w-6xl">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold">Property Portal Settings</h1>
-          <p className="text-gray-600 mt-2">Configure your property's tenant portal</p>
+          <h1 className="text-3xl font-bold">Client Portal Settings</h1>
+          <p className="text-gray-600 mt-2">Configure branding, navigation, pages, and forms for the client-facing portal. Publish when ready.</p>
         </div>
         <div className="flex items-center gap-3">
           <Badge variant={publishedVersion ? "default" : "secondary"}>
@@ -323,7 +323,7 @@ export default function PropertyPortalSettings() {
             <CardHeader>
               <CardTitle>Branding Configuration</CardTitle>
               <CardDescription>
-                Customize your portal's appearance. {restrictions && (
+                Customize your client portal's appearance. {restrictions && (
                   <>Available features for {restrictions.tier.toUpperCase()} plan.</>
                 )}
               </CardDescription>
