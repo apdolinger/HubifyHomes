@@ -180,6 +180,43 @@ export default function Navigation() {
                       </Link>
                     );
                   })}
+                  
+                  {/* Admin Section for Mobile */}
+                  {((user as any)?.role === 'admin' || (user as any)?.role === 'manager') && (
+                    <>
+                      <div className="pt-4 mt-4 border-t border-slate-200">
+                        <p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                          Admin
+                        </p>
+                      </div>
+                      <Link href="/admin">
+                        <a
+                          className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
+                            location === "/admin"
+                              ? "bg-blue-50 text-blue-700"
+                              : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                          }`}
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          <Settings className="w-5 h-5 mr-3" />
+                          Admin Settings
+                        </a>
+                      </Link>
+                      <Link href="/admin/client-portal">
+                        <a
+                          className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
+                            location === "/admin/client-portal"
+                              ? "bg-blue-50 text-blue-700"
+                              : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                          }`}
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          <Home className="w-5 h-5 mr-3" />
+                          Client Portal
+                        </a>
+                      </Link>
+                    </>
+                  )}
                 </div>
               </SheetContent>
             </Sheet>
