@@ -12,6 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
+import { routes } from '@/lib/routes';
 import { Save, Eye, Upload, Palette, Settings, Shield, Globe } from 'lucide-react';
 import type { PropertyPortalSettings } from '@shared/schema';
 
@@ -92,32 +93,32 @@ export default function PropertyPortalSettings() {
 
   // Fetch organization branding capabilities
   const { data: orgBranding, isLoading: brandingLoading } = useQuery<OrgBranding>({
-    queryKey: [`/api/orgs/${orgId}/branding`],
+    queryKey: [routes.api.adminBranding(orgId)],
     enabled: !!orgId
   });
 
   // Fetch property portal settings (using new admin API)
   const { data: portalSettings, isLoading: settingsLoading } = useQuery<PropertyPortalSettings[]>({
-    queryKey: [`/api/admin/client-portal/${orgId}/${propertyId}/settings`],
+    queryKey: [routes.api.adminClientPortal(orgId, propertyId)],
     enabled: !!orgId && !!propertyId
   });
 
   // Fetch latest draft settings
   const { data: draftSettings } = useQuery<PropertyPortalSettings>({
-    queryKey: [`/api/admin/client-portal/${orgId}/${propertyId}/settings`, { status: 'draft' }],
+    queryKey: [routes.api.adminClientPortal(orgId, propertyId), { status: 'draft' }],
     enabled: !!orgId && !!propertyId
   });
 
   // Fetch published settings
   const { data: publishedSettings } = useQuery<PropertyPortalSettings>({
-    queryKey: [`/api/admin/client-portal/${orgId}/${propertyId}/settings`, { status: 'published' }],
+    queryKey: [routes.api.adminClientPortal(orgId, propertyId), { status: 'published' }],
     enabled: !!orgId && !!propertyId
   });
 
   // Create portal settings mutation
   const createSettingsMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest(`/api/admin/client-portal/${orgId}/${propertyId}/settings`, 'POST', data);
+      return apiRequest(routes.api.adminClientPortal(orgId, propertyId), 'POST', data);
     },
     onSuccess: () => {
       toast({
@@ -125,7 +126,7 @@ export default function PropertyPortalSettings() {
         description: "Client portal settings have been saved as draft",
       });
       queryClient.invalidateQueries({
-        queryKey: [`/api/admin/client-portal/${orgId}/${propertyId}/settings`]
+        queryKey: [routes.api.adminClientPortal(orgId, propertyId)]
       });
     },
     onError: (error: Error) => {
@@ -140,7 +141,7 @@ export default function PropertyPortalSettings() {
   // Publish settings mutation
   const publishMutation = useMutation({
     mutationFn: async (version: number) => {
-      return apiRequest(`/api/admin/client-portal/${orgId}/${propertyId}/settings/publish`, 'POST', { version });
+      return apiRequest(routes.api.adminClientPortalPublish(orgId, propertyId!), 'POST', { version });
     },
     onSuccess: () => {
       toast({
@@ -148,7 +149,7 @@ export default function PropertyPortalSettings() {
         description: "Client portal settings are now live",
       });
       queryClient.invalidateQueries({
-        queryKey: [`/api/admin/client-portal/${orgId}/${propertyId}/settings`]
+        queryKey: [routes.api.adminClientPortal(orgId, propertyId)]
       });
     },
     onError: (error: Error) => {

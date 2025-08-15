@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import { routes } from "@/lib/routes";
 import { useTaskModal } from "@/contexts/TaskModalContext";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -138,7 +139,7 @@ export default function Navigation() {
                       <Settings className="w-4 h-4 mr-2" />
                       Admin Settings
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => window.location.href = '/admin/client-portal'}>
+                    <DropdownMenuItem onClick={() => window.location.href = routes.adminClientPortal()}>
                       <Home className="w-4 h-4 mr-2" />
                       Client Portal
                     </DropdownMenuItem>
@@ -202,10 +203,10 @@ export default function Navigation() {
                           Admin Settings
                         </a>
                       </Link>
-                      <Link href="/admin/client-portal">
+                      <Link href={routes.adminClientPortal()}>
                         <a
                           className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
-                            location === "/admin/client-portal"
+                            location === routes.adminClientPortal()
                               ? "bg-blue-50 text-blue-700"
                               : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                           }`}

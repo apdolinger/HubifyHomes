@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { routes } from "@/lib/routes";
 import { useToast } from "@/hooks/use-toast";
 import { SupportModal } from "@/components/SupportModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -323,7 +324,7 @@ export default function PropertyCenter() {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => window.location.href = `/admin/client-portal/${property.id}`}
+                        onClick={() => window.location.href = routes.adminClientPortalSettings(property.id)}
                       >
                         <Home className="w-4 h-4 mr-2" />
                         Client Portal Settings

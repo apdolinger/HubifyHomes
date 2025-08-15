@@ -31,6 +31,7 @@ import QuickSearchModal from "@/components/QuickSearchModal";
 import QuickAddTaskModal from "@/components/QuickAddTaskModal";
 import KeyboardHelpModal from "@/components/KeyboardHelpModal";
 import { TaskModalProvider, useTaskModal } from "@/contexts/TaskModalContext";
+import { routes } from "@/lib/routes";
 import { useState } from "react";
 
 // Global Task Modal Component
@@ -114,13 +115,13 @@ function Router() {
           {/* Backward compatibility redirects */}
           <Route path="/property-center">
             {() => {
-              window.location.replace("/admin/client-portal");
+              window.location.replace(routes.adminClientPortal());
               return null;
             }}
           </Route>
           <Route path="/properties/:propertyId/portal-settings">
             {(params) => {
-              window.location.replace(`/admin/client-portal/${params.propertyId}`);
+              window.location.replace(routes.adminClientPortalSettings(params.propertyId));
               return null;
             }}
           </Route>
