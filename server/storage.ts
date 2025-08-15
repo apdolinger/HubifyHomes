@@ -2149,6 +2149,65 @@ export class DatabaseStorage implements IStorage {
 
     return settings;
   }
+
+  // Property Forms Assignment operations
+  async getPropertyForms(orgId: string, propertyId: string): Promise<PropertyForm[]> {
+    return await db
+      .select()
+      .from(propertyForms)
+      .where(and(eq(propertyForms.orgId, orgId), eq(propertyForms.propertyId, propertyId)))
+      .orderBy(propertyForms.sortOrder);
+  }
+
+  async assignFormToProperty(orgId: string, propertyId: string, formId: string, sortOrder: number = 0, isRequired: boolean = false): Promise<PropertyForm> {
+    // First verify the form exists and belongs to the organization
+    const [form] = await db
+      .select()
+      .from(forms)
+      .where(and(eq(forms.id, formId), eq(forms.orgId, orgId)))
+      .limit(1);
+    
+    if (!form) {
+      throw new Error("Form not found");
+    }
+
+    const [assignment] = await db
+      .insert(propertyForms)
+      .values({
+        orgId,
+        propertyId,
+        formId,
+        sortOrder,
+        isRequired,
+      })
+      .returning();
+    
+    return assignment;
+  }
+
+  async removeFormFromProperty(orgId: string, propertyId: string, formId: string): Promise<void> {
+    await db
+      .delete(propertyForms)
+      .where(and(
+        eq(propertyForms.orgId, orgId),
+        eq(propertyForms.propertyId, propertyId),
+        eq(propertyForms.formId, formId)
+      ));
+  }
+
+  async updatePropertyFormAssignment(orgId: string, propertyId: string, formId: string, updates: { sortOrder?: number, isRequired?: boolean }): Promise<PropertyForm> {
+    const [assignment] = await db
+      .update(propertyForms)
+      .set(updates)
+      .where(and(
+        eq(propertyForms.orgId, orgId),
+        eq(propertyForms.propertyId, propertyId),
+        eq(propertyForms.formId, formId)
+      ))
+      .returning();
+    
+    return assignment;
+  }
 }
 
 export const storage = new DatabaseStorage();

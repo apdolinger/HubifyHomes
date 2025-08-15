@@ -2184,6 +2184,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Property Forms Assignment routes
+  app.get("/api/orgs/:orgId/properties/:propertyId/forms", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, propertyId } = req.params;
+      const propertyForms = await storage.getPropertyForms(orgId, propertyId);
+      res.json(propertyForms);
+    } catch (error) {
+      console.error("Error fetching property forms:", error);
+      res.status(500).json({ message: "Failed to fetch property forms" });
+    }
+  });
+
+  app.post("/api/orgs/:orgId/properties/:propertyId/forms", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, propertyId } = req.params;
+      const { form_id, sort_order, is_required } = req.body;
+
+      if (!form_id) {
+        return res.status(400).json({ error: "form_id is required" });
+      }
+
+      const assignment = await storage.assignFormToProperty(
+        orgId, 
+        propertyId, 
+        form_id, 
+        sort_order ?? 0, 
+        !!is_required
+      );
+      res.status(201).json(assignment);
+    } catch (error) {
+      console.error("Error assigning form to property:", error);
+      if (error.message === "Form not found") {
+        res.status(404).json({ error: "Form not found" });
+      } else {
+        res.status(500).json({ message: "Failed to assign form to property" });
+      }
+    }
+  });
+
+  app.delete("/api/orgs/:orgId/properties/:propertyId/forms", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, propertyId } = req.params;
+      const { form_id } = req.query;
+
+      if (!form_id) {
+        return res.status(400).json({ error: "form_id required" });
+      }
+
+      await storage.removeFormFromProperty(orgId, propertyId, form_id as string);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error removing form from property:", error);
+      res.status(500).json({ message: "Failed to remove form from property" });
+    }
+  });
+
+  app.patch("/api/orgs/:orgId/properties/:propertyId/forms/:formId", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, propertyId, formId } = req.params;
+      const { sort_order, is_required } = req.body;
+
+      const updates: { sortOrder?: number, isRequired?: boolean } = {};
+      if (sort_order !== undefined) updates.sortOrder = sort_order;
+      if (is_required !== undefined) updates.isRequired = !!is_required;
+
+      const assignment = await storage.updatePropertyFormAssignment(orgId, propertyId, formId, updates);
+      res.json(assignment);
+    } catch (error) {
+      console.error("Error updating property form assignment:", error);
+      res.status(500).json({ message: "Failed to update form assignment" });
+    }
+  });
+
   // Client portal routes
   app.get("/api/orgs/:orgId/clients", isAuthenticated, async (req, res) => {
     try {

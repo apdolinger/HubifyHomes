@@ -37,6 +37,12 @@ Hubify is a professional property management platform for home watch and HOA com
   - Real-time tier-based branding policy enforcement
   - API endpoints for CRUD operations and publishing workflow
   - Route: /properties/:propertyId/portal-settings
+- **Property Forms Assignment API (August 15, 2025)**: Implemented Express.js property forms assignment system equivalent to Next.js patterns:
+  - Property-specific form assignments with sort order and required flags
+  - CRUD operations: GET, POST, DELETE, PATCH for form assignments
+  - Organization-scoped validation and form verification
+  - API endpoints: /api/orgs/:orgId/properties/:propertyId/forms
+  - Full compatibility with existing forms and propertyForms schema
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
