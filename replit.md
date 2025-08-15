@@ -6,10 +6,21 @@ Hubify is a professional property management platform for home watch and HOA com
 **Production Domain**: BASE_DOMAIN=hubifyhomes.app
 
 ## Recent Changes (August 2025)
+- **Complete Rebranding**: Successfully updated entire application from "Dwellerly" to "Hubify" across all files, components, domains (hubifyhomes.app), and test data
+- **Multi-Tenant Architecture**: Implemented comprehensive organization-based multi-tenancy with:
+  - Organizations table with subscription tiers (starter, pro, grow, enterprise)
+  - Clients table for property tenants/owners separate from staff users
+  - Organization-scoped properties, forms, and submissions
+  - Advanced forms library with property-specific assignments
+- **Enhanced Forms System**: Replaced basic forms with advanced multi-tenant forms supporting:
+  - Complex field types (text, textarea, number, select, checkbox, date, file)
+  - Property-specific form assignments with sort order and required flags
+  - Client submissions with status tracking (received, in_review, accepted, rejected)
+  - File upload support with field-level attachments
+- **Database Migration**: Successfully migrated to UUID-based properties and forms, added multi-tenant relationships, preserved existing data with default organization
 - **Photo Upload System**: Implemented complete file upload functionality using multer middleware, server-side storage, and proper file serving
 - **Property Interface Cleanup**: Removed property-level Supplies tab since supplies are managed per room (4 tabs: Tasks, Contacts, Rooms, Notes)
 - **7-Tab Room Management**: Full room management system with Supplies, Devices, Notes, Surfaces, Fixtures, Photos, and History tabs
-- **Database Schema**: Fixed missing room_devices table and updated photo schema to match file upload requirements
 - **Advanced Duplicate Detection System**: Implemented comprehensive backend duplicate detection with sophisticated matching algorithms using Levenshtein distance, configurable scan parameters, confidence levels (Very High 95%+, High 85%+, Medium 70%+), real-time scanning, and support for both contacts and properties
 - **Smart Merge Logic**: Created intelligent merge system that preserves primary record data while filling missing fields from duplicates, with detailed merge preview
 - **Edit Contact Functionality**: Fixed edit buttons in PersonProfile page with complete modal form and validation
@@ -41,6 +52,8 @@ Preferred communication style: Simple, everyday language.
 - **Local Development**: Better SQLite3
 - **Schema Management**: Drizzle Kit
 - **Connection**: Neon Database serverless
+- **Multi-Tenant Architecture**: Organization-scoped data with UUID-based primary keys
+- **Advanced Forms**: JSONB schema storage with flexible field definitions and property assignments
 
 ### Key Features
 - **Authentication System**: Replit Auth with OIDC, PostgreSQL-backed sessions, role-based access control (admin, supervisor, staff, client), route-level authentication guards.
@@ -48,7 +61,7 @@ Preferred communication style: Simple, everyday language.
 - **Task Management System**: Priority levels, status tracking, task assignment with audit trail, property association, and due date management.
 - **Team Collaboration**: Hierarchical user roles with permissions, built-in communication, comprehensive activity logging, and real-time dashboard updates.
 - **Contact Management**: Management of tenants, owners, vendors, emergency contacts, property association, and communication tracking.
-- **Forms Management System**: Comprehensive forms creation and management, including form configuration, templates, and submission handling with flexible JSONB storage.
+- **Advanced Forms Management System**: Multi-tenant forms library with organization-level creation, property-specific assignments, client submissions with status tracking, file uploads, and tier-based feature restrictions.
 - **Super Admin Internal Platform**: Internal control panel for platform-wide monitoring and management, including user management, mass email communication, system alerts, organization management, revenue dashboard, feature flags, system monitoring, and platform messaging.
 - **Account Settings (Business Owner Control Center)**: Management of account information, subscription & billing, custom fields configuration, email template editor, task template manager, report templates, notification settings, team roles & permissions, automation rules, and audit logs.
 - **Property Profile Page**: Comprehensive property details, owner/contact info, billing status, task history, and tabbed interface for tasks, supplies log, community info, and notes. Includes room-associated items tracking (lightbulbs, filters, paint, batteries) and categorized room notes.

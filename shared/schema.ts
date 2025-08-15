@@ -8,6 +8,8 @@ import {
   integer,
   boolean,
   serial,
+  uuid,
+  unique,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -24,14 +26,49 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// User storage table - required for Replit Auth
+// Organizations table for multi-tenancy
+export const orgs = pgTable("orgs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name").notNull(),
+  domain: varchar("domain"), // Custom domain for the org
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Organization subscriptions and tiers
+export const orgSubscriptions = pgTable("org_subscriptions", {
+  orgId: uuid("org_id").primaryKey().references(() => orgs.id),
+  tier: text("tier").$type<"starter"|"pro"|"grow"|"enterprise">().notNull().default("starter"),
+  features: jsonb("features").$type<Record<string, boolean>>().default({}),
+  renewedAt: timestamp("renewed_at"),
+  expiresAt: timestamp("expires_at"),
+});
+
+// Clients table for property tenants/owners
+export const clients = pgTable("clients", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  email: varchar("email").notNull(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  phone: varchar("phone"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  uniqueOrgEmail: unique().on(table.orgId, table.email),
+}));
+
+// User storage table - required for Replit Auth (staff/admin users)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().notNull(),
+  orgId: uuid("org_id").references(() => orgs.id), // Which org they belong to
   email: varchar("email").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
-  role: varchar("role").notNull().default("staff"), // admin, supervisor, staff, client
+  role: varchar("role").notNull().default("staff"), // admin, supervisor, staff
   tier: varchar("tier").notNull().default("basic"), // basic, standard, premium
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
@@ -58,7 +95,8 @@ export const communities = pgTable("communities", {
 
 // Properties table
 export const properties = pgTable("properties", {
-  id: serial("id").primaryKey(),
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
   name: varchar("name").notNull(),
   address1: varchar("address1").notNull(),
   address2: varchar("address2"),
@@ -354,25 +392,56 @@ export const activityLog = pgTable("activity_log", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Forms system tables
+// Advanced Forms Library (organization creates; client sees/uses)
 export const forms = pgTable("forms", {
-  id: serial("id").primaryKey(),
-  title: text("title").notNull(),
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  name: text("name").notNull(),
   description: text("description"),
-  fields: jsonb("fields").notNull(), // Form fields structure
-  embedEnabled: boolean("embed_enabled").notNull().default(false),
-  createdBy: varchar("created_by").references(() => users.id),
+  schema: jsonb("schema").$type<{
+    fields: Array<{
+      id: string;
+      label: string;
+      type: "text"|"textarea"|"number"|"select"|"checkbox"|"date"|"file";
+      required?: boolean;
+      options?: string[];
+      placeholder?: string;
+      help?: string;
+      maxSizeMB?: number;
+    }>;
+    submitLabel?: string;
+    successMessage?: string;
+  }>().notNull(),
+  isArchived: boolean("is_archived").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-  formKey: text("form_key").notNull().unique(), // used in public URL and embed
-  tierRequired: text("tier_required").notNull().default("standard"), // 'basic', 'standard', 'premium'
 });
 
+// Assign org forms to a property (controls client visibility)
+export const propertyForms = pgTable("property_forms", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  propertyId: uuid("property_id").references(() => properties.id).notNull(),
+  formId: uuid("form_id").references(() => forms.id).notNull(),
+  sortOrder: integer("sort_order").default(0),
+  isRequired: boolean("is_required").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  uniq: unique().on(t.orgId, t.propertyId, t.formId),
+}));
+
+// Client submissions with enhanced features
 export const formSubmissions = pgTable("form_submissions", {
-  id: serial("id").primaryKey(),
-  formId: integer("form_id").references(() => forms.id, { onDelete: 'cascade' }).notNull(),
-  data: jsonb("data").notNull(), // Form field values
-  submittedAt: timestamp("submitted_at").defaultNow(),
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  propertyId: uuid("property_id").references(() => properties.id).notNull(),
+  formId: uuid("form_id").references(() => forms.id).notNull(),
+  submittedByClientId: uuid("submitted_by_client_id").references(() => clients.id).notNull(),
+  answers: jsonb("answers").$type<Record<string, any>>().notNull(),
+  files: jsonb("files").$type<Array<{fieldId:string; name:string; url:string; size:number}>>().default([]),
+  status: text("status").$type<"received"|"in_review"|"accepted"|"rejected">().default("received"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Checklist Templates (Admin-managed)
@@ -428,7 +497,36 @@ export const duplicateHistory = pgTable("duplicate_history", {
 });
 
 // Relations
-export const usersRelations = relations(users, ({ many }) => ({
+export const orgsRelations = relations(orgs, ({ one, many }) => ({
+  subscription: one(orgSubscriptions),
+  users: many(users),
+  clients: many(clients),
+  properties: many(properties),
+  forms: many(forms),
+  propertyForms: many(propertyForms),
+  formSubmissions: many(formSubmissions),
+}));
+
+export const orgSubscriptionsRelations = relations(orgSubscriptions, ({ one }) => ({
+  org: one(orgs, {
+    fields: [orgSubscriptions.orgId],
+    references: [orgs.id],
+  }),
+}));
+
+export const clientsRelations = relations(clients, ({ one, many }) => ({
+  org: one(orgs, {
+    fields: [clients.orgId],
+    references: [orgs.id],
+  }),
+  formSubmissions: many(formSubmissions),
+}));
+
+export const usersRelations = relations(users, ({ one, many }) => ({
+  org: one(orgs, {
+    fields: [users.orgId],
+    references: [orgs.id],
+  }),
   managedProperties: many(properties),
   assignedTasks: many(tasks, { relationName: "assignedTo" }),
   createdTasks: many(tasks, { relationName: "assignedBy" }),
@@ -449,6 +547,10 @@ export const communitiesRelations = relations(communities, ({ one, many }) => ({
 }));
 
 export const propertiesRelations = relations(properties, ({ one, many }) => ({
+  org: one(orgs, {
+    fields: [properties.orgId],
+    references: [orgs.id],
+  }),
   manager: one(users, {
     fields: [properties.managerId],
     references: [users.id],
@@ -461,6 +563,8 @@ export const propertiesRelations = relations(properties, ({ one, many }) => ({
   contacts: many(contacts),
   rooms: many(rooms),
   vehicles: many(vehicles),
+  propertyForms: many(propertyForms),
+  formSubmissions: many(formSubmissions),
 }));
 
 export const tasksRelations = relations(tasks, ({ one, many }) => ({
@@ -673,18 +777,46 @@ export const vehicleNotesRelations = relations(vehicleNotes, ({ one }) => ({
   }),
 }));
 
-export const formsRelations = relations(forms, ({ many, one }) => ({
+export const formsRelations = relations(forms, ({ one, many }) => ({
+  org: one(orgs, {
+    fields: [forms.orgId],
+    references: [orgs.id],
+  }),
+  propertyForms: many(propertyForms),
   submissions: many(formSubmissions),
-  createdBy: one(users, {
-    fields: [forms.createdBy],
-    references: [users.id],
+}));
+
+export const propertyFormsRelations = relations(propertyForms, ({ one }) => ({
+  org: one(orgs, {
+    fields: [propertyForms.orgId],
+    references: [orgs.id],
+  }),
+  property: one(properties, {
+    fields: [propertyForms.propertyId],
+    references: [properties.id],
+  }),
+  form: one(forms, {
+    fields: [propertyForms.formId],
+    references: [forms.id],
   }),
 }));
 
 export const formSubmissionsRelations = relations(formSubmissions, ({ one }) => ({
+  org: one(orgs, {
+    fields: [formSubmissions.orgId],
+    references: [orgs.id],
+  }),
+  property: one(properties, {
+    fields: [formSubmissions.propertyId],
+    references: [properties.id],
+  }),
   form: one(forms, {
     fields: [formSubmissions.formId],
     references: [forms.id],
+  }),
+  submittedByClient: one(clients, {
+    fields: [formSubmissions.submittedByClientId],
+    references: [clients.id],
   }),
 }));
 
@@ -755,17 +887,36 @@ export const insertActivityLogSchema = createInsertSchema(activityLog).omit({
   createdAt: true,
 });
 
+// New schemas for the enhanced forms system
+export const insertOrgSchema = createInsertSchema(orgs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertOrgSubscriptionSchema = createInsertSchema(orgSubscriptions);
+
+export const insertClientSchema = createInsertSchema(clients).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertFormSchema = createInsertSchema(forms).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
 
-
+export const insertPropertyFormSchema = createInsertSchema(propertyForms).omit({
+  id: true,
+  createdAt: true,
+});
 
 export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).omit({
   id: true,
-  submittedAt: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export const insertVehicleSchema = createInsertSchema(vehicles).omit({
@@ -836,10 +987,18 @@ export const insertContactPropertySchema = createInsertSchema(contactProperties)
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+export type InsertOrg = z.infer<typeof insertOrgSchema>;
+export type Org = typeof orgs.$inferSelect;
+export type InsertOrgSubscription = z.infer<typeof insertOrgSubscriptionSchema>;
+export type OrgSubscription = typeof orgSubscriptions.$inferSelect;
+export type InsertClient = z.infer<typeof insertClientSchema>;
+export type Client = typeof clients.$inferSelect;
 export type InsertCommunity = z.infer<typeof insertCommunitySchema>;
 export type Community = typeof communities.$inferSelect;
 export type InsertProperty = z.infer<typeof insertPropertySchema>;
 export type Property = typeof properties.$inferSelect;
+export type InsertPropertyForm = z.infer<typeof insertPropertyFormSchema>;
+export type PropertyForm = typeof propertyForms.$inferSelect;
 export type InsertRoom = z.infer<typeof insertRoomSchema>;
 export type Room = typeof rooms.$inferSelect;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
