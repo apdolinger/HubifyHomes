@@ -49,7 +49,8 @@ import {
   Thermometer,
   Camera,
   Speaker,
-  Car
+  Car,
+  Settings
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -1350,6 +1351,14 @@ export default function PropertyProfile() {
                 </div>
                 
                 <div className="flex space-x-2 flex-shrink-0">
+                  <Button 
+                    variant="outline"
+                    onClick={() => setLocation(`/properties/${propertyId}/portal-settings`)}
+                    className="flex items-center"
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    Portal Settings
+                  </Button>
                   <Button 
                     variant="outline"
                     onClick={() => openTaskModal()}

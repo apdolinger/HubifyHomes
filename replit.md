@@ -31,6 +31,12 @@ Hubify is a professional property management platform for home watch and HOA com
   - Grow/Enterprise tiers: Full theming capabilities including custom CSS and secondary colors
 - **Branding API Integration**: Added comprehensive branding management endpoints with policy enforcement and capabilities validation
 - **Organization Architecture**: Enhanced organizations table with branding and theme JSONB columns for flexible customization storage
+- **Property Portal Settings System (August 15, 2025)**: Completed comprehensive property portal configuration system with:
+  - property_portal_settings table with versioning and draft/published workflow
+  - Six-tab interface: Branding, Layout, Modules, Content, Legal, Authentication
+  - Real-time tier-based branding policy enforcement
+  - API endpoints for CRUD operations and publishing workflow
+  - Route: /properties/:propertyId/portal-settings
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
