@@ -41,7 +41,7 @@ export default function PropertyPortalSettings() {
     retry: false,
   });
 
-  const orgId = user?.orgId || "default-org";
+  const orgId = (user as any)?.orgId || "default-org";
 
   // State for portal settings form
   const [formData, setFormData] = useState({
