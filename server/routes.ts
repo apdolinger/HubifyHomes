@@ -200,6 +200,25 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Legacy redirect middleware - must come before other routes
+  app.use((req, res, next) => {
+    const path = req.path;
+    
+    // UI page redirects
+    if (path.startsWith("/property-centers/")) {
+      const newPath = path.replace("/property-centers/", "/admin/client-portal/");
+      return res.redirect(308, newPath);
+    }
+    
+    // API endpoint redirects  
+    if (path.startsWith("/api/property-centers/")) {
+      const newPath = path.replace("/api/property-centers/", "/api/admin/client-portal/");
+      return res.redirect(308, newPath);
+    }
+    
+    next();
+  });
+
   // Auth middleware
   await setupAuth(app);
   

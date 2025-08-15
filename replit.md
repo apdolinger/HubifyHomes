@@ -58,8 +58,8 @@ Hubify is a professional property management platform for home watch and HOA com
 - **Property Centers Navigation Restructuring (August 15, 2025)**: Successfully moved Property Centers from main navigation to Admin → Client Portal:
   - Updated navigation structure: Property Centers now accessible under Admin → Client Portal dropdown
   - Changed URL structure: /property-center → /admin/client-portal and /properties/:id/portal-settings → /admin/client-portal/:id
-  - Added backward compatibility: 308 redirects for old URLs to new admin paths
-  - Updated API endpoints: New /api/admin/client-portal/* endpoints with backward compatibility redirects
+  - Added comprehensive redirect middleware: Express.js middleware handles all legacy path redirects with 308 status
+  - Updated API endpoints: New /api/admin/client-portal/* endpoints with automatic redirects from old /api/property-centers/* paths
   - Enhanced PropertyCenter page: Renamed to "Client Portal" with updated description and Portal Settings buttons per property
   - Complete functionality preservation: All existing features work identically under new navigation structure
 
