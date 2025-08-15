@@ -2285,6 +2285,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Property Centers Forms Assignment (matching your API pattern)
+  // New route under admin/client-portal
+  app.post("/api/admin/client-portal/:propertyId/forms", isAuthenticated, async (req, res) => {
+    try {
+      const orgId = req.headers["x-tenant-org"] as string;
+      const { propertyId } = req.params;
+      const { form_id, sort_order, is_required } = req.body;
+
+      if (!orgId) {
+        return res.status(400).json({ error: "x-tenant-org header required" });
+      }
+
+      if (!form_id) {
+        return res.status(400).json({ error: "form_id is required" });
+      }
+
+      const assignment = await storage.assignFormToProperty(
+        orgId, 
+        propertyId, 
+        form_id, 
+        sort_order ?? 0, 
+        !!is_required
+      );
+      res.status(201).json(assignment);
+    } catch (error) {
+      console.error("Error assigning form to property:", error);
+      if (error.message === "Form not found") {
+        res.status(404).json({ error: "Form not found" });
+      } else {
+        res.status(500).json({ message: "Failed to assign form to property" });
+      }
+    }
+  });
+
+  // Backward compatibility redirect for property-centers API
   app.post("/api/property-centers/:propertyId/forms", isAuthenticated, async (req, res) => {
     try {
       const orgId = req.headers["x-tenant-org"] as string;
@@ -2314,6 +2348,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         res.status(500).json({ message: "Failed to assign form to property" });
       }
+    }
+  });
+
+  // Backward compatibility redirects for property portal settings
+  app.get("/api/orgs/:orgId/properties/:propertyId/portal-settings", (req, res) => {
+    const { orgId, propertyId } = req.params;
+    const queryString = new URLSearchParams(req.query as Record<string, string>).toString();
+    const redirectUrl = `/api/admin/client-portal/${orgId}/${propertyId}/settings${queryString ? `?${queryString}` : ''}`;
+    res.redirect(308, redirectUrl);
+  });
+
+  app.post("/api/orgs/:orgId/properties/:propertyId/portal-settings", (req, res) => {
+    const { orgId, propertyId } = req.params;
+    const redirectUrl = `/api/admin/client-portal/${orgId}/${propertyId}/settings`;
+    res.redirect(308, redirectUrl);
+  });
+
+  // New admin client portal API routes
+  app.get("/api/admin/client-portal/:orgId/:propertyId/settings", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, propertyId } = req.params;
+      const { status } = req.query;
+      
+      if (status) {
+        const settings = await storage.getLatestPropertyPortalSettings(orgId, parseInt(propertyId), status as string);
+        return res.json(settings || null);
+      } else {
+        const allSettings = await storage.getPropertyPortalSettings(orgId, parseInt(propertyId));
+        return res.json(allSettings);
+      }
+    } catch (error) {
+      console.error("Error fetching property portal settings:", error);
+      res.status(500).json({ message: "Failed to fetch property portal settings" });
+    }
+  });
+
+  app.post("/api/admin/client-portal/:orgId/:propertyId/settings", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, propertyId } = req.params;
+      
+      const brandingLevel = await getBrandingLevel(orgId);
+      const brandingData = {
+        branding: req.body.branding || {},
+        theme: req.body.theme || {}
+      };
+      const allowedBranding = enforceBrandingPolicy(brandingLevel, brandingData);
+      
+      const existingSettings = await storage.getPropertyPortalSettings(orgId, parseInt(propertyId));
+      const nextVersion = existingSettings.length > 0 ? Math.max(...existingSettings.map(s => s.version)) + 1 : 1;
+      
+      const settingsData = {
+        orgId,
+        propertyId: parseInt(propertyId),
+        version: nextVersion,
+        status: req.body.status || "draft",
+        branding: allowedBranding.branding,
+        theme: allowedBranding.theme,
+        layout: req.body.layout || {},
+        modulesEnabled: req.body.modulesEnabled || { taskRequests: true, messages: true },
+        copy: req.body.copy || {},
+        legal: req.body.legal || {},
+        i18n: req.body.i18n || { defaultLocale: "en", supportedLocales: ["en"] },
+        featureFlags: req.body.featureFlags || [],
+        authOptions: req.body.authOptions || { allowedLogin: "both", mfa: "sms" }
+      };
+      
+      const parsedData = insertPropertyPortalSettingsSchema.parse(settingsData);
+      const settings = await storage.createPropertyPortalSettings(parsedData);
+      
+      res.status(201).json(settings);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error creating property portal settings:", error);
+      res.status(500).json({ message: "Failed to create property portal settings" });
+    }
+  });
+
+  app.post("/api/admin/client-portal/:orgId/:propertyId/settings/publish", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, propertyId } = req.params;
+      const { version } = req.body;
+      
+      const settings = await storage.publishPropertyPortalSettings(orgId, parseInt(propertyId), version);
+      res.json(settings);
+    } catch (error) {
+      console.error("Error publishing property portal settings:", error);
+      res.status(500).json({ message: "Failed to publish property portal settings" });
     }
   });
 

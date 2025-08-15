@@ -101,13 +101,27 @@ function Router() {
           <Route path="/task-profile/:id" component={TaskProfile} />
           <Route path="/properties" component={Properties} />
           <Route path="/property-profile/:id" component={PropertyProfile} />
-          <Route path="/properties/:propertyId/portal-settings" component={PropertyPortalSettings} />
           <Route path="/team" component={Team} />
           <Route path="/people" component={People} />
           <Route path="/person-profile/:id" component={PersonProfile} />
           <Route path="/duplicates" component={DuplicatesManagement} />
-          <Route path="/property-center" component={PropertyCenter} />
           <Route path="/admin" component={Admin} />
+          <Route path="/admin/client-portal" component={PropertyCenter} />
+          <Route path="/admin/client-portal/:propertyId" component={PropertyPortalSettings} />
+          
+          {/* Backward compatibility redirects */}
+          <Route path="/property-center">
+            {() => {
+              window.location.replace("/admin/client-portal");
+              return null;
+            }}
+          </Route>
+          <Route path="/properties/:propertyId/portal-settings">
+            {(params) => {
+              window.location.replace(`/admin/client-portal/${params.propertyId}`);
+              return null;
+            }}
+          </Route>
           <Route path="/super-admin" component={Account} />
           <Route path="/dwellerly-admin" component={SuperAdmin} />
           <Route path="/dwellerly-admin/organization/:id" component={OrganizationProfile} />

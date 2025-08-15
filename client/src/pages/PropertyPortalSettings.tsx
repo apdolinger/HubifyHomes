@@ -96,28 +96,28 @@ export default function PropertyPortalSettings() {
     enabled: !!orgId
   });
 
-  // Fetch property portal settings
+  // Fetch property portal settings (using new admin API)
   const { data: portalSettings, isLoading: settingsLoading } = useQuery<PropertyPortalSettings[]>({
-    queryKey: [`/api/orgs/${orgId}/properties/${propertyId}/portal-settings`],
+    queryKey: [`/api/admin/client-portal/${orgId}/${propertyId}/settings`],
     enabled: !!orgId && !!propertyId
   });
 
   // Fetch latest draft settings
   const { data: draftSettings } = useQuery<PropertyPortalSettings>({
-    queryKey: [`/api/orgs/${orgId}/properties/${propertyId}/portal-settings`, { status: 'draft' }],
+    queryKey: [`/api/admin/client-portal/${orgId}/${propertyId}/settings`, { status: 'draft' }],
     enabled: !!orgId && !!propertyId
   });
 
   // Fetch published settings
   const { data: publishedSettings } = useQuery<PropertyPortalSettings>({
-    queryKey: [`/api/orgs/${orgId}/properties/${propertyId}/portal-settings`, { status: 'published' }],
+    queryKey: [`/api/admin/client-portal/${orgId}/${propertyId}/settings`, { status: 'published' }],
     enabled: !!orgId && !!propertyId
   });
 
   // Create portal settings mutation
   const createSettingsMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest(`/api/orgs/${orgId}/properties/${propertyId}/portal-settings`, 'POST', data);
+      return apiRequest(`/api/admin/client-portal/${orgId}/${propertyId}/settings`, 'POST', data);
     },
     onSuccess: () => {
       toast({
@@ -125,7 +125,7 @@ export default function PropertyPortalSettings() {
         description: "Portal settings have been saved as draft",
       });
       queryClient.invalidateQueries({
-        queryKey: [`/api/orgs/${orgId}/properties/${propertyId}/portal-settings`]
+        queryKey: [`/api/admin/client-portal/${orgId}/${propertyId}/settings`]
       });
     },
     onError: (error: Error) => {
@@ -140,7 +140,7 @@ export default function PropertyPortalSettings() {
   // Publish settings mutation
   const publishMutation = useMutation({
     mutationFn: async (version: number) => {
-      return apiRequest(`/api/orgs/${orgId}/properties/${propertyId}/portal-settings/publish`, 'POST', { version });
+      return apiRequest(`/api/admin/client-portal/${orgId}/${propertyId}/settings/publish`, 'POST', { version });
     },
     onSuccess: () => {
       toast({
@@ -148,7 +148,7 @@ export default function PropertyPortalSettings() {
         description: "Portal settings are now live",
       });
       queryClient.invalidateQueries({
-        queryKey: [`/api/orgs/${orgId}/properties/${propertyId}/portal-settings`]
+        queryKey: [`/api/admin/client-portal/${orgId}/${propertyId}/settings`]
       });
     },
     onError: (error: Error) => {

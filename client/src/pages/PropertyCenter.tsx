@@ -108,9 +108,9 @@ export default function PropertyCenter() {
       {/* Header */}
       <div className="mb-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-slate-900">Property Center</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Client Portal</h1>
           <p className="mt-2 text-lg text-slate-600">
-            Your comprehensive property information hub
+            Manage property portal settings and client access
           </p>
         </div>
       </div>
@@ -315,9 +315,19 @@ export default function PropertyCenter() {
 
                   {/* Property Info Footer */}
                   <div className="mt-6 pt-4 border-t border-slate-200">
-                    <div className="flex items-center justify-between text-sm text-slate-500">
-                      <span>{property.units} {property.units === 1 ? 'unit' : 'units'}</span>
-                      <span>Added {new Date(property.createdAt).toLocaleDateString()}</span>
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-slate-500">
+                        <span>{property.units} {property.units === 1 ? 'unit' : 'units'}</span>
+                        <span className="ml-4">Added {new Date(property.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => window.location.href = `/admin/client-portal/${property.id}`}
+                      >
+                        <Home className="w-4 h-4 mr-2" />
+                        Portal Settings
+                      </Button>
                     </div>
                   </div>
                 </CardContent>

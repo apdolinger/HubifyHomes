@@ -27,7 +27,6 @@ const getNavigationItems = (user: any) => {
     { name: "Properties", href: "/properties", icon: Building },
     { name: "People", href: "/people", icon: UserCheck },
     { name: "Team", href: "/team", icon: Users },
-    { name: "Property Center", href: "/property-center", icon: Home },
   ];
 
   // Admin access is now only available through the dropdown menu
@@ -134,9 +133,16 @@ export default function Navigation() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {((user as any)?.role === 'admin' || (user as any)?.role === 'manager') && (
-                  <DropdownMenuItem onClick={() => window.location.href = '/admin'}>
-                    Admin Panel
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem onClick={() => window.location.href = '/admin'}>
+                      <Settings className="w-4 h-4 mr-2" />
+                      Admin Settings
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => window.location.href = '/admin/client-portal'}>
+                      <Home className="w-4 h-4 mr-2" />
+                      Client Portal
+                    </DropdownMenuItem>
+                  </>
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>
