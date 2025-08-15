@@ -30,7 +30,11 @@ const getNavigationItems = (user: any) => {
     { name: "Team", href: "/team", icon: Users },
   ];
 
-  // Admin access is now only available through the dropdown menu
+  // Add Admin tab for admin and manager users
+  if (user?.role === 'admin' || user?.role === 'manager') {
+    baseItems.push({ name: "Admin", href: "/admin", icon: Settings });
+  }
+
   return baseItems;
 };
 
@@ -135,10 +139,6 @@ export default function Navigation() {
               <DropdownMenuContent align="end">
                 {((user as any)?.role === 'admin' || (user as any)?.role === 'manager') && (
                   <>
-                    <DropdownMenuItem onClick={() => window.location.href = '/admin'}>
-                      <Settings className="w-4 h-4 mr-2" />
-                      Admin Settings
-                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => window.location.href = routes.adminClientPortal()}>
                       <Home className="w-4 h-4 mr-2" />
                       Client Portal
@@ -190,19 +190,7 @@ export default function Navigation() {
                           Admin
                         </p>
                       </div>
-                      <Link href="/admin">
-                        <a
-                          className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
-                            location === "/admin"
-                              ? "bg-blue-50 text-blue-700"
-                              : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                          }`}
-                          onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                          <Settings className="w-5 h-5 mr-3" />
-                          Admin Settings
-                        </a>
-                      </Link>
+
                       <Link href={routes.adminClientPortal()}>
                         <a
                           className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
