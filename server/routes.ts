@@ -208,6 +208,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.use('/uploads', express.static('uploads'));
 
+  // Development route to create a test user
+  app.post('/api/dev/login', async (req, res) => {
+    if (process.env.NODE_ENV !== 'development') {
+      return res.status(404).json({ message: "Not found" });
+    }
+    
+    try {
+      // Create or get test user
+      let user = await storage.getUserByEmail('test@dwellerly.com');
+      if (!user) {
+        user = await storage.upsertUser({
+          id: 'dev-user-123',
+          email: 'test@dwellerly.com',
+          firstName: 'Test',
+          lastName: 'User',
+          profileImageUrl: null,
+        });
+      }
+      
+      // Set session
+      (req as any).session.user = {
+        claims: { sub: user.id },
+        expires_at: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60) // 7 days
+      };
+      
+      res.json({ message: "Logged in as test user", user });
+    } catch (error) {
+      console.error("Error creating test user:", error);
+      res.status(500).json({ message: "Failed to create test user" });
+    }
+  });
+
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {

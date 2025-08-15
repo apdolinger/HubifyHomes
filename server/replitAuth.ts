@@ -24,21 +24,15 @@ const getOidcConfig = memoize(
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
-  const pgStore = connectPg(session);
-  const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
-    createTableIfMissing: false,
-    ttl: sessionTtl,
-    tableName: "sessions",
-  });
+  
+  // Use memory store for development to avoid PostgreSQL session issues
   return session({
     secret: process.env.SESSION_SECRET!,
-    store: sessionStore,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === 'production',
       maxAge: sessionTtl,
     },
   });
@@ -128,6 +122,17 @@ export async function setupAuth(app: Express) {
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
+  // For development, use session-based auth
+  if (process.env.NODE_ENV === 'development') {
+    const sessionUser = (req as any).session?.user;
+    if (sessionUser && sessionUser.expires_at && sessionUser.expires_at > Math.floor(Date.now() / 1000)) {
+      (req as any).user = sessionUser;
+      return next();
+    }
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  // Production Replit auth logic
   const user = req.user as any;
 
   if (!req.isAuthenticated() || !user.expires_at) {

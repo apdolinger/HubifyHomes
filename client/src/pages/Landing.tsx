@@ -3,8 +3,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Building, Users, CheckSquare, BarChart3 } from "lucide-react";
 
 export default function Landing() {
-  const handleLogin = () => {
-    window.location.href = "/api/login";
+  const handleLogin = async () => {
+    // For development, use the dev login endpoint
+    if (import.meta.env.DEV) {
+      try {
+        const response = await fetch('/api/dev/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (response.ok) {
+          window.location.reload();
+        }
+      } catch (error) {
+        console.error('Login failed:', error);
+      }
+    } else {
+      window.location.href = "/api/login";
+    }
   };
 
   const features = [

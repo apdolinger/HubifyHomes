@@ -3,6 +3,8 @@
 ## Overview
 Dwellerly is a professional property management platform for home watch and HOA companies. It offers a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface. The platform aims to streamline property operations, enhance team efficiency, and improve client communication.
 
+**Production Domain**: BASE_DOMAIN=hubifyhomes.app
+
 ## Recent Changes (August 2025)
 - **Photo Upload System**: Implemented complete file upload functionality using multer middleware, server-side storage, and proper file serving
 - **Property Interface Cleanup**: Removed property-level Supplies tab since supplies are managed per room (4 tabs: Tasks, Contacts, Rooms, Notes)
