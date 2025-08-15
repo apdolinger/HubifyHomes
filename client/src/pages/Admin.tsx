@@ -34,7 +34,9 @@ import {
   Trash2,
   Save,
   Copy,
-  CheckCircle
+  CheckCircle,
+  Home,
+  Database
 } from "lucide-react";
 
 export default function Admin() {
@@ -344,10 +346,14 @@ export default function Admin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="forms" className="flex items-center gap-2">
             <FileText className="w-4 h-4" />
             Forms
+          </TabsTrigger>
+          <TabsTrigger value="data" className="flex items-center gap-2">
+            <Database className="w-4 h-4" />
+            Data Management
           </TabsTrigger>
           <TabsTrigger value="templates" className="flex items-center gap-2">
             <Mail className="w-4 h-4" />
@@ -374,6 +380,166 @@ export default function Admin() {
         {/* Forms Tab */}
         <TabsContent value="forms" className="space-y-6">
           <AdminForms />
+        </TabsContent>
+
+        {/* Data Management Tab */}
+        <TabsContent value="data" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Properties Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Home className="w-5 h-5" />
+                  Properties
+                </CardTitle>
+                <CardDescription>
+                  Manage property records and settings
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Link href="/properties">
+                    <Button variant="outline" className="w-full justify-start">
+                      <Home className="w-4 h-4 mr-2" />
+                      View All Properties
+                    </Button>
+                  </Link>
+                  <Button variant="outline" className="w-full justify-start">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add New Property
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Bulk Import
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start">
+                    <Download className="w-4 h-4 mr-2" />
+                    Export Data
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* People Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  People
+                </CardTitle>
+                <CardDescription>
+                  Manage contacts and relationships
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Link href="/people">
+                    <Button variant="outline" className="w-full justify-start">
+                      <Users className="w-4 h-4 mr-2" />
+                      View All Contacts
+                    </Button>
+                  </Link>
+                  <Button variant="outline" className="w-full justify-start">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add New Contact
+                  </Button>
+                  <Link href="/duplicates">
+                    <Button variant="outline" className="w-full justify-start">
+                      <Copy className="w-4 h-4 mr-2" />
+                      Manage Duplicates
+                    </Button>
+                  </Link>
+                  <Button variant="outline" className="w-full justify-start">
+                    <Download className="w-4 h-4 mr-2" />
+                    Export Contacts
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Team Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="w-5 h-5" />
+                  Team
+                </CardTitle>
+                <CardDescription>
+                  Manage team members and access
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Link href="/team">
+                    <Button variant="outline" className="w-full justify-start">
+                      <Users className="w-4 h-4 mr-2" />
+                      View Team Members
+                    </Button>
+                  </Link>
+                  <Button variant="outline" className="w-full justify-start">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Invite Team Member
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start">
+                    <Settings className="w-4 h-4 mr-2" />
+                    Manage Permissions
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start">
+                    <Shield className="w-4 h-4 mr-2" />
+                    Role Settings
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <Home className="h-8 w-8 text-blue-600" />
+                  <div className="ml-4">
+                    <p className="text-2xl font-bold">16</p>
+                    <p className="text-gray-600">Total Properties</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <Users className="h-8 w-8 text-green-600" />
+                  <div className="ml-4">
+                    <p className="text-2xl font-bold">42</p>
+                    <p className="text-gray-600">Total Contacts</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <Shield className="h-8 w-8 text-purple-600" />
+                  <div className="ml-4">
+                    <p className="text-2xl font-bold">8</p>
+                    <p className="text-gray-600">Team Members</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <Copy className="h-8 w-8 text-orange-600" />
+                  <div className="ml-4">
+                    <p className="text-2xl font-bold">3</p>
+                    <p className="text-gray-600">Potential Duplicates</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* Email & Message Templates Tab */}
