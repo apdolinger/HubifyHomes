@@ -236,18 +236,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     try {
-      // Create or get test user
+      // Create or get test user, always update to ensure admin role
       let user = await storage.getUserByEmail('test@hubify.com');
-      if (!user) {
-        user = await storage.upsertUser({
-          id: 'dev-user-123',
-          email: 'test@hubify.com',
-          firstName: 'Test',
-          lastName: 'User',
-          profileImageUrl: null,
-          role: 'admin', // Set admin role for development user
-        });
-      }
+      user = await storage.upsertUser({
+        id: 'dev-user-123',
+        email: 'test@hubify.com',
+        firstName: 'Test',
+        lastName: 'User',
+        profileImageUrl: null,
+        role: 'admin', // Set admin role for development user
+      });
       
       // Set session
       (req as any).session.user = {
@@ -267,6 +265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
+      console.log('Auth user data:', user); // Debug log
       res.json(user);
     } catch (error) {
       console.error("Error fetching user:", error);
