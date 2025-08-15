@@ -1,0 +1,60 @@
+// --- SUBSCRIPTIONS / TIERS ---
+export const orgSubscriptions = pgTable("org_subscriptions", {
+  orgId: uuid("org_id").primaryKey().references(() => orgs.id),
+  tier: text("tier").$type<"starter"|"pro"|"grow"|"enterprise">().notNull().default("starter"),
+  features: jsonb("features").$type<Record<string, boolean>>().default({}),
+  renewedAt: timestamp("renewed_at"),
+  expiresAt: timestamp("expires_at"),
+});
+
+// --- FORMS LIBRARY (org creates; client sees/uses) ---
+export const forms = pgTable("forms", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  schema: jsonb("schema").$type<{
+    fields: Array<{
+      id: string;
+      label: string;
+      type: "text"|"textarea"|"number"|"select"|"checkbox"|"date"|"file";
+      required?: boolean;
+      options?: string[];
+      placeholder?: string;
+      help?: string;
+      maxSizeMB?: number;
+    }>;
+    submitLabel?: string;
+    successMessage?: string;
+  }>().notNull(),
+  isArchived: boolean("is_archived").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Assign org forms to a property (controls client visibility)
+export const propertyForms = pgTable("property_forms", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  propertyId: uuid("property_id").references(() => properties.id).notNull(),
+  formId: uuid("form_id").references(() => forms.id).notNull(),
+  sortOrder: integer("sort_order").default(0),
+  isRequired: boolean("is_required").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  uniq: unique().on(t.orgId, t.propertyId, t.formId),
+}));
+
+// Client submissions
+export const formSubmissions = pgTable("form_submissions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  propertyId: uuid("property_id").references(() => properties.id).notNull(),
+  formId: uuid("form_id").references(() => forms.id).notNull(),
+  submittedByClientId: uuid("submitted_by_client_id").references(() => clients.id).notNull(),
+  answers: jsonb("answers").$type<Record<string, any>>().notNull(),
+  files: jsonb("files").$type<Array<{fieldId:string; name:string; url:string; size:number}>>().default([]),
+  status: text("status").$type<"received"|"in_review"|"accepted"|"rejected">().default("received"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});

@@ -146,7 +146,7 @@ export default function SuperAdmin() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Super Admin Control Panel</h1>
-            <p className="text-lg text-slate-600">Platform-wide monitoring and management for Dwellerly team</p>
+            <p className="text-lg text-slate-600">Platform-wide monitoring and management for Hubify team</p>
           </div>
         </div>
         <div className="flex items-center space-x-2">

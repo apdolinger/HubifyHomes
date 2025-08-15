@@ -1,7 +1,7 @@
-# Dwellerly - Property Management Platform
+# Hubify - Property Management Platform
 
 ## Overview
-Dwellerly is a professional property management platform for home watch and HOA companies. It offers a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface. The platform aims to streamline property operations, enhance team efficiency, and improve client communication.
+Hubify is a professional property management platform for home watch and HOA companies. It offers a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface. The platform aims to streamline property operations, enhance team efficiency, and improve client communication.
 
 **Production Domain**: BASE_DOMAIN=hubifyhomes.app
 

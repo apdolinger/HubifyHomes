@@ -53,7 +53,7 @@ export default function Landing() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <h1 className="text-xl font-bold text-white">
-                Dwellerly
+                Hubify
               </h1>
             </div>
             <div>
@@ -74,7 +74,7 @@ export default function Landing() {
         <div className="pt-16 pb-8">
           <div className="text-center">
             <h1 className="text-4xl font-bold text-slate-900 sm:text-5xl md:text-6xl">
-              Dwellerly
+              Hubify
             </h1>
             <p className="mt-3 max-w-md mx-auto text-base text-slate-600 sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
               Professional property management platform for home watch and HOA companies
@@ -129,7 +129,7 @@ export default function Landing() {
             Ready to transform your property management?
           </h3>
           <p className="mt-4 text-lg text-slate-600">
-            Join professional property managers who trust Dwellerly
+            Join professional property managers who trust Hubify
           </p>
           <div className="mt-8">
             <Button 

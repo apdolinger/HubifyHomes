@@ -84,7 +84,7 @@ function generateFormHTML(form: Form, isEmbed: boolean): string {
   const headerHTML = isEmbed ? '' : `
     <div class="bg-blue-600 text-white p-4 mb-6">
       <div class="container mx-auto">
-        <h1 class="text-2xl font-bold">Dwellerly</h1>
+        <h1 class="text-2xl font-bold">Hubify</h1>
       </div>
     </div>
   `;
@@ -105,7 +105,7 @@ function generateFormHTML(form: Form, isEmbed: boolean): string {
           <h2 class="text-2xl font-bold text-gray-900 mb-2">${form.title}</h2>
           ${form.description ? `<p class="text-gray-600 mb-6">${form.description}</p>` : ''}
           
-          <form id="dwellerly-form" onsubmit="submitForm(event)">
+          <form id="hubify-form" onsubmit="submitForm(event)">
             ${fieldHTML}
             
             <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50">
@@ -216,11 +216,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     try {
       // Create or get test user
-      let user = await storage.getUserByEmail('test@dwellerly.com');
+      let user = await storage.getUserByEmail('test@hubify.com');
       if (!user) {
         user = await storage.upsertUser({
           id: 'dev-user-123',
-          email: 'test@dwellerly.com',
+          email: 'test@hubify.com',
           firstName: 'Test',
           lastName: 'User',
           profileImageUrl: null,

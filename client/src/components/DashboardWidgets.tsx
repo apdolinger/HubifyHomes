@@ -97,7 +97,7 @@ export function SupportWidget({ className }: SupportWidgetProps) {
               <Button 
                 variant="outline" 
                 className="justify-start"
-                onClick={() => window.open('https://help.dwellerlyonline.com', '_blank')}
+                onClick={() => window.open('https://help.hubifyhomes.app', '_blank')}
               >
                 <BookOpen className="w-4 h-4 mr-2" />
                 Help Documentation
@@ -107,7 +107,7 @@ export function SupportWidget({ className }: SupportWidgetProps) {
               <Button 
                 variant="outline" 
                 className="justify-start"
-                onClick={() => window.open('https://help.dwellerlyonline.com/videos', '_blank')}
+                onClick={() => window.open('https://help.hubifyhomes.app/videos', '_blank')}
               >
                 <Users className="w-4 h-4 mr-2" />
                 Training Videos
@@ -117,7 +117,7 @@ export function SupportWidget({ className }: SupportWidgetProps) {
               <Button 
                 variant="outline" 
                 className="justify-start"
-                onClick={() => window.open('https://help.dwellerlyonline.com/tips', '_blank')}
+                onClick={() => window.open('https://help.hubifyhomes.app/tips', '_blank')}
               >
                 <Lightbulb className="w-4 h-4 mr-2" />
                 Tips & Tricks

@@ -43,7 +43,7 @@ const supportArticles: SupportArticle[] = [
   {
     id: '1',
     title: 'Getting Started with Property Management',
-    description: 'Learn the basics of adding and managing properties in Dwellerly',
+    description: 'Learn the basics of adding and managing properties in Hubify',
     category: 'Getting Started',
     url: '/help/getting-started-properties',
     keywords: ['property', 'add', 'create', 'manage', 'basic', 'setup', 'new']
@@ -222,7 +222,7 @@ export function SupportModal({ isOpen, onClose }: SupportModalProps) {
 
   const handleOpenArticle = (url: string) => {
     // In a real app, this would navigate to the help article
-    window.open(`https://help.dwellerlyonline.com${url}`, '_blank');
+    window.open(`https://help.hubifyhomes.app${url}`, '_blank');
   };
 
   return (
