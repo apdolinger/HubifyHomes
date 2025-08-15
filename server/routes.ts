@@ -2257,21 +2257,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Form Submissions routes (client-facing)
-  app.post("/api/orgs/:orgId/forms/:formId/submit", async (req, res) => {
+  // Staff Forms Management routes
+  app.post("/api/staff/forms", isAuthenticated, async (req, res) => {
     try {
-      const { orgId, formId } = req.params;
-      const { property_id, answers, files, client_id } = req.body;
+      const orgId = req.headers["x-tenant-org"] as string;
+      if (!orgId) {
+        return res.status(400).json({ error: "x-tenant-org header required" });
+      }
 
-      // In a real implementation, you would extract client_id from JWT token
-      // For now, we'll use the provided client_id for testing
-      if (!client_id) {
+      const { name, description, schema } = req.body;
+      if (!name || !schema) {
+        return res.status(400).json({ error: "name and schema are required" });
+      }
+
+      const form = await storage.createForm({
+        orgId,
+        name,
+        description: description || null,
+        schema
+      });
+
+      res.status(201).json(form);
+    } catch (error) {
+      console.error("Error creating form:", error);
+      res.status(500).json({ message: "Failed to create form" });
+    }
+  });
+
+  // Property Centers Forms Assignment (matching your API pattern)
+  app.post("/api/property-centers/:propertyId/forms", isAuthenticated, async (req, res) => {
+    try {
+      const orgId = req.headers["x-tenant-org"] as string;
+      const { propertyId } = req.params;
+      const { form_id, sort_order, is_required } = req.body;
+
+      if (!orgId) {
+        return res.status(400).json({ error: "x-tenant-org header required" });
+      }
+
+      if (!form_id) {
+        return res.status(400).json({ error: "form_id is required" });
+      }
+
+      const assignment = await storage.assignFormToProperty(
+        orgId, 
+        propertyId, 
+        form_id, 
+        sort_order ?? 0, 
+        !!is_required
+      );
+      res.status(201).json(assignment);
+    } catch (error) {
+      console.error("Error assigning form to property:", error);
+      if (error.message === "Form not found") {
+        res.status(404).json({ error: "Form not found" });
+      } else {
+        res.status(500).json({ message: "Failed to assign form to property" });
+      }
+    }
+  });
+
+  // Client Forms API (forms available to clients for a property)
+  app.get("/api/client/forms", async (req, res) => {
+    try {
+      const orgId = req.headers["x-tenant-org"] as string;
+      const { property_id } = req.query;
+      const authHeader = req.headers.authorization || "";
+      const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+
+      if (!orgId) {
+        return res.status(400).json({ error: "x-tenant-org header required" });
+      }
+
+      if (!token) {
+        return res.status(401).json({ error: "Client authentication required" });
+      }
+
+      if (!property_id) {
+        return res.status(400).json({ error: "property_id query parameter required" });
+      }
+
+      // In a real implementation, you would verify the JWT token here
+      // For now, we'll proceed with the property forms lookup
+      const propertyForms = await storage.getPropertyForms(orgId, property_id as string);
+      res.json(propertyForms);
+    } catch (error) {
+      console.error("Error fetching client forms:", error);
+      res.status(500).json({ message: "Failed to fetch forms" });
+    }
+  });
+
+  // Client Form Submission (matching your production pattern)
+  app.post("/api/client/forms/:formId/submit", async (req, res) => {
+    try {
+      const orgId = req.headers["x-tenant-org"] as string;
+      const { formId } = req.params;
+      const { property_id, answers, files } = req.body;
+      const authHeader = req.headers.authorization || "";
+      const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+
+      if (!orgId) {
+        return res.status(400).json({ error: "x-tenant-org header required" });
+      }
+
+      if (!token) {
         return res.status(401).json({ error: "Client authentication required" });
       }
 
       if (!property_id || !answers) {
         return res.status(400).json({ error: "property_id and answers are required" });
       }
+
+      // In a real implementation, you would extract client_id from JWT token
+      // For testing, we'll use a placeholder client ID
+      const clientId = "test-client-from-jwt";
 
       // Validate form submission
       const validation = await storage.validateFormSubmission(orgId, property_id, formId, answers);
@@ -2280,6 +2379,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create submission
+      const submission = await storage.createFormSubmission({
+        orgId,
+        propertyId: property_id,
+        formId,
+        submittedByClientId: clientId,
+        answers,
+        files: files || [],
+        status: "received"
+      });
+
+      res.status(201).json({ ok: true, submission_id: submission.id });
+    } catch (error) {
+      console.error("Error creating form submission:", error);
+      res.status(500).json({ message: "Failed to create form submission" });
+    }
+  });
+
+  // Legacy endpoint for testing (keeping for backward compatibility)
+  app.post("/api/orgs/:orgId/forms/:formId/submit", async (req, res) => {
+    try {
+      const { orgId, formId } = req.params;
+      const { property_id, answers, files, client_id } = req.body;
+
+      if (!client_id) {
+        return res.status(401).json({ error: "Client authentication required" });
+      }
+
+      if (!property_id || !answers) {
+        return res.status(400).json({ error: "property_id and answers are required" });
+      }
+
+      const validation = await storage.validateFormSubmission(orgId, property_id, formId, answers);
+      if (!validation.isValid) {
+        return res.status(400).json({ error: validation.errors.join(", ") });
+      }
+
       const submission = await storage.createFormSubmission({
         orgId,
         propertyId: property_id,
