@@ -31,10 +31,6 @@ const getNavigationItems = (user: any) => {
   ];
 
   // Add Admin tab for admin and manager users
-  // Debug logging
-  console.log('Navigation user:', user);
-  console.log('User role:', user?.role);
-  
   if ((user as any)?.role === 'admin' || (user as any)?.role === 'manager') {
     baseItems.push({ name: "Admin", href: "/admin", icon: Settings });
   }

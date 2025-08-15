@@ -245,6 +245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           firstName: 'Test',
           lastName: 'User',
           profileImageUrl: null,
+          role: 'admin', // Set admin role for development user
         });
       }
       
