@@ -34,7 +34,7 @@ import { z } from "zod";
 
 // HTML template for forms
 function generateFormHTML(form: Form, isEmbed: boolean): string {
-  const fields = Array.isArray(form.fields) ? form.fields : [];
+  const fields = Array.isArray(form.schema?.fields) ? form.schema.fields : [];
   
   const fieldHTML = fields.map((field: any) => {
     const required = field.required ? 'required' : '';
@@ -97,14 +97,14 @@ function generateFormHTML(form: Form, isEmbed: boolean): string {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${form.title}</title>
+      <title>${form.name}</title>
       <script src="https://cdn.tailwindcss.com"></script>
     </head>
     <body class="bg-gray-50">
       ${headerHTML}
       <div class="container mx-auto px-4 py-8 max-w-2xl">
         <div class="bg-white rounded-lg shadow-md p-6">
-          <h2 class="text-2xl font-bold text-gray-900 mb-2">${form.title}</h2>
+          <h2 class="text-2xl font-bold text-gray-900 mb-2">${form.name}</h2>
           ${form.description ? `<p class="text-gray-600 mb-6">${form.description}</p>` : ''}
           
           <form id="hubify-form" onsubmit="submitForm(event)">
@@ -2457,6 +2457,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error publishing property portal settings:", error);
       res.status(500).json({ message: "Failed to publish property portal settings" });
     }
+  });
+
+  // ===== ADMIN API ALIASES =====
+  // These routes provide the new admin namespace while keeping existing logic
+  
+  // 2a) Preview, Publish, Draft Save aliases
+  app.get("/api/admin/client-portal/:propertyId/preview", (req, res, next) => {
+    // Alias to existing property-centers preview logic
+    req.url = req.url.replace("/api/admin/client-portal/", "/api/property-centers/");
+    next();
+  });
+
+  app.post("/api/admin/client-portal/:propertyId/publish", (req, res, next) => {
+    // Alias to existing property-centers publish logic
+    req.url = req.url.replace("/api/admin/client-portal/", "/api/property-centers/");
+    next();
+  });
+
+  app.put("/api/admin/client-portal/:propertyId/config", (req, res, next) => {
+    // Alias to existing property-centers config logic
+    req.url = req.url.replace("/api/admin/client-portal/", "/api/property-centers/");
+    next();
+  });
+
+  // 2b) Forms assignment aliases (per property)  
+  app.get("/api/admin/client-portal/:propertyId/forms", (req, res, next) => {
+    // Alias to existing property-centers forms logic
+    req.url = req.url.replace("/api/admin/client-portal/", "/api/property-centers/");
+    next();
+  });
+
+  app.post("/api/admin/client-portal/:propertyId/forms", (req, res, next) => {
+    // Alias to existing property-centers forms logic
+    req.url = req.url.replace("/api/admin/client-portal/", "/api/property-centers/");
+    next();
+  });
+
+  app.delete("/api/admin/client-portal/:propertyId/forms", (req, res, next) => {
+    // Alias to existing property-centers forms logic  
+    req.url = req.url.replace("/api/admin/client-portal/", "/api/property-centers/");
+    next();
+  });
+
+  // 2c) Forms library aliases (org level)
+  app.get("/api/admin/forms", (req, res, next) => {
+    // Alias to existing staff forms logic
+    req.url = req.url.replace("/api/admin/forms", "/api/staff/forms");
+    next();
+  });
+
+  app.post("/api/admin/forms", (req, res, next) => {
+    // Alias to existing staff forms logic
+    req.url = req.url.replace("/api/admin/forms", "/api/staff/forms");
+    next();
+  });
+
+  app.patch("/api/admin/forms", (req, res, next) => {
+    // Alias to existing staff forms logic
+    req.url = req.url.replace("/api/admin/forms", "/api/staff/forms");
+    next();
   });
 
   // Client Forms API (forms available to clients for a property)

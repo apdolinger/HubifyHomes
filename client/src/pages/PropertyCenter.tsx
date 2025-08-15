@@ -40,19 +40,19 @@ export default function PropertyCenter() {
   }, [isAuthenticated, isLoading, toast]);
 
   // Fetch properties for client view
-  const { data: properties, isLoading: propertiesLoading } = useQuery({
+  const { data: properties = [], isLoading: propertiesLoading } = useQuery({
     queryKey: ["/api/properties"],
     enabled: isAuthenticated,
   });
 
   // Fetch tasks related to properties
-  const { data: tasks, isLoading: tasksLoading } = useQuery({
+  const { data: tasks = [], isLoading: tasksLoading } = useQuery({
     queryKey: ["/api/tasks"],
     enabled: isAuthenticated,
   });
 
   // Fetch contacts
-  const { data: contacts, isLoading: contactsLoading } = useQuery({
+  const { data: contacts = [], isLoading: contactsLoading } = useQuery({
     queryKey: ["/api/contacts"],
     enabled: isAuthenticated,
   });
