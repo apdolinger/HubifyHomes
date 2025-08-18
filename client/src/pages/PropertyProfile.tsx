@@ -2704,14 +2704,27 @@ export default function PropertyProfile() {
                             <Building className="w-6 h-6 mr-3" />
                             {community.name}
                           </CardTitle>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => setIsEditModalOpen(true)}
-                          >
-                            <Settings className="w-4 h-4 mr-2" />
-                            Edit Assignment
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setIsEditModalOpen(true)}
+                            >
+                              <Edit className="w-4 h-4 mr-2" />
+                              Change Community
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                // Navigate to admin data management page with community focus
+                                window.location.href = `/admin/data-management?tab=communities&community=${community.id}`;
+                              }}
+                            >
+                              <Settings className="w-4 h-4 mr-2" />
+                              Manage Community
+                            </Button>
+                          </div>
                         </div>
                       </CardHeader>
                       <CardContent>
