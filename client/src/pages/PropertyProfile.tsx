@@ -1678,8 +1678,21 @@ export default function PropertyProfile() {
                         bedrooms: (property as any)?.bedrooms?.toString() || "",
                         bathrooms: (property as any)?.bathrooms?.toString() || "",
                         billingRate: (property as any)?.billingRate?.toString() || "",
-                        description: (property as any)?.description || ""
+                        description: (property as any)?.description || "",
+                        communityId: (property as any)?.communityId?.toString() || ""
                       });
+                      
+                      // Set the community search field and selected community
+                      const currentCommunity = communities.find((c: any) => 
+                        c.id.toString() === (property as any)?.communityId?.toString()
+                      );
+                      if (currentCommunity) {
+                        setCommunitySearch(currentCommunity.name);
+                        setSelectedCommunity(currentCommunity);
+                      } else {
+                        setCommunitySearch("");
+                        setSelectedCommunity(null);
+                      }
                       setIsEditModalOpen(true);
                     }}
                     className="flex items-center"
