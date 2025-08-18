@@ -336,6 +336,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Super Admin: Get all communities across all organizations  
+  app.get("/api/super-admin/communities-report", isAuthenticated, async (req, res) => {
+    try {
+      // In production, add proper super admin role validation here
+      const userId = (req.user as any)?.claims?.sub;
+      
+      const communitiesData = await storage.getAllCommunitiesForSuperAdmin();
+      res.json(communitiesData);
+    } catch (error) {
+      console.error("Error fetching super admin communities report:", error);
+      res.status(500).json({ message: "Failed to fetch communities report" });
+    }
+  });
+
   app.post("/api/communities", isAuthenticated, async (req, res) => {
     try {
       const userId = (req.user as any)?.claims?.sub;

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -69,6 +70,172 @@ import {
   Pause,
   Send
 } from "lucide-react";
+
+// Communities Report Component
+function CommunitiesReport() {
+  const { data: communitiesData, isLoading, error } = useQuery({
+    queryKey: ['/api/super-admin/communities-report'],
+    enabled: true,
+  });
+
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 bg-red-50 text-red-700 rounded-lg">
+        Error loading communities report: {error.message}
+      </div>
+    );
+  }
+
+  const filteredCommunities = communitiesData?.filter((community: any) =>
+    community.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    community.organizationNames?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    community.fullAddress?.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
+
+  const downloadCSV = () => {
+    if (!communitiesData || communitiesData.length === 0) return;
+
+    const headers = [
+      'Community Name',
+      'Address',
+      'City',
+      'State',
+      'ZIP',
+      'Manager',
+      'Manager Email',
+      'Property Count',
+      'Organizations',
+      'Status',
+      'Created Date'
+    ];
+
+    const csvData = [
+      headers,
+      ...communitiesData.map((community: any) => [
+        community.name || '',
+        community.address1 || '',
+        community.city || '',
+        community.state || '',
+        community.zip || '',
+        community.managerName || 'N/A',
+        community.managerEmail || 'N/A',
+        community.propertyCount || 0,
+        community.organizationNames || 'No Properties',
+        community.isActive ? 'Active' : 'Inactive',
+        community.createdAt ? new Date(community.createdAt).toLocaleDateString() : 'N/A'
+      ])
+    ];
+
+    const csvContent = csvData.map(row => row.map(field => `"${field}"`).join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `communities-report-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <Input
+            placeholder="Search communities..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-64"
+          />
+          <Badge variant="outline" className="px-3 py-1">
+            {filteredCommunities.length} communities
+          </Badge>
+        </div>
+        <Button onClick={downloadCSV} variant="outline" size="sm">
+          <Download className="w-4 h-4 mr-2" />
+          Export CSV
+        </Button>
+      </div>
+
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Community Name</TableHead>
+              <TableHead>Address</TableHead>
+              <TableHead>Manager</TableHead>
+              <TableHead>Properties</TableHead>
+              <TableHead>Organizations</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Created</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredCommunities.map((community: any) => (
+              <TableRow key={community.id}>
+                <TableCell className="font-medium">
+                  {community.name || 'Unnamed Community'}
+                </TableCell>
+                <TableCell>
+                  <div className="text-sm">
+                    {community.fullAddress || 'No Address'}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="text-sm">
+                    <div className="font-medium">{community.managerName}</div>
+                    {community.managerEmail && (
+                      <div className="text-gray-500">{community.managerEmail}</div>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Badge variant="outline">
+                    {community.propertyCount || 0} properties
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <div className="text-sm max-w-xs truncate" title={community.organizationNames}>
+                    {community.organizationNames}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Badge 
+                    variant={community.isActive ? "default" : "secondary"}
+                  >
+                    {community.isActive ? 'Active' : 'Inactive'}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-sm text-gray-500">
+                  {community.createdAt ? new Date(community.createdAt).toLocaleDateString() : 'N/A'}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      {filteredCommunities.length === 0 && communitiesData && communitiesData.length > 0 && (
+        <div className="text-center py-8 text-gray-500">
+          No communities match your search criteria.
+        </div>
+      )}
+
+      {(!communitiesData || communitiesData.length === 0) && !isLoading && (
+        <div className="text-center py-8 text-gray-500">
+          No communities found in the database.
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function SuperAdmin() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -211,9 +378,10 @@ export default function SuperAdmin() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-10">
+        <TabsList className="grid w-full grid-cols-11">
           <TabsTrigger value="organizations">Organizations</TabsTrigger>
           <TabsTrigger value="users">All Users</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="messaging">Mass Email</TabsTrigger>
           <TabsTrigger value="alerts">System Alerts</TabsTrigger>
           <TabsTrigger value="revenue">Revenue</TabsTrigger>
@@ -313,6 +481,26 @@ export default function SuperAdmin() {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Reports Tab */}
+        <TabsContent value="reports">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <BarChart3 className="w-5 h-5 mr-2" />
+                  Communities Report
+                </CardTitle>
+                <p className="text-sm text-gray-600">
+                  Comprehensive view of all communities across all organizations
+                </p>
+              </CardHeader>
+              <CardContent>
+                <CommunitiesReport />
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* All Users Tab */}

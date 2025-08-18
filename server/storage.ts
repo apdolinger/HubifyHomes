@@ -115,6 +115,7 @@ export interface IStorage {
   createCommunity(community: InsertCommunity, userId: string): Promise<Community>;
   updateCommunity(id: number, community: Partial<InsertCommunity>): Promise<Community>;
   deleteCommunity(id: number): Promise<void>;
+  getAllCommunitiesForSuperAdmin(): Promise<any[]>;
   
   // Property operations
   getProperties(includeInactive?: boolean): Promise<Property[]>;
@@ -371,6 +372,74 @@ export class DatabaseStorage implements IStorage {
   // Community operations
   async getCommunities(): Promise<Community[]> {
     return db.select().from(communities).orderBy(desc(communities.createdAt));
+  }
+
+  // Super Admin: Get all communities across all organizations with additional details
+  async getAllCommunitiesForSuperAdmin(): Promise<any[]> {
+    // Get all communities with manager details
+    const allCommunities = await db
+      .select({
+        id: communities.id,
+        name: communities.name,
+        address1: communities.address1,
+        address2: communities.address2,
+        city: communities.city,
+        state: communities.state,
+        zip: communities.zip,
+        notes: communities.notes,
+        managerId: communities.managerId,
+        hoaPresidentId: communities.hoaPresidentId,
+        imageUrl: communities.imageUrl,
+        isActive: communities.isActive,
+        createdAt: communities.createdAt,
+        updatedAt: communities.updatedAt,
+        managerFirstName: users.firstName,
+        managerLastName: users.lastName,
+        managerEmail: users.email,
+      })
+      .from(communities)
+      .leftJoin(users, eq(communities.managerId, users.id))
+      .orderBy(desc(communities.createdAt));
+
+    // For each community, get property count and organization details
+    const enhancedResults = await Promise.all(
+      allCommunities.map(async (community) => {
+        // Get property count for this community
+        const propertyCount = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(properties)
+          .where(eq(properties.communityId, community.id));
+
+        // Get organizations associated with this community via properties
+        const associatedOrgs = await db
+          .select({ 
+            orgId: properties.orgId,
+            orgName: orgs.name 
+          })
+          .from(properties)
+          .leftJoin(orgs, eq(properties.orgId, orgs.id))
+          .where(eq(properties.communityId, community.id))
+          .groupBy(properties.orgId, orgs.name);
+
+        const organizationNames = associatedOrgs.length > 0 
+          ? associatedOrgs.map(org => org.orgName || 'Unknown').join(', ')
+          : 'No Properties';
+
+        return {
+          ...community,
+          propertyCount: propertyCount[0]?.count || 0,
+          organizationNames,
+          managerName: community.managerFirstName && community.managerLastName 
+            ? `${community.managerFirstName} ${community.managerLastName}`
+            : 'N/A',
+          fullAddress: [community.address1, community.city, community.state, community.zip]
+            .filter(Boolean)
+            .join(', ') || 'No Address'
+        };
+      })
+    );
+    
+    return enhancedResults;
   }
 
   async getCommunity(id: number): Promise<Community | undefined> {
