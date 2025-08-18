@@ -1521,24 +1521,24 @@ export default function PropertyProfile() {
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0 mr-4">
+                  <h1 className="text-3xl font-bold text-slate-900 mb-2 break-words">
+                    {(property as any)?.name || formatFullAddress(property) || 'Property Details'}
+                  </h1>
                   {(property as any)?.name && (
-                    <h1 className="text-3xl font-bold text-slate-900 mb-2 break-words">
-                      {(property as any)?.name}
-                    </h1>
+                    <button 
+                      onClick={() => {
+                        const address = formatFullAddress(property);
+                        if (address) {
+                          const encodedAddress = encodeURIComponent(address);
+                          window.open(`https://maps.google.com/maps?q=${encodedAddress}`, '_blank');
+                        }
+                      }}
+                      className="text-slate-600 flex items-center mb-3 hover:text-blue-600 transition-colors cursor-pointer text-left underline-offset-4 hover:underline"
+                    >
+                      <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
+                      <span className="break-words">{formatFullAddress(property)}</span>
+                    </button>
                   )}
-                  <button 
-                    onClick={() => {
-                      const address = formatFullAddress(property);
-                      if (address) {
-                        const encodedAddress = encodeURIComponent(address);
-                        window.open(`https://maps.google.com/maps?q=${encodedAddress}`, '_blank');
-                      }
-                    }}
-                    className="text-slate-600 flex items-center mb-3 hover:text-blue-600 transition-colors cursor-pointer text-left underline-offset-4 hover:underline"
-                  >
-                    <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
-                    <span className="break-words">{formatFullAddress(property)}</span>
-                  </button>
                   <div className="flex items-center space-x-3">
                     <Badge variant="outline">{getTypeDisplay((property as any)?.type)}</Badge>
                     <Badge variant={getStatusColor((property as any)?.status)}>
