@@ -10,6 +10,7 @@ import {
   serial,
   uuid,
   unique,
+  date,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -190,17 +191,15 @@ export const roomSupplies = pgTable("room_supplies", {
   id: serial("id").primaryKey(),
   roomId: integer("room_id").references(() => rooms.id, { onDelete: "cascade" }).notNull(),
   name: varchar("name").notNull(),
-  category: varchar("category").notNull(), // 'lighting', 'hardware', 'paint', 'flooring', 'fixtures', 'appliances', 'other'
+  type: varchar("type").notNull(), // 'lightbulb', 'filter', 'paint', 'battery', 'cleaning', 'hardware', 'electrical', 'plumbing', 'hvac', 'other'
   brand: varchar("brand"),
   model: varchar("model"),
   quantity: integer("quantity").default(1),
-  unitCost: varchar("unit_cost"), // dollar amount as string
-  totalCost: varchar("total_cost"), // calculated field
-  purchaseDate: timestamp("purchase_date"),
-  warrantyExpires: timestamp("warranty_expires"),
-  vendor: varchar("vendor"),
+  unit: varchar("unit"), // 'piece', 'gallon', 'quart', 'liter', 'bottle', 'box', 'pack', 'roll', 'tube', 'bag'
+  location: varchar("location"),
+  lastChanged: date("last_changed"),
+  nextReplacement: date("next_replacement"),
   notes: text("notes"),
-  isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
