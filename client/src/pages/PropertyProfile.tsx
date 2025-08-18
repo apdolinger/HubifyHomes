@@ -1531,6 +1531,31 @@ export default function PropertyProfile() {
                 <div className="flex space-x-2 flex-shrink-0">
                   <Button 
                     variant="outline"
+                    onClick={() => {
+                      setEditForm({
+                        name: (property as any)?.name || "",
+                        address1: (property as any)?.address1 || "",
+                        address2: (property as any)?.address2 || "",
+                        city: (property as any)?.city || "",
+                        state: (property as any)?.state || "",
+                        zip: (property as any)?.zip || "",
+                        type: (property as any)?.type || "",
+                        status: (property as any)?.status || "",
+                        squareFootage: (property as any)?.squareFootage?.toString() || "",
+                        bedrooms: (property as any)?.bedrooms?.toString() || "",
+                        bathrooms: (property as any)?.bathrooms?.toString() || "",
+                        billingRate: (property as any)?.billingRate?.toString() || "",
+                        description: (property as any)?.description || ""
+                      });
+                      setIsEditModalOpen(true);
+                    }}
+                    className="flex items-center"
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edit Property
+                  </Button>
+                  <Button 
+                    variant="outline"
                     onClick={() => setLocation(`/properties/${propertyId}/portal-settings`)}
                     className="flex items-center"
                   >
@@ -1556,37 +1581,10 @@ export default function PropertyProfile() {
           {/* Property Info Card */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center">
-                  <Building className="w-5 h-5 mr-2" />
-                  Property Details
-                </CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setEditForm({
-                      name: (property as any)?.name || "",
-                      address1: (property as any)?.address1 || "",
-                      address2: (property as any)?.address2 || "",
-                      city: (property as any)?.city || "",
-                      state: (property as any)?.state || "",
-                      zip: (property as any)?.zip || "",
-                      type: (property as any)?.type || "",
-                      status: (property as any)?.status || "",
-                      squareFootage: (property as any)?.squareFootage?.toString() || "",
-                      bedrooms: (property as any)?.bedrooms?.toString() || "",
-                      bathrooms: (property as any)?.bathrooms?.toString() || "",
-                      billingRate: (property as any)?.billingRate?.toString() || "",
-                      description: (property as any)?.description || ""
-                    });
-                    setIsEditModalOpen(true);
-                  }}
-                >
-                  <Edit className="w-4 h-4 mr-1" />
-                  Edit
-                </Button>
-              </div>
+              <CardTitle className="flex items-center">
+                <Building className="w-5 h-5 mr-2" />
+                Property Details
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex justify-between">
