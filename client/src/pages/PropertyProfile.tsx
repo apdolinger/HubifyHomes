@@ -1461,7 +1461,7 @@ export default function PropertyProfile() {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-600">Contacts:</span>
-                <span className="font-medium">{propertyContacts.length}</span>
+                <span className="font-medium">{Array.isArray(propertyContacts) ? propertyContacts.length : 0}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-600">Rooms:</span>
@@ -1538,13 +1538,13 @@ export default function PropertyProfile() {
                         <RefreshCw className="w-6 h-6 mx-auto animate-spin text-slate-400 mb-2" />
                         <p className="text-slate-600">Loading contacts...</p>
                       </div>
-                    ) : propertyContacts && propertyContacts.length > 0 ? (
+                    ) : Array.isArray(propertyContacts) && propertyContacts.length > 0 ? (
                       <div className="space-y-2">
                         {/* Primary Contact */}
-                        {propertyContacts.find((contact: any) => contact.type === 'owner') && (
+                        {Array.isArray(propertyContacts) && propertyContacts.find((contact: any) => contact.type === 'owner') && (
                           <div className="mb-4">
                             <h4 className="text-sm font-medium text-slate-700 mb-2">Primary Contact</h4>
-                            {propertyContacts
+                            {(Array.isArray(propertyContacts) ? propertyContacts : [])
                               .filter((contact: any) => contact.type === 'owner')
                               .map((contact: any) => (
                               <div
@@ -1572,10 +1572,10 @@ export default function PropertyProfile() {
                         )}
 
                         {/* Household Members/Tenants */}
-                        {propertyContacts.filter((contact: any) => contact.type !== 'owner').length > 0 && (
+                        {Array.isArray(propertyContacts) && propertyContacts.filter((contact: any) => contact.type !== 'owner').length > 0 && (
                           <div>
                             <h4 className="text-sm font-medium text-slate-700 mb-2">Household Members & Tenants</h4>
-                            {propertyContacts
+                            {(Array.isArray(propertyContacts) ? propertyContacts : [])
                               .filter((contact: any) => contact.type !== 'owner')
                               .map((contact: any) => (
                               <div
@@ -2181,13 +2181,13 @@ export default function PropertyProfile() {
                         </Button>
                       </div>
 
-                      {photosLoading ? (
+                      {false ? (
                         <div className="flex items-center justify-center py-8">
                           <RefreshCw className="w-6 h-6 animate-spin text-slate-400" />
                         </div>
-                      ) : Array.isArray(photos) && photos.length > 0 ? (
+                      ) : false ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {photos.map((photo: any) => (
+                          {[].map((photo: any) => (
                             <Card key={photo.id} className="overflow-hidden">
                               <div className="aspect-video relative">
                                 <img 
@@ -2307,7 +2307,7 @@ export default function PropertyProfile() {
                         <RefreshCw className="w-6 h-6 mx-auto animate-spin text-slate-400 mb-2" />
                         <p className="text-slate-600">Loading vehicles...</p>
                       </div>
-                    ) : vehicles && vehicles.length > 0 ? (
+                    ) : Array.isArray(vehicles) && vehicles.length > 0 ? (
                       <div className="space-y-2">
                         {vehicles.map((vehicle: any) => (
                           <div
