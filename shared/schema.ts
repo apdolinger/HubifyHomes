@@ -197,6 +197,7 @@ export const roomSupplies = pgTable("room_supplies", {
   quantity: integer("quantity").default(1),
   unit: varchar("unit"), // 'piece', 'gallon', 'quart', 'liter', 'bottle', 'box', 'pack', 'roll', 'tube', 'bag'
   location: varchar("location"),
+  purchaseUrl: varchar("purchase_url"), // hyperlink for future purchases
   lastChanged: date("last_changed"),
   nextReplacement: date("next_replacement"),
   notes: text("notes"),

@@ -97,6 +97,7 @@ export default function PropertyProfile() {
     quantity: 1,
     unit: "piece",
     location: "",
+    purchaseUrl: "",
     lastChanged: "",
     nextReplacement: "",
     notes: ""
@@ -509,6 +510,7 @@ export default function PropertyProfile() {
         quantity: 1,
         unit: "piece",
         location: "",
+        purchaseUrl: "",
         lastChanged: "",
         nextReplacement: "",
         notes: ""
@@ -988,6 +990,7 @@ export default function PropertyProfile() {
       quantity: supply.quantity || 1,
       unit: supply.unit || "piece",
       location: supply.location || "",
+      purchaseUrl: supply.purchaseUrl || "",
       lastChanged: supply.lastChanged ? supply.lastChanged.split('T')[0] : "",
       nextReplacement: supply.nextReplacement ? supply.nextReplacement.split('T')[0] : "",
       notes: supply.notes || ""
@@ -2482,6 +2485,17 @@ export default function PropertyProfile() {
                   value={roomSupplyForm.location}
                   onChange={(e) => setRoomSupplyForm({ ...roomSupplyForm, location: e.target.value })}
                   placeholder="e.g. Main ceiling fixture, Under sink"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor="supply-purchase-url">Purchase Link</Label>
+                <Input
+                  id="supply-purchase-url"
+                  type="url"
+                  value={roomSupplyForm.purchaseUrl}
+                  onChange={(e) => setRoomSupplyForm({ ...roomSupplyForm, purchaseUrl: e.target.value })}
+                  placeholder="e.g. https://amazon.com/product-link, https://homedepot.com/item"
                 />
               </div>
 
