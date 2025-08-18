@@ -1374,6 +1374,13 @@ export default function Admin() {
 
           <Form {...communityForm}>
             <form onSubmit={communityForm.handleSubmit((data) => createCommunityMutation.mutate(data))} className="space-y-6">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+                <p className="text-sm text-blue-800">
+                  <strong>Note:</strong> Currently only basic community information (Profile tab) is saved to the database. 
+                  Extended features like Rules, Schedules, and Financial info will be fully implemented in upcoming updates.
+                </p>
+              </div>
+
               <Tabs defaultValue="profile" className="w-full">
                 <TabsList className="grid w-full grid-cols-6">
                   <TabsTrigger value="profile">🏘️ Profile</TabsTrigger>
@@ -1557,6 +1564,12 @@ export default function Admin() {
 
                 {/* Rules & Access Tab */}
                 <TabsContent value="rules" className="space-y-4">
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
+                    <p className="text-sm text-yellow-800">
+                      Rules and access information will be saved in future updates. Feel free to fill out this information for reference.
+                    </p>
+                  </div>
+                  
                   <FormField
                     control={communityForm.control}
                     name="rentalRestrictions"

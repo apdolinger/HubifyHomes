@@ -347,7 +347,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Community name is required" });
       }
 
-      const community = await storage.createCommunity(req.body, userId);
+      // Extract only the fields that exist in the current database schema
+      const communityData = {
+        name: req.body.name,
+        address1: req.body.address1 || null,
+        address2: req.body.address2 || null,
+        city: req.body.city || null,
+        state: req.body.state || null,
+        zip: req.body.zip || null,
+        notes: req.body.notes || null
+      };
+
+      const community = await storage.createCommunity(communityData, userId);
       res.status(201).json(community);
     } catch (error) {
       console.error("Error creating community:", error);
