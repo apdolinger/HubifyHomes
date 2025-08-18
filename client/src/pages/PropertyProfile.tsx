@@ -1285,14 +1285,22 @@ export default function PropertyProfile() {
 
             {/* Location and Status Controls */}
             <div className="flex-shrink-0 flex flex-col space-y-3">
-              {/* Location Display - Show actual address */}
+              {/* Location Display - Clickable address */}
               <div className="flex items-start space-x-2 text-slate-600 max-w-xs">
                 <MapPin className="w-5 h-5 mt-0.5 flex-shrink-0" />
                 <div className="text-sm">
-                  <div className="font-medium text-slate-900 leading-tight">
+                  <button
+                    onClick={() => {
+                      const address = formatFullAddress(property);
+                      if (address) {
+                        const encodedAddress = encodeURIComponent(address);
+                        window.open(`https://maps.google.com/maps?q=${encodedAddress}`, '_blank');
+                      }
+                    }}
+                    className="font-medium text-slate-900 leading-tight hover:text-blue-600 transition-colors cursor-pointer text-left underline-offset-4 hover:underline"
+                  >
                     {formatFullAddress(property) || 'No address provided'}
-                  </div>
-                  <div className="text-slate-500 text-xs mt-1">Property Location</div>
+                  </button>
                 </div>
               </div>
               
@@ -1513,13 +1521,24 @@ export default function PropertyProfile() {
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0 mr-4">
-                  <h1 className="text-3xl font-bold text-slate-900 mb-2 break-words">
-                    {(property as any)?.name}
-                  </h1>
-                  <p className="text-slate-600 flex items-center mb-3">
+                  {(property as any)?.name && (
+                    <h1 className="text-3xl font-bold text-slate-900 mb-2 break-words">
+                      {(property as any)?.name}
+                    </h1>
+                  )}
+                  <button 
+                    onClick={() => {
+                      const address = formatFullAddress(property);
+                      if (address) {
+                        const encodedAddress = encodeURIComponent(address);
+                        window.open(`https://maps.google.com/maps?q=${encodedAddress}`, '_blank');
+                      }
+                    }}
+                    className="text-slate-600 flex items-center mb-3 hover:text-blue-600 transition-colors cursor-pointer text-left underline-offset-4 hover:underline"
+                  >
                     <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
                     <span className="break-words">{formatFullAddress(property)}</span>
-                  </p>
+                  </button>
                   <div className="flex items-center space-x-3">
                     <Badge variant="outline">{getTypeDisplay((property as any)?.type)}</Badge>
                     <Badge variant={getStatusColor((property as any)?.status)}>
