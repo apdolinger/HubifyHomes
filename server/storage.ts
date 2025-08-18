@@ -566,18 +566,10 @@ export class DatabaseStorage implements IStorage {
       nextServiceDue: roomDevices.nextServiceDue,
       notes: roomDevices.notes,
       isActive: roomDevices.isActive,
-      createdById: roomDevices.createdById,
       createdAt: roomDevices.createdAt,
       updatedAt: roomDevices.updatedAt,
-      createdBy: {
-        id: users.id,
-        firstName: users.firstName,
-        lastName: users.lastName,
-        email: users.email,
-      }
     })
     .from(roomDevices)
-    .leftJoin(users, eq(roomDevices.createdById, users.id))
     .where(eq(roomDevices.roomId, roomId))
     .orderBy(desc(roomDevices.createdAt));
   }

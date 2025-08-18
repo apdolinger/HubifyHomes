@@ -370,7 +370,9 @@ export default function PropertyProfile() {
     mutationFn: async (vehicleData: any) => {
       return await apiRequest("POST", "/api/vehicles", {
         ...vehicleData,
-        propertyId: parseInt(propertyId || "0")
+        propertyId: parseInt(propertyId || "0"),
+        year: vehicleData.year ? parseInt(vehicleData.year) : null,
+        details: vehicleData.description // Map description to details field
       });
     },
     onSuccess: () => {
@@ -3275,6 +3277,7 @@ export default function PropertyProfile() {
                 <Label htmlFor="vehicle-year">Year</Label>
                 <Input
                   id="vehicle-year"
+                  type="number"
                   value={vehicleForm.year}
                   onChange={(e) => setVehicleForm({ ...vehicleForm, year: e.target.value })}
                   placeholder="e.g. 2020"
