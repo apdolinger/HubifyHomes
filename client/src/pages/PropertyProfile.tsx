@@ -493,9 +493,13 @@ export default function PropertyProfile() {
   // Room supply mutations
   const createSupplyMutation = useMutation({
     mutationFn: async (supplyData: any) => {
+      // Map frontend fields to backend schema fields
+      const { type, unit, location, lastChanged, nextReplacement, ...rest } = supplyData;
       return await apiRequest("POST", "/api/room-supplies", {
-        ...supplyData,
-        roomId: selectedRoom?.id
+        ...rest,
+        category: type, // Map 'type' field to 'category' in schema
+        roomId: selectedRoom?.id,
+        // Note: unit, location, lastChanged, nextReplacement are not in schema, so we exclude them
       });
     },
     onSuccess: () => {
@@ -528,8 +532,14 @@ export default function PropertyProfile() {
   });
 
   const updateSupplyMutation = useMutation({
-    mutationFn: async ({ id, ...data }: any) => {
-      return await apiRequest("PATCH", `/api/room-supplies/${id}`, data);
+    mutationFn: async ({ id, ...supplyData }: any) => {
+      // Map frontend fields to backend schema fields
+      const { type, unit, location, lastChanged, nextReplacement, ...rest } = supplyData;
+      return await apiRequest("PATCH", `/api/room-supplies/${id}`, {
+        ...rest,
+        category: type, // Map 'type' field to 'category' in schema
+        // Note: unit, location, lastChanged, nextReplacement are not in schema, so we exclude them
+      });
     },
     onSuccess: () => {
       refetchSupplies();
