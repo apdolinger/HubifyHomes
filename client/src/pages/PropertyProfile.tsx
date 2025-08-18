@@ -3779,15 +3779,16 @@ export default function PropertyProfile() {
 
         {/* Edit Property Modal */}
         <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
+          <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+            <DialogHeader className="flex-shrink-0">
               <DialogTitle>Edit Property</DialogTitle>
               <DialogDescription>
                 Update property information and details.
               </DialogDescription>
             </DialogHeader>
             
-            <div className="space-y-6 py-4">
+            <div className="flex-1 overflow-y-auto pr-2">
+              <div className="space-y-6 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <Label htmlFor="edit-name">Property Name *</Label>
@@ -4032,8 +4033,9 @@ export default function PropertyProfile() {
                 </div>
               </div>
             </div>
+            </div>
 
-            <DialogFooter>
+            <DialogFooter className="flex-shrink-0">
               <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
                 Cancel
               </Button>
