@@ -1035,6 +1035,7 @@ export default function PropertyProfile() {
       quantity: 1,
       unit: "piece",
       location: "",
+      purchaseUrl: "",
       lastChanged: "",
       nextReplacement: "",
       notes: ""
