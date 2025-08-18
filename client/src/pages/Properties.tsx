@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Building, MapPin, Users, Plus, Home, Square, DollarSign, Activity, Eye, Edit, ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useLocation } from "wouter";
@@ -48,6 +49,8 @@ export default function Properties() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<any>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [selectedProperties, setSelectedProperties] = useState<Set<number>>(new Set());
+  const [selectAll, setSelectAll] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -189,7 +192,7 @@ export default function Properties() {
   };
 
   const getPrimaryContact = (propertyId: number) => {
-    return contacts?.find((contact: any) => 
+    return (contacts as any[])?.find((contact: any) => 
       contact.propertyId === propertyId && contact.type === "owner"
     );
   };
@@ -235,6 +238,39 @@ export default function Properties() {
     ].filter(Boolean);
     return parts.join(", ");
   };
+
+  // Bulk selection handlers
+  const handleSelectAll = (checked: boolean) => {
+    setSelectAll(checked);
+    if (checked) {
+      const allPropertyIds = new Set<number>(properties?.map((p: any) => p.id) || []);
+      setSelectedProperties(allPropertyIds);
+    } else {
+      setSelectedProperties(new Set<number>());
+    }
+  };
+
+  const handleSelectProperty = (propertyId: number, checked: boolean) => {
+    const newSelected = new Set(selectedProperties);
+    if (checked) {
+      newSelected.add(propertyId);
+    } else {
+      newSelected.delete(propertyId);
+      setSelectAll(false);
+    }
+    setSelectedProperties(newSelected);
+
+    // Update select all state
+    if (properties && newSelected.size === properties.length) {
+      setSelectAll(true);
+    }
+  };
+
+  // Reset selection when properties change
+  useEffect(() => {
+    setSelectedProperties(new Set<number>());
+    setSelectAll(false);
+  }, [properties]);
 
   if (isLoading) {
     return (
@@ -512,7 +548,14 @@ export default function Properties() {
       {/* Properties Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Properties List</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Properties List</CardTitle>
+            {selectedProperties.size > 0 && (
+              <div className="text-sm text-slate-600">
+                {selectedProperties.size} of {properties?.length || 0} selected
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {propertiesLoading ? (
@@ -523,6 +566,13 @@ export default function Properties() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={selectAll}
+                      onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                      aria-label="Select all properties"
+                    />
+                  </TableHead>
                   <TableHead>Image</TableHead>
                   <TableHead>Property/Community Name</TableHead>
                   <TableHead>Address</TableHead>
@@ -540,9 +590,20 @@ export default function Properties() {
                   return (
                     <TableRow 
                       key={property.id}
-                      className="cursor-pointer hover:bg-slate-50"
+                      className={`cursor-pointer hover:bg-slate-50 ${
+                        selectedProperties.has(property.id) ? 'bg-blue-50' : ''
+                      }`}
                       onClick={() => setLocation(`/property-profile/${property.id}`)}
                     >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedProperties.has(property.id)}
+                          onCheckedChange={(checked) => 
+                            handleSelectProperty(property.id, checked as boolean)
+                          }
+                          aria-label={`Select ${property.name}`}
+                        />
+                      </TableCell>
                       <TableCell>
                         {property.imageUrl ? (
                           <Avatar className="h-10 w-10">
