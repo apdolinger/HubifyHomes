@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Building, MapPin, Users, Plus, Home, Square, DollarSign, Activity, Eye, Edit, ToggleLeft, ToggleRight, Trash2, FileText, Mail, MessageCircle } from "lucide-react";
+import { Building, MapPin, Users, Plus, Home, Square, DollarSign, Activity, Eye, Edit, ToggleLeft, ToggleRight, Trash2, FileText, Mail, MessageCircle, ChevronUp, ChevronDown, Search, Filter } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { apiRequest } from "@/lib/queryClient";
@@ -52,6 +52,11 @@ export default function Properties() {
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [selectedProperties, setSelectedProperties] = useState<Set<number>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortField, setSortField] = useState<string>("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [filterType, setFilterType] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -244,8 +249,8 @@ export default function Properties() {
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked);
     if (checked) {
-      const allPropertyIds = new Set<number>(properties?.map((p: any) => p.id) || []);
-      setSelectedProperties(allPropertyIds);
+      const visiblePropertyIds = new Set<number>(filteredAndSortedProperties?.map((p: any) => p.id) || []);
+      setSelectedProperties(visiblePropertyIds);
     } else {
       setSelectedProperties(new Set<number>());
     }
@@ -262,16 +267,16 @@ export default function Properties() {
     setSelectedProperties(newSelected);
 
     // Update select all state
-    if (properties && newSelected.size === properties.length) {
+    if (filteredAndSortedProperties && newSelected.size === filteredAndSortedProperties.length) {
       setSelectAll(true);
     }
   };
 
-  // Reset selection when properties change
+  // Reset selection when properties or filters change
   useEffect(() => {
     setSelectedProperties(new Set<number>());
     setSelectAll(false);
-  }, [properties]);
+  }, [properties, searchTerm, filterType, filterStatus]);
 
   // Bulk actions
   const handleGenerateReport = () => {
@@ -361,6 +366,67 @@ export default function Properties() {
       title: "Communication Feature",
       description: `This would open a communication interface for ${selectedPropertyList.length} properties. Feature coming soon!`,
     });
+  };
+
+  // Sorting and filtering logic
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const filteredAndSortedProperties = properties?.filter((property: any) => {
+    // Search filter
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = 
+        property.name.toLowerCase().includes(searchLower) ||
+        formatFullAddress(property).toLowerCase().includes(searchLower) ||
+        property.type.toLowerCase().includes(searchLower) ||
+        property.status.toLowerCase().includes(searchLower);
+      
+      if (!matchesSearch) return false;
+    }
+
+    // Type filter
+    if (filterType !== "all" && property.type !== filterType) {
+      return false;
+    }
+
+    // Status filter
+    if (filterStatus !== "all" && property.status !== filterStatus) {
+      return false;
+    }
+
+    return true;
+  }).sort((a: any, b: any) => {
+    let aValue = a[sortField];
+    let bValue = b[sortField];
+
+    // Handle special cases
+    if (sortField === "address") {
+      aValue = formatFullAddress(a);
+      bValue = formatFullAddress(b);
+    }
+
+    if (typeof aValue === "string") {
+      aValue = aValue.toLowerCase();
+      bValue = bValue.toLowerCase();
+    }
+
+    if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+    if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const getSortIcon = (field: string) => {
+    if (sortField !== field) return null;
+    return sortDirection === "asc" ? 
+      <ChevronUp className="w-4 h-4 inline ml-1" /> : 
+      <ChevronDown className="w-4 h-4 inline ml-1" />;
   };
 
   if (isLoading) {
@@ -634,6 +700,45 @@ export default function Properties() {
             </Dialog>
           </div>
         </div>
+        
+        {/* Search and Filter Bar */}
+        <div className="flex flex-col sm:flex-row gap-4 items-center">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <Input
+              placeholder="Search properties..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <div className="flex gap-2 items-center">
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Filter by type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="single-family">Single-Family</SelectItem>
+                <SelectItem value="condo">Condo</SelectItem>
+                <SelectItem value="apartment">Apartment</SelectItem>
+                <SelectItem value="house">House</SelectItem>
+                <SelectItem value="commercial">Commercial</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="occupied">Occupied</SelectItem>
+                <SelectItem value="vacant">Vacant</SelectItem>
+                <SelectItem value="under_repair">Under Repair</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </div>
 
       {/* Bulk Actions Toolbar */}
@@ -714,11 +819,14 @@ export default function Properties() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Properties List</CardTitle>
-            {selectedProperties.size > 0 && (
-              <div className="text-sm text-slate-600">
-                {selectedProperties.size} of {properties?.length || 0} selected
-              </div>
-            )}
+            <div className="text-sm text-slate-600">
+              {filteredAndSortedProperties?.length || 0} of {properties?.length || 0} properties
+              {selectedProperties.size > 0 && (
+                <span className="ml-2 font-medium">
+                  • {selectedProperties.size} selected
+                </span>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -738,18 +846,48 @@ export default function Properties() {
                     />
                   </TableHead>
                   <TableHead>Image</TableHead>
-                  <TableHead>Property/Community Name</TableHead>
-                  <TableHead>Address</TableHead>
-                  <TableHead>Type</TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-slate-50 select-none"
+                    onClick={() => handleSort("name")}
+                  >
+                    Property/Community Name {getSortIcon("name")}
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-slate-50 select-none"
+                    onClick={() => handleSort("address")}
+                  >
+                    Address {getSortIcon("address")}
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-slate-50 select-none"
+                    onClick={() => handleSort("type")}
+                  >
+                    Type {getSortIcon("type")}
+                  </TableHead>
                   <TableHead>Primary Contact</TableHead>
-                  <TableHead>Square Footage</TableHead>
-                  <TableHead>Billing Type</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-slate-50 select-none"
+                    onClick={() => handleSort("squareFootage")}
+                  >
+                    Square Footage {getSortIcon("squareFootage")}
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-slate-50 select-none"
+                    onClick={() => handleSort("billingType")}
+                  >
+                    Billing Type {getSortIcon("billingType")}
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-slate-50 select-none"
+                    onClick={() => handleSort("status")}
+                  >
+                    Status {getSortIcon("status")}
+                  </TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {properties.map((property: any) => {
+                {filteredAndSortedProperties?.map((property: any) => {
                   const primaryContact = getPrimaryContact(property.id);
                   return (
                     <TableRow 
