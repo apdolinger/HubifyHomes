@@ -3932,6 +3932,95 @@ export default function PropertyProfile() {
                 </div>
 
                 <div className="col-span-2">
+                  <Label htmlFor="edit-community">Community / HOA</Label>
+                  <div className="relative">
+                    <Input
+                      id="edit-community"
+                      value={communitySearch}
+                      onChange={(e) => {
+                        setCommunitySearch(e.target.value);
+                        // Filter communities based on search
+                        const filtered = communities.filter((c: any) => 
+                          c.name.toLowerCase().includes(e.target.value.toLowerCase())
+                        );
+                        // If exact match found, select it
+                        const exactMatch = filtered.find((c: any) => 
+                          c.name.toLowerCase() === e.target.value.toLowerCase()
+                        );
+                        if (exactMatch) {
+                          setSelectedCommunity(exactMatch);
+                          setEditForm({ ...editForm, communityId: exactMatch.id.toString() });
+                        } else if (e.target.value === "") {
+                          setSelectedCommunity(null);
+                          setEditForm({ ...editForm, communityId: "" });
+                        }
+                      }}
+                      placeholder="Type community name or leave blank..."
+                    />
+                    {communitySearch && communities.filter((c: any) => 
+                      c.name.toLowerCase().includes(communitySearch.toLowerCase()) &&
+                      c.name.toLowerCase() !== communitySearch.toLowerCase()
+                    ).length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                        {communities
+                          .filter((c: any) => 
+                            c.name.toLowerCase().includes(communitySearch.toLowerCase()) &&
+                            c.name.toLowerCase() !== communitySearch.toLowerCase()
+                          )
+                          .slice(0, 5)
+                          .map((community: any) => (
+                            <div
+                              key={community.id}
+                              className="px-4 py-2 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0"
+                              onClick={() => {
+                                setCommunitySearch(community.name);
+                                setSelectedCommunity(community);
+                                setEditForm({ ...editForm, communityId: community.id.toString() });
+                              }}
+                            >
+                              <div className="font-medium text-slate-900">{community.name}</div>
+                              {community.city && community.state && (
+                                <div className="text-sm text-slate-600">
+                                  {community.city}, {community.state}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                    {communitySearch && !communities.some((c: any) => 
+                      c.name.toLowerCase().includes(communitySearch.toLowerCase())
+                    ) && communitySearch.length > 2 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg">
+                        <div className="px-4 py-3 text-center">
+                          <p className="text-slate-600 mb-2">Community "{communitySearch}" not found</p>
+                          <Button 
+                            size="sm" 
+                            onClick={() => {
+                              // Navigate to admin page to create new community
+                              window.open('/admin/data-management?create=community&name=' + encodeURIComponent(communitySearch), '_blank');
+                            }}
+                          >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Create New Community
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {selectedCommunity && (
+                    <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
+                      <div className="font-medium text-blue-900">Selected: {selectedCommunity.name}</div>
+                      {selectedCommunity.city && selectedCommunity.state && (
+                        <div className="text-blue-700">
+                          {selectedCommunity.city}, {selectedCommunity.state}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="col-span-2">
                   <Label htmlFor="edit-description">Description</Label>
                   <Textarea
                     id="edit-description"
