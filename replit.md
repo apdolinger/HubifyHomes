@@ -71,6 +71,13 @@ Hubify is a professional property management platform for home watch and HOA com
   - Kept "Client Portal" link in user dropdown for quick access
   - Created Data Management tab within Admin panel featuring Properties, People, and Team sections with quick action buttons and stats dashboard
   - Centralized route management using routes helper for easy maintenance
+- **Property Bulk Selection and Actions (August 18, 2025)**: Implemented comprehensive bulk operations for property management:
+  - Added individual property checkboxes with select all functionality in properties table
+  - Visual selection feedback with blue highlighting and selection counter
+  - Bulk actions toolbar with Generate Report (CSV download), Email Owners (mailto integration), and extensible More Actions dropdown
+  - Smart selection logic with automatic state management and clear selection option
+  - Report generation exports property data including name, address, type, status, square footage, and billing information
+  - Email integration compiles primary contact emails with pre-formatted property-specific messaging
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.

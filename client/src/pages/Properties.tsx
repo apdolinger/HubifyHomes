@@ -15,8 +15,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Building, MapPin, Users, Plus, Home, Square, DollarSign, Activity, Eye, Edit, ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
+import { Building, MapPin, Users, Plus, Home, Square, DollarSign, Activity, Eye, Edit, ToggleLeft, ToggleRight, Trash2, FileText, Mail, MessageCircle } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useLocation } from "wouter";
@@ -271,6 +272,96 @@ export default function Properties() {
     setSelectedProperties(new Set<number>());
     setSelectAll(false);
   }, [properties]);
+
+  // Bulk actions
+  const handleGenerateReport = () => {
+    const selectedPropertyList = properties?.filter((p: any) => selectedProperties.has(p.id));
+    if (!selectedPropertyList?.length) return;
+
+    // Create report data
+    const reportData = {
+      title: `Property Report - ${new Date().toLocaleDateString()}`,
+      properties: selectedPropertyList,
+      generatedAt: new Date().toISOString(),
+      totalProperties: selectedPropertyList.length
+    };
+
+    // Generate CSV-style report
+    const csvContent = [
+      ['Property Name', 'Address', 'Type', 'Status', 'Square Footage', 'Billing Type'].join(','),
+      ...selectedPropertyList.map((prop: any) => [
+        `"${prop.name}"`,
+        `"${formatFullAddress(prop)}"`,
+        `"${getTypeDisplay(prop.type)}"`,
+        `"${prop.status.replace('_', ' ')}"`,
+        prop.squareFootage || 'N/A',
+        prop.billingType ? (prop.billingType === 'sqft' ? 'Per Sq Ft' : 'Flat Fee') : 'N/A'
+      ].join(','))
+    ].join('\n');
+
+    // Download the report
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `property-report-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+
+    toast({
+      title: "Report Generated",
+      description: `Downloaded report for ${selectedPropertyList.length} properties`,
+    });
+  };
+
+  const handleBulkEmail = () => {
+    const selectedPropertyList = properties?.filter((p: any) => selectedProperties.has(p.id));
+    if (!selectedPropertyList?.length) return;
+
+    // Get all contacts for selected properties
+    const propertyContacts = selectedPropertyList.map((prop: any) => {
+      const contact = getPrimaryContact(prop.id);
+      return contact ? { property: prop, contact } : null;
+    }).filter(Boolean);
+
+    if (propertyContacts.length === 0) {
+      toast({
+        title: "No Contacts Found",
+        description: "Selected properties don't have primary contacts with email addresses",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Create mailto link with all contacts
+    const emailAddresses = propertyContacts
+      .map((pc: any) => pc.contact.email)
+      .filter(Boolean)
+      .join(',');
+
+    const subject = encodeURIComponent(`Important Update Regarding Your Property`);
+    const body = encodeURIComponent(`Dear Property Owners,\n\nWe hope this message finds you well. We are reaching out regarding your property/properties:\n\n${propertyContacts.map((pc: any) => `• ${pc.property.name} (${formatFullAddress(pc.property)})`).join('\n')}\n\nBest regards,\nHubify Property Management`);
+
+    window.open(`mailto:${emailAddresses}?subject=${subject}&body=${body}`);
+
+    toast({
+      title: "Email Composer Opened",
+      description: `Prepared email for ${propertyContacts.length} property contacts`,
+    });
+  };
+
+  const handleBulkCommunication = () => {
+    const selectedPropertyList = properties?.filter((p: any) => selectedProperties.has(p.id));
+    if (!selectedPropertyList?.length) return;
+
+    // For now, show a simple message about the communication feature
+    toast({
+      title: "Communication Feature",
+      description: `This would open a communication interface for ${selectedPropertyList.length} properties. Feature coming soon!`,
+    });
+  };
 
   if (isLoading) {
     return (
@@ -544,6 +635,79 @@ export default function Properties() {
           </div>
         </div>
       </div>
+
+      {/* Bulk Actions Toolbar */}
+      {selectedProperties.size > 0 && (
+        <Card className="mb-4 bg-blue-50 border-blue-200">
+          <CardContent className="py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-medium text-blue-900">
+                  {selectedProperties.size} {selectedProperties.size === 1 ? 'property' : 'properties'} selected
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleGenerateReport}
+                    className="bg-white hover:bg-blue-50"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Generate Report
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleBulkEmail}
+                    className="bg-white hover:bg-blue-50"
+                  >
+                    <Mail className="w-4 h-4 mr-2" />
+                    Email Owners
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="bg-white hover:bg-blue-50"
+                      >
+                        <MessageCircle className="w-4 h-4 mr-2" />
+                        More Actions
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={handleBulkCommunication}>
+                        <MessageCircle className="w-4 h-4 mr-2" />
+                        Send Messages
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => {
+                        toast({
+                          title: "Bulk Tasks Feature",
+                          description: "Create tasks for selected properties - coming soon!",
+                        });
+                      }}>
+                        <Activity className="w-4 h-4 mr-2" />
+                        Create Tasks
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setSelectedProperties(new Set<number>());
+                  setSelectAll(false);
+                }}
+                className="text-slate-500 hover:text-slate-700"
+              >
+                Clear Selection
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Properties Table */}
       <Card>
