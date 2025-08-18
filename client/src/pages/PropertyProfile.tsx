@@ -1325,12 +1325,12 @@ export default function PropertyProfile() {
                   {/* Edit Modal Content */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
                     <div className="md:col-span-2">
-                      <Label htmlFor="edit-name">Property Name *</Label>
+                      <Label htmlFor="edit-name">Property Name</Label>
                       <Input
                         id="edit-name"
                         value={editForm.name}
                         onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                        placeholder="Enter property name"
+                        placeholder="Enter property name (optional)"
                       />
                     </div>
 
@@ -1483,10 +1483,10 @@ export default function PropertyProfile() {
                     </Button>
                     <Button 
                       onClick={() => {
-                        if (!editForm.name.trim() || !editForm.address1.trim() || !editForm.city.trim() || !editForm.state.trim()) {
+                        if (!editForm.address1.trim() || !editForm.city.trim() || !editForm.state.trim()) {
                           toast({
                             title: "Missing required fields",
-                            description: "Please fill in property name, address, city, and state.",
+                            description: "Please fill in address, city, and state.",
                             variant: "destructive",
                           });
                           return;
