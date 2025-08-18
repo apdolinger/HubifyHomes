@@ -59,6 +59,7 @@ export default function Admin() {
 
   // Community form schema
   const communitySchema = z.object({
+    // Basic Info
     name: z.string().min(1, "Community name is required"),
     address1: z.string().optional(),
     address2: z.string().optional(),
@@ -66,11 +67,44 @@ export default function Admin() {
     state: z.string().optional(),
     zip: z.string().optional(),
     notes: z.string().optional(),
+    
+    // Community Profile
+    gateCodes: z.string().optional(),
+    propertyManagerName: z.string().optional(),
+    propertyManagerCompany: z.string().optional(),
+    emergencyContactNumber: z.string().optional(),
+    hoaMailingAddress: z.string().optional(),
+    
+    // Rules & Access
+    rentalRestrictions: z.string().optional(),
+    petPolicy: z.string().optional(),
+    parkingRestrictions: z.string().optional(),
+    noiseRestrictions: z.string().optional(),
+    accessProcedures: z.string().optional(),
+    
+    // Schedules
+    trashPickupDays: z.string().optional(),
+    bulkTrashDates: z.string().optional(),
+    landscapeSchedule: z.string().optional(),
+    pestControlSchedule: z.string().optional(),
+    hoaMeetingSchedule: z.string().optional(),
+    
+    // Financial Info
+    hoaDuesFrequency: z.string().optional(),
+    hoaDuesAmount: z.string().optional(),
+    paymentInstructions: z.string().optional(),
+    paymentPortalUrl: z.string().optional(),
+    lateFeePolicy: z.string().optional(),
+    specialAssessments: z.string().optional(),
+    
+    // Amenities & Maintenance
+    ongoingProjects: z.string().optional(),
   });
 
   const communityForm = useForm({
     resolver: zodResolver(communitySchema),
     defaultValues: {
+      // Basic Info
       name: "",
       address1: "",
       address2: "",
@@ -78,6 +112,38 @@ export default function Admin() {
       state: "",
       zip: "",
       notes: "",
+      
+      // Community Profile
+      gateCodes: "",
+      propertyManagerName: "",
+      propertyManagerCompany: "",
+      emergencyContactNumber: "",
+      hoaMailingAddress: "",
+      
+      // Rules & Access
+      rentalRestrictions: "",
+      petPolicy: "",
+      parkingRestrictions: "",
+      noiseRestrictions: "",
+      accessProcedures: "",
+      
+      // Schedules
+      trashPickupDays: "",
+      bulkTrashDates: "",
+      landscapeSchedule: "",
+      pestControlSchedule: "",
+      hoaMeetingSchedule: "",
+      
+      // Financial Info
+      hoaDuesFrequency: "",
+      hoaDuesAmount: "",
+      paymentInstructions: "",
+      paymentPortalUrl: "",
+      lateFeePolicy: "",
+      specialAssessments: "",
+      
+      // Amenities & Maintenance
+      ongoingProjects: "",
     },
   });
 
@@ -1295,121 +1361,556 @@ export default function Admin() {
 
       {/* Community Creation Dialog */}
       <Dialog open={isNewCommunityDialogOpen} onOpenChange={setIsNewCommunityDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add New Community</DialogTitle>
+            <DialogTitle className="flex items-center">
+              <Building className="w-5 h-5 mr-2" />
+              Add New Community
+            </DialogTitle>
             <DialogDescription>
-              Create a new community, HOA, or property association
+              Create a comprehensive community profile with all management details
             </DialogDescription>
           </DialogHeader>
 
           <Form {...communityForm}>
-            <form onSubmit={communityForm.handleSubmit((data) => createCommunityMutation.mutate(data))} className="space-y-4">
-              <FormField
-                control={communityForm.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Community Name *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. Riverside Gardens HOA" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <form onSubmit={communityForm.handleSubmit((data) => createCommunityMutation.mutate(data))} className="space-y-6">
+              <Tabs defaultValue="profile" className="w-full">
+                <TabsList className="grid w-full grid-cols-6">
+                  <TabsTrigger value="profile">🏘️ Profile</TabsTrigger>
+                  <TabsTrigger value="rules">🧾 Rules</TabsTrigger>
+                  <TabsTrigger value="schedule">📅 Schedule</TabsTrigger>
+                  <TabsTrigger value="financial">💵 Financial</TabsTrigger>
+                  <TabsTrigger value="amenities">🛠️ Amenities</TabsTrigger>
+                  <TabsTrigger value="documents">📝 Documents</TabsTrigger>
+                </TabsList>
 
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={communityForm.control}
-                  name="address1"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Address Line 1</FormLabel>
-                      <FormControl>
-                        <Input placeholder="123 Main Street" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/* Community Profile Tab */}
+                <TabsContent value="profile" className="space-y-4">
+                  <div className="grid grid-cols-1 gap-4">
+                    <FormField
+                      control={communityForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Community Name *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. Riverside Gardens HOA" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                <FormField
-                  control={communityForm.control}
-                  name="address2"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Address Line 2</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Suite 100" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <FormField
-                  control={communityForm.control}
-                  name="city"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>City</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Jupiter" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={communityForm.control}
-                  name="state"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>State</FormLabel>
-                      <FormControl>
-                        <Input placeholder="FL" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={communityForm.control}
-                  name="zip"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>ZIP Code</FormLabel>
-                      <FormControl>
-                        <Input placeholder="33469" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={communityForm.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Notes</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Additional information about this community..." 
-                        rows={3}
-                        {...field} 
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={communityForm.control}
+                        name="address1"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Address Line 1</FormLabel>
+                            <FormControl>
+                              <Input placeholder="123 Main Street" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+
+                      <FormField
+                        control={communityForm.control}
+                        name="address2"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Address Line 2</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Suite 100" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <FormField
+                        control={communityForm.control}
+                        name="city"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>City</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Jupiter" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={communityForm.control}
+                        name="state"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>State</FormLabel>
+                            <FormControl>
+                              <Input placeholder="FL" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={communityForm.control}
+                        name="zip"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>ZIP Code</FormLabel>
+                            <FormControl>
+                              <Input placeholder="33469" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={communityForm.control}
+                        name="gateCodes"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Gate Code(s)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g. 1234, 5678" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={communityForm.control}
+                        name="emergencyContactNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Emergency Contact</FormLabel>
+                            <FormControl>
+                              <Input placeholder="(555) 123-4567" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={communityForm.control}
+                        name="propertyManagerName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Property Manager Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="John Smith" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={communityForm.control}
+                        name="propertyManagerCompany"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Management Company</FormLabel>
+                            <FormControl>
+                              <Input placeholder="ABC Property Management" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={communityForm.control}
+                      name="hoaMailingAddress"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>HOA Mailing Address</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="P.O. Box 123, City, State, ZIP" 
+                              rows={3}
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </TabsContent>
+
+                {/* Rules & Access Tab */}
+                <TabsContent value="rules" className="space-y-4">
+                  <FormField
+                    control={communityForm.control}
+                    name="rentalRestrictions"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Rental Restrictions / Short-Term Rental Policy</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Describe rental restrictions, short-term rental policies, minimum lease terms..." 
+                            rows={3}
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={communityForm.control}
+                    name="petPolicy"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Pet Policy</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Pet restrictions, breed limitations, pet fees, registration requirements..." 
+                            rows={3}
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={communityForm.control}
+                    name="parkingRestrictions"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Parking Restrictions</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Parking rules, assigned spaces, guest parking, commercial vehicle restrictions..." 
+                            rows={3}
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={communityForm.control}
+                    name="noiseRestrictions"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Noise Restrictions / Quiet Hours</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Quiet hours (e.g. 10 PM - 8 AM), noise ordinances, construction hours..." 
+                            rows={3}
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={communityForm.control}
+                    name="accessProcedures"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Access Procedures for Vendors / Guests</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Gate procedures, guest registration, vendor authorization, delivery instructions..." 
+                            rows={3}
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+
+                {/* Schedules Tab */}
+                <TabsContent value="schedule" className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={communityForm.control}
+                      name="trashPickupDays"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Trash & Recycling Pickup Days</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. Tuesday, Friday" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={communityForm.control}
+                      name="bulkTrashDates"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Bulk Trash Pickup Dates</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. 1st Wednesday of each month" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={communityForm.control}
+                      name="landscapeSchedule"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Landscape Maintenance Schedule</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. Every other Wednesday" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={communityForm.control}
+                      name="pestControlSchedule"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Pest Control Schedule</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. Monthly - 2nd Tuesday" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={communityForm.control}
+                    name="hoaMeetingSchedule"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>HOA Board Meeting Schedule</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. 3rd Thursday of each month at 7 PM" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+
+                {/* Financial Info Tab */}
+                <TabsContent value="financial" className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={communityForm.control}
+                      name="hoaDuesFrequency"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>HOA Dues Frequency</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select frequency" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="monthly">Monthly</SelectItem>
+                              <SelectItem value="quarterly">Quarterly</SelectItem>
+                              <SelectItem value="annually">Annually</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={communityForm.control}
+                      name="hoaDuesAmount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Amount of Dues</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. $150.00" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={communityForm.control}
+                    name="paymentPortalUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Payment Portal URL</FormLabel>
+                        <FormControl>
+                          <Input placeholder="https://payment.hoamanagement.com/riverside" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={communityForm.control}
+                    name="paymentInstructions"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Payment Instructions</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Payment methods accepted, mailing address for checks, online portal instructions..." 
+                            rows={3}
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={communityForm.control}
+                    name="lateFeePolicy"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Late Fee Policy</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Late fee amounts, grace periods, enforcement procedures..." 
+                            rows={3}
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={communityForm.control}
+                    name="specialAssessments"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Special Assessments</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Current or upcoming special assessments, projects, payment schedules..." 
+                            rows={3}
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+
+                {/* Amenities & Maintenance Tab */}
+                <TabsContent value="amenities" className="space-y-4">
+                  <FormField
+                    control={communityForm.control}
+                    name="ongoingProjects"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Recent or Ongoing Projects</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Current construction, maintenance projects, upcoming improvements..." 
+                            rows={4}
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={communityForm.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Additional Notes</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Amenities list, access codes, common area maintenance contacts, general information..." 
+                            rows={4}
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+
+                {/* Documents Tab */}
+                <TabsContent value="documents" className="space-y-4">
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h4 className="font-medium text-blue-900 mb-2">Document Management</h4>
+                    <p className="text-sm text-blue-700">
+                      Document upload functionality will be available after creating the community. 
+                      You'll be able to upload HOA declarations, bylaws, FAQ sheets, and welcome packets.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center p-3 border border-gray-200 rounded">
+                      <FileText className="w-5 h-5 text-gray-400 mr-3" />
+                      <div>
+                        <p className="font-medium text-sm">HOA Declaration & Bylaws</p>
+                        <p className="text-xs text-gray-500">Upload after community creation</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center p-3 border border-gray-200 rounded">
+                      <FileText className="w-5 h-5 text-gray-400 mr-3" />
+                      <div>
+                        <p className="font-medium text-sm">Community FAQ Sheet</p>
+                        <p className="text-xs text-gray-500">Upload after community creation</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center p-3 border border-gray-200 rounded">
+                      <FileText className="w-5 h-5 text-gray-400 mr-3" />
+                      <div>
+                        <p className="font-medium text-sm">Welcome Packet</p>
+                        <p className="text-xs text-gray-500">Upload after community creation</p>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
+              </Tabs>
 
               <DialogFooter>
                 <Button

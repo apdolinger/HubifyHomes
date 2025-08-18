@@ -100,6 +100,68 @@ export const communities = pgTable("communities", {
   hoaPresidentId: varchar("hoa_president_id").references(() => users.id),
   isActive: boolean("is_active").notNull().default(true),
   notes: text("notes"),
+  
+  // Community Profile
+  gateCodes: text("gate_codes"),
+  mapUrl: varchar("map_url"), // PDF or image upload
+  propertyManagerName: varchar("property_manager_name"),
+  propertyManagerCompany: varchar("property_manager_company"),
+  emergencyContactNumber: varchar("emergency_contact_number"),
+  hoaMailingAddress: text("hoa_mailing_address"),
+  
+  // Rules & Access - using JSONB for complex data
+  rulesAndRegulations: jsonb("rules_and_regulations").$type<{
+    document_url?: string;
+    summary?: string;
+  }>(),
+  rentalRestrictions: text("rental_restrictions"),
+  petPolicy: text("pet_policy"),
+  parkingRestrictions: text("parking_restrictions"),
+  noiseRestrictions: text("noise_restrictions"),
+  accessProcedures: text("access_procedures"),
+  preferredVendors: jsonb("preferred_vendors").$type<Array<{
+    category: string;
+    name: string;
+    contact: string;
+  }>>(),
+  
+  // Schedules
+  trashPickupDays: varchar("trash_pickup_days"),
+  bulkTrashDates: varchar("bulk_trash_dates"),
+  landscapeSchedule: varchar("landscape_schedule"),
+  pestControlSchedule: varchar("pest_control_schedule"),
+  hoaMeetingSchedule: varchar("hoa_meeting_schedule"),
+  
+  // Financial Info
+  hoaDuesFrequency: varchar("hoa_dues_frequency"),
+  hoaDuesAmount: varchar("hoa_dues_amount"),
+  paymentInstructions: text("payment_instructions"),
+  paymentPortalUrl: varchar("payment_portal_url"),
+  lateFeePolicy: text("late_fee_policy"),
+  specialAssessments: text("special_assessments"),
+  
+  // Amenities & Maintenance
+  amenities: jsonb("amenities").$type<Array<{
+    name: string;
+    accessCode?: string;
+    rules?: string;
+    hours?: string;
+  }>>(),
+  commonAreaContacts: jsonb("common_area_contacts").$type<Array<{
+    area: string;
+    contact: string;
+    phone: string;
+  }>>(),
+  ongoingProjects: text("ongoing_projects"),
+  
+  // Documents (file URLs)
+  documentsUrls: jsonb("documents_urls").$type<{
+    declaration_bylaws?: string;
+    community_faq?: string;
+    welcome_packet?: string;
+    other_documents?: string[];
+  }>(),
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
