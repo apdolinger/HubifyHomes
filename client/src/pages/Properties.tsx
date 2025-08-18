@@ -933,7 +933,15 @@ export default function Properties() {
                       <TableCell>
                         {primaryContact ? (
                           <div className="text-sm">
-                            <div className="font-medium">{primaryContact.firstName} {primaryContact.lastName}</div>
+                            <div 
+                              className="font-medium text-primary hover:text-primary/80 cursor-pointer underline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setLocation(`/person-profile/${primaryContact.id}`);
+                              }}
+                            >
+                              {primaryContact.firstName} {primaryContact.lastName}
+                            </div>
                             <div className="text-slate-600">{primaryContact.email}</div>
                           </div>
                         ) : (
