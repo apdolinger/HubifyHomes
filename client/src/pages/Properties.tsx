@@ -87,6 +87,11 @@ export default function Properties() {
     enabled: isAuthenticated,
   });
 
+  const { data: users } = useQuery({
+    queryKey: ["/api/users"],
+    enabled: isAuthenticated,
+  });
+
   const form = useForm<PropertyFormData>({
     resolver: zodResolver(propertySchema),
     defaultValues: {
@@ -201,6 +206,11 @@ export default function Properties() {
     return (contacts as any[])?.find((contact: any) => 
       contact.propertyId === propertyId && contact.type === "owner"
     );
+  };
+
+  const getAssignedStaff = (managerId: string | null) => {
+    if (!managerId) return null;
+    return (users as any[])?.find((user: any) => user.id === managerId);
   };
 
   const getStatusColor = (status: string) => {
@@ -883,6 +893,7 @@ export default function Properties() {
                   >
                     Status {getSortIcon("status")}
                   </TableHead>
+                  <TableHead>Assigned Staff</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -971,6 +982,29 @@ export default function Properties() {
                         <Badge variant={getStatusColor(property.status)}>
                           {property.status.replace('_', ' ')}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const assignedStaff = getAssignedStaff(property.managerId);
+                          return assignedStaff ? (
+                            <div className="text-sm">
+                              <div 
+                                className="font-medium text-primary hover:text-primary/80 cursor-pointer underline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setLocation(`/person-profile/${assignedStaff.id}`);
+                                }}
+                              >
+                                {assignedStaff.firstName} {assignedStaff.lastName}
+                              </div>
+                              <div className="text-slate-600 text-xs capitalize">
+                                {assignedStaff.role}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400">Unassigned</span>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
                         <div className="flex space-x-2">
