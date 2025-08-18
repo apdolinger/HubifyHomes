@@ -464,7 +464,8 @@ export default function PropertyProfile() {
       return await apiRequest("PATCH", `/api/properties/${propertyId}`, propertyData);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/properties", propertyId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
       setIsEditModalOpen(false);
       toast({
         title: "Property updated",
