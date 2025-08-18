@@ -391,6 +391,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update property
+  app.patch("/api/properties/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid property ID' });
+      }
+
+      const property = await storage.updateProperty(id, req.body);
+      res.json(property);
+    } catch (error) {
+      console.error("Error updating property:", error);
+      res.status(500).json({ message: "Failed to update property" });
+    }
+  });
+
   // Delete property
   app.delete("/api/properties/:id", isAuthenticated, async (req, res) => {
     try {
