@@ -1322,9 +1322,9 @@ export default function PropertyProfile() {
                   </DialogHeader>
                   
                   {/* Edit Modal Content */}
-                  <div className="space-y-6 py-4">
-                    <div>
-                      <Label htmlFor="edit-name">Property Name</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+                    <div className="md:col-span-2">
+                      <Label htmlFor="edit-name">Property Name *</Label>
                       <Input
                         id="edit-name"
                         value={editForm.name}
@@ -1332,14 +1332,176 @@ export default function PropertyProfile() {
                         placeholder="Enter property name"
                       />
                     </div>
+
+                    <div className="md:col-span-2">
+                      <Label htmlFor="edit-address1">Street Address *</Label>
+                      <Input
+                        id="edit-address1"
+                        value={editForm.address1}
+                        onChange={(e) => setEditForm({ ...editForm, address1: e.target.value })}
+                        placeholder="123 Main Street"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <Label htmlFor="edit-address2">Address Line 2</Label>
+                      <Input
+                        id="edit-address2"
+                        value={editForm.address2}
+                        onChange={(e) => setEditForm({ ...editForm, address2: e.target.value })}
+                        placeholder="Apt, Suite, Unit, etc."
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="edit-city">City *</Label>
+                      <Input
+                        id="edit-city"
+                        value={editForm.city}
+                        onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                        placeholder="City"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="edit-state">State *</Label>
+                      <Input
+                        id="edit-state"
+                        value={editForm.state}
+                        onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
+                        placeholder="State"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="edit-zip">ZIP Code</Label>
+                      <Input
+                        id="edit-zip"
+                        value={editForm.zip}
+                        onChange={(e) => setEditForm({ ...editForm, zip: e.target.value })}
+                        placeholder="12345"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="edit-type">Property Type</Label>
+                      <Select value={editForm.type} onValueChange={(value) => setEditForm({ ...editForm, type: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select property type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="single-family">Single Family Home</SelectItem>
+                          <SelectItem value="condo">Condo</SelectItem>
+                          <SelectItem value="apartment">Apartment</SelectItem>
+                          <SelectItem value="townhouse">Townhouse</SelectItem>
+                          <SelectItem value="commercial">Commercial</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="edit-status">Status</Label>
+                      <Select value={editForm.status} onValueChange={(value) => setEditForm({ ...editForm, status: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="occupied">Occupied</SelectItem>
+                          <SelectItem value="vacant">Vacant</SelectItem>
+                          <SelectItem value="under_repair">Under Repair</SelectItem>
+                          <SelectItem value="maintenance">Maintenance</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="edit-sqft">Square Footage</Label>
+                      <Input
+                        id="edit-sqft"
+                        type="number"
+                        value={editForm.squareFootage}
+                        onChange={(e) => setEditForm({ ...editForm, squareFootage: e.target.value })}
+                        placeholder="1200"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="edit-bedrooms">Bedrooms</Label>
+                      <Input
+                        id="edit-bedrooms"
+                        type="number"
+                        min="0"
+                        value={editForm.bedrooms}
+                        onChange={(e) => setEditForm({ ...editForm, bedrooms: e.target.value })}
+                        placeholder="3"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="edit-bathrooms">Bathrooms</Label>
+                      <Input
+                        id="edit-bathrooms"
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={editForm.bathrooms}
+                        onChange={(e) => setEditForm({ ...editForm, bathrooms: e.target.value })}
+                        placeholder="2.5"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="edit-billing">Billing Rate</Label>
+                      <Input
+                        id="edit-billing"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={editForm.billingRate}
+                        onChange={(e) => setEditForm({ ...editForm, billingRate: e.target.value })}
+                        placeholder="150.00"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <Label htmlFor="edit-description">Description</Label>
+                      <Textarea
+                        id="edit-description"
+                        value={editForm.description}
+                        onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                        placeholder="Add property description, special notes, or instructions..."
+                        rows={3}
+                      />
+                    </div>
                   </div>
 
                   <DialogFooter>
-                    <Button variant="outline">
+                    <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
                       Cancel
                     </Button>
-                    <Button>
-                      Save Changes
+                    <Button 
+                      onClick={() => {
+                        if (!editForm.name.trim() || !editForm.address1.trim() || !editForm.city.trim() || !editForm.state.trim()) {
+                          toast({
+                            title: "Missing required fields",
+                            description: "Please fill in property name, address, city, and state.",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        updatePropertyMutation.mutate(editForm);
+                      }}
+                      disabled={updatePropertyMutation.isPending}
+                    >
+                      {updatePropertyMutation.isPending ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Changes'
+                      )}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
