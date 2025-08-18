@@ -494,10 +494,14 @@ export default function PropertyProfile() {
   // Room supply mutations
   const createSupplyMutation = useMutation({
     mutationFn: async (supplyData: any) => {
-      return await apiRequest("POST", "/api/room-supplies", {
+      // Convert empty date strings to null for database
+      const processedData = {
         ...supplyData,
-        roomId: selectedRoom?.id
-      });
+        roomId: selectedRoom?.id,
+        lastChanged: supplyData.lastChanged || null,
+        nextReplacement: supplyData.nextReplacement || null
+      };
+      return await apiRequest("POST", "/api/room-supplies", processedData);
     },
     onSuccess: () => {
       refetchSupplies();
@@ -530,8 +534,14 @@ export default function PropertyProfile() {
   });
 
   const updateSupplyMutation = useMutation({
-    mutationFn: async ({ id, ...data }: any) => {
-      return await apiRequest("PATCH", `/api/room-supplies/${id}`, data);
+    mutationFn: async ({ id, ...supplyData }: any) => {
+      // Convert empty date strings to null for database
+      const processedData = {
+        ...supplyData,
+        lastChanged: supplyData.lastChanged || null,
+        nextReplacement: supplyData.nextReplacement || null
+      };
+      return await apiRequest("PATCH", `/api/room-supplies/${id}`, processedData);
     },
     onSuccess: () => {
       refetchSupplies();
