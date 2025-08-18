@@ -2682,65 +2682,366 @@ export default function PropertyProfile() {
           </TabsContent>
 
           <TabsContent value="community">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Building className="w-5 h-5 mr-2" />
-                  Community Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {(property as any)?.communityId ? (
-                  <div className="space-y-4">
-                    <div className="bg-slate-50 p-4 rounded-lg">
-                      <h4 className="font-medium text-slate-900 mb-2">
-                        {communities.find((c: any) => c.id === (property as any).communityId)?.name || "Community"}
-                      </h4>
-                      <div className="text-sm text-slate-600 space-y-1">
-                        {(() => {
-                          const community = communities.find((c: any) => c.id === (property as any).communityId);
-                          if (!community) return <p>Community details not available</p>;
-                          
-                          return (
-                            <>
-                              {community.address1 && (
-                                <p>
-                                  {[community.address1, community.address2, community.city, community.state, community.zip]
-                                    .filter(Boolean)
-                                    .join(", ")}
-                                </p>
-                              )}
+            {(property as any)?.communityId ? (
+              (() => {
+                const community = communities.find((c: any) => c.id === (property as any).communityId);
+                if (!community) return (
+                  <Card>
+                    <CardContent className="text-center py-8">
+                      <Building className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                      <p className="text-slate-600">Community details not available</p>
+                    </CardContent>
+                  </Card>
+                );
+
+                return (
+                  <div className="space-y-6">
+                    {/* Community Header */}
+                    <Card>
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="flex items-center text-2xl">
+                            <Building className="w-6 h-6 mr-3" />
+                            {community.name}
+                          </CardTitle>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setIsEditModalOpen(true)}
+                          >
+                            <Settings className="w-4 h-4 mr-2" />
+                            Edit Assignment
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <h4 className="font-medium text-slate-900 mb-2">Location</h4>
+                            <p className="text-slate-600">
+                              {[community.address1, community.address2, community.city, community.state, community.zip]
+                                .filter(Boolean)
+                                .join(", ") || "Address not available"}
+                            </p>
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-slate-900 mb-2">Management</h4>
+                            <div className="space-y-1 text-sm">
                               {community.managerId && (
                                 <p><span className="font-medium">Manager ID:</span> {community.managerId}</p>
                               )}
                               {community.hoaPresidentId && (
-                                <p><span className="font-medium">HOA President ID:</span> {community.hoaPresidentId}</p>
+                                <p><span className="font-medium">HOA President:</span> {community.hoaPresidentId}</p>
                               )}
-                              {community.notes && (
-                                <div className="mt-2 pt-2 border-t border-slate-200">
-                                  <p className="font-medium">Notes:</p>
-                                  <p className="text-slate-700">{community.notes}</p>
+                              {!community.managerId && !community.hoaPresidentId && (
+                                <p className="text-slate-500">Management info not available</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Community Details Tabs */}
+                    <Tabs defaultValue="overview" className="space-y-4">
+                      <TabsList className="grid w-full grid-cols-6">
+                        <TabsTrigger value="overview">Overview</TabsTrigger>
+                        <TabsTrigger value="rules">Rules</TabsTrigger>
+                        <TabsTrigger value="schedule">Schedule</TabsTrigger>
+                        <TabsTrigger value="financial">Financial</TabsTrigger>
+                        <TabsTrigger value="amenities">Amenities</TabsTrigger>
+                        <TabsTrigger value="documents">Documents</TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="overview" className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-lg">Basic Information</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              <div>
+                                <span className="font-medium text-slate-700">Gate Code:</span>
+                                <span className="ml-2 text-slate-900">{community.gateCode || "Not set"}</span>
+                              </div>
+                              <div>
+                                <span className="font-medium text-slate-700">Property Manager:</span>
+                                <span className="ml-2 text-slate-900">{community.propertyManagerName || "Not assigned"}</span>
+                              </div>
+                              <div>
+                                <span className="font-medium text-slate-700">Emergency Contact:</span>
+                                <span className="ml-2 text-slate-900">{community.emergencyContact || "Not provided"}</span>
+                              </div>
+                              <div>
+                                <span className="font-medium text-slate-700">HOA Mailing Address:</span>
+                                <div className="ml-2 text-slate-900 mt-1">
+                                  {community.hoaMailingAddress || "Not provided"}
                                 </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-lg">Notes</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              {community.notes ? (
+                                <p className="text-slate-700 whitespace-pre-wrap">{community.notes}</p>
+                              ) : (
+                                <p className="text-slate-500 italic">No additional notes</p>
                               )}
-                            </>
-                          );
-                        })()}
-                      </div>
-                    </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="rules" className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-lg">Rental & Property Restrictions</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              <div>
+                                <span className="font-medium text-slate-700">Rental Restrictions:</span>
+                                <div className="ml-2 text-slate-900 mt-1">
+                                  {community.rentalRestrictions || "No restrictions specified"}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="font-medium text-slate-700">Pet Policy:</span>
+                                <div className="ml-2 text-slate-900 mt-1">
+                                  {community.petPolicy || "No pet policy specified"}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="font-medium text-slate-700">Parking Rules:</span>
+                                <div className="ml-2 text-slate-900 mt-1">
+                                  {community.parkingRules || "No parking rules specified"}
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-lg">Community Guidelines</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              <div>
+                                <span className="font-medium text-slate-700">Noise Restrictions:</span>
+                                <div className="ml-2 text-slate-900 mt-1">
+                                  {community.noiseRestrictions || "No noise restrictions specified"}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="font-medium text-slate-700">Vendor Access:</span>
+                                <div className="ml-2 text-slate-900 mt-1">
+                                  {community.vendorAccessProcedures || "No vendor procedures specified"}
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="schedule" className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-lg">Maintenance Schedule</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              <div>
+                                <span className="font-medium text-slate-700">Trash/Recycling:</span>
+                                <div className="ml-2 text-slate-900 mt-1">
+                                  {community.trashRecyclingPickup || "Schedule not available"}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="font-medium text-slate-700">Bulk Trash:</span>
+                                <div className="ml-2 text-slate-900 mt-1">
+                                  {community.bulkTrash || "Schedule not available"}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="font-medium text-slate-700">Landscaping:</span>
+                                <div className="ml-2 text-slate-900 mt-1">
+                                  {community.landscapeMaintenance || "Schedule not available"}
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-lg">Community Events</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              <div>
+                                <span className="font-medium text-slate-700">Pest Control:</span>
+                                <div className="ml-2 text-slate-900 mt-1">
+                                  {community.pestControl || "Schedule not available"}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="font-medium text-slate-700">HOA Meetings:</span>
+                                <div className="ml-2 text-slate-900 mt-1">
+                                  {community.hoaMeetings || "Schedule not available"}
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="financial" className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-lg">HOA Dues & Fees</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              <div>
+                                <span className="font-medium text-slate-700">HOA Dues Frequency:</span>
+                                <div className="ml-2 text-slate-900 mt-1">
+                                  {community.hoaDuesFrequency || "Not specified"}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="font-medium text-slate-700">HOA Dues Amount:</span>
+                                <div className="ml-2 text-slate-900 mt-1">
+                                  {community.hoaDuesAmount ? `$${community.hoaDuesAmount}` : "Not specified"}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="font-medium text-slate-700">Late Fees:</span>
+                                <div className="ml-2 text-slate-900 mt-1">
+                                  {community.lateFees || "Not specified"}
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-lg">Payment Information</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              <div>
+                                <span className="font-medium text-slate-700">Payment Portal:</span>
+                                <div className="ml-2 text-slate-900 mt-1">
+                                  {community.paymentPortals || "Not available"}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="font-medium text-slate-700">Special Assessments:</span>
+                                <div className="ml-2 text-slate-900 mt-1">
+                                  {community.specialAssessments || "None currently"}
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="amenities" className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-lg">Current Projects</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-slate-900">
+                                {community.ongoingProjects || "No ongoing projects"}
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-lg">Common Areas & Maintenance</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              <div>
+                                <span className="font-medium text-slate-700">Common Area Maintenance:</span>
+                                <div className="ml-2 text-slate-900 mt-1">
+                                  {community.commonAreaMaintenance || "Not specified"}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="font-medium text-slate-700">Facilities:</span>
+                                <div className="ml-2 text-slate-900 mt-1">
+                                  {community.facilityManagement || "No facilities listed"}
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="documents" className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-lg">Available Documents</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              <p className="text-slate-600 mb-4">Community documents and resources</p>
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
+                                  <span className="text-slate-700">HOA Declarations</span>
+                                  <span className="text-slate-500 text-sm">Not available</span>
+                                </div>
+                                <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
+                                  <span className="text-slate-700">CC&Rs & Bylaws</span>
+                                  <span className="text-slate-500 text-sm">Not available</span>
+                                </div>
+                                <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
+                                  <span className="text-slate-700">Community FAQ</span>
+                                  <span className="text-slate-500 text-sm">Not available</span>
+                                </div>
+                                <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
+                                  <span className="text-slate-700">Welcome Packet</span>
+                                  <span className="text-slate-500 text-sm">Not available</span>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-lg">Document Upload</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <p className="text-slate-600 mb-4">Upload community documents for easy access</p>
+                              <Button variant="outline" disabled>
+                                <Upload className="w-4 h-4 mr-2" />
+                                Upload Documents
+                                <span className="ml-2 text-xs text-slate-500">(Coming Soon)</span>
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </TabsContent>
+                    </Tabs>
                   </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Building className="w-12 h-12 mx-auto text-slate-400 mb-4" />
-                    <h3 className="text-lg font-medium text-slate-900 mb-2">No community assigned</h3>
-                    <p className="text-slate-600 mb-4">This property is not currently assigned to a community or HOA.</p>
-                    <Button onClick={() => setIsEditModalOpen(true)}>
-                      <Settings className="w-4 h-4 mr-2" />
-                      Assign Community
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                );
+              })()
+            ) : (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <Building className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                  <h3 className="text-lg font-medium text-slate-900 mb-2">No community assigned</h3>
+                  <p className="text-slate-600 mb-4">This property is not currently assigned to a community or HOA.</p>
+                  <Button onClick={() => setIsEditModalOpen(true)}>
+                    <Settings className="w-4 h-4 mr-2" />
+                    Assign Community
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="notes">
