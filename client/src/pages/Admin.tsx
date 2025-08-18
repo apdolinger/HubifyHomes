@@ -57,6 +57,23 @@ export default function Admin() {
   const [isNewCommunityDialogOpen, setIsNewCommunityDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
+  // Handle URL parameters to set initial tab and community focus
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tab = urlParams.get('tab');
+    const communityId = urlParams.get('community');
+    
+    if (tab) {
+      setActiveTab(tab);
+    }
+    
+    // If a community ID is specified and we're on communities tab, we could scroll to it
+    // For now, just focus on the communities tab
+    if (communityId && tab === 'communities') {
+      setActiveTab('communities');
+    }
+  }, []);
+
   // Community form schema
   const communitySchema = z.object({
     // Basic Info

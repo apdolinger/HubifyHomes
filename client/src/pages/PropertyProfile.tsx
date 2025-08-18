@@ -2717,8 +2717,8 @@ export default function PropertyProfile() {
                               variant="outline" 
                               size="sm"
                               onClick={() => {
-                                // Navigate to admin data management page with community focus
-                                window.location.href = `/admin/data-management?tab=communities&community=${community.id}`;
+                                // Navigate to admin page with communities tab and focus on this community
+                                window.location.href = `/admin?tab=communities&community=${community.id}`;
                               }}
                             >
                               <Settings className="w-4 h-4 mr-2" />
