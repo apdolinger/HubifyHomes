@@ -4,8 +4,12 @@ import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import AdminForms from "./AdminForms";
 import { SupportModal } from "@/components/SupportModal";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,7 +40,12 @@ import {
   Copy,
   CheckCircle,
   Home,
-  Database
+  Database,
+  Building,
+  MapPin,
+  User,
+  Phone,
+  Eye
 } from "lucide-react";
 
 export default function Admin() {
@@ -45,7 +54,63 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState("forms");
   const [isNewTemplateDialogOpen, setIsNewTemplateDialogOpen] = useState(false);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+  const [isNewCommunityDialogOpen, setIsNewCommunityDialogOpen] = useState(false);
   const queryClient = useQueryClient();
+
+  // Community form schema
+  const communitySchema = z.object({
+    name: z.string().min(1, "Community name is required"),
+    address1: z.string().optional(),
+    address2: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    zip: z.string().optional(),
+    notes: z.string().optional(),
+  });
+
+  const communityForm = useForm({
+    resolver: zodResolver(communitySchema),
+    defaultValues: {
+      name: "",
+      address1: "",
+      address2: "",
+      city: "",
+      state: "",
+      zip: "",
+      notes: "",
+    },
+  });
+
+  // Fetch communities
+  const { data: communities = [], isLoading: isCommunitiesLoading } = useQuery({
+    queryKey: ["/api/communities"],
+  });
+
+  // Create community mutation
+  const createCommunityMutation = useMutation({
+    mutationFn: async (communityData: any) => {
+      return apiRequest("/api/communities", {
+        method: "POST",
+        body: JSON.stringify(communityData),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/communities"] });
+      setIsNewCommunityDialogOpen(false);
+      communityForm.reset();
+      toast({
+        title: "Community Created",
+        description: "The community has been created successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create community",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Sample CSV data from user's provided file
   const csvData = [
@@ -346,7 +411,7 @@ export default function Admin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="forms" className="flex items-center gap-2">
             <FileText className="w-4 h-4" />
             Forms
@@ -354,6 +419,10 @@ export default function Admin() {
           <TabsTrigger value="data" className="flex items-center gap-2">
             <Database className="w-4 h-4" />
             Data Management
+          </TabsTrigger>
+          <TabsTrigger value="communities" className="flex items-center gap-2">
+            <Building className="w-4 h-4" />
+            Communities
           </TabsTrigger>
           <TabsTrigger value="templates" className="flex items-center gap-2">
             <Mail className="w-4 h-4" />
@@ -384,7 +453,7 @@ export default function Admin() {
 
         {/* Data Management Tab */}
         <TabsContent value="data" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Properties Section */}
             <Card>
               <CardHeader>
@@ -407,6 +476,47 @@ export default function Admin() {
                   <Button variant="outline" className="w-full justify-start">
                     <Plus className="w-4 h-4 mr-2" />
                     Add New Property
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Bulk Import
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start">
+                    <Download className="w-4 h-4 mr-2" />
+                    Export Data
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Communities Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building className="w-5 h-5" />
+                  Communities
+                </CardTitle>
+                <CardDescription>
+                  Manage HOAs, communities, and associations
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => setActiveTab("communities")}
+                  >
+                    <Building className="w-4 h-4 mr-2" />
+                    View All Communities
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => setActiveTab("communities")}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add New Community
                   </Button>
                   <Button variant="outline" className="w-full justify-start">
                     <Upload className="w-4 h-4 mr-2" />
@@ -679,6 +789,111 @@ export default function Admin() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Communities Tab */}
+        <TabsContent value="communities" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-semibold">Communities Management</h3>
+              <p className="text-slate-600">Manage HOAs, communities, and property associations</p>
+            </div>
+            <Button onClick={() => setIsNewCommunityDialogOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add New Community
+            </Button>
+          </div>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="space-y-4">
+                {/* Communities List */}
+                {isCommunitiesLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="animate-pulse p-4 border rounded-lg">
+                        <div className="h-4 bg-slate-200 rounded w-1/3 mb-2"></div>
+                        <div className="h-3 bg-slate-200 rounded w-1/2 mb-1"></div>
+                        <div className="h-3 bg-slate-200 rounded w-2/3"></div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {communities.map((community: any) => (
+                      <div key={community.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex-1">
+                          <div className="flex items-start space-x-4">
+                            <div className="flex-1">
+                              <h4 className="font-medium">{community.name}</h4>
+                              {(community.address1 || community.city) && (
+                                <p className="text-sm text-slate-500 flex items-center mt-1">
+                                  <MapPin className="w-3 h-3 mr-1" />
+                                  {[community.address1, community.city, community.state, community.zip]
+                                    .filter(Boolean)
+                                    .join(', ')}
+                                </p>
+                              )}
+                              {community.notes && (
+                                <p className="text-xs text-slate-400 mt-1">{community.notes}</p>
+                              )}
+                            </div>
+                            <div className="text-right text-sm text-slate-500">
+                              <p>{community.propertyCount || 0} Properties</p>
+                              <p>{community.isActive ? 'Active' : 'Inactive'}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button variant="outline" size="sm">
+                            <Eye className="w-3 h-3" />
+                          </Button>
+                          <Button variant="outline" size="sm">
+                            <Edit className="w-3 h-3" />
+                          </Button>
+                          <Button variant="outline" size="sm">
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {communities.length === 0 && (
+                      <div className="text-center py-8">
+                        <Building className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                        <h4 className="font-medium text-slate-900 mb-2">No Communities Yet</h4>
+                        <p className="text-slate-500 mb-4">Create your first community to get started</p>
+                        <Button onClick={() => setIsNewCommunityDialogOpen(true)}>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Community
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="border-t pt-4 mt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 bg-slate-50 rounded-lg">
+                      <h5 className="font-medium text-slate-900">Total Communities</h5>
+                      <p className="text-2xl font-bold text-blue-600 mt-1">{communities.length}</p>
+                      <p className="text-xs text-slate-500 mt-1">Active organizations</p>
+                    </div>
+                    <div className="p-4 bg-slate-50 rounded-lg">
+                      <h5 className="font-medium text-slate-900">Properties Managed</h5>
+                      <p className="text-2xl font-bold text-green-600 mt-1">{communities.reduce((sum, c) => sum + (c.propertyCount || 0), 0)}</p>
+                      <p className="text-xs text-slate-500 mt-1">Across all communities</p>
+                    </div>
+                    <div className="p-4 bg-slate-50 rounded-lg">
+                      <h5 className="font-medium text-slate-900">Active HOAs</h5>
+                      <p className="text-2xl font-bold text-purple-600 mt-1">{communities.filter(c => c.isActive).length}</p>
+                      <p className="text-xs text-slate-500 mt-1">With management contracts</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Custom Fields Tab */}
@@ -1079,6 +1294,147 @@ export default function Admin() {
         isOpen={isSupportModalOpen}
         onClose={() => setIsSupportModalOpen(false)}
       />
+
+      {/* Community Creation Dialog */}
+      <Dialog open={isNewCommunityDialogOpen} onOpenChange={setIsNewCommunityDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add New Community</DialogTitle>
+            <DialogDescription>
+              Create a new community, HOA, or property association
+            </DialogDescription>
+          </DialogHeader>
+
+          <Form {...communityForm}>
+            <form onSubmit={communityForm.handleSubmit((data) => createCommunityMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={communityForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Community Name *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. Riverside Gardens HOA" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={communityForm.control}
+                  name="address1"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Address Line 1</FormLabel>
+                      <FormControl>
+                        <Input placeholder="123 Main Street" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={communityForm.control}
+                  name="address2"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Address Line 2</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Suite 100" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <FormField
+                  control={communityForm.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>City</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Jupiter" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={communityForm.control}
+                  name="state"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>State</FormLabel>
+                      <FormControl>
+                        <Input placeholder="FL" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={communityForm.control}
+                  name="zip"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>ZIP Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="33469" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={communityForm.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Additional information about this community..." 
+                        rows={3}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsNewCommunityDialogOpen(false);
+                    communityForm.reset();
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createCommunityMutation.isPending}
+                >
+                  {createCommunityMutation.isPending ? "Creating..." : "Create Community"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
