@@ -236,7 +236,7 @@ export default function PropertyProfile() {
 
   // Get room supplies
   const { data: supplies = [], isLoading: suppliesLoading, refetch: refetchSupplies } = useQuery({
-    queryKey: [`/api/room-supplies`, selectedRoom?.id],
+    queryKey: [`/api/rooms/${selectedRoom?.id}/supplies`],
     enabled: isAuthenticated && !!selectedRoom?.id,
   });
 
