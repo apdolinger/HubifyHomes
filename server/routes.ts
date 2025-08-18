@@ -339,11 +339,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/communities", isAuthenticated, async (req, res) => {
     try {
       const userId = (req.user as any)?.claims?.sub;
+      console.log("Creating community with data:", req.body);
+      console.log("User ID:", userId);
+      
+      // Validate required fields
+      if (!req.body.name) {
+        return res.status(400).json({ message: "Community name is required" });
+      }
+
       const community = await storage.createCommunity(req.body, userId);
       res.status(201).json(community);
     } catch (error) {
       console.error("Error creating community:", error);
-      res.status(500).json({ message: "Failed to create community" });
+      res.status(500).json({ message: "Failed to create community", error: error.message });
     }
   });
 

@@ -86,13 +86,11 @@ export default function Admin() {
     queryKey: ["/api/communities"],
   });
 
-  // Create community mutation
+  // Create community mutation  
   const createCommunityMutation = useMutation({
     mutationFn: async (communityData: any) => {
-      return apiRequest("/api/communities", {
-        method: "POST",
-        body: JSON.stringify(communityData),
-      });
+      const response = await apiRequest("POST", "/api/communities", communityData);
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/communities"] });
