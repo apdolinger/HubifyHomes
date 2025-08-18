@@ -79,8 +79,11 @@ export default function PropertyProfile() {
     bedrooms: "",
     bathrooms: "",
     billingRate: "",
-    description: ""
+    description: "",
+    communityId: ""
   });
+  const [communitySearch, setCommunitySearch] = useState("");
+  const [selectedCommunity, setSelectedCommunity] = useState<any>(null);
   const [roomForm, setRoomForm] = useState({
     name: "",
     type: "bedroom",
@@ -262,6 +265,12 @@ export default function PropertyProfile() {
   const { data: propertyContacts = [], isLoading: contactsLoading, refetch: refetchContacts } = useQuery({
     queryKey: [`/api/properties/${propertyId}/contacts`],
     enabled: isAuthenticated && !!propertyId,
+  });
+
+  // Get communities
+  const { data: communities = [] } = useQuery({
+    queryKey: ["/api/communities"],
+    enabled: isAuthenticated,
   });
 
   // Room mutations
@@ -854,6 +863,40 @@ export default function PropertyProfile() {
       });
     },
   });
+
+  // Initialize edit form when property data is loaded
+  useEffect(() => {
+    if (property && isEditModalOpen) {
+      setEditForm({
+        name: (property as any).name || "",
+        address1: (property as any).address1 || "",
+        address2: (property as any).address2 || "",
+        city: (property as any).city || "",
+        state: (property as any).state || "",
+        zip: (property as any).zip || "",
+        type: (property as any).type || "",
+        status: (property as any).status || "",
+        squareFootage: (property as any).squareFootage || "",
+        bedrooms: (property as any).bedrooms || "",
+        bathrooms: (property as any).bathrooms || "",
+        billingRate: (property as any).billingRate || "",
+        description: (property as any).description || "",
+        communityId: (property as any).communityId || ""
+      });
+      
+      // Set community search if property has a community
+      if ((property as any).communityId) {
+        const community = communities.find((c: any) => c.id === (property as any).communityId);
+        if (community) {
+          setCommunitySearch(community.name);
+          setSelectedCommunity(community);
+        }
+      } else {
+        setCommunitySearch("");
+        setSelectedCommunity(null);
+      }
+    }
+  }, [property, communities, isEditModalOpen]);
 
   // Format full address helper
   const formatFullAddress = (property: any) => {
@@ -1456,6 +1499,95 @@ export default function PropertyProfile() {
                     </div>
 
                     <div className="md:col-span-2">
+                      <Label htmlFor="edit-community">Community / HOA</Label>
+                      <div className="relative">
+                        <Input
+                          id="edit-community"
+                          value={communitySearch}
+                          onChange={(e) => {
+                            setCommunitySearch(e.target.value);
+                            // Filter communities based on search
+                            const filtered = communities.filter((c: any) => 
+                              c.name.toLowerCase().includes(e.target.value.toLowerCase())
+                            );
+                            // If exact match found, select it
+                            const exactMatch = filtered.find((c: any) => 
+                              c.name.toLowerCase() === e.target.value.toLowerCase()
+                            );
+                            if (exactMatch) {
+                              setSelectedCommunity(exactMatch);
+                              setEditForm({ ...editForm, communityId: exactMatch.id.toString() });
+                            } else if (e.target.value === "") {
+                              setSelectedCommunity(null);
+                              setEditForm({ ...editForm, communityId: "" });
+                            }
+                          }}
+                          placeholder="Type community name or leave blank..."
+                        />
+                        {communitySearch && communities.filter((c: any) => 
+                          c.name.toLowerCase().includes(communitySearch.toLowerCase()) &&
+                          c.name.toLowerCase() !== communitySearch.toLowerCase()
+                        ).length > 0 && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                            {communities
+                              .filter((c: any) => 
+                                c.name.toLowerCase().includes(communitySearch.toLowerCase()) &&
+                                c.name.toLowerCase() !== communitySearch.toLowerCase()
+                              )
+                              .slice(0, 5)
+                              .map((community: any) => (
+                                <div
+                                  key={community.id}
+                                  className="px-4 py-2 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0"
+                                  onClick={() => {
+                                    setCommunitySearch(community.name);
+                                    setSelectedCommunity(community);
+                                    setEditForm({ ...editForm, communityId: community.id.toString() });
+                                  }}
+                                >
+                                  <div className="font-medium text-slate-900">{community.name}</div>
+                                  {community.city && community.state && (
+                                    <div className="text-sm text-slate-600">
+                                      {community.city}, {community.state}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                          </div>
+                        )}
+                        {communitySearch && !communities.some((c: any) => 
+                          c.name.toLowerCase().includes(communitySearch.toLowerCase())
+                        ) && communitySearch.length > 2 && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg">
+                            <div className="px-4 py-3 text-center">
+                              <p className="text-slate-600 mb-2">Community "{communitySearch}" not found</p>
+                              <Button 
+                                size="sm" 
+                                onClick={() => {
+                                  // Navigate to admin page to create new community
+                                  window.open('/admin/data-management?create=community&name=' + encodeURIComponent(communitySearch), '_blank');
+                                }}
+                              >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Create New Community
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      {selectedCommunity && (
+                        <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
+                          <div className="font-medium text-blue-900">Selected: {selectedCommunity.name}</div>
+                          {selectedCommunity.city && selectedCommunity.state && (
+                            <div className="text-blue-700">
+                              {selectedCommunity.city}, {selectedCommunity.state}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="md:col-span-2">
                       <Label htmlFor="edit-description">Description</Label>
                       <Textarea
                         id="edit-description"
@@ -1672,11 +1804,12 @@ export default function PropertyProfile() {
 
         {/* Tabs for detailed information */}
         <Tabs defaultValue="tasks" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="tasks">Tasks</TabsTrigger>
             <TabsTrigger value="contacts">Contacts</TabsTrigger>
             <TabsTrigger value="rooms">Rooms</TabsTrigger>
             <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
+            <TabsTrigger value="community">Community</TabsTrigger>
             <TabsTrigger value="notes">Notes</TabsTrigger>
           </TabsList>
 
@@ -2533,6 +2666,68 @@ export default function PropertyProfile() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="community">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Building className="w-5 h-5 mr-2" />
+                  Community Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(property as any)?.communityId ? (
+                  <div className="space-y-4">
+                    <div className="bg-slate-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-slate-900 mb-2">
+                        {communities.find((c: any) => c.id === (property as any).communityId)?.name || "Community"}
+                      </h4>
+                      <div className="text-sm text-slate-600 space-y-1">
+                        {(() => {
+                          const community = communities.find((c: any) => c.id === (property as any).communityId);
+                          if (!community) return <p>Community details not available</p>;
+                          
+                          return (
+                            <>
+                              {community.address1 && (
+                                <p>
+                                  {[community.address1, community.address2, community.city, community.state, community.zip]
+                                    .filter(Boolean)
+                                    .join(", ")}
+                                </p>
+                              )}
+                              {community.managerId && (
+                                <p><span className="font-medium">Manager ID:</span> {community.managerId}</p>
+                              )}
+                              {community.hoaPresidentId && (
+                                <p><span className="font-medium">HOA President ID:</span> {community.hoaPresidentId}</p>
+                              )}
+                              {community.notes && (
+                                <div className="mt-2 pt-2 border-t border-slate-200">
+                                  <p className="font-medium">Notes:</p>
+                                  <p className="text-slate-700">{community.notes}</p>
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Building className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                    <h3 className="text-lg font-medium text-slate-900 mb-2">No community assigned</h3>
+                    <p className="text-slate-600 mb-4">This property is not currently assigned to a community or HOA.</p>
+                    <Button onClick={() => setIsEditModalOpen(true)}>
+                      <Settings className="w-4 h-4 mr-2" />
+                      Assign Community
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="notes">
