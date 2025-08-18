@@ -1283,27 +1283,8 @@ export default function PropertyProfile() {
               </div>
             </div>
 
-            {/* Location and Status Controls */}
+            {/* Status Controls */}
             <div className="flex-shrink-0 flex flex-col space-y-3">
-              {/* Location Display - Clickable address */}
-              <div className="flex items-start space-x-2 text-slate-600 max-w-xs">
-                <MapPin className="w-5 h-5 mt-0.5 flex-shrink-0" />
-                <div className="text-sm">
-                  <button
-                    onClick={() => {
-                      const address = formatFullAddress(property);
-                      if (address) {
-                        const encodedAddress = encodeURIComponent(address);
-                        window.open(`https://maps.google.com/maps?q=${encodedAddress}`, '_blank');
-                      }
-                    }}
-                    className="font-medium text-slate-900 leading-tight hover:text-blue-600 transition-colors cursor-pointer text-left underline-offset-4 hover:underline"
-                  >
-                    {formatFullAddress(property) || 'No address provided'}
-                  </button>
-                </div>
-              </div>
-              
               {/* Active Status Button - Better styling */}
               <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
                 <DialogTrigger asChild>
