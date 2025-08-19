@@ -280,7 +280,7 @@ export default function PropertyProfile() {
     mutationFn: async (roomData: any) => {
       return await apiRequest("POST", "/api/rooms", {
         ...roomData,
-        propertyId: propertyId
+        propertyId: parseInt(propertyId)
       });
     },
     onSuccess: () => {
