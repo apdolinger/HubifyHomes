@@ -15,6 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   UserCheck, 
   Plus, 
@@ -29,7 +30,9 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Filter
+  Filter,
+  Download,
+  MoreHorizontal
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -63,6 +66,8 @@ export default function People() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [propertyFilter, setPropertyFilter] = useState<string>("all");
+  const [selectedContacts, setSelectedContacts] = useState<Set<number>>(new Set());
+  const [selectAll, setSelectAll] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -301,6 +306,109 @@ export default function People() {
     return sortDirection === "asc" 
       ? <ArrowUp className="w-4 h-4 text-blue-600" />
       : <ArrowDown className="w-4 h-4 text-blue-600" />;
+  };
+
+  // Selection handlers
+  const toggleContactSelection = (contactId: number) => {
+    const newSelected = new Set(selectedContacts);
+    if (newSelected.has(contactId)) {
+      newSelected.delete(contactId);
+    } else {
+      newSelected.add(contactId);
+    }
+    setSelectedContacts(newSelected);
+    setSelectAll(newSelected.size === filteredAndSortedContacts?.length);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectAll) {
+      setSelectedContacts(new Set());
+      setSelectAll(false);
+    } else {
+      const allContactIds = new Set(filteredAndSortedContacts?.map((contact: any) => contact.id) || []);
+      setSelectedContacts(allContactIds);
+      setSelectAll(true);
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedContacts(new Set());
+    setSelectAll(false);
+  };
+
+  // Bulk contact export
+  const handleBulkExport = () => {
+    if (selectedContacts.size === 0) {
+      toast({
+        title: "No Selection",
+        description: "Please select contacts to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const selectedContactsData = filteredAndSortedContacts?.filter((contact: any) => 
+      selectedContacts.has(contact.id)
+    ) || [];
+
+    // Generate CSV content
+    let csvContent = "Name,Type,Email,Phone,Property,Status\n";
+    selectedContactsData.forEach((contact: any) => {
+      const propertyName = properties?.find((p: any) => p.id === contact.propertyId)?.name || 'N/A';
+      csvContent += `"${contact.firstName} ${contact.lastName}",${contact.type || 'N/A'},"${contact.email || 'N/A'}","${contact.phone || 'N/A'}","${propertyName}",${contact.isActive ? 'Active' : 'Inactive'}\n`;
+    });
+
+    // Download CSV
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Contacts_Export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+      title: "Export Complete",
+      description: `${selectedContacts.size} contacts exported successfully.`,
+    });
+  };
+
+  // Bulk email contacts
+  const handleBulkEmail = () => {
+    if (selectedContacts.size === 0) {
+      toast({
+        title: "No Selection",
+        description: "Please select contacts to email.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const selectedContactsData = filteredAndSortedContacts?.filter((contact: any) => 
+      selectedContacts.has(contact.id) && contact.email
+    ) || [];
+
+    if (selectedContactsData.length === 0) {
+      toast({
+        title: "No Email Addresses",
+        description: "None of the selected contacts have email addresses.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const emailList = selectedContactsData.map((contact: any) => contact.email).join(',');
+    const subject = encodeURIComponent('Message from Property Management Team');
+    const body = encodeURIComponent(`Dear Property Contacts,\n\nWe hope this message finds you well.\n\nBest regards,\nProperty Management Team`);
+    
+    window.open(`mailto:${emailList}?subject=${subject}&body=${body}`, '_blank');
+    
+    toast({
+      title: "Email Client Opened",
+      description: `Email addresses for ${selectedContactsData.length} contacts loaded.`,
+    });
   };
 
   const filteredAndSortedContacts = contacts
@@ -586,9 +694,57 @@ export default function People() {
             </div>
           ) : filteredAndSortedContacts?.length > 0 ? (
             <div className="rounded-md border">
+              {/* Bulk Actions Toolbar */}
+              {selectedContacts.size > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm font-medium text-blue-900">
+                        {selectedContacts.size} contact{selectedContacts.size === 1 ? '' : 's'} selected
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={clearSelection}
+                        className="text-blue-700 border-blue-300 hover:bg-blue-100"
+                      >
+                        Clear Selection
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleBulkExport}
+                        className="flex items-center gap-2"
+                      >
+                        <Download className="w-4 h-4" />
+                        Export CSV
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleBulkEmail}
+                        className="flex items-center gap-2"
+                      >
+                        <Mail className="w-4 h-4" />
+                        Email Contacts
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={selectAll}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Select all contacts"
+                      />
+                    </TableHead>
                     <TableHead 
                       className="cursor-pointer hover:bg-slate-50 select-none"
                       onClick={() => handleSort("name")}
@@ -641,10 +797,23 @@ export default function People() {
                   {filteredAndSortedContacts.map((contact: any) => (
                     <TableRow 
                       key={contact.id}
-                      className="cursor-pointer hover:bg-slate-50"
-                      onClick={() => setLocation(`/person-profile/${contact.id}`)}
+                      className={`hover:bg-slate-50 ${selectedContacts.has(contact.id) ? 'bg-blue-50' : ''}`}
                     >
-                      <TableCell>
+                      <TableCell
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleContactSelection(contact.id);
+                        }}
+                      >
+                        <Checkbox
+                          checked={selectedContacts.has(contact.id)}
+                          onCheckedChange={() => toggleContactSelection(contact.id)}
+                        />
+                      </TableCell>
+                      <TableCell
+                        className="cursor-pointer"
+                        onClick={() => setLocation(`/person-profile/${contact.id}`)}
+                      >
                         <div className="flex items-center space-x-3">
                           <div>
                             <div className="font-medium text-slate-900">
@@ -658,12 +827,18 @@ export default function People() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell
+                        className="cursor-pointer"
+                        onClick={() => setLocation(`/person-profile/${contact.id}`)}
+                      >
                         <Badge variant={getTypeColor(contact.type)}>
                           {contact.type.replace('_', ' ')}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell
+                        className="cursor-pointer"
+                        onClick={() => setLocation(`/person-profile/${contact.id}`)}
+                      >
                         {contact.email ? (
                           <div className="flex items-center space-x-2">
                             <Mail className="w-4 h-4 text-slate-400" />
@@ -673,7 +848,10 @@ export default function People() {
                           <span className="text-slate-400 text-sm">—</span>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell
+                        className="cursor-pointer"
+                        onClick={() => setLocation(`/person-profile/${contact.id}`)}
+                      >
                         {contact.phone ? (
                           <div className="flex items-center space-x-2">
                             <Phone className="w-4 h-4 text-slate-400" />
@@ -683,7 +861,10 @@ export default function People() {
                           <span className="text-slate-400 text-sm">—</span>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell
+                        className="cursor-pointer"
+                        onClick={() => setLocation(`/person-profile/${contact.id}`)}
+                      >
                         <div className="flex items-center space-x-2">
                           <Building className="w-4 h-4 text-slate-400" />
                           <span className="text-sm">{getPropertyName(contact.propertyId)}</span>
