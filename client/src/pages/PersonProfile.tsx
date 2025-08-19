@@ -1388,7 +1388,7 @@ export default function PersonProfile() {
                     <FormItem>
                       <FormLabel>City</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Miami" />
+                        <Input {...field} placeholder="City" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1416,7 +1416,7 @@ export default function PersonProfile() {
                     <FormItem>
                       <FormLabel>ZIP Code</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="33101" />
+                        <Input {...field} placeholder="ZIP" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
