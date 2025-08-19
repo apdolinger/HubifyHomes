@@ -32,7 +32,12 @@ Preferred communication style: Simple, everyday language.
 - **Multi-Tenant Architecture**: Organization-scoped data with UUID-based primary keys
 - **Advanced Forms**: JSONB schema storage with flexible field definitions and property assignments
 
-### Key Features and Design Decisions
+### Recent Changes
+- **August 2025**: Fixed platform-wide propertyId validation issue affecting room, vehicle, and contact creation across all properties
+- **August 2025**: Streamlined form builder interface by removing step-by-step tutorial language and redundant settings
+- **August 2025**: Consolidated form settings into cleaner, professional interface without numbered progression indicators
+
+## Key Features and Design Decisions
 - **Multi-Tenant Architecture**: Comprehensive organization-based multi-tenancy supporting distinct clients, properties, forms, and submissions per organization.
 - **Enhanced Forms System**: Advanced, multi-tenant forms with complex field types, property-specific assignments, client submissions with status tracking, and file upload support.
 - **Duplicate Detection & Merge**: Sophisticated backend duplicate detection for contacts and properties using matching algorithms (e.g., Levenshtein distance) and smart merge logic that preserves primary record data.
