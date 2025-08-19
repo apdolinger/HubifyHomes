@@ -409,7 +409,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/properties", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const orgId = req.user.orgId;
+      // For dev mode, use the default org. In production, this would come from the user's org
+      const orgId = req.user.orgId || "00000000-0000-0000-0000-000000000000";
       
       console.log("Property creation request:", {
         body: req.body,
