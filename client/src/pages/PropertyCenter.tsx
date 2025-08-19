@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { routes } from "@/lib/routes";
 import { useToast } from "@/hooks/use-toast";
-import { SupportModal } from "@/components/SupportModal";
+import SupportModal from "@/components/SupportModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

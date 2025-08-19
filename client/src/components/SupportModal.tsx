@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -21,7 +21,12 @@ import {
   HelpCircle,
   Lightbulb,
   X,
-  Send
+  Send,
+  Link,
+  Upload,
+  FileText,
+  Image,
+  Paperclip
 } from 'lucide-react';
 
 interface SupportModalProps {
@@ -122,13 +127,95 @@ const supportArticles: SupportArticle[] = [
   }
 ];
 
-export function SupportModal({ isOpen, onClose }: SupportModalProps) {
+export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [email, setEmail] = useState('');
+  const [hyperlinks, setHyperlinks] = useState<string[]>(['']);
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [suggestedArticles, setSuggestedArticles] = useState<SupportArticle[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+
+  // File upload handlers
+  const handleFileUpload = useCallback((files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    const validFiles = fileArray.filter(file => {
+      // Allow common file types: images, documents, text files
+      const allowedTypes = [
+        'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+        'application/pdf', 'text/plain', 'text/csv',
+        'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      ];
+      
+      // Max 10MB per file
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File Too Large",
+          description: `${file.name} is larger than 10MB. Please choose a smaller file.`,
+          variant: "destructive",
+        });
+        return false;
+      }
+      
+      if (!allowedTypes.includes(file.type)) {
+        toast({
+          title: "Unsupported File Type",
+          description: `${file.name} is not a supported file type.`,
+          variant: "destructive",
+        });
+        return false;
+      }
+      
+      return true;
+    });
+
+    if (validFiles.length > 0) {
+      setAttachments(prev => [...prev, ...validFiles]);
+      toast({
+        title: "Files Added",
+        description: `${validFiles.length} file(s) attached successfully.`,
+      });
+    }
+  }, [toast]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    if (e.dataTransfer.files) {
+      handleFileUpload(e.dataTransfer.files);
+    }
+  }, [handleFileUpload]);
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const addHyperlink = () => {
+    setHyperlinks(prev => [...prev, '']);
+  };
+
+  const updateHyperlink = (index: number, value: string) => {
+    setHyperlinks(prev => prev.map((link, i) => i === index ? value : link));
+  };
+
+  const removeHyperlink = (index: number) => {
+    if (hyperlinks.length > 1) {
+      setHyperlinks(prev => prev.filter((_, i) => i !== index));
+    }
+  };
 
   // Function to calculate relevance score for articles
   const calculateRelevance = (article: SupportArticle, searchText: string): number => {
@@ -207,6 +294,8 @@ export function SupportModal({ isOpen, onClose }: SupportModalProps) {
       setSubject('');
       setMessage('');
       setEmail('');
+      setHyperlinks(['']);
+      setAttachments([]);
       setSuggestedArticles([]);
       onClose();
     } catch (error) {
@@ -275,6 +364,132 @@ export function SupportModal({ isOpen, onClose }: SupportModalProps) {
               rows={6}
               required
             />
+          </div>
+
+          {/* Hyperlinks Section */}
+          <div className="space-y-3">
+            <Label className="flex items-center">
+              <Link className="w-4 h-4 mr-2" />
+              Helpful Links (Optional)
+            </Label>
+            <p className="text-sm text-slate-600">
+              Share any relevant links that might help us understand your issue
+            </p>
+            <div className="space-y-2">
+              {hyperlinks.map((link, index) => (
+                <div key={index} className="flex items-center space-x-2">
+                  <Input
+                    placeholder="https://example.com or internal page reference"
+                    value={link}
+                    onChange={(e) => updateHyperlink(index, e.target.value)}
+                    className="flex-1"
+                  />
+                  {hyperlinks.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => removeHyperlink(index)}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addHyperlink}
+                className="text-blue-600 hover:text-blue-800"
+              >
+                <Link className="w-4 h-4 mr-2" />
+                Add Another Link
+              </Button>
+            </div>
+          </div>
+
+          {/* File Upload Section */}
+          <div className="space-y-3">
+            <Label className="flex items-center">
+              <Paperclip className="w-4 h-4 mr-2" />
+              Attachments (Optional)
+            </Label>
+            <p className="text-sm text-slate-600">
+              Upload screenshots, documents, or other files to help explain your issue
+            </p>
+            
+            {/* Drag and Drop Area */}
+            <div
+              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                isDragOver 
+                  ? 'border-blue-400 bg-blue-50' 
+                  : 'border-slate-300 hover:border-slate-400'
+              }`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
+              <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+              <p className="text-sm font-medium text-slate-600 mb-1">
+                Drag and drop files here, or click to browse
+              </p>
+              <p className="text-xs text-slate-500">
+                Supports: Images (JPG, PNG, GIF), Documents (PDF, DOC), Text files
+              </p>
+              <p className="text-xs text-slate-500">
+                Max 10MB per file
+              </p>
+              <input
+                type="file"
+                multiple
+                accept="image/*,.pdf,.doc,.docx,.txt,.csv"
+                onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
+                className="hidden"
+                id="file-upload"
+              />
+              <label htmlFor="file-upload">
+                <Button type="button" variant="outline" size="sm" className="mt-3" asChild>
+                  <span className="cursor-pointer">
+                    Choose Files
+                  </span>
+                </Button>
+              </label>
+            </div>
+
+            {/* Attached Files List */}
+            {attachments.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-slate-700">Attached Files:</h4>
+                <div className="space-y-1">
+                  {attachments.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-slate-50 rounded border">
+                      <div className="flex items-center space-x-2">
+                        {file.type.startsWith('image/') ? (
+                          <Image className="w-4 h-4 text-green-600" />
+                        ) : (
+                          <FileText className="w-4 h-4 text-blue-600" />
+                        )}
+                        <span className="text-sm text-slate-700">{file.name}</span>
+                        <span className="text-xs text-slate-500">
+                          ({(file.size / 1024 / 1024).toFixed(1)}MB)
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeAttachment(index)}
+                        className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Suggested Articles */}

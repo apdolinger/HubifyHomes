@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import AdminForms from "./AdminForms";
-import { SupportModal } from "@/components/SupportModal";
+import SupportModal from "@/components/SupportModal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { z } from "zod";
