@@ -489,19 +489,22 @@ export default function People() {
       const group = contactGroups.get(personKey);
       group.contactIds.push(contact.id);
       
-      if (contact.propertyId) {
-        // Check if property already exists in the group
-        const existingPropertyIndex = group.properties.findIndex(
-          (prop: any) => prop.propertyId === contact.propertyId
-        );
-        
-        if (existingPropertyIndex === -1) {
-          group.properties.push({
-            propertyId: contact.propertyId,
-            propertyName: getPropertyName(contact.propertyId),
-            isPrimary: group.properties.length === 0 // First property is primary
-          });
-        }
+      // Add properties from the contact's properties array
+      if (contact.properties && contact.properties.length > 0) {
+        contact.properties.forEach((property: any) => {
+          // Check if property already exists in the group
+          const existingPropertyIndex = group.properties.findIndex(
+            (prop: any) => prop.propertyId === property.propertyId
+          );
+          
+          if (existingPropertyIndex === -1) {
+            group.properties.push({
+              propertyId: property.propertyId,
+              propertyName: property.propertyName,
+              isPrimary: property.isPrimary
+            });
+          }
+        });
       }
     });
 

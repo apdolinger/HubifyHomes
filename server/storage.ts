@@ -1229,10 +1229,34 @@ export class DatabaseStorage implements IStorage {
 
   // Contact operations
   async getContacts(includeInactive: boolean = false): Promise<Contact[]> {
-    if (includeInactive) {
-      return await db.select().from(contacts).orderBy(desc(contacts.createdAt));
-    }
-    return await db.select().from(contacts).where(eq(contacts.isActive, true)).orderBy(desc(contacts.createdAt));
+    const contactsQuery = includeInactive 
+      ? db.select().from(contacts).orderBy(desc(contacts.createdAt))
+      : db.select().from(contacts).where(eq(contacts.isActive, true)).orderBy(desc(contacts.createdAt));
+    
+    const contactsList = await contactsQuery;
+    
+    // For each contact, fetch their associated properties
+    const contactsWithProperties = await Promise.all(
+      contactsList.map(async (contact) => {
+        const properties = await db
+          .select({
+            propertyId: contactProperties.propertyId,
+            propertyName: properties.name,
+            isPrimary: contactProperties.isPrimary,
+            relationship: contactProperties.relationship,
+          })
+          .from(contactProperties)
+          .leftJoin(properties, eq(contactProperties.propertyId, properties.id))
+          .where(eq(contactProperties.contactId, contact.id));
+        
+        return {
+          ...contact,
+          properties: properties,
+        };
+      })
+    );
+    
+    return contactsWithProperties;
   }
 
   async getContactsByProperty(propertyId: number): Promise<Contact[]> {
