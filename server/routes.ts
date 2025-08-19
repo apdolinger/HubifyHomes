@@ -410,15 +410,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const orgId = req.user.orgId;
-      const validatedData = insertPropertySchema.parse({
+      
+      console.log("Property creation request:", {
+        body: req.body,
+        userId,
+        orgId,
+        user: req.user
+      });
+      
+      const dataToValidate = {
         ...req.body,
         orgId,
         managerId: userId,
-      });
+      };
+      
+      console.log("Data being validated:", dataToValidate);
+      
+      const validatedData = insertPropertySchema.parse(dataToValidate);
       const property = await storage.createProperty(validatedData, userId);
       res.status(201).json(property);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error("Zod validation errors:", error.errors);
         return res.status(400).json({ message: "Invalid data", errors: error.errors });
       }
       console.error("Error creating property:", error);
