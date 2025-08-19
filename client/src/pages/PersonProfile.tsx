@@ -57,7 +57,25 @@ const editContactSchema = z.object({
   notes: z.string().optional(),
 });
 
+// Form schema for creating new property
+const propertySchema = z.object({
+  name: z.string().min(1, "Property name is required"),
+  address1: z.string().min(1, "Address line 1 is required"),
+  address2: z.string().optional(),
+  city: z.string().min(1, "City is required"),
+  state: z.string().min(2, "State is required").max(2, "State must be 2 characters"),
+  zip: z.string().min(5, "ZIP code is required"),
+  type: z.enum(["single-family", "condo", "apartment", "house", "commercial"]),
+  units: z.number().min(1).optional(),
+  squareFootage: z.number().min(1).optional(),
+  billingType: z.enum(["sqft", "flat_fee"]).optional(),
+  status: z.enum(["occupied", "vacant", "under_repair"]).default("occupied"),
+  imageUrl: z.string().optional(),
+  communityId: z.number().optional(),
+});
+
 type EditContactFormData = z.infer<typeof editContactSchema>;
+type PropertyFormData = z.infer<typeof propertySchema>;
 
 export default function PersonProfile() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -73,6 +91,9 @@ export default function PersonProfile() {
   // Link property modal state
   const [isLinkPropertyModalOpen, setIsLinkPropertyModalOpen] = useState(false);
   const [propertySearchTerm, setPropertySearchTerm] = useState("");
+  
+  // New property modal state
+  const [isNewPropertyModalOpen, setIsNewPropertyModalOpen] = useState(false);
   const [selectedProperties, setSelectedProperties] = useState<any[]>([]);
   
   // Multiple properties navigation state
@@ -96,6 +117,26 @@ export default function PersonProfile() {
       type: "tenant",
       propertyId: undefined,
       notes: "",
+    },
+  });
+
+  // New property form
+  const newPropertyForm = useForm<PropertyFormData>({
+    resolver: zodResolver(propertySchema),
+    defaultValues: {
+      name: "",
+      address1: "",
+      address2: "",
+      city: "",
+      state: "",
+      zip: "",
+      type: "single-family",
+      units: 1,
+      status: "occupied",
+      imageUrl: "",
+      squareFootage: undefined,
+      billingType: undefined,
+      communityId: undefined,
     },
   });
   
@@ -280,6 +321,44 @@ export default function PersonProfile() {
       toast({
         title: "Error",
         description: "Failed to delete contact. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create property mutation
+  const createPropertyMutation = useMutation({
+    mutationFn: async (data: PropertyFormData) => {
+      const response = await apiRequest("POST", "/api/properties", data);
+      return response.json();
+    },
+    onSuccess: (newProperty) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
+      toast({
+        title: "Property Created",
+        description: `Property "${newProperty.name}" has been created successfully.`,
+      });
+      setIsNewPropertyModalOpen(false);
+      newPropertyForm.reset();
+      // Refresh the property queries to include the new property
+      queryClient.invalidateQueries({ queryKey: [`/api/contacts/${personId}/properties`] });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      
+      toast({
+        title: "Error",
+        description: "Failed to create property. Please try again.",
         variant: "destructive",
       });
     },
@@ -1079,8 +1158,7 @@ export default function PersonProfile() {
                       <p className="text-sm mb-3">Try adjusting your search terms or create a new property</p>
                       <Button
                         onClick={() => {
-                          setIsLinkPropertyModalOpen(false);
-                          setLocation('/properties');
+                          setIsNewPropertyModalOpen(true);
                         }}
                         className="bg-primary hover:bg-primary/90"
                       >
@@ -1093,8 +1171,7 @@ export default function PersonProfile() {
                     <div className="mt-4">
                       <Button
                         onClick={() => {
-                          setIsLinkPropertyModalOpen(false);
-                          setLocation('/properties');
+                          setIsNewPropertyModalOpen(true);
                         }}
                         className="bg-primary hover:bg-primary/90"
                       >
@@ -1231,6 +1308,142 @@ export default function PersonProfile() {
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Property Modal */}
+      <Dialog open={isNewPropertyModalOpen} onOpenChange={setIsNewPropertyModalOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Create New Property</DialogTitle>
+            <DialogDescription>
+              Add a new property to your portfolio. It will be automatically linked to this person.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...newPropertyForm}>
+            <form onSubmit={newPropertyForm.handleSubmit((data) => createPropertyMutation.mutate(data))} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={newPropertyForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel>Property Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Sunset Villa" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={newPropertyForm.control}
+                  name="address1"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel>Address Line 1</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="123 Main Street" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={newPropertyForm.control}
+                  name="address2"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel>Address Line 2 (Optional)</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Apt 4B" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={newPropertyForm.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>City</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Miami" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={newPropertyForm.control}
+                  name="state"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>State</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="FL" maxLength={2} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={newPropertyForm.control}
+                  name="zip"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>ZIP Code</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="33101" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={newPropertyForm.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Property Type</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="single-family">Single Family</SelectItem>
+                          <SelectItem value="condo">Condo</SelectItem>
+                          <SelectItem value="apartment">Apartment</SelectItem>
+                          <SelectItem value="house">House</SelectItem>
+                          <SelectItem value="commercial">Commercial</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsNewPropertyModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createPropertyMutation.isPending}>
+                  {createPropertyMutation.isPending ? "Creating..." : "Create Property"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 
