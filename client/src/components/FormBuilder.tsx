@@ -29,6 +29,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
+import { FormContext } from '@/../../shared/schema';
 
 /**
  * FORM MANAGEMENT AREA
@@ -51,6 +52,7 @@ interface FormSchema {
   formTitle: string;
   internalDescription?: string;
   slug: string;
+  context: FormContext;
   fields: FormFieldOption[];
   allowMultipleSubmissions: boolean;
   matchExistingBy: 'email' | 'phone' | 'none';
@@ -333,6 +335,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
     formTitle: initialForm?.formTitle || '',
     internalDescription: initialForm?.internalDescription || '',
     slug: initialForm?.slug || '',
+    context: (initialForm?.context as FormContext) || 'people',
     fields: initialForm?.fields || [],
     allowMultipleSubmissions: initialForm?.allowMultipleSubmissions || false,
     matchExistingBy: initialForm?.matchExistingBy || 'email',
@@ -551,6 +554,29 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
                     placeholder="Internal notes about this form..."
                     rows={3}
                   />
+                </div>
+
+                <div>
+                  <Label>Form Context</Label>
+                  <Select
+                    value={formSchema.context}
+                    onValueChange={(value: FormContext) =>
+                      updateFormSchema({ context: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="people">People - Contact/Client Forms</SelectItem>
+                      <SelectItem value="property">Property - Property Information Forms</SelectItem>
+                      <SelectItem value="task">Task - Task & Service Request Forms</SelectItem>
+                      <SelectItem value="multi">Multi - General Purpose Forms</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Determines how form submissions are categorized and processed.
+                  </p>
                 </div>
 
                 <div className="space-y-3">

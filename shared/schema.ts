@@ -16,6 +16,9 @@ import { relations, sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Form context types
+export type FormContext = 'people' | 'property' | 'task' | 'multi';
+
 // Session storage table - required for Replit Auth
 export const sessions = pgTable(
   "sessions",
@@ -407,6 +410,7 @@ export const forms = pgTable("forms", {
   id: serial("id").primaryKey(),
   formTitle: text("form_title").notNull(),
   slug: text("slug").notNull().unique(),
+  context: text("context").$type<FormContext>().default('people'),
   settings: jsonb("settings").$type<{
     allowMultipleSubmissions?: boolean;
     matchExistingBy?: 'email' | 'phone' | 'none';

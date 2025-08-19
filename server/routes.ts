@@ -1810,6 +1810,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const formData = {
         formTitle: req.body.name || req.body.formTitle,
         slug: req.body.slug || req.body.name?.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-'),
+        context: req.body.context || req.body.schema?.context || 'people',
         settings: {
           internalDescription: req.body.description,
           allowMultipleSubmissions: req.body.schema?.allowMultipleSubmissions || false,
