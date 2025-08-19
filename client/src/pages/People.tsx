@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -286,7 +286,7 @@ export default function People() {
 
   const getPropertyName = (propertyId: number | null) => {
     if (!propertyId || !properties) return "No property";
-    const property = properties.find((p: any) => p.id === propertyId);
+    const property = (properties as any[]).find((p: any) => p.id === propertyId);
     return property?.name || "Unknown property";
   };
 
@@ -317,7 +317,7 @@ export default function People() {
       newSelected.add(contactId);
     }
     setSelectedContacts(newSelected);
-    setSelectAll(newSelected.size === filteredAndSortedContacts?.length);
+    setSelectAll(newSelected.size === groupedContacts?.length);
   };
 
   const toggleSelectAll = () => {
@@ -325,7 +325,7 @@ export default function People() {
       setSelectedContacts(new Set());
       setSelectAll(false);
     } else {
-      const allContactIds = new Set(filteredAndSortedContacts?.map((contact: any) => contact.id) || []);
+      const allContactIds = new Set(groupedContacts?.map((group: any) => group.id) || []);
       setSelectedContacts(allContactIds);
       setSelectAll(true);
     }
@@ -347,15 +347,17 @@ export default function People() {
       return;
     }
 
-    const selectedContactsData = filteredAndSortedContacts?.filter((contact: any) => 
-      selectedContacts.has(contact.id)
+    const selectedContactsData = groupedContacts?.filter((group: any) => 
+      selectedContacts.has(group.id)
     ) || [];
 
     // Generate CSV content
-    let csvContent = "Name,Type,Email,Phone,Property,Status\n";
-    selectedContactsData.forEach((contact: any) => {
-      const propertyName = properties?.find((p: any) => p.id === contact.propertyId)?.name || 'N/A';
-      csvContent += `"${contact.firstName} ${contact.lastName}",${contact.type || 'N/A'},"${contact.email || 'N/A'}","${contact.phone || 'N/A'}","${propertyName}",${contact.isActive ? 'Active' : 'Inactive'}\n`;
+    let csvContent = "Name,Type,Email,Phone,Properties,Status\n";
+    selectedContactsData.forEach((group: any) => {
+      const propertiesText = group.properties.length > 0 
+        ? group.properties.map((p: any) => p.propertyName + (p.isPrimary ? ' (Primary)' : '')).join('; ')
+        : 'N/A';
+      csvContent += `"${group.firstName} ${group.lastName}",${group.type || 'N/A'},"${group.email || 'N/A'}","${group.phone || 'N/A'}","${propertiesText}",${group.isActive ? 'Active' : 'Inactive'}\n`;
     });
 
     // Download CSV
@@ -386,8 +388,8 @@ export default function People() {
       return;
     }
 
-    const selectedContactsData = filteredAndSortedContacts?.filter((contact: any) => 
-      selectedContacts.has(contact.id) && contact.email
+    const selectedContactsData = groupedContacts?.filter((group: any) => 
+      selectedContacts.has(group.id) && group.email
     ) || [];
 
     if (selectedContactsData.length === 0) {
@@ -399,7 +401,7 @@ export default function People() {
       return;
     }
 
-    const emailList = selectedContactsData.map((contact: any) => contact.email).join(',');
+    const emailList = selectedContactsData.map((group: any) => group.email).join(',');
     const subject = encodeURIComponent('Message from Property Management Team');
     const body = encodeURIComponent(`Dear Property Contacts,\n\nWe hope this message finds you well.\n\nBest regards,\nProperty Management Team`);
     
@@ -460,6 +462,63 @@ export default function People() {
         return bValue.localeCompare(aValue);
       }
     });
+
+  // Group contacts by person (firstName + lastName + email combination)
+  const groupedContacts = React.useMemo(() => {
+    if (!filteredAndSortedContacts) return [];
+
+    const contactGroups = new Map();
+
+    filteredAndSortedContacts.forEach((contact: any) => {
+      const personKey = `${contact.firstName}_${contact.lastName}_${contact.email || ''}`;
+      
+      if (!contactGroups.has(personKey)) {
+        contactGroups.set(personKey, {
+          id: contact.id, // Use first contact's ID as the group ID
+          firstName: contact.firstName,
+          lastName: contact.lastName,
+          email: contact.email,
+          phone: contact.phone,
+          type: contact.type,
+          isActive: contact.isActive,
+          properties: [],
+          contactIds: [] // Track all contact IDs in this group for selection
+        });
+      }
+      
+      const group = contactGroups.get(personKey);
+      group.contactIds.push(contact.id);
+      
+      if (contact.propertyId) {
+        // Check if property already exists in the group
+        const existingPropertyIndex = group.properties.findIndex(
+          (prop: any) => prop.propertyId === contact.propertyId
+        );
+        
+        if (existingPropertyIndex === -1) {
+          group.properties.push({
+            propertyId: contact.propertyId,
+            propertyName: getPropertyName(contact.propertyId),
+            isPrimary: group.properties.length === 0 // First property is primary
+          });
+        }
+      }
+    });
+
+    // Convert map to array and sort by name
+    const groupsArray = Array.from(contactGroups.values());
+    
+    // Sort properties within each group (primary first)
+    groupsArray.forEach(group => {
+      group.properties.sort((a: any, b: any) => {
+        if (a.isPrimary && !b.isPrimary) return -1;
+        if (!a.isPrimary && b.isPrimary) return 1;
+        return a.propertyName.localeCompare(b.propertyName);
+      });
+    });
+
+    return groupsArray;
+  }, [filteredAndSortedContacts]);
 
   const getContactStats = () => {
     if (!contacts) return { total: 0, tenants: 0, owners: 0, vendors: 0 };
@@ -649,7 +708,7 @@ export default function People() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Properties</SelectItem>
-                    {properties?.map((property: any) => (
+                    {(properties as any[])?.map((property: any) => (
                       <SelectItem key={property.id} value={property.id.toString()}>
                         {property.name}
                       </SelectItem>
@@ -683,7 +742,7 @@ export default function People() {
           <div className="flex items-center justify-between">
             <CardTitle>Contacts</CardTitle>
             <div className="text-sm text-slate-600">
-              {filteredAndSortedContacts?.length || 0} of {contacts?.length || 0} contacts
+              {groupedContacts?.length || 0} people ({filteredAndSortedContacts?.length || 0} contacts)
             </div>
           </div>
         </CardHeader>
@@ -692,7 +751,7 @@ export default function People() {
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
-          ) : filteredAndSortedContacts?.length > 0 ? (
+          ) : groupedContacts?.length > 0 ? (
             <div className="rounded-md border">
               {/* Bulk Actions Toolbar */}
               {selectedContacts.size > 0 && (
@@ -786,7 +845,7 @@ export default function People() {
                       onClick={() => handleSort("property")}
                     >
                       <div className="flex items-center space-x-2">
-                        <span>Property</span>
+                        <span>Properties</span>
                         {getSortIcon("property")}
                       </div>
                     </TableHead>
@@ -794,32 +853,32 @@ export default function People() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredAndSortedContacts.map((contact: any) => (
+                  {groupedContacts.map((group: any) => (
                     <TableRow 
-                      key={contact.id}
-                      className={`hover:bg-slate-50 ${selectedContacts.has(contact.id) ? 'bg-blue-50' : ''}`}
+                      key={group.id}
+                      className={`hover:bg-slate-50 ${selectedContacts.has(group.id) ? 'bg-blue-50' : ''}`}
                     >
                       <TableCell
                         onClick={(e) => {
                           e.stopPropagation();
-                          toggleContactSelection(contact.id);
+                          toggleContactSelection(group.id);
                         }}
                       >
                         <Checkbox
-                          checked={selectedContacts.has(contact.id)}
-                          onCheckedChange={() => toggleContactSelection(contact.id)}
+                          checked={selectedContacts.has(group.id)}
+                          onCheckedChange={() => toggleContactSelection(group.id)}
                         />
                       </TableCell>
                       <TableCell
                         className="cursor-pointer"
-                        onClick={() => setLocation(`/person-profile/${contact.id}`)}
+                        onClick={() => setLocation(`/person-profile/${group.id}`)}
                       >
                         <div className="flex items-center space-x-3">
                           <div>
                             <div className="font-medium text-slate-900">
-                              {contact.firstName} {contact.lastName}
+                              {group.firstName} {group.lastName}
                             </div>
-                            {!contact.isActive && (
+                            {!group.isActive && (
                               <Badge variant="secondary" className="bg-red-100 text-red-800 border-red-200 text-xs">
                                 Inactive
                               </Badge>
@@ -829,20 +888,20 @@ export default function People() {
                       </TableCell>
                       <TableCell
                         className="cursor-pointer"
-                        onClick={() => setLocation(`/person-profile/${contact.id}`)}
+                        onClick={() => setLocation(`/person-profile/${group.id}`)}
                       >
-                        <Badge variant={getTypeColor(contact.type)}>
-                          {contact.type.replace('_', ' ')}
+                        <Badge variant={getTypeColor(group.type)}>
+                          {group.type.replace('_', ' ')}
                         </Badge>
                       </TableCell>
                       <TableCell
                         className="cursor-pointer"
-                        onClick={() => setLocation(`/person-profile/${contact.id}`)}
+                        onClick={() => setLocation(`/person-profile/${group.id}`)}
                       >
-                        {contact.email ? (
+                        {group.email ? (
                           <div className="flex items-center space-x-2">
                             <Mail className="w-4 h-4 text-slate-400" />
-                            <span className="text-sm">{contact.email}</span>
+                            <span className="text-sm">{group.email}</span>
                           </div>
                         ) : (
                           <span className="text-slate-400 text-sm">—</span>
@@ -850,12 +909,12 @@ export default function People() {
                       </TableCell>
                       <TableCell
                         className="cursor-pointer"
-                        onClick={() => setLocation(`/person-profile/${contact.id}`)}
+                        onClick={() => setLocation(`/person-profile/${group.id}`)}
                       >
-                        {contact.phone ? (
+                        {group.phone ? (
                           <div className="flex items-center space-x-2">
                             <Phone className="w-4 h-4 text-slate-400" />
-                            <span className="text-sm">{contact.phone}</span>
+                            <span className="text-sm">{group.phone}</span>
                           </div>
                         ) : (
                           <span className="text-slate-400 text-sm">—</span>
@@ -864,19 +923,30 @@ export default function People() {
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           <Building className="w-4 h-4 text-slate-400" />
-                          {contact.propertyId ? (
-                            <span 
-                              className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer underline"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setLocation(`/property-profile/${contact.propertyId}`);
-                              }}
-                            >
-                              {getPropertyName(contact.propertyId)}
-                            </span>
-                          ) : (
-                            <span className="text-sm text-slate-400">No property</span>
-                          )}
+                          <div className="space-y-1">
+                            {group.properties.length > 0 ? (
+                              group.properties.map((property: any, index: number) => (
+                                <div key={property.propertyId} className="flex items-center space-x-1">
+                                  <span 
+                                    className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer underline"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setLocation(`/property-profile/${property.propertyId}`);
+                                    }}
+                                  >
+                                    {property.propertyName}
+                                  </span>
+                                  {property.isPrimary && (
+                                    <Badge variant="outline" className="text-xs px-1 py-0 h-4">
+                                      Primary
+                                    </Badge>
+                                  )}
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-sm text-slate-400">No properties</span>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
@@ -886,7 +956,7 @@ export default function People() {
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleEditContact(contact);
+                              handleEditContact(group);
                             }}
                           >
                             <Edit className="w-4 h-4" />
@@ -1027,7 +1097,7 @@ export default function People() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {properties?.map((property: any) => (
+                          {(properties as any[])?.map((property: any) => (
                             <SelectItem key={property.id} value={property.id.toString()}>
                               {property.name}
                             </SelectItem>
@@ -1175,7 +1245,7 @@ export default function People() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {properties?.map((property: any) => (
+                          {(properties as any[])?.map((property: any) => (
                             <SelectItem key={property.id} value={property.id.toString()}>
                               {property.name}
                             </SelectItem>
