@@ -861,13 +861,22 @@ export default function People() {
                           <span className="text-slate-400 text-sm">—</span>
                         )}
                       </TableCell>
-                      <TableCell
-                        className="cursor-pointer"
-                        onClick={() => setLocation(`/person-profile/${contact.id}`)}
-                      >
+                      <TableCell>
                         <div className="flex items-center space-x-2">
                           <Building className="w-4 h-4 text-slate-400" />
-                          <span className="text-sm">{getPropertyName(contact.propertyId)}</span>
+                          {contact.propertyId ? (
+                            <span 
+                              className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer underline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setLocation(`/property-profile/${contact.propertyId}`);
+                              }}
+                            >
+                              {getPropertyName(contact.propertyId)}
+                            </span>
+                          ) : (
+                            <span className="text-sm text-slate-400">No property</span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
