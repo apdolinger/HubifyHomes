@@ -539,8 +539,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/properties/:id", isAuthenticated, async (req, res) => {
     try {
-      const id = req.params.id;
-      if (!id) {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
         return res.status(400).json({ message: 'Invalid property ID' });
       }
       
@@ -602,8 +602,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update property
   app.patch("/api/properties/:id", isAuthenticated, async (req, res) => {
     try {
-      const id = req.params.id;
-      if (!id) {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
         return res.status(400).json({ message: 'Invalid property ID' });
       }
 
@@ -620,8 +620,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete property
   app.delete("/api/properties/:id", isAuthenticated, async (req, res) => {
     try {
-      const id = req.params.id;
-      if (!id) {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
         return res.status(400).json({ message: 'Invalid property ID' });
       }
 
@@ -636,8 +636,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Room routes
   app.get("/api/properties/:propertyId/rooms", isAuthenticated, async (req, res) => {
     try {
-      const propertyId = req.params.propertyId;
-      if (!propertyId) {
+      const propertyId = parseInt(req.params.propertyId);
+      if (isNaN(propertyId)) {
         return res.status(400).json({ message: 'Invalid property ID' });
       }
       
