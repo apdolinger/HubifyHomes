@@ -142,6 +142,85 @@ interface FormBuilderProps {
   initialForm?: Partial<FormSchema>;
 }
 
+// FormSettingsPanel Component
+interface FormSettingsPanelProps {
+  formSchema: FormSchema;
+  updateFormSchema: (updates: Partial<FormSchema>) => void;
+}
+
+const FormSettingsPanel: React.FC<FormSettingsPanelProps> = ({
+  formSchema,
+  updateFormSchema
+}) => {
+  return (
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle className="flex items-center">
+          <Settings className="w-5 h-5 mr-2" />
+          Form Settings
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <Label htmlFor="formTitle">Form Title</Label>
+          <Input
+            id="formTitle"
+            value={formSchema.formTitle}
+            onChange={(e) => updateFormSchema({ formTitle: e.target.value })}
+            placeholder="Enter form title"
+          />
+        </div>
+        
+        <div>
+          <Label htmlFor="internalDescription">Internal Description</Label>
+          <Textarea
+            id="internalDescription"
+            value={formSchema.internalDescription || ''}
+            onChange={(e) => updateFormSchema({ internalDescription: e.target.value })}
+            placeholder="Internal notes about this form (not visible to users)"
+            rows={3}
+          />
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="allowMultipleSubmissions"
+            checked={formSchema.allowMultipleSubmissions}
+            onCheckedChange={(checked) => updateFormSchema({ allowMultipleSubmissions: checked })}
+          />
+          <Label htmlFor="allowMultipleSubmissions">Allow Multiple Submissions</Label>
+        </div>
+        
+        <div>
+          <Label htmlFor="matchExistingBy">Match Existing Profile By</Label>
+          <Select 
+            value={formSchema.matchExistingBy} 
+            onValueChange={(value: 'email' | 'phone' | 'none') => updateFormSchema({ matchExistingBy: value })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select matching method" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="email">Email Address</SelectItem>
+              <SelectItem value="phone">Phone Number</SelectItem>
+              <SelectItem value="none">No Profile Matching</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="triggerAutomation"
+            checked={formSchema.triggerAutomation || false}
+            onCheckedChange={(checked) => updateFormSchema({ triggerAutomation: checked })}
+          />
+          <Label htmlFor="triggerAutomation">Trigger Automation on Submit?</Label>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -167,14 +246,17 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
       .trim();
   }, []);
 
-  // Update slug when title changes
-  const handleTitleChange = (title: string) => {
-    setFormSchema(prev => ({
-      ...prev,
-      formTitle: title,
-      slug: generateSlug(title)
-    }));
-  };
+  // Update form schema helper
+  const updateFormSchema = useCallback((updates: Partial<FormSchema>) => {
+    setFormSchema(prev => {
+      const updated = { ...prev, ...updates };
+      // Auto-generate slug when title changes
+      if (updates.formTitle !== undefined) {
+        updated.slug = generateSlug(updates.formTitle);
+      }
+      return updated;
+    });
+  }, [generateSlug]);
 
   // Handle drag and drop
   const handleDragEnd = (result: DropResult) => {
@@ -308,6 +390,12 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
           </Button>
         </div>
       </div>
+
+      {/* Form Settings Panel */}
+      <FormSettingsPanel 
+        formSchema={formSchema}
+        updateFormSchema={updateFormSchema}
+      />
 
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
