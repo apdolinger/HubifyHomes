@@ -1074,8 +1074,34 @@ export default function PersonProfile() {
                       : "All matching properties are already linked"
                     }
                   </p>
-                  {propertySearchTerm && (
-                    <p className="text-sm">Try adjusting your search terms</p>
+                  {propertySearchTerm && filteredProperties.length === 0 && (
+                    <div className="mt-4">
+                      <p className="text-sm mb-3">Try adjusting your search terms or create a new property</p>
+                      <Button
+                        onClick={() => {
+                          setIsLinkPropertyModalOpen(false);
+                          setLocation('/properties');
+                        }}
+                        className="bg-primary hover:bg-primary/90"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create New Property
+                      </Button>
+                    </div>
+                  )}
+                  {!propertySearchTerm && filteredProperties.length === 0 && (
+                    <div className="mt-4">
+                      <Button
+                        onClick={() => {
+                          setIsLinkPropertyModalOpen(false);
+                          setLocation('/properties');
+                        }}
+                        className="bg-primary hover:bg-primary/90"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create New Property
+                      </Button>
+                    </div>
                   )}
                 </div>
               )}
@@ -1316,7 +1342,7 @@ export default function PersonProfile() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {properties?.map((property: any) => (
+                          {(properties as any[])?.map((property: any) => (
                             <SelectItem key={property.id} value={property.id.toString()}>
                               {property.name}
                             </SelectItem>
