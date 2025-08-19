@@ -46,6 +46,7 @@ function generateFormHTML(form: any, isEmbed: boolean): string {
         return `
           <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">${field.label}${field.required ? ' *' : ''}</label>
+            ${field.description ? `<p class="text-sm text-gray-600 mb-2">${field.description}</p>` : ''}
             <textarea name="${fieldId}" ${required} placeholder="${field.placeholder || ''}" 
                       class="${inputClass}" rows="4"></textarea>
           </div>
@@ -57,6 +58,7 @@ function generateFormHTML(form: any, isEmbed: boolean): string {
         return `
           <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">${field.label}${field.required ? ' *' : ''}</label>
+            ${field.description ? `<p class="text-sm text-gray-600 mb-2">${field.description}</p>` : ''}
             <select name="${fieldId}" ${required} class="${inputClass}">
               <option value="">Select an option</option>
               ${options}
@@ -66,10 +68,13 @@ function generateFormHTML(form: any, isEmbed: boolean): string {
       case 'checkbox':
         return `
           <div class="mb-4">
-            <div class="flex items-center">
+            <div class="flex items-start">
               <input type="checkbox" name="${fieldId}" ${required} id="${fieldId}"
-                     class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-              <label for="${fieldId}" class="ml-2 block text-sm text-gray-700">${field.label}${field.required ? ' *' : ''}</label>
+                     class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1">
+              <div class="ml-2">
+                <label for="${fieldId}" class="block text-sm text-gray-700">${field.label}${field.required ? ' *' : ''}</label>
+                ${field.description ? `<p class="text-sm text-gray-600 mt-1">${field.description}</p>` : ''}
+              </div>
             </div>
           </div>
         `;
@@ -77,6 +82,7 @@ function generateFormHTML(form: any, isEmbed: boolean): string {
         return `
           <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">${field.label}${field.required ? ' *' : ''}</label>
+            ${field.description ? `<p class="text-sm text-gray-600 mb-2">${field.description}</p>` : ''}
             <input type="${field.type}" name="${fieldId}" ${required} 
                    placeholder="${field.placeholder || ''}" class="${inputClass}">
           </div>

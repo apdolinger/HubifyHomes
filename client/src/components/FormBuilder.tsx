@@ -38,11 +38,13 @@ import { apiRequest } from '@/lib/queryClient';
 
 interface FormFieldOption {
   label: string;
+  description?: string;
   type: string;
   required: boolean;
   profileFieldKey: string; // maps to DB field on the person profile
   icon?: React.ReactNode;
   options?: string[]; // for select/checkbox fields
+  placeholder?: string;
 }
 
 interface FormSchema {
@@ -692,16 +694,22 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
                                     </div>
                                     {field.icon}
                                     <div className="flex-1">
-                                      <div className="flex items-center space-x-2">
+                                      <div className="flex items-center space-x-2 mb-2">
                                         <Input
                                           value={field.label}
                                           onChange={(e) => updateField(index, { label: e.target.value })}
                                           className="font-medium"
-                                          placeholder="Field label"
+                                          placeholder="Enter question text (e.g., Please provide your business phone number)"
                                         />
                                         <Badge variant="outline">{field.type}</Badge>
                                       </div>
-                                      <p className="text-xs text-slate-500 mt-1">
+                                      <Input
+                                        value={field.description || ''}
+                                        onChange={(e) => updateField(index, { description: e.target.value })}
+                                        className="text-sm mb-2"
+                                        placeholder="Enter description (e.g., This could be a mobile number, work number or home phone)"
+                                      />
+                                      <p className="text-xs text-slate-500">
                                         Maps to: <code className="bg-slate-100 px-1 rounded">{field.profileFieldKey}</code>
                                       </p>
                                     </div>
