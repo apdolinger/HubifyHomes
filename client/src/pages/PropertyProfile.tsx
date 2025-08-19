@@ -50,7 +50,8 @@ import {
   Camera,
   Speaker,
   Car,
-  Settings
+  Settings,
+  Navigation
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -66,6 +67,7 @@ export default function PropertyProfile() {
   const [isImageUploading, setIsImageUploading] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [showArchivedTasks, setShowArchivedTasks] = useState(false);
+  const [isNavigationModalOpen, setIsNavigationModalOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     name: "",
     address1: "",
@@ -1640,13 +1642,7 @@ export default function PropertyProfile() {
                   </h1>
                   {(property as any)?.name && (
                     <button 
-                      onClick={() => {
-                        const address = formatFullAddress(property);
-                        if (address) {
-                          const encodedAddress = encodeURIComponent(address);
-                          window.open(`https://maps.google.com/maps?q=${encodedAddress}`, '_blank');
-                        }
-                      }}
+                      onClick={() => setIsNavigationModalOpen(true)}
                       className="text-slate-600 flex items-center mb-3 hover:text-blue-600 transition-colors cursor-pointer text-left underline-offset-4 hover:underline"
                     >
                       <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
@@ -4508,6 +4504,98 @@ export default function PropertyProfile() {
                     Add Contact
                   </>
                 )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Navigation Modal */}
+        <Dialog open={isNavigationModalOpen} onOpenChange={setIsNavigationModalOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center">
+                <Navigation className="w-5 h-5 mr-2" />
+                Get Directions
+              </DialogTitle>
+              <DialogDescription>
+                Choose your preferred navigation app to get directions to {formatFullAddress(property)}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-3">
+              <Button
+                variant="outline"
+                className="w-full justify-start h-auto p-4"
+                onClick={() => {
+                  const address = formatFullAddress(property);
+                  if (address) {
+                    const encodedAddress = encodeURIComponent(address);
+                    window.open(`https://maps.google.com/maps?q=${encodedAddress}`, '_blank');
+                  }
+                  setIsNavigationModalOpen(false);
+                }}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <span className="text-blue-600 font-semibold text-sm">G</span>
+                  </div>
+                  <div className="text-left">
+                    <div className="font-medium">Google Maps</div>
+                    <div className="text-sm text-gray-500">Open in Google Maps</div>
+                  </div>
+                </div>
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full justify-start h-auto p-4"
+                onClick={() => {
+                  const address = formatFullAddress(property);
+                  if (address) {
+                    const encodedAddress = encodeURIComponent(address);
+                    window.open(`https://waze.com/ul?q=${encodedAddress}`, '_blank');
+                  }
+                  setIsNavigationModalOpen(false);
+                }}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-cyan-100 rounded-lg flex items-center justify-center">
+                    <span className="text-cyan-600 font-semibold text-sm">W</span>
+                  </div>
+                  <div className="text-left">
+                    <div className="font-medium">Waze</div>
+                    <div className="text-sm text-gray-500">Open in Waze app</div>
+                  </div>
+                </div>
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full justify-start h-auto p-4"
+                onClick={() => {
+                  const address = formatFullAddress(property);
+                  if (address) {
+                    const encodedAddress = encodeURIComponent(address);
+                    window.open(`maps://maps.apple.com/?q=${encodedAddress}`, '_blank');
+                  }
+                  setIsNavigationModalOpen(false);
+                }}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <span className="text-gray-600 font-semibold text-sm">🍎</span>
+                  </div>
+                  <div className="text-left">
+                    <div className="font-medium">Apple Maps</div>
+                    <div className="text-sm text-gray-500">Open in Apple Maps</div>
+                  </div>
+                </div>
+              </Button>
+            </div>
+
+            <DialogFooter className="mt-6">
+              <Button variant="outline" onClick={() => setIsNavigationModalOpen(false)}>
+                Cancel
               </Button>
             </DialogFooter>
           </DialogContent>
