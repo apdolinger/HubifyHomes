@@ -603,7 +603,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid property ID' });
       }
 
+      console.log(`Updating property ${id} with data:`, req.body);
       const property = await storage.updateProperty(id, req.body);
+      console.log("Updated property result:", property);
       res.json(property);
     } catch (error) {
       console.error("Error updating property:", error);
