@@ -1272,6 +1272,22 @@ export class DatabaseStorage implements IStorage {
     return contact;
   }
 
+  async getContactByEmail(email: string, orgId: string): Promise<Contact | undefined> {
+    const [contact] = await db
+      .select()
+      .from(contacts)
+      .where(and(eq(contacts.email, email), eq(contacts.orgId, orgId)));
+    return contact;
+  }
+
+  async getContactByPhone(phone: string, orgId: string): Promise<Contact | undefined> {
+    const [contact] = await db
+      .select()
+      .from(contacts)
+      .where(and(eq(contacts.phone, phone), eq(contacts.orgId, orgId)));
+    return contact;
+  }
+
   async createContact(contact: InsertContact, userId: string | null): Promise<Contact> {
     const [newContact] = await db.insert(contacts).values(contact).returning();
     

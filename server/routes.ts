@@ -1870,6 +1870,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Form submission with profile matching logic
   app.post("/forms/:formKey/submit", async (req, res) => {
     try {
       const form = await storage.getFormByKey(req.params.formKey);
@@ -1877,26 +1878,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Form not found" });
       }
 
-      // Create form submission
+      const submissionData = req.body;
+      const formSchema = form.schema as any;
+      let profileId = null;
+
+      // Handle profile matching and creation if form has mapping
+      if (formSchema?.matchExistingBy && formSchema?.fieldMapping) {
+        const identifier = formSchema.matchExistingBy;
+        const matchKey = identifier === 'email' ? submissionData.email : submissionData.phone;
+
+        if (matchKey) {
+          // Try to find existing contact
+          let existingContact = null;
+          try {
+            if (identifier === 'email') {
+              existingContact = await storage.getContactByEmail(matchKey, form.orgId);
+            } else {
+              existingContact = await storage.getContactByPhone(matchKey, form.orgId);
+            }
+          } catch (error) {
+            console.log("Contact lookup failed:", error);
+          }
+
+          if (existingContact) {
+            // Update existing profile with new data
+            const updateData: any = {};
+            Object.entries(formSchema.fieldMapping).forEach(([formFieldId, profileField]) => {
+              if (submissionData[formFieldId] && profileField !== 'none') {
+                updateData[profileField] = submissionData[formFieldId];
+              }
+            });
+
+            if (Object.keys(updateData).length > 0) {
+              await storage.updateContact(existingContact.id, updateData);
+            }
+            profileId = existingContact.id;
+          } else {
+            // Create new profile
+            const newProfileData: any = {
+              orgId: form.orgId
+            };
+            
+            Object.entries(formSchema.fieldMapping).forEach(([formFieldId, profileField]) => {
+              if (submissionData[formFieldId] && profileField !== 'none') {
+                newProfileData[profileField] = submissionData[formFieldId];
+              }
+            });
+
+            if (newProfileData.firstName || newProfileData.lastName || newProfileData.email || newProfileData.phone) {
+              const newContact = await storage.createContact(newProfileData, null);
+              profileId = newContact.id;
+            }
+          }
+        }
+      } else {
+        // Fallback: Extract mapped fields and create contact if configured (legacy behavior)
+        if (req.body.email && (req.body.firstName || req.body.name)) {
+          try {
+            const newContact = await storage.createContact({
+              firstName: req.body.firstName || req.body.name?.split(' ')[0] || 'Unknown',
+              lastName: req.body.lastName || req.body.name?.split(' ').slice(1).join(' ') || '',
+              email: req.body.email,
+              phone: req.body.phone || null,
+              type: 'client',
+              isActive: true,
+              orgId: form.orgId
+            }, null);
+            profileId = newContact.id;
+          } catch (contactError) {
+            console.warn("Could not create contact from form submission:", contactError);
+          }
+        }
+      }
+
+      // Create form submission with profile reference
       await storage.createFormSubmission({
         formId: form.id,
-        data: req.body
+        data: submissionData,
+        profileId: profileId
       });
 
-      // Extract mapped fields and create contact if configured
-      if (req.body.email && (req.body.firstName || req.body.name)) {
-        try {
-          await storage.createContact({
-            firstName: req.body.firstName || req.body.name?.split(' ')[0] || 'Unknown',
-            lastName: req.body.lastName || req.body.name?.split(' ').slice(1).join(' ') || '',
-            email: req.body.email,
-            phone: req.body.phone || null,
-            type: 'client',
-            isActive: true
-          }, null);
-        } catch (contactError) {
-          console.warn("Could not create contact from form submission:", contactError);
-        }
+      // Log form submission
+      console.log(`Form submission processed: formId=${form.id}, profileId=${profileId}, timestamp=${Date.now()}`);
+
+      // TODO: Implement automation triggers if needed
+      if (formSchema?.triggerAutomation) {
+        console.log(`Automation triggered for form: ${formSchema.slug}`);
+        // triggerAutomation(formSchema.slug, submissionData);
       }
 
       res.json({ message: "Form submitted successfully" });

@@ -49,6 +49,13 @@ Hubify is a professional property management platform for home watch and HOA com
   - Staff management endpoints for submission review and status updates
   - Status workflow: received → in_review → accepted/rejected
   - Integration with existing forms and property assignment system
+- **Advanced Form Profile Matching System (August 19, 2025)**: Implemented intelligent profile matching and creation logic:
+  - Form submissions automatically match existing contacts by email or phone
+  - Profile field mapping allows form data to update specific contact fields
+  - Creates new contact profiles when no match found
+  - Supports automation triggers and comprehensive submission logging
+  - Enhanced storage layer with getContactByEmail and getContactByPhone methods
+  - FormBuilder includes profile mapping interface with drag-and-drop field organization
 - **Production API Pattern Implementation (August 15, 2025)**: Complete API ecosystem matching production patterns:
   - Staff forms creation: POST /api/staff/forms with x-tenant-org header
   - Property centers assignment: POST /api/property-centers/:propertyId/forms
