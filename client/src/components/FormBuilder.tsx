@@ -59,87 +59,53 @@ interface FormSchema {
   triggerAutomation?: boolean;
 }
 
-const AvailableFields: FormFieldOption[] = [
-  { 
-    label: 'First Name', 
-    type: 'text', 
-    required: true, 
-    profileFieldKey: 'firstName',
-    icon: <User className="w-4 h-4" />
-  },
-  { 
-    label: 'Last Name', 
-    type: 'text', 
-    required: true, 
-    profileFieldKey: 'lastName',
-    icon: <User className="w-4 h-4" />
-  },
-  { 
-    label: 'Email', 
-    type: 'email', 
-    required: true, 
-    profileFieldKey: 'email',
-    icon: <Mail className="w-4 h-4" />
-  },
-  { 
-    label: 'Phone Number', 
-    type: 'tel', 
-    required: false, 
-    profileFieldKey: 'phone',
-    icon: <Phone className="w-4 h-4" />
-  },
-  { 
-    label: 'Address', 
-    type: 'textarea', 
-    required: false, 
-    profileFieldKey: 'address',
-    icon: <MapPin className="w-4 h-4" />
-  },
-  { 
-    label: 'Paragraph Text', 
-    type: 'textarea', 
-    required: false, 
-    profileFieldKey: 'notes',
-    icon: <FileText className="w-4 h-4" />
-  },
-  { 
-    label: 'Date of Birth', 
-    type: 'date', 
-    required: false, 
-    profileFieldKey: 'dob',
-    icon: <Calendar className="w-4 h-4" />
-  },
-  { 
-    label: 'Preferred Contact Method', 
-    type: 'select', 
-    required: false, 
-    profileFieldKey: 'preferredContact',
-    icon: <Settings className="w-4 h-4" />,
-    options: ['Email', 'Phone', 'Text Message', 'Mail']
-  },
-  { 
-    label: 'Services Interested In', 
-    type: 'checkbox', 
-    required: false, 
-    profileFieldKey: 'interests',
-    icon: <CheckSquare className="w-4 h-4" />,
-    options: ['Property Management', 'Maintenance', 'HOA Services', 'Inspections']
-  },
-  { 
-    label: 'Upload File', 
-    type: 'file', 
-    required: false, 
-    profileFieldKey: 'attachment',
-    icon: <Upload className="w-4 h-4" />
-  },
-  { 
-    label: 'Custom Field', 
-    type: 'text', 
-    required: false, 
-    profileFieldKey: 'customField1',
-    icon: <Type className="w-4 h-4" />
-  }
+const PeopleFields: FormFieldOption[] = [
+  { label: 'First Name', type: 'text', required: true, profileFieldKey: 'firstName', icon: <User className="w-4 h-4" /> },
+  { label: 'Last Name', type: 'text', required: true, profileFieldKey: 'lastName', icon: <User className="w-4 h-4" /> },
+  { label: 'Phone Number', type: 'tel', required: false, profileFieldKey: 'phone', icon: <Phone className="w-4 h-4" /> },
+  { label: 'Email', type: 'email', required: true, profileFieldKey: 'email', icon: <Mail className="w-4 h-4" /> },
+  { label: 'Notes', type: 'textarea', required: false, profileFieldKey: 'notes', icon: <FileText className="w-4 h-4" /> },
 ];
+
+const PropertyFields: FormFieldOption[] = [
+  { label: 'Address', type: 'text', required: true, profileFieldKey: 'address', icon: <MapPin className="w-4 h-4" /> },
+  { label: 'Square Footage', type: 'number', required: false, profileFieldKey: 'squareFootage', icon: <Type className="w-4 h-4" /> },
+  { label: 'Bedrooms', type: 'number', required: false, profileFieldKey: 'bedrooms', icon: <Type className="w-4 h-4" /> },
+  { label: 'Garage Spots', type: 'number', required: false, profileFieldKey: 'garageSpots', icon: <Type className="w-4 h-4" /> },
+  { label: 'Vehicles on Site', type: 'textarea', required: false, profileFieldKey: 'vehicleList', icon: <FileText className="w-4 h-4" /> },
+  { label: 'Room List', type: 'textarea', required: false, profileFieldKey: 'roomList', icon: <FileText className="w-4 h-4" /> },
+  { label: 'Supplies Needed', type: 'textarea', required: false, profileFieldKey: 'supplies', icon: <FileText className="w-4 h-4" /> },
+];
+
+const TaskFields: FormFieldOption[] = [
+  { label: 'Task Title', type: 'text', required: true, profileFieldKey: 'taskTitle', icon: <Type className="w-4 h-4" /> },
+  { label: 'Task Description', type: 'textarea', required: true, profileFieldKey: 'taskDescription', icon: <FileText className="w-4 h-4" /> },
+  { label: 'Requested Date', type: 'date', required: false, profileFieldKey: 'requestedDate', icon: <Calendar className="w-4 h-4" /> },
+  { label: 'Priority Level', type: 'select', required: false, options: ['Low', 'Medium', 'High'], profileFieldKey: 'priority', icon: <CheckSquare className="w-4 h-4" /> },
+  { label: 'Assign To', type: 'select', required: false, profileFieldKey: 'assignedUserId', icon: <User className="w-4 h-4" /> },
+];
+
+const MultiFields: FormFieldOption[] = [
+  ...PeopleFields,
+  ...PropertyFields,
+  ...TaskFields,
+];
+
+// Get available fields based on form context
+const getAvailableFields = (context: FormContext): FormFieldOption[] => {
+  switch (context) {
+    case 'people':
+      return PeopleFields;
+    case 'property':
+      return PropertyFields;
+    case 'task':
+      return TaskFields;
+    case 'multi':
+      return MultiFields;
+    default:
+      return PeopleFields;
+  }
+};
 
 interface FormBuilderProps {
   onSave?: (form: FormSchema) => void;
@@ -627,7 +593,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <Plus className="w-4 h-4 mr-2" />
-                  Available Fields
+                  Available Fields ({formSchema.context === 'people' ? 'People' : formSchema.context === 'property' ? 'Property' : formSchema.context === 'task' ? 'Task' : 'Multi'})
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -638,7 +604,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
                       ref={provided.innerRef}
                       className="space-y-2"
                     >
-                      {AvailableFields.map((field, index) => (
+                      {getAvailableFields(formSchema.context).map((field, index) => (
                         <Draggable
                           key={field.profileFieldKey}
                           draggableId={`available-${field.profileFieldKey}`}
