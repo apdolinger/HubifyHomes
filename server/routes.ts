@@ -206,6 +206,118 @@ const upload = multer({
   }
 });
 
+// Context-based form submission handler
+async function onFormSubmit(formData: any, formSchema: any, storage: any) {
+  const contexts = formSchema.contexts || [formSchema.context] || ['people'];
+
+  if (contexts.includes('people')) {
+    await upsertPerson(formData, storage, formSchema.orgId);
+  }
+
+  if (contexts.includes('property')) {
+    await upsertProperty(formData, storage, formSchema.orgId);
+  }
+
+  if (contexts.includes('task')) {
+    await createTask(formData, storage, formSchema.orgId);
+  }
+
+  await logSubmission(formSchema.id, formData, storage);
+}
+
+// Helper functions for context-specific data handling
+async function upsertPerson(formData: any, storage: any, orgId: string) {
+  try {
+    const personData = {
+      firstName: formData.firstName || formData.first_name,
+      lastName: formData.lastName || formData.last_name,
+      email: formData.email,
+      phone: formData.phone || formData.phoneNumber,
+      notes: formData.notes,
+      orgId: orgId
+    };
+
+    // Try to find existing person by email or phone
+    let existingPerson = null;
+    if (personData.email) {
+      existingPerson = await storage.getContactByEmail(personData.email, orgId);
+    } else if (personData.phone) {
+      existingPerson = await storage.getContactByPhone(personData.phone, orgId);
+    }
+
+    if (existingPerson) {
+      // Update existing person
+      await storage.updateContact(existingPerson.id, personData);
+      console.log(`Updated person: ${existingPerson.id}`);
+    } else {
+      // Create new person
+      const newPerson = await storage.createContact(personData, null);
+      console.log(`Created new person: ${newPerson.id}`);
+    }
+  } catch (error) {
+    console.error('Error upserting person:', error);
+  }
+}
+
+async function upsertProperty(formData: any, storage: any, orgId: string) {
+  try {
+    const propertyData = {
+      address: formData.address,
+      squareFootage: formData.squareFootage ? parseInt(formData.squareFootage) : null,
+      bedrooms: formData.bedrooms ? parseInt(formData.bedrooms) : null,
+      garageSpots: formData.garageSpots ? parseInt(formData.garageSpots) : null,
+      vehicleList: formData.vehicleList,
+      roomList: formData.roomList,
+      supplies: formData.supplies,
+      orgId: orgId,
+      status: 'active',
+      type: 'residential'
+    };
+
+    // Try to find existing property by address
+    const existingProperty = await storage.getPropertyByAddress(propertyData.address, orgId);
+    
+    if (existingProperty) {
+      // Update existing property
+      await storage.updateProperty(existingProperty.id, propertyData);
+      console.log(`Updated property: ${existingProperty.id}`);
+    } else {
+      // Create new property
+      const newProperty = await storage.createProperty(propertyData);
+      console.log(`Created new property: ${newProperty.id}`);
+    }
+  } catch (error) {
+    console.error('Error upserting property:', error);
+  }
+}
+
+async function createTask(formData: any, storage: any, orgId: string) {
+  try {
+    const taskData = {
+      title: formData.taskTitle || formData.title,
+      description: formData.taskDescription || formData.description,
+      priority: formData.priority || 'medium',
+      status: 'pending',
+      dueDate: formData.requestedDate ? new Date(formData.requestedDate) : null,
+      assignedUserId: formData.assignedUserId || null,
+      orgId: orgId
+    };
+
+    const newTask = await storage.createTask(taskData);
+    console.log(`Created new task: ${newTask.id}`);
+  } catch (error) {
+    console.error('Error creating task:', error);
+  }
+}
+
+async function logSubmission(formId: number, formData: any, storage: any) {
+  try {
+    console.log(`Form submission logged: formId=${formId}, data=${JSON.stringify(formData)}, timestamp=${Date.now()}`);
+  } catch (error) {
+    console.error('Error logging submission:', error);
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Legacy redirect middleware - must come before other routes
   app.use((req, res, next) => {
@@ -1907,8 +2019,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const formSettings = form.settings as any;
       let profileId = null;
 
+      // Process submission based on form contexts
+      await onFormSubmit(submissionData, form, storage);
+
       // Handle profile matching and creation if form has mapping
-      if (formSchema?.matchExistingBy && formSchema?.fieldMapping) {
+      if (formSettings?.matchExistingBy && formSettings?.fieldMapping) {
         const identifier = formSchema.matchExistingBy;
         const matchKey = identifier === 'email' ? submissionData.email : submissionData.phone;
 
