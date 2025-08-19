@@ -33,19 +33,20 @@ import {
 import { z } from "zod";
 
 // HTML template for forms
-function generateFormHTML(form: Form, isEmbed: boolean): string {
-  const fields = Array.isArray(form.schema?.fields) ? form.schema.fields : [];
+function generateFormHTML(form: any, isEmbed: boolean): string {
+  const fields = Array.isArray(form.fields) ? form.fields : [];
   
   const fieldHTML = fields.map((field: any) => {
     const required = field.required ? 'required' : '';
     const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500";
+    const fieldId = `field-${field.id}`;
     
     switch (field.type) {
       case 'textarea':
         return `
           <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">${field.label}${field.required ? ' *' : ''}</label>
-            <textarea name="${field.id}" ${required} placeholder="${field.placeholder || ''}" 
+            <textarea name="${fieldId}" ${required} placeholder="${field.placeholder || ''}" 
                       class="${inputClass}" rows="4"></textarea>
           </div>
         `;
@@ -56,7 +57,7 @@ function generateFormHTML(form: Form, isEmbed: boolean): string {
         return `
           <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">${field.label}${field.required ? ' *' : ''}</label>
-            <select name="${field.id}" ${required} class="${inputClass}">
+            <select name="${fieldId}" ${required} class="${inputClass}">
               <option value="">Select an option</option>
               ${options}
             </select>
@@ -66,9 +67,9 @@ function generateFormHTML(form: Form, isEmbed: boolean): string {
         return `
           <div class="mb-4">
             <div class="flex items-center">
-              <input type="checkbox" name="${field.id}" ${required} id="${field.id}"
+              <input type="checkbox" name="${fieldId}" ${required} id="${fieldId}"
                      class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-              <label for="${field.id}" class="ml-2 block text-sm text-gray-700">${field.label}${field.required ? ' *' : ''}</label>
+              <label for="${fieldId}" class="ml-2 block text-sm text-gray-700">${field.label}${field.required ? ' *' : ''}</label>
             </div>
           </div>
         `;
@@ -76,7 +77,7 @@ function generateFormHTML(form: Form, isEmbed: boolean): string {
         return `
           <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">${field.label}${field.required ? ' *' : ''}</label>
-            <input type="${field.type}" name="${field.id}" ${required} 
+            <input type="${field.type}" name="${fieldId}" ${required} 
                    placeholder="${field.placeholder || ''}" class="${inputClass}">
           </div>
         `;
@@ -1780,7 +1781,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user?.orgId) {
         return res.status(404).json({ message: "User organization not found" });
       }
-      const forms = await storage.getForms(user.orgId);
+      
+      // Get forms with their fields
+      const forms = await storage.getFormsWithFields();
       res.json(forms);
     } catch (error) {
       console.error("Error fetching forms:", error);
@@ -1797,24 +1800,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Check tier limits
-      const tierLimits = { basic: 2, standard: 20, premium: Infinity };
-      const userTier = user.tier || 'basic';
-      const currentLimit = tierLimits[userTier as keyof typeof tierLimits] || 0;
-      
-      const existingForms = await storage.getForms(user.orgId!);
-      if (existingForms.length >= currentLimit) {
-        return res.status(403).json({ 
-          message: `Form limit reached for ${userTier} plan` 
-        });
-      }
+      // Validate request body
+      const formData = {
+        formTitle: req.body.name || req.body.formTitle,
+        slug: req.body.slug || req.body.name?.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-'),
+        settings: {
+          internalDescription: req.body.description,
+          allowMultipleSubmissions: req.body.schema?.allowMultipleSubmissions || false,
+          matchExistingBy: req.body.schema?.matchExistingBy || 'email',
+          triggerAutomation: req.body.schema?.triggerAutomation || false,
+          fieldMapping: req.body.schema?.fieldMapping || {},
+          submitLabel: req.body.schema?.submitLabel || 'Submit Form',
+          successMessage: req.body.schema?.successMessage || 'Thank you for your submission!'
+        }
+      };
 
-      const form = await storage.createForm({
-        name: req.body.name,
-        description: req.body.description,
-        schema: req.body.schema,
-        orgId: user.orgId
-      });
+      // Create form using new schema
+      const form = await storage.createForm(formData);
+      
+      // Create form fields if provided
+      if (req.body.schema?.fields && Array.isArray(req.body.schema.fields)) {
+        const fields = req.body.schema.fields.map((field: any, index: number) => ({
+          formId: form.id,
+          label: field.label,
+          type: field.type,
+          required: field.required || false,
+          profileFieldKey: field.profileFieldKey || field.id,
+          options: field.options || null,
+          sortOrder: index
+        }));
+        
+        await storage.createFormFields(form.id, fields);
+      }
+      
       res.json(form);
     } catch (error) {
       console.error("Error creating form:", error);
@@ -1836,9 +1854,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Public form routes (no authentication required)
-  app.get("/forms/:formKey", async (req, res) => {
+  app.get("/forms/:slug", async (req, res) => {
     try {
-      const form = await storage.getFormByKey(req.params.formKey);
+      const form = await storage.getFormBySlug(req.params.slug);
       if (!form) {
         return res.status(404).send("Form not found");
       }
@@ -1871,15 +1889,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Form submission with profile matching logic
-  app.post("/forms/:formKey/submit", async (req, res) => {
+  app.post("/forms/:slug/submit", async (req, res) => {
     try {
-      const form = await storage.getFormByKey(req.params.formKey);
+      const form = await storage.getFormBySlug(req.params.slug);
       if (!form) {
         return res.status(404).json({ message: "Form not found" });
       }
 
       const submissionData = req.body;
-      const formSchema = form.schema as any;
+      const formSettings = form.settings as any;
       let profileId = null;
 
       // Handle profile matching and creation if form has mapping

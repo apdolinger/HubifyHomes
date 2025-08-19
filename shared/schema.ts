@@ -404,27 +404,31 @@ export const activityLog = pgTable("activity_log", {
 
 // Advanced Forms Library (organization creates; client sees/uses)
 export const forms = pgTable("forms", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  orgId: uuid("org_id").references(() => orgs.id).notNull(),
-  name: text("name").notNull(),
-  description: text("description"),
-  schema: jsonb("schema").$type<{
-    fields: Array<{
-      id: string;
-      label: string;
-      type: "text"|"textarea"|"number"|"select"|"checkbox"|"date"|"file";
-      required?: boolean;
-      options?: string[];
-      placeholder?: string;
-      help?: string;
-      maxSizeMB?: number;
-    }>;
+  id: serial("id").primaryKey(),
+  formTitle: text("form_title").notNull(),
+  slug: text("slug").notNull().unique(),
+  settings: jsonb("settings").$type<{
+    allowMultipleSubmissions?: boolean;
+    matchExistingBy?: 'email' | 'phone' | 'none';
+    triggerAutomation?: boolean;
+    internalDescription?: string;
+    fieldMapping?: Record<string, string>;
     submitLabel?: string;
     successMessage?: string;
-  }>().notNull(),
-  isArchived: boolean("is_archived").default(false),
+  }>().default({}),
   createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Form fields table - for form field definitions
+export const formFields = pgTable("form_fields", {
+  id: serial("id").primaryKey(),
+  formId: integer("form_id").references(() => forms.id).notNull(),
+  label: text("label").notNull(),
+  type: text("type").notNull(), // text, textarea, select, checkbox, etc.
+  required: boolean("required").default(false),
+  profileFieldKey: text("profile_field_key"), // maps to contact/profile field
+  options: jsonb("options").$type<string[]>(), // for select/checkbox options
+  sortOrder: integer("sort_order").default(0),
 });
 
 // Assign org forms to a property (controls client visibility)
@@ -442,16 +446,14 @@ export const propertyForms = pgTable("property_forms", {
 
 // Client submissions with enhanced features
 export const formSubmissions = pgTable("form_submissions", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  orgId: uuid("org_id").references(() => orgs.id).notNull(),
-  propertyId: uuid("property_id").references(() => properties.id).notNull(),
-  formId: uuid("form_id").references(() => forms.id).notNull(),
-  submittedByClientId: uuid("submitted_by_client_id").references(() => clients.id).notNull(),
-  answers: jsonb("answers").$type<Record<string, any>>().notNull(),
-  files: jsonb("files").$type<Array<{fieldId:string; name:string; url:string; size:number}>>().default([]),
-  status: text("status").$type<"received"|"in_review"|"accepted"|"rejected">().default("received"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  id: serial("id").primaryKey(),
+  formId: integer("form_id").references(() => forms.id).notNull(),
+  profileId: integer("profile_id"), // references contacts table (if contact created/matched)
+  data: jsonb("data").notNull(), // submitted form data
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  status: text("status").$type<"received" | "in_review" | "accepted" | "rejected">().default("received"),
+  reviewedBy: uuid("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
 });
 
 // Property portal settings for tenant/client portals with branding and configuration
@@ -844,13 +846,16 @@ export const vehicleNotesRelations = relations(vehicleNotes, ({ one }) => ({
   }),
 }));
 
-export const formsRelations = relations(forms, ({ one, many }) => ({
-  org: one(orgs, {
-    fields: [forms.orgId],
-    references: [orgs.id],
-  }),
-  propertyForms: many(propertyForms),
+export const formsRelations = relations(forms, ({ many }) => ({
+  fields: many(formFields),
   submissions: many(formSubmissions),
+}));
+
+export const formFieldsRelations = relations(formFields, ({ one }) => ({
+  form: one(forms, {
+    fields: [formFields.formId],
+    references: [forms.id],
+  }),
 }));
 
 export const propertyFormsRelations = relations(propertyForms, ({ one }) => ({
@@ -869,21 +874,13 @@ export const propertyFormsRelations = relations(propertyForms, ({ one }) => ({
 }));
 
 export const formSubmissionsRelations = relations(formSubmissions, ({ one }) => ({
-  org: one(orgs, {
-    fields: [formSubmissions.orgId],
-    references: [orgs.id],
-  }),
-  property: one(properties, {
-    fields: [formSubmissions.propertyId],
-    references: [properties.id],
-  }),
   form: one(forms, {
     fields: [formSubmissions.formId],
     references: [forms.id],
   }),
-  submittedByClient: one(clients, {
-    fields: [formSubmissions.submittedByClientId],
-    references: [clients.id],
+  reviewedBy: one(users, {
+    fields: [formSubmissions.reviewedBy],
+    references: [users.id],
   }),
 }));
 
@@ -944,6 +941,21 @@ export const insertTeamMessageSchema = createInsertSchema(teamMessages).omit({
   isEdited: true,
 });
 
+export const insertFormSchema = createInsertSchema(forms).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertFormFieldSchema = createInsertSchema(formFields).omit({
+  id: true,
+});
+
+export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).omit({
+  id: true,
+  submittedAt: true,
+  reviewedAt: true,
+});
+
 export const insertMessageReactionSchema = createInsertSchema(messageReactions).omit({
   id: true,
   createdAt: true,
@@ -969,21 +981,9 @@ export const insertClientSchema = createInsertSchema(clients).omit({
   updatedAt: true,
 });
 
-export const insertFormSchema = createInsertSchema(forms).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
 export const insertPropertyFormSchema = createInsertSchema(propertyForms).omit({
   id: true,
   createdAt: true,
-});
-
-export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
 });
 
 export const insertPropertyPortalSettingsSchema = createInsertSchema(propertyPortalSettings).omit({

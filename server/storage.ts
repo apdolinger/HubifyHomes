@@ -23,8 +23,9 @@ import {
   messageReactions,
   activityLog,
   forms,
-  propertyForms,
+  formFields,
   formSubmissions,
+  propertyForms,
   propertyPortalSettings,
   ignoredDuplicates,
   duplicateHistory,
@@ -245,9 +246,10 @@ export interface IStorage {
   }>;
   
   // Forms operations
-  getForms(userId: string): Promise<Form[]>;
-  getFormByKey(formKey: string): Promise<Form | undefined>;
-  createForm(form: InsertForm): Promise<Form>;
+  getFormsWithFields(): Promise<any[]>;
+  getFormBySlug(slug: string): Promise<any>;
+  createForm(form: any): Promise<any>;
+  createFormFields(formId: number, fields: any[]): Promise<void>;
   deleteForm(formId: number, userId: string): Promise<void>;
   createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission>;
   
@@ -1673,34 +1675,68 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Forms operations
-  async getForms(orgId: string): Promise<Form[]> {
-    return await db
-      .select()
-      .from(forms)
-      .where(eq(forms.orgId, orgId))
-      .orderBy(desc(forms.createdAt));
+  async getFormsWithFields(): Promise<any[]> {
+    const formsData = await db.select().from(forms).orderBy(desc(forms.createdAt));
+    
+    // Get fields for each form
+    const formsWithFields = await Promise.all(formsData.map(async (form) => {
+      const fields = await db
+        .select()
+        .from(formFields)
+        .where(eq(formFields.formId, form.id))
+        .orderBy(formFields.sortOrder);
+      
+      return {
+        ...form,
+        fields
+      };
+    }));
+    
+    return formsWithFields;
   }
 
-  async getFormByKey(formKey: string): Promise<Form | undefined> {
+  async getFormBySlug(slug: string): Promise<any> {
     const [form] = await db
       .select()
       .from(forms)
-      .where(eq(forms.formKey, formKey));
-    return form;
+      .where(eq(forms.slug, slug));
+    
+    if (!form) return undefined;
+    
+    // Get fields for this form
+    const fields = await db
+      .select()
+      .from(formFields)
+      .where(eq(formFields.formId, form.id))
+      .orderBy(formFields.sortOrder);
+    
+    return {
+      ...form,
+      fields
+    };
   }
 
-  async createForm(formData: InsertForm): Promise<Form> {
+  async createForm(formData: any): Promise<any> {
     const [form] = await db.insert(forms).values(formData).returning();
     return form;
   }
 
-  async deleteForm(formId: number, userId: string): Promise<void> {
-    await db
-      .delete(forms)
-      .where(and(eq(forms.id, formId), eq(forms.createdBy, userId)));
+  async createFormFields(formId: number, fields: any[]): Promise<void> {
+    if (fields.length > 0) {
+      await db.insert(formFields).values(fields);
+    }
   }
 
-  async createFormSubmission(submissionData: InsertFormSubmission): Promise<FormSubmission> {
+  async deleteForm(formId: number, userId: string): Promise<void> {
+    // Delete form fields first (foreign key constraint)
+    await db.delete(formFields).where(eq(formFields.formId, formId));
+    // Delete form submissions
+    await db.delete(formSubmissions).where(eq(formSubmissions.formId, formId));
+    // Delete the form
+    await db.delete(forms).where(eq(forms.id, formId));
+  }
+
+  async createFormSubmission(submissionData: any): Promise<any> {
     const [submission] = await db
       .insert(formSubmissions)
       .values(submissionData)
