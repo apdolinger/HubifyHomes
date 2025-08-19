@@ -1238,7 +1238,7 @@ export class DatabaseStorage implements IStorage {
     // For each contact, fetch their associated properties
     const contactsWithProperties = await Promise.all(
       contactsList.map(async (contact) => {
-        const properties = await db
+        const contactProps = await db
           .select({
             propertyId: contactProperties.propertyId,
             propertyName: properties.name,
@@ -1251,7 +1251,7 @@ export class DatabaseStorage implements IStorage {
         
         return {
           ...contact,
-          properties: properties,
+          properties: contactProps,
         };
       })
     );
