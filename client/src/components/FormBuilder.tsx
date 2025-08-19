@@ -52,7 +52,7 @@ interface FormSchema {
   formTitle: string;
   internalDescription?: string;
   slug: string;
-  context: FormContext;
+  contexts: FormContext[];
   fields: FormFieldOption[];
   allowMultipleSubmissions: boolean;
   matchExistingBy: 'email' | 'phone' | 'none';
@@ -91,20 +91,35 @@ const MultiFields: FormFieldOption[] = [
   ...TaskFields,
 ];
 
-// Get available fields based on form context
-const getAvailableFields = (context: FormContext): FormFieldOption[] => {
-  switch (context) {
-    case 'people':
-      return PeopleFields;
-    case 'property':
-      return PropertyFields;
-    case 'task':
-      return TaskFields;
-    case 'multi':
-      return MultiFields;
-    default:
-      return PeopleFields;
-  }
+// Get available fields based on selected contexts
+const getAvailableFields = (contexts: FormContext[]): FormFieldOption[] => {
+  if (contexts.length === 0) return PeopleFields;
+  
+  const fieldsMap = new Map<string, FormFieldOption>();
+  
+  contexts.forEach(context => {
+    let contextFields: FormFieldOption[] = [];
+    switch (context) {
+      case 'people':
+        contextFields = PeopleFields;
+        break;
+      case 'property':
+        contextFields = PropertyFields;
+        break;
+      case 'task':
+        contextFields = TaskFields;
+        break;
+      case 'multi':
+        contextFields = MultiFields;
+        break;
+    }
+    
+    contextFields.forEach(field => {
+      fieldsMap.set(field.profileFieldKey, field);
+    });
+  });
+  
+  return Array.from(fieldsMap.values());
 };
 
 interface FormBuilderProps {
@@ -301,7 +316,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
     formTitle: initialForm?.formTitle || '',
     internalDescription: initialForm?.internalDescription || '',
     slug: initialForm?.slug || '',
-    context: (initialForm?.context as FormContext) || 'people',
+    contexts: initialForm?.contexts ? (Array.isArray(initialForm.contexts) ? initialForm.contexts : [initialForm.context || 'people']) : ['people'],
     fields: initialForm?.fields || [],
     allowMultipleSubmissions: initialForm?.allowMultipleSubmissions || false,
     matchExistingBy: initialForm?.matchExistingBy || 'email',
@@ -455,7 +470,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Form Builder</h1>
-          <p className="text-slate-600">Create forms that map directly to person profiles</p>
+          <p className="text-slate-600">5-Step Process: Select Context → Filter Fields → Drag/Drop → Customize → Save + Deploy</p>
         </div>
         <div className="flex items-center space-x-3">
           <Button variant="outline" onClick={() => setShowPreview(true)}>
@@ -467,8 +482,9 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
             disabled={saveFormMutation.isPending}
             className="bg-primary hover:bg-primary/90"
           >
+            <span className="bg-white text-primary text-xs px-2 py-1 rounded mr-2">Step 5</span>
             <Save className="w-4 h-4 mr-2" />
-            {saveFormMutation.isPending ? 'Saving...' : 'Save Form'}
+            {saveFormMutation.isPending ? 'Saving...' : 'Save + Deploy'}
           </Button>
         </div>
       </div>
@@ -523,25 +539,35 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
                 </div>
 
                 <div>
-                  <Label>Form Context</Label>
-                  <Select
-                    value={formSchema.context}
-                    onValueChange={(value: FormContext) =>
-                      updateFormSchema({ context: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="people">People - Contact/Client Forms</SelectItem>
-                      <SelectItem value="property">Property - Property Information Forms</SelectItem>
-                      <SelectItem value="task">Task - Task & Service Request Forms</SelectItem>
-                      <SelectItem value="multi">Multi - General Purpose Forms</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Determines how form submissions are categorized and processed.
+                  <Label className="flex items-center">
+                    <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded mr-2">Step 1</span>
+                    Form Contexts
+                  </Label>
+                  <div className="space-y-2">
+                    {(['people', 'property', 'task'] as FormContext[]).map((context) => (
+                      <div key={context} className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id={`context-${context}`}
+                          checked={formSchema.contexts.includes(context)}
+                          onChange={(e) => {
+                            const newContexts = e.target.checked
+                              ? [...formSchema.contexts, context]
+                              : formSchema.contexts.filter(c => c !== context);
+                            updateFormSchema({ contexts: newContexts });
+                          }}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        <label htmlFor={`context-${context}`} className="text-sm capitalize">
+                          {context === 'people' ? 'People - Contact/Client Forms' :
+                           context === 'property' ? 'Property - Property Information Forms' :
+                           'Task - Service Request Forms'}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">
+                    Select one or more contexts to determine available fields and submission processing.
                   </p>
                 </div>
 
@@ -592,8 +618,9 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
+                  <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded mr-2">Step 2</span>
                   <Plus className="w-4 h-4 mr-2" />
-                  Available Fields ({formSchema.context === 'people' ? 'People' : formSchema.context === 'property' ? 'Property' : formSchema.context === 'task' ? 'Task' : 'Multi'})
+                  Available Fields ({formSchema.contexts.length > 0 ? formSchema.contexts.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ') : 'None Selected'})
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -604,7 +631,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
                       ref={provided.innerRef}
                       className="space-y-2"
                     >
-                      {getAvailableFields(formSchema.context).map((field, index) => (
+                      {getAvailableFields(formSchema.contexts).map((field, index) => (
                         <Draggable
                           key={field.profileFieldKey}
                           draggableId={`available-${field.profileFieldKey}`}
@@ -641,9 +668,12 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
           <div className="lg:col-span-2">
             <Card>
               <CardHeader>
-                <CardTitle>Form Fields</CardTitle>
+                <CardTitle className="flex items-center">
+                  <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded mr-2">Step 3 & 4</span>
+                  Form Fields - Drag/Drop & Customize
+                </CardTitle>
                 <p className="text-sm text-slate-600">
-                  Drag fields from the left panel to build your form. Submissions will map to person profile fields.
+                  Drag fields from the left panel to build your form. Each field shows: Label (editable), Field Type (fixed), Target Profile Field Key (mapped), Required toggle.
                 </p>
               </CardHeader>
               <CardContent>
@@ -686,24 +716,41 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
                                     </div>
                                     {field.icon}
                                     <div className="flex-1">
-                                      <div className="flex items-center space-x-2 mb-2">
-                                        <Input
-                                          value={field.label}
-                                          onChange={(e) => updateField(index, { label: e.target.value })}
-                                          className="font-medium"
-                                          placeholder="Enter question text (e.g., Please provide your business phone number)"
-                                        />
-                                        <Badge variant="outline">{field.type}</Badge>
+                                      <div className="space-y-2">
+                                        {/* Step 4: Label (editable) */}
+                                        <div>
+                                          <Label className="text-xs text-slate-600">Label (editable)</Label>
+                                          <Input
+                                            value={field.label}
+                                            onChange={(e) => updateField(index, { label: e.target.value })}
+                                            className="font-medium"
+                                            placeholder="Enter question text (e.g., Please provide your business phone number)"
+                                          />
+                                        </div>
+                                        
+                                        {/* Step 4: Description */}
+                                        <div>
+                                          <Label className="text-xs text-slate-600">Description</Label>
+                                          <Input
+                                            value={field.description || ''}
+                                            onChange={(e) => updateField(index, { description: e.target.value })}
+                                            className="text-sm"
+                                            placeholder="Enter description (e.g., This could be a mobile number, work number or home phone)"
+                                          />
+                                        </div>
+                                        
+                                        {/* Step 4: Field Type (fixed) and Target Profile Field Key */}
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center space-x-2">
+                                            <Badge variant="outline" className="text-xs">
+                                              Type: {field.type}
+                                            </Badge>
+                                            <Badge variant="secondary" className="text-xs">
+                                              Maps to: {field.profileFieldKey}
+                                            </Badge>
+                                          </div>
+                                        </div>
                                       </div>
-                                      <Input
-                                        value={field.description || ''}
-                                        onChange={(e) => updateField(index, { description: e.target.value })}
-                                        className="text-sm mb-2"
-                                        placeholder="Enter description (e.g., This could be a mobile number, work number or home phone)"
-                                      />
-                                      <p className="text-xs text-slate-500">
-                                        Maps to: <code className="bg-slate-100 px-1 rounded">{field.profileFieldKey}</code>
-                                      </p>
                                     </div>
                                   </div>
                                   <div className="flex items-center space-x-2">

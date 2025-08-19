@@ -410,7 +410,7 @@ export const forms = pgTable("forms", {
   id: serial("id").primaryKey(),
   formTitle: text("form_title").notNull(),
   slug: text("slug").notNull().unique(),
-  context: text("context").$type<FormContext>().default('people'),
+  contexts: text("contexts").$type<FormContext[]>().array().default(['people']),
   settings: jsonb("settings").$type<{
     allowMultipleSubmissions?: boolean;
     matchExistingBy?: 'email' | 'phone' | 'none';
