@@ -208,25 +208,37 @@ const upload = multer({
 
 // Context-based form submission handler
 async function onFormSubmit(formData: any, formSchema: any, storage: any) {
-  const contexts = formSchema.contexts || [formSchema.context] || ['people'];
+  const contexts = formSchema.contexts || ['people'];
+  let profileId = null;
+  let propertyId = null;  
+  let taskId = null;
 
   if (contexts.includes('people')) {
-    await upsertPerson(formData, storage, formSchema.orgId);
+    profileId = await upsertPerson(formData, storage);
   }
 
   if (contexts.includes('property')) {
-    await upsertProperty(formData, storage, formSchema.orgId);
+    propertyId = await upsertProperty(formData, storage);
   }
 
   if (contexts.includes('task')) {
-    await createTask(formData, storage, formSchema.orgId);
+    taskId = await createTask(formData, storage);
   }
 
-  await logSubmission(formSchema.id, formData, storage);
+  // Create form submission with all relevant IDs
+  await storage.createFormSubmission({
+    formId: formSchema.id,
+    profileId,
+    propertyId,
+    taskId,
+    data: formData
+  });
+
+  console.log(`Form submission processed: formId=${formSchema.id}, profileId=${profileId}, propertyId=${propertyId}, taskId=${taskId}`);
 }
 
 // Helper functions for context-specific data handling
-async function upsertPerson(formData: any, storage: any, orgId: string) {
+async function upsertPerson(formData: any, storage: any): Promise<number | null> {
   try {
     const personData = {
       firstName: formData.firstName || formData.first_name,
@@ -234,64 +246,73 @@ async function upsertPerson(formData: any, storage: any, orgId: string) {
       email: formData.email,
       phone: formData.phone || formData.phoneNumber,
       notes: formData.notes,
-      orgId: orgId
+      type: 'client',
+      isActive: true,
+      orgId: '00000000-0000-0000-0000-000000000001' // Default org for now
     };
 
     // Try to find existing person by email or phone
     let existingPerson = null;
     if (personData.email) {
-      existingPerson = await storage.getContactByEmail(personData.email, orgId);
+      existingPerson = await storage.getContactByEmail(personData.email, personData.orgId);
     } else if (personData.phone) {
-      existingPerson = await storage.getContactByPhone(personData.phone, orgId);
+      existingPerson = await storage.getContactByPhone(personData.phone, personData.orgId);
     }
 
     if (existingPerson) {
       // Update existing person
       await storage.updateContact(existingPerson.id, personData);
       console.log(`Updated person: ${existingPerson.id}`);
+      return existingPerson.id;
     } else {
       // Create new person
       const newPerson = await storage.createContact(personData, null);
       console.log(`Created new person: ${newPerson.id}`);
+      return newPerson.id;
     }
   } catch (error) {
     console.error('Error upserting person:', error);
+    return null;
   }
 }
 
-async function upsertProperty(formData: any, storage: any, orgId: string) {
+async function upsertProperty(formData: any, storage: any): Promise<number | null> {
   try {
     const propertyData = {
+      name: formData.address || 'Untitled Property',
       address: formData.address,
       squareFootage: formData.squareFootage ? parseInt(formData.squareFootage) : null,
       bedrooms: formData.bedrooms ? parseInt(formData.bedrooms) : null,
       garageSpots: formData.garageSpots ? parseInt(formData.garageSpots) : null,
-      vehicleList: formData.vehicleList,
       roomList: formData.roomList,
       supplies: formData.supplies,
-      orgId: orgId,
+      orgId: '00000000-0000-0000-0000-000000000001', // Default org for now
       status: 'active',
-      type: 'residential'
+      type: 'residential',
+      isActive: true
     };
 
     // Try to find existing property by address
-    const existingProperty = await storage.getPropertyByAddress(propertyData.address, orgId);
+    const existingProperty = await storage.getPropertyByAddress(propertyData.address, propertyData.orgId);
     
     if (existingProperty) {
       // Update existing property
       await storage.updateProperty(existingProperty.id, propertyData);
       console.log(`Updated property: ${existingProperty.id}`);
+      return existingProperty.id;
     } else {
       // Create new property
-      const newProperty = await storage.createProperty(propertyData);
+      const newProperty = await storage.createProperty(propertyData, null);
       console.log(`Created new property: ${newProperty.id}`);
+      return newProperty.id;
     }
   } catch (error) {
     console.error('Error upserting property:', error);
+    return null;
   }
 }
 
-async function createTask(formData: any, storage: any, orgId: string) {
+async function createTask(formData: any, storage: any): Promise<number | null> {
   try {
     const taskData = {
       title: formData.taskTitle || formData.title,
@@ -299,14 +320,18 @@ async function createTask(formData: any, storage: any, orgId: string) {
       priority: formData.priority || 'medium',
       status: 'pending',
       dueDate: formData.requestedDate ? new Date(formData.requestedDate) : null,
-      assignedUserId: formData.assignedUserId || null,
-      orgId: orgId
+      assignedToId: formData.assignedUserId || null,
+      assignedById: null, // Will be set when admin assigns
+      orgId: '00000000-0000-0000-0000-000000000001', // Default org for now
+      isArchived: false
     };
 
-    const newTask = await storage.createTask(taskData);
+    const newTask = await storage.createTask(taskData, null);
     console.log(`Created new task: ${newTask.id}`);
+    return newTask.id;
   } catch (error) {
     console.error('Error creating task:', error);
+    return null;
   }
 }
 

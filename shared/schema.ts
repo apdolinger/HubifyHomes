@@ -410,29 +410,18 @@ export const forms = pgTable("forms", {
   id: serial("id").primaryKey(),
   formTitle: text("form_title").notNull(),
   slug: text("slug").notNull().unique(),
-  contexts: text("contexts").$type<FormContext[]>().array().default(['people']),
-  settings: jsonb("settings").$type<{
-    allowMultipleSubmissions?: boolean;
-    matchExistingBy?: 'email' | 'phone' | 'none';
-    triggerAutomation?: boolean;
-    internalDescription?: string;
-    fieldMapping?: Record<string, string>;
-    submitLabel?: string;
-    successMessage?: string;
-  }>().default({}),
+  contexts: text("contexts").array().notNull(), // ['people', 'property', 'task']
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Form fields table - for form field definitions
 export const formFields = pgTable("form_fields", {
   id: serial("id").primaryKey(),
   formId: integer("form_id").references(() => forms.id).notNull(),
   label: text("label").notNull(),
-  type: text("type").notNull(), // text, textarea, select, checkbox, etc.
+  type: text("type").notNull(),
   required: boolean("required").default(false),
-  profileFieldKey: text("profile_field_key"), // maps to contact/profile field
-  options: jsonb("options").$type<string[]>(), // for select/checkbox options
-  sortOrder: integer("sort_order").default(0),
+  profileFieldKey: text("profile_field_key"), // maps to database field
+  context: text("context").notNull(), // 'people', 'property', or 'task'
 });
 
 // Assign org forms to a property (controls client visibility)
@@ -448,16 +437,14 @@ export const propertyForms = pgTable("property_forms", {
   uniq: unique().on(t.orgId, t.propertyId, t.formId),
 }));
 
-// Client submissions with enhanced features
 export const formSubmissions = pgTable("form_submissions", {
   id: serial("id").primaryKey(),
   formId: integer("form_id").references(() => forms.id).notNull(),
-  profileId: integer("profile_id"), // references contacts table (if contact created/matched)
-  data: jsonb("data").notNull(), // submitted form data
+  profileId: integer("profile_id").references(() => contacts.id), // if people context used
+  propertyId: integer("property_id").references(() => properties.id), // if property context used  
+  taskId: integer("task_id").references(() => tasks.id), // if task context used
+  data: jsonb("data").notNull(),
   submittedAt: timestamp("submitted_at").defaultNow(),
-  status: text("status").$type<"received" | "in_review" | "accepted" | "rejected">().default("received"),
-  reviewedBy: uuid("reviewed_by").references(() => users.id),
-  reviewedAt: timestamp("reviewed_at"),
 });
 
 // Property portal settings for tenant/client portals with branding and configuration
@@ -882,9 +869,17 @@ export const formSubmissionsRelations = relations(formSubmissions, ({ one }) => 
     fields: [formSubmissions.formId],
     references: [forms.id],
   }),
-  reviewedBy: one(users, {
-    fields: [formSubmissions.reviewedBy],
-    references: [users.id],
+  profile: one(contacts, {
+    fields: [formSubmissions.profileId],
+    references: [contacts.id],
+  }),
+  property: one(properties, {
+    fields: [formSubmissions.propertyId],
+    references: [properties.id],
+  }),
+  task: one(tasks, {
+    fields: [formSubmissions.taskId],
+    references: [tasks.id],
   }),
 }));
 
