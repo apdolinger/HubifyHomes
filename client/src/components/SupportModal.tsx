@@ -576,12 +576,6 @@ export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" size="sm" className="text-xs">
-                    📞 (555) 123-4567
-                  </Button>
-                  <Button variant="outline" size="sm" className="text-xs">
-                    💬 Live Chat
-                  </Button>
-                  <Button variant="outline" size="sm" className="text-xs">
                     📚 Full Help Center
                   </Button>
                 </div>
