@@ -647,11 +647,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/rooms", isAuthenticated, async (req, res) => {
     try {
+      console.log("Creating room with data:", req.body);
       const validatedData = insertRoomSchema.parse(req.body);
+      console.log("Validated room data:", validatedData);
       const room = await storage.createRoom(validatedData);
       res.status(201).json(room);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error("Room validation errors:", error.errors);
         return res.status(400).json({ message: "Invalid data", errors: error.errors });
       }
       console.error("Error creating room:", error);
