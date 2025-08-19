@@ -7,8 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Settings, Eye, EyeOff, Upload, PenTool } from 'lucide-react';
+import { Plus, Settings, Eye, EyeOff, Upload, PenTool, FileText, Trash2 } from 'lucide-react';
 
 interface FormField {
   id: number;
@@ -117,11 +116,11 @@ export function EnhancedFormBuilder({ initialFields = [], onSave }: EnhancedForm
     switch (currentStep) {
       case 1:
         return (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Basic Information</h3>
+          <div className="space-y-6">
+            <h3 className="text-lg font-semibold">Form Setup</h3>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="title">Form Title</Label>
+                <Label htmlFor="title">Form Title *</Label>
                 <Input
                   id="title"
                   value={formTitle}
@@ -129,23 +128,37 @@ export function EnhancedFormBuilder({ initialFields = [], onSave }: EnhancedForm
                     setFormTitle(e.target.value);
                     setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
                   }}
-                  placeholder="Enter form title"
+                  placeholder="e.g., New Client Request"
                 />
               </div>
               <div>
-                <Label htmlFor="slug">URL Slug</Label>
+                <Label htmlFor="slug">Form Slug</Label>
                 <Input
                   id="slug"
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
-                  placeholder="form-url-slug"
+                  placeholder="new-client-request"
                 />
+                <p className="text-sm text-gray-500 mt-1">Used in form URLs. Auto-generated from title.</p>
               </div>
               <div>
-                <Label>Form Contexts</Label>
-                <div className="grid grid-cols-3 gap-2 mt-2">
+                <Label htmlFor="description">Internal Description</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Internal notes about this form..."
+                  className="resize-none"
+                  rows={3}
+                />
+              </div>
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">Step 1</span>
+                  <span className="text-sm font-medium text-blue-900">Form Contexts</span>
+                </div>
+                <p className="text-sm text-blue-700 mb-3">Select one or more contexts to determine available fields and submission processing.</p>
+                <div className="space-y-2">
                   {contexts.map(context => (
-                    <div key={context.value} className="flex items-center space-x-2">
+                    <div key={context.value} className="flex items-center space-x-3 p-2 bg-white rounded border">
                       <Checkbox
                         checked={selectedContexts.includes(context.value)}
                         onCheckedChange={(checked) => {
@@ -156,7 +169,14 @@ export function EnhancedFormBuilder({ initialFields = [], onSave }: EnhancedForm
                           }
                         }}
                       />
-                      <label className="text-sm">{context.label}</label>
+                      <div>
+                        <label className="text-sm font-medium">{context.label}</label>
+                        <p className="text-xs text-gray-500">
+                          {context.value === 'people' && 'Contact/Client Forms'}
+                          {context.value === 'property' && 'Property Information Forms'}
+                          {context.value === 'task' && 'Service Request Forms'}
+                        </p>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -167,75 +187,74 @@ export function EnhancedFormBuilder({ initialFields = [], onSave }: EnhancedForm
 
       case 2:
         return (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <h3 className="text-lg font-semibold">Form Fields</h3>
-            <Tabs defaultValue={selectedContexts[0]} className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                {selectedContexts.map(context => (
-                  <TabsTrigger key={context} value={context}>
-                    {contexts.find(c => c.value === context)?.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h4 className="font-medium">Field Builder</h4>
+                  <p className="text-sm text-gray-600">Add and configure fields for your selected contexts</p>
+                </div>
+                <Button
+                  onClick={() => addField(selectedContexts[0] || 'people')}
+                  size="sm"
+                  className="flex items-center space-x-1"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Add Field</span>
+                </Button>
+              </div>
               
-              {selectedContexts.map(context => (
-                <TabsContent key={context} value={context} className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-medium">
-                      {contexts.find(c => c.value === context)?.label} Fields
-                    </h4>
-                    <Button
-                      onClick={() => addField(context)}
-                      size="sm"
-                      className="flex items-center space-x-1"
-                    >
-                      <Plus className="h-4 w-4" />
-                      <span>Add Field</span>
-                    </Button>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    {fields.filter(field => field.context === context).map(field => (
-                      <Card key={field.id} className="relative">
-                        <CardContent className="pt-4">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2 mb-2">
-                                <Badge variant="outline">{field.type}</Badge>
-                                {field.required && <Badge variant="secondary">Required</Badge>}
-                                {field.conditions && <Badge variant="outline">Conditional</Badge>}
-                              </div>
-                              <h5 className="font-medium">{field.label}</h5>
-                              {field.options && (
-                                <p className="text-sm text-gray-600 mt-1">
-                                  Options: {field.options.join(', ')}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex space-x-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setEditingField(field)}
-                              >
-                                <Settings className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeField(field.id)}
-                              >
-                                ×
-                              </Button>
-                            </div>
+              <div className="space-y-3">
+                {fields.map((field, index) => (
+                  <Card key={field.id} className="bg-white">
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <span className="text-xs bg-gray-100 px-2 py-1 rounded">Field {index + 1}</span>
+                            <Badge variant="outline">{field.type}</Badge>
+                            <Badge variant="outline" className="text-xs">{field.context}</Badge>
+                            {field.required && <Badge variant="secondary" className="text-xs">Required</Badge>}
+                            {field.conditions && <Badge variant="outline" className="text-xs">Conditional</Badge>}
                           </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                          <h5 className="font-medium">{field.label}</h5>
+                          {field.options && (
+                            <p className="text-sm text-gray-600 mt-1">
+                              Options: {field.options.slice(0, 3).join(', ')}{field.options.length > 3 ? '...' : ''}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex space-x-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditingField(field)}
+                          >
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeField(field.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                
+                {fields.length === 0 && (
+                  <div className="text-center py-8 text-gray-500 bg-white rounded-lg border-2 border-dashed">
+                    <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="font-medium">No fields added yet</p>
+                    <p className="text-sm">Click "Add Field" to get started</p>
                   </div>
-                </TabsContent>
-              ))}
-            </Tabs>
+                )}
+              </div>
+            </div>
           </div>
         );
 

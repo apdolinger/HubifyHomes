@@ -145,15 +145,34 @@ const FormSettingsPanel: React.FC<FormSettingsPanelProps> = ({
           Form Settings
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div>
-          <Label htmlFor="formTitle">Form Title</Label>
-          <Input
-            id="formTitle"
-            value={formSchema.formTitle}
-            onChange={(e) => updateFormSchema({ formTitle: e.target.value })}
-            placeholder="Enter form title"
-          />
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="formTitle">Form Title *</Label>
+            <Input
+              id="formTitle"
+              value={formSchema.formTitle}
+              onChange={(e) => {
+                const title = e.target.value;
+                updateFormSchema({ 
+                  formTitle: title,
+                  slug: title.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+                });
+              }}
+              placeholder="new client inquiry"
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="formSlug">Form Slug</Label>
+            <Input
+              id="formSlug"
+              value={formSchema.slug}
+              onChange={(e) => updateFormSchema({ slug: e.target.value })}
+              placeholder="new-client-inquiry"
+            />
+            <p className="text-xs text-gray-500 mt-1">Used in form URLs. Auto-generated from title.</p>
+          </div>
         </div>
         
         <div>
@@ -162,22 +181,65 @@ const FormSettingsPanel: React.FC<FormSettingsPanelProps> = ({
             id="internalDescription"
             value={formSchema.internalDescription || ''}
             onChange={(e) => updateFormSchema({ internalDescription: e.target.value })}
-            placeholder="Internal notes about this form (not visible to users)"
+            placeholder="Internal notes about this form..."
             rows={3}
+            className="resize-none"
           />
         </div>
-        
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="allowMultipleSubmissions"
-            checked={formSchema.allowMultipleSubmissions}
-            onCheckedChange={(checked) => updateFormSchema({ allowMultipleSubmissions: checked })}
-          />
-          <Label htmlFor="allowMultipleSubmissions">Allow Multiple Submissions</Label>
+
+        <div className="bg-blue-50 p-4 rounded-lg">
+          <div className="flex items-center justify-between mb-2">
+            <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">Step 1</span>
+            <span className="text-sm font-medium text-blue-900">Form Contexts</span>
+          </div>
+          <p className="text-sm text-blue-700 mb-3">Select one or more contexts to determine available fields and submission processing.</p>
+          <div className="space-y-2">
+            {(['people', 'property', 'task'] as FormContext[]).map((context) => (
+              <div key={context} className="flex items-center space-x-3 p-2 bg-white rounded border">
+                <input
+                  type="checkbox"
+                  id={`context-${context}`}
+                  checked={formSchema.contexts.includes(context)}
+                  onChange={(e) => {
+                    const newContexts = e.target.checked
+                      ? [...formSchema.contexts, context]
+                      : formSchema.contexts.filter(c => c !== context);
+                    updateFormSchema({ contexts: newContexts });
+                  }}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <div>
+                  <label htmlFor={`context-${context}`} className="text-sm font-medium capitalize">
+                    {context === 'people' ? 'People - Contact/Client Forms' :
+                     context === 'property' ? 'Property - Property Information Forms' :
+                     'Task - Service Request Forms'}
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
         
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="flex items-center justify-between">
+            <Label>Allow Multiple Submissions</Label>
+            <Switch
+              checked={formSchema.allowMultipleSubmissions}
+              onCheckedChange={(checked) => updateFormSchema({ allowMultipleSubmissions: checked })}
+            />
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <Label>Trigger Automation</Label>
+            <Switch
+              checked={formSchema.triggerAutomation || false}
+              onCheckedChange={(checked) => updateFormSchema({ triggerAutomation: checked })}
+            />
+          </div>
+        </div>
+
         <div>
-          <Label htmlFor="matchExistingBy">Match Existing Profile By</Label>
+          <Label htmlFor="matchExistingBy">Match Existing Contacts By</Label>
           <Select 
             value={formSchema.matchExistingBy} 
             onValueChange={(value: 'email' | 'phone' | 'none') => updateFormSchema({ matchExistingBy: value })}
@@ -501,115 +563,49 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
           <div className="lg:col-span-1 space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Form Settings</CardTitle>
+                <CardTitle className="flex items-center">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Quick Settings
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="form-title">Form Title *</Label>
-                  <Input
-                    id="form-title"
-                    value={formSchema.formTitle}
-                    onChange={(e) => updateFormSchema({ formTitle: e.target.value })}
-                    placeholder="e.g., New Client Registration"
+                <div className="flex items-center justify-between">
+                  <Label>Multiple Submissions</Label>
+                  <Switch
+                    checked={formSchema.allowMultipleSubmissions}
+                    onCheckedChange={(checked) => 
+                      updateFormSchema({ allowMultipleSubmissions: checked })
+                    }
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="form-slug">Form Slug</Label>
-                  <Input
-                    id="form-slug"
-                    value={formSchema.slug}
-                    onChange={(e) => updateFormSchema({ slug: e.target.value })}
-                    placeholder="auto-generated-from-title"
+                  <Label>Match Existing Contacts By</Label>
+                  <Select
+                    value={formSchema.matchExistingBy}
+                    onValueChange={(value: 'email' | 'phone' | 'none') =>
+                      updateFormSchema({ matchExistingBy: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="email">Email Address</SelectItem>
+                      <SelectItem value="phone">Phone Number</SelectItem>
+                      <SelectItem value="none">Always Create New</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Label>Trigger Automation</Label>
+                  <Switch
+                    checked={formSchema.triggerAutomation}
+                    onCheckedChange={(checked) => 
+                      updateFormSchema({ triggerAutomation: checked })
+                    }
                   />
-                  <p className="text-xs text-slate-500 mt-1">
-                    Used in form URLs. Auto-generated from title.
-                  </p>
-                </div>
-
-                <div>
-                  <Label htmlFor="form-description">Internal Description</Label>
-                  <Textarea
-                    id="form-description"
-                    value={formSchema.internalDescription}
-                    onChange={(e) => updateFormSchema({ internalDescription: e.target.value })}
-                    placeholder="Internal notes about this form..."
-                    rows={3}
-                  />
-                </div>
-
-                <div>
-                  <Label className="flex items-center">
-                    <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded mr-2">Step 1</span>
-                    Form Contexts
-                  </Label>
-                  <div className="space-y-2">
-                    {(['people', 'property', 'task'] as FormContext[]).map((context) => (
-                      <div key={context} className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id={`context-${context}`}
-                          checked={formSchema.contexts.includes(context)}
-                          onChange={(e) => {
-                            const newContexts = e.target.checked
-                              ? [...formSchema.contexts, context]
-                              : formSchema.contexts.filter(c => c !== context);
-                            updateFormSchema({ contexts: newContexts });
-                          }}
-                          className="h-4 w-4 rounded border-gray-300"
-                        />
-                        <label htmlFor={`context-${context}`} className="text-sm capitalize">
-                          {context === 'people' ? 'People - Contact/Client Forms' :
-                           context === 'property' ? 'Property - Property Information Forms' :
-                           'Task - Service Request Forms'}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-slate-500 mt-2">
-                    Select one or more contexts to determine available fields and submission processing.
-                  </p>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label>Allow Multiple Submissions</Label>
-                    <Switch
-                      checked={formSchema.allowMultipleSubmissions}
-                      onCheckedChange={(checked) => 
-                        updateFormSchema({ allowMultipleSubmissions: checked })
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Match Existing Contacts By</Label>
-                    <Select
-                      value={formSchema.matchExistingBy}
-                      onValueChange={(value: 'email' | 'phone' | 'none') =>
-                        updateFormSchema({ matchExistingBy: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="email">Email Address</SelectItem>
-                        <SelectItem value="phone">Phone Number</SelectItem>
-                        <SelectItem value="none">Always Create New</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <Label>Trigger Automation</Label>
-                    <Switch
-                      checked={formSchema.triggerAutomation}
-                      onCheckedChange={(checked) => 
-                        updateFormSchema({ triggerAutomation: checked })
-                      }
-                    />
-                  </div>
                 </div>
               </CardContent>
             </Card>
