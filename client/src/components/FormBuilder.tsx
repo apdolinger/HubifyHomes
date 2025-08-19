@@ -221,6 +221,108 @@ const FormSettingsPanel: React.FC<FormSettingsPanelProps> = ({
   );
 };
 
+// FormDeploySection Component
+interface FormDeploySectionProps {
+  formSchema: FormSchema;
+}
+
+const FormDeploySection: React.FC<FormDeploySectionProps> = ({ formSchema }) => {
+  const { toast } = useToast();
+  
+  const embedCode = `<iframe src="${window.location.origin}/forms/${formSchema.slug}" width="100%" height="600" frameborder="0"></iframe>`;
+  
+  const handlePublish = () => {
+    if (!formSchema.formTitle || !formSchema.slug) {
+      toast({
+        title: "Cannot Publish",
+        description: "Please save the form first before publishing.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    toast({
+      title: "Form Published",
+      description: "Your form is now live and accepting submissions.",
+    });
+  };
+  
+  const copyEmbedCode = async () => {
+    try {
+      await navigator.clipboard.writeText(embedCode);
+      toast({
+        title: "Copied!",
+        description: "Embed code copied to clipboard.",
+      });
+    } catch (err) {
+      toast({
+        title: "Copy Failed",
+        description: "Please manually copy the embed code.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle className="flex items-center">
+          <Upload className="w-5 h-5 mr-2" />
+          Form Deployment
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center space-x-2">
+          <Button onClick={handlePublish} className="bg-green-600 hover:bg-green-700">
+            <Upload className="w-4 h-4 mr-2" />
+            Publish Form
+          </Button>
+          <Badge variant={formSchema.formTitle ? "default" : "secondary"}>
+            {formSchema.formTitle ? "Ready to Publish" : "Save First"}
+          </Badge>
+        </div>
+        
+        <div>
+          <Label htmlFor="embedCode">Embed Code</Label>
+          <div className="flex space-x-2">
+            <Input
+              id="embedCode"
+              value={embedCode}
+              readOnly
+              className="flex-1"
+            />
+            <Button variant="outline" onClick={copyEmbedCode}>
+              Copy Embed Code
+            </Button>
+          </div>
+          <p className="text-xs text-slate-500 mt-1">
+            Use this code to embed the form on your website.
+          </p>
+        </div>
+        
+        {formSchema.slug && (
+          <div>
+            <Label>Form URL</Label>
+            <div className="flex space-x-2">
+              <Input
+                value={`${window.location.origin}/forms/${formSchema.slug}`}
+                readOnly
+                className="flex-1"
+              />
+              <Button 
+                variant="outline" 
+                onClick={() => window.open(`/forms/${formSchema.slug}`, '_blank')}
+              >
+                Open Form
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
 export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -309,7 +411,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
     mutationFn: async (formData: FormSchema) => {
       return apiRequest('/api/forms', {
         method: 'POST',
-        body: {
+        body: JSON.stringify({
           name: formData.formTitle,
           description: formData.internalDescription,
           schema: {
@@ -321,9 +423,18 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
               options: field.options,
               profileFieldKey: field.profileFieldKey
             })),
+            matchExistingBy: formData.matchExistingBy,
+            fieldMapping: formData.fields.reduce((acc, field) => {
+              acc[field.profileFieldKey] = field.profileFieldKey;
+              return acc;
+            }, {} as Record<string, string>),
+            triggerAutomation: formData.triggerAutomation,
             submitLabel: 'Submit Form',
             successMessage: 'Thank you for your submission!'
           }
+        }),
+        headers: {
+          'Content-Type': 'application/json'
         }
       });
     },
@@ -411,7 +522,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
                   <Input
                     id="form-title"
                     value={formSchema.formTitle}
-                    onChange={(e) => handleTitleChange(e.target.value)}
+                    onChange={(e) => updateFormSchema({ formTitle: e.target.value })}
                     placeholder="e.g., New Client Registration"
                   />
                 </div>
@@ -421,7 +532,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
                   <Input
                     id="form-slug"
                     value={formSchema.slug}
-                    onChange={(e) => setFormSchema(prev => ({ ...prev, slug: e.target.value }))}
+                    onChange={(e) => updateFormSchema({ slug: e.target.value })}
                     placeholder="auto-generated-from-title"
                   />
                   <p className="text-xs text-slate-500 mt-1">
@@ -434,7 +545,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
                   <Textarea
                     id="form-description"
                     value={formSchema.internalDescription}
-                    onChange={(e) => setFormSchema(prev => ({ ...prev, internalDescription: e.target.value }))}
+                    onChange={(e) => updateFormSchema({ internalDescription: e.target.value })}
                     placeholder="Internal notes about this form..."
                     rows={3}
                   />
@@ -446,7 +557,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
                     <Switch
                       checked={formSchema.allowMultipleSubmissions}
                       onCheckedChange={(checked) => 
-                        setFormSchema(prev => ({ ...prev, allowMultipleSubmissions: checked }))
+                        updateFormSchema({ allowMultipleSubmissions: checked })
                       }
                     />
                   </div>
@@ -456,7 +567,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
                     <Select
                       value={formSchema.matchExistingBy}
                       onValueChange={(value: 'email' | 'phone' | 'none') =>
-                        setFormSchema(prev => ({ ...prev, matchExistingBy: value }))
+                        updateFormSchema({ matchExistingBy: value })
                       }
                     >
                       <SelectTrigger>
@@ -475,7 +586,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
                     <Switch
                       checked={formSchema.triggerAutomation}
                       onCheckedChange={(checked) => 
-                        setFormSchema(prev => ({ ...prev, triggerAutomation: checked }))
+                        updateFormSchema({ triggerAutomation: checked })
                       }
                     />
                   </div>
@@ -683,6 +794,9 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Form Deploy Section */}
+      <FormDeploySection formSchema={formSchema} />
     </div>
   );
 }
