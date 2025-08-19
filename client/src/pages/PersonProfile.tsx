@@ -329,7 +329,7 @@ export default function PersonProfile() {
   // Create property mutation
   const createPropertyMutation = useMutation({
     mutationFn: async (data: PropertyFormData) => {
-      const response = await apiRequest("POST", "/api/properties", data);
+      const response = await apiRequest("POST", "/api/properties", { ...data, contactId: personId });
       return response.json();
     },
     onSuccess: (newProperty) => {

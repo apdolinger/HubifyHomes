@@ -419,8 +419,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         user: req.user
       });
       
+      // Extract contactId from request body if provided
+      const { contactId, ...propertyData } = req.body;
+      
       const dataToValidate = {
-        ...req.body,
+        ...propertyData,
         orgId,
         managerId: userId,
       };
@@ -429,6 +432,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const validatedData = insertPropertySchema.parse(dataToValidate);
       const property = await storage.createProperty(validatedData, userId);
+      
+      // If contactId is provided, create the property-contact association
+      if (contactId) {
+        await storage.linkContactToProperty(contactId, property.id, true, "owner");
+        console.log(`Linked contact ${contactId} to property ${property.id}`);
+      }
+      
       res.status(201).json(property);
     } catch (error) {
       if (error instanceof z.ZodError) {
