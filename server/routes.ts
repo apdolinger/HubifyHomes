@@ -409,11 +409,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/properties", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const validatedData = insertPropertySchema.parse(req.body);
-      const property = await storage.createProperty({
-        ...validatedData,
+      const orgId = req.user.orgId;
+      const validatedData = insertPropertySchema.parse({
+        ...req.body,
+        orgId,
         managerId: userId,
-      }, userId);
+      });
+      const property = await storage.createProperty(validatedData, userId);
       res.status(201).json(property);
     } catch (error) {
       if (error instanceof z.ZodError) {

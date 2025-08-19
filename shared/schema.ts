@@ -130,7 +130,7 @@ export const properties = pgTable("properties", {
 // Rooms/Spaces table
 export const rooms = pgTable("rooms", {
   id: serial("id").primaryKey(),
-  propertyId: integer("property_id").references(() => properties.id, { onDelete: "cascade" }).notNull(),
+  propertyId: uuid("property_id").references(() => properties.id, { onDelete: "cascade" }).notNull(),
   name: varchar("name").notNull(),
   type: varchar("type").notNull(), // 'bedroom', 'bathroom', 'kitchen', 'living_room', 'office', 'storage', 'outdoor', 'other'
   description: text("description"),
@@ -142,7 +142,7 @@ export const rooms = pgTable("rooms", {
 // Vehicles table
 export const vehicles = pgTable("vehicles", {
   id: serial("id").primaryKey(),
-  propertyId: integer("property_id").references(() => properties.id, { onDelete: "cascade" }).notNull(),
+  propertyId: uuid("property_id").references(() => properties.id, { onDelete: "cascade" }).notNull(),
   make: varchar("make").notNull(),
   model: varchar("model").notNull(),
   year: integer("year"),
@@ -320,7 +320,7 @@ export const tasks = pgTable("tasks", {
   description: text("description"),
   priority: varchar("priority").notNull().default("normal"), // urgent, high, normal, low
   status: varchar("status").notNull().default("pending"), // pending, in_progress, completed, cancelled
-  propertyId: integer("property_id").references(() => properties.id),
+  propertyId: uuid("property_id").references(() => properties.id),
   roomId: integer("room_id").references(() => rooms.id),
   contactId: integer("contact_id").references(() => contacts.id),
   assignedToId: varchar("assigned_to_id").references(() => users.id),
@@ -346,7 +346,7 @@ export const contacts = pgTable("contacts", {
   email: varchar("email"),
   phone: varchar("phone"),
   type: varchar("type").notNull(), // tenant, owner, vendor, emergency_contact
-  propertyId: integer("property_id").references(() => properties.id),
+  propertyId: uuid("property_id").references(() => properties.id),
   isActive: boolean("is_active").notNull().default(true),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -357,7 +357,7 @@ export const contacts = pgTable("contacts", {
 export const contactProperties = pgTable("contact_properties", {
   id: serial("id").primaryKey(),
   contactId: integer("contact_id").references(() => contacts.id, { onDelete: "cascade" }).notNull(),
-  propertyId: integer("property_id").references(() => properties.id, { onDelete: "cascade" }).notNull(),
+  propertyId: uuid("property_id").references(() => properties.id, { onDelete: "cascade" }).notNull(),
   isPrimary: boolean("is_primary").default(false),
   relationship: varchar("relationship"), // tenant, owner, vendor, emergency_contact
   startDate: timestamp("start_date"),
@@ -458,7 +458,7 @@ export const formSubmissions = pgTable("form_submissions", {
 export const propertyPortalSettings = pgTable("property_portal_settings", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").references(() => orgs.id).notNull(),
-  propertyId: integer("property_id").references(() => properties.id).notNull(),
+  propertyId: uuid("property_id").references(() => properties.id).notNull(),
   version: integer("version").notNull().default(1),
   status: varchar("status").notNull().default("draft"), // draft, published, archived
   branding: jsonb("branding").$type<{

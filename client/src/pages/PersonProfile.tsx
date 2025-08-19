@@ -343,7 +343,7 @@ export default function PersonProfile() {
       // Refresh the property queries to include the new property
       queryClient.invalidateQueries({ queryKey: [`/api/contacts/${personId}/properties`] });
     },
-    onError: (error) => {
+    onError: async (error) => {
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
@@ -356,9 +356,24 @@ export default function PersonProfile() {
         return;
       }
       
+      // Try to get more detailed error information
+      let errorMessage = "Failed to create property. Please try again.";
+      try {
+        if (error instanceof Response) {
+          const errorData = await error.json();
+          if (errorData.errors && errorData.errors.length > 0) {
+            errorMessage = errorData.errors.map((e: any) => `${e.path?.join('.')}: ${e.message}`).join(', ');
+          } else if (errorData.message) {
+            errorMessage = errorData.message;
+          }
+        }
+      } catch {
+        // Use default error message
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to create property. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     },
