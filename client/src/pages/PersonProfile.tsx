@@ -1402,7 +1402,7 @@ export default function PersonProfile() {
                     <FormItem>
                       <FormLabel>State</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="FL" maxLength={2} />
+                        <Input {...field} placeholder="State" maxLength={2} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

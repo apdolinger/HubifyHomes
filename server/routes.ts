@@ -2032,7 +2032,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           zip: record.zipCode,
           status: "occupied", // Use default status from schema
           units: 1,
-          isActive: true
+          isActive: true,
+          orgId: "00000000-0000-0000-0000-000000000000", // Default org for imported data
+          managerId: null
         }, null); // Use null for user_id to avoid foreign key constraint
         
         importResults.properties++;
