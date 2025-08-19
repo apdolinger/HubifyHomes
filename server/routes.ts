@@ -6,6 +6,7 @@ import fs from "fs";
 import express from "express";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { ObjectStorageService } from "./objectStorage";
 import { importSampleData } from "./import-data";
 import { getBrandingLevel, enforceBrandingPolicy, getBrandingCapabilities } from "./branding";
 import { 
@@ -2029,6 +2030,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching form:", error);
       res.status(500).send("Error loading form");
+    }
+  });
+
+  // File upload URL endpoint for form fields
+  app.post("/api/forms/:formId/fields/:fieldId/upload-url", async (req, res) => {
+    try {
+      const formId = parseInt(req.params.formId);
+      const fieldId = parseInt(req.params.fieldId);
+      
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getFormFileUploadURL(formId, fieldId);
+      
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error("Error getting upload URL:", error);
+      res.status(500).json({ message: "Failed to get upload URL" });
     }
   });
 

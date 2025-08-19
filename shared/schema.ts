@@ -418,10 +418,23 @@ export const formFields = pgTable("form_fields", {
   id: serial("id").primaryKey(),
   formId: integer("form_id").references(() => forms.id).notNull(),
   label: text("label").notNull(),
-  type: text("type").notNull(),
+  type: text("type").notNull(), // text, textarea, select, checkbox, file, signature, etc.
   required: boolean("required").default(false),
   profileFieldKey: text("profile_field_key"), // maps to database field
   context: text("context").notNull(), // 'people', 'property', or 'task'
+  options: jsonb("options").$type<string[]>(), // for select/checkbox options
+  conditions: jsonb("conditions").$type<{
+    showIf?: { fieldId: number; operator: 'equals' | 'not_equals' | 'contains'; value: string }[];
+    hideIf?: { fieldId: number; operator: 'equals' | 'not_equals' | 'contains'; value: string }[];
+  }>(), // conditional display logic
+  validation: jsonb("validation").$type<{
+    minLength?: number;
+    maxLength?: number;
+    pattern?: string;
+    fileTypes?: string[];
+    maxFileSize?: number;
+  }>(), // field validation rules
+  sortOrder: integer("sort_order").default(0),
 });
 
 // Assign org forms to a property (controls client visibility)
