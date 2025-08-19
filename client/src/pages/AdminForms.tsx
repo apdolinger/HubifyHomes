@@ -12,6 +12,8 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import FormBuilder from "@/components/FormBuilder";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { 
@@ -28,7 +30,8 @@ import {
   Code,
   Crown,
   Shield,
-  Zap
+  Zap,
+  Hammer
 } from "lucide-react";
 import type { Form, InsertForm } from "@shared/schema";
 
@@ -244,13 +247,36 @@ export default function AdminForms() {
             {getTierIcon(userTier)}
             {userTier.charAt(0).toUpperCase() + userTier.slice(1)} Plan
           </Badge>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Create New Form
-              </Button>
-            </DialogTrigger>
+        </div>
+      </div>
+
+      <Tabs defaultValue="builder" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="builder" className="flex items-center">
+            <Hammer className="w-4 h-4 mr-2" />
+            Form Builder
+          </TabsTrigger>
+          <TabsTrigger value="manage" className="flex items-center">
+            <FileText className="w-4 h-4 mr-2" />
+            Manage Forms
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="builder">
+          <FormBuilder />
+        </TabsContent>
+
+        <TabsContent value="manage">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Existing Forms</h2>
+              <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Legacy Form
+                  </Button>
+                </DialogTrigger>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Create New Form</DialogTitle>
@@ -403,11 +429,10 @@ export default function AdminForms() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
+            </div>
 
-      {/* Forms List */}
-      <Card>
+            {/* Forms List */}
+            <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
             <FileText className="w-5 h-5 mr-2" />
@@ -513,15 +538,15 @@ export default function AdminForms() {
         </CardContent>
       </Card>
 
-      {/* Tier Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Settings className="w-5 h-5 mr-2" />
-            Plan Limits & Features
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+            {/* Tier Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Settings className="w-5 h-5 mr-2" />
+                  Plan Limits & Features
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="border rounded-lg p-4">
               <div className="flex items-center mb-2">
@@ -557,8 +582,11 @@ export default function AdminForms() {
               </ul>
             </div>
           </div>
-        </CardContent>
-      </Card>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

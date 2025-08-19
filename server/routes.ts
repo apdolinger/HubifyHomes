@@ -1776,7 +1776,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Forms API routes
   app.get("/api/forms", isAuthenticated, async (req: any, res) => {
     try {
-      const forms = await storage.getForms((req.user as any).claims.sub);
+      const user = await storage.getUser((req.user as any).claims.sub);
+      if (!user?.orgId) {
+        return res.status(404).json({ message: "User organization not found" });
+      }
+      const forms = await storage.getForms(user.orgId);
       res.json(forms);
     } catch (error) {
       console.error("Error fetching forms:", error);
@@ -1798,7 +1802,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userTier = user.tier || 'basic';
       const currentLimit = tierLimits[userTier as keyof typeof tierLimits] || 0;
       
-      const existingForms = await storage.getForms(userId);
+      const existingForms = await storage.getForms(user.orgId!);
       if (existingForms.length >= currentLimit) {
         return res.status(403).json({ 
           message: `Form limit reached for ${userTier} plan` 
@@ -1806,8 +1810,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const form = await storage.createForm({
-        ...req.body,
-        createdBy: userId
+        name: req.body.name,
+        description: req.body.description,
+        schema: req.body.schema,
+        orgId: user.orgId
       });
       res.json(form);
     } catch (error) {

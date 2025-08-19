@@ -1657,11 +1657,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Forms operations
-  async getForms(userId: string): Promise<Form[]> {
+  async getForms(orgId: string): Promise<Form[]> {
     return await db
       .select()
       .from(forms)
-      .where(eq(forms.createdBy, userId))
+      .where(eq(forms.orgId, orgId))
       .orderBy(desc(forms.createdAt));
   }
 
