@@ -491,7 +491,7 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(properties).where(eq(properties.isActive, true)).orderBy(desc(properties.createdAt));
   }
 
-  async getProperty(id: number): Promise<Property | undefined> {
+  async getProperty(id: string): Promise<Property | undefined> {
     const [property] = await db.select().from(properties).where(eq(properties.id, id));
     return property;
   }
@@ -520,7 +520,7 @@ export class DatabaseStorage implements IStorage {
     return newProperty;
   }
 
-  async updateProperty(id: number, property: Partial<InsertProperty>): Promise<Property> {
+  async updateProperty(id: string, property: Partial<InsertProperty>): Promise<Property> {
     const [updatedProperty] = await db
       .update(properties)
       .set({ ...property, updatedAt: new Date() })
@@ -529,12 +529,12 @@ export class DatabaseStorage implements IStorage {
     return updatedProperty;
   }
 
-  async deleteProperty(id: number): Promise<void> {
+  async deleteProperty(id: string): Promise<void> {
     await db.update(properties).set({ isActive: false }).where(eq(properties.id, id));
   }
 
   // Room operations
-  async getRoomsByProperty(propertyId: number): Promise<Room[]> {
+  async getRoomsByProperty(propertyId: string): Promise<Room[]> {
     return await db.select().from(rooms).where(eq(rooms.propertyId, propertyId));
   }
 
