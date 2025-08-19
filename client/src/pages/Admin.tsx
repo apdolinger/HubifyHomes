@@ -55,7 +55,161 @@ export default function Admin() {
   const [isNewTemplateDialogOpen, setIsNewTemplateDialogOpen] = useState(false);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isNewCommunityDialogOpen, setIsNewCommunityDialogOpen] = useState(false);
+  const [selectedProperty, setSelectedProperty] = useState<any>(null);
+  const [includeNotes, setIncludeNotes] = useState(true);
+  const [includeTasks, setIncludeTasks] = useState(true);
+  const [includeContacts, setIncludeContacts] = useState(true);
+  const [includeRooms, setIncludeRooms] = useState(true);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const queryClient = useQueryClient();
+
+  // Fetch properties for the property selector
+  const { data: properties = [] } = useQuery({
+    queryKey: ['/api/properties'],
+    staleTime: 30000,
+  });
+
+  // Property report generation function
+  const generatePropertyReport = async (property: any) => {
+    if (!property) return;
+    
+    setIsGeneratingReport(true);
+    
+    try {
+      // Fetch comprehensive property data
+      const responses = await Promise.all([
+        fetch(`/api/properties/${property.id}`).then(r => r.json()),
+        includeNotes ? fetch(`/api/properties/${property.id}/notes`).then(r => r.json()) : Promise.resolve([]),
+        includeTasks ? fetch(`/api/tasks?propertyId=${property.id}`).then(r => r.json()) : Promise.resolve([]),
+        includeContacts ? fetch(`/api/properties/${property.id}/contacts`).then(r => r.json()) : Promise.resolve([]),
+        includeRooms ? fetch(`/api/properties/${property.id}/rooms`).then(r => r.json()) : Promise.resolve([]),
+      ]);
+
+      const [propertyDetails, notes, tasks, contacts, rooms] = responses;
+
+      // Generate CSV content
+      const csvContent = generatePropertyReportCSV({
+        property: propertyDetails,
+        notes: includeNotes ? notes : [],
+        tasks: includeTasks ? tasks : [],
+        contacts: includeContacts ? contacts : [],
+        rooms: includeRooms ? rooms : [],
+      });
+
+      // Download the report
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `Property_Report_${property.name || 'Property'}_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast({
+        title: "Report Generated",
+        description: `Comprehensive report for ${property.name || 'Property'} has been downloaded.`,
+      });
+    } catch (error) {
+      console.error('Error generating report:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate property report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  // Generate CSV content for property report
+  const generatePropertyReportCSV = (data: any) => {
+    const { property, notes, tasks, contacts, rooms } = data;
+    
+    let csvContent = `Property Comprehensive Report\n`;
+    csvContent += `Generated on: ${new Date().toLocaleDateString()}\n\n`;
+
+    // Property Details
+    csvContent += `PROPERTY INFORMATION\n`;
+    csvContent += `Name,${property.name || 'N/A'}\n`;
+    csvContent += `Address,"${property.address || 'N/A'}"\n`;
+    csvContent += `Type,${property.type || 'N/A'}\n`;
+    csvContent += `Status,${property.status || 'N/A'}\n`;
+    csvContent += `Square Footage,${property.squareFootage || 'N/A'}\n`;
+    csvContent += `Bedrooms,${property.bedrooms || 'N/A'}\n`;
+    csvContent += `Bathrooms,${property.bathrooms || 'N/A'}\n`;
+    csvContent += `Year Built,${property.yearBuilt || 'N/A'}\n`;
+    csvContent += `Lot Size,${property.lotSize || 'N/A'}\n`;
+    csvContent += `HOA Fee,${property.hoaFee || 'N/A'}\n`;
+    csvContent += `Property Tax,${property.propertyTax || 'N/A'}\n`;
+    csvContent += `Manager,${property.manager || 'N/A'}\n\n`;
+
+    // Contacts
+    if (includeContacts && contacts.length > 0) {
+      csvContent += `CONTACTS\n`;
+      csvContent += `Name,Type,Email,Phone,Address\n`;
+      contacts.forEach((contact: any) => {
+        csvContent += `"${contact.firstName} ${contact.lastName}",${contact.type || 'N/A'},${contact.email || 'N/A'},${contact.phone || 'N/A'},"${contact.address || 'N/A'}"\n`;
+      });
+      csvContent += `\n`;
+    }
+
+    // Tasks
+    if (includeTasks && tasks.length > 0) {
+      csvContent += `TASKS\n`;
+      csvContent += `Title,Description,Status,Priority,Due Date,Assigned To\n`;
+      tasks.forEach((task: any) => {
+        csvContent += `"${task.title}","${task.description || 'N/A'}",${task.status || 'N/A'},${task.priority || 'N/A'},${task.dueDate || 'N/A'},${task.assignedTo || 'N/A'}\n`;
+      });
+      csvContent += `\n`;
+    }
+
+    // Rooms
+    if (includeRooms && rooms.length > 0) {
+      csvContent += `ROOMS\n`;
+      csvContent += `Room Name,Type,Notes\n`;
+      rooms.forEach((room: any) => {
+        csvContent += `"${room.name}",${room.type || 'N/A'},"${room.notes || 'N/A'}"\n`;
+      });
+      csvContent += `\n`;
+    }
+
+    // Notes
+    if (includeNotes && notes.length > 0) {
+      csvContent += `PROPERTY NOTES\n`;
+      csvContent += `Date,Category,Content,Author\n`;
+      notes.forEach((note: any) => {
+        csvContent += `${note.createdAt || 'N/A'},${note.category || 'General'},"${note.content || 'N/A'}",${note.author || 'N/A'}\n`;
+      });
+    }
+
+    return csvContent;
+  };
+
+  // PropertySelector component
+  const PropertySelector = ({ onPropertyChange }: { onPropertyChange: (property: any) => void }) => {
+    return (
+      <Select onValueChange={(value) => {
+        const property = properties.find(p => p.id.toString() === value);
+        onPropertyChange(property);
+      }}>
+        <SelectTrigger>
+          <SelectValue placeholder="Choose a property..." />
+        </SelectTrigger>
+        <SelectContent>
+          {properties.map((property: any) => (
+            <SelectItem key={property.id} value={property.id.toString()}>
+              <div className="flex flex-col">
+                <span className="font-medium">{property.name || 'Unnamed Property'}</span>
+                <span className="text-sm text-slate-500">{property.address || 'No address'}</span>
+              </div>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  };
 
   // Handle URL parameters to set initial tab and community focus
   useEffect(() => {
@@ -492,7 +646,7 @@ export default function Admin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-8">
+        <TabsList className="grid w-full grid-cols-9">
           <TabsTrigger value="forms" className="flex items-center gap-2">
             <FileText className="w-4 h-4" />
             Forms
@@ -500,6 +654,10 @@ export default function Admin() {
           <TabsTrigger value="data" className="flex items-center gap-2">
             <Database className="w-4 h-4" />
             Data Management
+          </TabsTrigger>
+          <TabsTrigger value="reports" className="flex items-center gap-2">
+            <Download className="w-4 h-4" />
+            Reports
           </TabsTrigger>
           <TabsTrigger value="communities" className="flex items-center gap-2">
             <Building className="w-4 h-4" />
@@ -728,6 +886,135 @@ export default function Admin() {
                     <p className="text-gray-600">Potential Duplicates</p>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Reports Tab */}
+        <TabsContent value="reports" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-semibold">Comprehensive Reports</h3>
+              <p className="text-slate-600">Generate detailed reports for properties and data analysis</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Property Report Generator */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building className="w-5 h-5" />
+                  Property Report Generator
+                </CardTitle>
+                <CardDescription>
+                  Generate comprehensive reports for any property including all details, tasks, contacts, and notes
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="property-select">Select Property</Label>
+                  <PropertySelector onPropertyChange={setSelectedProperty} />
+                </div>
+
+                {selectedProperty && (
+                  <div className="space-y-3">
+                    <div className="p-3 bg-slate-50 rounded-lg">
+                      <div className="font-medium">{selectedProperty.name || 'Unnamed Property'}</div>
+                      <div className="text-sm text-slate-600">{selectedProperty.address || 'No address'}</div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <h4 className="font-medium">Report Options</h4>
+                      
+                      <div className="flex items-center space-x-2">
+                        <Switch 
+                          id="include-notes" 
+                          checked={includeNotes} 
+                          onCheckedChange={setIncludeNotes}
+                        />
+                        <Label htmlFor="include-notes">Include Property Notes</Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Switch 
+                          id="include-tasks" 
+                          checked={includeTasks} 
+                          onCheckedChange={setIncludeTasks}
+                        />
+                        <Label htmlFor="include-tasks">Include Tasks & History</Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Switch 
+                          id="include-contacts" 
+                          checked={includeContacts} 
+                          onCheckedChange={setIncludeContacts}
+                        />
+                        <Label htmlFor="include-contacts">Include Contacts & Owners</Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Switch 
+                          id="include-rooms" 
+                          checked={includeRooms} 
+                          onCheckedChange={setIncludeRooms}
+                        />
+                        <Label htmlFor="include-rooms">Include Rooms & Supplies</Label>
+                      </div>
+                    </div>
+
+                    <Button 
+                      onClick={() => generatePropertyReport(selectedProperty)}
+                      disabled={isGeneratingReport}
+                      className="w-full"
+                    >
+                      {isGeneratingReport ? (
+                        <>
+                          <Download className="w-4 h-4 mr-2 animate-pulse" />
+                          Generating Report...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-4 h-4 mr-2" />
+                          Generate Property Report
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Quick Reports */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Quick Reports
+                </CardTitle>
+                <CardDescription>
+                  Pre-configured reports for common needs
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button variant="outline" className="w-full justify-start">
+                  <Download className="w-4 h-4 mr-2" />
+                  All Properties Summary
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <Download className="w-4 h-4 mr-2" />
+                  Active Tasks Report
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <Download className="w-4 h-4 mr-2" />
+                  Contact Directory
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <Download className="w-4 h-4 mr-2" />
+                  Billing Summary
+                </Button>
               </CardContent>
             </Card>
           </div>

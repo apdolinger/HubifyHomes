@@ -947,6 +947,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Property notes routes
+  app.get("/api/properties/:propertyId/notes", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = req.params.propertyId;
+      if (!propertyId) {
+        return res.status(400).json({ message: 'Invalid property ID' });
+      }
+      
+      const notes = await storage.getPropertyNotes(propertyId);
+      res.json(notes);
+    } catch (error) {
+      console.error("Error fetching property notes:", error);
+      res.status(500).json({ message: "Failed to fetch property notes" });
+    }
+  });
+
   // Property contacts routes
   app.get("/api/properties/:propertyId/contacts", isAuthenticated, async (req, res) => {
     try {

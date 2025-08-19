@@ -139,6 +139,7 @@ export interface IStorage {
   
   // Room note operations
   getRoomNotes(roomId: number): Promise<RoomNote[]>;
+  getPropertyNotes(propertyId: string): Promise<any[]>;
   createRoomNote(note: InsertRoomNote): Promise<RoomNote>;
   updateRoomNote(id: number, note: Partial<InsertRoomNote>): Promise<RoomNote>;
   deleteRoomNote(id: number): Promise<void>;
@@ -575,6 +576,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Room note operations
+  async getPropertyNotes(propertyId: string): Promise<any[]> {
+    try {
+      // For now, return empty array since property notes don't exist yet
+      // In the future, this would fetch from a property_notes table
+      return [];
+    } catch (error) {
+      console.error("Error fetching property notes:", error);
+      throw error;
+    }
+  }
+
   async getRoomNotes(roomId: number): Promise<RoomNote[]> {
     return await db.select({
       id: roomNotes.id,
