@@ -187,15 +187,14 @@ const FormSettingsPanel: React.FC<FormSettingsPanelProps> = ({
           />
         </div>
 
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <div className="flex items-center justify-between mb-2">
-            <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">Step 1</span>
-            <span className="text-sm font-medium text-blue-900">Form Contexts</span>
+        <div className="border rounded-lg p-4">
+          <div className="mb-3">
+            <h4 className="text-sm font-medium text-gray-900 mb-1">Form Contexts</h4>
+            <p className="text-sm text-gray-600">Select one or more contexts to determine available fields and submission processing</p>
           </div>
-          <p className="text-sm text-blue-700 mb-3">Select one or more contexts to determine available fields and submission processing.</p>
           <div className="space-y-2">
             {(['people', 'property', 'task'] as FormContext[]).map((context) => (
-              <div key={context} className="flex items-center space-x-3 p-2 bg-white rounded border">
+              <div key={context} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded border">
                 <input
                   type="checkbox"
                   id={`context-${context}`}
@@ -209,7 +208,7 @@ const FormSettingsPanel: React.FC<FormSettingsPanelProps> = ({
                   className="h-4 w-4 rounded border-gray-300"
                 />
                 <div>
-                  <label htmlFor={`context-${context}`} className="text-sm font-medium capitalize">
+                  <label htmlFor={`context-${context}`} className="text-sm font-medium capitalize cursor-pointer">
                     {context === 'people' ? 'People - Contact/Client Forms' :
                      context === 'property' ? 'Property - Property Information Forms' :
                      'Task - Service Request Forms'}
@@ -532,7 +531,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Form Builder</h1>
-          <p className="text-slate-600">5-Step Process: Select Context → Filter Fields → Drag/Drop → Customize → Save + Deploy</p>
+          <p className="text-slate-600">Create custom forms with smart field mapping and automated processing</p>
         </div>
         <div className="flex items-center space-x-3">
           <Button variant="outline" onClick={() => setShowPreview(true)}>
@@ -544,9 +543,8 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
             disabled={saveFormMutation.isPending}
             className="bg-primary hover:bg-primary/90"
           >
-            <span className="bg-white text-primary text-xs px-2 py-1 rounded mr-2">Step 5</span>
             <Save className="w-4 h-4 mr-2" />
-            {saveFormMutation.isPending ? 'Saving...' : 'Save + Deploy'}
+            {saveFormMutation.isPending ? 'Saving...' : 'Save Form'}
           </Button>
         </div>
       </div>
@@ -614,10 +612,15 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded mr-2">Step 2</span>
                   <Plus className="w-4 h-4 mr-2" />
-                  Available Fields ({formSchema.contexts.length > 0 ? formSchema.contexts.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ') : 'None Selected'})
+                  Available Fields
                 </CardTitle>
+                <p className="text-sm text-gray-600 mt-1">
+                  {formSchema.contexts.length > 0 
+                    ? `Showing fields for: ${formSchema.contexts.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ')}`
+                    : 'Select contexts above to see available fields'
+                  }
+                </p>
               </CardHeader>
               <CardContent>
                 <Droppable droppableId="available-fields" isDropDisabled={true}>
@@ -665,11 +668,11 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded mr-2">Step 3 & 4</span>
-                  Form Fields - Drag/Drop & Customize
+                  <GripVertical className="w-4 h-4 mr-2" />
+                  Form Builder
                 </CardTitle>
                 <p className="text-sm text-slate-600">
-                  Drag fields from the left panel to build your form. Each field shows: Label (editable), Field Type (fixed), Target Profile Field Key (mapped), Required toggle.
+                  Drag fields from the left panel to build your form. Customize labels, descriptions, and field requirements.
                 </p>
               </CardHeader>
               <CardContent>
@@ -713,9 +716,9 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
                                     {field.icon}
                                     <div className="flex-1">
                                       <div className="space-y-2">
-                                        {/* Step 4: Label (editable) */}
+                                        {/* Field Label */}
                                         <div>
-                                          <Label className="text-xs text-slate-600">Label (editable)</Label>
+                                          <Label className="text-xs text-slate-600">Field Label</Label>
                                           <Input
                                             value={field.label}
                                             onChange={(e) => updateField(index, { label: e.target.value })}
@@ -724,7 +727,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
                                           />
                                         </div>
                                         
-                                        {/* Step 4: Description */}
+                                        {/* Field Description */}
                                         <div>
                                           <Label className="text-xs text-slate-600">Description</Label>
                                           <Input
@@ -735,7 +738,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
                                           />
                                         </div>
                                         
-                                        {/* Step 4: Field Type (fixed) and Target Profile Field Key */}
+                                        {/* Field Type and Profile Mapping */}
                                         <div className="flex items-center justify-between">
                                           <div className="flex items-center space-x-2">
                                             <Badge variant="outline" className="text-xs">
