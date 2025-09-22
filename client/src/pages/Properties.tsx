@@ -882,6 +882,12 @@ export default function Properties() {
                   </TableHead>
                   <TableHead 
                     className="cursor-pointer hover:bg-slate-50 select-none"
+                    onClick={() => handleSort("accountId")}
+                  >
+                    Account ID {getSortIcon("accountId")}
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-slate-50 select-none"
                     onClick={() => handleSort("address")}
                   >
                     Address {getSortIcon("address")}
@@ -950,6 +956,9 @@ export default function Properties() {
                         )}
                       </TableCell>
                       <TableCell className="font-medium">{property.name}</TableCell>
+                      <TableCell className="text-sm text-slate-600">
+                        {property.accountId || <span className="text-slate-400 italic">No account ID</span>}
+                      </TableCell>
                       <TableCell className="text-sm text-slate-600">{formatFullAddress(property)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">

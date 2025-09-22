@@ -822,6 +822,15 @@ export default function People() {
                     </TableHead>
                     <TableHead 
                       className="cursor-pointer hover:bg-slate-50 select-none"
+                      onClick={() => handleSort("accountId")}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <span>Account ID</span>
+                        {getSortIcon("accountId")}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-slate-50 select-none"
                       onClick={() => handleSort("type")}
                     >
                       <div className="flex items-center space-x-2">
@@ -891,6 +900,14 @@ export default function People() {
                               </Badge>
                             )}
                           </div>
+                        </div>
+                      </TableCell>
+                      <TableCell
+                        className="cursor-pointer"
+                        onClick={() => setLocation(`/person-profile/${group.id}`)}
+                      >
+                        <div className="text-sm text-slate-600">
+                          {group.accountId || <span className="text-slate-400 italic">No account ID</span>}
                         </div>
                       </TableCell>
                       <TableCell
