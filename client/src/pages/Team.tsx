@@ -1,19 +1,40 @@
-import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users, Plus, Mail, User, Eye } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+
+// Form schema for inviting team members
+const inviteTeamMemberSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  email: z.string().email("Please enter a valid email address"),
+  role: z.enum(["staff", "supervisor", "admin"], {
+    required_error: "Please select a role",
+  }),
+});
+
+type InviteTeamMemberForm = z.infer<typeof inviteTeamMemberSchema>;
 
 export default function Team() {
   const { isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -35,6 +56,48 @@ export default function Team() {
     queryKey: ["/api/users"],
     enabled: isAuthenticated,
   });
+
+  // Form for inviting team members
+  const inviteForm = useForm<InviteTeamMemberForm>({
+    resolver: zodResolver(inviteTeamMemberSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      role: "staff",
+    },
+  });
+
+  // Mutation for creating new team members
+  const createTeamMemberMutation = useMutation({
+    mutationFn: async (data: InviteTeamMemberForm) => {
+      return apiRequest("POST", "/api/users", {
+        ...data,
+        id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // Generate a temporary ID
+        isActive: true,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setIsInviteModalOpen(false);
+      inviteForm.reset();
+      toast({
+        title: "Team member invited!",
+        description: "The new team member has been added successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to invite team member. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleInviteTeamMember = (data: InviteTeamMemberForm) => {
+    createTeamMemberMutation.mutate(data);
+  };
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -79,7 +142,10 @@ export default function Team() {
             </p>
           </div>
           <div className="mt-4 sm:mt-0">
-            <Button>
+            <Button 
+              onClick={() => setIsInviteModalOpen(true)}
+              data-testid="invite-team-member-btn"
+            >
               <Plus className="w-4 h-4 mr-2" />
               Invite Team Member
             </Button>
@@ -308,6 +374,117 @@ export default function Team() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Invite Team Member Modal */}
+      <Dialog open={isInviteModalOpen} onOpenChange={setIsInviteModalOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Invite Team Member</DialogTitle>
+          </DialogHeader>
+          
+          <Form {...inviteForm}>
+            <form onSubmit={inviteForm.handleSubmit(handleInviteTeamMember)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={inviteForm.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First Name</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          placeholder="Enter first name"
+                          data-testid="input-first-name"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={inviteForm.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last Name</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          placeholder="Enter last name"
+                          data-testid="input-last-name"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <FormField
+                control={inviteForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email Address</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        type="email" 
+                        placeholder="Enter email address"
+                        data-testid="input-email"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={inviteForm.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Role</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-role">
+                          <SelectValue placeholder="Select a role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="staff">Staff</SelectItem>
+                        <SelectItem value="supervisor">Supervisor</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsInviteModalOpen(false)}
+                  data-testid="button-cancel"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={createTeamMemberMutation.isPending}
+                  data-testid="button-invite"
+                >
+                  {createTeamMemberMutation.isPending ? "Inviting..." : "Send Invite"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
