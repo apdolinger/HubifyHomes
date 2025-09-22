@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Users, Plus, Mail, User, Eye } from "lucide-react";
 
 export default function Team() {
@@ -177,76 +178,108 @@ export default function Team() {
         </Card>
       </div>
 
-      {/* Team Members List */}
+      {/* Team Members Table */}
       <Card>
         <CardHeader>
           <CardTitle>Team Members</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {teamLoading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
-                  <div className="flex items-center space-x-4">
-                    <div className="h-10 w-10 bg-slate-200 rounded-full animate-pulse"></div>
-                    <div className="space-y-2">
-                      <div className="h-4 w-32 bg-slate-200 rounded animate-pulse"></div>
-                      <div className="h-3 w-48 bg-slate-200 rounded animate-pulse"></div>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="h-5 w-16 bg-slate-200 rounded animate-pulse"></div>
-                    <div className="h-5 w-12 bg-slate-200 rounded animate-pulse"></div>
-                    <div className="h-8 w-16 bg-slate-200 rounded animate-pulse"></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {teamMembers.map((member: any) => (
-                <div key={member.id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
-                  <div className="flex items-center space-x-4">
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={member.profileImageUrl || undefined} />
-                      <AvatarFallback>
-                        {getUserInitials(member.firstName || 'U', member.lastName || 'U')}
-                      </AvatarFallback>
-                    </Avatar>
-                    
-                    <div>
-                      <h3 className="text-sm font-medium text-slate-900">
-                        {member.firstName} {member.lastName}
-                      </h3>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <Mail className="w-3 h-3 text-slate-500" />
-                        <span className="text-xs text-slate-600">{member.email}</span>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[300px]">Member</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[1, 2, 3].map((i) => (
+                  <TableRow key={i}>
+                    <TableCell>
+                      <div className="flex items-center space-x-3">
+                        <div className="h-10 w-10 bg-slate-200 rounded-full animate-pulse"></div>
+                        <div className="space-y-2">
+                          <div className="h-4 w-32 bg-slate-200 rounded animate-pulse"></div>
+                          <div className="h-3 w-48 bg-slate-200 rounded animate-pulse"></div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-3">
-                    <Badge variant={getRoleColor(member.role)}>
-                      {member.role}
-                    </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-5 w-16 bg-slate-200 rounded animate-pulse"></div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-5 w-12 bg-slate-200 rounded animate-pulse"></div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="h-8 w-20 bg-slate-200 rounded animate-pulse ml-auto"></div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[300px]">Member</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {teamMembers.map((member: any) => (
+                  <TableRow key={member.id} className="hover:bg-slate-50">
+                    <TableCell>
+                      <div className="flex items-center space-x-3">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={member.profileImageUrl || undefined} />
+                          <AvatarFallback>
+                            {getUserInitials(member.firstName || 'U', member.lastName || 'U')}
+                          </AvatarFallback>
+                        </Avatar>
+                        
+                        <div>
+                          <div className="font-medium text-slate-900">
+                            {member.firstName} {member.lastName}
+                          </div>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <Mail className="w-3 h-3 text-slate-500" />
+                            <span className="text-sm text-slate-600">{member.email}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </TableCell>
                     
-                    <Badge variant={member.isActive ? "default" : "secondary"}>
-                      {member.isActive ? "Active" : "Inactive"}
-                    </Badge>
+                    <TableCell>
+                      <Badge variant={getRoleColor(member.role)}>
+                        {member.role}
+                      </Badge>
+                    </TableCell>
                     
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setLocation(`/team/member/${member.id}`)}
-                      data-testid={`view-member-${member.id}`}
-                    >
-                      <Eye className="w-3 h-3 mr-1" />
-                      View Profile
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                    <TableCell>
+                      <Badge variant={member.isActive ? "default" : "secondary"}>
+                        {member.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    
+                    <TableCell className="text-right">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setLocation(`/team/member/${member.id}`)}
+                        data-testid={`view-member-${member.id}`}
+                      >
+                        <Eye className="w-3 h-3 mr-1" />
+                        View Profile
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
