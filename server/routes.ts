@@ -429,6 +429,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/users/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.params.id;
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  app.get("/api/users/:id/task-stats", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.params.id;
+      const stats = await storage.getUserTaskStats(userId);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching user task stats:", error);
+      res.status(500).json({ message: "Failed to fetch user task stats" });
+    }
+  });
+
+  app.patch("/api/users/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.params.id;
+      const updateData = req.body;
+      
+      // Validate and sanitize input
+      const allowedFields = ['firstName', 'lastName', 'email', 'role', 'isActive'];
+      const filteredData = Object.keys(updateData)
+        .filter(key => allowedFields.includes(key))
+        .reduce((obj, key) => {
+          obj[key] = updateData[key];
+          return obj;
+        }, {} as any);
+
+      const updatedUser = await storage.updateUser(userId, filteredData);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
   // Dashboard routes
   app.get("/api/dashboard/stats", isAuthenticated, async (req, res) => {
     try {

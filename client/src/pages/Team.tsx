@@ -1,15 +1,18 @@
 import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Users, Plus, Mail, User } from "lucide-react";
+import { Users, Plus, Mail, User, Eye } from "lucide-react";
 
 export default function Team() {
   const { isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -26,36 +29,11 @@ export default function Team() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  // Mock team data for now - in real app this would come from API
-  const teamMembers = [
-    {
-      id: 1,
-      firstName: "Sarah",
-      lastName: "Chen",
-      email: "sarah.chen@dwellerly.com",
-      role: "admin",
-      isActive: true,
-      profileImageUrl: null,
-    },
-    {
-      id: 2,
-      firstName: "Mike",
-      lastName: "Rodriguez",
-      email: "mike.rodriguez@dwellerly.com", 
-      role: "supervisor",
-      isActive: true,
-      profileImageUrl: null,
-    },
-    {
-      id: 3,
-      firstName: "Lisa",
-      lastName: "Thompson",
-      email: "lisa.thompson@dwellerly.com",
-      role: "staff",
-      isActive: true,
-      profileImageUrl: null,
-    },
-  ];
+  // Fetch team members from API
+  const { data: teamMembers = [], isLoading: teamLoading } = useQuery({
+    queryKey: ["/api/users"],
+    enabled: isAuthenticated,
+  });
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -205,44 +183,71 @@ export default function Team() {
           <CardTitle>Team Members</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {teamMembers.map((member) => (
-              <div key={member.id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
-                <div className="flex items-center space-x-4">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={member.profileImageUrl || undefined} />
-                    <AvatarFallback>
-                      {getUserInitials(member.firstName, member.lastName)}
-                    </AvatarFallback>
-                  </Avatar>
-                  
-                  <div>
-                    <h3 className="text-sm font-medium text-slate-900">
-                      {member.firstName} {member.lastName}
-                    </h3>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <Mail className="w-3 h-3 text-slate-500" />
-                      <span className="text-xs text-slate-600">{member.email}</span>
+          {teamLoading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
+                  <div className="flex items-center space-x-4">
+                    <div className="h-10 w-10 bg-slate-200 rounded-full animate-pulse"></div>
+                    <div className="space-y-2">
+                      <div className="h-4 w-32 bg-slate-200 rounded animate-pulse"></div>
+                      <div className="h-3 w-48 bg-slate-200 rounded animate-pulse"></div>
                     </div>
                   </div>
+                  <div className="flex items-center space-x-3">
+                    <div className="h-5 w-16 bg-slate-200 rounded animate-pulse"></div>
+                    <div className="h-5 w-12 bg-slate-200 rounded animate-pulse"></div>
+                    <div className="h-8 w-16 bg-slate-200 rounded animate-pulse"></div>
+                  </div>
                 </div>
-                
-                <div className="flex items-center space-x-3">
-                  <Badge variant={getRoleColor(member.role)}>
-                    {member.role}
-                  </Badge>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {teamMembers.map((member: any) => (
+                <div key={member.id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
+                  <div className="flex items-center space-x-4">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={member.profileImageUrl || undefined} />
+                      <AvatarFallback>
+                        {getUserInitials(member.firstName || 'U', member.lastName || 'U')}
+                      </AvatarFallback>
+                    </Avatar>
+                    
+                    <div>
+                      <h3 className="text-sm font-medium text-slate-900">
+                        {member.firstName} {member.lastName}
+                      </h3>
+                      <div className="flex items-center space-x-2 mt-1">
+                        <Mail className="w-3 h-3 text-slate-500" />
+                        <span className="text-xs text-slate-600">{member.email}</span>
+                      </div>
+                    </div>
+                  </div>
                   
-                  <Badge variant={member.isActive ? "default" : "secondary"}>
-                    {member.isActive ? "Active" : "Inactive"}
-                  </Badge>
-                  
-                  <Button variant="outline" size="sm">
-                    Edit
-                  </Button>
+                  <div className="flex items-center space-x-3">
+                    <Badge variant={getRoleColor(member.role)}>
+                      {member.role}
+                    </Badge>
+                    
+                    <Badge variant={member.isActive ? "default" : "secondary"}>
+                      {member.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                    
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setLocation(`/team/member/${member.id}`)}
+                      data-testid={`view-member-${member.id}`}
+                    >
+                      <Eye className="w-3 h-3 mr-1" />
+                      View Profile
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

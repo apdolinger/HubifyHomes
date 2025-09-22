@@ -15,6 +15,7 @@ import TaskProfile from "@/pages/TaskProfile";
 import Properties from "@/pages/Properties";
 import PropertyProfile from "@/pages/PropertyProfile";
 import Team from "@/pages/Team";
+import TeamMemberProfile from "@/pages/TeamMemberProfile";
 import People from "@/pages/People";
 import PersonProfile from "@/pages/PersonProfile";
 import DuplicatesManagement from "@/pages/DuplicatesManagement";
@@ -105,6 +106,7 @@ function Router() {
           <Route path="/properties" component={Properties} />
           <Route path="/property-profile/:id" component={PropertyProfile} />
           <Route path="/team" component={Team} />
+          <Route path="/team/member/:id" component={TeamMemberProfile} />
           <Route path="/people" component={People} />
           <Route path="/person-profile/:id" component={PersonProfile} />
           <Route path="/duplicates" component={DuplicatesManagement} />
