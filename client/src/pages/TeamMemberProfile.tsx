@@ -58,6 +58,12 @@ export default function TeamMemberProfile() {
   const memberId = params.id;
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
+  // Get current user for authorization
+  const { data: currentUser } = useQuery({
+    queryKey: ["/api/auth/user"],
+    enabled: isAuthenticated,
+  });
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -267,10 +273,13 @@ export default function TeamMemberProfile() {
           </div>
           
           <div className="mt-4 sm:mt-0">
-            <Button onClick={() => setIsEditModalOpen(true)} data-testid="edit-member-btn">
-              <Edit className="w-4 h-4 mr-2" />
-              Edit Member
-            </Button>
+            {/* Only show edit button for admins/supervisors or if editing own profile */}
+            {(currentUser && (currentUser.role === 'admin' || currentUser.role === 'supervisor' || currentUser.id === memberId)) && (
+              <Button onClick={() => setIsEditModalOpen(true)} data-testid="edit-member-btn">
+                <Edit className="w-4 h-4 mr-2" />
+                Edit Member
+              </Button>
+            )}
           </div>
         </div>
       </div>

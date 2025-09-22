@@ -458,9 +458,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.params.id;
       const updateData = req.body;
+      const currentUserId = (req.user as any)?.claims?.sub;
+      
+      // Get current user to check their role
+      const currentUser = await storage.getUser(currentUserId);
+      if (!currentUser) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Authorization check: only admins can edit other users, users can edit themselves (limited fields)
+      const isAdmin = currentUser.role === 'admin' || currentUser.role === 'supervisor';
+      const isSelfUpdate = userId === currentUserId;
+      
+      if (!isAdmin && !isSelfUpdate) {
+        return res.status(403).json({ message: "Insufficient permissions to edit this user" });
+      }
+
+      // Define allowed fields based on permissions
+      let allowedFields: string[];
+      if (isAdmin) {
+        // Admins can edit all fields
+        allowedFields = ['firstName', 'lastName', 'email', 'role', 'isActive'];
+      } else {
+        // Users can only edit their own basic info, not role or active status
+        allowedFields = ['firstName', 'lastName', 'email'];
+      }
       
       // Validate and sanitize input
-      const allowedFields = ['firstName', 'lastName', 'email', 'role', 'isActive'];
       const filteredData = Object.keys(updateData)
         .filter(key => allowedFields.includes(key))
         .reduce((obj, key) => {
@@ -575,8 +599,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Property routes
   app.get("/api/properties", isAuthenticated, async (req, res) => {
     try {
-      const includeInactive = req.query.includeInactive === 'true';
-      const properties = await storage.getProperties(includeInactive);
+      const { includeInactive, managerId } = req.query;
+      const includeInactiveFlag = includeInactive === 'true';
+      let properties = await storage.getProperties(includeInactiveFlag);
+      
+      // Filter by managerId if provided
+      if (managerId) {
+        properties = properties.filter(property => property.managerId === managerId);
+      }
+      
       res.json(properties);
     } catch (error) {
       console.error("Error fetching properties:", error);
@@ -1407,7 +1438,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Task routes
   app.get("/api/tasks", isAuthenticated, async (req, res) => {
     try {
-      const tasks = await storage.getTasks();
+      const { assignedTo, limit } = req.query;
+      let tasks = await storage.getTasks();
+      
+      // Filter by assignedTo if provided
+      if (assignedTo) {
+        tasks = tasks.filter(task => task.assignedToId === assignedTo);
+      }
+      
+      // Apply limit if provided
+      if (limit) {
+        const limitNum = parseInt(limit as string);
+        if (!isNaN(limitNum)) {
+          tasks = tasks.slice(0, limitNum);
+        }
+      }
+      
       res.json(tasks);
     } catch (error) {
       console.error("Error fetching tasks:", error);
