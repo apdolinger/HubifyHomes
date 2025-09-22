@@ -924,13 +924,7 @@ export default function Dashboard() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {recentActivityLoading ? (
-                      <div className="space-y-2">
-                        <div className="h-8 bg-slate-100 rounded animate-pulse"></div>
-                        <div className="h-8 bg-slate-100 rounded animate-pulse"></div>
-                        <div className="h-8 bg-slate-100 rounded animate-pulse"></div>
-                      </div>
-                    ) : recentActivity && Array.isArray(recentActivity) && recentActivity.length > 0 ? (
+                    {recentActivity && Array.isArray(recentActivity) && recentActivity.length > 0 ? (
                       <div className="space-y-3">
                         {recentActivity.slice(0, 4).map((activity: any) => (
                           <div key={activity.id} className="flex items-start space-x-3">
