@@ -38,6 +38,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 
 const contactSchema = z.object({
+  accountId: z.string().optional(),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email address").optional().or(z.literal("")),
@@ -104,6 +105,7 @@ export default function People() {
   const addForm = useForm<ContactFormData>({
     resolver: zodResolver(contactSchema),
     defaultValues: {
+      accountId: "",
       firstName: "",
       lastName: "",
       email: "",
@@ -117,6 +119,7 @@ export default function People() {
   const editForm = useForm<ContactFormData>({
     resolver: zodResolver(contactSchema),
     defaultValues: {
+      accountId: "",
       firstName: "",
       lastName: "",
       email: "",
@@ -241,6 +244,7 @@ export default function People() {
   const handleEditContact = (contact: any) => {
     setSelectedContact(contact);
     editForm.reset({
+      accountId: contact.accountId || "",
       firstName: contact.firstName,
       lastName: contact.lastName,
       email: contact.email || "",
@@ -1036,6 +1040,20 @@ export default function People() {
               
               <FormField
                 control={addForm.control}
+                name="accountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Account ID</FormLabel>
+                    <FormControl>
+                      <Input placeholder="External account number (optional)" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={addForm.control}
                 name="email"
                 render={({ field }) => (
                   <FormItem>
@@ -1178,6 +1196,20 @@ export default function People() {
                   )}
                 />
               </div>
+              
+              <FormField
+                control={editForm.control}
+                name="accountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Account ID</FormLabel>
+                    <FormControl>
+                      <Input placeholder="External account number (optional)" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               
               <FormField
                 control={editForm.control}
