@@ -95,6 +95,13 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUsers(): Promise<User[]>;
   upsertUser(user: UpsertUser): Promise<User>;
+  updateUser(id: string, userData: Partial<UpsertUser>): Promise<User>;
+  getUserTaskStats(userId: string): Promise<{
+    totalTasks: number;
+    completedTasks: number;
+    activeTasks: number;
+    overdueTasks: number;
+  }>;
   
   // Organization operations
   getOrgs(): Promise<Org[]>;
@@ -298,6 +305,41 @@ export class DatabaseStorage implements IStorage {
       const [user] = await db.insert(users).values(userData).returning();
       return user;
     }
+  }
+
+  async updateUser(id: string, userData: Partial<UpsertUser>): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ ...userData, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
+  async getUserTaskStats(userId: string): Promise<{
+    totalTasks: number;
+    completedTasks: number;
+    activeTasks: number;
+    overdueTasks: number;
+  }> {
+    // Get all tasks assigned to this user
+    const allTasks = await db.select().from(tasks).where(eq(tasks.assignedToId, userId));
+    
+    const totalTasks = allTasks.length;
+    const completedTasks = allTasks.filter(task => task.status === 'completed').length;
+    const activeTasks = allTasks.filter(task => task.status === 'in_progress' || task.status === 'pending').length;
+    const overdueTasks = allTasks.filter(task => 
+      task.dueDate && 
+      new Date(task.dueDate) < new Date() && 
+      task.status !== 'completed'
+    ).length;
+
+    return {
+      totalTasks,
+      completedTasks,
+      activeTasks,
+      overdueTasks
+    };
   }
 
   // Organization operations
