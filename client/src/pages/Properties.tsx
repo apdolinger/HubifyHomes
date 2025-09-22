@@ -23,6 +23,7 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { useLocation } from "wouter";
 
 const propertySchema = z.object({
+  accountId: z.string().optional(),
   name: z.string().min(1, "Property name is required"),
   address1: z.string().min(1, "Address line 1 is required"),
   address2: z.string().optional(),
@@ -95,6 +96,7 @@ export default function Properties() {
   const form = useForm<PropertyFormData>({
     resolver: zodResolver(propertySchema),
     defaultValues: {
+      accountId: "",
       name: "",
       address1: "",
       address2: "",
@@ -492,19 +494,35 @@ export default function Properties() {
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(handleAddProperty)} className="space-y-4">
                     <div className="grid grid-cols-1 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Property/Community Name</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Enter property name" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Property/Community Name</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Enter property name" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="accountId"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Account ID</FormLabel>
+                              <FormControl>
+                                <Input placeholder="External account number (optional)" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
                       
                       <div className="grid grid-cols-2 gap-4">
                         <FormField
