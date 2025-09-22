@@ -23,7 +23,7 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { useLocation } from "wouter";
 
 const propertySchema = z.object({
-  accountId: z.string().optional(),
+  accountId: z.string().nullable().optional(),
   name: z.string().min(1, "Property name is required"),
   address1: z.string().min(1, "Address line 1 is required"),
   address2: z.string().optional(),
@@ -190,7 +190,12 @@ export default function Properties() {
   });
 
   const handleAddProperty = (data: PropertyFormData) => {
-    createPropertyMutation.mutate(data);
+    // Convert empty accountId to undefined for creates
+    const cleanedData = {
+      ...data,
+      accountId: data.accountId?.trim() || undefined,
+    };
+    createPropertyMutation.mutate(cleanedData);
   };
 
   const handleDeleteProperty = (property: any) => {
@@ -516,7 +521,11 @@ export default function Properties() {
                             <FormItem>
                               <FormLabel>Account ID</FormLabel>
                               <FormControl>
-                                <Input placeholder="External account number (optional)" {...field} />
+                                <Input 
+                                  placeholder="External account number (optional)" 
+                                  {...field}
+                                  value={field.value || ""}
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>

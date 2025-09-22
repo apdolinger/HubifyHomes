@@ -38,7 +38,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 
 const contactSchema = z.object({
-  accountId: z.string().optional(),
+  accountId: z.string().nullable().optional(),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email address").optional().or(z.literal("")),
@@ -238,7 +238,12 @@ export default function People() {
   });
 
   const handleAddContact = (data: ContactFormData) => {
-    createContactMutation.mutate(data);
+    // Convert empty accountId to undefined to avoid storing empty strings
+    const cleanedData = {
+      ...data,
+      accountId: data.accountId?.trim() || undefined,
+    };
+    createContactMutation.mutate(cleanedData);
   };
 
   const handleEditContact = (contact: any) => {
@@ -258,7 +263,12 @@ export default function People() {
 
   const handleUpdateContact = (data: ContactFormData) => {
     if (selectedContact) {
-      updateContactMutation.mutate({ id: selectedContact.id, data });
+      // For updates: convert empty accountId to null to allow clearing existing values
+      const cleanedData = {
+        ...data,
+        accountId: data.accountId?.trim() === "" ? null : data.accountId?.trim() || null,
+      };
+      updateContactMutation.mutate({ id: selectedContact.id, data: cleanedData });
     }
   };
 
@@ -1062,7 +1072,11 @@ export default function People() {
                   <FormItem>
                     <FormLabel>Account ID</FormLabel>
                     <FormControl>
-                      <Input placeholder="External account number (optional)" {...field} />
+                      <Input 
+                        placeholder="External account number (optional)" 
+                        {...field}
+                        value={field.value || ""}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1221,7 +1235,11 @@ export default function People() {
                   <FormItem>
                     <FormLabel>Account ID</FormLabel>
                     <FormControl>
-                      <Input placeholder="External account number (optional)" {...field} />
+                      <Input 
+                        placeholder="External account number (optional)" 
+                        {...field}
+                        value={field.value || ""}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
