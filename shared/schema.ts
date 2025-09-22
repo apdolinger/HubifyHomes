@@ -111,6 +111,7 @@ export const communities = pgTable("communities", {
 export const properties = pgTable("properties", {
   id: serial("id").primaryKey(),
   orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  accountId: varchar("account_id"), // External account/reference ID for company tracking
   name: varchar("name").notNull(),
   address1: varchar("address1").notNull(),
   address2: varchar("address2"),
@@ -344,6 +345,7 @@ export const tasks = pgTable("tasks", {
 // Contacts/People table
 export const contacts = pgTable("contacts", {
   id: serial("id").primaryKey(),
+  accountId: varchar("account_id"), // External account/reference ID for company tracking
   firstName: varchar("first_name").notNull(),
   lastName: varchar("last_name").notNull(),
   email: varchar("email"),
