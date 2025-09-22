@@ -415,7 +415,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
 
     if (source.droppableId === 'available-fields' && destination.droppableId === 'form-fields') {
       // Add field from available to form
-      const fieldToAdd = AvailableFields[source.index];
+      const fieldToAdd = getAvailableFields(formSchema.contexts)[source.index];
       const newField = {
         ...fieldToAdd,
         id: `field-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
@@ -456,32 +456,26 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
   // Save form mutation
   const saveFormMutation = useMutation({
     mutationFn: async (formData: FormSchema) => {
-      return apiRequest('/api/forms', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: formData.formTitle,
-          description: formData.internalDescription,
-          schema: {
-            fields: formData.fields.map(field => ({
-              id: field.profileFieldKey,
-              label: field.label,
-              type: field.type,
-              required: field.required,
-              options: field.options,
-              profileFieldKey: field.profileFieldKey
-            })),
-            matchExistingBy: formData.matchExistingBy,
-            fieldMapping: formData.fields.reduce((acc, field) => {
-              acc[field.profileFieldKey] = field.profileFieldKey;
-              return acc;
-            }, {} as Record<string, string>),
-            triggerAutomation: formData.triggerAutomation,
-            submitLabel: 'Submit Form',
-            successMessage: 'Thank you for your submission!'
-          }
-        }),
-        headers: {
-          'Content-Type': 'application/json'
+      return apiRequest('POST', '/api/forms', {
+        name: formData.formTitle,
+        description: formData.internalDescription,
+        schema: {
+          fields: formData.fields.map(field => ({
+            id: field.profileFieldKey,
+            label: field.label,
+            type: field.type,
+            required: field.required,
+            options: field.options,
+            profileFieldKey: field.profileFieldKey
+          })),
+          matchExistingBy: formData.matchExistingBy,
+          fieldMapping: formData.fields.reduce((acc, field) => {
+            acc[field.profileFieldKey] = field.profileFieldKey;
+            return acc;
+          }, {} as Record<string, string>),
+          triggerAutomation: formData.triggerAutomation,
+          submitLabel: 'Submit Form',
+          successMessage: 'Thank you for your submission!'
         }
       });
     },

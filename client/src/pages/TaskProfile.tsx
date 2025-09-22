@@ -284,6 +284,10 @@ export default function TaskProfile() {
       // Invalidate dashboard queries to update statistics
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/urgent-tasks'] });
+      
+      // Close the edit modal if it's open
+      setIsEditModalOpen(false);
+      
       toast({
         title: "Success",
         description: "Task updated successfully",
@@ -402,17 +406,7 @@ export default function TaskProfile() {
     }
 
     console.log("Sending update data:", updateData);
-    updateTaskMutation.mutate(updateData, {
-      onSuccess: () => {
-        // Invalidate queries to refresh the task data on the page
-        queryClient.invalidateQueries({ queryKey: ['/api/tasks', (task as any)?.id?.toString()] });
-        queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
-        // Invalidate dashboard queries to update statistics
-        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/urgent-tasks'] });
-        setIsEditModalOpen(false);
-      }
-    });
+    updateTaskMutation.mutate(updateData);
   };
 
   const checkForConflicts = async (assignedUserId: string, dueDate: string, timeEstimate: string, currentTaskId?: number) => {
@@ -433,17 +427,9 @@ export default function TaskProfile() {
     if (forceUpdate && conflictData) {
       // User chose to proceed despite conflicts
       console.log("Forcing update despite conflicts:", conflictData.updateData);
-      updateTaskMutation.mutate(conflictData.updateData, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ['/api/tasks', (task as any)?.id?.toString()] });
-          queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
-          queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
-          queryClient.invalidateQueries({ queryKey: ['/api/dashboard/urgent-tasks'] });
-          setIsEditModalOpen(false);
-          setIsConflictModalOpen(false);
-          setConflictData(null);
-        }
-      });
+      updateTaskMutation.mutate(conflictData.updateData);
+      setIsConflictModalOpen(false);
+      setConflictData(null);
     } else {
       // User chose to go back and edit
       setIsConflictModalOpen(false);

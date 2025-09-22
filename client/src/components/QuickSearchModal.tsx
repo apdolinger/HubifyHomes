@@ -40,13 +40,13 @@ export default function QuickSearchModal({ isOpen, onClose }: QuickSearchModalPr
     onClose();
     switch (type) {
       case "property":
-        setLocation(`/properties?id=${id}`);
+        setLocation(`/property-profile/${id}`);
         break;
       case "task":
-        setLocation(`/tasks?id=${id}`);
+        setLocation(`/task-profile/${id}`);
         break;
       case "contact":
-        setLocation(`/people?id=${id}`);
+        setLocation(`/person-profile/${id}`);
         break;
     }
   };

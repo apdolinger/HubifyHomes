@@ -68,7 +68,7 @@ export default function QuickAddTaskModal({ isOpen, onClose }: QuickAddTaskModal
       form.reset();
       
       // Redirect to task detail page
-      setLocation(`/tasks?id=${newTask.id}`);
+      setLocation(`/task-profile/${newTask.id}`);
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {

@@ -127,7 +127,7 @@ export default function Properties() {
       form.reset();
       // Redirect to property profile page after creation
       setTimeout(() => {
-        setLocation(`/property-profile?id=${newProperty.id}`);
+        setLocation(`/property-profile/${newProperty.id}`);
       }, 1000);
     },
     onError: (error) => {
