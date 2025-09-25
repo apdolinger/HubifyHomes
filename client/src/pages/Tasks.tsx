@@ -28,6 +28,20 @@ export default function Tasks() {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [assignedFilter, setAssignedFilter] = useState("all");
   
+  // Parse URL search parameters and update filters when location changes
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.split('?')[1] || '');
+    const urlStatusFilter = urlParams.get('status');
+    const urlPriorityFilter = urlParams.get('priority');
+    
+    if (urlStatusFilter) {
+      setStatusFilter(urlStatusFilter);
+    }
+    if (urlPriorityFilter) {
+      setPriorityFilter(urlPriorityFilter);
+    }
+  }, [location]);
+  
   // Sort state
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -72,7 +86,17 @@ export default function Tasks() {
     
     // Apply status filter
     if (statusFilter !== "all") {
-      filtered = filtered.filter(task => task.status === statusFilter);
+      if (statusFilter === "overdue") {
+        // Special handling for overdue tasks - tasks with due dates in the past that aren't completed
+        const now = new Date();
+        filtered = filtered.filter(task => 
+          task.dueDate && 
+          new Date(task.dueDate) < now && 
+          task.status !== "completed"
+        );
+      } else {
+        filtered = filtered.filter(task => task.status === statusFilter);
+      }
     }
     
     // Apply priority filter
