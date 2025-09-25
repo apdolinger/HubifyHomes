@@ -30,15 +30,20 @@ export default function Tasks() {
   
   // Parse URL search parameters and update filters when location changes
   useEffect(() => {
-    const urlParams = new URLSearchParams(location.split('?')[1] || '');
+    const urlParams = new URLSearchParams(window.location.search);
     const urlStatusFilter = urlParams.get('status');
     const urlPriorityFilter = urlParams.get('priority');
     
     if (urlStatusFilter) {
       setStatusFilter(urlStatusFilter);
+    } else {
+      setStatusFilter("all"); // Reset to default when no parameter
     }
+    
     if (urlPriorityFilter) {
       setPriorityFilter(urlPriorityFilter);
+    } else {
+      setPriorityFilter("all"); // Reset to default when no parameter
     }
   }, [location]);
   
@@ -285,6 +290,7 @@ export default function Tasks() {
                 <SelectItem value="in_progress">In Progress</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
                 <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="overdue">Overdue</SelectItem>
               </SelectContent>
             </Select>
             
