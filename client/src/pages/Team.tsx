@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Plus, Mail, User, Eye } from "lucide-react";
+import { Users, Plus, Mail, User } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 // Form schema for inviting team members
@@ -257,7 +257,6 @@ export default function Team() {
                   <TableHead className="w-[300px]">Member</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -278,9 +277,6 @@ export default function Team() {
                     <TableCell>
                       <div className="h-5 w-12 bg-slate-200 rounded animate-pulse"></div>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="h-8 w-20 bg-slate-200 rounded animate-pulse ml-auto"></div>
-                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -292,12 +288,16 @@ export default function Team() {
                   <TableHead className="w-[300px]">Member</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {teamMembers.map((member: any) => (
-                  <TableRow key={member.id} className="hover:bg-slate-50">
+                  <TableRow 
+                    key={member.id} 
+                    className="hover:bg-slate-50 cursor-pointer" 
+                    onClick={() => setLocation(`/team/member/${member.id}`)}
+                    data-testid={`team-row-${member.id}`}
+                  >
                     <TableCell>
                       <div className="flex items-center space-x-3">
                         <Avatar className="h-10 w-10">
@@ -329,18 +329,6 @@ export default function Team() {
                       <Badge variant={member.isActive ? "default" : "secondary"}>
                         {member.isActive ? "Active" : "Inactive"}
                       </Badge>
-                    </TableCell>
-                    
-                    <TableCell className="text-right">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => setLocation(`/team/member/${member.id}`)}
-                        data-testid={`view-member-${member.id}`}
-                      >
-                        <Eye className="w-3 h-3 mr-1" />
-                        View Profile
-                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
