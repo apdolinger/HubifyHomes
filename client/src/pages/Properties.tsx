@@ -774,6 +774,20 @@ export default function Properties() {
                 <SelectItem value="under_repair">Under Repair</SelectItem>
               </SelectContent>
             </Select>
+            {(searchTerm || filterType !== "all" || filterStatus !== "all") && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearchTerm("");
+                  setFilterType("all");
+                  setFilterStatus("all");
+                }}
+                data-testid="clear-filters"
+              >
+                Clear Filters
+              </Button>
+            )}
           </div>
         </div>
       </div>
