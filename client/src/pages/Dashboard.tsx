@@ -603,19 +603,35 @@ export default function Dashboard() {
                       </div>
                     ) : (
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="text-center p-3">
+                        <div 
+                          className="text-center p-3 cursor-pointer rounded-lg hover:bg-slate-50 transition-colors"
+                          onClick={() => setLocation('/properties')}
+                          data-testid="stat-properties"
+                        >
                           <div className="text-2xl font-bold text-primary">{(stats as any)?.totalProperties || 0}</div>
                           <div className="text-xs text-slate-600">Properties</div>
                         </div>
-                        <div className="text-center p-3">
+                        <div 
+                          className="text-center p-3 cursor-pointer rounded-lg hover:bg-slate-50 transition-colors"
+                          onClick={() => setLocation('/tasks?priority=urgent')}
+                          data-testid="stat-urgent-tasks"
+                        >
                           <div className="text-2xl font-bold text-orange-600">{(stats as any)?.urgentTasks || 0}</div>
                           <div className="text-xs text-slate-600">Urgent Tasks</div>
                         </div>
-                        <div className="text-center p-3">
+                        <div 
+                          className="text-center p-3 cursor-pointer rounded-lg hover:bg-slate-50 transition-colors"
+                          onClick={() => setLocation('/tasks?status=overdue')}
+                          data-testid="stat-overdue"
+                        >
                           <div className="text-2xl font-bold text-red-600">{(stats as any)?.overdueTasks || 0}</div>
                           <div className="text-xs text-slate-600">Overdue</div>
                         </div>
-                        <div className="text-center p-3">
+                        <div 
+                          className="text-center p-3 cursor-pointer rounded-lg hover:bg-slate-50 transition-colors"
+                          onClick={() => setLocation('/team')}
+                          data-testid="stat-team-members"
+                        >
                           <div className="text-2xl font-bold text-blue-600">{(stats as any)?.activeTeam || 0}</div>
                           <div className="text-xs text-slate-600">Team Members</div>
                         </div>
