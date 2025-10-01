@@ -1,0 +1,80 @@
+Hubify Super Admin Settings (Master Tab)
+
+1. Platform Configuration
+	•	API rate limits & quotas
+	•	Default session timeout
+	•	Max file upload sizes (e.g., lease PDFs, inspection photos)
+	•	Webhook retry/recovery policies
+	•	Global time zone / localization settings
+
+⸻
+
+2. Email & Communication
+	•	SMTP / SendGrid / Mailgun setup
+	•	Master email template editor (branding, headers, footers)
+	•	Notification defaults (system alerts, overdue rent reminders, maintenance requests)
+	•	SMS gateway credentials (Twilio, Plivo, etc.)
+	•	Global unsubscribe / compliance settings
+
+⸻
+
+3. Integration Management
+	•	Stripe master keys & billing API config
+	•	Third-party API connections (QuickBooks, Yardi, Buildium, etc.)
+	•	OAuth app configurations (Google, Microsoft login)
+	•	External service endpoints (property listing feeds, DocuSign, etc.)
+
+⸻
+
+4. Default Organization Settings
+	•	Default plan assignment (Lite, Pro, Enterprise)
+	•	Free trial length (e.g., 14/30 days)
+	•	Default feature toggles (e.g., “Maintenance Module ON by default”)
+	•	Default storage quota per org (GB of file storage)
+	•	Default roles/permissions template (Admin, Manager, Resident, Vendor)
+	•	Default branding package (colors, logo placeholder, portal style)
+
+⸻
+
+5. Billing & Subscription
+	•	Master subscription tiers & pricing tables
+	•	Add-ons (extra storage, premium support, white-label portals)
+	•	Billing cycles & grace period settings
+	•	Referral/affiliate program settings
+	•	Override billing for individual orgs (custom pricing/discounts)
+
+⸻
+
+6. Compliance & Legal
+	•	Document retention policies (leases, HOA bylaws, contracts)
+	•	E-signature provider setup (DocuSign, HelloSign, etc.)
+	•	GDPR/CCPA data handling policies
+	•	Global audit log configuration (who changed what, when)
+	•	Data purge/anonymization controls
+
+⸻
+
+7. System Maintenance
+	•	Platform “Maintenance Mode” toggle
+	•	Downtime scheduling / announcements
+	•	Automated backup schedule & restore points
+	•	System health checks (intervals, alert recipients)
+	•	Status page management (what users see when systems lag)
+
+⸻
+
+8. Security & Access
+	•	Global 2FA policy (required, optional, off)
+	•	Password complexity rules
+	•	Session length / re-auth policies
+	•	IP whitelist/blacklist management
+	•	API key management for orgs
+	•	Intrusion detection alerts
+
+⸻
+
+9. Customization Controls
+	•	Toggle features globally (e.g., “Vendor Portal active across all orgs”)
+	•	Default notification templates (rent reminders, violation notices, welcome emails)
+	•	Default report templates (owner statements, community notices)
+	•	Global theme editor (applies across orgs if no custom branding applied)

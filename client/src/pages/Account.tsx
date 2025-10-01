@@ -650,7 +650,7 @@ export default function Account() {
                     />
                     <div className="flex justify-between items-center mt-4">
                       <div className="text-xs text-slate-500">
-                        Available variables: {{firstName}}, {{lastName}}, {{companyName}}, {{loginUrl}}
+                        Available variables: {'{'}firstName{'}'}, {'{'}lastName{'}'}, {'{'}companyName{'}'}, {'{'}loginUrl{'}'}
                       </div>
                       <Button size="sm">
                         <Save className="w-4 h-4 mr-2" />

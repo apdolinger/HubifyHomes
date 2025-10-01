@@ -1237,6 +1237,539 @@ export default function SuperAdmin() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Settings Tab */}
+        <TabsContent value="settings">
+          <div className="space-y-6">
+            {/* Platform Configuration */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Settings className="w-5 h-5 mr-2" />
+                  Platform Configuration
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="api-rate-limit">API Rate Limit (requests/hour)</Label>
+                    <Input id="api-rate-limit" type="number" defaultValue="10000" data-testid="input-api-rate-limit" />
+                  </div>
+                  <div>
+                    <Label htmlFor="session-timeout">Default Session Timeout (minutes)</Label>
+                    <Input id="session-timeout" type="number" defaultValue="60" data-testid="input-session-timeout" />
+                  </div>
+                  <div>
+                    <Label htmlFor="max-file-size">Max File Upload Size (MB)</Label>
+                    <Input id="max-file-size" type="number" defaultValue="25" data-testid="input-max-file-size" />
+                  </div>
+                  <div>
+                    <Label htmlFor="webhook-retries">Webhook Retry Attempts</Label>
+                    <Input id="webhook-retries" type="number" defaultValue="3" data-testid="input-webhook-retries" />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="global-timezone">Global Time Zone</Label>
+                  <Select>
+                    <SelectTrigger id="global-timezone" data-testid="select-global-timezone">
+                      <SelectValue placeholder="Select timezone" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="utc">UTC</SelectItem>
+                      <SelectItem value="est">Eastern (EST/EDT)</SelectItem>
+                      <SelectItem value="cst">Central (CST/CDT)</SelectItem>
+                      <SelectItem value="mst">Mountain (MST/MDT)</SelectItem>
+                      <SelectItem value="pst">Pacific (PST/PDT)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button data-testid="button-save-platform-config">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Save Platform Configuration
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Email & Communication */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Mail className="w-5 h-5 mr-2" />
+                  Email & Communication Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="smtp-provider">Email Provider</Label>
+                  <Select>
+                    <SelectTrigger id="smtp-provider" data-testid="select-smtp-provider">
+                      <SelectValue placeholder="Select provider" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="sendgrid">SendGrid</SelectItem>
+                      <SelectItem value="mailgun">Mailgun</SelectItem>
+                      <SelectItem value="smtp">Custom SMTP</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="sendgrid-key">SendGrid API Key</Label>
+                  <Input id="sendgrid-key" type="password" placeholder="SG.xxxxx" data-testid="input-sendgrid-key" />
+                </div>
+                <div>
+                  <Label htmlFor="from-email">Default From Email</Label>
+                  <Input id="from-email" type="email" defaultValue="noreply@hubify.com" data-testid="input-from-email" />
+                </div>
+                <div>
+                  <Label htmlFor="sms-provider">SMS Gateway Provider</Label>
+                  <Select>
+                    <SelectTrigger id="sms-provider" data-testid="select-sms-provider">
+                      <SelectValue placeholder="Select SMS provider" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="twilio">Twilio</SelectItem>
+                      <SelectItem value="plivo">Plivo</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch id="email-notifications" defaultChecked data-testid="switch-email-notifications" />
+                  <Label htmlFor="email-notifications">Enable System Email Notifications</Label>
+                </div>
+                <Button data-testid="button-save-email-settings">
+                  <Mail className="w-4 h-4 mr-2" />
+                  Save Email Settings
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Integration Management */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Zap className="w-5 h-5 mr-2" />
+                  Integration Management
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="stripe-master-key">Stripe Master Secret Key</Label>
+                  <Input id="stripe-master-key" type="password" placeholder="sk_live_xxxxx" data-testid="input-stripe-master-key" />
+                  <p className="text-xs text-gray-500 mt-1">Used for platform billing</p>
+                </div>
+                <div>
+                  <Label htmlFor="oauth-google">Google OAuth Client ID</Label>
+                  <Input id="oauth-google" placeholder="xxxxx.apps.googleusercontent.com" data-testid="input-oauth-google" />
+                </div>
+                <div>
+                  <Label htmlFor="oauth-microsoft">Microsoft OAuth Client ID</Label>
+                  <Input id="oauth-microsoft" placeholder="xxxxx-xxxxx-xxxxx" data-testid="input-oauth-microsoft" />
+                </div>
+                <div>
+                  <Label htmlFor="quickbooks-key">QuickBooks API Key</Label>
+                  <Input id="quickbooks-key" type="password" placeholder="Optional" data-testid="input-quickbooks-key" />
+                </div>
+                <Button data-testid="button-save-integrations">
+                  <Zap className="w-4 h-4 mr-2" />
+                  Save Integration Settings
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Default Organization Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Building2 className="w-5 h-5 mr-2" />
+                  Default Organization Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="default-plan">Default Plan for New Orgs</Label>
+                    <Select>
+                      <SelectTrigger id="default-plan" data-testid="select-default-plan">
+                        <SelectValue placeholder="Select plan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="starter">Starter</SelectItem>
+                        <SelectItem value="professional">Professional</SelectItem>
+                        <SelectItem value="enterprise">Enterprise</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="trial-length">Free Trial Length (days)</Label>
+                    <Input id="trial-length" type="number" defaultValue="14" data-testid="input-trial-length" />
+                  </div>
+                  <div>
+                    <Label htmlFor="default-storage">Default Storage Quota (GB)</Label>
+                    <Input id="default-storage" type="number" defaultValue="10" data-testid="input-default-storage" />
+                  </div>
+                  <div>
+                    <Label htmlFor="max-users">Default Max Users</Label>
+                    <Input id="max-users" type="number" defaultValue="5" data-testid="input-max-users" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Default Feature Toggles</Label>
+                  <div className="space-y-2 pl-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch id="feature-maintenance" defaultChecked data-testid="switch-feature-maintenance" />
+                      <Label htmlFor="feature-maintenance">Maintenance Module</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch id="feature-calendar" defaultChecked data-testid="switch-feature-calendar" />
+                      <Label htmlFor="feature-calendar">Calendar System</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch id="feature-invoices" defaultChecked data-testid="switch-feature-invoices" />
+                      <Label htmlFor="feature-invoices">Invoice Management</Label>
+                    </div>
+                  </div>
+                </div>
+                <Button data-testid="button-save-org-defaults">
+                  <Building2 className="w-4 h-4 mr-2" />
+                  Save Organization Defaults
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Billing & Subscription */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <CreditCard className="w-5 h-5 mr-2" />
+                  Billing & Subscription Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label>Starter Plan Price</Label>
+                    <Input type="number" defaultValue="49" placeholder="$/month" data-testid="input-price-starter" />
+                  </div>
+                  <div>
+                    <Label>Professional Plan Price</Label>
+                    <Input type="number" defaultValue="149" placeholder="$/month" data-testid="input-price-professional" />
+                  </div>
+                  <div>
+                    <Label>Enterprise Plan Price</Label>
+                    <Input type="number" defaultValue="399" placeholder="$/month" data-testid="input-price-enterprise" />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="grace-period">Payment Grace Period (days)</Label>
+                  <Input id="grace-period" type="number" defaultValue="3" data-testid="input-grace-period" />
+                </div>
+                <div>
+                  <Label>Add-ons Pricing</Label>
+                  <div className="grid grid-cols-2 gap-4 mt-2">
+                    <div>
+                      <Label htmlFor="addon-storage">Extra Storage (per 10GB/month)</Label>
+                      <Input id="addon-storage" type="number" defaultValue="15" data-testid="input-addon-storage" />
+                    </div>
+                    <div>
+                      <Label htmlFor="addon-support">Premium Support (/month)</Label>
+                      <Input id="addon-support" type="number" defaultValue="99" data-testid="input-addon-support" />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch id="referral-program" data-testid="switch-referral-program" />
+                  <Label htmlFor="referral-program">Enable Referral Program</Label>
+                </div>
+                <Button data-testid="button-save-billing-settings">
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Save Billing Settings
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Compliance & Legal */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <FileText className="w-5 h-5 mr-2" />
+                  Compliance & Legal Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="retention-period">Document Retention Period (years)</Label>
+                  <Input id="retention-period" type="number" defaultValue="7" data-testid="input-retention-period" />
+                </div>
+                <div>
+                  <Label htmlFor="esign-provider">E-Signature Provider</Label>
+                  <Select>
+                    <SelectTrigger id="esign-provider" data-testid="select-esign-provider">
+                      <SelectValue placeholder="Select provider" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="docusign">DocuSign</SelectItem>
+                      <SelectItem value="hellosign">HelloSign</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Data Privacy Controls</Label>
+                  <div className="space-y-2 pl-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch id="gdpr-compliance" defaultChecked data-testid="switch-gdpr-compliance" />
+                      <Label htmlFor="gdpr-compliance">GDPR Compliance Mode</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch id="ccpa-compliance" defaultChecked data-testid="switch-ccpa-compliance" />
+                      <Label htmlFor="ccpa-compliance">CCPA Compliance Mode</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch id="audit-logging" defaultChecked data-testid="switch-audit-logging" />
+                      <Label htmlFor="audit-logging">Global Audit Logging</Label>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="data-purge">Auto Data Purge Schedule</Label>
+                  <Select>
+                    <SelectTrigger id="data-purge" data-testid="select-data-purge">
+                      <SelectValue placeholder="Select schedule" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="never">Never</SelectItem>
+                      <SelectItem value="30days">After 30 days of deletion</SelectItem>
+                      <SelectItem value="90days">After 90 days of deletion</SelectItem>
+                      <SelectItem value="1year">After 1 year of deletion</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button data-testid="button-save-compliance-settings">
+                  <FileText className="w-4 h-4 mr-2" />
+                  Save Compliance Settings
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* System Maintenance */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Server className="w-5 h-5 mr-2" />
+                  System Maintenance
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 border rounded-lg bg-yellow-50 border-yellow-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <AlertTriangle className="w-5 h-5 text-yellow-600" />
+                      <div>
+                        <div className="font-medium text-yellow-900">Maintenance Mode</div>
+                        <div className="text-sm text-yellow-700">Enable to prevent user access during maintenance</div>
+                      </div>
+                    </div>
+                    <Switch id="maintenance-mode" data-testid="switch-maintenance-mode" />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="downtime-message">Maintenance Mode Message</Label>
+                  <Textarea 
+                    id="downtime-message" 
+                    placeholder="We're performing scheduled maintenance. We'll be back shortly!"
+                    defaultValue="We're performing scheduled maintenance. We'll be back shortly!"
+                    data-testid="textarea-downtime-message"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="backup-schedule">Automated Backup Schedule</Label>
+                  <Select>
+                    <SelectTrigger id="backup-schedule" data-testid="select-backup-schedule">
+                      <SelectValue placeholder="Select schedule" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hourly">Hourly</SelectItem>
+                      <SelectItem value="daily">Daily at 2 AM</SelectItem>
+                      <SelectItem value="weekly">Weekly (Sunday 2 AM)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="health-check">System Health Check Interval</Label>
+                  <Select>
+                    <SelectTrigger id="health-check" data-testid="select-health-check">
+                      <SelectValue placeholder="Select interval" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1min">Every 1 minute</SelectItem>
+                      <SelectItem value="5min">Every 5 minutes</SelectItem>
+                      <SelectItem value="15min">Every 15 minutes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button data-testid="button-save-maintenance-settings">
+                  <Server className="w-4 h-4 mr-2" />
+                  Save Maintenance Settings
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Security & Access */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Lock className="w-5 h-5 mr-2" />
+                  Security & Access Controls
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="2fa-policy">Two-Factor Authentication Policy</Label>
+                  <Select>
+                    <SelectTrigger id="2fa-policy" data-testid="select-2fa-policy">
+                      <SelectValue placeholder="Select policy" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="required">Required for all users</SelectItem>
+                      <SelectItem value="admins">Required for admins only</SelectItem>
+                      <SelectItem value="optional">Optional</SelectItem>
+                      <SelectItem value="off">Disabled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Password Complexity Requirements</Label>
+                  <div className="space-y-2 mt-2 pl-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch id="pwd-length" defaultChecked data-testid="switch-pwd-length" />
+                      <Label htmlFor="pwd-length">Minimum 8 characters</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch id="pwd-uppercase" defaultChecked data-testid="switch-pwd-uppercase" />
+                      <Label htmlFor="pwd-uppercase">Require uppercase letters</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch id="pwd-numbers" defaultChecked data-testid="switch-pwd-numbers" />
+                      <Label htmlFor="pwd-numbers">Require numbers</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch id="pwd-special" defaultChecked data-testid="switch-pwd-special" />
+                      <Label htmlFor="pwd-special">Require special characters</Label>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="session-length">Max Session Length (hours)</Label>
+                    <Input id="session-length" type="number" defaultValue="24" data-testid="input-session-length" />
+                  </div>
+                  <div>
+                    <Label htmlFor="reauth-period">Re-authentication Period (hours)</Label>
+                    <Input id="reauth-period" type="number" defaultValue="8" data-testid="input-reauth-period" />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="ip-whitelist">IP Whitelist (comma-separated)</Label>
+                  <Textarea 
+                    id="ip-whitelist" 
+                    placeholder="192.168.1.1, 10.0.0.0/24"
+                    data-testid="textarea-ip-whitelist"
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch id="intrusion-detection" defaultChecked data-testid="switch-intrusion-detection" />
+                  <Label htmlFor="intrusion-detection">Enable Intrusion Detection Alerts</Label>
+                </div>
+                <Button data-testid="button-save-security-settings">
+                  <Lock className="w-4 h-4 mr-2" />
+                  Save Security Settings
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Customization Controls */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Palette className="w-5 h-5 mr-2" />
+                  Customization Controls
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label>Global Feature Toggles</Label>
+                  <div className="space-y-2 mt-2 pl-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch id="feature-vendor-portal" defaultChecked data-testid="switch-feature-vendor-portal" />
+                      <Label htmlFor="feature-vendor-portal">Vendor Portal (all orgs)</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch id="feature-client-portal" defaultChecked data-testid="switch-feature-client-portal" />
+                      <Label htmlFor="feature-client-portal">Client Portal (all orgs)</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch id="feature-mobile-app" data-testid="switch-feature-mobile-app" />
+                      <Label htmlFor="feature-mobile-app">Mobile App Access</Label>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="global-theme">Global Default Theme</Label>
+                  <Select>
+                    <SelectTrigger id="global-theme" data-testid="select-global-theme">
+                      <SelectValue placeholder="Select theme" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="light">Light Mode</SelectItem>
+                      <SelectItem value="dark">Dark Mode</SelectItem>
+                      <SelectItem value="auto">Auto (System Preference)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="default-color">Default Brand Color</Label>
+                  <div className="flex items-center space-x-2">
+                    <Input 
+                      id="default-color" 
+                      type="color" 
+                      defaultValue="#3b82f6" 
+                      className="w-20 h-10"
+                      data-testid="input-default-color"
+                    />
+                    <Input 
+                      type="text" 
+                      defaultValue="#3b82f6" 
+                      className="flex-1"
+                      data-testid="input-default-color-hex"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>Default Notification Templates</Label>
+                  <div className="mt-2 space-y-2">
+                    <Button variant="outline" size="sm" className="w-full justify-start" data-testid="button-edit-welcome-template">
+                      <Mail className="w-4 h-4 mr-2" />
+                      Edit Welcome Email Template
+                    </Button>
+                    <Button variant="outline" size="sm" className="w-full justify-start" data-testid="button-edit-reminder-template">
+                      <Bell className="w-4 h-4 mr-2" />
+                      Edit Reminder Email Template
+                    </Button>
+                    <Button variant="outline" size="sm" className="w-full justify-start" data-testid="button-edit-invoice-template">
+                      <FileText className="w-4 h-4 mr-2" />
+                      Edit Invoice Email Template
+                    </Button>
+                  </div>
+                </div>
+                <Button data-testid="button-save-customization-settings">
+                  <Palette className="w-4 h-4 mr-2" />
+                  Save Customization Settings
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
       </Tabs>
     </main>
   );
