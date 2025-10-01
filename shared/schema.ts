@@ -126,6 +126,87 @@ export const stripeWebhookEvents = pgTable("stripe_webhook_events", {
   index("stripe_webhook_events_org_idx").on(table.orgId),
 ]);
 
+// Platform invoices - Hubify billing organizations
+export const platformInvoices = pgTable("platform_invoices", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  
+  // Source and Stripe linkage
+  source: varchar("source").$type<"stripe"|"manual">().notNull().default("manual"),
+  stripeInvoiceId: varchar("stripe_invoice_id"),
+  
+  // Invoice details
+  invoiceNumber: varchar("invoice_number"),
+  amountCents: integer("amount_cents").notNull(),
+  currency: varchar("currency").notNull().default("usd"),
+  status: varchar("status").$type<"draft"|"open"|"paid"|"void"|"uncollectible">().notNull().default("draft"),
+  
+  // Dates
+  dueDate: timestamp("due_date"),
+  periodStart: timestamp("period_start"),
+  periodEnd: timestamp("period_end"),
+  
+  // Links and storage
+  hostedInvoiceUrl: text("hosted_invoice_url"),
+  pdfStorageKey: text("pdf_storage_key"),
+  
+  // Additional info
+  description: text("description"),
+  metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("platform_invoices_org_status_idx").on(table.orgId, table.status),
+  index("platform_invoices_stripe_id_idx").on(table.stripeInvoiceId),
+]);
+
+// Client invoices - Organizations billing their clients
+export const clientInvoices = pgTable("client_invoices", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  clientId: uuid("client_id").references(() => clients.id).notNull(),
+  
+  // Source and Stripe linkage
+  source: varchar("source").$type<"stripe"|"manual">().notNull().default("manual"),
+  stripeInvoiceId: varchar("stripe_invoice_id"),
+  stripeCustomerId: varchar("stripe_customer_id"),
+  
+  // Invoice details
+  invoiceNumber: varchar("invoice_number"),
+  amountCents: integer("amount_cents").notNull(),
+  currency: varchar("currency").notNull().default("usd"),
+  status: varchar("status").$type<"draft"|"open"|"paid"|"void"|"uncollectible">().notNull().default("draft"),
+  
+  // Dates
+  dueDate: timestamp("due_date"),
+  issuedAt: timestamp("issued_at"),
+  
+  // Links and storage
+  hostedInvoiceUrl: text("hosted_invoice_url"),
+  pdfStorageKey: text("pdf_storage_key"),
+  
+  // Additional info
+  description: text("description"),
+  lineItems: jsonb("line_items").$type<Array<{
+    description: string;
+    quantity: number;
+    unitAmountCents: number;
+    totalCents: number;
+  }>>().default([]),
+  metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+  
+  // Creator tracking
+  createdBy: varchar("created_by").references(() => users.id),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("client_invoices_org_status_idx").on(table.orgId, table.status),
+  index("client_invoices_org_client_idx").on(table.orgId, table.clientId),
+  index("client_invoices_stripe_id_idx").on(table.stripeInvoiceId),
+]);
+
 // Clients table for property tenants/owners
 export const clients = pgTable("clients", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -1148,6 +1229,18 @@ export const insertStripeWebhookEventSchema = createInsertSchema(stripeWebhookEv
   createdAt: true,
 });
 
+export const insertPlatformInvoiceSchema = createInsertSchema(platformInvoices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertClientInvoiceSchema = createInsertSchema(clientInvoices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertClientSchema = createInsertSchema(clients).omit({
   id: true,
   createdAt: true,
@@ -1274,6 +1367,10 @@ export type InsertOrgStripeConnection = z.infer<typeof insertOrgStripeConnection
 export type OrgStripeConnection = typeof orgStripeConnections.$inferSelect;
 export type InsertStripeWebhookEvent = z.infer<typeof insertStripeWebhookEventSchema>;
 export type StripeWebhookEvent = typeof stripeWebhookEvents.$inferSelect;
+export type InsertPlatformInvoice = z.infer<typeof insertPlatformInvoiceSchema>;
+export type PlatformInvoice = typeof platformInvoices.$inferSelect;
+export type InsertClientInvoice = z.infer<typeof insertClientInvoiceSchema>;
+export type ClientInvoice = typeof clientInvoices.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
 export type InsertCommunity = z.infer<typeof insertCommunitySchema>;
