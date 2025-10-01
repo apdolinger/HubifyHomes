@@ -570,6 +570,87 @@ export const duplicateHistory = pgTable("duplicate_history", {
   details: jsonb("details"), // Additional details about the action
 });
 
+// Calendar tables
+export const calendars = pgTable("calendars", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  name: varchar("name").notNull(),
+  color: varchar("color").default("#3b82f6"), // Hex color code
+  isDefault: boolean("is_default").default(false),
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const events = pgTable("events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  calendarId: uuid("calendar_id").references(() => calendars.id, { onDelete: "cascade" }).notNull(),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  location: varchar("location"),
+  allDay: boolean("all_day").default(false),
+  start: timestamp("start", { withTimezone: true }).notNull(),
+  end: timestamp("end", { withTimezone: true }).notNull(),
+  timezone: varchar("timezone").default("UTC"),
+  recurrenceRule: text("recurrence_rule"), // RFC5545 RRULE string
+  recurrenceExDates: text("recurrence_ex_dates").array(), // Exception dates for recurring events
+  organizerId: varchar("organizer_id").references(() => users.id).notNull(),
+  propertyId: integer("property_id").references(() => properties.id),
+  taskId: integer("task_id").references(() => tasks.id),
+  clientId: uuid("client_id").references(() => clients.id),
+  visibility: varchar("visibility").default("org"), // 'private', 'org', 'public'
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const eventAttendees = pgTable("event_attendees", {
+  id: serial("id").primaryKey(),
+  eventId: uuid("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  type: varchar("type").notNull(), // 'user', 'client', 'external'
+  userId: varchar("user_id").references(() => users.id),
+  clientId: uuid("client_id").references(() => clients.id),
+  email: varchar("email"),
+  name: varchar("name"),
+  responseStatus: varchar("response_status").default("needsAction"), // 'needsAction', 'accepted', 'declined', 'tentative'
+  isOptional: boolean("is_optional").default(false),
+  notifyByEmail: boolean("notify_by_email").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const eventReminders = pgTable("event_reminders", {
+  id: serial("id").primaryKey(),
+  eventId: uuid("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  offsetMinutes: integer("offset_minutes").notNull(), // Minutes before event to send reminder
+  method: varchar("method").default("email"), // 'email', 'push', 'sms'
+  lastSentAt: timestamp("last_sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const icsFeeds = pgTable("ics_feeds", {
+  id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  calendarId: uuid("calendar_id").references(() => calendars.id),
+  userId: varchar("user_id").references(() => users.id),
+  token: varchar("token").unique().notNull(), // Unique token for accessing the feed
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const eventImports = pgTable("event_imports", {
+  id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  calendarId: uuid("calendar_id").references(() => calendars.id).notNull(),
+  sourceType: varchar("source_type").notNull(), // 'ics_url', 'ics_file'
+  sourceUrl: varchar("source_url"),
+  lastSyncAt: timestamp("last_sync_at"),
+  status: varchar("status").default("pending"), // 'pending', 'syncing', 'success', 'error'
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const orgsRelations = relations(orgs, ({ one, many }) => ({
   subscription: one(orgSubscriptions),
@@ -1071,6 +1152,39 @@ export const insertContactPropertySchema = createInsertSchema(contactProperties)
   updatedAt: true,
 });
 
+export const insertCalendarSchema = createInsertSchema(calendars).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEventSchema = createInsertSchema(events).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEventAttendeeSchema = createInsertSchema(eventAttendees).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertEventReminderSchema = createInsertSchema(eventReminders).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertIcsFeedSchema = createInsertSchema(icsFeeds).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertEventImportSchema = createInsertSchema(eventImports).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -1135,3 +1249,15 @@ export type DuplicateHistory = typeof duplicateHistory.$inferSelect;
 export type InsertDuplicateHistory = typeof duplicateHistory.$inferInsert;
 export type InsertPropertyPortalSettings = z.infer<typeof insertPropertyPortalSettingsSchema>;
 export type PropertyPortalSettings = typeof propertyPortalSettings.$inferSelect;
+export type InsertCalendar = z.infer<typeof insertCalendarSchema>;
+export type Calendar = typeof calendars.$inferSelect;
+export type InsertEvent = z.infer<typeof insertEventSchema>;
+export type Event = typeof events.$inferSelect;
+export type InsertEventAttendee = z.infer<typeof insertEventAttendeeSchema>;
+export type EventAttendee = typeof eventAttendees.$inferSelect;
+export type InsertEventReminder = z.infer<typeof insertEventReminderSchema>;
+export type EventReminder = typeof eventReminders.$inferSelect;
+export type InsertIcsFeed = z.infer<typeof insertIcsFeedSchema>;
+export type IcsFeed = typeof icsFeeds.$inferSelect;
+export type InsertEventImport = z.infer<typeof insertEventImportSchema>;
+export type EventImport = typeof eventImports.$inferSelect;
