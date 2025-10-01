@@ -139,7 +139,7 @@ function Router() {
               return null;
             }}
           </Route>
-          <Route path="/super-admin" component={Account} />
+          <Route path="/super-admin" component={SuperAdmin} />
           <Route path="/dwellerly-admin" component={SuperAdmin} />
           <Route path="/dwellerly-admin/organization/:id" component={OrganizationProfile} />
         </>
