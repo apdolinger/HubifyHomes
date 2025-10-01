@@ -65,7 +65,12 @@ export function CalendarWidget({ className }: CalendarWidgetProps) {
             </div>
           </div>
           
-          <Button variant="outline" className="w-full">
+          <Button 
+            variant="outline" 
+            className="w-full"
+            onClick={() => window.location.href = '/calendar'}
+            data-testid="button-view-full-calendar"
+          >
             <Calendar className="w-4 h-4 mr-2" />
             View Full Calendar
           </Button>

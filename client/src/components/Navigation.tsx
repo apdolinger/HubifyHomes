@@ -26,7 +26,6 @@ const getNavigationItems = (user: any) => {
     { name: "Dashboard", href: "/", icon: BarChart3 },
     { name: "Tasks", href: "/tasks", icon: CheckSquare },
     { name: "Properties", href: "/properties", icon: Building },
-    { name: "Calendar", href: "/calendar", icon: Calendar },
     { name: "People", href: "/people", icon: UserCheck },
     { name: "Team", href: "/team", icon: Users },
   ];
@@ -127,8 +126,13 @@ export default function Navigation() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => window.location.href = '/calendar'}>
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Calendar
+                </DropdownMenuItem>
                 {((user as any)?.role === 'admin' || (user as any)?.role === 'manager') && (
                   <>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => window.location.href = routes.adminClientPortal()}>
                       <Home className="w-4 h-4 mr-2" />
                       Client Portal
