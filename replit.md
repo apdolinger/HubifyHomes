@@ -33,15 +33,21 @@ Preferred communication style: Simple, everyday language.
 - **Advanced Forms**: JSONB schema storage with flexible field definitions and property assignments
 
 ### Recent Changes
+- **October 2025**: Implemented dual-tier Stripe integration system with master billing (Hubify billing organizations via subscriptions) and per-organization Stripe connections (via Stripe Connect or direct API keys) for processing payments
 - **October 2025**: Added comprehensive event attendees management system with support for team members, clients, and external email addresses, including multi-tenant org scoping security
+- **October 2025**: Fixed duplicate scanner confidence calculation to show accurate match percentages instead of false 100% scores
 - **August 2025**: Fixed platform-wide propertyId validation issue affecting room, vehicle, and contact creation across all properties
 - **August 2025**: Streamlined form builder interface by removing step-by-step tutorial language and redundant settings
 - **August 2025**: Consolidated form settings into cleaner, professional interface without numbered progression indicators
 
 ## Key Features and Design Decisions
 - **Multi-Tenant Architecture**: Comprehensive organization-based multi-tenancy supporting distinct clients, properties, forms, and submissions per organization.
+- **Dual-Tier Stripe Integration**: Complete payment processing system with two separate tiers:
+  - **Master Billing**: Hubify uses a master Stripe account to bill organizations for platform subscriptions with subscription management, webhook processing, and automatic billing updates
+  - **Per-Organization Connections**: Organizations can connect their own Stripe accounts (via Stripe Connect or direct API keys) to process payments from their clients, supporting both Standard Connect accounts and direct API key integration
+  - **Security Note**: API keys stored in database require encryption-at-rest before production deployment (currently noted as TODO in codebase)
 - **Enhanced Forms System**: Advanced, multi-tenant forms with complex field types, property-specific assignments, client submissions with status tracking, and file upload support.
-- **Duplicate Detection & Merge**: Sophisticated backend duplicate detection for contacts and properties using matching algorithms (e.g., Levenshtein distance) and smart merge logic that preserves primary record data.
+- **Duplicate Detection & Merge**: Sophisticated backend duplicate detection for contacts and properties using weighted similarity algorithms (Levenshtein distance) with accurate confidence scoring and smart merge logic that preserves primary record data.
 - **Tier-Based Branding System**: Flexible branding policy enforcement with subscription-based feature restrictions (logo, primary color, full theming).
 - **Property Portal Settings**: Comprehensive configuration system for client-facing property portals with versioning, draft/published workflow, and real-time tier-based branding enforcement.
 - **Form Submissions System**: Client-facing form submission workflow with server-side validation and staff management endpoints for review and status updates.
@@ -65,6 +71,7 @@ Preferred communication style: Simple, everyday language.
 - **better-sqlite3**: Local development database
 - **express-session**: Session management
 - **connect-pg-simple**: PostgreSQL session store
+- **stripe**: Payment processing for both master billing and per-organization connections
 
 ### Authentication
 - **openid-client**: OpenID Connect client for Replit Auth

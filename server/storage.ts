@@ -2,6 +2,8 @@ import {
   users,
   orgs,
   orgSubscriptions,
+  orgStripeConnections,
+  stripeWebhookEvents,
   clients,
   communities,
   properties,
@@ -41,6 +43,10 @@ import {
   type InsertOrg,
   type OrgSubscription,
   type InsertOrgSubscription,
+  type OrgStripeConnection,
+  type InsertOrgStripeConnection,
+  type StripeWebhookEvent,
+  type InsertStripeWebhookEvent,
   type Client,
   type InsertClient,
   type Community,
@@ -330,6 +336,22 @@ export interface IStorage {
   createEventImport(importData: InsertEventImport): Promise<EventImport>;
   updateEventImport(id: number, importData: Partial<InsertEventImport>): Promise<EventImport>;
   deleteEventImport(id: number): Promise<void>;
+  
+  // Stripe operations - Master billing (Hubify billing organizations)
+  getOrgSubscription(orgId: string): Promise<OrgSubscription | undefined>;
+  updateOrgSubscription(orgId: string, subscription: Partial<InsertOrgSubscription>): Promise<OrgSubscription>;
+  upsertOrgSubscription(orgId: string, subscription: InsertOrgSubscription): Promise<OrgSubscription>;
+  
+  // Stripe operations - Per-organization connections
+  getOrgStripeConnection(orgId: string): Promise<OrgStripeConnection | undefined>;
+  createOrgStripeConnection(connection: InsertOrgStripeConnection): Promise<OrgStripeConnection>;
+  updateOrgStripeConnection(orgId: string, connection: Partial<InsertOrgStripeConnection>): Promise<OrgStripeConnection>;
+  deleteOrgStripeConnection(orgId: string): Promise<void>;
+  
+  // Stripe webhook operations
+  recordWebhookEvent(event: InsertStripeWebhookEvent): Promise<StripeWebhookEvent>;
+  markWebhookProcessed(stripeEventId: string, error?: string): Promise<void>;
+  getUnprocessedWebhooks(limit?: number): Promise<StripeWebhookEvent[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2805,6 +2827,97 @@ export class DatabaseStorage implements IStorage {
 
   async deleteEventImport(id: number): Promise<void> {
     await db.delete(eventImports).where(eq(eventImports.id, id));
+  }
+
+  // Stripe operations - Master billing (Hubify billing organizations)
+  async getOrgSubscription(orgId: string): Promise<OrgSubscription | undefined> {
+    const [subscription] = await db
+      .select()
+      .from(orgSubscriptions)
+      .where(eq(orgSubscriptions.orgId, orgId));
+    return subscription;
+  }
+
+  async updateOrgSubscription(orgId: string, subscriptionData: Partial<InsertOrgSubscription>): Promise<OrgSubscription> {
+    const [subscription] = await db
+      .update(orgSubscriptions)
+      .set({ ...subscriptionData, updatedAt: new Date() })
+      .where(eq(orgSubscriptions.orgId, orgId))
+      .returning();
+    return subscription;
+  }
+
+  async upsertOrgSubscription(orgId: string, subscriptionData: InsertOrgSubscription): Promise<OrgSubscription> {
+    const existing = await this.getOrgSubscription(orgId);
+    
+    if (existing) {
+      return await this.updateOrgSubscription(orgId, subscriptionData);
+    } else {
+      const [subscription] = await db
+        .insert(orgSubscriptions)
+        .values(subscriptionData)
+        .returning();
+      return subscription;
+    }
+  }
+
+  // Stripe operations - Per-organization connections
+  async getOrgStripeConnection(orgId: string): Promise<OrgStripeConnection | undefined> {
+    const [connection] = await db
+      .select()
+      .from(orgStripeConnections)
+      .where(eq(orgStripeConnections.orgId, orgId));
+    return connection;
+  }
+
+  async createOrgStripeConnection(connectionData: InsertOrgStripeConnection): Promise<OrgStripeConnection> {
+    const [connection] = await db
+      .insert(orgStripeConnections)
+      .values(connectionData)
+      .returning();
+    return connection;
+  }
+
+  async updateOrgStripeConnection(orgId: string, connectionData: Partial<InsertOrgStripeConnection>): Promise<OrgStripeConnection> {
+    const [connection] = await db
+      .update(orgStripeConnections)
+      .set({ ...connectionData, updatedAt: new Date() })
+      .where(eq(orgStripeConnections.orgId, orgId))
+      .returning();
+    return connection;
+  }
+
+  async deleteOrgStripeConnection(orgId: string): Promise<void> {
+    await db.delete(orgStripeConnections).where(eq(orgStripeConnections.orgId, orgId));
+  }
+
+  // Stripe webhook operations
+  async recordWebhookEvent(eventData: InsertStripeWebhookEvent): Promise<StripeWebhookEvent> {
+    const [event] = await db
+      .insert(stripeWebhookEvents)
+      .values(eventData)
+      .returning();
+    return event;
+  }
+
+  async markWebhookProcessed(stripeEventId: string, error?: string): Promise<void> {
+    await db
+      .update(stripeWebhookEvents)
+      .set({
+        processed: true,
+        processedAt: new Date(),
+        errorMessage: error || null,
+      })
+      .where(eq(stripeWebhookEvents.stripeEventId, stripeEventId));
+  }
+
+  async getUnprocessedWebhooks(limit: number = 50): Promise<StripeWebhookEvent[]> {
+    return await db
+      .select()
+      .from(stripeWebhookEvents)
+      .where(eq(stripeWebhookEvents.processed, false))
+      .orderBy(stripeWebhookEvents.createdAt)
+      .limit(limit);
   }
 }
 

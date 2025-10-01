@@ -3446,6 +3446,168 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Stripe routes - Master billing (Hubify billing organizations)
+  app.post("/api/stripe/create-subscription", isAuthenticated, async (req, res) => {
+    try {
+      if (req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { orgId, orgName, email, priceId } = req.body;
+      const { createSubscription } = await import("./stripe");
+      
+      const result = await createSubscription(orgId, orgName, email, priceId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error creating subscription:", error);
+      res.status(500).json({ message: "Failed to create subscription" });
+    }
+  });
+
+  app.post("/api/stripe/cancel-subscription", isAuthenticated, async (req, res) => {
+    try {
+      if (req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { orgId, cancelAtPeriodEnd } = req.body;
+      const { cancelSubscription } = await import("./stripe");
+      
+      const result = await cancelSubscription(orgId, cancelAtPeriodEnd);
+      res.json(result);
+    } catch (error) {
+      console.error("Error canceling subscription:", error);
+      res.status(500).json({ message: "Failed to cancel subscription" });
+    }
+  });
+
+  app.post("/api/stripe/webhooks/master", express.raw({ type: "application/json" }), async (req, res) => {
+    try {
+      const { getMasterStripe, handleMasterWebhook } = await import("./stripe");
+      const stripe = getMasterStripe();
+      const sig = req.headers["stripe-signature"];
+
+      if (!sig || !process.env.STRIPE_WEBHOOK_SECRET) {
+        return res.status(400).json({ message: "Missing signature or webhook secret" });
+      }
+
+      const event = stripe.webhooks.constructEvent(
+        req.body,
+        sig,
+        process.env.STRIPE_WEBHOOK_SECRET
+      );
+
+      await handleMasterWebhook(event);
+      res.json({ received: true });
+    } catch (error) {
+      console.error("Webhook error:", error);
+      res.status(400).json({ message: `Webhook Error: ${(error as Error).message}` });
+    }
+  });
+
+  // Stripe routes - Per-organization connections
+  app.get("/api/orgs/:orgId/stripe-connection", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      
+      // Verify user belongs to org
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const connection = await storage.getOrgStripeConnection(orgId);
+      
+      // Hide sensitive data
+      if (connection) {
+        const { stripeSecretKey, accessToken, refreshToken, ...safeConnection } = connection;
+        res.json(safeConnection);
+      } else {
+        res.json(null);
+      }
+    } catch (error) {
+      console.error("Error fetching Stripe connection:", error);
+      res.status(500).json({ message: "Failed to fetch Stripe connection" });
+    }
+  });
+
+  app.post("/api/orgs/:orgId/stripe-connection", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      
+      // Verify user is admin of the org
+      if (req.user?.orgId !== orgId || req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { accountType, stripePublishableKey, stripeSecretKey } = req.body;
+
+      if (accountType === "direct") {
+        const connection = await storage.createOrgStripeConnection({
+          orgId,
+          accountType: "direct",
+          stripePublishableKey,
+          stripeSecretKey, // TODO: Encrypt in production
+          isActive: true,
+        });
+
+        const { stripeSecretKey: _, ...safeConnection } = connection;
+        res.status(201).json(safeConnection);
+      } else if (accountType === "connect") {
+        const org = await storage.getOrg(orgId);
+        if (!org) {
+          return res.status(404).json({ message: "Organization not found" });
+        }
+
+        const { createStripeConnectAccount } = await import("./stripe");
+        const account = await createStripeConnectAccount(orgId, org.name, req.user.email || "");
+        
+        res.status(201).json({ accountId: account.id });
+      } else {
+        res.status(400).json({ message: "Invalid account type" });
+      }
+    } catch (error) {
+      console.error("Error creating Stripe connection:", error);
+      res.status(500).json({ message: "Failed to create Stripe connection" });
+    }
+  });
+
+  app.delete("/api/orgs/:orgId/stripe-connection", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      
+      // Verify user is admin of the org
+      if (req.user?.orgId !== orgId || req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      await storage.deleteOrgStripeConnection(orgId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting Stripe connection:", error);
+      res.status(500).json({ message: "Failed to delete Stripe connection" });
+    }
+  });
+
+  app.post("/api/orgs/:orgId/stripe-connect/account-link", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const { accountId, returnUrl, refreshUrl } = req.body;
+      
+      // Verify user is admin of the org
+      if (req.user?.orgId !== orgId || req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { createStripeConnectAccountLink } = await import("./stripe");
+      const accountLink = await createStripeConnectAccountLink(accountId, returnUrl, refreshUrl);
+      
+      res.json(accountLink);
+    } catch (error) {
+      console.error("Error creating account link:", error);
+      res.status(500).json({ message: "Failed to create account link" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
