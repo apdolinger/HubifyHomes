@@ -33,6 +33,8 @@ import {
   insertEventSchema,
   insertEventAttendeeSchema,
   insertEventReminderSchema,
+  insertPlatformInvoiceSchema,
+  insertClientInvoiceSchema,
   type Form
 } from "@shared/schema";
 import { z } from "zod";
@@ -207,6 +209,36 @@ const upload = multer({
       cb(null, true);
     } else {
       cb(new Error('Only image files are allowed'));
+    }
+  }
+});
+
+// Configure multer for invoice uploads (PDFs and images)
+const invoiceStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = 'uploads/invoices';
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'invoice-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const uploadInvoice = multer({ 
+  storage: invoiceStorage,
+  limits: {
+    fileSize: 25 * 1024 * 1024, // 25MB limit for invoices
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF and image files are allowed for invoices'));
     }
   }
 });
@@ -3623,6 +3655,455 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating account link:", error);
       res.status(500).json({ message: "Failed to create account link" });
+    }
+  });
+
+  // Platform Invoice routes (Admin → Organizations)
+  const statusEnum = z.enum(["draft", "open", "paid", "void", "uncollectible"]);
+  
+  app.get("/api/admin/invoices", isAuthenticated, async (req, res) => {
+    try {
+      if (req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { orgId, status } = req.query;
+      
+      // Validate status if provided
+      const validatedStatus = status ? statusEnum.optional().parse(status) : undefined;
+      
+      const invoices = await storage.getPlatformInvoices(
+        orgId as string | undefined,
+        validatedStatus
+      );
+      res.json(invoices);
+    } catch (error) {
+      console.error("Error fetching platform invoices:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid status filter", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+
+  app.get("/api/admin/invoices/:id", isAuthenticated, async (req, res) => {
+    try {
+      if (req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const invoice = await storage.getPlatformInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      res.json(invoice);
+    } catch (error) {
+      console.error("Error fetching invoice:", error);
+      res.status(500).json({ message: "Failed to fetch invoice" });
+    }
+  });
+
+  app.post("/api/admin/invoices", isAuthenticated, async (req, res) => {
+    try {
+      if (req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const validatedData = insertPlatformInvoiceSchema.parse(req.body);
+      const invoice = await storage.createPlatformInvoice(validatedData);
+      res.status(201).json(invoice);
+    } catch (error) {
+      console.error("Error creating invoice:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid invoice data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create invoice" });
+    }
+  });
+
+  app.patch("/api/admin/invoices/:id", isAuthenticated, async (req, res) => {
+    try {
+      if (req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const validatedData = insertPlatformInvoiceSchema.partial().parse(req.body);
+      const invoice = await storage.updatePlatformInvoice(req.params.id, validatedData);
+      
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      res.json(invoice);
+    } catch (error) {
+      console.error("Error updating invoice:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid invoice data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update invoice" });
+    }
+  });
+
+  app.delete("/api/admin/invoices/:id", isAuthenticated, async (req, res) => {
+    try {
+      if (req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const existing = await storage.getPlatformInvoice(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      await storage.deletePlatformInvoice(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting invoice:", error);
+      res.status(500).json({ message: "Failed to delete invoice" });
+    }
+  });
+
+  // Upload/Download endpoints for admin platform invoices
+  app.post("/api/admin/invoices/:id/upload", uploadInvoice.single('file'), isAuthenticated, async (req, res) => {
+    try {
+      if (req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const invoice = await storage.getPlatformInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const objectStorage = new ObjectStorageService();
+      const storageKey = `invoices/platform/${invoice.orgId}/${req.params.id}.pdf`;
+      
+      await objectStorage.uploadFile(
+        req.file.path,
+        storageKey,
+        'application/pdf'
+      );
+
+      // Clean up temp file
+      fs.unlinkSync(req.file.path);
+
+      // Update invoice with storage key
+      const updatedInvoice = await storage.updatePlatformInvoice(req.params.id, { pdfStorageKey: storageKey });
+      res.json({ pdfStorageKey: storageKey, invoice: updatedInvoice });
+    } catch (error) {
+      console.error("Error uploading invoice PDF:", error);
+      res.status(500).json({ message: "Failed to upload PDF" });
+    }
+  });
+
+  app.get("/api/admin/invoices/:id/download", isAuthenticated, async (req, res) => {
+    try {
+      if (req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const invoice = await storage.getPlatformInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      if (!invoice.pdfStorageKey) {
+        return res.status(404).json({ message: "No PDF available for this invoice" });
+      }
+
+      const objectStorage = new ObjectStorageService();
+      const signedUrl = await objectStorage.getSignedUrl(invoice.pdfStorageKey, 3600);
+      
+      res.json({ downloadUrl: signedUrl });
+    } catch (error) {
+      console.error("Error generating download URL:", error);
+      res.status(500).json({ message: "Failed to generate download URL" });
+    }
+  });
+
+  // Organization platform invoice routes (View their invoices from Hubify)
+  app.get("/api/orgs/:orgId/platform-invoices", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      
+      // Verify user belongs to org
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { status } = req.query;
+      const validatedStatus = status ? statusEnum.optional().parse(status) : undefined;
+      
+      const invoices = await storage.getPlatformInvoices(orgId, validatedStatus);
+      res.json(invoices);
+    } catch (error) {
+      console.error("Error fetching org platform invoices:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid status filter", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+
+  app.get("/api/orgs/:orgId/platform-invoices/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, id } = req.params;
+      
+      // Verify user belongs to org
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const invoice = await storage.getPlatformInvoice(id, orgId);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      res.json(invoice);
+    } catch (error) {
+      console.error("Error fetching platform invoice:", error);
+      res.status(500).json({ message: "Failed to fetch invoice" });
+    }
+  });
+
+  app.get("/api/orgs/:orgId/platform-invoices/:id/download", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, id } = req.params;
+      
+      // Verify user belongs to org
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const invoice = await storage.getPlatformInvoice(id, orgId);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      if (!invoice.pdfStorageKey) {
+        return res.status(404).json({ message: "No PDF available for this invoice" });
+      }
+
+      const objectStorage = new ObjectStorageService();
+      const signedUrl = await objectStorage.getSignedUrl(invoice.pdfStorageKey, 3600);
+      
+      res.json({ downloadUrl: signedUrl });
+    } catch (error) {
+      console.error("Error generating download URL:", error);
+      res.status(500).json({ message: "Failed to generate download URL" });
+    }
+  });
+
+  // Client Invoice routes (Organizations → Clients)
+  app.get("/api/orgs/:orgId/clients/:clientId/invoices", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, clientId } = req.params;
+      
+      // Verify user belongs to org
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { status } = req.query;
+      const validatedStatus = status ? statusEnum.optional().parse(status) : undefined;
+      
+      const invoices = await storage.getClientInvoices(orgId, clientId, validatedStatus);
+      res.json(invoices);
+    } catch (error) {
+      console.error("Error fetching client invoices:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid status filter", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+
+  app.get("/api/orgs/:orgId/client-invoices", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      
+      // Verify user belongs to org
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { status } = req.query;
+      const validatedStatus = status ? statusEnum.optional().parse(status) : undefined;
+      
+      const invoices = await storage.getClientInvoices(orgId, undefined, validatedStatus);
+      res.json(invoices);
+    } catch (error) {
+      console.error("Error fetching client invoices:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid status filter", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+
+  app.get("/api/orgs/:orgId/client-invoices/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, id } = req.params;
+      
+      // Verify user belongs to org
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const invoice = await storage.getClientInvoice(orgId, id);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      res.json(invoice);
+    } catch (error) {
+      console.error("Error fetching client invoice:", error);
+      res.status(500).json({ message: "Failed to fetch invoice" });
+    }
+  });
+
+  app.post("/api/orgs/:orgId/clients/:clientId/invoices", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, clientId } = req.params;
+      
+      // Verify user belongs to org
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const validatedData = insertClientInvoiceSchema.parse({
+        ...req.body,
+        orgId,
+        clientId,
+        createdBy: req.user.claims.sub,
+      });
+      
+      const invoice = await storage.createClientInvoice(validatedData);
+      res.status(201).json(invoice);
+    } catch (error) {
+      console.error("Error creating client invoice:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid invoice data", errors: error.errors });
+      }
+      res.status(500).json({ message: (error as Error).message || "Failed to create invoice" });
+    }
+  });
+
+  app.patch("/api/orgs/:orgId/client-invoices/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, id } = req.params;
+      
+      // Verify user belongs to org
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const validatedData = insertClientInvoiceSchema.partial().parse(req.body);
+      const invoice = await storage.updateClientInvoice(orgId, id, validatedData);
+      
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      res.json(invoice);
+    } catch (error) {
+      console.error("Error updating client invoice:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid invoice data", errors: error.errors });
+      }
+      res.status(500).json({ message: (error as Error).message || "Failed to update invoice" });
+    }
+  });
+
+  app.delete("/api/orgs/:orgId/client-invoices/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, id } = req.params;
+      
+      // Verify user belongs to org
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const existing = await storage.getClientInvoice(orgId, id);
+      if (!existing) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      await storage.deleteClientInvoice(orgId, id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting client invoice:", error);
+      res.status(500).json({ message: "Failed to delete invoice" });
+    }
+  });
+
+  // Upload/Download endpoints for client invoices
+  app.post("/api/orgs/:orgId/client-invoices/:id/upload", uploadInvoice.single('file'), isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, id } = req.params;
+      
+      // Verify user belongs to org
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const invoice = await storage.getClientInvoice(orgId, id);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const objectStorage = new ObjectStorageService();
+      const storageKey = `invoices/org/${orgId}/clients/${invoice.clientId}/${id}.pdf`;
+      
+      await objectStorage.uploadFile(
+        req.file.path,
+        storageKey,
+        'application/pdf'
+      );
+
+      // Clean up temp file
+      fs.unlinkSync(req.file.path);
+
+      // Update invoice with storage key
+      const updatedInvoice = await storage.updateClientInvoice(orgId, id, { pdfStorageKey: storageKey });
+      res.json({ pdfStorageKey: storageKey, invoice: updatedInvoice });
+    } catch (error) {
+      console.error("Error uploading client invoice PDF:", error);
+      res.status(500).json({ message: "Failed to upload PDF" });
+    }
+  });
+
+  app.get("/api/orgs/:orgId/client-invoices/:id/download", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, id } = req.params;
+      
+      // Verify user belongs to org
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const invoice = await storage.getClientInvoice(orgId, id);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      if (!invoice.pdfStorageKey) {
+        return res.status(404).json({ message: "No PDF available for this invoice" });
+      }
+
+      const objectStorage = new ObjectStorageService();
+      const signedUrl = await objectStorage.getSignedUrl(invoice.pdfStorageKey, 3600);
+      
+      res.json({ downloadUrl: signedUrl });
+    } catch (error) {
+      console.error("Error generating download URL:", error);
+      res.status(500).json({ message: "Failed to generate download URL" });
     }
   });
 
