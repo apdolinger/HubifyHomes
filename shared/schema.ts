@@ -50,14 +50,81 @@ export const orgs = pgTable("orgs", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Organization subscriptions and tiers
+// Organization subscriptions and tiers (Master Stripe billing)
 export const orgSubscriptions = pgTable("org_subscriptions", {
   orgId: uuid("org_id").primaryKey().references(() => orgs.id),
   tier: text("tier").$type<"starter"|"pro"|"grow"|"enterprise">().notNull().default("starter"),
   features: jsonb("features").$type<Record<string, boolean>>().default({}),
+  
+  // Stripe master billing fields (Hubify billing organizations)
+  stripeCustomerId: varchar("stripe_customer_id"),
+  stripeSubscriptionId: varchar("stripe_subscription_id"),
+  stripeProductId: varchar("stripe_product_id"),
+  stripePriceId: varchar("stripe_price_id"),
+  status: varchar("status").$type<"active"|"past_due"|"canceled"|"incomplete"|"trialing">().default("trialing"),
+  currentPeriodStart: timestamp("current_period_start"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
+  
   renewedAt: timestamp("renewed_at"),
   expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Per-organization Stripe connections (organizations connect their own Stripe accounts)
+export const orgStripeConnections = pgTable("org_stripe_connections", {
+  id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull().unique(),
+  
+  // Stripe Connect Account ID (if using Stripe Connect)
+  stripeAccountId: varchar("stripe_account_id"),
+  
+  // Direct API keys (alternative to Stripe Connect)
+  stripePublishableKey: varchar("stripe_publishable_key"),
+  stripeSecretKey: varchar("stripe_secret_key"), // Encrypted in production
+  
+  // Connection metadata
+  accountType: varchar("account_type").$type<"connect"|"direct">().notNull().default("direct"),
+  isActive: boolean("is_active").notNull().default(true),
+  
+  // Stripe Connect details (if using Connect)
+  accessToken: varchar("access_token"), // Encrypted
+  refreshToken: varchar("refresh_token"), // Encrypted
+  scope: varchar("scope"),
+  livemode: boolean("livemode").default(false),
+  
+  // Account capabilities and status
+  chargesEnabled: boolean("charges_enabled").default(false),
+  payoutsEnabled: boolean("payouts_enabled").default(false),
+  detailsSubmitted: boolean("details_submitted").default(false),
+  
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Stripe webhook events for tracking and idempotency
+export const stripeWebhookEvents = pgTable("stripe_webhook_events", {
+  id: serial("id").primaryKey(),
+  stripeEventId: varchar("stripe_event_id").notNull().unique(), // Stripe's event ID
+  
+  // Master vs Org-level webhook
+  eventSource: varchar("event_source").$type<"master"|"organization">().notNull(),
+  orgId: uuid("org_id").references(() => orgs.id), // null for master events
+  
+  eventType: varchar("event_type").notNull(), // e.g., "customer.subscription.updated"
+  eventData: jsonb("event_data").notNull(),
+  
+  processed: boolean("processed").default(false),
+  processedAt: timestamp("processed_at"),
+  errorMessage: text("error_message"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("stripe_webhook_events_stripe_id_idx").on(table.stripeEventId),
+  index("stripe_webhook_events_org_idx").on(table.orgId),
+]);
 
 // Clients table for property tenants/owners
 export const clients = pgTable("clients", {
@@ -1070,6 +1137,17 @@ export const insertOrgSchema = createInsertSchema(orgs).omit({
 
 export const insertOrgSubscriptionSchema = createInsertSchema(orgSubscriptions);
 
+export const insertOrgStripeConnectionSchema = createInsertSchema(orgStripeConnections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertStripeWebhookEventSchema = createInsertSchema(stripeWebhookEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertClientSchema = createInsertSchema(clients).omit({
   id: true,
   createdAt: true,
@@ -1192,6 +1270,10 @@ export type InsertOrg = z.infer<typeof insertOrgSchema>;
 export type Org = typeof orgs.$inferSelect;
 export type InsertOrgSubscription = z.infer<typeof insertOrgSubscriptionSchema>;
 export type OrgSubscription = typeof orgSubscriptions.$inferSelect;
+export type InsertOrgStripeConnection = z.infer<typeof insertOrgStripeConnectionSchema>;
+export type OrgStripeConnection = typeof orgStripeConnections.$inferSelect;
+export type InsertStripeWebhookEvent = z.infer<typeof insertStripeWebhookEventSchema>;
+export type StripeWebhookEvent = typeof stripeWebhookEvents.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
 export type InsertCommunity = z.infer<typeof insertCommunitySchema>;
