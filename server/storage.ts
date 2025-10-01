@@ -2036,16 +2036,23 @@ export class DatabaseStorage implements IStorage {
           return scoreB - scoreA;
         });
         
-        const avgConfidence = confidenceScores.length > 0 
-          ? Math.round(confidenceScores.reduce((sum, conf) => sum + conf, 0) / confidenceScores.length)
-          : 100;
+        // Calculate the actual confidence based on the primary pair comparison
+        // This gives the most accurate match percentage
+        let actualConfidence;
+        if (confidenceScores.length > 0) {
+          // Use the average of all pairwise comparisons
+          actualConfidence = Math.round(confidenceScores.reduce((sum, conf) => sum + conf, 0) / confidenceScores.length);
+        } else {
+          // If no scores were recorded, calculate it now for the first pair
+          actualConfidence = this.calculateContactSimilarity(sortedCluster[0], sortedCluster[1], criteria);
+        }
         
         const matchFields = this.getContactMatchFields(sortedCluster[0], sortedCluster[1], criteria);
         
         duplicateGroups.push({
           id: duplicateGroups.length + 1,
           type: 'contact',
-          confidence: avgConfidence,
+          confidence: actualConfidence,
           matchFields,
           records: sortedCluster,
           totalRecords: sortedCluster.length,
@@ -2177,13 +2184,14 @@ export class DatabaseStorage implements IStorage {
     let totalScore = 0;
     let totalWeights = 0;
 
+    // Build full address for comparison (address1 + city + state + zip)
+    const addr1 = `${property1.address1 || ''} ${property1.city || ''} ${property1.state || ''} ${property1.zip || ''}`.trim().toLowerCase();
+    const addr2 = `${property2.address1 || ''} ${property2.city || ''} ${property2.state || ''} ${property2.zip || ''}`.trim().toLowerCase();
+
     // Address similarity (weight: 60%)
     const addressWeight = 60;
-    if (property1.address && property2.address) {
-      const addressScore = this.calculateStringSimilarity(
-        property1.address.toLowerCase(), 
-        property2.address.toLowerCase()
-      );
+    if (addr1 && addr2) {
+      const addressScore = this.calculateStringSimilarity(addr1, addr2);
       
       if (addressScore >= criteria.addressThreshold / 100) {
         totalScore += addressScore * addressWeight;
@@ -2291,15 +2299,20 @@ export class DatabaseStorage implements IStorage {
   private getPropertyMatchFields(property1: any, property2: any, criteria: any): string[] {
     const matchFields = [];
 
-    if (property1.address && property2.address) {
-      if (this.calculateStringSimilarity(property1.address.toLowerCase(), property2.address.toLowerCase()) >= criteria.addressThreshold / 100) {
-        matchFields.push('address');
-      }
-    }
-
+    // Check name similarity
     if (property1.name && property2.name) {
       if (this.calculateStringSimilarity(property1.name.toLowerCase(), property2.name.toLowerCase()) >= criteria.nameThreshold / 100) {
         matchFields.push('name');
+      }
+    }
+
+    // Check full address similarity
+    const addr1 = `${property1.address1 || ''} ${property1.city || ''} ${property1.state || ''} ${property1.zip || ''}`.trim().toLowerCase();
+    const addr2 = `${property2.address1 || ''} ${property2.city || ''} ${property2.state || ''} ${property2.zip || ''}`.trim().toLowerCase();
+    
+    if (addr1 && addr2) {
+      if (this.calculateStringSimilarity(addr1, addr2) >= criteria.addressThreshold / 100) {
+        matchFields.push('address');
       }
     }
 
