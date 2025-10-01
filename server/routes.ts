@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import path from "path";
@@ -9,6 +9,16 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { ObjectStorageService } from "./objectStorage";
 import { importSampleData } from "./import-data";
 import { getBrandingLevel, enforceBrandingPolicy, getBrandingCapabilities } from "./branding";
+import { 
+  AuditLogger, 
+  MFAEnforcement, 
+  IPAllowlist, 
+  SessionManager,
+  auditMiddleware,
+  requireMFA,
+  requireAllowedIP,
+  trackSession
+} from "./security";
 import { 
   insertCommunitySchema,
   insertPropertySchema,
@@ -38,6 +48,91 @@ import {
   type Form
 } from "@shared/schema";
 import { z } from "zod";
+
+// Security Middleware
+const isSuperAdmin = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user as any;
+    
+    if (user?.role !== 'super_admin') {
+      await AuditLogger.log({
+        req,
+        action: "unauthorized_super_admin_access",
+        actionType: "auth",
+        resource: "super_admin",
+        severity: "critical",
+        success: false,
+        errorMessage: "User attempted to access super admin route without proper role",
+      });
+      return res.status(403).json({ message: "Super admin access required" });
+    }
+    
+    next();
+  } catch (error) {
+    console.error("Error in isSuperAdmin middleware:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const isAdmin = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user as any;
+    
+    if (user?.role !== 'admin' && user?.role !== 'supervisor' && user?.role !== 'super_admin') {
+      await AuditLogger.log({
+        req,
+        action: "unauthorized_admin_access",
+        actionType: "auth",
+        resource: "admin",
+        severity: "warning",
+        success: false,
+        errorMessage: "User attempted to access admin route without proper role",
+      });
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    
+    next();
+  } catch (error) {
+    console.error("Error in isAdmin middleware:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const requireAdminAccount = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user as any;
+    const userId = user?.claims?.sub || user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    
+    const userRecord = await storage.getUser(userId);
+    
+    if (user?.role === 'admin' || user?.role === 'supervisor') {
+      if (!userRecord?.isAdminAccount) {
+        await AuditLogger.log({
+          req,
+          action: "admin_daily_work_blocked",
+          actionType: "auth",
+          resource: "admin_account",
+          severity: "warning",
+          success: false,
+          errorMessage: "Admin user using personal account for daily operations (least privilege violation)",
+        });
+        return res.status(403).json({ 
+          message: "This operation requires a separate admin account. Please use your personal account for daily work.",
+          code: "ADMIN_ACCOUNT_REQUIRED"
+        });
+      }
+    }
+    
+    next();
+  } catch (error) {
+    console.error("Error in requireAdminAccount middleware:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
 
 // HTML template for forms
 function generateFormHTML(form: any, isEmbed: boolean): string {
@@ -403,6 +498,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
   
+  // Global security middlewares
+  app.use(trackSession);
+  app.use(auditMiddleware);
+  
   // Serve uploaded photos
   app.use('/uploads', (req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -593,16 +692,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Super Admin: Get all communities across all organizations  
-  app.get("/api/super-admin/communities-report", isAuthenticated, async (req, res) => {
+  app.get("/api/super-admin/communities-report", isAuthenticated, isSuperAdmin, requireMFA, requireAllowedIP, async (req, res) => {
     try {
-      // In production, add proper super admin role validation here
       const userId = (req.user as any)?.claims?.sub;
       
       const communitiesData = await storage.getAllCommunitiesForSuperAdmin();
+      
+      await AuditLogger.log({
+        req,
+        action: "view_communities_report",
+        actionType: "read",
+        resource: "super_admin",
+        severity: "info",
+        success: true,
+      });
+      
       res.json(communitiesData);
     } catch (error) {
       console.error("Error fetching super admin communities report:", error);
+      
+      await AuditLogger.log({
+        req,
+        action: "view_communities_report",
+        actionType: "read",
+        resource: "super_admin",
+        severity: "critical",
+        success: false,
+        errorMessage: error instanceof Error ? error.message : "Unknown error",
+      });
+      
       res.status(500).json({ message: "Failed to fetch communities report" });
+    }
+  });
+
+  // Super Admin Security & Compliance API Endpoints
+  
+  // Get audit logs
+  app.get("/api/super-admin/audit-logs", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { limit = 100, offset = 0, severity, actionType, userId, startDate, endDate } = req.query;
+      
+      const logs = await storage.getAuditLogs({
+        limit: Number(limit),
+        offset: Number(offset),
+        severity: severity as string | undefined,
+        actionType: actionType as string | undefined,
+        userId: userId as string | undefined,
+        startDate: startDate as string | undefined,
+        endDate: endDate as string | undefined,
+      });
+      
+      await AuditLogger.log({
+        req,
+        action: "view_audit_logs",
+        actionType: "read",
+        resource: "audit_logs",
+        severity: "info",
+        success: true,
+      });
+      
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching audit logs:", error);
+      res.status(500).json({ message: "Failed to fetch audit logs" });
+    }
+  });
+  
+  // Get access review report (all admin users)
+  app.get("/api/super-admin/access-review", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const adminUsers = await storage.getAdminUsers();
+      
+      await AuditLogger.log({
+        req,
+        action: "view_access_review",
+        actionType: "read",
+        resource: "access_review",
+        severity: "info",
+        success: true,
+      });
+      
+      res.json(adminUsers);
+    } catch (error) {
+      console.error("Error fetching access review:", error);
+      res.status(500).json({ message: "Failed to fetch access review" });
+    }
+  });
+  
+  // Force logout all sessions for a user
+  app.post("/api/super-admin/sessions/invalidate", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { userId } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ message: "userId is required" });
+      }
+      
+      await SessionManager.invalidateUserSessions(userId);
+      
+      await AuditLogger.log({
+        req,
+        action: "invalidate_user_sessions",
+        actionType: "admin",
+        resource: "user_sessions",
+        resourceId: userId,
+        severity: "warning",
+        success: true,
+      });
+      
+      res.json({ message: "All sessions invalidated successfully" });
+    } catch (error) {
+      console.error("Error invalidating sessions:", error);
+      res.status(500).json({ message: "Failed to invalidate sessions" });
+    }
+  });
+  
+  // Get active sessions
+  app.get("/api/super-admin/sessions", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { userId } = req.query;
+      
+      const sessions = userId 
+        ? await storage.getUserSessions(userId as string)
+        : await storage.getAllActiveSessions();
+      
+      await AuditLogger.log({
+        req,
+        action: "view_active_sessions",
+        actionType: "read",
+        resource: "user_sessions",
+        severity: "info",
+        success: true,
+      });
+      
+      res.json(sessions);
+    } catch (error) {
+      console.error("Error fetching sessions:", error);
+      res.status(500).json({ message: "Failed to fetch sessions" });
     }
   });
 

@@ -232,7 +232,9 @@ export const users = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   role: varchar("role").notNull().default("staff"), // admin, supervisor, staff
   tier: varchar("tier").notNull().default("basic"), // basic, standard, premium
+  isAdminAccount: boolean("is_admin_account").notNull().default(false), // For least privilege: separate admin accounts
   isActive: boolean("is_active").notNull().default(true),
+  lastActiveAt: timestamp("last_active_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

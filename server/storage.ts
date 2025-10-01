@@ -39,6 +39,8 @@ import {
   eventReminders,
   icsFeeds,
   eventImports,
+  securityAuditLogs,
+  userSessions,
   type User,
   type UpsertUser,
   type Org,
@@ -373,6 +375,20 @@ export interface IStorage {
   createClientInvoice(invoice: InsertClientInvoice): Promise<ClientInvoice>;
   updateClientInvoice(orgId: string, id: string, invoice: Partial<InsertClientInvoice>): Promise<ClientInvoice>;
   deleteClientInvoice(orgId: string, id: string): Promise<void>;
+  
+  // Security & Compliance operations
+  getAuditLogs(params: {
+    limit: number;
+    offset: number;
+    severity?: string;
+    actionType?: string;
+    userId?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<any[]>;
+  getAdminUsers(): Promise<any[]>;
+  getUserSessions(userId: string): Promise<any[]>;
+  getAllActiveSessions(): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3094,6 +3110,92 @@ export class DatabaseStorage implements IStorage {
       eq(clientInvoices.id, id),
       eq(clientInvoices.orgId, orgId)
     ));
+  }
+  
+  // Security & Compliance operations
+  async getAuditLogs(params: {
+    limit: number;
+    offset: number;
+    severity?: string;
+    actionType?: string;
+    userId?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<any[]> {
+    const conditions = [];
+    
+    if (params.severity) {
+      conditions.push(eq(securityAuditLogs.severity, params.severity as any));
+    }
+    if (params.actionType) {
+      conditions.push(eq(securityAuditLogs.actionType, params.actionType as any));
+    }
+    if (params.userId) {
+      conditions.push(eq(securityAuditLogs.userId, params.userId));
+    }
+    if (params.startDate) {
+      conditions.push(sql`${securityAuditLogs.createdAt} >= ${params.startDate}`);
+    }
+    if (params.endDate) {
+      conditions.push(sql`${securityAuditLogs.createdAt} <= ${params.endDate}`);
+    }
+    
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    return await db
+      .select()
+      .from(securityAuditLogs)
+      .where(whereClause)
+      .orderBy(desc(securityAuditLogs.createdAt))
+      .limit(params.limit)
+      .offset(params.offset);
+  }
+  
+  async getAdminUsers(): Promise<any[]> {
+    return await db
+      .select({
+        id: users.id,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        role: users.role,
+        isAdminAccount: users.isAdminAccount,
+        lastActiveAt: users.lastActiveAt,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .where(or(
+        eq(users.role, 'admin'),
+        eq(users.role, 'supervisor'),
+        eq(users.role, 'super_admin')
+      ))
+      .orderBy(desc(users.lastActiveAt));
+  }
+  
+  async getUserSessions(userId: string): Promise<any[]> {
+    return await db
+      .select()
+      .from(userSessions)
+      .where(eq(userSessions.userId, userId))
+      .orderBy(desc(userSessions.lastActivityAt));
+  }
+  
+  async getAllActiveSessions(): Promise<any[]> {
+    return await db
+      .select({
+        sessionId: userSessions.sessionId,
+        userId: userSessions.userId,
+        userEmail: users.email,
+        userName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`.as('userName'),
+        ipAddress: userSessions.ipAddress,
+        userAgent: userSessions.userAgent,
+        lastActivityAt: userSessions.lastActivityAt,
+        createdAt: userSessions.createdAt,
+      })
+      .from(userSessions)
+      .innerJoin(users, eq(userSessions.userId, users.id))
+      .where(eq(userSessions.isActive, true))
+      .orderBy(desc(userSessions.lastActivityAt));
   }
 }
 

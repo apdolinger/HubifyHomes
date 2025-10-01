@@ -96,14 +96,15 @@ function CommunitiesReport() {
     );
   }
 
-  const filteredCommunities = communitiesData?.filter((community: any) =>
+  const communitiesList = (communitiesData as any[]) || [];
+  const filteredCommunities = communitiesList.filter((community: any) =>
     community.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     community.organizationNames?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     community.fullAddress?.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  );
 
   const downloadCSV = () => {
-    if (!communitiesData || communitiesData.length === 0) return;
+    if (!communitiesList || communitiesList.length === 0) return;
 
     const headers = [
       'Community Name',
@@ -121,7 +122,7 @@ function CommunitiesReport() {
 
     const csvData = [
       headers,
-      ...communitiesData.map((community: any) => [
+      ...communitiesList.map((community: any) => [
         community.name || '',
         community.address1 || '',
         community.city || '',
@@ -222,13 +223,13 @@ function CommunitiesReport() {
         </Table>
       </div>
 
-      {filteredCommunities.length === 0 && communitiesData && communitiesData.length > 0 && (
+      {filteredCommunities.length === 0 && communitiesList && communitiesList.length > 0 && (
         <div className="text-center py-8 text-gray-500">
           No communities match your search criteria.
         </div>
       )}
 
-      {(!communitiesData || communitiesData.length === 0) && !isLoading && (
+      {(!communitiesList || communitiesList.length === 0) && !isLoading && (
         <div className="text-center py-8 text-gray-500">
           No communities found in the database.
         </div>
@@ -1221,21 +1222,229 @@ export default function SuperAdmin() {
 
         {/* Compliance Tab */}
         <TabsContent value="compliance">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Shield className="w-5 h-5 mr-2" />
-                Compliance & Security
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-slate-500">
-                <Shield className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-                <p>Compliance monitoring and security logs</p>
-                <p className="text-sm mt-2">GDPR, SOC 2, security certifications</p>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="space-y-6">
+            {/* Audit Logs */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Shield className="w-5 h-5 mr-2" />
+                    Security Audit Logs
+                  </div>
+                  <Button variant="outline" size="sm" data-testid="button-export-audit-logs">
+                    <FileText className="w-4 h-4 mr-2" />
+                    Export
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Filters */}
+                  <div className="flex gap-2">
+                    <Select>
+                      <SelectTrigger className="w-[180px]" data-testid="select-severity-filter">
+                        <SelectValue placeholder="Severity" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Severities</SelectItem>
+                        <SelectItem value="info">Info</SelectItem>
+                        <SelectItem value="warning">Warning</SelectItem>
+                        <SelectItem value="critical">Critical</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    
+                    <Select>
+                      <SelectTrigger className="w-[180px]" data-testid="select-action-type-filter">
+                        <SelectValue placeholder="Action Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Actions</SelectItem>
+                        <SelectItem value="read">Read</SelectItem>
+                        <SelectItem value="create">Create</SelectItem>
+                        <SelectItem value="update">Update</SelectItem>
+                        <SelectItem value="delete">Delete</SelectItem>
+                        <SelectItem value="auth">Authentication</SelectItem>
+                        <SelectItem value="admin">Admin Action</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    
+                    <Input 
+                      type="date" 
+                      placeholder="Start Date"
+                      className="w-[180px]"
+                      data-testid="input-start-date"
+                    />
+                    
+                    <Input 
+                      type="date" 
+                      placeholder="End Date"
+                      className="w-[180px]"
+                      data-testid="input-end-date"
+                    />
+                  </div>
+                  
+                  {/* Audit Log Table */}
+                  <div className="border rounded-md">
+                    <div className="max-h-96 overflow-auto">
+                      <table className="w-full">
+                        <thead className="bg-slate-50 sticky top-0">
+                          <tr className="border-b">
+                            <th className="text-left p-3 text-sm font-medium">Timestamp</th>
+                            <th className="text-left p-3 text-sm font-medium">User</th>
+                            <th className="text-left p-3 text-sm font-medium">Action</th>
+                            <th className="text-left p-3 text-sm font-medium">Resource</th>
+                            <th className="text-left p-3 text-sm font-medium">Severity</th>
+                            <th className="text-left p-3 text-sm font-medium">IP Address</th>
+                            <th className="text-left p-3 text-sm font-medium">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b hover:bg-slate-50" data-testid="audit-log-row-sample">
+                            <td className="p-3 text-sm">Loading...</td>
+                            <td className="p-3 text-sm" colSpan={6}>
+                              <span className="text-slate-500">Connect to view audit logs</span>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Access Review */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Users className="w-5 h-5 mr-2" />
+                    Admin Access Review
+                  </div>
+                  <Button variant="outline" size="sm" data-testid="button-export-access-review">
+                    <FileText className="w-4 h-4 mr-2" />
+                    Export Review
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-slate-600 mb-4">
+                  Quarterly review of all users with admin, supervisor, or super_admin privileges (required for SOC 2 compliance)
+                </p>
+                <div className="border rounded-md">
+                  <div className="max-h-96 overflow-auto">
+                    <table className="w-full">
+                      <thead className="bg-slate-50 sticky top-0">
+                        <tr className="border-b">
+                          <th className="text-left p-3 text-sm font-medium">Name</th>
+                          <th className="text-left p-3 text-sm font-medium">Email</th>
+                          <th className="text-left p-3 text-sm font-medium">Role</th>
+                          <th className="text-left p-3 text-sm font-medium">Admin Account</th>
+                          <th className="text-left p-3 text-sm font-medium">Last Active</th>
+                          <th className="text-left p-3 text-sm font-medium">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b hover:bg-slate-50" data-testid="access-review-row-sample">
+                          <td className="p-3 text-sm">Loading...</td>
+                          <td className="p-3 text-sm" colSpan={5}>
+                            <span className="text-slate-500">Connect to view admin users</span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Active Sessions */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Activity className="w-5 h-5 mr-2" />
+                    Active Sessions
+                  </div>
+                  <Button variant="outline" size="sm" data-testid="button-refresh-sessions">
+                    <Activity className="w-4 h-4 mr-2" />
+                    Refresh
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-slate-600 mb-4">
+                  Monitor and manage active user sessions. Force logout if needed.
+                </p>
+                <div className="border rounded-md">
+                  <div className="max-h-96 overflow-auto">
+                    <table className="w-full">
+                      <thead className="bg-slate-50 sticky top-0">
+                        <tr className="border-b">
+                          <th className="text-left p-3 text-sm font-medium">User</th>
+                          <th className="text-left p-3 text-sm font-medium">Email</th>
+                          <th className="text-left p-3 text-sm font-medium">IP Address</th>
+                          <th className="text-left p-3 text-sm font-medium">Last Activity</th>
+                          <th className="text-left p-3 text-sm font-medium">Duration</th>
+                          <th className="text-left p-3 text-sm font-medium">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b hover:bg-slate-50" data-testid="session-row-sample">
+                          <td className="p-3 text-sm">Loading...</td>
+                          <td className="p-3 text-sm" colSpan={5}>
+                            <span className="text-slate-500">Connect to view active sessions</span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Security Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-slate-600">Security Score</p>
+                      <p className="text-3xl font-bold text-green-600" data-testid="text-security-score">85%</p>
+                      <p className="text-xs text-slate-500 mt-1">Target: 85% mitigation</p>
+                    </div>
+                    <Shield className="w-12 h-12 text-green-500" />
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-slate-600">Failed Auth Attempts</p>
+                      <p className="text-3xl font-bold" data-testid="text-failed-auth">0</p>
+                      <p className="text-xs text-slate-500 mt-1">Last 24 hours</p>
+                    </div>
+                    <AlertTriangle className="w-12 h-12 text-yellow-500" />
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-slate-600">Active Admins</p>
+                      <p className="text-3xl font-bold" data-testid="text-active-admins">0</p>
+                      <p className="text-xs text-slate-500 mt-1">Requires MFA</p>
+                    </div>
+                    <Users className="w-12 h-12 text-blue-500" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </TabsContent>
 
         {/* Settings Tab */}

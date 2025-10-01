@@ -94,7 +94,7 @@ export class MFAEnforcement {
     const user = req.user as any;
     
     // Non-admin users don't need MFA enforcement
-    if (user?.role !== "admin" && user?.role !== "supervisor") {
+    if (user?.role !== "admin" && user?.role !== "supervisor" && user?.role !== "super_admin") {
       return true;
     }
 
@@ -107,9 +107,9 @@ export class MFAEnforcement {
         action: "admin_access_blocked_no_mfa",
         actionType: "auth",
         resource: "mfa",
-        severity: "warning",
+        severity: user?.role === "super_admin" ? "critical" : "warning",
         success: false,
-        errorMessage: "MFA not enabled for admin user",
+        errorMessage: `MFA not enabled for ${user?.role} user`,
       });
       return false;
     }
@@ -154,8 +154,8 @@ export class IPAllowlist {
   static async enforceForAdmin(req: Request): Promise<boolean> {
     const user = req.user as any;
     
-    // Only enforce for admin users
-    if (user?.role !== "admin") {
+    // Only enforce for admin, supervisor, and super_admin users
+    if (user?.role !== "admin" && user?.role !== "supervisor" && user?.role !== "super_admin") {
       return true;
     }
 
@@ -170,7 +170,7 @@ export class IPAllowlist {
         resource: "ip_allowlist",
         severity: "critical",
         success: false,
-        errorMessage: `Admin access blocked from unauthorized IP: ${ipAddress}`,
+        errorMessage: `${user?.role} access blocked from unauthorized IP: ${ipAddress}`,
       });
     }
 
