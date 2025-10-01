@@ -3658,6 +3658,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Organizations list endpoint for admin
+  app.get("/api/organizations", isAuthenticated, async (req, res) => {
+    try {
+      if (req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const orgs = await storage.getOrgs();
+      res.json(orgs);
+    } catch (error) {
+      console.error("Error fetching organizations:", error);
+      res.status(500).json({ message: "Failed to fetch organizations" });
+    }
+  });
+
   // Platform Invoice routes (Admin → Organizations)
   const statusEnum = z.enum(["draft", "open", "paid", "void", "uncollectible"]);
   
