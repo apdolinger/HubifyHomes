@@ -52,7 +52,9 @@ const formSchema = insertEventSchema.extend({
   (data) => {
     const start = new Date(data.start);
     const end = new Date(data.end);
-    return end > start;
+    // For all-day events, allow same day (end >= start)
+    // For timed events, require end > start
+    return data.allDay ? end >= start : end > start;
   },
   {
     message: "End time must be after start time",
@@ -168,10 +170,25 @@ export function EventModal({
 
   const createEventMutation = useMutation({
     mutationFn: async (data: FormData) => {
+      // Normalize dates for all-day events to avoid timezone issues
+      let startDate, endDate;
+      if (data.allDay) {
+        // For all-day events, use date-only and set to start of day in local time
+        startDate = new Date(data.start);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(data.end);
+        endDate.setHours(23, 59, 59, 999);
+      } else {
+        startDate = new Date(data.start);
+        endDate = new Date(data.end);
+      }
+
       const payload = {
         ...data,
-        start: new Date(data.start).toISOString(),
-        end: new Date(data.end).toISOString(),
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+        description: data.description?.trim() || null,
+        location: data.location?.trim() || null,
         propertyId: data.propertyId || null,
         taskId: data.taskId || null,
         clientId: data.clientId || null,
@@ -197,10 +214,25 @@ export function EventModal({
 
   const updateEventMutation = useMutation({
     mutationFn: async (data: FormData) => {
+      // Normalize dates for all-day events to avoid timezone issues
+      let startDate, endDate;
+      if (data.allDay) {
+        // For all-day events, use date-only and set to start of day in local time
+        startDate = new Date(data.start);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(data.end);
+        endDate.setHours(23, 59, 59, 999);
+      } else {
+        startDate = new Date(data.start);
+        endDate = new Date(data.end);
+      }
+
       const payload = {
         ...data,
-        start: new Date(data.start).toISOString(),
-        end: new Date(data.end).toISOString(),
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+        description: data.description?.trim() || null,
+        location: data.location?.trim() || null,
         propertyId: data.propertyId || null,
         taskId: data.taskId || null,
         clientId: data.clientId || null,
