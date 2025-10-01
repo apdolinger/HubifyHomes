@@ -29,6 +29,12 @@ import {
   propertyPortalSettings,
   ignoredDuplicates,
   duplicateHistory,
+  calendars,
+  events,
+  eventAttendees,
+  eventReminders,
+  icsFeeds,
+  eventImports,
   type User,
   type UpsertUser,
   type Org,
@@ -85,6 +91,18 @@ import {
   type InsertPropertyPortalSettings,
   type DuplicateHistory,
   type InsertDuplicateHistory,
+  type Calendar,
+  type InsertCalendar,
+  type Event,
+  type InsertEvent,
+  type EventAttendee,
+  type InsertEventAttendee,
+  type EventReminder,
+  type InsertEventReminder,
+  type IcsFeed,
+  type InsertIcsFeed,
+  type EventImport,
+  type InsertEventImport,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, like, count, sql } from "drizzle-orm";
@@ -273,6 +291,45 @@ export interface IStorage {
   ignoreDuplicate(recordType: string, recordIds: number[], userId: string, reason?: string): Promise<void>;
   getDuplicateHistory(): Promise<DuplicateHistory[]>;
   addDuplicateHistory(action: string, recordType: string, recordIds: number[], userId: string, details?: any): Promise<void>;
+  
+  // Calendar operations
+  getCalendars(orgId: string): Promise<Calendar[]>;
+  getCalendar(id: string): Promise<Calendar | undefined>;
+  createCalendar(calendar: InsertCalendar): Promise<Calendar>;
+  updateCalendar(id: string, calendar: Partial<InsertCalendar>): Promise<Calendar>;
+  deleteCalendar(id: string): Promise<void>;
+  
+  // Event operations
+  getEvents(orgId: string, startDate?: Date, endDate?: Date, calendarId?: string): Promise<Event[]>;
+  getEvent(id: string): Promise<Event | undefined>;
+  createEvent(event: InsertEvent): Promise<Event>;
+  updateEvent(id: string, event: Partial<InsertEvent>): Promise<Event>;
+  deleteEvent(id: string): Promise<void>;
+  
+  // Event attendee operations
+  getEventAttendees(eventId: string): Promise<EventAttendee[]>;
+  addEventAttendee(attendee: InsertEventAttendee): Promise<EventAttendee>;
+  updateEventAttendee(id: number, attendee: Partial<InsertEventAttendee>): Promise<EventAttendee>;
+  removeEventAttendee(id: number): Promise<void>;
+  
+  // Event reminder operations
+  getEventReminders(eventId: string): Promise<EventReminder[]>;
+  addEventReminder(reminder: InsertEventReminder): Promise<EventReminder>;
+  removeEventReminder(id: number): Promise<void>;
+  getPendingReminders(): Promise<any[]>;
+  markReminderSent(id: number): Promise<void>;
+  
+  // ICS feed operations
+  getIcsFeed(token: string): Promise<IcsFeed | undefined>;
+  createIcsFeed(feed: InsertIcsFeed): Promise<IcsFeed>;
+  getIcsFeedsByOrg(orgId: string): Promise<IcsFeed[]>;
+  deactivateIcsFeed(id: number): Promise<void>;
+  
+  // Event import operations
+  getEventImports(orgId: string): Promise<EventImport[]>;
+  createEventImport(importData: InsertEventImport): Promise<EventImport>;
+  updateEventImport(id: number, importData: Partial<InsertEventImport>): Promise<EventImport>;
+  deleteEventImport(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2505,6 +2562,236 @@ export class DatabaseStorage implements IStorage {
     }
 
     return { isValid: errors.length === 0, errors };
+  }
+
+  // Calendar operations
+  async getCalendars(orgId: string): Promise<Calendar[]> {
+    return await db
+      .select()
+      .from(calendars)
+      .where(eq(calendars.orgId, orgId))
+      .orderBy(calendars.name);
+  }
+
+  async getCalendar(id: string): Promise<Calendar | undefined> {
+    const [calendar] = await db
+      .select()
+      .from(calendars)
+      .where(eq(calendars.id, id));
+    return calendar;
+  }
+
+  async createCalendar(calendarData: InsertCalendar): Promise<Calendar> {
+    const [calendar] = await db
+      .insert(calendars)
+      .values(calendarData)
+      .returning();
+    return calendar;
+  }
+
+  async updateCalendar(id: string, calendarData: Partial<InsertCalendar>): Promise<Calendar> {
+    const [calendar] = await db
+      .update(calendars)
+      .set({ ...calendarData, updatedAt: new Date() })
+      .where(eq(calendars.id, id))
+      .returning();
+    return calendar;
+  }
+
+  async deleteCalendar(id: string): Promise<void> {
+    await db.delete(calendars).where(eq(calendars.id, id));
+  }
+
+  // Event operations
+  async getEvents(orgId: string, startDate?: Date, endDate?: Date, calendarId?: string): Promise<Event[]> {
+    let conditions = [eq(events.orgId, orgId)];
+    
+    if (calendarId) {
+      conditions.push(eq(events.calendarId, calendarId));
+    }
+    
+    if (startDate && endDate) {
+      conditions.push(
+        and(
+          sql`${events.start} <= ${endDate.toISOString()}`,
+          sql`${events.end} >= ${startDate.toISOString()}`
+        ) as any
+      );
+    }
+    
+    return await db
+      .select()
+      .from(events)
+      .where(and(...conditions))
+      .orderBy(events.start);
+  }
+
+  async getEvent(id: string): Promise<Event | undefined> {
+    const [event] = await db
+      .select()
+      .from(events)
+      .where(eq(events.id, id));
+    return event;
+  }
+
+  async createEvent(eventData: InsertEvent): Promise<Event> {
+    const [event] = await db
+      .insert(events)
+      .values(eventData)
+      .returning();
+    return event;
+  }
+
+  async updateEvent(id: string, eventData: Partial<InsertEvent>): Promise<Event> {
+    const [event] = await db
+      .update(events)
+      .set({ ...eventData, updatedAt: new Date() })
+      .where(eq(events.id, id))
+      .returning();
+    return event;
+  }
+
+  async deleteEvent(id: string): Promise<void> {
+    await db.delete(events).where(eq(events.id, id));
+  }
+
+  // Event attendee operations
+  async getEventAttendees(eventId: string): Promise<EventAttendee[]> {
+    return await db
+      .select()
+      .from(eventAttendees)
+      .where(eq(eventAttendees.eventId, eventId));
+  }
+
+  async addEventAttendee(attendeeData: InsertEventAttendee): Promise<EventAttendee> {
+    const [attendee] = await db
+      .insert(eventAttendees)
+      .values(attendeeData)
+      .returning();
+    return attendee;
+  }
+
+  async updateEventAttendee(id: number, attendeeData: Partial<InsertEventAttendee>): Promise<EventAttendee> {
+    const [attendee] = await db
+      .update(eventAttendees)
+      .set(attendeeData)
+      .where(eq(eventAttendees.id, id))
+      .returning();
+    return attendee;
+  }
+
+  async removeEventAttendee(id: number): Promise<void> {
+    await db.delete(eventAttendees).where(eq(eventAttendees.id, id));
+  }
+
+  // Event reminder operations
+  async getEventReminders(eventId: string): Promise<EventReminder[]> {
+    return await db
+      .select()
+      .from(eventReminders)
+      .where(eq(eventReminders.eventId, eventId));
+  }
+
+  async addEventReminder(reminderData: InsertEventReminder): Promise<EventReminder> {
+    const [reminder] = await db
+      .insert(eventReminders)
+      .values(reminderData)
+      .returning();
+    return reminder;
+  }
+
+  async removeEventReminder(id: number): Promise<void> {
+    await db.delete(eventReminders).where(eq(eventReminders.id, id));
+  }
+
+  async getPendingReminders(): Promise<any[]> {
+    const now = new Date();
+    const upcomingWindow = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour window
+    
+    const reminders = await db
+      .select({
+        reminder: eventReminders,
+        event: events,
+      })
+      .from(eventReminders)
+      .innerJoin(events, eq(eventReminders.eventId, events.id))
+      .where(
+        and(
+          sql`${eventReminders.lastSentAt} IS NULL`,
+          sql`${events.start} <= ${upcomingWindow.toISOString()}`,
+          sql`${events.start} > ${now.toISOString()}`
+        )
+      );
+    
+    return reminders;
+  }
+
+  async markReminderSent(id: number): Promise<void> {
+    await db
+      .update(eventReminders)
+      .set({ lastSentAt: new Date() })
+      .where(eq(eventReminders.id, id));
+  }
+
+  // ICS feed operations
+  async getIcsFeed(token: string): Promise<IcsFeed | undefined> {
+    const [feed] = await db
+      .select()
+      .from(icsFeeds)
+      .where(and(eq(icsFeeds.token, token), eq(icsFeeds.isActive, true)));
+    return feed;
+  }
+
+  async createIcsFeed(feedData: InsertIcsFeed): Promise<IcsFeed> {
+    const [feed] = await db
+      .insert(icsFeeds)
+      .values(feedData)
+      .returning();
+    return feed;
+  }
+
+  async getIcsFeedsByOrg(orgId: string): Promise<IcsFeed[]> {
+    return await db
+      .select()
+      .from(icsFeeds)
+      .where(and(eq(icsFeeds.orgId, orgId), eq(icsFeeds.isActive, true)));
+  }
+
+  async deactivateIcsFeed(id: number): Promise<void> {
+    await db
+      .update(icsFeeds)
+      .set({ isActive: false })
+      .where(eq(icsFeeds.id, id));
+  }
+
+  // Event import operations
+  async getEventImports(orgId: string): Promise<EventImport[]> {
+    return await db
+      .select()
+      .from(eventImports)
+      .where(eq(eventImports.orgId, orgId))
+      .orderBy(desc(eventImports.createdAt));
+  }
+
+  async createEventImport(importData: InsertEventImport): Promise<EventImport> {
+    const [eventImport] = await db
+      .insert(eventImports)
+      .values(importData)
+      .returning();
+    return eventImport;
+  }
+
+  async updateEventImport(id: number, importData: Partial<InsertEventImport>): Promise<EventImport> {
+    const [eventImport] = await db
+      .update(eventImports)
+      .set({ ...importData, updatedAt: new Date() })
+      .where(eq(eventImports.id, id))
+      .returning();
+    return eventImport;
+  }
+
+  async deleteEventImport(id: number): Promise<void> {
+    await db.delete(eventImports).where(eq(eventImports.id, id));
   }
 }
 
