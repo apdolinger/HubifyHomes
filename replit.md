@@ -33,6 +33,7 @@ Preferred communication style: Simple, everyday language.
 - **Advanced Forms**: JSONB schema storage with flexible field definitions and property assignments
 
 ### Recent Changes
+- **October 2025**: Implemented comprehensive three-tier invoice management system with platform invoices (Hubify billing organizations), organization billing views (orgs viewing their Hubify invoices), and client invoices (orgs billing their clients), including PDF/image upload support via object storage
 - **October 2025**: Implemented dual-tier Stripe integration system with master billing (Hubify billing organizations via subscriptions) and per-organization Stripe connections (via Stripe Connect or direct API keys) for processing payments
 - **October 2025**: Added comprehensive event attendees management system with support for team members, clients, and external email addresses, including multi-tenant org scoping security
 - **October 2025**: Fixed duplicate scanner confidence calculation to show accurate match percentages instead of false 100% scores
@@ -42,6 +43,13 @@ Preferred communication style: Simple, everyday language.
 
 ## Key Features and Design Decisions
 - **Multi-Tenant Architecture**: Comprehensive organization-based multi-tenancy supporting distinct clients, properties, forms, and submissions per organization.
+- **Three-Tier Invoice Management System**: Complete invoice management across three distinct contexts:
+  - **Platform Invoices** (Admin → Organizations): Hubify admins create and manage invoices for billing organizations, with file upload/download via object storage, status tracking (draft, sent, paid, overdue, cancelled), and Stripe integration capability
+  - **Organization Billing View** (Organizations viewing Hubify invoices): Read-only view for organizations to see and download their invoices from Hubify
+  - **Client Invoices** (Organizations → Clients): Organizations create and manage invoices for their clients, with full CRUD operations, file upload/download, and multi-tenant security
+  - **Technical Implementation**: Dedicated multer instance for invoice files (PDF/images, 25MB limit), ObjectStorageService integration with hierarchical storage keys, Zod validation on all API routes, proper 404 handling, and dynamic content-type detection for uploads
+  - **Security**: Org-scoped enforcement on all operations, client-org integrity validation, signed URLs for downloads, and API routes with proper authorization checks
+  - **Database Schema**: platformInvoices and clientInvoices tables with proper indices for status and date-based queries
 - **Dual-Tier Stripe Integration**: Complete payment processing system with two separate tiers:
   - **Master Billing**: Hubify uses a master Stripe account to bill organizations for platform subscriptions with subscription management, webhook processing, and automatic billing updates
   - **Per-Organization Connections**: Organizations can connect their own Stripe accounts (via Stripe Connect or direct API keys) to process payments from their clients, supporting both Standard Connect accounts and direct API key integration

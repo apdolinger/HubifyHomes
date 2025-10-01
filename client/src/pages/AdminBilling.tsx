@@ -160,14 +160,21 @@ export default function AdminBilling() {
             </p>
           </div>
         </div>
-        <Button 
-          onClick={() => setIsCreateDialogOpen(true)}
-          className="flex items-center gap-2"
-          data-testid="button-create-subscription"
-        >
-          <Plus className="w-4 h-4" />
-          Create Subscription
-        </Button>
+        <div className="flex gap-2">
+          <Link href="/admin/invoices">
+            <Button variant="outline" data-testid="button-view-invoices">
+              View Invoices
+            </Button>
+          </Link>
+          <Button 
+            onClick={() => setIsCreateDialogOpen(true)}
+            className="flex items-center gap-2"
+            data-testid="button-create-subscription"
+          >
+            <Plus className="w-4 h-4" />
+            Create Subscription
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

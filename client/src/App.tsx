@@ -29,6 +29,9 @@ import Account from "@/pages/Account";
 import SuperAdmin from "@/pages/SuperAdmin";
 import OrganizationProfile from "@/pages/OrganizationProfile";
 import AdminBilling from "@/pages/AdminBilling";
+import AdminInvoices from "@/pages/AdminInvoices";
+import OrgBillingInvoices from "@/pages/OrgBillingInvoices";
+import OrgClientInvoices from "@/pages/OrgClientInvoices";
 import OrgStripeSettings from "@/pages/OrgStripeSettings";
 import Navigation from "@/components/Navigation";
 import QuickSearchModal from "@/components/QuickSearchModal";
@@ -118,6 +121,9 @@ function Router() {
           <Route path="/admin/client-portal" component={AdminClientPortal} />
           <Route path="/admin/client-portal/:propertyId" component={AdminClientPortalProperty} />
           <Route path="/admin/billing" component={AdminBilling} />
+          <Route path="/admin/invoices" component={AdminInvoices} />
+          <Route path="/billing/invoices" component={OrgBillingInvoices} />
+          <Route path="/invoices/clients" component={OrgClientInvoices} />
           <Route path="/settings/stripe" component={OrgStripeSettings} />
           
           {/* Backward compatibility redirects */}

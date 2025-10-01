@@ -3780,20 +3780,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const objectStorage = new ObjectStorageService();
-      const storageKey = `invoices/platform/${invoice.orgId}/${req.params.id}.pdf`;
+      const ext = path.extname(req.file.originalname);
+      const contentType = req.file.mimetype;
+      const storageKey = `invoices/platform/${invoice.orgId}/${req.params.id}${ext}`;
       
-      await objectStorage.uploadFile(
-        req.file.path,
-        storageKey,
-        'application/pdf'
-      );
+      try {
+        await objectStorage.uploadFile(
+          req.file.path,
+          storageKey,
+          contentType
+        );
 
-      // Clean up temp file
-      fs.unlinkSync(req.file.path);
-
-      // Update invoice with storage key
-      const updatedInvoice = await storage.updatePlatformInvoice(req.params.id, { pdfStorageKey: storageKey });
-      res.json({ pdfStorageKey: storageKey, invoice: updatedInvoice });
+        // Update invoice with storage key
+        const updatedInvoice = await storage.updatePlatformInvoice(req.params.id, { pdfStorageKey: storageKey });
+        res.json({ pdfStorageKey: storageKey, invoice: updatedInvoice });
+      } finally {
+        // Clean up temp file (non-blocking, ignore errors)
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (cleanupError) {
+          console.error("Failed to clean up temp file:", cleanupError);
+        }
+      }
     } catch (error) {
       console.error("Error uploading invoice PDF:", error);
       res.status(500).json({ message: "Failed to upload PDF" });
@@ -4059,20 +4067,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const objectStorage = new ObjectStorageService();
-      const storageKey = `invoices/org/${orgId}/clients/${invoice.clientId}/${id}.pdf`;
+      const ext = path.extname(req.file.originalname);
+      const contentType = req.file.mimetype;
+      const storageKey = `invoices/org/${orgId}/clients/${invoice.clientId}/${id}${ext}`;
       
-      await objectStorage.uploadFile(
-        req.file.path,
-        storageKey,
-        'application/pdf'
-      );
+      try {
+        await objectStorage.uploadFile(
+          req.file.path,
+          storageKey,
+          contentType
+        );
 
-      // Clean up temp file
-      fs.unlinkSync(req.file.path);
-
-      // Update invoice with storage key
-      const updatedInvoice = await storage.updateClientInvoice(orgId, id, { pdfStorageKey: storageKey });
-      res.json({ pdfStorageKey: storageKey, invoice: updatedInvoice });
+        // Update invoice with storage key
+        const updatedInvoice = await storage.updateClientInvoice(orgId, id, { pdfStorageKey: storageKey });
+        res.json({ pdfStorageKey: storageKey, invoice: updatedInvoice });
+      } finally {
+        // Clean up temp file (non-blocking, ignore errors)
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (cleanupError) {
+          console.error("Failed to clean up temp file:", cleanupError);
+        }
+      }
     } catch (error) {
       console.error("Error uploading client invoice PDF:", error);
       res.status(500).json({ message: "Failed to upload PDF" });
