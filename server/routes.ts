@@ -3447,6 +3447,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Stripe routes - Master billing (Hubify billing organizations)
+  app.get("/api/stripe/subscriptions", isAuthenticated, async (req, res) => {
+    try {
+      if (req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const subscriptions = await storage.getAllOrgSubscriptions();
+      res.json(subscriptions);
+    } catch (error) {
+      console.error("Error fetching subscriptions:", error);
+      res.status(500).json({ message: "Failed to fetch subscriptions" });
+    }
+  });
+
   app.post("/api/stripe/create-subscription", isAuthenticated, async (req, res) => {
     try {
       if (req.user?.role !== "admin") {

@@ -28,6 +28,8 @@ import Admin from "@/pages/Admin";
 import Account from "@/pages/Account";
 import SuperAdmin from "@/pages/SuperAdmin";
 import OrganizationProfile from "@/pages/OrganizationProfile";
+import AdminBilling from "@/pages/AdminBilling";
+import OrgStripeSettings from "@/pages/OrgStripeSettings";
 import Navigation from "@/components/Navigation";
 import QuickSearchModal from "@/components/QuickSearchModal";
 import QuickAddTaskModal from "@/components/QuickAddTaskModal";
@@ -115,6 +117,8 @@ function Router() {
           <Route path="/admin" component={Admin} />
           <Route path="/admin/client-portal" component={AdminClientPortal} />
           <Route path="/admin/client-portal/:propertyId" component={AdminClientPortalProperty} />
+          <Route path="/admin/billing" component={AdminBilling} />
+          <Route path="/settings/stripe" component={OrgStripeSettings} />
           
           {/* Backward compatibility redirects */}
           <Route path="/property-center">

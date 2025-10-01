@@ -339,6 +339,7 @@ export interface IStorage {
   
   // Stripe operations - Master billing (Hubify billing organizations)
   getOrgSubscription(orgId: string): Promise<OrgSubscription | undefined>;
+  getAllOrgSubscriptions(): Promise<OrgSubscription[]>;
   updateOrgSubscription(orgId: string, subscription: Partial<InsertOrgSubscription>): Promise<OrgSubscription>;
   upsertOrgSubscription(orgId: string, subscription: InsertOrgSubscription): Promise<OrgSubscription>;
   
@@ -2836,6 +2837,14 @@ export class DatabaseStorage implements IStorage {
       .from(orgSubscriptions)
       .where(eq(orgSubscriptions.orgId, orgId));
     return subscription;
+  }
+
+  async getAllOrgSubscriptions(): Promise<OrgSubscription[]> {
+    const subscriptions = await db
+      .select()
+      .from(orgSubscriptions)
+      .orderBy(orgSubscriptions.updatedAt);
+    return subscriptions;
   }
 
   async updateOrgSubscription(orgId: string, subscriptionData: Partial<InsertOrgSubscription>): Promise<OrgSubscription> {
