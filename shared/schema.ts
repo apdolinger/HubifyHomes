@@ -555,6 +555,127 @@ export const activityLog = pgTable("activity_log", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Security Audit Logs - Comprehensive admin action tracking for compliance
+export const securityAuditLogs = pgTable("security_audit_logs", {
+  id: serial("id").primaryKey(),
+  
+  // Actor (who performed the action)
+  userId: varchar("user_id").references(() => users.id),
+  userEmail: varchar("user_email"),
+  userRole: varchar("user_role"),
+  
+  // Organization context (multi-tenant)
+  orgId: uuid("org_id").references(() => orgs.id),
+  
+  // Action details
+  action: varchar("action").notNull(), // login, logout, create, update, delete, export, etc.
+  actionType: varchar("action_type").$type<"read"|"create"|"update"|"delete"|"auth"|"admin">().notNull(),
+  resource: varchar("resource").notNull(), // users, properties, invoices, settings, etc.
+  resourceId: varchar("resource_id"), // ID of the affected resource
+  
+  // Request context
+  method: varchar("method"), // GET, POST, PUT, DELETE
+  endpoint: varchar("endpoint"), // /api/admin/users, etc.
+  ipAddress: varchar("ip_address"),
+  userAgent: text("user_agent"),
+  sessionId: varchar("session_id"),
+  
+  // Change tracking
+  changes: jsonb("changes").$type<{
+    before?: Record<string, any>;
+    after?: Record<string, any>;
+  }>(),
+  
+  // Additional metadata
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  
+  // Security classification
+  severity: varchar("severity").$type<"info"|"warning"|"critical">().notNull().default("info"),
+  
+  // Result
+  success: boolean("success").notNull().default(true),
+  errorMessage: text("error_message"),
+  
+  // Timestamp (immutable)
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("security_audit_logs_user_idx").on(table.userId),
+  index("security_audit_logs_org_idx").on(table.orgId),
+  index("security_audit_logs_action_idx").on(table.action),
+  index("security_audit_logs_created_idx").on(table.createdAt),
+  index("security_audit_logs_severity_idx").on(table.severity),
+]);
+
+// MFA (Two-Factor Authentication) tracking
+export const userMfaSettings = pgTable("user_mfa_settings", {
+  userId: varchar("user_id").primaryKey().references(() => users.id),
+  
+  // MFA status
+  mfaEnabled: boolean("mfa_enabled").notNull().default(false),
+  mfaMethod: varchar("mfa_method").$type<"totp"|"sms"|"email"|"hardware">(),
+  
+  // TOTP (Time-based One-Time Password) secret
+  totpSecret: varchar("totp_secret"), // Encrypted
+  
+  // Backup codes (encrypted, hashed)
+  backupCodes: text("backup_codes").array(),
+  
+  // Last verification
+  lastVerifiedAt: timestamp("last_verified_at"),
+  
+  // Timestamps
+  enabledAt: timestamp("enabled_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Admin IP Allowlist - controls which IPs can access admin functions
+export const adminIpAllowlist = pgTable("admin_ip_allowlist", {
+  id: serial("id").primaryKey(),
+  
+  ipAddress: varchar("ip_address").notNull().unique(),
+  ipRange: varchar("ip_range"), // CIDR notation, e.g., "192.168.1.0/24"
+  
+  description: text("description"), // e.g., "Office HQ", "VPN Gateway"
+  
+  isActive: boolean("is_active").notNull().default(true),
+  
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("admin_ip_allowlist_active_idx").on(table.isActive),
+]);
+
+// User session tracking - for concurrent session limits and monitoring
+export const userSessions = pgTable("user_sessions", {
+  id: serial("id").primaryKey(),
+  
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  sessionId: varchar("session_id").notNull().unique(), // From express-session
+  
+  // Session metadata
+  ipAddress: varchar("ip_address"),
+  userAgent: text("user_agent"),
+  deviceFingerprint: varchar("device_fingerprint"),
+  
+  // Location (optional)
+  country: varchar("country"),
+  city: varchar("city"),
+  
+  // Session state
+  isActive: boolean("is_active").notNull().default(true),
+  lastActivityAt: timestamp("last_activity_at").defaultNow(),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+}, (table) => [
+  index("user_sessions_user_idx").on(table.userId),
+  index("user_sessions_active_idx").on(table.isActive),
+  index("user_sessions_expires_idx").on(table.expiresAt),
+]);
+
 // Advanced Forms Library (organization creates; client sees/uses)
 export const forms = pgTable("forms", {
   id: serial("id").primaryKey(),
@@ -1209,6 +1330,27 @@ export const insertActivityLogSchema = createInsertSchema(activityLog).omit({
   createdAt: true,
 });
 
+export const insertSecurityAuditLogSchema = createInsertSchema(securityAuditLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertUserMfaSettingsSchema = createInsertSchema(userMfaSettings).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAdminIpAllowlistSchema = createInsertSchema(adminIpAllowlist).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertUserSessionSchema = createInsertSchema(userSessions).omit({
+  id: true,
+  createdAt: true,
+});
+
 // New schemas for the enhanced forms system
 export const insertOrgSchema = createInsertSchema(orgs).omit({
   id: true,
@@ -1393,6 +1535,19 @@ export type InsertMessageReaction = z.infer<typeof insertMessageReactionSchema>;
 export type MessageReaction = typeof messageReactions.$inferSelect;
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type ActivityLog = typeof activityLog.$inferSelect;
+
+export type InsertSecurityAuditLog = z.infer<typeof insertSecurityAuditLogSchema>;
+export type SecurityAuditLog = typeof securityAuditLogs.$inferSelect;
+
+export type InsertUserMfaSettings = z.infer<typeof insertUserMfaSettingsSchema>;
+export type UserMfaSettings = typeof userMfaSettings.$inferSelect;
+
+export type InsertAdminIpAllowlist = z.infer<typeof insertAdminIpAllowlistSchema>;
+export type AdminIpAllowlist = typeof adminIpAllowlist.$inferSelect;
+
+export type InsertUserSession = z.infer<typeof insertUserSessionSchema>;
+export type UserSession = typeof userSessions.$inferSelect;
+
 export type InsertForm = z.infer<typeof insertFormSchema>;
 export type Form = typeof forms.$inferSelect;
 
