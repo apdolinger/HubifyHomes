@@ -308,6 +308,7 @@ export default function DuplicatesManagement() {
               onClick={() => setScanConfigOpen(true)}
               variant="outline"
               disabled={isScanning}
+              data-testid="button-configure-scan"
             >
               <Settings className="w-4 h-4 mr-2" />
               Configure Scan
@@ -316,6 +317,7 @@ export default function DuplicatesManagement() {
               onClick={handleQuickScan}
               disabled={isScanning}
               className="bg-blue-600 hover:bg-blue-700"
+              data-testid="button-quick-scan"
             >
               {isScanning ? (
                 <>
