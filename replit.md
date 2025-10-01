@@ -33,6 +33,7 @@ Preferred communication style: Simple, everyday language.
 - **Advanced Forms**: JSONB schema storage with flexible field definitions and property assignments
 
 ### Recent Changes
+- **October 2025**: Added comprehensive event attendees management system with support for team members, clients, and external email addresses, including multi-tenant org scoping security
 - **August 2025**: Fixed platform-wide propertyId validation issue affecting room, vehicle, and contact creation across all properties
 - **August 2025**: Streamlined form builder interface by removing step-by-step tutorial language and redundant settings
 - **August 2025**: Consolidated form settings into cleaner, professional interface without numbered progression indicators
@@ -53,6 +54,7 @@ Preferred communication style: Simple, everyday language.
 - **Property Bulk Actions**: Functionality for bulk selection of properties, report generation (CSV), and email integration for owners.
 - **Communities Management System**: Multi-tab interface for managing community details including profile, rules, schedule, financial information, amenities, and documents.
 - **Admin Navigation Enhancement**: Centralized 'Admin' section in main navigation for authorized users, consolidating administrative tools like Client Portal and Data Management.
+- **Calendar System with Attendees**: Full-featured calendar with FullCalendar integration, event creation/editing, attendees management (team members, clients, external emails), org-scoped security, and state reconciliation for attendee add/remove operations.
 - **UI/UX Decisions**: Utilizes Radix UI and shadcn/ui for components, Tailwind CSS for styling, aiming for a modern and clean interface.
 
 ## External Dependencies
