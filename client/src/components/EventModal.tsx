@@ -1,10 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Calendar, Clock, MapPin, AlignLeft, Users, Link as LinkIcon } from "lucide-react";
+import { Calendar, Clock, MapPin, AlignLeft, Users, Link as LinkIcon, X, Mail, UserPlus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -32,8 +32,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { insertEventSchema, type Event } from "@shared/schema";
+import { insertEventSchema, type Event, type EventAttendee } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 interface EventModalProps {
   open: boolean;
@@ -64,6 +65,15 @@ const formSchema = insertEventSchema.extend({
 
 type FormData = z.infer<typeof formSchema>;
 
+type Attendee = {
+  id: string;
+  type: 'user' | 'client' | 'external';
+  userId?: string;
+  clientId?: string;
+  email?: string;
+  name?: string;
+};
+
 export function EventModal({
   open,
   onClose,
@@ -75,6 +85,12 @@ export function EventModal({
 }: EventModalProps) {
   const { toast } = useToast();
   const isEditing = !!event;
+  
+  // Attendees state
+  const [attendees, setAttendees] = useState<Attendee[]>([]);
+  const [attendeeType, setAttendeeType] = useState<'user' | 'client' | 'external'>('user');
+  const [externalEmail, setExternalEmail] = useState('');
+  const [externalName, setExternalName] = useState('');
 
   // Fetch calendars for the dropdown
   const { data: calendars } = useQuery({
@@ -98,6 +114,18 @@ export function EventModal({
   const { data: clients } = useQuery({
     queryKey: ["/api/clients"],
     enabled: open,
+  });
+
+  // Fetch team users for attendees
+  const { data: teamUsers } = useQuery({
+    queryKey: ["/api/users"],
+    enabled: open,
+  });
+
+  // Fetch existing attendees when editing
+  const { data: existingAttendees } = useQuery<EventAttendee[]>({
+    queryKey: ["/api/orgs", orgId, "events", event?.id, "attendees"],
+    enabled: open && !!event?.id,
   });
 
   const form = useForm<FormData>({
@@ -166,7 +194,24 @@ export function EventModal({
         recurrenceExDates: null,
       });
     }
-  }, [event, orgId, userId, defaultDate, defaultCalendarId, form]);
+
+    // Load existing attendees when editing
+    if (event && existingAttendees) {
+      const mappedAttendees: Attendee[] = existingAttendees.map(ea => ({
+        id: ea.id.toString(),
+        type: ea.type as 'user' | 'client' | 'external',
+        userId: ea.userId || undefined,
+        clientId: ea.clientId || undefined,
+        email: ea.email || undefined,
+        name: ea.name || undefined,
+      }));
+      setAttendees(mappedAttendees);
+    } else if (!event && open) {
+      setAttendees([]);
+      setExternalEmail('');
+      setExternalName('');
+    }
+  }, [event, orgId, userId, defaultDate, defaultCalendarId, existingAttendees, form, open]);
 
   const createEventMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -193,14 +238,39 @@ export function EventModal({
         taskId: data.taskId || null,
         clientId: data.clientId || null,
       };
-      return await apiRequest(`/api/orgs/${orgId}/events`, "POST", payload);
+      const newEvent = await apiRequest<Event>(`/api/orgs/${orgId}/events`, "POST", payload);
+      
+      // Save attendees
+      if (attendees.length > 0 && newEvent?.id) {
+        await Promise.all(
+          attendees.map(attendee =>
+            apiRequest(`/api/orgs/${orgId}/events/${newEvent.id}/attendees`, "POST", {
+              eventId: newEvent.id,
+              type: attendee.type,
+              userId: attendee.userId || null,
+              clientId: attendee.clientId || null,
+              email: attendee.email || null,
+              name: attendee.name || null,
+              responseStatus: "needsAction",
+              isOptional: false,
+              notifyByEmail: true,
+            })
+          )
+        );
+      }
+      
+      return newEvent;
     },
-    onSuccess: () => {
+    onSuccess: (newEvent) => {
       queryClient.invalidateQueries({ queryKey: ["/api/orgs", orgId, "events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orgs", orgId, "events", newEvent.id, "attendees"] });
       toast({
         title: "Event created",
         description: "Your event has been created successfully.",
       });
+      setAttendees([]);
+      setExternalEmail('');
+      setExternalName('');
       onClose();
     },
     onError: (error: Error) => {
@@ -237,14 +307,71 @@ export function EventModal({
         taskId: data.taskId || null,
         clientId: data.clientId || null,
       };
-      return await apiRequest(`/api/orgs/${orgId}/events/${event?.id}`, "PATCH", payload);
+      const updatedEvent = await apiRequest<Event>(`/api/orgs/${orgId}/events/${event?.id}`, "PATCH", payload);
+      
+      // Reconcile attendees: delete removed ones and add new ones
+      if (event?.id) {
+        const existingAttendeesData = existingAttendees || [];
+        
+        // Find attendees to delete (in existing but not in current)
+        const attendeesToDelete = existingAttendeesData.filter(ea => 
+          !attendees.find(a => 
+            (a.userId && a.userId === ea.userId) ||
+            (a.clientId && a.clientId === ea.clientId) ||
+            (a.email && a.email === ea.email)
+          )
+        );
+        
+        // Delete removed attendees
+        if (attendeesToDelete.length > 0) {
+          await Promise.all(
+            attendeesToDelete.map(ea =>
+              apiRequest(`/api/orgs/${orgId}/events/${event.id}/attendees/${ea.id}`, "DELETE")
+            )
+          );
+        }
+        
+        // Find attendees to add (in current but not in existing)
+        const attendeesToAdd = attendees.filter(a => 
+          !existingAttendeesData.find(ea =>
+            (a.userId && a.userId === ea.userId) ||
+            (a.clientId && a.clientId === ea.clientId) ||
+            (a.email && a.email === ea.email)
+          )
+        );
+        
+        // Add new attendees
+        if (attendeesToAdd.length > 0) {
+          await Promise.all(
+            attendeesToAdd.map(attendee =>
+              apiRequest(`/api/orgs/${orgId}/events/${event.id}/attendees`, "POST", {
+                eventId: event.id,
+                type: attendee.type,
+                userId: attendee.userId || null,
+                clientId: attendee.clientId || null,
+                email: attendee.email || null,
+                name: attendee.name || null,
+                responseStatus: "needsAction",
+                isOptional: false,
+                notifyByEmail: true,
+              })
+            )
+          );
+        }
+      }
+      
+      return updatedEvent;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orgs", orgId, "events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orgs", orgId, "events", event?.id, "attendees"] });
       toast({
         title: "Event updated",
         description: "Your event has been updated successfully.",
       });
+      setAttendees([]);
+      setExternalEmail('');
+      setExternalName('');
       onClose();
     },
     onError: (error: Error) => {
@@ -266,8 +393,15 @@ export function EventModal({
 
   const isPending = createEventMutation.isPending || updateEventMutation.isPending;
 
+  const handleClose = () => {
+    setAttendees([]);
+    setExternalEmail('');
+    setExternalName('');
+    onClose();
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) handleClose(); }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="modal-event">
         <DialogHeader>
           <DialogTitle data-testid="text-modal-title">
@@ -570,12 +704,166 @@ export function EventModal({
               />
             </div>
 
+            {/* Attendees Section */}
+            <div className="space-y-3 pt-4 border-t">
+              <FormLabel className="flex items-center gap-2">
+                <UserPlus className="h-4 w-4" />
+                Event Attendees
+              </FormLabel>
+
+              {/* Display current attendees */}
+              {attendees.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {attendees.map((attendee) => (
+                    <Badge key={attendee.id} variant="secondary" className="flex items-center gap-1">
+                      {attendee.type === 'user' && (
+                        <>
+                          <Users className="h-3 w-3" />
+                          {(teamUsers as any[])?.find((u: any) => u.id === attendee.userId)?.firstName} {(teamUsers as any[])?.find((u: any) => u.id === attendee.userId)?.lastName}
+                        </>
+                      )}
+                      {attendee.type === 'client' && (
+                        <>
+                          <Users className="h-3 w-3" />
+                          {(clients as any[])?.find((c: any) => c.id === attendee.clientId)?.firstName} {(clients as any[])?.find((c: any) => c.id === attendee.clientId)?.lastName}
+                        </>
+                      )}
+                      {attendee.type === 'external' && (
+                        <>
+                          <Mail className="h-3 w-3" />
+                          {attendee.name || attendee.email}
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setAttendees(attendees.filter(a => a.id !== attendee.id))}
+                        className="ml-1 hover:bg-secondary-foreground/20 rounded-full p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              {/* Add attendee controls */}
+              <div className="space-y-3">
+                <Select value={attendeeType} onValueChange={(value: any) => setAttendeeType(value)} disabled={isPending}>
+                  <SelectTrigger data-testid="select-attendee-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">Team Member</SelectItem>
+                    <SelectItem value="client">Client</SelectItem>
+                    <SelectItem value="external">External Email</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {attendeeType === 'user' && (
+                  <Select
+                    onValueChange={(value) => {
+                      const user = (teamUsers as any[])?.find((u: any) => u.id === value);
+                      if (user && !attendees.find(a => a.userId === value)) {
+                        setAttendees([...attendees, {
+                          id: `temp-${Date.now()}`,
+                          type: 'user',
+                          userId: user.id,
+                          email: user.email,
+                          name: `${user.firstName} ${user.lastName}`,
+                        }]);
+                      }
+                    }}
+                    disabled={isPending}
+                  >
+                    <SelectTrigger data-testid="select-team-member">
+                      <SelectValue placeholder="Select team member" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {teamUsers && Array.isArray(teamUsers) && (teamUsers as any[]).filter(Boolean).map((user: any) => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.firstName} {user.lastName} ({user.email})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {attendeeType === 'client' && (
+                  <Select
+                    onValueChange={(value) => {
+                      const client = (clients as any[])?.find((c: any) => c.id === value);
+                      if (client && !attendees.find(a => a.clientId === value)) {
+                        setAttendees([...attendees, {
+                          id: `temp-${Date.now()}`,
+                          type: 'client',
+                          clientId: client.id,
+                          email: client.email,
+                          name: `${client.firstName} ${client.lastName}`,
+                        }]);
+                      }
+                    }}
+                    disabled={isPending}
+                  >
+                    <SelectTrigger data-testid="select-client-attendee">
+                      <SelectValue placeholder="Select client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients && Array.isArray(clients) && (clients as any[]).filter(Boolean).map((client: any) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.firstName} {client.lastName} ({client.email})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {attendeeType === 'external' && (
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Name"
+                      value={externalName}
+                      onChange={(e) => setExternalName(e.target.value)}
+                      disabled={isPending}
+                      data-testid="input-external-name"
+                    />
+                    <Input
+                      type="email"
+                      placeholder="Email"
+                      value={externalEmail}
+                      onChange={(e) => setExternalEmail(e.target.value)}
+                      disabled={isPending}
+                      data-testid="input-external-email"
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (externalEmail && !attendees.find(a => a.email === externalEmail)) {
+                          setAttendees([...attendees, {
+                            id: `temp-${Date.now()}`,
+                            type: 'external',
+                            email: externalEmail,
+                            name: externalName || externalEmail,
+                          }]);
+                          setExternalEmail('');
+                          setExternalName('');
+                        }
+                      }}
+                      disabled={!externalEmail || isPending}
+                      data-testid="button-add-external"
+                    >
+                      Add
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Form Actions */}
             <div className="flex justify-end gap-3 pt-4">
               <Button
                 type="button"
                 variant="outline"
-                onClick={onClose}
+                onClick={handleClose}
                 disabled={isPending}
                 data-testid="button-cancel"
               >

@@ -3365,9 +3365,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Event attendee routes
+  app.get("/api/orgs/:orgId/events/:eventId/attendees", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, eventId } = req.params;
+      
+      // Verify event belongs to org
+      const event = await storage.getEvent(eventId);
+      if (!event || event.orgId !== orgId) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      const attendees = await storage.getEventAttendees(eventId);
+      res.json(attendees);
+    } catch (error) {
+      console.error("Error fetching attendees:", error);
+      res.status(500).json({ message: "Failed to fetch attendees" });
+    }
+  });
+
   app.post("/api/orgs/:orgId/events/:eventId/attendees", isAuthenticated, async (req, res) => {
     try {
-      const { eventId } = req.params;
+      const { orgId, eventId } = req.params;
+      
+      // Verify event belongs to org
+      const event = await storage.getEvent(eventId);
+      if (!event || event.orgId !== orgId) {
+        return res.status(404).json({ message: "Event not found" });
+      }
       
       const validation = insertEventAttendeeSchema.safeParse({
         ...req.body,
@@ -3388,7 +3412,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/orgs/:orgId/events/:eventId/attendees/:attendeeId", isAuthenticated, async (req, res) => {
     try {
-      const { attendeeId } = req.params;
+      const { orgId, eventId, attendeeId } = req.params;
+      
+      // Verify event belongs to org
+      const event = await storage.getEvent(eventId);
+      if (!event || event.orgId !== orgId) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
       const attendee = await storage.updateEventAttendee(parseInt(attendeeId), req.body);
       res.json(attendee);
     } catch (error) {
@@ -3399,7 +3430,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/orgs/:orgId/events/:eventId/attendees/:attendeeId", isAuthenticated, async (req, res) => {
     try {
-      const { attendeeId } = req.params;
+      const { orgId, eventId, attendeeId } = req.params;
+      
+      // Verify event belongs to org
+      const event = await storage.getEvent(eventId);
+      if (!event || event.orgId !== orgId) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
       await storage.removeEventAttendee(parseInt(attendeeId));
       res.status(204).send();
     } catch (error) {
