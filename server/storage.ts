@@ -4,6 +4,8 @@ import {
   orgSubscriptions,
   orgStripeConnections,
   stripeWebhookEvents,
+  platformInvoices,
+  clientInvoices,
   clients,
   communities,
   properties,
@@ -47,6 +49,10 @@ import {
   type InsertOrgStripeConnection,
   type StripeWebhookEvent,
   type InsertStripeWebhookEvent,
+  type PlatformInvoice,
+  type InsertPlatformInvoice,
+  type ClientInvoice,
+  type InsertClientInvoice,
   type Client,
   type InsertClient,
   type Community,
@@ -353,6 +359,20 @@ export interface IStorage {
   recordWebhookEvent(event: InsertStripeWebhookEvent): Promise<StripeWebhookEvent>;
   markWebhookProcessed(stripeEventId: string, error?: string): Promise<void>;
   getUnprocessedWebhooks(limit?: number): Promise<StripeWebhookEvent[]>;
+  
+  // Platform invoice operations (Admin → Organizations)
+  getPlatformInvoices(orgId?: string, status?: PlatformInvoice["status"]): Promise<PlatformInvoice[]>;
+  getPlatformInvoice(id: string, orgId?: string): Promise<PlatformInvoice | undefined>;
+  createPlatformInvoice(invoice: InsertPlatformInvoice): Promise<PlatformInvoice>;
+  updatePlatformInvoice(id: string, invoice: Partial<InsertPlatformInvoice>, orgId?: string): Promise<PlatformInvoice>;
+  deletePlatformInvoice(id: string, orgId?: string): Promise<void>;
+  
+  // Client invoice operations (Organizations → Clients)
+  getClientInvoices(orgId: string, clientId?: string, status?: ClientInvoice["status"]): Promise<ClientInvoice[]>;
+  getClientInvoice(orgId: string, id: string): Promise<ClientInvoice | undefined>;
+  createClientInvoice(invoice: InsertClientInvoice): Promise<ClientInvoice>;
+  updateClientInvoice(orgId: string, id: string, invoice: Partial<InsertClientInvoice>): Promise<ClientInvoice>;
+  deleteClientInvoice(orgId: string, id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2927,6 +2947,153 @@ export class DatabaseStorage implements IStorage {
       .where(eq(stripeWebhookEvents.processed, false))
       .orderBy(stripeWebhookEvents.createdAt)
       .limit(limit);
+  }
+
+  // Platform invoice operations (Admin → Organizations)
+  async getPlatformInvoices(orgId?: string, status?: PlatformInvoice["status"]): Promise<PlatformInvoice[]> {
+    let query = db.select().from(platformInvoices);
+    
+    const conditions = [];
+    if (orgId) {
+      conditions.push(eq(platformInvoices.orgId, orgId));
+    }
+    if (status) {
+      conditions.push(eq(platformInvoices.status, status));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return await query.orderBy(desc(platformInvoices.createdAt));
+  }
+
+  async getPlatformInvoice(id: string, orgId?: string): Promise<PlatformInvoice | undefined> {
+    const conditions = [eq(platformInvoices.id, id)];
+    if (orgId) {
+      conditions.push(eq(platformInvoices.orgId, orgId));
+    }
+    
+    const [invoice] = await db
+      .select()
+      .from(platformInvoices)
+      .where(and(...conditions));
+    return invoice;
+  }
+
+  async createPlatformInvoice(invoiceData: InsertPlatformInvoice): Promise<PlatformInvoice> {
+    const [invoice] = await db
+      .insert(platformInvoices)
+      .values(invoiceData)
+      .returning();
+    return invoice;
+  }
+
+  async updatePlatformInvoice(id: string, invoiceData: Partial<InsertPlatformInvoice>, orgId?: string): Promise<PlatformInvoice> {
+    const conditions = [eq(platformInvoices.id, id)];
+    if (orgId) {
+      conditions.push(eq(platformInvoices.orgId, orgId));
+    }
+    
+    const [invoice] = await db
+      .update(platformInvoices)
+      .set({ ...invoiceData, updatedAt: new Date() })
+      .where(and(...conditions))
+      .returning();
+    return invoice;
+  }
+
+  async deletePlatformInvoice(id: string, orgId?: string): Promise<void> {
+    const conditions = [eq(platformInvoices.id, id)];
+    if (orgId) {
+      conditions.push(eq(platformInvoices.orgId, orgId));
+    }
+    
+    await db.delete(platformInvoices).where(and(...conditions));
+  }
+
+  // Client invoice operations (Organizations → Clients)
+  async getClientInvoices(orgId: string, clientId?: string, status?: ClientInvoice["status"]): Promise<ClientInvoice[]> {
+    const conditions = [eq(clientInvoices.orgId, orgId)];
+    
+    if (clientId) {
+      conditions.push(eq(clientInvoices.clientId, clientId));
+    }
+    if (status) {
+      conditions.push(eq(clientInvoices.status, status));
+    }
+    
+    return await db
+      .select()
+      .from(clientInvoices)
+      .where(and(...conditions))
+      .orderBy(desc(clientInvoices.createdAt));
+  }
+
+  async getClientInvoice(orgId: string, id: string): Promise<ClientInvoice | undefined> {
+    const [invoice] = await db
+      .select()
+      .from(clientInvoices)
+      .where(and(
+        eq(clientInvoices.id, id),
+        eq(clientInvoices.orgId, orgId)
+      ));
+    return invoice;
+  }
+
+  async createClientInvoice(invoiceData: InsertClientInvoice): Promise<ClientInvoice> {
+    // Verify client belongs to the organization (integrity check)
+    const [client] = await db
+      .select()
+      .from(clients)
+      .where(and(
+        eq(clients.id, invoiceData.clientId),
+        eq(clients.orgId, invoiceData.orgId)
+      ));
+    
+    if (!client) {
+      throw new Error("Client does not belong to the specified organization");
+    }
+    
+    const [invoice] = await db
+      .insert(clientInvoices)
+      .values(invoiceData)
+      .returning();
+    return invoice;
+  }
+
+  async updateClientInvoice(orgId: string, id: string, invoiceData: Partial<InsertClientInvoice>): Promise<ClientInvoice> {
+    // If clientId is being updated, verify it belongs to the org
+    if (invoiceData.clientId) {
+      const [client] = await db
+        .select()
+        .from(clients)
+        .where(and(
+          eq(clients.id, invoiceData.clientId),
+          eq(clients.orgId, orgId)
+        ));
+      
+      if (!client) {
+        throw new Error("Client does not belong to the specified organization");
+      }
+    }
+    
+    const [invoice] = await db
+      .update(clientInvoices)
+      .set({ ...invoiceData, updatedAt: new Date() })
+      .where(and(
+        eq(clientInvoices.id, id),
+        eq(clientInvoices.orgId, orgId)
+      ))
+      .returning();
+    return invoice;
+  }
+
+  async deleteClientInvoice(orgId: string, id: string): Promise<void> {
+    await db.delete(clientInvoices).where(and(
+      eq(clientInvoices.id, id),
+      eq(clientInvoices.orgId, orgId)
+    ));
   }
 }
 
