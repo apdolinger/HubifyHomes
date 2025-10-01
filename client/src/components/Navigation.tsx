@@ -18,7 +18,9 @@ import {
   ChevronDown,
   Settings,
   Plus,
-  Calendar
+  Calendar,
+  CreditCard,
+  Wrench
 } from "lucide-react";
 
 const getNavigationItems = (user: any) => {
@@ -130,6 +132,10 @@ export default function Navigation() {
                   <Calendar className="w-4 h-4 mr-2" />
                   Calendar
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => window.location.href = '/settings/stripe'}>
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Stripe Settings
+                </DropdownMenuItem>
                 {((user as any)?.role === 'admin' || (user as any)?.role === 'manager') && (
                   <>
                     <DropdownMenuSeparator />
@@ -137,6 +143,12 @@ export default function Navigation() {
                       <Home className="w-4 h-4 mr-2" />
                       Client Portal
                     </DropdownMenuItem>
+                    {(user as any)?.role === 'admin' && (
+                      <DropdownMenuItem onClick={() => window.location.href = '/admin/billing'}>
+                        <Wrench className="w-4 h-4 mr-2" />
+                        Billing Management
+                      </DropdownMenuItem>
+                    )}
                   </>
                 )}
                 <DropdownMenuSeparator />
@@ -176,6 +188,27 @@ export default function Navigation() {
                     );
                   })}
                   
+                  {/* Settings Section for Mobile */}
+                  <div className="pt-4 mt-4 border-t border-slate-200">
+                    <p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                      Settings
+                    </p>
+                  </div>
+                  
+                  <Link href="/settings/stripe">
+                    <a
+                      className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
+                        location === '/settings/stripe'
+                          ? "bg-blue-50 text-blue-700"
+                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                      }`}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <CreditCard className="w-5 h-5 mr-3" />
+                      Stripe Settings
+                    </a>
+                  </Link>
+
                   {/* Admin Section for Mobile */}
                   {((user as any)?.role === 'admin' || (user as any)?.role === 'manager') && (
                     <>
@@ -198,6 +231,22 @@ export default function Navigation() {
                           Client Portal
                         </a>
                       </Link>
+                      
+                      {(user as any)?.role === 'admin' && (
+                        <Link href="/admin/billing">
+                          <a
+                            className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
+                              location === '/admin/billing'
+                                ? "bg-blue-50 text-blue-700"
+                                : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                            }`}
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            <Wrench className="w-5 h-5 mr-3" />
+                            Billing Management
+                          </a>
+                        </Link>
+                      )}
                     </>
                   )}
                 </div>

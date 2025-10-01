@@ -415,7 +415,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
 
-      res.json(user);
+      // Include orgId and role from OIDC claims
+      const orgId = req.user.claims.orgId || req.user.claims.org_id;
+      const role = req.user.claims.role || user?.role;
+
+      res.json({ ...user, orgId, role });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -3548,8 +3552,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { orgId } = req.params;
       
-      // Verify user is admin of the org
-      if (req.user?.orgId !== orgId || req.user?.role !== "admin") {
+      // Verify user belongs to org or is platform admin
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -3589,8 +3593,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { orgId } = req.params;
       
-      // Verify user is admin of the org
-      if (req.user?.orgId !== orgId || req.user?.role !== "admin") {
+      // Verify user belongs to org or is platform admin
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -3607,8 +3611,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { orgId } = req.params;
       const { accountId, returnUrl, refreshUrl } = req.body;
       
-      // Verify user is admin of the org
-      if (req.user?.orgId !== orgId || req.user?.role !== "admin") {
+      // Verify user belongs to org or is platform admin
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
       }
 

@@ -33,7 +33,7 @@ export default function OrgStripeSettings() {
   const [directSecretKey, setDirectSecretKey] = useState("");
   const [directPublishableKey, setDirectPublishableKey] = useState("");
 
-  const orgId = (user as any)?.organizationId;
+  const orgId = (user as any)?.orgId;
 
   const { data: connection, isLoading: isConnectionLoading } = useQuery({
     queryKey: ['/api/orgs', orgId, 'stripe-connection'],
@@ -107,7 +107,7 @@ export default function OrgStripeSettings() {
   });
 
   useEffect(() => {
-    if (!isLoading && (!isAuthenticated || !(user as any)?.organizationId)) {
+    if (!isLoading && (!isAuthenticated || !(user as any)?.orgId)) {
       toast({
         title: "Unauthorized",
         description: "You need to be logged in to view this page.",
@@ -128,7 +128,7 @@ export default function OrgStripeSettings() {
     );
   }
 
-  if (!isAuthenticated || !(user as any)?.organizationId) {
+  if (!isAuthenticated || !(user as any)?.orgId) {
     return null;
   }
 
