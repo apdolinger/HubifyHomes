@@ -8,30 +8,70 @@ import { Calendar, Plus, ChevronLeft, ChevronRight, Settings } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EventModal } from "@/components/EventModal";
+import type { Event } from "@shared/schema";
 
 export default function CalendarPage() {
   const [currentView, setCurrentView] = useState("dayGridMonth");
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [defaultEventDate, setDefaultEventDate] = useState<Date | undefined>();
   const calendarRef = useRef<FullCalendar>(null);
 
   // Get user's org from session
-  const { data: user } = useQuery({ queryKey: ["/api/auth/user"] });
+  const { data: user, isLoading: userLoading, isError: userError } = useQuery({ queryKey: ["/api/auth/user"] });
   const orgId = (user as any)?.orgId;
+  const userId = (user as any)?.id;
+
+  // Show loading if still fetching user
+  if (userLoading) {
+    return (
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <Skeleton className="h-[600px] w-full" />
+      </div>
+    );
+  }
+
+  // Show error if user fetch failed
+  if (userError || !orgId) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card className="p-8 text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-2">Authentication Required</h2>
+          <p className="text-muted-foreground">Please log in to view your calendar.</p>
+        </Card>
+      </div>
+    );
+  }
 
   // Fetch calendars
-  const { data: calendars, isLoading: calendarsLoading, isError: calendarsError } = useQuery({
+  const calendarsQuery = useQuery({
     queryKey: ["/api/orgs", orgId, "calendars"],
     enabled: !!orgId,
   });
 
   // Fetch events
-  const { data: events, isLoading: eventsLoading, isError: eventsError } = useQuery({
+  const eventsQuery = useQuery({
     queryKey: ["/api/orgs", orgId, "events"],
     enabled: !!orgId,
   });
 
-  const isLoading = calendarsLoading || eventsLoading;
-  const hasError = calendarsError || eventsError;
+  const calendars = calendarsQuery.data;
+  const events = eventsQuery.data;
+
+  // Only show loading if queries are enabled and loading
+  const isLoading = !!orgId && (calendarsQuery.isLoading || eventsQuery.isLoading);
+  
+  // Only show error if queries are enabled and actually errored
+  const hasError = !!orgId && (
+    (calendarsQuery.isError && calendarsQuery.fetchStatus !== 'idle') ||
+    (eventsQuery.isError && eventsQuery.fetchStatus !== 'idle')
+  );
 
   // Transform events for FullCalendar
   const calendarEvents = (events && Array.isArray(events)) ? events.map((event: any) => ({
@@ -49,13 +89,31 @@ export default function CalendarPage() {
   })) : [];
 
   const handleDateClick = (arg: any) => {
-    console.log("Date clicked:", arg.dateStr);
-    // TODO: Open event creation modal
+    setDefaultEventDate(arg.date);
+    setSelectedEvent(null);
+    setEventModalOpen(true);
   };
 
   const handleEventClick = (clickInfo: any) => {
-    console.log("Event clicked:", clickInfo.event);
-    // TODO: Open event details modal
+    const eventId = clickInfo.event.id;
+    const event = (events as any[])?.find((e: any) => e.id === eventId);
+    if (event) {
+      setSelectedEvent(event);
+      setDefaultEventDate(undefined);
+      setEventModalOpen(true);
+    }
+  };
+
+  const handleNewEventClick = () => {
+    setSelectedEvent(null);
+    setDefaultEventDate(new Date());
+    setEventModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setEventModalOpen(false);
+    setSelectedEvent(null);
+    setDefaultEventDate(undefined);
   };
 
   const handlePrevClick = () => {
@@ -136,6 +194,7 @@ export default function CalendarPage() {
             <Settings className="h-4 w-4" />
           </Button>
           <Button
+            onClick={handleNewEventClick}
             data-testid="button-create-event"
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -201,6 +260,19 @@ export default function CalendarPage() {
           />
         </Card>
       </div>
+
+      {/* Event Modal */}
+      {orgId && userId && (
+        <EventModal
+          open={eventModalOpen}
+          onClose={handleCloseModal}
+          orgId={orgId}
+          userId={userId}
+          event={selectedEvent}
+          defaultDate={defaultEventDate}
+          defaultCalendarId={calendars && Array.isArray(calendars) && calendars.length > 0 ? (calendars[0] as any).id : undefined}
+        />
+      )}
     </div>
   );
 }
