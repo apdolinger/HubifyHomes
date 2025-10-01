@@ -29,6 +29,10 @@ import {
   insertFormSchema,
   insertFormSubmissionSchema,
   insertPropertyPortalSettingsSchema,
+  insertCalendarSchema,
+  insertEventSchema,
+  insertEventAttendeeSchema,
+  insertEventReminderSchema,
   type Form
 } from "@shared/schema";
 import { z } from "zod";
@@ -3158,6 +3162,249 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating client:", error);
       res.status(500).json({ message: "Failed to create client" });
+    }
+  });
+
+  // Calendar routes
+  app.get("/api/orgs/:orgId/calendars", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const calendars = await storage.getCalendars(orgId);
+      res.json(calendars);
+    } catch (error) {
+      console.error("Error fetching calendars:", error);
+      res.status(500).json({ message: "Failed to fetch calendars" });
+    }
+  });
+
+  app.post("/api/orgs/:orgId/calendars", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const validation = insertCalendarSchema.safeParse({
+        ...req.body,
+        orgId,
+        createdById: userId
+      });
+
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid calendar data", errors: validation.error.issues });
+      }
+
+      const calendar = await storage.createCalendar(validation.data);
+      res.status(201).json(calendar);
+    } catch (error) {
+      console.error("Error creating calendar:", error);
+      res.status(500).json({ message: "Failed to create calendar" });
+    }
+  });
+
+  app.patch("/api/orgs/:orgId/calendars/:calendarId", isAuthenticated, async (req, res) => {
+    try {
+      const { calendarId } = req.params;
+      const calendar = await storage.updateCalendar(calendarId, req.body);
+      res.json(calendar);
+    } catch (error) {
+      console.error("Error updating calendar:", error);
+      res.status(500).json({ message: "Failed to update calendar" });
+    }
+  });
+
+  app.delete("/api/orgs/:orgId/calendars/:calendarId", isAuthenticated, async (req, res) => {
+    try {
+      const { calendarId } = req.params;
+      await storage.deleteCalendar(calendarId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting calendar:", error);
+      res.status(500).json({ message: "Failed to delete calendar" });
+    }
+  });
+
+  // Event routes
+  app.get("/api/orgs/:orgId/events", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const { start, end, calendar_id } = req.query;
+      
+      const startDate = start ? new Date(start as string) : undefined;
+      const endDate = end ? new Date(end as string) : undefined;
+      
+      const events = await storage.getEvents(orgId, startDate, endDate, calendar_id as string);
+      res.json(events);
+    } catch (error) {
+      console.error("Error fetching events:", error);
+      res.status(500).json({ message: "Failed to fetch events" });
+    }
+  });
+
+  app.get("/api/orgs/:orgId/events/:eventId", isAuthenticated, async (req, res) => {
+    try {
+      const { eventId } = req.params;
+      const event = await storage.getEvent(eventId);
+      
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      const attendees = await storage.getEventAttendees(eventId);
+      const reminders = await storage.getEventReminders(eventId);
+      
+      res.json({ ...event, attendees, reminders });
+    } catch (error) {
+      console.error("Error fetching event:", error);
+      res.status(500).json({ message: "Failed to fetch event" });
+    }
+  });
+
+  app.post("/api/orgs/:orgId/events", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const { attendees, reminders, ...eventData } = req.body;
+
+      const validation = insertEventSchema.safeParse({
+        ...eventData,
+        orgId,
+        organizerId: userId,
+        createdById: userId
+      });
+
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid event data", errors: validation.error.issues });
+      }
+
+      const event = await storage.createEvent(validation.data);
+      
+      if (attendees && Array.isArray(attendees)) {
+        for (const attendee of attendees) {
+          await storage.addEventAttendee({
+            ...attendee,
+            eventId: event.id
+          });
+        }
+      }
+      
+      if (reminders && Array.isArray(reminders)) {
+        for (const reminder of reminders) {
+          await storage.addEventReminder({
+            ...reminder,
+            eventId: event.id
+          });
+        }
+      }
+      
+      res.status(201).json(event);
+    } catch (error) {
+      console.error("Error creating event:", error);
+      res.status(500).json({ message: "Failed to create event" });
+    }
+  });
+
+  app.patch("/api/orgs/:orgId/events/:eventId", isAuthenticated, async (req, res) => {
+    try {
+      const { eventId } = req.params;
+      const { attendees, reminders, ...eventData } = req.body;
+      
+      const event = await storage.updateEvent(eventId, eventData);
+      
+      if (attendees) {
+        const existingAttendees = await storage.getEventAttendees(eventId);
+        for (const existing of existingAttendees) {
+          await storage.removeEventAttendee(existing.id);
+        }
+        
+        for (const attendee of attendees) {
+          await storage.addEventAttendee({
+            ...attendee,
+            eventId: event.id
+          });
+        }
+      }
+      
+      if (reminders) {
+        const existingReminders = await storage.getEventReminders(eventId);
+        for (const existing of existingReminders) {
+          await storage.removeEventReminder(existing.id);
+        }
+        
+        for (const reminder of reminders) {
+          await storage.addEventReminder({
+            ...reminder,
+            eventId: event.id
+          });
+        }
+      }
+      
+      res.json(event);
+    } catch (error) {
+      console.error("Error updating event:", error);
+      res.status(500).json({ message: "Failed to update event" });
+    }
+  });
+
+  app.delete("/api/orgs/:orgId/events/:eventId", isAuthenticated, async (req, res) => {
+    try {
+      const { eventId } = req.params;
+      await storage.deleteEvent(eventId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      res.status(500).json({ message: "Failed to delete event" });
+    }
+  });
+
+  // Event attendee routes
+  app.post("/api/orgs/:orgId/events/:eventId/attendees", isAuthenticated, async (req, res) => {
+    try {
+      const { eventId } = req.params;
+      
+      const validation = insertEventAttendeeSchema.safeParse({
+        ...req.body,
+        eventId
+      });
+
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid attendee data", errors: validation.error.issues });
+      }
+
+      const attendee = await storage.addEventAttendee(validation.data);
+      res.status(201).json(attendee);
+    } catch (error) {
+      console.error("Error adding attendee:", error);
+      res.status(500).json({ message: "Failed to add attendee" });
+    }
+  });
+
+  app.patch("/api/orgs/:orgId/events/:eventId/attendees/:attendeeId", isAuthenticated, async (req, res) => {
+    try {
+      const { attendeeId } = req.params;
+      const attendee = await storage.updateEventAttendee(parseInt(attendeeId), req.body);
+      res.json(attendee);
+    } catch (error) {
+      console.error("Error updating attendee:", error);
+      res.status(500).json({ message: "Failed to update attendee" });
+    }
+  });
+
+  app.delete("/api/orgs/:orgId/events/:eventId/attendees/:attendeeId", isAuthenticated, async (req, res) => {
+    try {
+      const { attendeeId } = req.params;
+      await storage.removeEventAttendee(parseInt(attendeeId));
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing attendee:", error);
+      res.status(500).json({ message: "Failed to remove attendee" });
     }
   });
 
