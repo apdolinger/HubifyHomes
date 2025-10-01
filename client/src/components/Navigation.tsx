@@ -4,7 +4,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { routes } from "@/lib/routes";
 import { useTaskModal } from "@/contexts/TaskModalContext";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { 
@@ -55,13 +54,6 @@ export default function Navigation() {
       return `${(user as any).firstName[0]}${(user as any).lastName[0]}`.toUpperCase();
     }
     return (user as any)?.email?.[0]?.toUpperCase() || "U";
-  };
-
-  const getUserDisplayName = () => {
-    if ((user as any)?.firstName && (user as any)?.lastName) {
-      return `${(user as any).firstName} ${(user as any).lastName}`;
-    }
-    return (user as any)?.email || "User";
   };
 
   return (
@@ -126,12 +118,8 @@ export default function Navigation() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center space-x-2">
-                  <Avatar className="w-8 h-8">
-                    <AvatarImage src={(user as any)?.profileImageUrl || undefined} />
-                    <AvatarFallback>{getUserInitials()}</AvatarFallback>
-                  </Avatar>
-                  <span className="text-sm font-medium hidden sm:block">
-                    {getUserDisplayName()}
+                  <span className="text-sm font-medium">
+                    {getUserInitials()}
                   </span>
                   <ChevronDown className="w-4 h-4" />
                 </Button>
