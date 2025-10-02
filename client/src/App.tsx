@@ -21,7 +21,7 @@ import TeamMemberProfile from "@/pages/TeamMemberProfile";
 import People from "@/pages/People";
 import PersonProfile from "@/pages/PersonProfile";
 import DuplicatesManagement from "@/pages/DuplicatesManagement";
-import HubifyConsole from "@/pages/PropertyCenter"; // Will be renamed to HubifyConsole.tsx
+import HubifyConsole from "@/pages/HubifyConsole";
 import PropertyPortalSettings from "@/pages/PropertyPortalSettings";
 import AdminClientPortal from "@/pages/AdminClientPortal";
 import AdminClientPortalProperty from "@/pages/AdminClientPortalProperty";
