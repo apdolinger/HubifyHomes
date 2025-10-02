@@ -143,6 +143,22 @@ export default function Landing() {
           </div>
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="bg-white border-t border-slate-200 py-6 mt-12">
+        <div className="max-w-7xl mx-auto px-6 text-center text-sm text-slate-600">
+          <p>© 2025 Hubify. All rights reserved.</p>
+          <p className="mt-2">
+            <a href="/privacy" className="text-blue-600 hover:underline" data-testid="link-privacy">
+              Privacy Policy
+            </a>
+            {' · '}
+            <a href="/terms" className="text-blue-600 hover:underline" data-testid="link-terms">
+              Terms of Service
+            </a>
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
