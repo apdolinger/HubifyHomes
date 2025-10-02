@@ -4,6 +4,13 @@
 Hubify is a professional property management platform designed to streamline operations for home watch and estate management companies. It aims to enhance team efficiency and client communication by providing a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface. The platform's vision is to become a leading solution in property management, addressing workflow inefficiencies and offering significant market potential.
 
 ## Recent Changes
+- **Portal Preview Mode (October 2, 2025)**: Added admin portal preview feature for visualizing role-specific dashboards:
+  - **Preview Interface**: Dedicated `/portal-preview` page with role selector and device toggle controls
+  - **Role Switching**: Live preview of all three portal roles (resident, staff, vendor) without creating actual users
+  - **Device Views**: Toggle between desktop (full-width) and mobile (375px with device frame) preview modes
+  - **Integration**: "Preview Portal" button added to Hubify Console header for easy access
+  - **Live Rendering**: Uses actual dashboard components to show authentic portal experience
+  - **End-to-End Testing**: All role switches and device toggles validated across desktop and mobile views
 - **Portal Authentication System (October 2, 2025)**: Implemented secure invitation-based authentication for Hubify Portal:
   - **Database Schema**: Created `portal_users`, `portal_sessions`, `portal_user_properties`, and `portal_invitations` tables
   - **Invitation Security**: Registration requires invitation tokens created by admins, preventing unauthorized access
