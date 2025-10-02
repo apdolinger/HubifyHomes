@@ -33,8 +33,14 @@ import {
   Users,
   Star,
   AlertCircle,
-  Award
+  Award,
+  Plus,
+  Trash2,
+  CalendarIcon
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 
@@ -48,6 +54,21 @@ const editMemberSchema = z.object({
 
 type EditMemberFormData = z.infer<typeof editMemberSchema>;
 
+const oooSchema = z.object({
+  startDate: z.date({
+    required_error: "Start date is required",
+  }),
+  endDate: z.date({
+    required_error: "End date is required",
+  }),
+  reason: z.string().optional(),
+}).refine((data) => data.endDate > data.startDate, {
+  message: "End date must be after start date",
+  path: ["endDate"],
+});
+
+type OOOFormData = z.infer<typeof oooSchema>;
+
 export default function TeamMemberProfile() {
   const { isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
@@ -57,12 +78,36 @@ export default function TeamMemberProfile() {
   
   const memberId = params.id;
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isOOOModalOpen, setIsOOOModalOpen] = useState(false);
 
   // Get current user for authorization
   const { data: currentUser } = useQuery({
     queryKey: ["/api/auth/user"],
     enabled: isAuthenticated,
   });
+
+  // Fetch out-of-office periods for this member
+  const { data: oooPeriods = [], isLoading: oooLoading, error: oooError } = useQuery({
+    queryKey: [`/api/out-of-office/${memberId}`],
+    enabled: isAuthenticated && !!memberId,
+  });
+
+  // Fetch active out-of-office period
+  const { data: activeOOO, isLoading: activeOOOLoading, error: activeOOOError } = useQuery({
+    queryKey: [`/api/out-of-office/${memberId}/active`],
+    enabled: isAuthenticated && !!memberId,
+  });
+
+  // Show error toast for OOO queries
+  useEffect(() => {
+    if (oooError || activeOOOError) {
+      toast({
+        title: "Error",
+        description: "Failed to load out-of-office periods. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [oooError, activeOOOError, toast]);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -163,6 +208,78 @@ export default function TeamMemberProfile() {
 
   const handleEditSubmit = (data: EditMemberFormData) => {
     updateMemberMutation.mutate(data);
+  };
+
+  // Out-of-Office form
+  const oooForm = useForm<OOOFormData>({
+    resolver: zodResolver(oooSchema),
+    defaultValues: {
+      startDate: undefined,
+      endDate: undefined,
+      reason: "",
+    },
+  });
+
+  // Create OOO period mutation
+  const createOOOMutation = useMutation({
+    mutationFn: async (data: OOOFormData) => {
+      return await apiRequest("POST", "/api/out-of-office", {
+        userId: memberId,
+        startDate: data.startDate.toISOString(),
+        endDate: data.endDate.toISOString(),
+        reason: data.reason || null,
+        isActive: true,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/out-of-office/${memberId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/out-of-office/${memberId}/active`] });
+      setIsOOOModalOpen(false);
+      oooForm.reset();
+      toast({
+        title: "Success",
+        description: "Out-of-office period added successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create out-of-office period",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete OOO period mutation
+  const deleteOOOMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("DELETE", `/api/out-of-office/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/out-of-office/${memberId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/out-of-office/${memberId}/active`] });
+      toast({
+        title: "Success",
+        description: "Out-of-office period deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete out-of-office period",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleOOOSubmit = (data: OOOFormData) => {
+    createOOOMutation.mutate(data);
+  };
+
+  const handleDeleteOOO = (id: number) => {
+    if (confirm("Are you sure you want to delete this out-of-office period?")) {
+      deleteOOOMutation.mutate(id);
+    }
   };
 
   const getRoleColor = (role: string) => {
@@ -389,19 +506,85 @@ export default function TeamMemberProfile() {
             {/* Out-of-Office Status */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Out-of-Office
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Calendar className="w-4 h-4 mr-2" />
+                    Out-of-Office
+                  </div>
+                  {activeOOO && (
+                    <Badge variant="default" className="bg-yellow-500">
+                      Currently Out
+                    </Badge>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-slate-600 mb-4">
                   Set your out-of-office periods. Tasks assigned during these times will notify your supervisor.
                 </p>
-                <Button className="w-full" data-testid="add-ooo-btn">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Out-of-Office Period
-                </Button>
+                
+                {/* Loading state */}
+                {(oooLoading || activeOOOLoading) && (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                )}
+                
+                {/* Show active period */}
+                {!oooLoading && !activeOOOLoading && activeOOO && (
+                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm font-medium text-slate-900">Active Period</p>
+                    <p className="text-xs text-slate-600 mt-1">
+                      {format(new Date(activeOOO.startDate), "MMM d, yyyy")} - {format(new Date(activeOOO.endDate), "MMM d, yyyy")}
+                    </p>
+                    {activeOOO.reason && (
+                      <p className="text-xs text-slate-600 mt-1 italic">{activeOOO.reason}</p>
+                    )}
+                  </div>
+                )}
+                
+                {/* List of upcoming periods */}
+                {!oooLoading && !activeOOOLoading && oooPeriods.length > 0 && (
+                  <div className="space-y-2 mb-4">
+                    <p className="text-sm font-medium text-slate-700">Scheduled Periods</p>
+                    {oooPeriods
+                      .filter((period: any) => new Date(period.endDate) >= new Date())
+                      .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+                      .slice(0, 3)
+                      .map((period: any) => (
+                        <div key={period.id} className="flex items-center justify-between p-2 bg-slate-50 rounded">
+                          <div className="flex-1">
+                            <p className="text-xs text-slate-900">
+                              {format(new Date(period.startDate), "MMM d")} - {format(new Date(period.endDate), "MMM d, yyyy")}
+                            </p>
+                            {period.reason && (
+                              <p className="text-xs text-slate-500 truncate">{period.reason}</p>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteOOO(period.id)}
+                            data-testid={`delete-ooo-${period.id}`}
+                            disabled={deleteOOOMutation.isPending}
+                          >
+                            <Trash2 className="w-3 h-3 text-red-500" />
+                          </Button>
+                        </div>
+                      ))}
+                  </div>
+                )}
+                
+                {!oooLoading && !activeOOOLoading && (
+                  <Button 
+                    className="w-full" 
+                    onClick={() => setIsOOOModalOpen(true)}
+                    data-testid="add-ooo-btn"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Out-of-Office Period
+                  </Button>
+                )}
               </CardContent>
             </Card>
 
@@ -709,6 +892,122 @@ export default function TeamMemberProfile() {
                   data-testid="save-member"
                 >
                   {updateMemberMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Out-of-Office Modal */}
+      <Dialog open={isOOOModalOpen} onOpenChange={setIsOOOModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Out-of-Office Period</DialogTitle>
+          </DialogHeader>
+          <Form {...oooForm}>
+            <form onSubmit={oooForm.handleSubmit(handleOOOSubmit)} className="space-y-4">
+              <FormField
+                control={oooForm.control}
+                name="startDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Start Date</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start text-left font-normal"
+                            data-testid="start-date-picker"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {field.value ? format(field.value, "PPP") : "Pick a date"}
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={oooForm.control}
+                name="endDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>End Date</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start text-left font-normal"
+                            data-testid="end-date-picker"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {field.value ? format(field.value, "PPP") : "Pick a date"}
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={oooForm.control}
+                name="reason"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reason (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="e.g., Vacation, Personal leave..."
+                        {...field}
+                        data-testid="ooo-reason"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsOOOModalOpen(false)}
+                  data-testid="cancel-ooo"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={createOOOMutation.isPending}
+                  data-testid="save-ooo"
+                >
+                  {createOOOMutation.isPending ? "Adding..." : "Add Period"}
                 </Button>
               </div>
             </form>
