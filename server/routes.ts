@@ -33,7 +33,8 @@ import {
   insertVehicleSchema,
   insertVehicleMaintenanceSchema,
   insertVehicleNoteSchema,
-  insertTaskSchema, 
+  insertTaskSchema,
+  insertTimeEntrySchema,
   insertContactSchema, 
   insertTeamMessageSchema,
   insertFormSchema,
@@ -1852,6 +1853,170 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error checking task conflicts:", error);
       res.status(500).json({ message: "Failed to check task conflicts" });
+    }
+  });
+
+  // Time tracking routes
+  app.get("/api/time-entries", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const orgId = user.orgId;
+      
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID is required" });
+      }
+
+      const filters: any = {};
+      if (req.query.userId) filters.userId = req.query.userId as string;
+      if (req.query.propertyId) filters.propertyId = parseInt(req.query.propertyId as string);
+      if (req.query.taskId) filters.taskId = parseInt(req.query.taskId as string);
+      if (req.query.startDate) filters.startDate = req.query.startDate as string;
+      if (req.query.endDate) filters.endDate = req.query.endDate as string;
+
+      const entries = await storage.getTimeEntries(orgId, filters);
+      res.json(entries);
+    } catch (error) {
+      console.error("Error fetching time entries:", error);
+      res.status(500).json({ message: "Failed to fetch time entries" });
+    }
+  });
+
+  app.get("/api/time-entries/active", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const entry = await storage.getActiveTimeEntry(userId);
+      res.json(entry || null);
+    } catch (error) {
+      console.error("Error fetching active time entry:", error);
+      res.status(500).json({ message: "Failed to fetch active time entry" });
+    }
+  });
+
+  app.get("/api/time-entries/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const entry = await storage.getTimeEntry(id);
+      
+      if (!entry) {
+        return res.status(404).json({ message: "Time entry not found" });
+      }
+      
+      res.json(entry);
+    } catch (error) {
+      console.error("Error fetching time entry:", error);
+      res.status(500).json({ message: "Failed to fetch time entry" });
+    }
+  });
+
+  app.post("/api/time-entries/clock-in", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = req.user;
+      const orgId = user.orgId;
+      
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID is required" });
+      }
+
+      // Check if user already has an active time entry
+      const activeEntry = await storage.getActiveTimeEntry(userId);
+      if (activeEntry) {
+        return res.status(400).json({ message: "You already have an active time entry. Please clock out first." });
+      }
+
+      const { propertyId, taskId, notes } = req.body;
+
+      let billableRate: number | null = null;
+
+      // If taskId is provided, fetch the task's billable rate
+      if (taskId) {
+        const task = await storage.getTask(parseInt(taskId));
+        if (task && task.billableRateCents) {
+          billableRate = task.billableRateCents;
+        }
+      }
+
+      const entryData = {
+        userId,
+        orgId,
+        clockIn: new Date(),
+        propertyId: propertyId ? parseInt(propertyId) : null,
+        taskId: taskId ? parseInt(taskId) : null,
+        notes: notes || null,
+        billableRateCents: billableRate,
+      };
+
+      const validatedData = insertTimeEntrySchema.parse(entryData);
+      const entry = await storage.createTimeEntry(validatedData);
+      
+      res.status(201).json(entry);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error clocking in:", error);
+      res.status(500).json({ message: "Failed to clock in" });
+    }
+  });
+
+  app.post("/api/time-entries/:id/clock-out", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      
+      const entry = await storage.getTimeEntry(id);
+      if (!entry) {
+        return res.status(404).json({ message: "Time entry not found" });
+      }
+      
+      // Verify the entry belongs to the current user
+      if (entry.userId !== userId) {
+        return res.status(403).json({ message: "You can only clock out your own time entries" });
+      }
+      
+      if (entry.clockOut) {
+        return res.status(400).json({ message: "This time entry is already clocked out" });
+      }
+
+      const updatedEntry = await storage.clockOut(id, new Date());
+      res.json(updatedEntry);
+    } catch (error) {
+      console.error("Error clocking out:", error);
+      res.status(500).json({ message: "Failed to clock out" });
+    }
+  });
+
+  app.patch("/api/time-entries/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const entry = await storage.getTimeEntry(id);
+      
+      if (!entry) {
+        return res.status(404).json({ message: "Time entry not found" });
+      }
+
+      const updates: any = {};
+      if (req.body.notes !== undefined) updates.notes = req.body.notes;
+      if (req.body.billableRateCents !== undefined) updates.billableRateCents = req.body.billableRateCents;
+      if (req.body.propertyId !== undefined) updates.propertyId = req.body.propertyId ? parseInt(req.body.propertyId) : null;
+      if (req.body.taskId !== undefined) updates.taskId = req.body.taskId ? parseInt(req.body.taskId) : null;
+
+      const updatedEntry = await storage.updateTimeEntry(id, updates);
+      res.json(updatedEntry);
+    } catch (error) {
+      console.error("Error updating time entry:", error);
+      res.status(500).json({ message: "Failed to update time entry" });
+    }
+  });
+
+  app.delete("/api/time-entries/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteTimeEntry(id);
+      res.json({ message: "Time entry deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting time entry:", error);
+      res.status(500).json({ message: "Failed to delete time entry" });
     }
   });
 
