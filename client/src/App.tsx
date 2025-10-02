@@ -33,6 +33,8 @@ import AdminInvoices from "@/pages/AdminInvoices";
 import OrgBillingInvoices from "@/pages/OrgBillingInvoices";
 import OrgClientInvoices from "@/pages/OrgClientInvoices";
 import OrgStripeSettings from "@/pages/OrgStripeSettings";
+import PrivacyPolicy from "@/pages/PrivacyPolicy";
+import TermsOfService from "@/pages/TermsOfService";
 import Navigation from "@/components/Navigation";
 import QuickSearchModal from "@/components/QuickSearchModal";
 import QuickAddTaskModal from "@/components/QuickAddTaskModal";
@@ -58,6 +60,8 @@ function Router() {
 
   return (
     <Switch>
+      <Route path="/privacy" component={PrivacyPolicy} />
+      <Route path="/terms" component={TermsOfService} />
       {isLoading ? (
         <Route>
           <div className="min-h-screen flex items-center justify-center">
@@ -178,6 +182,14 @@ function AuthenticatedAppContent() {
       <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
         <div className="text-sm text-slate-600">
           © 2025 Hubify. All rights reserved.
+          <span className="mx-2">·</span>
+          <a href="/privacy" className="text-blue-600 hover:underline" data-testid="link-privacy">
+            Privacy Policy
+          </a>
+          <span className="mx-2">·</span>
+          <a href="/terms" className="text-blue-600 hover:underline" data-testid="link-terms">
+            Terms of Service
+          </a>
         </div>
         <div className="text-xs">
           <a 
