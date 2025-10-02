@@ -85,7 +85,7 @@ export default function TermsOfService() {
           <section>
             <h2 className="text-2xl font-bold mb-4">3. Description of Service</h2>
             <p className="text-slate-700 mb-3">
-              Hubify provides a cloud-based property management platform designed for home watch and HOA companies, offering features including:
+              Hubify provides a cloud-based property management platform designed for home watch and estate management companies, offering features including:
             </p>
             <ul className="list-disc list-inside text-slate-700 space-y-1 ml-4">
               <li>Property and client management</li>

@@ -1,7 +1,7 @@
 # Hubify - Property Management Platform
 
 ## Overview
-Hubify is a professional property management platform designed for home watch and HOA companies. Its purpose is to streamline property operations, enhance team efficiency, and improve client communication by offering a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface. The platform's business vision is to become the leading solution for property management, offering significant market potential by addressing inefficiencies in current workflows.
+Hubify is a professional property management platform designed for home watch and estate management companies. Its purpose is to streamline property operations, enhance team efficiency, and improve client communication by offering a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface. The platform's business vision is to become the leading solution for property management, offering significant market potential by addressing inefficiencies in current workflows.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
