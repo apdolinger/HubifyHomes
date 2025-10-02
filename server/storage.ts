@@ -8,6 +8,9 @@ import {
   platformInvoices,
   clientInvoices,
   clients,
+  portalUsers,
+  portalUserProperties,
+  portalSessions,
   communities,
   properties,
   rooms,
@@ -59,6 +62,12 @@ import {
   type InsertClientInvoice,
   type Client,
   type InsertClient,
+  type PortalUser,
+  type InsertPortalUser,
+  type PortalUserProperty,
+  type InsertPortalUserProperty,
+  type PortalSession,
+  type InsertPortalSession,
   type Community,
   type InsertCommunity,
   type Property,
@@ -162,6 +171,16 @@ export interface IStorage {
   getClient(id: string): Promise<Client | undefined>;
   createClient(client: InsertClient): Promise<Client>;
   updateClient(id: string, client: Partial<InsertClient>): Promise<Client>;
+  
+  // Portal user operations
+  getPortalUserByEmail(orgId: string, email: string): Promise<PortalUser | undefined>;
+  getPortalUserById(id: string): Promise<PortalUser | undefined>;
+  createPortalUser(user: InsertPortalUser): Promise<PortalUser>;
+  updatePortalUser(id: string, updates: Partial<InsertPortalUser>): Promise<PortalUser>;
+  createPortalSession(session: InsertPortalSession): Promise<PortalSession>;
+  getPortalSessionByToken(token: string): Promise<PortalSession | undefined>;
+  invalidatePortalSession(token: string): Promise<void>;
+  getPortalUserProperties(portalUserId: string): Promise<PortalUserProperty[]>;
   
   // Community operations
   getCommunities(): Promise<Community[]>;
@@ -620,6 +639,76 @@ export class DatabaseStorage implements IStorage {
       .where(eq(clients.id, id))
       .returning();
     return client;
+  }
+
+  // Portal user operations
+  async getPortalUserByEmail(orgId: string, email: string): Promise<PortalUser | undefined> {
+    const [user] = await db
+      .select()
+      .from(portalUsers)
+      .where(and(eq(portalUsers.orgId, orgId), eq(portalUsers.email, email)));
+    return user;
+  }
+
+  async getPortalUserById(id: string): Promise<PortalUser | undefined> {
+    const [user] = await db
+      .select()
+      .from(portalUsers)
+      .where(eq(portalUsers.id, id));
+    return user;
+  }
+
+  async createPortalUser(userData: InsertPortalUser): Promise<PortalUser> {
+    const [user] = await db
+      .insert(portalUsers)
+      .values(userData)
+      .returning();
+    return user;
+  }
+
+  async updatePortalUser(id: string, updates: Partial<InsertPortalUser>): Promise<PortalUser> {
+    const [user] = await db
+      .update(portalUsers)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(portalUsers.id, id))
+      .returning();
+    return user;
+  }
+
+  async createPortalSession(sessionData: InsertPortalSession): Promise<PortalSession> {
+    const [session] = await db
+      .insert(portalSessions)
+      .values(sessionData)
+      .returning();
+    return session;
+  }
+
+  async getPortalSessionByToken(token: string): Promise<PortalSession | undefined> {
+    const [session] = await db
+      .select()
+      .from(portalSessions)
+      .where(and(
+        eq(portalSessions.token, token),
+        eq(portalSessions.isActive, true)
+      ));
+    return session;
+  }
+
+  async invalidatePortalSession(token: string): Promise<void> {
+    await db
+      .update(portalSessions)
+      .set({ isActive: false })
+      .where(eq(portalSessions.token, token));
+  }
+
+  async getPortalUserProperties(portalUserId: string): Promise<PortalUserProperty[]> {
+    return await db
+      .select()
+      .from(portalUserProperties)
+      .where(and(
+        eq(portalUserProperties.portalUserId, portalUserId),
+        eq(portalUserProperties.isActive, true)
+      ));
   }
 
   // Community operations

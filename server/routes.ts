@@ -4,6 +4,8 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import express from "express";
+import bcrypt from "bcryptjs";
+import { nanoid } from "nanoid";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { ObjectStorageService } from "./objectStorage";
@@ -20,6 +22,7 @@ import {
   trackSession
 } from "./security";
 import { 
+  insertPortalUserSchema,
   insertCommunitySchema,
   insertPropertySchema,
   insertRoomSchema,
