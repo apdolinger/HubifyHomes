@@ -20,6 +20,7 @@ import {
   Settings,
   Plus,
   Calendar,
+  Clock,
   CreditCard,
   Wrench
 } from "lucide-react";
@@ -133,6 +134,10 @@ export default function Navigation() {
                 <DropdownMenuItem onClick={() => window.location.href = '/calendar'}>
                   <Calendar className="w-4 h-4 mr-2" />
                   Calendar
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => window.location.href = '/time-tracking'}>
+                  <Clock className="w-4 h-4 mr-2" />
+                  Time Tracking
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => window.location.href = '/settings/stripe'}>
                   <CreditCard className="w-4 h-4 mr-2" />
