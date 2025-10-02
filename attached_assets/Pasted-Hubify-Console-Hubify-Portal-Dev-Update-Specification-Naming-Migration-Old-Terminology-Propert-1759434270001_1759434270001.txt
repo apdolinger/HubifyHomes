@@ -1,0 +1,117 @@
+Hubify Console & Hubify Portal: Dev Update Specification
+
+Naming Migration
+Old Terminology
+• PropertyCenter = Admin back end
+• ClientCenter = User-facing front end
+
+New Terminology
+• Hubify Console = Admin back end (formerly PropertyCenter)
+• Hubify Portal = User-facing front end (formerly ClientCenter)
+
+Action for Devs:
+• Update all code references, documentation, and UI navigation labels accordingly.
+• Maintain a migration note so future devs understand that Console = former PropertyCenter and Portal = former ClientCenter.
+
+⸻
+
+Hubify Console (Admin / Back End)
+Audience: Property managers, admins
+Purpose: Configure, publish, and control everything that surfaces in the Portal.
+
+Core Features
+• Roles & Permissions
+• Resident, Staff, Vendor
+• Role-based access control for forms, tasks, billing, and messaging
+• Form Builder
+• Drag-and-drop interface
+• Conditional logic
+• Saved into a central library
+• Dual Output:
+• Portal-embedded: published to specific role-based views
+• Link-based: generates shareable URLs for use outside Portal (embed in websites, email, or SMS)
+• Automations
+• Example: “If rent overdue > 5 days → send notice + notify staff”
+• Task routing (e.g., plumbing → preferred vendor)
+• Escalation rules
+• Document Management
+• Upload and tag property docs (leases, manuals, contracts)
+• Publish docs by role
+• eSignature support
+• Communication Hub
+• Send announcements, push notifications, or messages to specific user roles
+• Two-way messaging log
+• White-Label Customization
+• Client branding (logo, colors, fonts, domain mapping)
+• White-label options apply to Hubify Portal
+• Portal Preview
+• “Preview as” toggle (Resident / Staff / Vendor)
+• Desktop vs mobile preview mode
+• Analytics / Reporting
+• Time tracking, payroll export
+• Resident payment compliance
+• Vendor SLA performance
+• Task completion trends
+3. Hubify Portal (Front End)
+
+Audience: End-users (Residents, Staff, Vendors)
+Purpose: Role-based interaction with Hubify services.
+
+Role Views
+• Resident
+• Pay rent/fees
+• Submit maintenance requests
+• View announcements and updates
+• Access documents
+• Staff
+• Clock in/out (GPS tagged to property or task)
+• View shift calendar + task list
+• Upload receipts, incident reports, task completions
+• Communicate with managers
+• Vendor
+• Receive and complete work orders
+• Upload invoices/receipts
+• Mark jobs complete with photo evidence
+• Track payment status
+
+Enhancements
+• Unified messaging center
+• Push notifications (rent due, task assigned, job complete)
+• Media uploads (photo/video attachments)
+• Multi-language toggle
+
+⸻
+
+Console ↔ Portal Dynamics
+• Single Source of Truth: All forms, tasks, docs originate in Console.
+• Publishing Layer: Admins decide what’s exposed to each role.
+• Portal Output: Same app adapts per user role (Resident, Staff, Vendor).
+• Link Sharing: Forms can be copied as unique links for external use.
+Development Roadmap
+MVP (must-have for launch)
+• Roles & permissions
+• Form builder (dual output: portal + link)
+• Payments
+• Staff time clock (GPS)
+• Vendor work orders
+• Basic Portal preview
+
+Phase 2 (differentiators)
+• Automations/workflows
+• Communication hub (messaging + push notifications)
+• Document management with role-based access
+• Advanced analytics
+
+Phase 3 (future-proof & sticky features)
+• White-label mobile app wrappers
+• Integrations (QuickBooks, Stripe, payroll)
+• Multi-language support
+• API / plugin layer
+
+⸻
+
+✅ Deliverable for Devs:
+• Migrate naming (PropertyCenter → Hubify Console, ClientCenter → Hubify Portal).
+• Implement forms as dual-purpose (portal-embedded + shareable links).
+• Add preview mode in Console (role-based + mobile/desktop toggle).
+• Keep Console the control hub; Portal is strictly role-based front end with white-label customization.
