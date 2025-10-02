@@ -232,12 +232,30 @@ export const users = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   role: varchar("role").notNull().default("staff"), // admin, supervisor, staff
   tier: varchar("tier").notNull().default("basic"), // basic, standard, premium
+  supervisorId: varchar("supervisor_id").references(() => users.id), // Reports to this supervisor
   isAdminAccount: boolean("is_admin_account").notNull().default(false), // For least privilege: separate admin accounts
   isActive: boolean("is_active").notNull().default(true),
   lastActiveAt: timestamp("last_active_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Out-of-office periods for team members
+export const outOfOfficePeriods = pgTable("out_of_office_periods", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  reason: text("reason"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("out_of_office_user_idx").on(table.userId),
+  index("out_of_office_org_idx").on(table.orgId),
+  index("out_of_office_dates_idx").on(table.startDate, table.endDate),
+]);
 
 // Communities table
 export const communities = pgTable("communities", {
@@ -1277,6 +1295,12 @@ export const insertUserSchema = createInsertSchema(users).omit({
   updatedAt: true,
 });
 
+export const insertOutOfOfficePeriodSchema = createInsertSchema(outOfOfficePeriods).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertChecklistTemplateSchema = createInsertSchema(checklistTemplates).omit({
   id: true,
   createdAt: true,
@@ -1530,6 +1554,8 @@ export const insertEventImportSchema = createInsertSchema(eventImports).omit({
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+export type InsertOutOfOfficePeriod = z.infer<typeof insertOutOfOfficePeriodSchema>;
+export type OutOfOfficePeriod = typeof outOfOfficePeriods.$inferSelect;
 export type InsertOrg = z.infer<typeof insertOrgSchema>;
 export type Org = typeof orgs.$inferSelect;
 export type InsertOrgSubscription = z.infer<typeof insertOrgSubscriptionSchema>;
