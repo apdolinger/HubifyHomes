@@ -20,7 +20,7 @@ import {
   Mail
 } from "lucide-react";
 
-export default function PropertyCenter() {
+export default function HubifyConsole() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
@@ -109,9 +109,9 @@ export default function PropertyCenter() {
       {/* Header */}
       <div className="mb-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-slate-900">Client Portal</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Hubify Console</h1>
           <p className="mt-2 text-lg text-slate-600">
-            Manage client portal settings and property access
+            Manage portal settings and property access
           </p>
         </div>
       </div>
@@ -327,7 +327,7 @@ export default function PropertyCenter() {
                         onClick={() => window.location.href = routes.adminClientPortalSettings(property.id)}
                       >
                         <Home className="w-4 h-4 mr-2" />
-                        Client Portal Settings
+                        Portal Settings
                       </Button>
                     </div>
                   </div>
