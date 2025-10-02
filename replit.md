@@ -41,6 +41,7 @@ Preferred communication style: Simple, everyday language.
     - **Calendar System with Attendees**: Full-featured calendar with event management and attendee support (team, clients, external emails).
     - **Super Admin Control Panel**: Internal dashboard for platform management, including organizations, users, reports, communication, revenue, feature flags, monitoring, compliance, and platform settings. Includes system alerts with scheduling and location targeting, and a centralized settings tab with 9 configuration categories.
     - **Legal Compliance Pages**: Publicly accessible Privacy Policy and Terms of Service pages compliant with US (CCPA/CPRA) and Canadian (PIPEDA) legal standards, including GDPR for privacy, and comprehensive SaaS clauses for terms.
+    - **QuickBooks Integration (In Progress)**: Database schema implemented for OAuth-based QuickBooks Online connections, including sync logging and invoice linkage. Ready for API endpoint implementation and UI development.
 
 ### Database
 - **Primary Database**: PostgreSQL with Drizzle ORM
