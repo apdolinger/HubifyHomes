@@ -167,10 +167,11 @@ export const clientInvoices = pgTable("client_invoices", {
   orgId: uuid("org_id").references(() => orgs.id).notNull(),
   clientId: uuid("client_id").references(() => clients.id).notNull(),
   
-  // Source and Stripe linkage
+  // Source and integration linkage
   source: varchar("source").$type<"stripe"|"manual">().notNull().default("manual"),
   stripeInvoiceId: varchar("stripe_invoice_id"),
   stripeCustomerId: varchar("stripe_customer_id"),
+  quickbooksInvoiceId: varchar("quickbooks_invoice_id"), // QuickBooks Invoice ID when synced
   
   // Invoice details
   invoiceNumber: varchar("invoice_number"),
@@ -205,6 +206,77 @@ export const clientInvoices = pgTable("client_invoices", {
   index("client_invoices_org_status_idx").on(table.orgId, table.status),
   index("client_invoices_org_client_idx").on(table.orgId, table.clientId),
   index("client_invoices_stripe_id_idx").on(table.stripeInvoiceId),
+]);
+
+// QuickBooks Online connections - per-organization OAuth integration
+export const quickbooksConnections = pgTable("quickbooks_connections", {
+  id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull().unique(),
+  
+  // OAuth 2.0 credentials
+  accessToken: text("access_token").notNull(), // Encrypted in production
+  refreshToken: text("refresh_token").notNull(), // Encrypted in production
+  realmId: varchar("realm_id").notNull(), // QuickBooks Company ID
+  
+  // Token expiry tracking
+  accessTokenExpiresAt: timestamp("access_token_expires_at").notNull(),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at").notNull(),
+  
+  // Connection metadata
+  companyName: varchar("company_name"),
+  isActive: boolean("is_active").notNull().default(true),
+  isProduction: boolean("is_production").notNull().default(false), // Sandbox vs production
+  
+  // Sync settings
+  autoSyncInvoices: boolean("auto_sync_invoices").notNull().default(false),
+  autoSyncCustomers: boolean("auto_sync_customers").notNull().default(false),
+  autoSyncPayments: boolean("auto_sync_payments").notNull().default(false),
+  
+  // Last sync tracking
+  lastInvoiceSyncAt: timestamp("last_invoice_sync_at"),
+  lastCustomerSyncAt: timestamp("last_customer_sync_at"),
+  lastPaymentSyncAt: timestamp("last_payment_sync_at"),
+  
+  // Error tracking
+  lastError: text("last_error"),
+  lastErrorAt: timestamp("last_error_at"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("quickbooks_connections_org_idx").on(table.orgId),
+  index("quickbooks_connections_realm_idx").on(table.realmId),
+]);
+
+// QuickBooks sync log - track individual sync operations
+export const quickbooksSyncLogs = pgTable("quickbooks_sync_logs", {
+  id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  connectionId: integer("connection_id").references(() => quickbooksConnections.id).notNull(),
+  
+  // Sync details
+  syncType: varchar("sync_type").$type<"invoice"|"customer"|"payment">().notNull(),
+  direction: varchar("direction").$type<"to_quickbooks"|"from_quickbooks">().notNull(),
+  status: varchar("status").$type<"success"|"failed"|"partial">().notNull(),
+  
+  // Records processed
+  recordsProcessed: integer("records_processed").notNull().default(0),
+  recordsSucceeded: integer("records_succeeded").notNull().default(0),
+  recordsFailed: integer("records_failed").notNull().default(0),
+  
+  // Error details
+  errorMessage: text("error_message"),
+  errorDetails: jsonb("error_details").$type<Record<string, any>>().default({}),
+  
+  // Duration
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("quickbooks_sync_logs_org_idx").on(table.orgId),
+  index("quickbooks_sync_logs_connection_idx").on(table.connectionId),
+  index("quickbooks_sync_logs_status_idx").on(table.status),
 ]);
 
 // Clients table for property tenants/owners
@@ -1439,6 +1511,17 @@ export const insertClientInvoiceSchema = createInsertSchema(clientInvoices).omit
   updatedAt: true,
 });
 
+export const insertQuickbooksConnectionSchema = createInsertSchema(quickbooksConnections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertQuickbooksSyncLogSchema = createInsertSchema(quickbooksSyncLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertClientSchema = createInsertSchema(clients).omit({
   id: true,
   createdAt: true,
@@ -1571,6 +1654,10 @@ export type InsertPlatformInvoice = z.infer<typeof insertPlatformInvoiceSchema>;
 export type PlatformInvoice = typeof platformInvoices.$inferSelect;
 export type InsertClientInvoice = z.infer<typeof insertClientInvoiceSchema>;
 export type ClientInvoice = typeof clientInvoices.$inferSelect;
+export type InsertQuickbooksConnection = z.infer<typeof insertQuickbooksConnectionSchema>;
+export type QuickbooksConnection = typeof quickbooksConnections.$inferSelect;
+export type InsertQuickbooksSyncLog = z.infer<typeof insertQuickbooksSyncLogSchema>;
+export type QuickbooksSyncLog = typeof quickbooksSyncLogs.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
 export type InsertCommunity = z.infer<typeof insertCommunitySchema>;
