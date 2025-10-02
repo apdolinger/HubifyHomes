@@ -742,6 +742,7 @@ export default function SuperAdmin() {
                       <SelectItem value="contacts">Contacts Page</SelectItem>
                       <SelectItem value="billing">Billing Page</SelectItem>
                       <SelectItem value="settings">Settings Page</SelectItem>
+                      <SelectItem value="support">Support Area</SelectItem>
                       <SelectItem value="admin">Admin Pages Only</SelectItem>
                     </SelectContent>
                   </Select>
