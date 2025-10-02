@@ -57,6 +57,13 @@ export default function Team() {
     enabled: isAuthenticated,
   });
 
+  // Helper function to check if user is currently out of office
+  const isUserOutOfOffice = (member: any) => {
+    // This would be better fetched from an API endpoint, but for now
+    // we'll add a visual placeholder that can be enhanced later
+    return false; // TODO: Implement OOO status check
+  };
+
   // Form for inviting team members
   const inviteForm = useForm<InviteTeamMemberForm>({
     resolver: zodResolver(inviteTeamMemberSchema),
@@ -326,9 +333,16 @@ export default function Team() {
                     </TableCell>
                     
                     <TableCell>
-                      <Badge variant={member.isActive ? "default" : "secondary"}>
-                        {member.isActive ? "Active" : "Inactive"}
-                      </Badge>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant={member.isActive ? "default" : "secondary"}>
+                          {member.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                        {isUserOutOfOffice(member) && (
+                          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">
+                            Out of Office
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
