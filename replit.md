@@ -3,6 +3,14 @@
 ## Overview
 Hubify is a professional property management platform designed to streamline operations for home watch and estate management companies. It aims to enhance team efficiency and client communication by providing a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface. The platform's vision is to become a leading solution in property management, addressing workflow inefficiencies and offering significant market potential.
 
+## Recent Changes
+- **Terminology Migration (October 2, 2025)**: Completed migration from legacy naming to unified Hubify branding:
+  - **Hubify Console**: Admin back-end for property management (formerly PropertyCenter/ClientCenter admin)
+  - **Hubify Portal**: Client-facing frontend for property owners/tenants (future implementation)
+  - Routes updated: `/hubify-console` as primary path with backward compatibility redirects from `/admin/client-portal` and `/property-center`
+  - All UI labels, navigation menu items, and file names updated to reflect new terminology
+  - File renamed: `PropertyCenter.tsx` → `HubifyConsole.tsx`
+
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
