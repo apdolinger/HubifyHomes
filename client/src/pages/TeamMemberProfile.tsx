@@ -385,6 +385,51 @@ export default function TeamMemberProfile() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            {/* Out-of-Office Status */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Out-of-Office
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-slate-600 mb-4">
+                  Set your out-of-office periods. Tasks assigned during these times will notify your supervisor.
+                </p>
+                <Button className="w-full" data-testid="add-ooo-btn">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Out-of-Office Period
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Quick Stats Summary */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Activity className="w-4 h-4 mr-2" />
+                  Activity Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-slate-600">Tasks Completed</span>
+                  <span className="font-semibold">{taskStats?.completed || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-slate-600">Active Tasks</span>
+                  <span className="font-semibold">{taskStats?.active || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-slate-600">Properties Managed</span>
+                  <span className="font-semibold">{managedProperties.length}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Basic Information */}
             <Card>

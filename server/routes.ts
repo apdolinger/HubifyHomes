@@ -23,6 +23,7 @@ import {
   insertCommunitySchema,
   insertPropertySchema,
   insertRoomSchema,
+  insertOutOfOfficePeriodSchema,
   insertRoomSupplySchema,
   insertRoomNoteSchema,
   insertRoomDeviceSchema,
@@ -637,6 +638,184 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating user:", error);
       res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
+  // Out-of-office routes
+  app.get("/api/out-of-office/:userId", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.params.userId;
+      const currentUserId = (req.user as any)?.claims?.sub;
+      const currentUser = await storage.getUser(currentUserId);
+
+      if (!currentUser) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Check target user exists and is in same org
+      const targetUser = await storage.getUser(userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Authorization: users can view their own, admins/supervisors can view anyone in their org
+      const isAdmin = currentUser.role === 'admin' || currentUser.role === 'supervisor';
+      const isSelfQuery = userId === currentUserId;
+      const sameOrg = currentUser.orgId === targetUser.orgId;
+
+      if (!isSelfQuery && (!isAdmin || !sameOrg)) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const periods = await storage.getOutOfOfficePeriods(userId);
+      res.json(periods);
+    } catch (error) {
+      console.error("Error fetching out-of-office periods:", error);
+      res.status(500).json({ message: "Failed to fetch out-of-office periods" });
+    }
+  });
+
+  app.get("/api/out-of-office/:userId/active", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.params.userId;
+      const currentUserId = (req.user as any)?.claims?.sub;
+      const currentUser = await storage.getUser(currentUserId);
+
+      // Authorization: users can view their own, admins/supervisors can view anyone in their org
+      const targetUser = await storage.getUser(userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'supervisor';
+      const isSelfQuery = userId === currentUserId;
+      const sameOrg = currentUser?.orgId === targetUser.orgId;
+
+      if (!isSelfQuery && (!isAdmin || !sameOrg)) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const period = await storage.getActiveOutOfOfficePeriod(userId);
+      res.json(period || null);
+    } catch (error) {
+      console.error("Error fetching active out-of-office period:", error);
+      res.status(500).json({ message: "Failed to fetch active period" });
+    }
+  });
+
+  app.post("/api/out-of-office", isAuthenticated, async (req, res) => {
+    try {
+      const currentUserId = (req.user as any)?.claims?.sub;
+      const currentUser = await storage.getUser(currentUserId);
+      
+      if (!currentUser) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Validate with Zod
+      const validatedData = insertOutOfOfficePeriodSchema.parse({
+        ...req.body,
+        userId: currentUserId, // Ensure user can only create for themselves
+        orgId: currentUser.orgId,
+      });
+
+      const period = await storage.createOutOfOfficePeriod(validatedData);
+      res.status(201).json(period);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating out-of-office period:", error);
+      res.status(500).json({ message: "Failed to create out-of-office period" });
+    }
+  });
+
+  app.patch("/api/out-of-office/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid ID' });
+      }
+
+      const currentUserId = (req.user as any)?.claims?.sub;
+      const currentUser = await storage.getUser(currentUserId);
+      
+      if (!currentUser) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Get the period to verify ownership and org
+      const periods = await storage.getOutOfOfficePeriods(currentUser.id);
+      const period = periods.find(p => p.id === id);
+      
+      if (!period) {
+        return res.status(404).json({ message: "Out-of-office period not found" });
+      }
+
+      // Verify ownership and org match
+      if (period.userId !== currentUserId || period.orgId !== currentUser.orgId) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      // Define allowed fields to prevent userId/orgId tampering
+      const allowedFields = ['startDate', 'endDate', 'reason', 'isActive'];
+      const updateData = Object.keys(req.body)
+        .filter(key => allowedFields.includes(key))
+        .reduce((obj, key) => {
+          obj[key] = req.body[key];
+          return obj;
+        }, {} as any);
+
+      // Validate dates if provided
+      if (updateData.startDate || updateData.endDate) {
+        const startDate = updateData.startDate ? new Date(updateData.startDate) : new Date(period.startDate);
+        const endDate = updateData.endDate ? new Date(updateData.endDate) : new Date(period.endDate);
+        
+        if (endDate <= startDate) {
+          return res.status(400).json({ message: "End date must be after start date" });
+        }
+      }
+
+      const updated = await storage.updateOutOfOfficePeriod(id, updateData);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating out-of-office period:", error);
+      res.status(500).json({ message: "Failed to update out-of-office period" });
+    }
+  });
+
+  app.delete("/api/out-of-office/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid ID' });
+      }
+
+      const currentUserId = (req.user as any)?.claims?.sub;
+      const currentUser = await storage.getUser(currentUserId);
+      
+      if (!currentUser) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Get the period to verify ownership and org
+      const periods = await storage.getOutOfOfficePeriods(currentUser.id);
+      const period = periods.find(p => p.id === id);
+      
+      if (!period) {
+        return res.status(404).json({ message: "Out-of-office period not found" });
+      }
+
+      // Verify ownership and org match
+      if (period.userId !== currentUserId || period.orgId !== currentUser.orgId) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      await storage.deleteOutOfOfficePeriod(id);
+      res.json({ message: 'Out-of-office period deleted successfully' });
+    } catch (error) {
+      console.error("Error deleting out-of-office period:", error);
+      res.status(500).json({ message: "Failed to delete out-of-office period" });
     }
   });
 

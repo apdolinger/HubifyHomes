@@ -546,7 +546,7 @@ export class DatabaseStorage implements IStorage {
 
     if (periods.length === 0) return [];
 
-    const userIds = [...new Set(periods.map(p => p.userId))];
+    const userIds = Array.from(new Set(periods.map(p => p.userId)));
     return await db.select().from(users).where(sql`${users.id} = ANY(${userIds})`);
   }
 
