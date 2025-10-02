@@ -294,6 +294,62 @@ export const clients = pgTable("clients", {
   uniqueOrgEmail: unique().on(table.orgId, table.email),
 }));
 
+// Portal users table - for Hubify Portal (Residents, Staff, Vendors)
+export const portalUsers = pgTable("portal_users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  email: varchar("email").notNull(),
+  passwordHash: varchar("password_hash").notNull(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  phone: varchar("phone"),
+  role: varchar("role").$type<"resident"|"staff"|"vendor">().notNull(),
+  profileImageUrl: varchar("profile_image_url"),
+  isActive: boolean("is_active").notNull().default(true),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  phoneVerified: boolean("phone_verified").notNull().default(false),
+  lastLoginAt: timestamp("last_login_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  uniqueOrgEmail: unique().on(table.orgId, table.email),
+}));
+
+// Portal user property associations
+export const portalUserProperties = pgTable("portal_user_properties", {
+  id: serial("id").primaryKey(),
+  portalUserId: uuid("portal_user_id").references(() => portalUsers.id, { onDelete: "cascade" }).notNull(),
+  propertyId: integer("property_id").references(() => properties.id, { onDelete: "cascade" }).notNull(),
+  relationship: varchar("relationship").$type<"resident"|"owner"|"staff"|"vendor"|"emergency_contact">(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("portal_user_properties_user_idx").on(table.portalUserId),
+  index("portal_user_properties_property_idx").on(table.propertyId),
+]);
+
+// Portal sessions for authentication
+export const portalSessions = pgTable("portal_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  portalUserId: uuid("portal_user_id").references(() => portalUsers.id, { onDelete: "cascade" }).notNull(),
+  token: varchar("token").notNull().unique(),
+  deviceInfo: jsonb("device_info").$type<{
+    userAgent?: string;
+    deviceType?: string;
+    browser?: string;
+    os?: string;
+  }>(),
+  ipAddress: varchar("ip_address"),
+  isActive: boolean("is_active").notNull().default(true),
+  lastActivityAt: timestamp("last_activity_at").defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("portal_sessions_user_idx").on(table.portalUserId),
+  index("portal_sessions_token_idx").on(table.token),
+  index("portal_sessions_expires_idx").on(table.expiresAt),
+]);
+
 // User storage table - required for Replit Auth (staff/admin users)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().notNull(),
@@ -1528,6 +1584,22 @@ export const insertClientSchema = createInsertSchema(clients).omit({
   updatedAt: true,
 });
 
+export const insertPortalUserSchema = createInsertSchema(portalUsers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPortalUserPropertySchema = createInsertSchema(portalUserProperties).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertPortalSessionSchema = createInsertSchema(portalSessions).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertPropertyFormSchema = createInsertSchema(propertyForms).omit({
   id: true,
   createdAt: true,
@@ -1660,6 +1732,12 @@ export type InsertQuickbooksSyncLog = z.infer<typeof insertQuickbooksSyncLogSche
 export type QuickbooksSyncLog = typeof quickbooksSyncLogs.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
+export type InsertPortalUser = z.infer<typeof insertPortalUserSchema>;
+export type PortalUser = typeof portalUsers.$inferSelect;
+export type InsertPortalUserProperty = z.infer<typeof insertPortalUserPropertySchema>;
+export type PortalUserProperty = typeof portalUserProperties.$inferSelect;
+export type InsertPortalSession = z.infer<typeof insertPortalSessionSchema>;
+export type PortalSession = typeof portalSessions.$inferSelect;
 export type InsertCommunity = z.infer<typeof insertCommunitySchema>;
 export type Community = typeof communities.$inferSelect;
 export type InsertProperty = z.infer<typeof insertPropertySchema>;
