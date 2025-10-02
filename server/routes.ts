@@ -50,6 +50,84 @@ import {
   type Form
 } from "@shared/schema";
 import { z } from "zod";
+import sgMail from "@sendgrid/mail";
+
+// Initialize SendGrid if API key is available
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
+if (SENDGRID_API_KEY) {
+  sgMail.setApiKey(SENDGRID_API_KEY);
+}
+
+// Helper function to send OOO conflict notification email
+async function sendOOOConflictNotification(
+  supervisorEmail: string,
+  supervisorName: string,
+  assignedUserName: string,
+  taskTitle: string,
+  taskDueDate: Date,
+  oooStartDate: Date,
+  oooEndDate: Date,
+  oooReason: string | null
+) {
+  if (!SENDGRID_API_KEY) {
+    console.warn("SendGrid API key not configured. Skipping email notification.");
+    return;
+  }
+
+  try {
+    const msg = {
+      to: supervisorEmail,
+      from: process.env.SENDGRID_FROM_EMAIL || "noreply@hubify.com",
+      subject: `Out-of-Office Conflict: Task Assigned to ${assignedUserName}`,
+      text: `Hello ${supervisorName},
+
+A task has been assigned to ${assignedUserName}, who is currently scheduled to be out of office during the task's due date.
+
+Task Details:
+- Title: ${taskTitle}
+- Due Date: ${new Date(taskDueDate).toLocaleDateString()}
+
+Out-of-Office Period:
+- Start: ${new Date(oooStartDate).toLocaleDateString()}
+- End: ${new Date(oooEndDate).toLocaleDateString()}
+${oooReason ? `- Reason: ${oooReason}` : ""}
+
+Please reassign this task to another team member or adjust the due date accordingly.
+
+Best regards,
+Hubify Team`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #dc2626;">Out-of-Office Conflict Alert</h2>
+          <p>Hello ${supervisorName},</p>
+          <p>A task has been assigned to <strong>${assignedUserName}</strong>, who is currently scheduled to be out of office during the task's due date.</p>
+          
+          <div style="background-color: #f3f4f6; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <h3 style="margin-top: 0;">Task Details</h3>
+            <p><strong>Title:</strong> ${taskTitle}</p>
+            <p><strong>Due Date:</strong> ${new Date(taskDueDate).toLocaleDateString()}</p>
+          </div>
+
+          <div style="background-color: #fef3c7; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <h3 style="margin-top: 0;">Out-of-Office Period</h3>
+            <p><strong>Start:</strong> ${new Date(oooStartDate).toLocaleDateString()}</p>
+            <p><strong>End:</strong> ${new Date(oooEndDate).toLocaleDateString()}</p>
+            ${oooReason ? `<p><strong>Reason:</strong> ${oooReason}</p>` : ""}
+          </div>
+
+          <p>Please reassign this task to another team member or adjust the due date accordingly.</p>
+          
+          <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">Best regards,<br>Hubify Team</p>
+        </div>
+      `,
+    };
+
+    await sgMail.send(msg);
+    console.log(`OOO conflict notification sent to ${supervisorEmail}`);
+  } catch (error) {
+    console.error("Error sending OOO conflict notification:", error);
+  }
+}
 
 // Security Middleware
 const isSuperAdmin = async (req: Request, res: Response, next: NextFunction) => {
@@ -1972,6 +2050,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignedById: userId,
       });
 
+      // Send email notification if conflict exists and user has supervisor
+      if (conflict.hasConflict && conflict.assignedUser?.supervisorId) {
+        const supervisor = await storage.getUser(conflict.assignedUser.supervisorId);
+        if (supervisor?.email) {
+          // Send notification asynchronously (don't await to avoid blocking)
+          sendOOOConflictNotification(
+            supervisor.email,
+            `${supervisor.firstName} ${supervisor.lastName}`,
+            `${conflict.assignedUser.firstName} ${conflict.assignedUser.lastName}`,
+            task.title,
+            task.dueDate!,
+            conflict.activeOOO!.startDate,
+            conflict.activeOOO!.endDate,
+            conflict.activeOOO!.reason
+          ).catch(error => console.error("Failed to send OOO notification:", error));
+        }
+      }
+
       // Return task with conflict information
       res.status(201).json({
         ...task,
@@ -2003,6 +2099,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check for out-of-office conflicts
       const conflict = await checkOutOfOfficeConflict(assignedToId, task.dueDate);
+
+      // Send email notification if conflict exists and user has supervisor
+      if (conflict.hasConflict && conflict.assignedUser?.supervisorId) {
+        const supervisor = await storage.getUser(conflict.assignedUser.supervisorId);
+        if (supervisor?.email) {
+          sendOOOConflictNotification(
+            supervisor.email,
+            `${supervisor.firstName} ${supervisor.lastName}`,
+            `${conflict.assignedUser.firstName} ${conflict.assignedUser.lastName}`,
+            task.title,
+            task.dueDate!,
+            conflict.activeOOO!.startDate,
+            conflict.activeOOO!.endDate,
+            conflict.activeOOO!.reason
+          ).catch(error => console.error("Failed to send OOO notification:", error));
+        }
+      }
 
       // Return task with conflict information
       res.json({
@@ -2049,6 +2162,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const assignedToId = updateData.assignedToId || task.assignedToId;
         const dueDate = updateData.dueDate || task.dueDate;
         conflict = await checkOutOfOfficeConflict(assignedToId, dueDate);
+
+        // Send email notification if conflict exists and user has supervisor
+        if (conflict.hasConflict && conflict.assignedUser?.supervisorId) {
+          const supervisor = await storage.getUser(conflict.assignedUser.supervisorId);
+          if (supervisor?.email) {
+            sendOOOConflictNotification(
+              supervisor.email,
+              `${supervisor.firstName} ${supervisor.lastName}`,
+              `${conflict.assignedUser.firstName} ${conflict.assignedUser.lastName}`,
+              task.title,
+              dueDate!,
+              conflict.activeOOO!.startDate,
+              conflict.activeOOO!.endDate,
+              conflict.activeOOO!.reason
+            ).catch(error => console.error("Failed to send OOO notification:", error));
+          }
+        }
       }
 
       // Return task with conflict information
