@@ -234,6 +234,7 @@ export default function TeamMemberProfile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/out-of-office/${memberId}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/out-of-office/${memberId}/active`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/out-of-office/active-statuses"] });
       setIsOOOModalOpen(false);
       oooForm.reset();
       toast({
@@ -258,6 +259,7 @@ export default function TeamMemberProfile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/out-of-office/${memberId}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/out-of-office/${memberId}/active`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/out-of-office/active-statuses"] });
       toast({
         title: "Success",
         description: "Out-of-office period deleted successfully",
