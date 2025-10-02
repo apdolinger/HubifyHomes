@@ -711,6 +711,40 @@ export class DatabaseStorage implements IStorage {
       ));
   }
 
+  async createPortalInvitation(data: InsertPortalInvitation): Promise<PortalInvitation> {
+    const [invitation] = await db
+      .insert(portalInvitations)
+      .values(data)
+      .returning();
+    return invitation;
+  }
+
+  async getPortalInvitationByToken(token: string): Promise<PortalInvitation | undefined> {
+    const [invitation] = await db
+      .select()
+      .from(portalInvitations)
+      .where(and(
+        eq(portalInvitations.token, token),
+        eq(portalInvitations.isUsed, false)
+      ));
+    return invitation;
+  }
+
+  async markPortalInvitationUsed(token: string): Promise<void> {
+    await db
+      .update(portalInvitations)
+      .set({ isUsed: true, usedAt: new Date() })
+      .where(eq(portalInvitations.token, token));
+  }
+
+  async getPortalInvitationsByOrg(orgId: string): Promise<PortalInvitation[]> {
+    return await db
+      .select()
+      .from(portalInvitations)
+      .where(eq(portalInvitations.orgId, orgId))
+      .orderBy(desc(portalInvitations.createdAt));
+  }
+
   // Community operations
   async getCommunities(): Promise<Community[]> {
     return db.select().from(communities).orderBy(desc(communities.createdAt));

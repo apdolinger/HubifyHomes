@@ -350,6 +350,25 @@ export const portalSessions = pgTable("portal_sessions", {
   index("portal_sessions_expires_idx").on(table.expiresAt),
 ]);
 
+// Portal invitations for secure registration
+export const portalInvitations = pgTable("portal_invitations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id, { onDelete: "cascade" }).notNull(),
+  token: varchar("token").notNull().unique(),
+  email: varchar("email").notNull(),
+  role: varchar("role").$type<"resident"|"staff"|"vendor">().notNull(),
+  propertyIds: text("property_ids").array().$type<string[]>(),
+  createdByUserId: varchar("created_by_user_id").references(() => users.id).notNull(),
+  isUsed: boolean("is_used").notNull().default(false),
+  usedAt: timestamp("used_at"),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("portal_invitations_token_idx").on(table.token),
+  index("portal_invitations_org_idx").on(table.orgId),
+  index("portal_invitations_email_idx").on(table.email),
+]);
+
 // User storage table - required for Replit Auth (staff/admin users)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().notNull(),
@@ -1590,6 +1609,13 @@ export const insertPortalUserSchema = createInsertSchema(portalUsers).omit({
   updatedAt: true,
 });
 
+export const insertPortalInvitationSchema = createInsertSchema(portalInvitations).omit({
+  id: true,
+  createdAt: true,
+  isUsed: true,
+  usedAt: true,
+});
+
 export const insertPortalUserPropertySchema = createInsertSchema(portalUserProperties).omit({
   id: true,
   createdAt: true,
@@ -1738,6 +1764,8 @@ export type InsertPortalUserProperty = z.infer<typeof insertPortalUserPropertySc
 export type PortalUserProperty = typeof portalUserProperties.$inferSelect;
 export type InsertPortalSession = z.infer<typeof insertPortalSessionSchema>;
 export type PortalSession = typeof portalSessions.$inferSelect;
+export type InsertPortalInvitation = z.infer<typeof insertPortalInvitationSchema>;
+export type PortalInvitation = typeof portalInvitations.$inferSelect;
 export type InsertCommunity = z.infer<typeof insertCommunitySchema>;
 export type Community = typeof communities.$inferSelect;
 export type InsertProperty = z.infer<typeof insertPropertySchema>;

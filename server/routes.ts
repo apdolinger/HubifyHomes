@@ -722,6 +722,216 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Portal authentication middleware
+  const isPortalAuthenticated = async (req: any, res: Response, next: NextFunction) => {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ message: 'No token provided' });
+    }
+
+    const session = await storage.getPortalSessionByToken(token);
+    if (!session) {
+      return res.status(401).json({ message: 'Invalid or expired token' });
+    }
+
+    // Check if session is expired
+    if (new Date() > session.expiresAt) {
+      await storage.invalidatePortalSession(token);
+      return res.status(401).json({ message: 'Session expired' });
+    }
+
+    const user = await storage.getPortalUserById(session.portalUserId);
+    if (!user || !user.isActive) {
+      return res.status(401).json({ message: 'User not found or inactive' });
+    }
+
+    req.portalUser = user;
+    req.portalSession = session;
+    next();
+  };
+
+  // Portal auth routes
+  app.post('/api/portal/register', async (req, res) => {
+    try {
+      const { inviteToken, email, password, firstName, lastName, phone } = req.body;
+
+      if (!inviteToken || !email || !password) {
+        return res.status(400).json({ message: 'Missing required fields' });
+      }
+
+      // Get and validate invitation
+      const invitation = await storage.getPortalInvitationByToken(inviteToken);
+      if (!invitation) {
+        return res.status(404).json({ message: 'Invalid or expired invitation' });
+      }
+
+      // Check if invitation expired
+      if (new Date() > invitation.expiresAt) {
+        return res.status(400).json({ message: 'Invitation has expired' });
+      }
+
+      // Verify email matches invitation
+      if (email.toLowerCase() !== invitation.email.toLowerCase()) {
+        return res.status(400).json({ message: 'Email does not match invitation' });
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.getPortalUserByEmail(invitation.orgId, email);
+      if (existingUser) {
+        return res.status(409).json({ message: 'User already exists' });
+      }
+
+      // Hash password
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // Create user with invitation's orgId and role
+      const user = await storage.createPortalUser({
+        orgId: invitation.orgId,
+        email,
+        passwordHash,
+        role: invitation.role,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        phone: phone || null,
+      });
+
+      // Mark invitation as used
+      await storage.markPortalInvitationUsed(inviteToken);
+
+      // Create session
+      const token = nanoid(32);
+      const sessionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+      await storage.createPortalSession({
+        portalUserId: user.id,
+        token,
+        expiresAt: sessionExpiresAt,
+      });
+
+      res.status(201).json({ user: { ...user, passwordHash: undefined }, token });
+    } catch (error) {
+      console.error('Error registering portal user:', error);
+      res.status(500).json({ message: 'Failed to register user' });
+    }
+  });
+
+  app.post('/api/portal/login', async (req, res) => {
+    try {
+      const { orgId, email, password } = req.body;
+
+      if (!orgId || !email || !password) {
+        return res.status(400).json({ message: 'Missing required fields' });
+      }
+
+      // Get user
+      const user = await storage.getPortalUserByEmail(orgId, email);
+      if (!user || !user.isActive) {
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      // Verify password
+      const isValid = await bcrypt.compare(password, user.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      // Create session
+      const token = nanoid(32);
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+      await storage.createPortalSession({
+        portalUserId: user.id,
+        token,
+        expiresAt,
+      });
+
+      // Update last login
+      await storage.updatePortalUser(user.id, { lastLoginAt: new Date() });
+
+      res.json({ user: { ...user, passwordHash: undefined }, token });
+    } catch (error) {
+      console.error('Error logging in portal user:', error);
+      res.status(500).json({ message: 'Failed to login' });
+    }
+  });
+
+  app.post('/api/portal/logout', isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const token = req.headers.authorization?.replace('Bearer ', '');
+      if (token) {
+        await storage.invalidatePortalSession(token);
+      }
+      res.json({ message: 'Logged out successfully' });
+    } catch (error) {
+      console.error('Error logging out portal user:', error);
+      res.status(500).json({ message: 'Failed to logout' });
+    }
+  });
+
+  app.get('/api/portal/me', isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.portalUser;
+      const properties = await storage.getPortalUserProperties(user.id);
+      res.json({ user: { ...user, passwordHash: undefined }, properties });
+    } catch (error) {
+      console.error('Error fetching portal user:', error);
+      res.status(500).json({ message: 'Failed to fetch user' });
+    }
+  });
+
+  // Admin endpoint to create portal invitations
+  app.post('/api/portal/invitations', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user?.claims?.sub;
+      const currentUser = await storage.getUser(currentUserId);
+      
+      if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'supervisor')) {
+        return res.status(403).json({ message: 'Only admins can create invitations' });
+      }
+
+      const { email, role, propertyIds, expiresInDays = 7 } = req.body;
+
+      if (!email || !role) {
+        return res.status(400).json({ message: 'Email and role are required' });
+      }
+
+      const token = nanoid(32);
+      const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
+
+      const invitation = await storage.createPortalInvitation({
+        orgId: currentUser.orgId!,
+        token,
+        email: email.toLowerCase(),
+        role,
+        propertyIds: propertyIds || [],
+        createdByUserId: currentUserId,
+        expiresAt,
+      });
+
+      res.status(201).json(invitation);
+    } catch (error) {
+      console.error('Error creating portal invitation:', error);
+      res.status(500).json({ message: 'Failed to create invitation' });
+    }
+  });
+
+  app.get('/api/portal/invitations', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user?.claims?.sub;
+      const currentUser = await storage.getUser(currentUserId);
+      
+      if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'supervisor')) {
+        return res.status(403).json({ message: 'Only admins can view invitations' });
+      }
+
+      const invitations = await storage.getPortalInvitationsByOrg(currentUser.orgId!);
+      res.json(invitations);
+    } catch (error) {
+      console.error('Error fetching portal invitations:', error);
+      res.status(500).json({ message: 'Failed to fetch invitations' });
+    }
+  });
+
   // Helper function to check for out-of-office conflicts
   async function checkOutOfOfficeConflict(assignedToId: string, dueDate: Date | null) {
     if (!dueDate || !assignedToId) {
