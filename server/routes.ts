@@ -641,6 +641,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function to check for out-of-office conflicts
+  async function checkOutOfOfficeConflict(assignedToId: string, dueDate: Date | null) {
+    if (!dueDate || !assignedToId) {
+      return { hasConflict: false, activeOOO: null, assignedUser: null };
+    }
+
+    try {
+      // Get the assigned user to check for supervisor
+      const assignedUser = await storage.getUser(assignedToId);
+      if (!assignedUser) {
+        return { hasConflict: false, activeOOO: null, assignedUser: null };
+      }
+
+      // Check if user has an active OOO period on the due date
+      const activeOOO = await storage.getActiveOutOfOfficePeriod(assignedToId);
+      if (!activeOOO) {
+        return { hasConflict: false, activeOOO: null, assignedUser };
+      }
+
+      // Check if due date falls within OOO period
+      const dueDateTimestamp = new Date(dueDate).getTime();
+      const oooStart = new Date(activeOOO.startDate).getTime();
+      const oooEnd = new Date(activeOOO.endDate).getTime();
+
+      if (dueDateTimestamp >= oooStart && dueDateTimestamp <= oooEnd) {
+        return { hasConflict: true, activeOOO, assignedUser };
+      }
+
+      return { hasConflict: false, activeOOO: null, assignedUser };
+    } catch (error) {
+      console.error("Error checking OOO conflict:", error);
+      return { hasConflict: false, activeOOO: null, assignedUser: null };
+    }
+  }
+
   // Out-of-office routes
   app.get("/api/out-of-office/:userId", isAuthenticated, async (req, res) => {
     try {
@@ -1925,11 +1960,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const validatedData = insertTaskSchema.parse(req.body);
+      
+      // Check for out-of-office conflicts
+      const conflict = await checkOutOfOfficeConflict(
+        validatedData.assignedToId,
+        validatedData.dueDate
+      );
+
       const task = await storage.createTask({
         ...validatedData,
         assignedById: userId,
       });
-      res.status(201).json(task);
+
+      // Return task with conflict information
+      res.status(201).json({
+        ...task,
+        oooConflict: conflict.hasConflict ? {
+          hasConflict: true,
+          assignedUserName: `${conflict.assignedUser?.firstName} ${conflict.assignedUser?.lastName}`,
+          supervisorId: conflict.assignedUser?.supervisorId,
+          oooStartDate: conflict.activeOOO?.startDate,
+          oooEndDate: conflict.activeOOO?.endDate,
+          oooReason: conflict.activeOOO?.reason,
+        } : null,
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid data", errors: error.errors });
@@ -1946,7 +2000,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const assignedById = req.user.claims.sub;
       
       const task = await storage.assignTask(taskId, assignedToId, assignedById);
-      res.json(task);
+      
+      // Check for out-of-office conflicts
+      const conflict = await checkOutOfOfficeConflict(assignedToId, task.dueDate);
+
+      // Return task with conflict information
+      res.json({
+        ...task,
+        oooConflict: conflict.hasConflict ? {
+          hasConflict: true,
+          assignedUserName: `${conflict.assignedUser?.firstName} ${conflict.assignedUser?.lastName}`,
+          supervisorId: conflict.assignedUser?.supervisorId,
+          oooStartDate: conflict.activeOOO?.startDate,
+          oooEndDate: conflict.activeOOO?.endDate,
+          oooReason: conflict.activeOOO?.reason,
+        } : null,
+      });
     } catch (error) {
       console.error("Error assigning task:", error);
       res.status(500).json({ message: "Failed to assign task" });
@@ -1973,7 +2042,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const task = await storage.updateTask(taskId, updateData);
-      res.json(task);
+      
+      // Check for out-of-office conflicts if assignee or due date changed
+      let conflict = { hasConflict: false, activeOOO: null, assignedUser: null };
+      if (updateData.assignedToId || updateData.dueDate) {
+        const assignedToId = updateData.assignedToId || task.assignedToId;
+        const dueDate = updateData.dueDate || task.dueDate;
+        conflict = await checkOutOfOfficeConflict(assignedToId, dueDate);
+      }
+
+      // Return task with conflict information
+      res.json({
+        ...task,
+        oooConflict: conflict.hasConflict ? {
+          hasConflict: true,
+          assignedUserName: `${conflict.assignedUser?.firstName} ${conflict.assignedUser?.lastName}`,
+          supervisorId: conflict.assignedUser?.supervisorId,
+          oooStartDate: conflict.activeOOO?.startDate,
+          oooEndDate: conflict.activeOOO?.endDate,
+          oooReason: conflict.activeOOO?.reason,
+        } : null,
+      });
     } catch (error) {
       console.error("Error updating task (ID:", taskId, "):", error);
       if (error instanceof Error && error.message?.includes('constraint')) {
