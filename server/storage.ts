@@ -1,5 +1,6 @@
 import {
   users,
+  outOfOfficePeriods,
   orgs,
   orgSubscriptions,
   orgStripeConnections,
@@ -120,6 +121,8 @@ import {
   type InsertIcsFeed,
   type EventImport,
   type InsertEventImport,
+  type OutOfOfficePeriod,
+  type InsertOutOfOfficePeriod,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, like, count, sql } from "drizzle-orm";
@@ -137,6 +140,14 @@ export interface IStorage {
     activeTasks: number;
     overdueTasks: number;
   }>;
+  
+  // Out-of-office operations
+  getOutOfOfficePeriods(userId: string): Promise<OutOfOfficePeriod[]>;
+  getActiveOutOfOfficePeriod(userId: string, date?: Date): Promise<OutOfOfficePeriod | undefined>;
+  createOutOfOfficePeriod(period: InsertOutOfOfficePeriod): Promise<OutOfOfficePeriod>;
+  updateOutOfOfficePeriod(id: number, period: Partial<InsertOutOfOfficePeriod>): Promise<OutOfOfficePeriod>;
+  deleteOutOfOfficePeriod(id: number): Promise<void>;
+  getUsersOutOfOffice(orgId: string, startDate: Date, endDate: Date): Promise<User[]>;
   
   // Organization operations
   getOrgs(): Promise<Org[]>;
@@ -468,6 +479,75 @@ export class DatabaseStorage implements IStorage {
       activeTasks,
       overdueTasks
     };
+  }
+
+  // Out-of-office operations
+  async getOutOfOfficePeriods(userId: string): Promise<OutOfOfficePeriod[]> {
+    return await db
+      .select()
+      .from(outOfOfficePeriods)
+      .where(and(
+        eq(outOfOfficePeriods.userId, userId),
+        eq(outOfOfficePeriods.isActive, true)
+      ))
+      .orderBy(desc(outOfOfficePeriods.startDate));
+  }
+
+  async getActiveOutOfOfficePeriod(userId: string, date?: Date): Promise<OutOfOfficePeriod | undefined> {
+    const checkDate = date || new Date();
+    const [period] = await db
+      .select()
+      .from(outOfOfficePeriods)
+      .where(and(
+        eq(outOfOfficePeriods.userId, userId),
+        eq(outOfOfficePeriods.isActive, true),
+        sql`${outOfOfficePeriods.startDate} <= ${checkDate}`,
+        sql`${outOfOfficePeriods.endDate} >= ${checkDate}`
+      ));
+    return period;
+  }
+
+  async createOutOfOfficePeriod(period: InsertOutOfOfficePeriod): Promise<OutOfOfficePeriod> {
+    const [created] = await db.insert(outOfOfficePeriods).values(period).returning();
+    return created;
+  }
+
+  async updateOutOfOfficePeriod(id: number, periodData: Partial<InsertOutOfOfficePeriod>): Promise<OutOfOfficePeriod> {
+    const [updated] = await db
+      .update(outOfOfficePeriods)
+      .set({ ...periodData, updatedAt: new Date() })
+      .where(eq(outOfOfficePeriods.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteOutOfOfficePeriod(id: number): Promise<void> {
+    await db
+      .update(outOfOfficePeriods)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(outOfOfficePeriods.id, id));
+  }
+
+  async getUsersOutOfOffice(orgId: string, startDate: Date, endDate: Date): Promise<User[]> {
+    // Find all users who have active out-of-office periods overlapping with the date range
+    const periods = await db
+      .select()
+      .from(outOfOfficePeriods)
+      .where(and(
+        eq(outOfOfficePeriods.orgId, orgId),
+        eq(outOfOfficePeriods.isActive, true),
+        or(
+          and(
+            sql`${outOfOfficePeriods.startDate} <= ${endDate}`,
+            sql`${outOfOfficePeriods.endDate} >= ${startDate}`
+          )
+        )
+      ));
+
+    if (periods.length === 0) return [];
+
+    const userIds = [...new Set(periods.map(p => p.userId))];
+    return await db.select().from(users).where(sql`${users.id} = ANY(${userIds})`);
   }
 
   // Organization operations
