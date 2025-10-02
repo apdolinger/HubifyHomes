@@ -21,6 +21,7 @@ import {
   vehicleMaintenance,
   vehicleNotes,
   tasks,
+  timeEntries,
   contacts,
   contactProperties,
   teamMessages,
@@ -85,6 +86,8 @@ import {
   type InsertVehicleNote,
   type Task,
   type InsertTask,
+  type TimeEntry,
+  type InsertTimeEntry,
   type Contact,
   type InsertContact,
   type ContactProperty,
@@ -245,6 +248,15 @@ export interface IStorage {
   archiveTask(taskId: number): Promise<Task>;
   deleteTask(taskId: number): Promise<void>;
   checkTaskConflicts(assignedUserId: string, dueDate: string, timeEstimate: string, excludeTaskId?: number): Promise<any[]>;
+  
+  // Time tracking operations
+  getTimeEntries(orgId: string, filters?: { userId?: string; propertyId?: number; taskId?: number; startDate?: string; endDate?: string }): Promise<TimeEntry[]>;
+  getActiveTimeEntry(userId: string): Promise<TimeEntry | undefined>;
+  getTimeEntry(id: number): Promise<TimeEntry | undefined>;
+  createTimeEntry(entry: InsertTimeEntry): Promise<TimeEntry>;
+  updateTimeEntry(id: number, entry: Partial<InsertTimeEntry>): Promise<TimeEntry>;
+  clockOut(id: number, clockOutTime: Date): Promise<TimeEntry>;
+  deleteTimeEntry(id: number): Promise<void>;
   
   // Contact operations
   getContacts(includeInactive?: boolean): Promise<Contact[]>;
@@ -1392,6 +1404,101 @@ export class DatabaseStorage implements IStorage {
       console.error("Error checking task conflicts:", error);
       return [];
     }
+  }
+
+  // Time tracking operations
+  async getTimeEntries(orgId: string, filters?: { userId?: string; propertyId?: number; taskId?: number; startDate?: string; endDate?: string }): Promise<TimeEntry[]> {
+    let query = db
+      .select()
+      .from(timeEntries)
+      .where(eq(timeEntries.orgId, orgId))
+      .orderBy(desc(timeEntries.clockIn));
+
+    if (filters) {
+      const conditions = [eq(timeEntries.orgId, orgId)];
+      
+      if (filters.userId) {
+        conditions.push(eq(timeEntries.userId, filters.userId));
+      }
+      if (filters.propertyId) {
+        conditions.push(eq(timeEntries.propertyId, filters.propertyId));
+      }
+      if (filters.taskId) {
+        conditions.push(eq(timeEntries.taskId, filters.taskId));
+      }
+      if (filters.startDate) {
+        conditions.push(sql`${timeEntries.clockIn} >= ${filters.startDate}`);
+      }
+      if (filters.endDate) {
+        conditions.push(sql`${timeEntries.clockIn} <= ${filters.endDate}`);
+      }
+
+      query = db
+        .select()
+        .from(timeEntries)
+        .where(and(...conditions))
+        .orderBy(desc(timeEntries.clockIn));
+    }
+
+    return await query;
+  }
+
+  async getActiveTimeEntry(userId: string): Promise<TimeEntry | undefined> {
+    const [entry] = await db
+      .select()
+      .from(timeEntries)
+      .where(
+        and(
+          eq(timeEntries.userId, userId),
+          sql`${timeEntries.clockOut} IS NULL`
+        )
+      )
+      .orderBy(desc(timeEntries.clockIn))
+      .limit(1);
+
+    return entry;
+  }
+
+  async getTimeEntry(id: number): Promise<TimeEntry | undefined> {
+    const [entry] = await db
+      .select()
+      .from(timeEntries)
+      .where(eq(timeEntries.id, id));
+
+    return entry;
+  }
+
+  async createTimeEntry(entry: InsertTimeEntry): Promise<TimeEntry> {
+    const [newEntry] = await db
+      .insert(timeEntries)
+      .values(entry)
+      .returning();
+
+    return newEntry;
+  }
+
+  async updateTimeEntry(id: number, entry: Partial<InsertTimeEntry>): Promise<TimeEntry> {
+    const [updatedEntry] = await db
+      .update(timeEntries)
+      .set({ ...entry, updatedAt: new Date() })
+      .where(eq(timeEntries.id, id))
+      .returning();
+
+    return updatedEntry;
+  }
+
+  async clockOut(id: number, clockOutTime: Date): Promise<TimeEntry> {
+    const [updatedEntry] = await db
+      .update(timeEntries)
+      .set({ clockOut: clockOutTime, updatedAt: new Date() })
+      .where(eq(timeEntries.id, id))
+      .returning();
+
+    return updatedEntry;
+  }
+
+  async deleteTimeEntry(id: number): Promise<void> {
+    await db.delete(timeEntries).where(eq(timeEntries.id, id));
   }
 
   // Contact operations
