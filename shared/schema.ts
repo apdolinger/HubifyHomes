@@ -487,10 +487,31 @@ export const tasks = pgTable("tasks", {
   recurrenceFrequency: varchar("recurrence_frequency"), // daily, weekly, monthly, quarterly
   billedSeparately: boolean("billed_separately").notNull().default(false),
   billingAmount: varchar("billing_amount"), // dollar amount as string, e.g., "125.00"
+  billableRateCents: integer("billable_rate_cents"), // Hourly billable rate in cents for time tracking
   isArchived: boolean("is_archived").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Time Entries table - for clock in/out and time tracking
+export const timeEntries = pgTable("time_entries", {
+  id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  propertyId: integer("property_id").references(() => properties.id),
+  taskId: integer("task_id").references(() => tasks.id),
+  clockIn: timestamp("clock_in").notNull(),
+  clockOut: timestamp("clock_out"), // null when currently clocked in
+  notes: text("notes"),
+  billableRateCents: integer("billable_rate_cents"), // Hourly rate in cents, overrides task rate if set
+  isBillable: boolean("is_billable").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("time_entries_org_user_idx").on(table.orgId, table.userId),
+  index("time_entries_property_idx").on(table.propertyId),
+  index("time_entries_task_idx").on(table.taskId),
+]);
 
 // Contacts/People table
 export const contacts = pgTable("contacts", {
@@ -1294,6 +1315,12 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({
   completedAt: true,
 });
 
+export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertContactSchema = createInsertSchema(contacts).omit({
   id: true,
   createdAt: true,
@@ -1527,6 +1554,8 @@ export type InsertRoom = z.infer<typeof insertRoomSchema>;
 export type Room = typeof rooms.$inferSelect;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type Task = typeof tasks.$inferSelect;
+export type InsertTimeEntry = z.infer<typeof insertTimeEntrySchema>;
+export type TimeEntry = typeof timeEntries.$inferSelect;
 export type InsertContact = z.infer<typeof insertContactSchema>;
 export type Contact = typeof contacts.$inferSelect;
 export type InsertContactProperty = z.infer<typeof insertContactPropertySchema>;
