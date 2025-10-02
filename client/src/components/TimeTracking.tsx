@@ -53,7 +53,7 @@ export function TimeTrackingDropdownItems() {
 
   const clockInMutation = useMutation({
     mutationFn: async (data: { propertyId?: number; taskId?: number; notes?: string }) => {
-      return await apiRequest("/api/time-entries/clock-in", "POST", data);
+      return await apiRequest("POST", "/api/time-entries/clock-in", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/time-entries/active"] });
@@ -78,7 +78,7 @@ export function TimeTrackingDropdownItems() {
 
   const clockOutMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest(`/api/time-entries/${id}/clock-out`, "POST", {});
+      return await apiRequest("POST", `/api/time-entries/${id}/clock-out`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/time-entries/active"] });
@@ -99,8 +99,8 @@ export function TimeTrackingDropdownItems() {
 
   const handleClockIn = () => {
     clockInMutation.mutate({
-      propertyId: propertyId ? parseInt(propertyId) : undefined,
-      taskId: taskId ? parseInt(taskId) : undefined,
+      propertyId: propertyId && propertyId !== "none" ? parseInt(propertyId) : undefined,
+      taskId: taskId && taskId !== "none" ? parseInt(taskId) : undefined,
       notes: notes || undefined,
     });
   };
@@ -178,7 +178,7 @@ export function TimeTrackingDropdownItems() {
                   <SelectValue placeholder="Select a property" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {properties.map((property) => (
                     <SelectItem key={property.id} value={property.id.toString()}>
                       {property.name}
@@ -195,7 +195,7 @@ export function TimeTrackingDropdownItems() {
                   <SelectValue placeholder="Select a task" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {tasks.map((task) => (
                     <SelectItem key={task.id} value={task.id.toString()}>
                       {task.title}
@@ -218,6 +218,7 @@ export function TimeTrackingDropdownItems() {
           </div>
           <DialogFooter>
             <Button
+              type="button"
               variant="outline"
               onClick={() => setShowClockInDialog(false)}
               data-testid="button-cancel"
@@ -225,6 +226,7 @@ export function TimeTrackingDropdownItems() {
               Cancel
             </Button>
             <Button
+              type="button"
               onClick={handleClockIn}
               disabled={clockInMutation.isPending}
               data-testid="button-submit-clock-in"

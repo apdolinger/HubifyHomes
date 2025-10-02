@@ -33,6 +33,7 @@ Preferred communication style: Simple, everyday language.
 - **Advanced Forms**: JSONB schema storage with flexible field definitions and property assignments
 
 ### Recent Changes
+- **October 2025**: Implemented staff time tracking system with clock-in/clock-out functionality in navigation dropdown, property/task association, billable rate tracking, and management page with filters, edit/delete capabilities, and CSV export
 - **October 2025**: Created comprehensive Privacy Policy and Terms of Service pages compliant with US and Canadian legal standards (CCPA/CPRA, GDPR, PIPEDA for privacy; all required SaaS clauses for terms). Both pages are publicly accessible at /privacy and /terms, with footer links on landing page and authenticated pages
 - **October 2025**: Implemented comprehensive security infrastructure achieving 85% vulnerability mitigation through: MFA enforcement (20%), separate admin accounts with least privilege controls (30%), comprehensive audit logging (15%), session management with concurrent limits (10%), IP allowlist enforcement (5%), and quarterly access reviews (5%). Includes 4 new database tables (security_audit_logs, user_mfa_settings, admin_ip_allowlist, user_sessions), security middleware stack (requireMFA, requireAllowedIP, auditMiddleware, trackSession, isSuperAdmin, requireAdminAccount), Super Admin Compliance tab UI with audit log viewer, access review table, active session management, and security stats dashboard
 - **October 2025**: Implemented comprehensive Super Admin Settings tab with 9 configuration sections for platform-wide management (Platform Configuration, Email & Communication, Integration Management, Default Organization Settings, Billing & Subscription, Compliance & Legal, System Maintenance, Security & Access, Customization Controls)
@@ -45,6 +46,7 @@ Preferred communication style: Simple, everyday language.
 - **August 2025**: Consolidated form settings into cleaner, professional interface without numbered progression indicators
 
 ## Key Features and Design Decisions
+- **Staff Time Tracking**: Complete time tracking system with clock-in/clock-out functionality accessible from navigation dropdown, support for property/task association, billable rate tracking (from tasks), management page with comprehensive filters (user, property, task, date range), edit/delete capabilities, duration calculation, and CSV export functionality. All time entries are org-scoped for proper multi-tenant isolation.
 - **Multi-Tenant Architecture**: Comprehensive organization-based multi-tenancy supporting distinct clients, properties, forms, and submissions per organization.
 - **Three-Tier Invoice Management System**: Complete invoice management across three distinct contexts:
   - **Platform Invoices** (Admin → Organizations): Hubify admins create and manage invoices for billing organizations, with file upload/download via object storage, status tracking (draft, sent, paid, overdue, cancelled), and Stripe integration capability

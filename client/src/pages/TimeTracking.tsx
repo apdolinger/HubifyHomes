@@ -58,9 +58,9 @@ export default function TimeTracking() {
 
   const buildQueryString = () => {
     const params = new URLSearchParams();
-    if (userFilter) params.append("userId", userFilter);
-    if (propertyFilter) params.append("propertyId", propertyFilter);
-    if (taskFilter) params.append("taskId", taskFilter);
+    if (userFilter && userFilter !== "all") params.append("userId", userFilter);
+    if (propertyFilter && propertyFilter !== "all") params.append("propertyId", propertyFilter);
+    if (taskFilter && taskFilter !== "all") params.append("taskId", taskFilter);
     if (startDate) params.append("startDate", startDate);
     if (endDate) params.append("endDate", endDate);
     return params.toString() ? `?${params.toString()}` : "";
@@ -90,7 +90,7 @@ export default function TimeTracking() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: { id: number; updates: Partial<TimeEntry> }) => {
-      return await apiRequest(`/api/time-entries/${data.id}`, "PATCH", data.updates);
+      return await apiRequest("PATCH", `/api/time-entries/${data.id}`, data.updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/time-entries"] });
@@ -112,7 +112,7 @@ export default function TimeTracking() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest(`/api/time-entries/${id}`, "DELETE", {});
+      return await apiRequest("DELETE", `/api/time-entries/${id}`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/time-entries"] });
@@ -287,7 +287,7 @@ export default function TimeTracking() {
                   <SelectValue placeholder="All users" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All users</SelectItem>
+                  <SelectItem value="all">All users</SelectItem>
                   {users.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.firstName} {user.lastName}
@@ -304,7 +304,7 @@ export default function TimeTracking() {
                   <SelectValue placeholder="All properties" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All properties</SelectItem>
+                  <SelectItem value="all">All properties</SelectItem>
                   {properties.map((property) => (
                     <SelectItem key={property.id} value={property.id.toString()}>
                       {property.name}
@@ -321,7 +321,7 @@ export default function TimeTracking() {
                   <SelectValue placeholder="All tasks" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All tasks</SelectItem>
+                  <SelectItem value="all">All tasks</SelectItem>
                   {tasks.map((task) => (
                     <SelectItem key={task.id} value={task.id.toString()}>
                       {task.title}
