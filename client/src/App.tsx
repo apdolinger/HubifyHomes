@@ -41,8 +41,12 @@ import QuickSearchModal from "@/components/QuickSearchModal";
 import QuickAddTaskModal from "@/components/QuickAddTaskModal";
 import KeyboardHelpModal from "@/components/KeyboardHelpModal";
 import { TaskModalProvider, useTaskModal } from "@/contexts/TaskModalContext";
+import { PortalAuthProvider } from "@/contexts/PortalAuthContext";
 import { routes } from "@/lib/routes";
 import { useState } from "react";
+import Portal from "@/pages/Portal";
+import PortalLogin from "@/pages/PortalLogin";
+import PortalRegister from "@/pages/PortalRegister";
 
 // Global Task Modal Component
 function GlobalTaskModal() {
@@ -61,8 +65,14 @@ function Router() {
 
   return (
     <Switch>
+      {/* Public routes */}
       <Route path="/privacy" component={PrivacyPolicy} />
       <Route path="/terms" component={TermsOfService} />
+      
+      {/* Portal routes (separate auth system) */}
+      <Route path="/portal/login" component={PortalLogin} />
+      <Route path="/portal/register" component={PortalRegister} />
+      <Route path="/portal" component={Portal} />
       {isLoading ? (
         <Route>
           <div className="min-h-screen flex items-center justify-center">
@@ -260,7 +270,9 @@ function AuthWrapper() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthWrapper />
+      <PortalAuthProvider>
+        <AuthWrapper />
+      </PortalAuthProvider>
     </QueryClientProvider>
   );
 }
