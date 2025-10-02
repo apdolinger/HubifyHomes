@@ -6,6 +6,7 @@ import { useTaskModal } from "@/contexts/TaskModalContext";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { TimeTrackingDropdownItems } from "@/components/TimeTracking";
 import { 
   BarChart3, 
   CheckSquare, 
@@ -128,6 +129,7 @@ export default function Navigation() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <TimeTrackingDropdownItems />
                 <DropdownMenuItem onClick={() => window.location.href = '/calendar'}>
                   <Calendar className="w-4 h-4 mr-2" />
                   Calendar
