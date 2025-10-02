@@ -445,17 +445,28 @@ export default function Tasks() {
                     </TableCell>
                     <TableCell>
                       {task.assignedUser ? (
-                        <div className="flex items-center space-x-2">
-                          <Avatar className="w-6 h-6">
-                            <AvatarImage src={task.assignedUser.profileImageUrl} alt={`${task.assignedUser.firstName} ${task.assignedUser.lastName}`} />
-                            <AvatarFallback className="text-xs">
-                              {task.assignedUser.firstName?.[0]}{task.assignedUser.lastName?.[0]}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="text-sm">
-                            <div className="font-medium">{task.assignedUser.firstName} {task.assignedUser.lastName}</div>
-                            <div className="text-slate-600">{task.assignedUser.email}</div>
+                        <div className="space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <Avatar className="w-6 h-6">
+                              <AvatarImage src={task.assignedUser.profileImageUrl} alt={`${task.assignedUser.firstName} ${task.assignedUser.lastName}`} />
+                              <AvatarFallback className="text-xs">
+                                {task.assignedUser.firstName?.[0]}{task.assignedUser.lastName?.[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="text-sm">
+                              <div className="font-medium">{task.assignedUser.firstName} {task.assignedUser.lastName}</div>
+                              <div className="text-slate-600">{task.assignedUser.email}</div>
+                            </div>
                           </div>
+                          {(task as any).oooConflict?.hasConflict && (
+                            <Badge 
+                              variant="outline" 
+                              className="bg-yellow-50 text-yellow-700 border-yellow-300 text-xs"
+                              data-testid={`ooo-conflict-badge-${task.id}`}
+                            >
+                              Out of Office Conflict
+                            </Badge>
+                          )}
                         </div>
                       ) : (
                         <span className="text-slate-400">Unassigned</span>

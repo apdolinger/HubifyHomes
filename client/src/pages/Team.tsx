@@ -57,11 +57,23 @@ export default function Team() {
     enabled: isAuthenticated,
   });
 
+  // Fetch active OOO periods for all team members
+  const { data: activeOOOPeriods = {} } = useQuery({
+    queryKey: ["/api/out-of-office/active-statuses"],
+    enabled: isAuthenticated && teamMembers.length > 0,
+    select: (data: any) => {
+      // Transform array of OOO periods into a map by userId for quick lookup
+      if (!Array.isArray(data)) return {};
+      return data.reduce((acc: any, period: any) => {
+        acc[period.userId] = period;
+        return acc;
+      }, {});
+    },
+  });
+
   // Helper function to check if user is currently out of office
   const isUserOutOfOffice = (member: any) => {
-    // This would be better fetched from an API endpoint, but for now
-    // we'll add a visual placeholder that can be enhanced later
-    return false; // TODO: Implement OOO status check
+    return !!activeOOOPeriods[member.id];
   };
 
   // Form for inviting team members

@@ -816,6 +816,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get active OOO statuses for all users in the organization
+  app.get("/api/out-of-office/active-statuses", isAuthenticated, async (req, res) => {
+    try {
+      const currentUserId = (req.user as any)?.claims?.sub;
+      const currentUser = await storage.getUser(currentUserId);
+      
+      if (!currentUser) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Get all users in the organization
+      const users = await storage.getUsersByOrganization(currentUser.organizationId);
+      
+      // Get active OOO periods for each user
+      const activeStatuses = [];
+      for (const user of users) {
+        const period = await storage.getActiveOutOfOfficePeriod(user.id);
+        if (period) {
+          activeStatuses.push(period);
+        }
+      }
+
+      res.json(activeStatuses);
+    } catch (error) {
+      console.error("Error fetching active OOO statuses:", error);
+      res.status(500).json({ message: "Failed to fetch active statuses" });
+    }
+  });
+
   app.post("/api/out-of-office", isAuthenticated, async (req, res) => {
     try {
       const currentUserId = (req.user as any)?.claims?.sub;
