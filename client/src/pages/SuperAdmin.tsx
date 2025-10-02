@@ -379,12 +379,11 @@ export default function SuperAdmin() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-11">
+        <TabsList className="grid w-full grid-cols-10">
           <TabsTrigger value="organizations">Organizations</TabsTrigger>
           <TabsTrigger value="users">All Users</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
-          <TabsTrigger value="messaging">Mass Email</TabsTrigger>
-          <TabsTrigger value="alerts">System Alerts</TabsTrigger>
+          <TabsTrigger value="communication">Communication</TabsTrigger>
           <TabsTrigger value="revenue">Revenue</TabsTrigger>
           <TabsTrigger value="features">Feature Flags</TabsTrigger>
           <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
@@ -657,141 +656,8 @@ export default function SuperAdmin() {
           </Card>
         </TabsContent>
 
-        {/* Mass Email Tab */}
-        <TabsContent value="messaging">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Mail className="w-5 h-5 mr-2" />
-                Mass Email Tool
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Email Composition */}
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="recipients">Recipients</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select recipient group" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Users</SelectItem>
-                        <SelectItem value="admins">Admin Users Only</SelectItem>
-                        <SelectItem value="selected">Selected from User Table</SelectItem>
-                        <SelectItem value="account">Specific Account</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="subject">Subject Line</Label>
-                    <Input 
-                      placeholder="Enter email subject..."
-                      className="mt-1"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="message">Message</Label>
-                    <Textarea 
-                      placeholder="Compose your message here... Use {{firstName}}, {{accountName}}, etc. for dynamic fields"
-                      rows={8}
-                      className="mt-1"
-                    />
-                  </div>
-
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                      <input type="checkbox" id="schedule" className="rounded" />
-                      <Label htmlFor="schedule">Schedule Send</Label>
-                    </div>
-                    <Input type="datetime-local" className="w-48" />
-                  </div>
-
-                  <div className="flex space-x-2">
-                    <Button variant="outline">
-                      <Eye className="w-4 h-4 mr-2" />
-                      Preview Message
-                    </Button>
-                    <Button className="bg-blue-600 hover:bg-blue-700">
-                      <Send className="w-4 h-4 mr-2" />
-                      Send Email
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Dynamic Fields & Templates */}
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="font-semibold mb-2">Available Dynamic Fields</h3>
-                    <div className="space-y-2">
-                      <div className="p-2 bg-gray-50 rounded text-sm">
-                        <code>{'{{firstName}}'}</code> - User's first name
-                      </div>
-                      <div className="p-2 bg-gray-50 rounded text-sm">
-                        <code>{'{{lastName}}'}</code> - User's last name
-                      </div>
-                      <div className="p-2 bg-gray-50 rounded text-sm">
-                        <code>{'{{email}}'}</code> - User's email address
-                      </div>
-                      <div className="p-2 bg-gray-50 rounded text-sm">
-                        <code>{'{{accountName}}'}</code> - User's company name
-                      </div>
-                      <div className="p-2 bg-gray-50 rounded text-sm">
-                        <code>{'{{role}}'}</code> - User's role (Admin, Staff, etc.)
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold mb-2">Quick Templates</h3>
-                    <div className="space-y-2">
-                      <Button variant="outline" size="sm" className="w-full justify-start">
-                        Maintenance Notice
-                      </Button>
-                      <Button variant="outline" size="sm" className="w-full justify-start">
-                        New Feature Announcement
-                      </Button>
-                      <Button variant="outline" size="sm" className="w-full justify-start">
-                        System Update
-                      </Button>
-                      <Button variant="outline" size="sm" className="w-full justify-start">
-                        Account Reminder
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold mb-2">Delivery Stats</h3>
-                    <div className="space-y-2 text-sm text-gray-600">
-                      <div className="flex justify-between">
-                        <span>Last Campaign:</span>
-                        <span>Jan 20, 2025</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Emails Sent:</span>
-                        <span>1,247</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Delivery Rate:</span>
-                        <span>97.8%</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Open Rate:</span>
-                        <span>68.2%</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* System Alerts Tab */}
-        <TabsContent value="alerts">
+        {/* Communication Tab - System Alerts */}
+        <TabsContent value="communication">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Create Alert */}
             <Card>
@@ -860,6 +726,30 @@ export default function SuperAdmin() {
                   </Select>
                 </div>
 
+                <div>
+                  <Label htmlFor="location">Page/Location (Optional)</Label>
+                  <Select>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Show on all pages" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Pages</SelectItem>
+                      <SelectItem value="dashboard">Dashboard Only</SelectItem>
+                      <SelectItem value="properties">Properties Page</SelectItem>
+                      <SelectItem value="tasks">Tasks Page</SelectItem>
+                      <SelectItem value="calendar">Calendar Page</SelectItem>
+                      <SelectItem value="team">Team Page</SelectItem>
+                      <SelectItem value="contacts">Contacts Page</SelectItem>
+                      <SelectItem value="billing">Billing Page</SelectItem>
+                      <SelectItem value="settings">Settings Page</SelectItem>
+                      <SelectItem value="admin">Admin Pages Only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Alert will only appear on the selected page/location
+                  </p>
+                </div>
+
                 <div className="flex items-center space-x-2">
                   <input type="checkbox" id="require-ack" className="rounded" />
                   <Label htmlFor="require-ack">Require acknowledgment</Label>
@@ -906,7 +796,7 @@ export default function SuperAdmin() {
                         Platform will be offline for maintenance on Jan 25, 2025 from 1:00 AM - 3:00 AM EST.
                       </p>
                       <div className="text-xs text-yellow-600">
-                        Active: Jan 24, 1:00 PM - Jan 25, 4:00 AM | Target: All Users
+                        Active: Jan 24, 1:00 PM - Jan 25, 4:00 AM | Target: All Users | Location: All Pages
                       </div>
                     </div>
                     <div className="flex space-x-1">
@@ -933,7 +823,7 @@ export default function SuperAdmin() {
                         🎉 Dashboard customization is now live! Personalize your workspace with drag-and-drop widgets.
                       </p>
                       <div className="text-xs text-blue-600">
-                        Active: Jan 22, 9:00 AM - Jan 29, 11:59 PM | Target: Admin Users
+                        Active: Jan 22, 9:00 AM - Jan 29, 11:59 PM | Target: Admin Users | Location: Dashboard Only
                       </div>
                     </div>
                     <div className="flex space-x-1">
