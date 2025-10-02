@@ -21,7 +21,7 @@ import TeamMemberProfile from "@/pages/TeamMemberProfile";
 import People from "@/pages/People";
 import PersonProfile from "@/pages/PersonProfile";
 import DuplicatesManagement from "@/pages/DuplicatesManagement";
-import PropertyCenter from "@/pages/PropertyCenter";
+import HubifyConsole from "@/pages/PropertyCenter"; // Will be renamed to HubifyConsole.tsx
 import PropertyPortalSettings from "@/pages/PropertyPortalSettings";
 import AdminClientPortal from "@/pages/AdminClientPortal";
 import AdminClientPortalProperty from "@/pages/AdminClientPortalProperty";
@@ -124,8 +124,12 @@ function Router() {
           <Route path="/person-profile/:id" component={PersonProfile} />
           <Route path="/duplicates" component={DuplicatesManagement} />
           <Route path="/admin" component={Admin} />
-          <Route path="/admin/client-portal" component={AdminClientPortal} />
-          <Route path="/admin/client-portal/:propertyId" component={AdminClientPortalProperty} />
+          
+          {/* Hubify Console (Admin Back-End) */}
+          <Route path="/hubify-console" component={AdminClientPortal} />
+          <Route path="/hubify-console/:propertyId" component={AdminClientPortalProperty} />
+          
+          {/* Billing Routes */}
           <Route path="/admin/billing" component={AdminBilling} />
           <Route path="/admin/invoices" component={AdminInvoices} />
           <Route path="/billing/invoices" component={OrgBillingInvoices} />
@@ -133,15 +137,27 @@ function Router() {
           <Route path="/settings/stripe" component={OrgStripeSettings} />
           
           {/* Backward compatibility redirects */}
+          <Route path="/admin/client-portal">
+            {() => {
+              window.location.replace(routes.hubifyConsole());
+              return null;
+            }}
+          </Route>
+          <Route path="/admin/client-portal/:propertyId">
+            {(params) => {
+              window.location.replace(routes.hubifyConsoleSettings(params.propertyId));
+              return null;
+            }}
+          </Route>
           <Route path="/property-center">
             {() => {
-              window.location.replace(routes.adminClientPortal());
+              window.location.replace(routes.hubifyConsole());
               return null;
             }}
           </Route>
           <Route path="/properties/:propertyId/portal-settings">
             {(params) => {
-              window.location.replace(routes.adminClientPortalSettings(params.propertyId));
+              window.location.replace(routes.hubifyConsoleSettings(params.propertyId));
               return null;
             }}
           </Route>

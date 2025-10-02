@@ -1,30 +1,56 @@
 /**
  * Centralized route definitions for type safety and easy maintenance
  * Update routes here for application-wide changes
+ * 
+ * MIGRATION NOTE:
+ * - "Hubify Console" = Admin back-end (formerly PropertyCenter/ClientCenter admin)
+ * - "Hubify Portal" = User-facing front-end (formerly ClientCenter public)
  */
 
 export const routes = {
-  // Admin Client Portal Routes
+  // Hubify Console Routes (Admin Back-End)
+  hubifyConsole: (propertyId?: string) => 
+    propertyId ? `/hubify-console/${propertyId}` : '/hubify-console',
+  
+  hubifyConsoleSettings: (propertyId: string) => 
+    `/hubify-console/${propertyId}`,
+  
+  hubifyConsoleBranding: (propertyId: string) => 
+    `/hubify-console/${propertyId}/branding`,
+  
+  hubifyConsoleNav: (propertyId: string) => 
+    `/hubify-console/${propertyId}/nav`,
+  
+  hubifyConsolePages: (propertyId: string) => 
+    `/hubify-console/${propertyId}/pages`,
+  
+  hubifyConsoleForms: (propertyId: string) => 
+    `/hubify-console/${propertyId}/forms`,
+  
+  hubifyConsolePreview: (propertyId: string) => 
+    `/hubify-console/${propertyId}/preview`,
+  
+  // Backward compatibility aliases
   adminClientPortal: (propertyId?: string) => 
-    propertyId ? `/admin/client-portal/${propertyId}` : '/admin/client-portal',
+    propertyId ? `/hubify-console/${propertyId}` : '/hubify-console',
   
   adminClientPortalSettings: (propertyId: string) => 
-    `/admin/client-portal/${propertyId}`,
+    `/hubify-console/${propertyId}`,
   
   adminClientPortalBranding: (propertyId: string) => 
-    `/admin/client-portal/${propertyId}/branding`,
+    `/hubify-console/${propertyId}/branding`,
   
   adminClientPortalNav: (propertyId: string) => 
-    `/admin/client-portal/${propertyId}/nav`,
+    `/hubify-console/${propertyId}/nav`,
   
   adminClientPortalPages: (propertyId: string) => 
-    `/admin/client-portal/${propertyId}/pages`,
+    `/hubify-console/${propertyId}/pages`,
   
   adminClientPortalForms: (propertyId: string) => 
-    `/admin/client-portal/${propertyId}/forms`,
+    `/hubify-console/${propertyId}/forms`,
   
   adminClientPortalPreview: (propertyId: string) => 
-    `/admin/client-portal/${propertyId}/preview`,
+    `/hubify-console/${propertyId}/preview`,
 
   // API Routes
   api: {
@@ -43,7 +69,11 @@ export const routes = {
       `/api/orgs/${orgId}/branding`,
   },
 
-  // Public Portal Routes (unchanged)
+  // Hubify Portal Routes (User-Facing Front-End)
+  hubifyPortal: (propertySlug: string) => `/p/${propertySlug}`,
+  hubifyPortalConfig: (propertyId: string) => `/api/portals/${propertyId}/config`,
+  
+  // Backward compatibility
   publicPortal: (propertySlug: string) => `/p/${propertySlug}`,
   publicPortalConfig: (propertyId: string) => `/api/portals/${propertyId}/config`,
 

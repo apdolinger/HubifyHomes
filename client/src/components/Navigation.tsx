@@ -146,9 +146,9 @@ export default function Navigation() {
                 {((user as any)?.role === 'admin' || (user as any)?.role === 'manager') && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => window.location.href = routes.adminClientPortal()}>
+                    <DropdownMenuItem onClick={() => window.location.href = routes.hubifyConsole()}>
                       <Home className="w-4 h-4 mr-2" />
-                      Client Portal
+                      Hubify Console
                     </DropdownMenuItem>
                     {(user as any)?.role === 'admin' && (
                       <DropdownMenuItem onClick={() => window.location.href = '/admin/billing'}>
@@ -225,17 +225,17 @@ export default function Navigation() {
                         </p>
                       </div>
 
-                      <Link href={routes.adminClientPortal()}>
+                      <Link href={routes.hubifyConsole()}>
                         <a
                           className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
-                            location === routes.adminClientPortal()
+                            location === routes.hubifyConsole()
                               ? "bg-blue-50 text-blue-700"
                               : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                           }`}
                           onClick={() => setIsMobileMenuOpen(false)}
                         >
                           <Home className="w-5 h-5 mr-3" />
-                          Client Portal
+                          Hubify Console
                         </a>
                       </Link>
                       
