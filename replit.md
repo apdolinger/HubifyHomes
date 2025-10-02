@@ -4,6 +4,14 @@
 Hubify is a professional property management platform designed to streamline operations for home watch and estate management companies. It aims to enhance team efficiency and client communication by providing a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface. The platform's vision is to become a leading solution in property management, addressing workflow inefficiencies and offering significant market potential.
 
 ## Recent Changes
+- **Portal Authentication System (October 2, 2025)**: Implemented secure invitation-based authentication for Hubify Portal:
+  - **Database Schema**: Created `portal_users`, `portal_sessions`, `portal_user_properties`, and `portal_invitations` tables
+  - **Invitation Security**: Registration requires invitation tokens created by admins, preventing unauthorized access
+  - **Role-Based Access**: Support for three portal user roles (resident, staff, vendor) with property associations
+  - **Session Management**: Token-based authentication with 30-day expiry and device tracking
+  - **Password Security**: bcrypt password hashing with salt rounds for secure storage
+  - **Admin Controls**: Endpoints for creating/managing invitations with role restrictions
+  - **Multi-Tenant Security**: Invitation system enforces org/role from tokens, closing critical security flaw
 - **Terminology Migration (October 2, 2025)**: Completed migration from legacy naming to unified Hubify branding:
   - **Hubify Console**: Admin back-end for property management (formerly PropertyCenter/ClientCenter admin)
   - **Hubify Portal**: Client-facing frontend for property owners/tenants (future implementation)
