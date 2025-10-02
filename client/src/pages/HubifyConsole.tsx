@@ -17,8 +17,10 @@ import {
   AlertTriangle,
   MessageCircle,
   Phone,
-  Mail
+  Mail,
+  Eye
 } from "lucide-react";
+import { Link } from "wouter";
 
 export default function HubifyConsole() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -113,6 +115,14 @@ export default function HubifyConsole() {
           <p className="mt-2 text-lg text-slate-600">
             Manage portal settings and property access
           </p>
+          <div className="mt-4">
+            <Link href="/portal-preview">
+              <Button variant="outline" className="gap-2" data-testid="button-portal-preview">
+                <Eye className="h-4 w-4" />
+                Preview Portal
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
 

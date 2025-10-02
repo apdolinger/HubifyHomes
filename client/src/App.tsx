@@ -47,6 +47,7 @@ import { useState } from "react";
 import Portal from "@/pages/Portal";
 import PortalLogin from "@/pages/PortalLogin";
 import PortalRegister from "@/pages/PortalRegister";
+import PortalPreview from "@/pages/PortalPreview";
 
 // Global Task Modal Component
 function GlobalTaskModal() {
@@ -138,6 +139,9 @@ function Router() {
           {/* Hubify Console (Admin Back-End) */}
           <Route path="/hubify-console" component={AdminClientPortal} />
           <Route path="/hubify-console/:propertyId" component={AdminClientPortalProperty} />
+          
+          {/* Portal Preview */}
+          <Route path="/portal-preview" component={PortalPreview} />
           
           {/* Billing Routes */}
           <Route path="/admin/billing" component={AdminBilling} />
