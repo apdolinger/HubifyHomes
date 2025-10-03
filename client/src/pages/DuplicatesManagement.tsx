@@ -643,8 +643,51 @@ export default function DuplicatesManagement() {
                           )}
                         </div>
                       </div>
+                    ) : selectedDuplicateGroup?.type === 'property' && selectedPrimary ? (
+                      <div className="space-y-3">
+                        <div>
+                          <h4 className="font-semibold text-lg">{selectedPrimary.name}</h4>
+                          <Badge className="mt-1">
+                            {selectedPrimary.type || 'Property'}
+                          </Badge>
+                        </div>
+                        
+                        <div className="space-y-2 text-sm">
+                          <div className="flex items-center space-x-2">
+                            <MapPin className="w-4 h-4 text-gray-500" />
+                            <div>
+                              <div>{selectedPrimary.address1}</div>
+                              {selectedPrimary.address2 && <div>{selectedPrimary.address2}</div>}
+                              <div>{selectedPrimary.city}, {selectedPrimary.state} {selectedPrimary.zip}</div>
+                            </div>
+                          </div>
+                          
+                          {selectedPrimary.accountId && (
+                            <div className="flex items-center space-x-2">
+                              <Building className="w-4 h-4 text-gray-500" />
+                              <span>Account ID: {selectedPrimary.accountId}</span>
+                            </div>
+                          )}
+                          
+                          {selectedPrimary.status && (
+                            <div className="flex items-center space-x-2">
+                              <Badge variant={selectedPrimary.status === 'occupied' ? 'default' : 'secondary'}>
+                                Status: {selectedPrimary.status}
+                              </Badge>
+                            </div>
+                          )}
+                          
+                          <div className="text-gray-600">
+                            Units: {selectedPrimary.units ?? 1}
+                          </div>
+                          
+                          <div className="text-gray-600">
+                            Square Footage: {selectedPrimary.squareFootage?.toLocaleString() ?? 'N/A'} {selectedPrimary.squareFootage ? 'sq ft' : ''}
+                          </div>
+                        </div>
+                      </div>
                     ) : (
-                      <div>Property details would go here</div>
+                      <div className="text-gray-500">No property details available</div>
                     )}
                   </CardContent>
                 </Card>
@@ -706,8 +749,51 @@ export default function DuplicatesManagement() {
                           )}
                         </div>
                       </div>
+                    ) : selectedDuplicateGroup?.type === 'property' && selectedDuplicate ? (
+                      <div className="space-y-3">
+                        <div>
+                          <h4 className="font-semibold text-lg">{selectedDuplicate.name}</h4>
+                          <Badge className="mt-1">
+                            {selectedDuplicate.type || 'Property'}
+                          </Badge>
+                        </div>
+                        
+                        <div className="space-y-2 text-sm">
+                          <div className="flex items-center space-x-2">
+                            <MapPin className="w-4 h-4 text-gray-500" />
+                            <div>
+                              <div>{selectedDuplicate.address1}</div>
+                              {selectedDuplicate.address2 && <div>{selectedDuplicate.address2}</div>}
+                              <div>{selectedDuplicate.city}, {selectedDuplicate.state} {selectedDuplicate.zip}</div>
+                            </div>
+                          </div>
+                          
+                          {selectedDuplicate.accountId && (
+                            <div className="flex items-center space-x-2">
+                              <Building className="w-4 h-4 text-gray-500" />
+                              <span>Account ID: {selectedDuplicate.accountId}</span>
+                            </div>
+                          )}
+                          
+                          {selectedDuplicate.status && (
+                            <div className="flex items-center space-x-2">
+                              <Badge variant={selectedDuplicate.status === 'occupied' ? 'default' : 'secondary'}>
+                                Status: {selectedDuplicate.status}
+                              </Badge>
+                            </div>
+                          )}
+                          
+                          <div className="text-gray-600">
+                            Units: {selectedDuplicate.units ?? 1}
+                          </div>
+                          
+                          <div className="text-gray-600">
+                            Square Footage: {selectedDuplicate.squareFootage?.toLocaleString() ?? 'N/A'} {selectedDuplicate.squareFootage ? 'sq ft' : ''}
+                          </div>
+                        </div>
+                      </div>
                     ) : (
-                      <div>Property details would go here</div>
+                      <div className="text-gray-500">No property details available</div>
                     )}
                   </CardContent>
                 </Card>
