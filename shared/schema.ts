@@ -732,6 +732,29 @@ export const messageReactions = pgTable("message_reactions", {
   uniqueUserMessageReaction: index("unique_user_message_reaction").on(table.messageId, table.userId, table.reaction),
 }));
 
+// Message Mentions table - tracks @mentions in messages
+export const messageMentions = pgTable("message_mentions", {
+  id: serial("id").primaryKey(),
+  messageId: integer("message_id").references(() => teamMessages.id, { onDelete: 'cascade' }).notNull(),
+  mentionedUserId: varchar("mentioned_user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("message_mentions_message_idx").on(table.messageId),
+  index("message_mentions_user_idx").on(table.mentionedUserId),
+  index("message_mentions_unread_idx").on(table.mentionedUserId, table.isRead),
+]);
+
+// User Notification Preferences table
+export const userNotificationPreferences = pgTable("user_notification_preferences", {
+  userId: varchar("user_id").primaryKey().references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  emailOnMention: boolean("email_on_mention").notNull().default(true),
+  emailOnReply: boolean("email_on_reply").notNull().default(true),
+  emailOnReaction: boolean("email_on_reaction").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Activity Log table
 export const activityLog = pgTable("activity_log", {
   id: serial("id").primaryKey(),
@@ -1339,6 +1362,7 @@ export const teamMessagesRelations = relations(teamMessages, ({ one, many }) => 
     relationName: "replies",
   }),
   reactions: many(messageReactions),
+  mentions: many(messageMentions),
 }));
 
 export const messageReactionsRelations = relations(messageReactions, ({ one }) => ({
@@ -1348,6 +1372,24 @@ export const messageReactionsRelations = relations(messageReactions, ({ one }) =
   }),
   user: one(users, {
     fields: [messageReactions.userId],
+    references: [users.id],
+  }),
+}));
+
+export const messageMentionsRelations = relations(messageMentions, ({ one }) => ({
+  message: one(teamMessages, {
+    fields: [messageMentions.messageId],
+    references: [teamMessages.id],
+  }),
+  mentionedUser: one(users, {
+    fields: [messageMentions.mentionedUserId],
+    references: [users.id],
+  }),
+}));
+
+export const userNotificationPreferencesRelations = relations(userNotificationPreferences, ({ one }) => ({
+  user: one(users, {
+    fields: [userNotificationPreferences.userId],
     references: [users.id],
   }),
 }));
@@ -1526,6 +1568,17 @@ export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).om
 export const insertMessageReactionSchema = createInsertSchema(messageReactions).omit({
   id: true,
   createdAt: true,
+});
+
+export const insertMessageMentionSchema = createInsertSchema(messageMentions).omit({
+  id: true,
+  createdAt: true,
+  isRead: true,
+});
+
+export const insertUserNotificationPreferencesSchema = createInsertSchema(userNotificationPreferences).omit({
+  createdAt: true,
+  updatedAt: true,
 });
 
 export const insertActivityLogSchema = createInsertSchema(activityLog).omit({
@@ -1786,6 +1839,10 @@ export type InsertTeamMessage = z.infer<typeof insertTeamMessageSchema>;
 export type TeamMessage = typeof teamMessages.$inferSelect;
 export type InsertMessageReaction = z.infer<typeof insertMessageReactionSchema>;
 export type MessageReaction = typeof messageReactions.$inferSelect;
+export type InsertMessageMention = z.infer<typeof insertMessageMentionSchema>;
+export type MessageMention = typeof messageMentions.$inferSelect;
+export type InsertUserNotificationPreferences = z.infer<typeof insertUserNotificationPreferencesSchema>;
+export type UserNotificationPreferences = typeof userNotificationPreferences.$inferSelect;
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type ActivityLog = typeof activityLog.$inferSelect;
 
