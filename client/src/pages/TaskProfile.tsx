@@ -96,6 +96,8 @@ export default function TaskProfile() {
   const [isImageUploading, setIsImageUploading] = useState(false);
   const [conflictData, setConflictData] = useState<any>(null);
   const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   // Task templates
   const taskTemplates = {
@@ -304,6 +306,48 @@ export default function TaskProfile() {
       });
     },
   });
+
+  // Delete task mutation
+  const deleteTaskMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("DELETE", `/api/tasks/${taskId}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/urgent-tasks'] });
+      
+      toast({
+        title: "Success",
+        description: "Task deleted successfully",
+      });
+      
+      // Navigate back to tasks list
+      navigate("/tasks");
+    },
+    onError: (error: any) => {
+      console.error("Task delete error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete task",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteTask = () => {
+    if (deleteConfirmText === "DELETE") {
+      deleteTaskMutation.mutate();
+      setIsDeleteModalOpen(false);
+      setDeleteConfirmText("");
+    } else {
+      toast({
+        title: "Invalid confirmation",
+        description: "Please type DELETE in all capitals to confirm",
+        variant: "destructive",
+      });
+    }
+  };
 
   useEffect(() => {
     if (task) {
@@ -1662,6 +1706,87 @@ export default function TaskProfile() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Task Section */}
+      <div className="mt-8 pt-8 border-t">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900">Danger Zone</h3>
+            <p className="text-sm text-slate-600 mt-1">
+              Permanently delete this task and all associated data
+            </p>
+          </div>
+          <Button
+            variant="destructive"
+            onClick={() => setIsDeleteModalOpen(true)}
+            data-testid="button-delete-task"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete Task
+          </Button>
+        </div>
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={isDeleteModalOpen} onOpenChange={(open) => {
+        setIsDeleteModalOpen(open);
+        if (!open) setDeleteConfirmText("");
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2 text-red-600">
+              <AlertCircle className="w-5 h-5" />
+              <span>Delete Task</span>
+            </DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. This will permanently delete the task and all associated data.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-800">
+                <strong>Warning:</strong> You are about to delete "{(task as any)?.title}"
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="delete-confirm" className="text-sm font-medium">
+                Type <span className="font-mono font-bold">DELETE</span> to confirm
+              </Label>
+              <Input
+                id="delete-confirm"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="Type DELETE in all capitals"
+                className="mt-2"
+                data-testid="input-delete-confirm"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDeleteModalOpen(false);
+                setDeleteConfirmText("");
+              }}
+              data-testid="button-cancel-delete"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteTask}
+              disabled={deleteConfirmText !== "DELETE" || deleteTaskMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteTaskMutation.isPending ? "Deleting..." : "Delete Task"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Conflict Resolution Modal */}
       <Dialog open={isConflictModalOpen} onOpenChange={setIsConflictModalOpen}>
