@@ -99,6 +99,27 @@ export default function TaskProfile() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isFileUploading, setIsFileUploading] = useState(false);
+  const [propertySearchOpen, setPropertySearchOpen] = useState(false);
+  const [propertySearchValue, setPropertySearchValue] = useState("");
+  const [contactSearchOpen, setContactSearchOpen] = useState(false);
+  const [contactSearchValue, setContactSearchValue] = useState("");
+  const [isNewPropertyModalOpen, setIsNewPropertyModalOpen] = useState(false);
+  const [isNewContactModalOpen, setIsNewContactModalOpen] = useState(false);
+  const [newPropertyForm, setNewPropertyForm] = useState({
+    name: "",
+    address1: "",
+    city: "",
+    state: "",
+    zip: "",
+    type: "residential",
+  });
+  const [newContactForm, setNewContactForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    type: "owner",
+  });
 
   // Task templates
   const taskTemplates = {
