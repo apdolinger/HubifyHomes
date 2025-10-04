@@ -132,6 +132,85 @@ Hubify Team`,
   }
 }
 
+// Helper function to parse @mentions from message content
+function parseMentions(content: string, allUsers: Array<{id: string, firstName: string | null, lastName: string | null}>): string[] {
+  const mentionRegex = /@(\w+(?:\s+\w+)?)/g;
+  const matches = content.matchAll(mentionRegex);
+  const mentionedUserIds: string[] = [];
+  
+  for (const match of matches) {
+    const mentionedName = match[1].toLowerCase();
+    
+    // Try to find user by first name, last name, or full name
+    const user = allUsers.find(u => {
+      const firstName = (u.firstName || '').toLowerCase();
+      const lastName = (u.lastName || '').toLowerCase();
+      const fullName = `${firstName} ${lastName}`.trim();
+      
+      return firstName === mentionedName || 
+             lastName === mentionedName || 
+             fullName === mentionedName;
+    });
+    
+    if (user && !mentionedUserIds.includes(user.id)) {
+      mentionedUserIds.push(user.id);
+    }
+  }
+  
+  return mentionedUserIds;
+}
+
+// Helper function to send mention notification email
+async function sendMentionNotification(
+  mentionedUserEmail: string,
+  mentionedUserName: string,
+  authorName: string,
+  messageContent: string
+) {
+  if (!SENDGRID_API_KEY) {
+    console.warn("SendGrid API key not configured. Skipping email notification.");
+    return;
+  }
+
+  try {
+    const msg = {
+      to: mentionedUserEmail,
+      from: process.env.SENDGRID_FROM_EMAIL || "noreply@hubify.com",
+      subject: `${authorName} mentioned you in a team message`,
+      text: `Hello ${mentionedUserName},
+
+${authorName} mentioned you in a team message:
+
+"${messageContent}"
+
+Log in to Hubify to view and respond.
+
+Best regards,
+Hubify Team`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #3b82f6;">New Mention in Team Chat</h2>
+          <p>Hello ${mentionedUserName},</p>
+          <p><strong>${authorName}</strong> mentioned you in a team message:</p>
+          
+          <div style="background-color: #f3f4f6; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #3b82f6;">
+            <p style="margin: 0;">"${messageContent}"</p>
+          </div>
+
+          <p>Log in to Hubify to view and respond to this message.</p>
+          
+          <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">Best regards,<br>Hubify Team</p>
+        </div>
+      `,
+    };
+
+    await sgMail.send(msg);
+    console.log(`Mention notification sent to ${mentionedUserEmail}`);
+  } catch (error) {
+    console.error("Error sending mention notification:", error);
+  }
+}
+
 // Security Middleware
 const isSuperAdmin = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -2821,7 +2900,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         authorId: userId,
       });
+      
+      // Create the message
       const message = await storage.createTeamMessage(validatedData);
+      
+      // Parse @mentions
+      const allUsers = await storage.getUsers();
+      const mentionedUserIds = parseMentions(validatedData.content, allUsers);
+      
+      // Create mention records
+      if (mentionedUserIds.length > 0) {
+        await storage.createMentions(message.id, mentionedUserIds);
+        
+        // Send email notifications to mentioned users
+        const author = await storage.getUser(userId);
+        const authorName = author ? `${author.firstName || ''} ${author.lastName || ''}`.trim() || 'A team member' : 'A team member';
+        
+        for (const mentionedUserId of mentionedUserIds) {
+          const mentionedUser = await storage.getUser(mentionedUserId);
+          if (mentionedUser && mentionedUser.email) {
+            // Check user's notification preferences
+            const prefs = await storage.getUserNotificationPreferences(mentionedUserId);
+            if (!prefs || prefs.emailOnMention) { // Send email by default
+              const mentionedUserName = `${mentionedUser.firstName || ''} ${mentionedUser.lastName || ''}`.trim() || 'there';
+              await sendMentionNotification(
+                mentionedUser.email,
+                mentionedUserName,
+                authorName,
+                validatedData.content
+              );
+            }
+          }
+        }
+      }
+      
       res.status(201).json(message);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -2849,6 +2961,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!updatedMessage) {
         return res.status(404).json({ message: "Message not found or you don't have permission to edit it" });
+      }
+
+      // Update @mentions
+      const allUsers = await storage.getUsers();
+      const mentionedUserIds = parseMentions(content.trim(), allUsers);
+      
+      // Delete old mentions and create new ones
+      await storage.deleteMentions(messageId);
+      if (mentionedUserIds.length > 0) {
+        await storage.createMentions(messageId, mentionedUserIds);
       }
 
       res.json(updatedMessage);
@@ -2907,10 +3029,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
         emailNotification,
       });
 
+      // Parse @mentions in reply
+      const allUsers = await storage.getUsers();
+      const mentionedUserIds = parseMentions(content.trim(), allUsers);
+      
+      // Create mention records
+      if (mentionedUserIds.length > 0) {
+        await storage.createMentions(reply.id, mentionedUserIds);
+        
+        // Send email notifications to mentioned users
+        const author = await storage.getUser(req.user.claims.sub);
+        const authorName = author ? `${author.firstName || ''} ${author.lastName || ''}`.trim() || 'A team member' : 'A team member';
+        
+        for (const mentionedUserId of mentionedUserIds) {
+          const mentionedUser = await storage.getUser(mentionedUserId);
+          if (mentionedUser && mentionedUser.email) {
+            const prefs = await storage.getUserNotificationPreferences(mentionedUserId);
+            if (!prefs || prefs.emailOnMention) {
+              const mentionedUserName = `${mentionedUser.firstName || ''} ${mentionedUser.lastName || ''}`.trim() || 'there';
+              await sendMentionNotification(
+                mentionedUser.email,
+                mentionedUserName,
+                authorName,
+                content.trim()
+              );
+            }
+          }
+        }
+      }
+
       res.status(201).json(reply);
     } catch (error) {
       console.error("Error creating reply:", error);
       res.status(500).json({ message: "Failed to create reply" });
+    }
+  });
+
+  // User mentions routes
+  app.get("/api/user-mentions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const mentions = await storage.getMentionedMessages(userId);
+      res.json(mentions);
+    } catch (error) {
+      console.error("Error fetching user mentions:", error);
+      res.status(500).json({ message: "Failed to fetch mentions" });
+    }
+  });
+
+  app.post("/api/user-mentions/:id/mark-read", isAuthenticated, async (req: any, res) => {
+    try {
+      const mentionId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      await storage.markMentionAsRead(mentionId, userId);
+      res.json({ message: "Mention marked as read" });
+    } catch (error) {
+      console.error("Error marking mention as read:", error);
+      res.status(500).json({ message: "Failed to mark mention as read" });
+    }
+  });
+
+  // User notification preferences routes
+  app.get("/api/user/notification-preferences", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      let prefs = await storage.getUserNotificationPreferences(userId);
+      
+      // If no preferences exist, return defaults
+      if (!prefs) {
+        prefs = {
+          userId,
+          emailOnMention: true,
+          emailOnReply: true,
+          emailOnReaction: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+      }
+      
+      res.json(prefs);
+    } catch (error) {
+      console.error("Error fetching notification preferences:", error);
+      res.status(500).json({ message: "Failed to fetch notification preferences" });
+    }
+  });
+
+  app.put("/api/user/notification-preferences", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { emailOnMention, emailOnReply, emailOnReaction } = req.body;
+      
+      const prefs = await storage.upsertUserNotificationPreferences({
+        userId,
+        emailOnMention: emailOnMention !== undefined ? emailOnMention : true,
+        emailOnReply: emailOnReply !== undefined ? emailOnReply : true,
+        emailOnReaction: emailOnReaction !== undefined ? emailOnReaction : false,
+      });
+      
+      res.json(prefs);
+    } catch (error) {
+      console.error("Error updating notification preferences:", error);
+      res.status(500).json({ message: "Failed to update notification preferences" });
     }
   });
 
