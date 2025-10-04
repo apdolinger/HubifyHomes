@@ -192,10 +192,7 @@ export default function Dashboard() {
   // Send message mutation
   const sendMessageMutation = useMutation({
     mutationFn: async ({ content, emailNotification }: { content: string; emailNotification: boolean }) => {
-      return await apiRequest("/api/team-messages", {
-        method: "POST",
-        body: { content, emailNotification }
-      });
+      return await apiRequest("POST", "/api/team-messages", { content, emailNotification });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/team-messages"] });
@@ -228,10 +225,7 @@ export default function Dashboard() {
   // Edit message mutation
   const editMessageMutation = useMutation({
     mutationFn: async ({ id, content }: { id: number; content: string }) => {
-      return await apiRequest(`/api/team-messages/${id}`, {
-        method: "PUT",
-        body: { content }
-      });
+      return await apiRequest("PUT", `/api/team-messages/${id}`, { content });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/team-messages"] });
@@ -265,9 +259,7 @@ export default function Dashboard() {
   // Delete message mutation
   const deleteMessageMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest(`/api/team-messages/${id}`, {
-        method: "DELETE"
-      });
+      return await apiRequest("DELETE", `/api/team-messages/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/team-messages"] });
@@ -327,10 +319,7 @@ export default function Dashboard() {
   // Reaction mutation
   const reactionMutation = useMutation({
     mutationFn: async ({ messageId, reaction }: { messageId: number; reaction: string }) => {
-      return await apiRequest(`/api/team-messages/${messageId}/reactions`, {
-        method: "POST",
-        body: { reaction }
-      });
+      return await apiRequest("POST", `/api/team-messages/${messageId}/reactions`, { reaction });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/team-messages"] });
@@ -358,10 +347,7 @@ export default function Dashboard() {
   // Reply mutation
   const replyMutation = useMutation({
     mutationFn: async ({ messageId, content, emailNotification }: { messageId: number; content: string; emailNotification: boolean }) => {
-      return await apiRequest(`/api/team-messages/${messageId}/reply`, {
-        method: "POST",
-        body: { content, emailNotification }
-      });
+      return await apiRequest("POST", `/api/team-messages/${messageId}/reply`, { content, emailNotification });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/team-messages"] });
