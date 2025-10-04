@@ -125,28 +125,25 @@ export async function setupAuth(app: Express) {
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
-  // For development, use session-based auth
-  if (process.env.NODE_ENV === 'development') {
-    const sessionUser = (req as any).session?.user;
-    if (sessionUser && sessionUser.expires_at && sessionUser.expires_at > Math.floor(Date.now() / 1000)) {
-      (req as any).user = sessionUser;
-      return next();
-    }
+  // Check if user is authenticated via passport
+  if (!req.isAuthenticated()) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  // Production Replit auth logic
   const user = req.user as any;
-
-  if (!req.isAuthenticated() || !user.expires_at) {
+  
+  // Check if user object has required data
+  if (!user || !user.expires_at) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
+  // Check if token is still valid
   const now = Math.floor(Date.now() / 1000);
   if (now <= user.expires_at) {
     return next();
   }
 
+  // Token expired, try to refresh
   const refreshToken = user.refresh_token;
   if (!refreshToken) {
     res.status(401).json({ message: "Unauthorized" });
