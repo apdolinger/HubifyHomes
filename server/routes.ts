@@ -3077,6 +3077,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get mentions for a specific user (for viewing their profile Messages tab)
+  app.get("/api/mentions/user/:userId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.params.userId;
+      const mentions = await storage.getMentionedMessages(userId);
+      res.json(mentions);
+    } catch (error) {
+      console.error("Error fetching user mentions:", error);
+      res.status(500).json({ message: "Failed to fetch mentions" });
+    }
+  });
+
   app.post("/api/user-mentions/:id/mark-read", isAuthenticated, async (req: any, res) => {
     try {
       const mentionId = parseInt(req.params.id);
@@ -3090,7 +3102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User notification preferences routes
-  app.get("/api/user/notification-preferences", isAuthenticated, async (req: any, res) => {
+  app.get("/api/notification-preferences", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       let prefs = await storage.getUserNotificationPreferences(userId);
@@ -3114,7 +3126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/user/notification-preferences", isAuthenticated, async (req: any, res) => {
+  app.put("/api/notification-preferences", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { emailOnMention, emailOnReply, emailOnReaction } = req.body;
