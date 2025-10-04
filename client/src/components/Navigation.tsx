@@ -3,10 +3,15 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { routes } from "@/lib/routes";
 import { useTaskModal } from "@/contexts/TaskModalContext";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { TimeTrackingDropdownItems } from "@/components/TimeTracking";
+import { apiRequest } from "@/lib/queryClient";
 import { 
   BarChart3, 
   CheckSquare, 
@@ -22,7 +27,8 @@ import {
   Calendar,
   Clock,
   CreditCard,
-  Wrench
+  Wrench,
+  Bell
 } from "lucide-react";
 
 const getNavigationItems = (user: any) => {
@@ -47,8 +53,38 @@ export default function Navigation() {
   const { user } = useAuth();
   const { openTaskModal } = useTaskModal();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   const navigationItems = getNavigationItems(user);
+
+  // Fetch notification preferences
+  const { data: notificationPrefs, isLoading: prefsLoading } = useQuery({
+    queryKey: ["/api/notification-preferences"],
+    enabled: isNotificationSettingsOpen && !!(user as any)?.id,
+  });
+
+  // Update notification preferences mutation
+  const updatePrefsMutation = useMutation({
+    mutationFn: async (prefs: { emailOnMention: boolean }) => {
+      return await apiRequest("PUT", "/api/notification-preferences", prefs);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notification-preferences"] });
+      toast({
+        title: "Settings saved",
+        description: "Your notification preferences have been updated.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update notification preferences.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleLogout = () => {
     window.location.href = "/api/logout";
@@ -142,6 +178,10 @@ export default function Navigation() {
                 <DropdownMenuItem onClick={() => window.location.href = '/settings/stripe'}>
                   <CreditCard className="w-4 h-4 mr-2" />
                   Stripe Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsNotificationSettingsOpen(true)}>
+                  <Bell className="w-4 h-4 mr-2" />
+                  Notification Settings
                 </DropdownMenuItem>
                 {((user as any)?.role === 'admin' || (user as any)?.role === 'manager') && (
                   <>
@@ -262,6 +302,38 @@ export default function Navigation() {
           </div>
         </div>
       </div>
+
+      {/* Notification Settings Dialog */}
+      <Dialog open={isNotificationSettingsOpen} onOpenChange={setIsNotificationSettingsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Notification Settings</DialogTitle>
+          </DialogHeader>
+          {prefsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <div className="space-y-4 py-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium">Email notifications for @mentions</p>
+                  <p className="text-sm text-slate-500">
+                    Receive an email when someone mentions you in a team message
+                  </p>
+                </div>
+                <Switch
+                  checked={notificationPrefs?.emailOnMention ?? true}
+                  onCheckedChange={(checked) => {
+                    updatePrefsMutation.mutate({ emailOnMention: checked });
+                  }}
+                  disabled={updatePrefsMutation.isPending}
+                />
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </nav>
   );
 }
