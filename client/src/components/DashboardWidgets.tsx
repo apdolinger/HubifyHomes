@@ -82,10 +82,16 @@ export function CalendarWidget({ className }: CalendarWidgetProps) {
 
 interface SupportWidgetProps {
   className?: string;
+  externalModalOpen?: boolean;
+  onExternalModalChange?: (open: boolean) => void;
 }
 
-export function SupportWidget({ className }: SupportWidgetProps) {
-  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+export function SupportWidget({ className, externalModalOpen, onExternalModalChange }: SupportWidgetProps) {
+  const [internalModalOpen, setInternalModalOpen] = useState(false);
+  
+  // Use external control if provided, otherwise use internal state
+  const isModalOpen = externalModalOpen !== undefined ? externalModalOpen : internalModalOpen;
+  const setModalOpen = onExternalModalChange || setInternalModalOpen;
 
   return (
     <>
@@ -133,13 +139,14 @@ export function SupportWidget({ className }: SupportWidgetProps) {
             <div className="bg-slate-50 rounded-lg p-3">
               <h4 className="font-medium text-slate-900 mb-1">Quick Tip</h4>
               <p className="text-sm text-slate-600">
-                Use keyboard shortcut "T" to quickly add a new task from anywhere in the app.
+                Press "?" to open support, or "T" to quickly add a new task from anywhere.
               </p>
             </div>
             
             <Button 
               className="w-full bg-primary hover:bg-primary/90"
-              onClick={() => setIsSupportModalOpen(true)}
+              onClick={() => setModalOpen(true)}
+              data-testid="button-contact-support"
             >
               Contact Support
             </Button>
@@ -148,8 +155,8 @@ export function SupportWidget({ className }: SupportWidgetProps) {
       </Card>
 
       <SupportModal
-        isOpen={isSupportModalOpen}
-        onClose={() => setIsSupportModalOpen(false)}
+        isOpen={isModalOpen}
+        onClose={() => setModalOpen(false)}
       />
     </>
   );
