@@ -463,7 +463,14 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return user;
     } else {
-      const [user] = await db.insert(users).values(userData).returning();
+      const [user] = await db
+        .insert(users)
+        .values(userData)
+        .onConflictDoUpdate({
+          target: users.email,
+          set: { ...userData, updatedAt: new Date() }
+        })
+        .returning();
       return user;
     }
   }

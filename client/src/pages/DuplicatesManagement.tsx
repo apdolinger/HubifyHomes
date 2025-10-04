@@ -97,7 +97,7 @@ export default function DuplicatesManagement() {
   // Scan for duplicates mutation
   const scanMutation = useMutation({
     mutationFn: async (criteria: any) => {
-      return await apiRequest("/api/duplicates/scan", "POST", { criteria });
+      return await apiRequest("POST", "/api/duplicates/scan", { criteria });
     },
     onSuccess: () => {
       setIsScanning(false);
@@ -190,7 +190,7 @@ export default function DuplicatesManagement() {
         reason: "User manually ignored this duplicate group"
       });
       
-      await apiRequest("/api/duplicates/ignore", "POST", {
+      await apiRequest("POST", "/api/duplicates/ignore", {
         recordType: selectedDuplicateGroup.type,
         recordIds: recordIds,
         reason: "User manually ignored this duplicate group"
@@ -237,7 +237,7 @@ export default function DuplicatesManagement() {
   // Handle merging duplicates
   const handleMerge = async () => {
     try {
-      await apiRequest("/api/duplicates/merge-multiple", "POST", {
+      await apiRequest("POST", "/api/duplicates/merge-multiple", {
         recordIds: [selectedPrimary.id, selectedDuplicate.id],
         type: selectedDuplicateGroup.type,
         mergeNotes
