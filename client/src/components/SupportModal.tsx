@@ -563,26 +563,6 @@ export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
             </Button>
           </div>
         </form>
-
-        {/* Additional Help Section */}
-        <div className="border-t pt-4">
-          <div className="bg-slate-50 rounded-lg p-4">
-            <div className="flex items-start space-x-3">
-              <HelpCircle className="w-5 h-5 text-slate-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <h4 className="font-medium text-slate-900 mb-1">Need Immediate Help?</h4>
-                <p className="text-sm text-slate-600 mb-3">
-                  For urgent issues, you can also reach us directly:
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" className="text-xs">
-                    📚 Full Help Center
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </DialogContent>
     </Dialog>
   );
