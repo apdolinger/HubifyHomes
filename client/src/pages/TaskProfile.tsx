@@ -98,6 +98,7 @@ export default function TaskProfile() {
   const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isFileUploading, setIsFileUploading] = useState(false);
 
   // Task templates
   const taskTemplates = {
@@ -606,6 +607,61 @@ export default function TaskProfile() {
     toast({
       title: "Image removed",
       description: "Task image has been removed",
+    });
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      setIsFileUploading(true);
+      
+      // Process each file
+      Array.from(files).forEach((file) => {
+        // Validate file size (max 10MB)
+        if (file.size > 10 * 1024 * 1024) {
+          toast({
+            title: "File too large",
+            description: `${file.name} exceeds 10MB limit`,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Add file to attachments list with a unique ID
+        const newAttachment = {
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          name: file.name,
+          size: formatFileSize(file.size),
+          type: file.type,
+        };
+
+        setAttachments(prev => [...prev, newAttachment]);
+      });
+
+      setIsFileUploading(false);
+      toast({
+        title: "Files uploaded",
+        description: `${files.length} file(s) added successfully`,
+      });
+
+      // Clear the input
+      event.target.value = '';
+    }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachments(prev => prev.filter(file => file.id !== id));
+    toast({
+      title: "File removed",
+      description: "Attachment has been removed",
     });
   };
 
@@ -1445,7 +1501,13 @@ export default function TaskProfile() {
                             <Button variant="ghost" size="sm">
                               <Download className="w-4 h-4" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="text-red-500 hover:text-red-700"
+                              onClick={() => removeAttachment(file.id)}
+                              data-testid={`button-remove-attachment-${file.id}`}
+                            >
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
@@ -1459,10 +1521,27 @@ export default function TaskProfile() {
                       </div>
                     )}
                     
-                    <Button variant="outline" className="w-full">
-                      <Upload className="w-4 h-4 mr-2" />
-                      Upload Files
-                    </Button>
+                    <label className="w-full">
+                      <Button 
+                        variant="outline" 
+                        className="w-full cursor-pointer"
+                        disabled={isFileUploading}
+                        asChild
+                      >
+                        <span>
+                          <Upload className="w-4 h-4 mr-2" />
+                          {isFileUploading ? "Uploading..." : "Upload Files"}
+                        </span>
+                      </Button>
+                      <input
+                        type="file"
+                        multiple
+                        onChange={handleFileUpload}
+                        className="hidden"
+                        accept="*/*"
+                        data-testid="input-file-upload"
+                      />
+                    </label>
                   </div>
                 </CardContent>
               </Card>
