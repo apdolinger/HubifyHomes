@@ -2964,20 +2964,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { recordType, recordIds, reason } = req.body;
       
-      console.log("[Ignore Duplicate] Request body:", { recordType, recordIds, reason, userId: req.user.claims.sub });
-      
       if (!recordType || !recordIds || !Array.isArray(recordIds)) {
-        console.log("[Ignore Duplicate] Validation failed");
         return res.status(400).json({ message: "recordType and recordIds array are required" });
       }
       
       await storage.ignoreDuplicate(recordType, recordIds, req.user.claims.sub, reason);
-      console.log("[Ignore Duplicate] Success");
       res.json({ message: "Duplicate ignored successfully" });
     } catch (error) {
-      console.error("[Ignore Duplicate] Error:", error);
-      console.error("[Ignore Duplicate] Error stack:", error instanceof Error ? error.stack : 'No stack trace');
-      res.status(500).json({ message: "Failed to ignore duplicate", error: error instanceof Error ? error.message : String(error) });
+      console.error("Error ignoring duplicate:", error);
+      res.status(500).json({ message: "Failed to ignore duplicate" });
     }
   });
 
