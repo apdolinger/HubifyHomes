@@ -9,6 +9,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   Building, 
   AlertTriangle, 
@@ -57,6 +63,9 @@ export default function Dashboard() {
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [mentionSearch, setMentionSearch] = useState("");
   const [mentionPosition, setMentionPosition] = useState(0);
+  
+  // Recent Activity filter state
+  const [activityFilter, setActivityFilter] = useState<"all" | "task" | "property" | "contact">("all");
   
   // Widget icon mapping for consistent icons
   const getWidgetIcon = (id: string) => {
@@ -960,6 +969,14 @@ function renderMessageWithMentions(content: string) {
               );
 
             case "recent-activity":
+              // Filter activity based on selected category
+              const filteredActivity = recentActivity && Array.isArray(recentActivity)
+                ? recentActivity.filter((activity: any) => {
+                    if (activityFilter === "all") return true;
+                    return activity.entityType === activityFilter;
+                  })
+                : [];
+
               return (
                 <Card key={widget.id} className="lg:col-span-6">
                   <CardHeader className="pb-3">
@@ -968,15 +985,58 @@ function renderMessageWithMentions(content: string) {
                         {widget.icon}
                         <span className="ml-2">{widget.name}</span>
                       </div>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                        <Settings className="w-3 h-3" />
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6 w-6 p-0"
+                            data-testid="button-activity-filter"
+                          >
+                            <Settings className="w-3 h-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => setActivityFilter("all")}
+                            className={activityFilter === "all" ? "bg-slate-100" : ""}
+                            data-testid="filter-all"
+                          >
+                            <CheckCircle className="w-3 h-3 mr-2" />
+                            All Activity
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setActivityFilter("task")}
+                            className={activityFilter === "task" ? "bg-slate-100" : ""}
+                            data-testid="filter-tasks"
+                          >
+                            <AlertTriangle className="w-3 h-3 mr-2" />
+                            Tasks
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setActivityFilter("property")}
+                            className={activityFilter === "property" ? "bg-slate-100" : ""}
+                            data-testid="filter-properties"
+                          >
+                            <Building className="w-3 h-3 mr-2" />
+                            Properties
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setActivityFilter("contact")}
+                            className={activityFilter === "contact" ? "bg-slate-100" : ""}
+                            data-testid="filter-contacts"
+                          >
+                            <Users className="w-3 h-3 mr-2" />
+                            Contacts
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {recentActivity && Array.isArray(recentActivity) && recentActivity.length > 0 ? (
+                    {filteredActivity && filteredActivity.length > 0 ? (
                       <div className="space-y-3">
-                        {recentActivity.slice(0, 4).map((activity: any) => (
+                        {filteredActivity.slice(0, 4).map((activity: any) => (
                           <div key={activity.id} className="flex items-start space-x-3">
                             <div className="flex-shrink-0 mt-0.5">
                               <User className="w-4 h-4 text-slate-400" />
@@ -991,7 +1051,9 @@ function renderMessageWithMentions(content: string) {
                     ) : (
                       <div className="text-center py-6 text-sm text-slate-500">
                         <Clock className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                        No recent activity
+                        {activityFilter === "all" 
+                          ? "No recent activity" 
+                          : `No recent ${activityFilter} activity`}
                       </div>
                     )}
                   </CardContent>
