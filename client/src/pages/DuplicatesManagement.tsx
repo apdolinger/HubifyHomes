@@ -177,15 +177,26 @@ export default function DuplicatesManagement() {
   // Handle ignoring a duplicate
   const handleIgnoreDuplicate = async () => {
     try {
-      if (!selectedDuplicateGroup) return;
+      if (!selectedDuplicateGroup) {
+        console.log("[Ignore Duplicate] No selected duplicate group");
+        return;
+      }
       
       const recordIds = selectedDuplicateGroup.records.map((record: any) => record.id);
+      
+      console.log("[Ignore Duplicate] Request payload:", {
+        recordType: selectedDuplicateGroup.type,
+        recordIds,
+        reason: "User manually ignored this duplicate group"
+      });
       
       await apiRequest("/api/duplicates/ignore", "POST", {
         recordType: selectedDuplicateGroup.type,
         recordIds: recordIds,
         reason: "User manually ignored this duplicate group"
       });
+      
+      console.log("[Ignore Duplicate] Success");
       
       toast({
         title: "Duplicate Ignored",
@@ -196,6 +207,7 @@ export default function DuplicatesManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/duplicates"] });
       queryClient.invalidateQueries({ queryKey: ["/api/duplicates/history"] });
     } catch (error) {
+      console.error("[Ignore Duplicate] Error:", error);
       if (isUnauthorizedError(error as Error)) {
         toast({
           title: "Unauthorized",
