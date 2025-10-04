@@ -40,6 +40,7 @@ import Navigation from "@/components/Navigation";
 import QuickSearchModal from "@/components/QuickSearchModal";
 import QuickAddTaskModal from "@/components/QuickAddTaskModal";
 import KeyboardHelpModal from "@/components/KeyboardHelpModal";
+import SupportModal from "@/components/SupportModal";
 import { TaskModalProvider, useTaskModal } from "@/contexts/TaskModalContext";
 import { PortalAuthProvider } from "@/contexts/PortalAuthContext";
 import { routes } from "@/lib/routes";
@@ -188,6 +189,7 @@ function Router() {
 function AuthenticatedAppContent() {
   const [isQuickSearchOpen, setIsQuickSearchOpen] = useState(false);
   const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState(false);
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const { openTaskModal } = useTaskModal();
 
   useHotkeys({
@@ -195,10 +197,11 @@ function AuthenticatedAppContent() {
     "S": () => setIsQuickSearchOpen(true),
     "t": () => openTaskModal(),
     "T": () => openTaskModal(),
-    "?": () => setIsKeyboardHelpOpen(true),
+    "?": () => setIsSupportModalOpen(true),
     "Escape": () => {
       setIsQuickSearchOpen(false);
       setIsKeyboardHelpOpen(false);
+      setIsSupportModalOpen(false);
     },
   });
 
@@ -243,6 +246,10 @@ function AuthenticatedAppContent() {
     <KeyboardHelpModal 
       isOpen={isKeyboardHelpOpen} 
       onClose={() => setIsKeyboardHelpOpen(false)} 
+    />
+    <SupportModal 
+      isOpen={isSupportModalOpen} 
+      onClose={() => setIsSupportModalOpen(false)} 
     />
     </div>
   );

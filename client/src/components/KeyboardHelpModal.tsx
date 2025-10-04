@@ -11,7 +11,7 @@ export default function KeyboardHelpModal({ isOpen, onClose }: KeyboardHelpModal
   const shortcuts = [
     { key: "S", description: "Quick Search" },
     { key: "T", description: "Add Task" },
-    { key: "?", description: "Help" },
+    { key: "?", description: "Open Support" },
     { key: "ESC", description: "Close Modal" },
   ];
 

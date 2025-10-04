@@ -67,9 +67,6 @@ export default function Dashboard() {
   // Recent Activity filter state
   const [activityFilter, setActivityFilter] = useState<"all" | "task" | "property" | "contact">("all");
   
-  // Support modal state for keyboard shortcut
-  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
-  
   // Widget icon mapping for consistent icons
   const getWidgetIcon = (id: string) => {
     const iconMap: Record<string, React.ReactNode> = {
@@ -219,29 +216,6 @@ function renderMessageWithMentions(content: string) {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  // Keyboard shortcut: Press "?" to open support modal
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      // Check if "?" key is pressed (Shift + /)
-      if (e.key === "?" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        // Check if user is currently in a text input field
-        const activeElement = document.activeElement;
-        const isInTextField = 
-          activeElement instanceof HTMLInputElement ||
-          activeElement instanceof HTMLTextAreaElement ||
-          (activeElement instanceof HTMLElement && activeElement.isContentEditable);
-        
-        // Only open support modal if not in a text field
-        if (!isInTextField) {
-          e.preventDefault();
-          setIsSupportModalOpen(true);
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyPress);
-    return () => window.removeEventListener("keydown", handleKeyPress);
-  }, []);
 
   // Dashboard stats query
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -1091,14 +1065,7 @@ function renderMessageWithMentions(content: string) {
               return <CalendarWidget key={widget.id} className="lg:col-span-4" />;
 
             case "support":
-              return (
-                <SupportWidget 
-                  key={widget.id} 
-                  className="lg:col-span-4"
-                  externalModalOpen={isSupportModalOpen}
-                  onExternalModalChange={setIsSupportModalOpen}
-                />
-              );
+              return <SupportWidget key={widget.id} className="lg:col-span-4" />;
 
             case "duplicates":
               return <DuplicatesWidget key={widget.id} className="lg:col-span-4" />;
