@@ -1487,7 +1487,7 @@ export default function TaskProfile() {
             <div className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Task Details</CardTitle>
+                  <CardTitle>Team Details</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
