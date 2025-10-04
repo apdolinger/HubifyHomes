@@ -878,53 +878,49 @@ export default function TaskProfile() {
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Actions Row */}
-        <div className="flex items-center justify-end">
-          <div className="flex items-center space-x-2">
-            <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit Task
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto">
-                <DialogHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <DialogTitle>Edit Task</DialogTitle>
-                      <DialogDescription>
-                        Update task details, checklist items, and other information.
-                      </DialogDescription>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Label htmlFor="task-template" className="text-sm font-medium">Template:</Label>
-                      <Select onValueChange={handleTemplateSelect}>
-                        <SelectTrigger className="w-48">
-                          <SelectValue placeholder="Select template" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">No Template</SelectItem>
-                          <SelectItem value="weekly-inspection">Weekly Inspection</SelectItem>
-                          <SelectItem value="monthly-maintenance">Monthly Maintenance</SelectItem>
-                          <SelectItem value="quarterly-review">Quarterly Review</SelectItem>
-                          <SelectItem value="emergency-repair">Emergency Repair</SelectItem>
-                          <SelectItem value="cleaning-checklist">Cleaning Checklist</SelectItem>
-                          <SelectItem value="hvac-maintenance">HVAC Maintenance</SelectItem>
-                          <SelectItem value="landscaping">Landscaping Tasks</SelectItem>
-                          <SelectItem value="security-check">Security Check</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </DialogHeader>
-                
-                {/* Edit Modal Content */}
-                <div className="space-y-6 py-4 min-h-[600px]">
+              
+              {/* Edit Task Button */}
+              <div className="flex-shrink-0">
+                <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Task
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto">
+                    <DialogHeader>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <DialogTitle>Edit Task</DialogTitle>
+                          <DialogDescription>
+                            Update task details, checklist items, and other information.
+                          </DialogDescription>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Label htmlFor="task-template" className="text-sm font-medium">Template:</Label>
+                          <Select onValueChange={handleTemplateSelect}>
+                            <SelectTrigger className="w-48">
+                              <SelectValue placeholder="Select template" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No Template</SelectItem>
+                              <SelectItem value="weekly-inspection">Weekly Inspection</SelectItem>
+                              <SelectItem value="monthly-maintenance">Monthly Maintenance</SelectItem>
+                              <SelectItem value="quarterly-review">Quarterly Review</SelectItem>
+                              <SelectItem value="emergency-repair">Emergency Repair</SelectItem>
+                              <SelectItem value="cleaning-checklist">Cleaning Checklist</SelectItem>
+                              <SelectItem value="hvac-maintenance">HVAC Maintenance</SelectItem>
+                              <SelectItem value="landscaping">Landscaping Tasks</SelectItem>
+                              <SelectItem value="security-check">Security Check</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </DialogHeader>
+                    
+                    {/* Edit Modal Content */}
+                    <div className="space-y-6 py-4 min-h-[600px]">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="edit-title">Task Name</Label>
@@ -1209,18 +1205,20 @@ export default function TaskProfile() {
                   </div>
 
 
-                </div>
+                    </div>
 
-                <DialogFooter>
-                  <Button variant="outline" onClick={handleCancel}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleSave} disabled={updateTaskMutation.isPending}>
-                    Save Changes
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={handleCancel}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handleSave} disabled={updateTaskMutation.isPending}>
+                        Save Changes
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </div>
           </div>
         </div>
       </div>
