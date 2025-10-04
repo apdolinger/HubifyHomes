@@ -689,13 +689,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: 'admin', // Set admin role for development user
       });
       
-      // Set session
-      (req as any).session.user = {
-        claims: { sub: user.id },
+      // Create a Passport-compatible user object
+      const passportUser = {
+        id: user.id,
+        claims: { 
+          sub: user.id,
+          email: user.email,
+          first_name: user.firstName,
+          last_name: user.lastName,
+          profile_image_url: user.profileImageUrl,
+          role: user.role
+        },
         expires_at: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60) // 7 days
       };
       
-      res.json({ message: "Logged in as test user", user });
+      // Use Passport's login method to properly authenticate
+      req.login(passportUser, (err) => {
+        if (err) {
+          console.error("Error logging in:", err);
+          return res.status(500).json({ message: "Failed to login" });
+        }
+        res.json({ message: "Logged in as test user", user });
+      });
     } catch (error) {
       console.error("Error creating test user:", error);
       res.status(500).json({ message: "Failed to create test user" });
