@@ -132,6 +132,43 @@ export default function Dashboard() {
       category: "content" as const
     }];
 
+// Helper function to render message content with highlighted @mentions
+function renderMessageWithMentions(content: string) {
+  const mentionRegex = /@(\w+(?:\s+\w+)?)/g;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+  let key = 0;
+
+  while ((match = mentionRegex.exec(content)) !== null) {
+    // Add text before the mention
+    if (match.index > lastIndex) {
+      parts.push(
+        <span key={`text-${key++}`}>{content.substring(lastIndex, match.index)}</span>
+      );
+    }
+
+    // Add the highlighted mention
+    parts.push(
+      <span
+        key={`mention-${key++}`}
+        className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 px-1 rounded font-medium"
+      >
+        @{match[1]}
+      </span>
+    );
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Add any remaining text
+  if (lastIndex < content.length) {
+    parts.push(<span key={`text-${key++}`}>{content.substring(lastIndex)}</span>);
+  }
+
+  return parts.length > 0 ? parts : content;
+}
+
   // Load saved widget configuration from localStorage or use defaults
   const [dashboardWidgets, setDashboardWidgets] = useState(() => {
     const saved = localStorage.getItem('dashboardWidgets');
@@ -690,7 +727,7 @@ export default function Dashboard() {
                                 </div>
                               ) : (
                                 <>
-                                  <p className="text-xs text-slate-900">{message.content}</p>
+                                  <p className="text-xs text-slate-900">{renderMessageWithMentions(message.content)}</p>
                                   <div className="flex items-center justify-between">
                                     <p className="text-xs text-slate-500">
                                       {message.author?.firstName} {message.author?.lastName} • {formatTimeAgo(message.createdAt)}
