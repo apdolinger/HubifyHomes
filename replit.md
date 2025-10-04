@@ -4,6 +4,12 @@
 Hubify is a professional property management platform designed to streamline operations for home watch and estate management companies. It aims to enhance team efficiency and client communication by providing a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface. The platform's vision is to become a leading solution in property management, addressing workflow inefficiencies and offering significant market potential.
 
 ## Recent Changes
+- **Support Modal & Keyboard Shortcut Updates (October 4, 2025)**: Enhanced support accessibility and streamlined UI:
+  - **Global Keyboard Shortcut**: Integrated "?" key with centralized useHotkeys system in App.tsx for global Support modal access
+  - **Smart Text Detection**: Keyboard shortcut respects input field focus (won't trigger when typing in text fields)
+  - **Simplified Support Modal**: Removed "Need Immediate Help" section and "Full Help Center" button for cleaner interface
+  - **Centralized State Management**: SupportModal now rendered at App level for consistent access across all pages
+  - **Updated Documentation**: Keyboard Help modal reflects "?" → "Open Support" shortcut mapping
 - **Portal Preview Mode (October 2, 2025)**: Added admin portal preview feature for visualizing role-specific dashboards:
   - **Preview Interface**: Dedicated `/portal-preview` page with role selector and device toggle controls
   - **Role Switching**: Live preview of all three portal roles (resident, staff, vendor) without creating actual users
