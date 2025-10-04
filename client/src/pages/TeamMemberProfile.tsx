@@ -36,7 +36,8 @@ import {
   Award,
   Plus,
   Trash2,
-  CalendarIcon
+  CalendarIcon,
+  MessageSquare
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -145,6 +146,12 @@ export default function TeamMemberProfile() {
   // Fetch member's properties (if any are managed by them)
   const { data: managedProperties = [] } = useQuery({
     queryKey: [`/api/properties`, { managerId: memberId }],
+    enabled: isAuthenticated && !!memberId,
+  });
+
+  // Fetch messages where this user is mentioned
+  const { data: mentionedMessages = [], isLoading: mentionedMessagesLoading } = useQuery({
+    queryKey: [`/api/mentions/user/${memberId}`],
     enabled: isAuthenticated && !!memberId,
   });
 
@@ -325,6 +332,39 @@ export default function TeamMemberProfile() {
     return `${Math.floor(diffInSeconds / 86400)}d ago`;
   };
 
+  const renderMessageWithMentions = (content: string) => {
+    const mentionRegex = /@(\w+(?:\s+\w+)?)/g;
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+    let key = 0;
+
+    while ((match = mentionRegex.exec(content)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(
+          <span key={`text-${key++}`}>{content.substring(lastIndex, match.index)}</span>
+        );
+      }
+
+      parts.push(
+        <span
+          key={`mention-${key++}`}
+          className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 px-1 rounded font-medium"
+        >
+          @{match[1]}
+        </span>
+      );
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    if (lastIndex < content.length) {
+      parts.push(<span key={`text-${key++}`}>{content.substring(lastIndex)}</span>);
+    }
+
+    return parts.length > 0 ? parts : content;
+  };
+
   if (isLoading || memberLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -496,10 +536,11 @@ export default function TeamMemberProfile() {
 
       {/* Detailed Information Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="tasks">Tasks</TabsTrigger>
           <TabsTrigger value="properties">Properties</TabsTrigger>
+          <TabsTrigger value="messages">Messages</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
         </TabsList>
 
@@ -757,6 +798,59 @@ export default function TeamMemberProfile() {
                 <div className="text-center py-8 text-sm text-slate-500">
                   <Building className="w-12 h-12 mx-auto mb-4 text-slate-300" />
                   No properties currently managed by this member
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="messages" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Mentioned Messages
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {mentionedMessagesLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : mentionedMessages.length > 0 ? (
+                <div className="space-y-4">
+                  {mentionedMessages.map((mention: any) => (
+                    <div key={mention.id} className="p-4 border border-slate-200 rounded-lg bg-white">
+                      <div className="flex items-start space-x-3">
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback>
+                            {getUserInitials(mention.message.author.firstName, mention.message.author.lastName)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-sm font-medium text-slate-900">
+                              {mention.message.author.firstName} {mention.message.author.lastName}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {formatTimeAgo(mention.message.createdAt)}
+                            </p>
+                          </div>
+                          <p className="text-sm text-slate-700">
+                            {renderMessageWithMentions(mention.message.content)}
+                          </p>
+                          {mention.message.isEdited && (
+                            <p className="text-xs text-slate-400 mt-1">(edited)</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-sm text-slate-500">
+                  <MessageSquare className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+                  No messages mention this user yet
                 </div>
               )}
             </CardContent>

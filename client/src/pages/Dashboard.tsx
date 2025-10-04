@@ -53,6 +53,11 @@ export default function Dashboard() {
   const [replyContent, setReplyContent] = useState("");
   const [emailNotification, setEmailNotification] = useState(false);
   
+  // @mention autocomplete state
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [mentionSearch, setMentionSearch] = useState("");
+  const [mentionPosition, setMentionPosition] = useState(0);
+  
   // Widget icon mapping for consistent icons
   const getWidgetIcon = (id: string) => {
     const iconMap: Record<string, React.ReactNode> = {
@@ -224,6 +229,12 @@ function renderMessageWithMentions(content: string) {
   const { data: recentActivity, isLoading: recentActivityLoading } = useQuery({
     queryKey: ["/api/dashboard/recent-activity"],
     enabled: isAuthenticated,
+  });
+
+  // Team members query for @mention autocomplete
+  const { data: teamMembers = [] } = useQuery({
+    queryKey: ["/api/users"],
+    enabled: isAuthenticated && showMentionDropdown,
   });
 
   // Send message mutation
