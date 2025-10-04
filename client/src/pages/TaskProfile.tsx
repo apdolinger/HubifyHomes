@@ -257,7 +257,7 @@ export default function TaskProfile() {
 
   // Fetch task details
   const { data: task, isLoading: taskLoading } = useQuery({
-    queryKey: [`/api/tasks/${taskId}`],
+    queryKey: ["/api/tasks", taskId],
     enabled: isAuthenticated && !!taskId,
   });
 
@@ -302,9 +302,10 @@ export default function TaskProfile() {
     mutationFn: async (updatedTask: any) => {
       return await apiRequest("PATCH", `/api/tasks/${taskId}`, updatedTask);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      // Refetch the task to get updated data immediately
+      await queryClient.refetchQueries({ queryKey: ["/api/tasks", taskId] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] });
       // Invalidate dashboard queries to update statistics
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/urgent-tasks'] });
@@ -686,6 +687,107 @@ export default function TaskProfile() {
     });
   };
 
+  // Create property mutation
+  const createPropertyMutation = useMutation({
+    mutationFn: async (propertyData: any) => {
+      const response = await apiRequest("POST", "/api/properties", propertyData);
+      const newProperty = await response.json();
+      // Immediately assign the property to the task
+      await apiRequest("PATCH", `/api/tasks/${taskId}`, { propertyId: newProperty.id });
+      return newProperty;
+    },
+    onSuccess: async (newProperty) => {
+      // Refetch the task to get the updated property
+      await queryClient.refetchQueries({ queryKey: ["/api/tasks", taskId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      toast({
+        title: "Success",
+        description: "Property created and assigned successfully",
+      });
+      setIsNewPropertyModalOpen(false);
+      setPropertySearchOpen(false);
+      setPropertySearchValue("");
+      setNewPropertyForm({
+        name: "",
+        address1: "",
+        city: "",
+        state: "",
+        zip: "",
+        type: "residential",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: "Failed to create property",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create contact mutation
+  const createContactMutation = useMutation({
+    mutationFn: async (contactData: any) => {
+      const response = await apiRequest("POST", "/api/contacts", contactData);
+      const newContact = await response.json();
+      // Immediately assign the contact to the task
+      await apiRequest("PATCH", `/api/tasks/${taskId}`, { contactId: newContact.id });
+      return newContact;
+    },
+    onSuccess: async (newContact) => {
+      // Refetch the task to get the updated contact
+      await queryClient.refetchQueries({ queryKey: ["/api/tasks", taskId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      toast({
+        title: "Success",
+        description: "Contact created and assigned successfully",
+      });
+      setIsNewContactModalOpen(false);
+      setContactSearchOpen(false);
+      setContactSearchValue("");
+      setNewContactForm({
+        firstName: "",
+        lastName: "",
+        email: "",
+        phone: "",
+        type: "owner",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: "Failed to create contact",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateProperty = () => {
+    if (!newPropertyForm.name || !newPropertyForm.address1 || !newPropertyForm.city || !newPropertyForm.state || !newPropertyForm.zip) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    createPropertyMutation.mutate(newPropertyForm);
+  };
+
+  const handleCreateContact = () => {
+    if (!newContactForm.firstName || !newContactForm.lastName) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide first and last name",
+        variant: "destructive",
+      });
+      return;
+    }
+    createContactMutation.mutate(newContactForm);
+  };
+
   const handlePropertyAssociation = (propertyId: string) => {
     const updatedTask = { propertyId: propertyId === "none" ? null : parseInt(propertyId) };
     updateTaskMutation.mutate(updatedTask);
@@ -857,39 +959,86 @@ export default function TaskProfile() {
                     <Label className="text-sm font-medium text-slate-700 mb-2 block">
                       Associated Property
                     </Label>
-                    <Select
-                      value={(task as any).propertyId?.toString() || "none"}
-                      onValueChange={handlePropertyAssociation}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select a property">
-                          {(task as any).property ? (
+                    <Popover open={propertySearchOpen} onOpenChange={setPropertySearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={propertySearchOpen}
+                          className="w-full justify-between"
+                        >
+                          {(task as any).property?.id ? (
                             <div className="flex items-center space-x-2">
                               <Building className="w-4 h-4 text-slate-500" />
                               <span>{(task as any).property.name}</span>
                             </div>
                           ) : (
-                            <span className="text-slate-500">No property assigned</span>
+                            <span className="text-slate-500">Search property...</span>
                           )}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">
-                          <div className="flex items-center space-x-2">
-                            <X className="w-4 h-4 text-slate-400" />
-                            <span>No property</span>
-                          </div>
-                        </SelectItem>
-                        {Array.isArray(properties) && properties.map((property: any) => (
-                          <SelectItem key={property.id} value={property.id.toString()}>
-                            <div className="flex items-center space-x-2">
-                              <Building className="w-4 h-4 text-slate-500" />
-                              <span>{property.name}</span>
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[400px] p-0">
+                        <Command>
+                          <CommandInput 
+                            placeholder="Search properties..." 
+                            value={propertySearchValue}
+                            onValueChange={setPropertySearchValue}
+                          />
+                          <CommandEmpty>
+                            <div className="p-4 text-center">
+                              <p className="text-sm text-slate-500 mb-3">No properties found</p>
+                              <Button 
+                                size="sm" 
+                                onClick={() => {
+                                  setPropertySearchOpen(false);
+                                  setIsNewPropertyModalOpen(true);
+                                  setNewPropertyForm(prev => ({ ...prev, name: propertySearchValue }));
+                                }}
+                                className="w-full"
+                              >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Create new property
+                              </Button>
                             </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          </CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              onSelect={() => {
+                                handlePropertyAssociation("none");
+                                setPropertySearchOpen(false);
+                                setPropertySearchValue("");
+                              }}
+                            >
+                              <X className="mr-2 h-4 w-4 text-slate-400" />
+                              No property
+                            </CommandItem>
+                            {Array.isArray(properties) && properties.map((property: any) => (
+                              <CommandItem
+                                key={property.id}
+                                value={`${property.name} ${property.address1} ${property.city}`}
+                                onSelect={() => {
+                                  handlePropertyAssociation(property.id.toString());
+                                  setPropertySearchOpen(false);
+                                  setPropertySearchValue("");
+                                }}
+                              >
+                                <Check
+                                  className={`mr-2 h-4 w-4 ${
+                                    (task as any).propertyId === property.id ? "opacity-100" : "opacity-0"
+                                  }`}
+                                />
+                                <Building className="mr-2 h-4 w-4 text-slate-500" />
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{property.name}</span>
+                                  <span className="text-xs text-slate-500">{property.address1}, {property.city}</span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
                   {/* Room/Space Association */}
@@ -923,39 +1072,96 @@ export default function TaskProfile() {
                     <Label className="text-sm font-medium text-slate-700 mb-2 block">
                       Related Contact
                     </Label>
-                    <Select
-                      value={(task as any).contactId?.toString() || "none"}
-                      onValueChange={handleContactAssociation}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select contact">
-                          {(task as any).contact ? (
+                    <Popover open={contactSearchOpen} onOpenChange={setContactSearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={contactSearchOpen}
+                          className="w-full justify-between"
+                        >
+                          {(task as any).contact?.id ? (
                             <div className="flex items-center space-x-2">
                               <User className="w-4 h-4 text-slate-500" />
                               <span>{(task as any).contact.firstName} {(task as any).contact.lastName}</span>
                             </div>
                           ) : (
-                            <span className="text-slate-500">No contact</span>
+                            <span className="text-slate-500">Search contact...</span>
                           )}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">
-                          <div className="flex items-center space-x-2">
-                            <X className="w-4 h-4 text-slate-400" />
-                            <span>No contact</span>
-                          </div>
-                        </SelectItem>
-                        {Array.isArray(contacts) && contacts.map((contact: any) => (
-                          <SelectItem key={contact.id} value={contact.id.toString()}>
-                            <div className="flex items-center space-x-2">
-                              <User className="w-4 h-4 text-slate-500" />
-                              <span>{contact.firstName} {contact.lastName} ({contact.type})</span>
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[400px] p-0">
+                        <Command>
+                          <CommandInput 
+                            placeholder="Search contacts..." 
+                            value={contactSearchValue}
+                            onValueChange={setContactSearchValue}
+                          />
+                          <CommandEmpty>
+                            <div className="p-4 text-center">
+                              <p className="text-sm text-slate-500 mb-3">No contacts found</p>
+                              <Button 
+                                size="sm" 
+                                onClick={() => {
+                                  setContactSearchOpen(false);
+                                  setIsNewContactModalOpen(true);
+                                  // Pre-fill with search value if it looks like a name
+                                  const nameParts = contactSearchValue.trim().split(' ');
+                                  if (nameParts.length >= 2) {
+                                    setNewContactForm(prev => ({ 
+                                      ...prev, 
+                                      firstName: nameParts[0], 
+                                      lastName: nameParts.slice(1).join(' ')
+                                    }));
+                                  } else if (nameParts.length === 1) {
+                                    setNewContactForm(prev => ({ ...prev, firstName: nameParts[0] }));
+                                  }
+                                }}
+                                className="w-full"
+                              >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Create new contact
+                              </Button>
                             </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          </CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              onSelect={() => {
+                                handleContactAssociation("none");
+                                setContactSearchOpen(false);
+                                setContactSearchValue("");
+                              }}
+                            >
+                              <X className="mr-2 h-4 w-4 text-slate-400" />
+                              No contact
+                            </CommandItem>
+                            {Array.isArray(contacts) && contacts.map((contact: any) => (
+                              <CommandItem
+                                key={contact.id}
+                                value={`${contact.firstName} ${contact.lastName} ${contact.email || ''}`}
+                                onSelect={() => {
+                                  handleContactAssociation(contact.id.toString());
+                                  setContactSearchOpen(false);
+                                  setContactSearchValue("");
+                                }}
+                              >
+                                <Check
+                                  className={`mr-2 h-4 w-4 ${
+                                    (task as any).contactId === contact.id ? "opacity-100" : "opacity-0"
+                                  }`}
+                                />
+                                <User className="mr-2 h-4 w-4 text-slate-500" />
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{contact.firstName} {contact.lastName}</span>
+                                  <span className="text-xs text-slate-500 capitalize">{contact.type}{contact.email ? ` • ${contact.email}` : ''}</span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
                   {/* Team Assignment */}
@@ -1883,6 +2089,224 @@ export default function TaskProfile() {
               data-testid="button-confirm-delete"
             >
               {deleteTaskMutation.isPending ? "Deleting..." : "Delete Task"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Property Modal */}
+      <Dialog open={isNewPropertyModalOpen} onOpenChange={setIsNewPropertyModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New Property</DialogTitle>
+            <DialogDescription>
+              Add a new property and assign it to this task
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="property-name">Property Name *</Label>
+              <Input
+                id="property-name"
+                value={newPropertyForm.name}
+                onChange={(e) => setNewPropertyForm({ ...newPropertyForm, name: e.target.value })}
+                placeholder="e.g. 123 Main St"
+                data-testid="input-property-name"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="property-address">Street Address *</Label>
+              <Input
+                id="property-address"
+                value={newPropertyForm.address1}
+                onChange={(e) => setNewPropertyForm({ ...newPropertyForm, address1: e.target.value })}
+                placeholder="Street address"
+                data-testid="input-property-address"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="property-city">City *</Label>
+                <Input
+                  id="property-city"
+                  value={newPropertyForm.city}
+                  onChange={(e) => setNewPropertyForm({ ...newPropertyForm, city: e.target.value })}
+                  placeholder="City"
+                  data-testid="input-property-city"
+                />
+              </div>
+              <div>
+                <Label htmlFor="property-state">State *</Label>
+                <Input
+                  id="property-state"
+                  value={newPropertyForm.state}
+                  onChange={(e) => setNewPropertyForm({ ...newPropertyForm, state: e.target.value })}
+                  placeholder="State"
+                  data-testid="input-property-state"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="property-zip">ZIP Code *</Label>
+              <Input
+                id="property-zip"
+                value={newPropertyForm.zip}
+                onChange={(e) => setNewPropertyForm({ ...newPropertyForm, zip: e.target.value })}
+                placeholder="ZIP code"
+                data-testid="input-property-zip"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="property-type">Property Type</Label>
+              <Select 
+                value={newPropertyForm.type}
+                onValueChange={(value) => setNewPropertyForm({ ...newPropertyForm, type: value })}
+              >
+                <SelectTrigger id="property-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="residential">Residential</SelectItem>
+                  <SelectItem value="commercial">Commercial</SelectItem>
+                  <SelectItem value="condo">Condo</SelectItem>
+                  <SelectItem value="apartment">Apartment</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsNewPropertyModalOpen(false);
+                setNewPropertyForm({
+                  name: "",
+                  address1: "",
+                  city: "",
+                  state: "",
+                  zip: "",
+                  type: "residential",
+                });
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateProperty}
+              disabled={createPropertyMutation.isPending}
+              data-testid="button-create-property"
+            >
+              {createPropertyMutation.isPending ? "Creating..." : "Create Property"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Contact Modal */}
+      <Dialog open={isNewContactModalOpen} onOpenChange={setIsNewContactModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New Contact</DialogTitle>
+            <DialogDescription>
+              Add a new contact and assign it to this task
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="contact-first-name">First Name *</Label>
+                <Input
+                  id="contact-first-name"
+                  value={newContactForm.firstName}
+                  onChange={(e) => setNewContactForm({ ...newContactForm, firstName: e.target.value })}
+                  placeholder="First name"
+                  data-testid="input-contact-first-name"
+                />
+              </div>
+              <div>
+                <Label htmlFor="contact-last-name">Last Name *</Label>
+                <Input
+                  id="contact-last-name"
+                  value={newContactForm.lastName}
+                  onChange={(e) => setNewContactForm({ ...newContactForm, lastName: e.target.value })}
+                  placeholder="Last name"
+                  data-testid="input-contact-last-name"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="contact-email">Email</Label>
+              <Input
+                id="contact-email"
+                type="email"
+                value={newContactForm.email}
+                onChange={(e) => setNewContactForm({ ...newContactForm, email: e.target.value })}
+                placeholder="email@example.com"
+                data-testid="input-contact-email"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="contact-phone">Phone</Label>
+              <Input
+                id="contact-phone"
+                type="tel"
+                value={newContactForm.phone}
+                onChange={(e) => setNewContactForm({ ...newContactForm, phone: e.target.value })}
+                placeholder="(555) 123-4567"
+                data-testid="input-contact-phone"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="contact-type">Contact Type</Label>
+              <Select 
+                value={newContactForm.type}
+                onValueChange={(value) => setNewContactForm({ ...newContactForm, type: value })}
+              >
+                <SelectTrigger id="contact-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="owner">Owner</SelectItem>
+                  <SelectItem value="tenant">Tenant</SelectItem>
+                  <SelectItem value="vendor">Vendor</SelectItem>
+                  <SelectItem value="emergency_contact">Emergency Contact</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsNewContactModalOpen(false);
+                setNewContactForm({
+                  firstName: "",
+                  lastName: "",
+                  email: "",
+                  phone: "",
+                  type: "owner",
+                });
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateContact}
+              disabled={createContactMutation.isPending}
+              data-testid="button-create-contact"
+            >
+              {createContactMutation.isPending ? "Creating..." : "Create Contact"}
             </Button>
           </DialogFooter>
         </DialogContent>
