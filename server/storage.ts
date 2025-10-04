@@ -31,6 +31,8 @@ import {
   contactProperties,
   teamMessages,
   messageReactions,
+  messageMentions,
+  userNotificationPreferences,
   activityLog,
   forms,
   formFields,
@@ -109,6 +111,10 @@ import {
   type InsertTeamMessage,
   type MessageReaction,
   type InsertMessageReaction,
+  type MessageMention,
+  type InsertMessageMention,
+  type UserNotificationPreferences,
+  type InsertUserNotificationPreferences,
   type ActivityLog,
   type InsertActivityLog,
   type Form,
@@ -309,6 +315,19 @@ export interface IStorage {
   // Team message operations
   getTeamMessages(limit?: number): Promise<TeamMessage[]>;
   createTeamMessage(message: InsertTeamMessage): Promise<TeamMessage>;
+  updateTeamMessage(id: number, content: string, userId: string): Promise<TeamMessage>;
+  deleteTeamMessage(id: number, userId: string): Promise<void>;
+  toggleReaction(messageId: number, userId: string, reaction: string): Promise<any>;
+  
+  // Message mention operations
+  createMentions(messageId: number, mentionedUserIds: string[]): Promise<void>;
+  deleteMentions(messageId: number): Promise<void>;
+  getMentionedMessages(userId: string): Promise<any[]>;
+  markMentionAsRead(mentionId: number, userId: string): Promise<void>;
+  
+  // User notification preferences operations
+  getUserNotificationPreferences(userId: string): Promise<UserNotificationPreferences | null>;
+  upsertUserNotificationPreferences(preferences: InsertUserNotificationPreferences): Promise<UserNotificationPreferences>;
   
   // Activity log operations
   getRecentActivity(limit?: number): Promise<ActivityLog[]>;
@@ -2053,6 +2072,89 @@ export class DatabaseStorage implements IStorage {
       await this.addReaction(messageId, userId, reaction);
       return { added: true };
     }
+  }
+
+  // Message mention operations
+  async createMentions(messageId: number, mentionedUserIds: string[]): Promise<void> {
+    if (mentionedUserIds.length === 0) return;
+    
+    const mentionRecords = mentionedUserIds.map(userId => ({
+      messageId,
+      mentionedUserId: userId,
+    }));
+    
+    await db.insert(messageMentions).values(mentionRecords);
+  }
+
+  async deleteMentions(messageId: number): Promise<void> {
+    await db.delete(messageMentions).where(eq(messageMentions.messageId, messageId));
+  }
+
+  async getMentionedMessages(userId: string): Promise<any[]> {
+    const mentions = await db
+      .select({
+        id: messageMentions.id,
+        messageId: messageMentions.messageId,
+        isRead: messageMentions.isRead,
+        createdAt: messageMentions.createdAt,
+        message: {
+          id: teamMessages.id,
+          content: teamMessages.content,
+          createdAt: teamMessages.createdAt,
+          isEdited: teamMessages.isEdited,
+          author: {
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            profileImageUrl: users.profileImageUrl,
+          }
+        }
+      })
+      .from(messageMentions)
+      .leftJoin(teamMessages, eq(messageMentions.messageId, teamMessages.id))
+      .leftJoin(users, eq(teamMessages.authorId, users.id))
+      .where(eq(messageMentions.mentionedUserId, userId))
+      .orderBy(desc(messageMentions.createdAt));
+
+    return mentions;
+  }
+
+  async markMentionAsRead(mentionId: number, userId: string): Promise<void> {
+    await db
+      .update(messageMentions)
+      .set({ isRead: true })
+      .where(and(
+        eq(messageMentions.id, mentionId),
+        eq(messageMentions.mentionedUserId, userId)
+      ));
+  }
+
+  // User notification preferences operations
+  async getUserNotificationPreferences(userId: string): Promise<UserNotificationPreferences | null> {
+    const [prefs] = await db
+      .select()
+      .from(userNotificationPreferences)
+      .where(eq(userNotificationPreferences.userId, userId));
+    
+    return prefs || null;
+  }
+
+  async upsertUserNotificationPreferences(preferences: InsertUserNotificationPreferences): Promise<UserNotificationPreferences> {
+    const [prefs] = await db
+      .insert(userNotificationPreferences)
+      .values(preferences)
+      .onConflictDoUpdate({
+        target: userNotificationPreferences.userId,
+        set: {
+          emailOnMention: preferences.emailOnMention,
+          emailOnReply: preferences.emailOnReply,
+          emailOnReaction: preferences.emailOnReaction,
+          updatedAt: new Date(),
+        }
+      })
+      .returning();
+    
+    return prefs;
   }
 
   // Activity log operations
