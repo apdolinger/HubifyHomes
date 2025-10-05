@@ -166,7 +166,7 @@ export default function Landing() {
                 className="text-blue-600 hover:underline"
                 data-testid="link-hubify-home"
               >
-                Hubify Home
+                Hubify Homes
               </a>
             </div>
           </div>
