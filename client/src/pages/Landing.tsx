@@ -146,17 +146,30 @@ export default function Landing() {
 
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200 py-6 mt-12">
-        <div className="max-w-7xl mx-auto px-6 text-center text-sm text-slate-600">
-          <p>© 2025 Hubify. All rights reserved.</p>
-          <p className="mt-2">
-            <a href="/privacy" className="text-blue-600 hover:underline" data-testid="link-privacy">
-              Privacy Policy
-            </a>
-            {' · '}
-            <a href="/terms" className="text-blue-600 hover:underline" data-testid="link-terms">
-              Terms of Service
-            </a>
-          </p>
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex justify-between items-center text-sm text-slate-600">
+            <div className="text-center flex-1">
+              <p>© 2025 Hubify. All rights reserved.</p>
+              <p className="mt-2">
+                <a href="/privacy" className="text-blue-600 hover:underline" data-testid="link-privacy">
+                  Privacy Policy
+                </a>
+                {' · '}
+                <a href="/terms" className="text-blue-600 hover:underline" data-testid="link-terms">
+                  Terms of Service
+                </a>
+              </p>
+            </div>
+            <div>
+              <a 
+                href="/api/login" 
+                className="text-blue-600 hover:underline"
+                data-testid="link-hubify-home"
+              >
+                Hubify Home
+              </a>
+            </div>
+          </div>
         </div>
       </footer>
     </div>
