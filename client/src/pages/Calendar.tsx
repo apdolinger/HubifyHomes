@@ -9,7 +9,26 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EventModal } from "@/components/EventModal";
+import { CalendarSettings } from "@/components/CalendarSettings";
 import type { Event } from "@shared/schema";
+
+interface CalendarDisplaySettings {
+  showWeekends: boolean;
+  defaultView: string;
+  weekStartsOn: number;
+  hiddenCalendars: string[];
+  filterEventType: 'all' | 'events' | 'tasks';
+  filterPriority: 'all' | 'urgent' | 'high' | 'normal' | 'low';
+}
+
+const DEFAULT_SETTINGS: CalendarDisplaySettings = {
+  showWeekends: true,
+  defaultView: 'dayGridMonth',
+  weekStartsOn: 0,
+  hiddenCalendars: [],
+  filterEventType: 'all',
+  filterPriority: 'all',
+};
 
 export default function CalendarPage() {
   const [currentView, setCurrentView] = useState("dayGridMonth");
@@ -17,6 +36,8 @@ export default function CalendarPage() {
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [defaultEventDate, setDefaultEventDate] = useState<Date | undefined>();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settings, setSettings] = useState<CalendarDisplaySettings>(DEFAULT_SETTINGS);
   const calendarRef = useRef<FullCalendar>(null);
 
   // Get user's org from session
@@ -145,10 +166,31 @@ export default function CalendarPage() {
     return conflicts;
   };
 
-  const conflicts = events && Array.isArray(events) ? detectConflicts(events) : new Map();
+  // Apply filters based on settings
+  const filteredEvents = (events && Array.isArray(events)) ? events.filter((event: any) => {
+    // Filter by calendar visibility
+    if (event.calendarId && settings.hiddenCalendars.includes(event.calendarId)) {
+      return false;
+    }
+    
+    // Filter by event type
+    if (settings.filterEventType !== 'all') {
+      if (settings.filterEventType === 'events' && event.type === 'task') return false;
+      if (settings.filterEventType === 'tasks' && event.type !== 'task') return false;
+    }
+    
+    // Filter by priority (for tasks)
+    if (settings.filterPriority !== 'all' && event.type === 'task') {
+      if (event.priority !== settings.filterPriority) return false;
+    }
+    
+    return true;
+  }) : [];
+
+  const conflicts = filteredEvents.length > 0 ? detectConflicts(filteredEvents) : new Map();
 
   // Transform events for FullCalendar
-  const calendarEvents = (events && Array.isArray(events)) ? events.map((event: any) => {
+  const calendarEvents = filteredEvents.map((event: any) => {
     // Task events get special styling
     const isTask = event.type === 'task';
     const hasConflict = conflicts.has(event.id);
@@ -184,7 +226,7 @@ export default function CalendarPage() {
         attendees: event.attendees,
       },
     };
-  }) : [];
+  });
 
   const handleDateClick = (arg: any) => {
     setDefaultEventDate(arg.date);
@@ -304,6 +346,7 @@ export default function CalendarPage() {
           <Button
             variant="outline"
             size="icon"
+            onClick={() => setSettingsOpen(true)}
             data-testid="button-calendar-settings"
           >
             <Settings className="h-4 w-4" />
@@ -345,6 +388,7 @@ export default function CalendarPage() {
             variant="outline"
             size="sm"
             className="w-full mt-4"
+            onClick={() => setSettingsOpen(true)}
             data-testid="button-add-calendar"
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -357,7 +401,7 @@ export default function CalendarPage() {
           <FullCalendar
             ref={calendarRef}
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView={currentView}
+            initialView={settings.defaultView}
             headerToolbar={{
               left: "",
               center: "title",
@@ -370,7 +414,8 @@ export default function CalendarPage() {
             selectable={true}
             selectMirror={true}
             dayMaxEvents={true}
-            weekends={true}
+            weekends={settings.showWeekends}
+            firstDay={settings.weekStartsOn}
             height="auto"
           />
         </Card>
@@ -386,6 +431,16 @@ export default function CalendarPage() {
           event={selectedEvent}
           defaultDate={defaultEventDate}
           defaultCalendarId={calendars && Array.isArray(calendars) && calendars.length > 0 ? (calendars[0] as any).id : undefined}
+        />
+      )}
+
+      {/* Calendar Settings Modal */}
+      {orgId && (
+        <CalendarSettings
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          orgId={orgId}
+          onSettingsChange={setSettings}
         />
       )}
       </div>

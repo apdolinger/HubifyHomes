@@ -73,7 +73,7 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
   };
 
   // Fetch calendars
-  const { data: calendars, isLoading } = useQuery({
+  const { data: calendars, isLoading } = useQuery<any[]>({
     queryKey: [`/api/orgs/${orgId}/calendars`],
     enabled: !!orgId,
   });
@@ -81,10 +81,7 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
   // Create calendar mutation
   const createCalendar = useMutation({
     mutationFn: async (data: { name: string; color: string }) => {
-      return apiRequest(`/api/orgs/${orgId}/calendars`, {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("POST", `/api/orgs/${orgId}/calendars`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}/calendars`] });
@@ -105,10 +102,7 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
   // Update calendar mutation
   const updateCalendar = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: { name: string; color: string } }) => {
-      return apiRequest(`/api/orgs/${orgId}/calendars/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("PATCH", `/api/orgs/${orgId}/calendars/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}/calendars`] });
@@ -128,9 +122,7 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
   // Delete calendar mutation
   const deleteCalendar = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/orgs/${orgId}/calendars/${id}`, {
-        method: "DELETE",
-      });
+      return apiRequest("DELETE", `/api/orgs/${orgId}/calendars/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}/calendars`] });
