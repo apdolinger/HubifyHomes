@@ -28,6 +28,7 @@ import AdminClientPortalProperty from "@/pages/AdminClientPortalProperty";
 import Admin from "@/pages/Admin";
 import Account from "@/pages/Account";
 import SuperAdmin from "@/pages/SuperAdmin";
+import SuperAdminLogin from "@/pages/SuperAdminLogin";
 import OrganizationProfile from "@/pages/OrganizationProfile";
 import AdminBilling from "@/pages/AdminBilling";
 import AdminInvoices from "@/pages/AdminInvoices";
@@ -70,6 +71,7 @@ function Router() {
       {/* Public routes */}
       <Route path="/privacy" component={PrivacyPolicy} />
       <Route path="/terms" component={TermsOfService} />
+      <Route path="/super-admin/login" component={SuperAdminLogin} />
       
       {/* Portal routes (separate auth system) */}
       <Route path="/portal/login" component={PortalLogin} />
