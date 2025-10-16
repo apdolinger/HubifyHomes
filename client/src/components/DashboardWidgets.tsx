@@ -16,12 +16,53 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { format, isToday, isTomorrow, parseISO } from "date-fns";
 
 interface CalendarWidgetProps {
   className?: string;
 }
 
 export function CalendarWidget({ className }: CalendarWidgetProps) {
+  const { data: user } = useQuery({ queryKey: ["/api/auth/user"] });
+  const orgId = (user as any)?.orgId;
+
+  const { data: events, isLoading } = useQuery({
+    queryKey: [`/api/orgs/${orgId}/events`],
+    enabled: !!orgId,
+  });
+
+  // Get upcoming events (next 3)
+  const upcomingEvents = events 
+    ? (events as any[])
+        .filter(event => new Date(event.start) >= new Date())
+        .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+        .slice(0, 3)
+    : [];
+
+  const getEventColors = (event: any) => {
+    if (event.type === 'task') {
+      // Task colors based on priority
+      if (event.priority === 'urgent') return { bg: 'bg-red-50', border: 'border-red-500', text: 'text-red-900', subtext: 'text-red-700' };
+      if (event.priority === 'high') return { bg: 'bg-orange-50', border: 'border-orange-500', text: 'text-orange-900', subtext: 'text-orange-700' };
+      return { bg: 'bg-green-50', border: 'border-green-500', text: 'text-green-900', subtext: 'text-green-700' };
+    }
+    // Calendar events use blue
+    return { bg: 'bg-blue-50', border: 'border-blue-500', text: 'text-blue-900', subtext: 'text-blue-700' };
+  };
+
+  const formatEventDate = (dateStr: string) => {
+    const date = parseISO(dateStr);
+    if (isToday(date)) return 'Today';
+    if (isTomorrow(date)) return 'Tomorrow';
+    return format(date, 'EEEE'); // Day name like "Friday"
+  };
+
+  const formatEventTime = (dateStr: string, allDay: boolean) => {
+    if (allDay) return 'All day';
+    return format(parseISO(dateStr), 'h:mm a');
+  };
+
   return (
     <Card className={className}>
       <CardHeader>
@@ -32,38 +73,29 @@ export function CalendarWidget({ className }: CalendarWidgetProps) {
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500">
-            <div>
-              <p className="font-medium text-blue-900">Property Inspection</p>
-              <p className="text-sm text-blue-700">123 Oak Street</p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm font-medium text-blue-900">Today</p>
-              <p className="text-xs text-blue-700">2:00 PM</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border-l-4 border-yellow-500">
-            <div>
-              <p className="font-medium text-yellow-900">Maintenance Visit</p>
-              <p className="text-sm text-yellow-700">456 Pine Avenue</p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm font-medium text-yellow-900">Tomorrow</p>
-              <p className="text-xs text-yellow-700">10:00 AM</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border-l-4 border-green-500">
-            <div>
-              <p className="font-medium text-green-900">Team Meeting</p>
-              <p className="text-sm text-green-700">Weekly sync</p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm font-medium text-green-900">Friday</p>
-              <p className="text-xs text-green-700">9:00 AM</p>
-            </div>
-          </div>
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading events...</p>
+          ) : upcomingEvents.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No upcoming events</p>
+          ) : (
+            upcomingEvents.map((event: any) => {
+              const colors = getEventColors(event);
+              return (
+                <div key={event.id} className={`flex items-center justify-between p-3 ${colors.bg} rounded-lg border-l-4 ${colors.border}`}>
+                  <div>
+                    <p className={`font-medium ${colors.text}`}>{event.title}</p>
+                    <p className={`text-sm ${colors.subtext}`}>
+                      {event.propertyName || event.location || (event.type === 'task' ? 'Task' : 'Event')}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-sm font-medium ${colors.text}`}>{formatEventDate(event.start)}</p>
+                    <p className={`text-xs ${colors.subtext}`}>{formatEventTime(event.start, event.allDay)}</p>
+                  </div>
+                </div>
+              );
+            })
+          )}
           
           <Button 
             variant="outline" 
