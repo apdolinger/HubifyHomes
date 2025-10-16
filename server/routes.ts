@@ -700,6 +700,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: 'admin', // Set admin role for development user (regular admin, not super admin)
       });
       
+      // Get or create a test organization for the dev user
+      let orgs = await storage.getOrgs();
+      let testOrg = orgs.find(o => o.name === 'Test Organization');
+      
+      if (!testOrg) {
+        testOrg = await storage.createOrg({
+          name: 'Test Organization',
+          contactEmail: 'test@hubify.com',
+          tier: 'premium',
+          status: 'active'
+        });
+      }
+      
+      // Update user with orgId
+      await storage.updateUser(user.id, { orgId: testOrg.id });
+      
       // Create a Passport-compatible user object
       const passportUser = {
         id: user.id,
@@ -709,7 +725,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           first_name: user.firstName,
           last_name: user.lastName,
           profile_image_url: user.profileImageUrl,
-          role: user.role
+          role: user.role,
+          orgId: testOrg.id // Add orgId to claims
         },
         expires_at: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60) // 7 days
       };
