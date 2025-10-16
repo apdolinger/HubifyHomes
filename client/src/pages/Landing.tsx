@@ -163,11 +163,11 @@ export default function Landing() {
             </div>
             <div>
               <a 
-                href="/api/login" 
+                href="/super-admin/login" 
                 className="text-blue-600 hover:underline"
-                data-testid="link-hubify-home"
+                data-testid="link-super-admin"
               >
-                Hubify Homes
+                Super Admin
               </a>
             </div>
           </div>

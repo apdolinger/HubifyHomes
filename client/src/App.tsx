@@ -230,11 +230,11 @@ function AuthenticatedAppContent() {
         </div>
         <div className="text-xs">
           <a 
-            href="/dwellerly-admin" 
+            href="/super-admin/login" 
             className="text-slate-400 hover:text-slate-600 transition-colors"
-            title="Internal Platform Management"
+            title="Super Admin Access"
           >
-            Platform
+            Super Admin
           </a>
         </div>
       </div>
