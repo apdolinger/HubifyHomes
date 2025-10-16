@@ -109,7 +109,7 @@ export default function CalendarPage() {
     // Task events get special styling
     const isTask = event.type === 'task';
     const backgroundColor = isTask 
-      ? (event.priority === 'urgent' ? '#dc2626' : event.priority === 'high' ? '#ea580c' : '#059669') 
+      ? (event.priority === 'urgent' ? '#ef4444' : event.priority === 'high' ? '#ea580c' : '#059669') 
       : (calendars && Array.isArray(calendars)) ? calendars.find((cal: any) => cal.id === event.calendarId)?.color || "#3b82f6" : "#3b82f6";
     
     return {
