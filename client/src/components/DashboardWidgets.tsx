@@ -32,13 +32,51 @@ export function CalendarWidget({ className }: CalendarWidgetProps) {
     enabled: !!orgId,
   });
 
+  // Detect scheduling conflicts for staff members
+  const detectConflicts = (events: any[]) => {
+    const conflicts = new Map<string, Set<string>>();
+    
+    events.forEach((event, index) => {
+      const eventStart = new Date(event.start);
+      const eventEnd = new Date(event.end);
+      const eventStaff = (event.attendees || [])
+        .filter((a: any) => a.type === 'user' && a.userId)
+        .map((a: any) => a.userId);
+      
+      if (eventStaff.length === 0) return;
+      
+      events.forEach((otherEvent, otherIndex) => {
+        if (index === otherIndex) return;
+        
+        const otherStart = new Date(otherEvent.start);
+        const otherEnd = new Date(otherEvent.end);
+        const otherStaff = (otherEvent.attendees || [])
+          .filter((a: any) => a.type === 'user' && a.userId)
+          .map((a: any) => a.userId);
+        
+        const hasTimeOverlap = eventStart < otherEnd && eventEnd > otherStart;
+        const hasStaffOverlap = eventStaff.some((staffId: string) => otherStaff.includes(staffId));
+        
+        if (hasTimeOverlap && hasStaffOverlap) {
+          if (!conflicts.has(event.id)) {
+            conflicts.set(event.id, new Set());
+          }
+          conflicts.get(event.id)!.add(otherEvent.id);
+        }
+      });
+    });
+    
+    return conflicts;
+  };
+
+  const allEventsList = events && Array.isArray(events) ? events : [];
+  const conflicts = detectConflicts(allEventsList);
+
   // Get upcoming events (next 3)
-  const upcomingEvents = events 
-    ? (events as any[])
-        .filter(event => new Date(event.start) >= new Date())
-        .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
-        .slice(0, 3)
-    : [];
+  const upcomingEvents = allEventsList
+    .filter(event => new Date(event.start) >= new Date())
+    .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+    .slice(0, 3);
 
   const getEventColors = (event: any) => {
     if (event.type === 'task') {
@@ -80,12 +118,16 @@ export function CalendarWidget({ className }: CalendarWidgetProps) {
           ) : (
             upcomingEvents.map((event: any) => {
               const colors = getEventColors(event);
+              const hasConflict = conflicts.has(event.id);
               return (
                 <div key={event.id} className={`flex items-center justify-between p-3 ${colors.bg} rounded-lg border-l-4 ${colors.border}`}>
                   <div>
                     <p className={`font-medium ${colors.text}`}>{event.title}</p>
                     <p className={`text-sm ${colors.subtext}`}>
-                      {event.propertyName || event.location || (event.type === 'task' ? 'Task' : 'Event')}
+                      {hasConflict 
+                        ? '⚠️ Conflict' 
+                        : event.propertyName || event.location || (event.type === 'task' ? 'Task' : 'Event')
+                      }
                     </p>
                   </div>
                   <div className="text-right">
