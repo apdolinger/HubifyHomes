@@ -4,15 +4,18 @@
 Hubify is a professional property management platform designed to streamline operations for home watch and estate management companies. It aims to enhance team efficiency and client communication by providing a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface. The platform's vision is to become a leading solution in property management, addressing workflow inefficiencies and offering significant market potential.
 
 ## Recent Changes
+- **Staff Scheduling Conflict Detection (October 16, 2025)**: Added automatic conflict detection for staff scheduling:
+  - **Automatic Detection**: Calendar detects when staff members (user attendees) have overlapping events
+  - **Visual Indicators**: Conflicting events display with warning emoji (⚠️), striped diagonal pattern, red border, and glow effect
+  - **Attendee Data**: Events API now includes attendee information for conflict analysis
+  - **Conflict Logic**: Detects both time overlap and staff member overlap to identify true scheduling conflicts
+  - **Real-time Calendar Widget**: Updated dashboard calendar widget to show actual upcoming events and tasks from database
 - **Calendar-Task Integration (October 16, 2025)**: Integrated tasks with due dates into the calendar system:
   - **Task Events**: Tasks with due dates now automatically appear on the calendar as all-day events
-  - **Visual Differentiation**: Tasks are prefixed with 📋 emoji and color-coded by priority:
-    - Urgent tasks: Red background (#dc2626)
-    - High priority tasks: Orange background (#ea580c)
-    - Normal/Low priority tasks: Green background (#059669)
+  - **Visual Differentiation**: Tasks color-coded by priority (urgent=#ef4444, high=#ea580c, normal/low=#059669)
   - **Smart Filtering**: Only shows active tasks (excludes archived, completed, and cancelled tasks)
   - **Organization Scoping**: Tasks are filtered by organization membership for multi-tenant security
-  - **Merged Event Feed**: `/api/orgs/:orgId/events` endpoint now returns combined calendar events and task events
+  - **Merged Event Feed**: `/api/orgs/:orgId/events` endpoint now returns combined calendar events and task events with attendees
   - **End-to-End Testing**: Validated task creation, API integration, and calendar display functionality
 - **Calendar Authentication Fix (October 16, 2025)**: Fixed calendar page authentication for Super Admin users:
   - **Hybrid User Endpoint**: `/api/auth/user` now supports both Super Admin session and OIDC authentication

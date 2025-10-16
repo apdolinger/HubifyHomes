@@ -4698,6 +4698,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Fetch calendar events
       const events = await storage.getEvents(orgId, startDate, endDate, calendar_id as string);
       
+      // Fetch attendees for each event
+      const eventsWithAttendees = await Promise.all(
+        events.map(async (event) => {
+          const attendees = await storage.getEventAttendees(event.id);
+          return { ...event, attendees };
+        })
+      );
+      
       // Fetch all tasks and filter to this organization's tasks with due dates
       const allTasks = await storage.getTasks();
       const orgTasks = allTasks.filter(task => 
@@ -4718,7 +4726,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         task.propertyId && propertyIds.has(task.propertyId)
       );
       
-      // Transform tasks into calendar event format
+      // Transform tasks into calendar event format (tasks don't have attendees)
       const taskEvents = orgTasksFiltered.map(task => ({
         id: `task-${task.id}`,
         title: task.title,
@@ -4732,11 +4740,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         taskId: task.id,
         priority: task.priority,
         status: task.status,
-        propertyName: task.property?.name
+        propertyName: task.property?.name,
+        attendees: []
       }));
       
       // Combine calendar events and task events
-      const allEvents = [...events, ...taskEvents];
+      const allEvents = [...eventsWithAttendees, ...taskEvents];
       
       res.json(allEvents);
     } catch (error) {

@@ -104,21 +104,72 @@ export default function CalendarPage() {
     (eventsQuery.isError && eventsQuery.fetchStatus !== 'idle')
   );
 
+  // Detect scheduling conflicts for staff members
+  const detectConflicts = (events: any[]) => {
+    const conflicts = new Map<string, Set<string>>(); // eventId -> Set of conflicting eventIds
+    
+    events.forEach((event, index) => {
+      const eventStart = new Date(event.start);
+      const eventEnd = new Date(event.end);
+      const eventStaff = (event.attendees || [])
+        .filter((a: any) => a.type === 'user' && a.userId)
+        .map((a: any) => a.userId);
+      
+      if (eventStaff.length === 0) return; // Skip events with no staff
+      
+      // Check against other events
+      events.forEach((otherEvent, otherIndex) => {
+        if (index === otherIndex) return; // Skip same event
+        
+        const otherStart = new Date(otherEvent.start);
+        const otherEnd = new Date(otherEvent.end);
+        const otherStaff = (otherEvent.attendees || [])
+          .filter((a: any) => a.type === 'user' && a.userId)
+          .map((a: any) => a.userId);
+        
+        // Check for time overlap
+        const hasTimeOverlap = eventStart < otherEnd && eventEnd > otherStart;
+        
+        // Check for staff overlap
+        const hasStaffOverlap = eventStaff.some((staffId: string) => otherStaff.includes(staffId));
+        
+        if (hasTimeOverlap && hasStaffOverlap) {
+          if (!conflicts.has(event.id)) {
+            conflicts.set(event.id, new Set());
+          }
+          conflicts.get(event.id)!.add(otherEvent.id);
+        }
+      });
+    });
+    
+    return conflicts;
+  };
+
+  const conflicts = events && Array.isArray(events) ? detectConflicts(events) : new Map();
+
   // Transform events for FullCalendar
   const calendarEvents = (events && Array.isArray(events)) ? events.map((event: any) => {
     // Task events get special styling
     const isTask = event.type === 'task';
-    const backgroundColor = isTask 
+    const hasConflict = conflicts.has(event.id);
+    
+    let backgroundColor = isTask 
       ? (event.priority === 'urgent' ? '#ef4444' : event.priority === 'high' ? '#ea580c' : '#059669') 
       : (calendars && Array.isArray(calendars)) ? calendars.find((cal: any) => cal.id === event.calendarId)?.color || "#3b82f6" : "#3b82f6";
     
+    // Add visual indicator for conflicts
+    const borderColor = hasConflict ? '#dc2626' : backgroundColor;
+    const classNames = hasConflict ? 'event-conflict' : '';
+    
     return {
       id: event.id,
-      title: event.title,
+      title: hasConflict ? `⚠️ ${event.title}` : event.title,
       start: event.start,
       end: event.end,
       allDay: event.allDay,
       backgroundColor,
+      borderColor,
+      className: classNames,
       extendedProps: {
         description: event.description,
         location: event.location,
@@ -128,6 +179,9 @@ export default function CalendarPage() {
         priority: event.priority,
         status: event.status,
         propertyName: event.propertyName,
+        hasConflict,
+        conflictingEventIds: hasConflict ? Array.from(conflicts.get(event.id)!) : [],
+        attendees: event.attendees,
       },
     };
   }) : [];
@@ -199,12 +253,29 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Calendar className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold">Calendar</h1>
-        </div>
+    <>
+      <style>{`
+        .event-conflict {
+          background-image: repeating-linear-gradient(
+            45deg,
+            transparent,
+            transparent 10px,
+            rgba(0, 0, 0, 0.15) 10px,
+            rgba(0, 0, 0, 0.15) 20px
+          ) !important;
+          border-width: 2px !important;
+          font-weight: 600;
+        }
+        .fc-event.event-conflict {
+          box-shadow: 0 0 0 2px #dc2626;
+        }
+      `}</style>
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Calendar className="h-8 w-8 text-primary" />
+            <h1 className="text-3xl font-bold">Calendar</h1>
+          </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -317,6 +388,7 @@ export default function CalendarPage() {
           defaultCalendarId={calendars && Array.isArray(calendars) && calendars.length > 0 ? (calendars[0] as any).id : undefined}
         />
       )}
-    </div>
+      </div>
+    </>
   );
 }
