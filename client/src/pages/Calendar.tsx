@@ -23,6 +23,7 @@ export default function CalendarPage() {
   const { data: user, isLoading: userLoading, isError: userError } = useQuery({ queryKey: ["/api/auth/user"] });
   const orgId = (user as any)?.orgId;
   const userId = (user as any)?.id;
+  const isSuperAdmin = (user as any)?.isSuperAdmin || (user as any)?.role === 'super_admin';
 
   // Show loading if still fetching user
   if (userLoading) {
@@ -38,12 +39,42 @@ export default function CalendarPage() {
   }
 
   // Show error if user fetch failed
-  if (userError || !orgId) {
+  if (userError) {
     return (
       <div className="container mx-auto p-6">
         <Card className="p-8 text-center">
           <h2 className="text-2xl font-bold text-red-600 mb-2">Authentication Required</h2>
           <p className="text-muted-foreground">Please log in to view your calendar.</p>
+        </Card>
+      </div>
+    );
+  }
+
+  // Super Admin doesn't have organization-specific calendars
+  if (isSuperAdmin) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card className="p-8 text-center">
+          <Calendar className="w-16 h-16 mx-auto mb-4 text-blue-500" />
+          <h2 className="text-2xl font-bold mb-2">Super Admin Calendar Access</h2>
+          <p className="text-muted-foreground mb-4">
+            As a Super Admin, you manage platform-wide settings. Organization-specific calendars are managed within each organization's dashboard.
+          </p>
+          <Button onClick={() => window.location.href = '/super-admin'} data-testid="button-go-to-super-admin">
+            Go to Super Admin Control Panel
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  // Regular users must have an orgId
+  if (!orgId) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card className="p-8 text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-2">Organization Required</h2>
+          <p className="text-muted-foreground">You must be associated with an organization to view calendars.</p>
         </Card>
       </div>
     );

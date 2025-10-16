@@ -737,11 +737,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const SUPER_ADMIN_USERNAME = process.env.SUPER_ADMIN_USERNAME;
       const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD;
 
-      // For development only: allow defaults if explicitly enabled
-      const allowDefaults = process.env.NODE_ENV === 'development' && process.env.ALLOW_DEFAULT_SUPER_ADMIN === 'true';
+      // For development only: allow defaults
+      const isDevelopment = process.env.NODE_ENV === 'development';
       
-      const finalUsername = SUPER_ADMIN_USERNAME || (allowDefaults ? 'superadmin' : null);
-      const finalPassword = SUPER_ADMIN_PASSWORD || (allowDefaults ? 'hubify2025' : null);
+      const finalUsername = SUPER_ADMIN_USERNAME || (isDevelopment ? 'superadmin' : null);
+      const finalPassword = SUPER_ADMIN_PASSWORD || (isDevelopment ? 'hubify2025' : null);
 
       if (!finalUsername || !finalPassword) {
         console.error("Super Admin credentials not configured. Set SUPER_ADMIN_USERNAME and SUPER_ADMIN_PASSWORD environment variables.");
@@ -761,7 +761,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ipAddress: req.ip || 'unknown',
           userAgent: req.get('user-agent') || 'unknown',
           details: { username },
-          severity: 'high'
+          severity: 'warning'
         });
         
         return res.status(401).json({ message: "Invalid credentials" });
@@ -781,7 +781,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ipAddress: req.ip || 'unknown',
         userAgent: req.get('user-agent') || 'unknown',
         details: { username },
-        severity: 'medium'
+        severity: 'info'
       });
 
       res.json({ 
@@ -805,7 +805,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ipAddress: req.ip || 'unknown',
         userAgent: req.get('user-agent') || 'unknown',
         details: { username },
-        severity: 'low'
+        severity: 'info'
       });
     }
 
@@ -828,8 +828,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+  app.get('/api/auth/user', async (req: any, res) => {
     try {
+      // Check for Super Admin session first
+      const superAdmin = (req.session as any).superAdmin;
+      if (superAdmin?.authenticated) {
+        // Return Super Admin user object
+        return res.json({
+          id: 'super-admin',
+          email: superAdmin.username,
+          name: 'Super Admin',
+          role: 'super_admin',
+          isSuperAdmin: true,
+          // Super Admin doesn't have an orgId since they manage all orgs
+          orgId: null
+        });
+      }
+
+      // Check for regular OIDC authentication
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
 
