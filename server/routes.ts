@@ -678,7 +678,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     try {
-      // Create or get test user, always update to ensure super admin role
+      // Create or get test user, always update to ensure admin role (not super admin)
       let user = await storage.getUserByEmail('test@hubify.com');
       user = await storage.upsertUser({
         id: 'dev-user-123',
@@ -686,7 +686,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName: 'Test',
         lastName: 'User',
         profileImageUrl: null,
-        role: 'super_admin', // Set super admin role for development user to access all areas
+        role: 'admin', // Set admin role for development user (regular admin, not super admin)
       });
       
       // Create a Passport-compatible user object
@@ -714,6 +714,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating test user:", error);
       res.status(500).json({ message: "Failed to create test user" });
+    }
+  });
+
+  // Super Admin login route (username/password authentication)
+  app.post('/api/super-admin/login', async (req, res) => {
+    try {
+      const { username, password } = req.body;
+
+      // Get credentials from environment or use defaults for development
+      const SUPER_ADMIN_USERNAME = process.env.SUPER_ADMIN_USERNAME || 'superadmin';
+      const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD || 'hubify2025';
+
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password are required" });
+      }
+
+      // Validate credentials
+      if (username !== SUPER_ADMIN_USERNAME || password !== SUPER_ADMIN_PASSWORD) {
+        // Log failed attempt
+        AuditLogger.log({
+          action: 'super_admin_login_failed',
+          userId: 'unknown',
+          ipAddress: req.ip || 'unknown',
+          userAgent: req.get('user-agent') || 'unknown',
+          details: { username },
+          severity: 'high'
+        });
+        
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      // Set super admin session
+      (req.session as any).superAdmin = {
+        authenticated: true,
+        username,
+        loginTime: new Date().toISOString()
+      };
+
+      // Log successful login
+      AuditLogger.log({
+        action: 'super_admin_login_success',
+        userId: username,
+        ipAddress: req.ip || 'unknown',
+        userAgent: req.get('user-agent') || 'unknown',
+        details: { username },
+        severity: 'medium'
+      });
+
+      res.json({ 
+        message: "Super admin authenticated successfully",
+        username 
+      });
+    } catch (error) {
+      console.error("Super admin login error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // Super Admin logout route
+  app.post('/api/super-admin/logout', (req, res) => {
+    const username = (req.session as any).superAdmin?.username;
+    
+    if (username) {
+      AuditLogger.log({
+        action: 'super_admin_logout',
+        userId: username,
+        ipAddress: req.ip || 'unknown',
+        userAgent: req.get('user-agent') || 'unknown',
+        details: { username },
+        severity: 'low'
+      });
+    }
+
+    (req.session as any).superAdmin = null;
+    res.json({ message: "Logged out successfully" });
+  });
+
+  // Super Admin session check route
+  app.get('/api/super-admin/session', (req, res) => {
+    const superAdmin = (req.session as any).superAdmin;
+    if (superAdmin?.authenticated) {
+      res.json({ 
+        authenticated: true, 
+        username: superAdmin.username,
+        loginTime: superAdmin.loginTime
+      });
+    } else {
+      res.json({ authenticated: false });
     }
   });
 
