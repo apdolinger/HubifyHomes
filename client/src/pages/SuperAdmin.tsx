@@ -239,27 +239,59 @@ function CommunitiesReport() {
 }
 
 export default function SuperAdmin() {
-  const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("organizations");
+  const [isSuperAdminAuthenticated, setIsSuperAdminAuthenticated] = useState<boolean | null>(null);
+  const [superAdminUsername, setSuperAdminUsername] = useState<string>("");
 
-  // This is internal-only access - in real implementation, would check for internal employee role
+  // Check super admin session
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "Access Denied",
-        description: "Super Admin access is restricted to Dwellerly platform team only.",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/";
-      }, 1000);
-      return;
-    }
-  }, [isAuthenticated, isLoading, toast]);
+    const checkSession = async () => {
+      try {
+        const response = await fetch('/api/super-admin/session');
+        const data = await response.json();
+        
+        if (data.authenticated) {
+          setIsSuperAdminAuthenticated(true);
+          setSuperAdminUsername(data.username);
+        } else {
+          setIsSuperAdminAuthenticated(false);
+          toast({
+            title: "Access Denied",
+            description: "Super Admin authentication required.",
+            variant: "destructive",
+          });
+          setTimeout(() => {
+            setLocation("/super-admin/login");
+          }, 1000);
+        }
+      } catch (error) {
+        console.error("Error checking super admin session:", error);
+        setIsSuperAdminAuthenticated(false);
+        setTimeout(() => {
+          setLocation("/super-admin/login");
+        }, 1000);
+      }
+    };
 
-  if (isLoading) {
+    checkSession();
+  }, [toast, setLocation]);
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/super-admin/logout', { method: 'POST' });
+      toast({
+        title: "Logged Out",
+        description: "You have been logged out of Super Admin.",
+      });
+      setLocation("/super-admin/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
+  if (isSuperAdminAuthenticated === null) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -267,7 +299,7 @@ export default function SuperAdmin() {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isSuperAdminAuthenticated) {
     return null;
   }
 
@@ -317,11 +349,24 @@ export default function SuperAdmin() {
             <p className="text-lg text-slate-600">Platform-wide monitoring and management for Hubify team</p>
           </div>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-3">
           <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
             <Shield className="w-3 h-3 mr-1" />
             Internal Access Only
           </Badge>
+          <div className="flex items-center space-x-2 text-sm text-slate-600">
+            <span>Logged in as: <strong>{superAdminUsername}</strong></span>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleLogout}
+            className="text-red-600 border-red-300 hover:bg-red-50"
+            data-testid="button-logout"
+          >
+            <Lock className="w-4 h-4 mr-2" />
+            Logout
+          </Button>
         </div>
       </div>
 
