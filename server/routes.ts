@@ -678,7 +678,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     try {
-      // Create or get test user, always update to ensure admin role
+      // Create or get test user, always update to ensure super admin role
       let user = await storage.getUserByEmail('test@hubify.com');
       user = await storage.upsertUser({
         id: 'dev-user-123',
@@ -686,7 +686,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName: 'Test',
         lastName: 'User',
         profileImageUrl: null,
-        role: 'admin', // Set admin role for development user
+        role: 'super_admin', // Set super admin role for development user to access all areas
       });
       
       // Create a Passport-compatible user object
