@@ -1062,13 +1062,13 @@ function renderMessageWithMentions(content: string) {
               );
 
             case "calendar":
-              return <CalendarWidget key={widget.id} className="lg:col-span-4" />;
+              return <CalendarWidget key={widget.id} className="lg:col-span-6" />;
 
             case "support":
-              return <SupportWidget key={widget.id} className="lg:col-span-4" />;
+              return <SupportWidget key={widget.id} className="lg:col-span-6" />;
 
             case "duplicates":
-              return <DuplicatesWidget key={widget.id} className="lg:col-span-4" />;
+              return <DuplicatesWidget key={widget.id} className="lg:col-span-6" />;
 
             default:
               return null;
