@@ -4695,8 +4695,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startDate = start ? new Date(start as string) : undefined;
       const endDate = end ? new Date(end as string) : undefined;
       
+      // Fetch calendar events
       const events = await storage.getEvents(orgId, startDate, endDate, calendar_id as string);
-      res.json(events);
+      
+      // Fetch all tasks and filter to this organization's tasks with due dates
+      const allTasks = await storage.getTasks();
+      const orgTasks = allTasks.filter(task => 
+        task.property?.id && 
+        task.dueDate && 
+        !task.isArchived &&
+        task.status !== 'completed' &&
+        task.status !== 'cancelled'
+      );
+      
+      // Get properties for this org to filter tasks
+      const properties = await storage.getPropertiesByOrg(orgId);
+      const propertyIds = new Set(properties.map(p => p.id));
+      
+      // Filter tasks to only those belonging to this org's properties
+      const orgTasksFiltered = orgTasks.filter(task => 
+        task.propertyId && propertyIds.has(task.propertyId)
+      );
+      
+      // Transform tasks into calendar event format
+      const taskEvents = orgTasksFiltered.map(task => ({
+        id: `task-${task.id}`,
+        title: task.title,
+        start: task.dueDate,
+        end: task.dueDate,
+        allDay: true,
+        description: task.description || '',
+        location: task.property ? `${task.property.address1}, ${task.property.city}` : '',
+        calendarId: null,
+        type: 'task',
+        taskId: task.id,
+        priority: task.priority,
+        status: task.status,
+        propertyName: task.property?.name
+      }));
+      
+      // Combine calendar events and task events
+      const allEvents = [...events, ...taskEvents];
+      
+      res.json(allEvents);
     } catch (error) {
       console.error("Error fetching events:", error);
       res.status(500).json({ message: "Failed to fetch events" });

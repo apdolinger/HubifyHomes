@@ -105,19 +105,32 @@ export default function CalendarPage() {
   );
 
   // Transform events for FullCalendar
-  const calendarEvents = (events && Array.isArray(events)) ? events.map((event: any) => ({
-    id: event.id,
-    title: event.title,
-    start: event.start,
-    end: event.end,
-    allDay: event.allDay,
-    backgroundColor: (calendars && Array.isArray(calendars)) ? calendars.find((cal: any) => cal.id === event.calendarId)?.color || "#3b82f6" : "#3b82f6",
-    extendedProps: {
-      description: event.description,
-      location: event.location,
-      calendarId: event.calendarId,
-    },
-  })) : [];
+  const calendarEvents = (events && Array.isArray(events)) ? events.map((event: any) => {
+    // Task events get special styling
+    const isTask = event.type === 'task';
+    const backgroundColor = isTask 
+      ? (event.priority === 'urgent' ? '#dc2626' : event.priority === 'high' ? '#ea580c' : '#059669') 
+      : (calendars && Array.isArray(calendars)) ? calendars.find((cal: any) => cal.id === event.calendarId)?.color || "#3b82f6" : "#3b82f6";
+    
+    return {
+      id: event.id,
+      title: isTask ? `📋 ${event.title}` : event.title,
+      start: event.start,
+      end: event.end,
+      allDay: event.allDay,
+      backgroundColor,
+      extendedProps: {
+        description: event.description,
+        location: event.location,
+        calendarId: event.calendarId,
+        type: event.type,
+        taskId: event.taskId,
+        priority: event.priority,
+        status: event.status,
+        propertyName: event.propertyName,
+      },
+    };
+  }) : [];
 
   const handleDateClick = (arg: any) => {
     setDefaultEventDate(arg.date);
