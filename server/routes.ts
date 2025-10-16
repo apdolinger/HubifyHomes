@@ -50,9 +50,19 @@ import {
   insertEventReminderSchema,
   insertPlatformInvoiceSchema,
   insertClientInvoiceSchema,
-  type Form
+  type Form,
+  contacts,
+  properties,
+  tasks,
+  timeEntries,
+  formSubmissions,
+  contactProperties,
+  rooms,
+  vehicles
 } from "@shared/schema";
 import { z } from "zod";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 import sgMail from "@sendgrid/mail";
 
 // Initialize SendGrid if API key is available
@@ -3474,8 +3484,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
           mergedRecords: contactsToMerge.length 
         });
         
+      } else if (type === 'property') {
+        // Get all properties to merge
+        const allProperties = await db.select().from(properties);
+        const propertiesToMerge = allProperties.filter(p => recordIds.includes(p.id));
+        
+        if (propertiesToMerge.length !== recordIds.length) {
+          return res.status(404).json({ message: "Some properties not found" });
+        }
+        
+        // Ensure all properties belong to the same organization
+        const orgIds = [...new Set(propertiesToMerge.map(p => p.orgId))];
+        if (orgIds.length > 1) {
+          return res.status(400).json({ message: "Cannot merge properties from different organizations" });
+        }
+        
+        // Sort by completeness - most complete becomes primary
+        const calculatePropertyCompleteness = (property: any): number => {
+          let score = 0;
+          if (property.name) score += 15;
+          if (property.address1) score += 20;
+          if (property.address2) score += 5;
+          if (property.city) score += 15;
+          if (property.state) score += 10;
+          if (property.zip) score += 10;
+          if (property.type) score += 10;
+          if (property.managerId) score += 5;
+          if (property.imageUrl) score += 5;
+          if (property.squareFootage) score += 5;
+          if (property.accountId) score += 5;
+          return score;
+        };
+        
+        const sortedProperties = propertiesToMerge.sort((a, b) => {
+          const scoreA = calculatePropertyCompleteness(a);
+          const scoreB = calculatePropertyCompleteness(b);
+          return scoreB - scoreA;
+        });
+        
+        const primary = sortedProperties[0];
+        const duplicates = sortedProperties.slice(1);
+        
+        // Create smart merged record
+        const mergedData = { ...primary };
+        
+        duplicates.forEach(duplicate => {
+          // Fill in missing fields from duplicates
+          Object.keys(duplicate).forEach(key => {
+            if (key === 'id') return;
+            
+            if (!mergedData[key] && duplicate[key]) {
+              mergedData[key] = duplicate[key];
+            }
+            
+            // For strings, prefer longer/more complete versions
+            if (typeof mergedData[key] === 'string' && typeof duplicate[key] === 'string') {
+              if (duplicate[key].length > mergedData[key].length) {
+                mergedData[key] = duplicate[key];
+              }
+            }
+            
+            // For numbers, prefer larger values (e.g., square footage)
+            if (typeof mergedData[key] === 'number' && typeof duplicate[key] === 'number') {
+              if (duplicate[key] > mergedData[key]) {
+                mergedData[key] = duplicate[key];
+              }
+            }
+          });
+        });
+        
+        // Update primary record with merged data
+        await db.update(properties)
+          .set({
+            ...mergedData,
+            updatedAt: new Date()
+          })
+          .where(eq(properties.id, primary.id));
+        
+        // Reassign all related records to the primary property
+        const duplicateIds = duplicates.map(d => d.id);
+        
+        // Update tasks
+        for (const duplicateId of duplicateIds) {
+          await db.update(tasks)
+            .set({ propertyId: primary.id })
+            .where(eq(tasks.propertyId, duplicateId));
+        }
+        
+        // Update time entries
+        for (const duplicateId of duplicateIds) {
+          await db.update(timeEntries)
+            .set({ propertyId: primary.id })
+            .where(eq(timeEntries.propertyId, duplicateId));
+        }
+        
+        // Update form submissions
+        for (const duplicateId of duplicateIds) {
+          await db.update(formSubmissions)
+            .set({ propertyId: primary.id })
+            .where(eq(formSubmissions.propertyId, duplicateId));
+        }
+        
+        // Update contact_properties junction records
+        for (const duplicateId of duplicateIds) {
+          // First check if there are any conflicting records
+          const existingLinks = await db.select()
+            .from(contactProperties)
+            .where(eq(contactProperties.propertyId, primary.id));
+          
+          const duplicateLinks = await db.select()
+            .from(contactProperties)
+            .where(eq(contactProperties.propertyId, duplicateId));
+          
+          for (const link of duplicateLinks) {
+            // Check if this contact is already linked to the primary property
+            const exists = existingLinks.some(el => el.contactId === link.contactId);
+            
+            if (!exists) {
+              // Safe to update - no conflict
+              await db.update(contactProperties)
+                .set({ propertyId: primary.id })
+                .where(eq(contactProperties.id, link.id));
+            } else {
+              // Conflict - just delete the duplicate link
+              await db.delete(contactProperties)
+                .where(eq(contactProperties.id, link.id));
+            }
+          }
+        }
+        
+        // Note: rooms and vehicles have CASCADE DELETE, so they'll be deleted when properties are deleted
+        // We need to update them to point to the primary property instead
+        for (const duplicateId of duplicateIds) {
+          await db.update(rooms)
+            .set({ propertyId: primary.id })
+            .where(eq(rooms.propertyId, duplicateId));
+          
+          await db.update(vehicles)
+            .set({ propertyId: primary.id })
+            .where(eq(vehicles.propertyId, duplicateId));
+        }
+        
+        // Delete duplicate properties
+        for (const duplicateId of duplicateIds) {
+          await db.delete(properties).where(eq(properties.id, duplicateId));
+        }
+        
+        // Log the merge activity
+        await storage.createActivity({
+          user_id: req.user?.claims?.sub,
+          type: 'property_merge',
+          entity_type: 'property',
+          entity_id: primary.id,
+          description: `Merged ${duplicates.length} duplicate properties into primary record`,
+          details: JSON.stringify({ 
+            mergedPropertyIds: duplicateIds,
+            mergeNotes,
+            totalRecords: propertiesToMerge.length,
+            primaryAddress: `${primary.address1}, ${primary.city}, ${primary.state}`
+          })
+        });
+        
+        res.json({ 
+          success: true, 
+          primaryId: primary.id, 
+          deletedIds: duplicateIds,
+          mergedRecords: propertiesToMerge.length 
+        });
+        
       } else {
-        res.status(400).json({ message: "Property merge not yet implemented" });
+        res.status(400).json({ message: "Invalid record type for merge" });
       }
       
     } catch (error) {
