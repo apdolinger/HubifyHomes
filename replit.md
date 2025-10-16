@@ -4,6 +4,15 @@
 Hubify is a professional property management platform designed to streamline operations for home watch and estate management companies. It aims to enhance team efficiency and client communication by providing a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface. The platform's vision is to become a leading solution in property management, addressing workflow inefficiencies and offering significant market potential.
 
 ## Recent Changes
+- **Calendar Settings & Customization (October 16, 2025)**: Comprehensive calendar settings system with localStorage persistence:
+  - **Calendar Management**: Create, edit, and delete calendars with customizable color picker (10 preset colors)
+  - **Filter Settings**: Show/hide individual calendars, filter by event type (all/events/tasks), filter tasks by priority (all/urgent/high/normal/low)
+  - **Display Settings**: Toggle weekends visibility, select default view (month/week/day), configure week start day (Sunday/Monday/Saturday)
+  - **Three-Tab Interface**: Organized settings modal with Calendars, Filters, and Display tabs
+  - **Persistent Preferences**: All settings stored per organization in localStorage and automatically restored
+  - **Real-time Application**: Settings instantly applied to calendar view and event filtering without page reload
+  - **Multiple Entry Points**: Accessible via settings button (gear icon) or "Add Calendar" sidebar button
+  - **End-to-End Testing**: Complete calendar CRUD operations and settings persistence validated
 - **Staff Scheduling Conflict Detection (October 16, 2025)**: Added automatic conflict detection for staff scheduling:
   - **Automatic Detection**: Calendar detects when staff members (user attendees) have overlapping events
   - **Visual Indicators**: Conflicting events display with warning emoji (⚠️), striped diagonal pattern, red border, and glow effect
