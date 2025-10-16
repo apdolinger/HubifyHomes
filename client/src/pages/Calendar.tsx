@@ -114,7 +114,7 @@ export default function CalendarPage() {
     
     return {
       id: event.id,
-      title: isTask ? `📋 ${event.title}` : event.title,
+      title: event.title,
       start: event.start,
       end: event.end,
       allDay: event.allDay,
