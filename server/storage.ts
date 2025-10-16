@@ -2456,11 +2456,11 @@ export class DatabaseStorage implements IStorage {
     // Filter out ignored duplicates
     const ignoredDuplicatesList = await db.select().from(ignoredDuplicates);
     
-    return filteredDuplicates.filter(group => {
+    const finalDuplicates = filteredDuplicates.filter(group => {
       const groupRecordIds = group.records.map((r: any) => r.id.toString()).sort();
       
       // Check if this duplicate group matches any ignored entry
-      return !ignoredDuplicatesList.some(ignored => {
+      const isIgnored = ignoredDuplicatesList.some(ignored => {
         if (ignored.recordType !== group.type) return false;
         
         const ignoredIds = ignored.recordIds.sort();
@@ -2469,7 +2469,11 @@ export class DatabaseStorage implements IStorage {
         return ignoredIds.every((id: string) => groupRecordIds.includes(id)) &&
                ignoredIds.length >= 2;
       });
+      
+      return !isIgnored;
     });
+    
+    return finalDuplicates;
   }
 
   async getDuplicates(): Promise<any[]> {
@@ -2569,8 +2573,8 @@ export class DatabaseStorage implements IStorage {
   // Calculate how complete a contact record is (more fields = higher score)
   private calculateRecordCompleteness(contact: any): number {
     let score = 0;
-    if (contact.first_name) score += 20;
-    if (contact.last_name) score += 20;
+    if (contact.firstName) score += 20;
+    if (contact.lastName) score += 20;
     if (contact.email) score += 25;
     if (contact.phone) score += 20;
     if (contact.address) score += 10;
@@ -2627,8 +2631,8 @@ export class DatabaseStorage implements IStorage {
 
     // Name similarity (weight: 40%)
     const nameWeight = 40;
-    const name1 = `${contact1.first_name || ''} ${contact1.last_name || ''}`.trim().toLowerCase();
-    const name2 = `${contact2.first_name || ''} ${contact2.last_name || ''}`.trim().toLowerCase();
+    const name1 = `${contact1.firstName || ''} ${contact1.lastName || ''}`.trim().toLowerCase();
+    const name2 = `${contact2.firstName || ''} ${contact2.lastName || ''}`.trim().toLowerCase();
     const nameScore = this.calculateStringSimilarity(name1, name2);
     
     if (nameScore >= criteria.nameThreshold / 100) {
@@ -2764,8 +2768,8 @@ export class DatabaseStorage implements IStorage {
   private getContactMatchFields(contact1: any, contact2: any, criteria: any): string[] {
     const matchFields = [];
 
-    const name1 = `${contact1.first_name || ''} ${contact1.last_name || ''}`.trim().toLowerCase();
-    const name2 = `${contact2.first_name || ''} ${contact2.last_name || ''}`.trim().toLowerCase();
+    const name1 = `${contact1.firstName || ''} ${contact1.lastName || ''}`.trim().toLowerCase();
+    const name2 = `${contact2.firstName || ''} ${contact2.lastName || ''}`.trim().toLowerCase();
     if (this.calculateStringSimilarity(name1, name2) >= criteria.nameThreshold / 100) {
       matchFields.push('name');
     }
