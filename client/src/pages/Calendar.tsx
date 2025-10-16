@@ -27,13 +27,13 @@ export default function CalendarPage() {
 
   // Fetch calendars (must be at top level before any returns)
   const calendarsQuery = useQuery({
-    queryKey: ["/api/orgs", orgId, "calendars"],
+    queryKey: [`/api/orgs/${orgId}/calendars`],
     enabled: !!orgId && !isSuperAdmin,
   });
 
   // Fetch events (must be at top level before any returns)
   const eventsQuery = useQuery({
-    queryKey: ["/api/orgs", orgId, "events"],
+    queryKey: [`/api/orgs/${orgId}/events`],
     enabled: !!orgId && !isSuperAdmin,
   });
 

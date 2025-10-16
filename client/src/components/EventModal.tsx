@@ -262,8 +262,8 @@ export function EventModal({
       return newEvent;
     },
     onSuccess: (newEvent) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/orgs", orgId, "events"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/orgs", orgId, "events", newEvent.id, "attendees"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}/events`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}/events/${newEvent.id}/attendees`] });
       toast({
         title: "Event created",
         description: "Your event has been created successfully.",
@@ -363,8 +363,8 @@ export function EventModal({
       return updatedEvent;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/orgs", orgId, "events"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/orgs", orgId, "events", event?.id, "attendees"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}/events`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}/events/${event?.id}/attendees`] });
       toast({
         title: "Event updated",
         description: "Your event has been updated successfully.",
