@@ -214,22 +214,33 @@ Hubify Team`,
 // Security Middleware
 const isSuperAdmin = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = req.user as any;
+    // Check for super admin session (new session-based auth)
+    const superAdminSession = (req.session as any)?.superAdmin;
     
-    if (user?.role !== 'super_admin') {
-      await AuditLogger.log({
-        req,
-        action: "unauthorized_super_admin_access",
-        actionType: "auth",
-        resource: "super_admin",
-        severity: "critical",
-        success: false,
-        errorMessage: "User attempted to access super admin route without proper role",
-      });
-      return res.status(403).json({ message: "Super admin access required" });
+    if (superAdminSession?.authenticated) {
+      // Super admin is authenticated via session
+      next();
+      return;
     }
     
-    next();
+    // Fallback: check for super_admin role in OIDC user (legacy support)
+    const user = req.user as any;
+    if (user?.role === 'super_admin') {
+      next();
+      return;
+    }
+    
+    // Access denied
+    await AuditLogger.log({
+      req,
+      action: "unauthorized_super_admin_access",
+      actionType: "auth",
+      resource: "super_admin",
+      severity: "critical",
+      success: false,
+      errorMessage: "User attempted to access super admin route without proper authentication",
+    });
+    return res.status(403).json({ message: "Super admin access required" });
   } catch (error) {
     console.error("Error in isSuperAdmin middleware:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -722,16 +733,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { username, password } = req.body;
 
-      // Get credentials from environment or use defaults for development
-      const SUPER_ADMIN_USERNAME = process.env.SUPER_ADMIN_USERNAME || 'superadmin';
-      const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD || 'hubify2025';
+      // Require environment variables for super admin credentials (security requirement)
+      const SUPER_ADMIN_USERNAME = process.env.SUPER_ADMIN_USERNAME;
+      const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD;
+
+      // For development only: allow defaults if explicitly enabled
+      const allowDefaults = process.env.NODE_ENV === 'development' && process.env.ALLOW_DEFAULT_SUPER_ADMIN === 'true';
+      
+      const finalUsername = SUPER_ADMIN_USERNAME || (allowDefaults ? 'superadmin' : null);
+      const finalPassword = SUPER_ADMIN_PASSWORD || (allowDefaults ? 'hubify2025' : null);
+
+      if (!finalUsername || !finalPassword) {
+        console.error("Super Admin credentials not configured. Set SUPER_ADMIN_USERNAME and SUPER_ADMIN_PASSWORD environment variables.");
+        return res.status(503).json({ message: "Super Admin authentication is not configured" });
+      }
 
       if (!username || !password) {
         return res.status(400).json({ message: "Username and password are required" });
       }
 
       // Validate credentials
-      if (username !== SUPER_ADMIN_USERNAME || password !== SUPER_ADMIN_PASSWORD) {
+      if (username !== finalUsername || password !== finalPassword) {
         // Log failed attempt
         AuditLogger.log({
           action: 'super_admin_login_failed',

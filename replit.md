@@ -4,6 +4,13 @@
 Hubify is a professional property management platform designed to streamline operations for home watch and estate management companies. It aims to enhance team efficiency and client communication by providing a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface. The platform's vision is to become a leading solution in property management, addressing workflow inefficiencies and offering significant market potential.
 
 ## Recent Changes
+- **Hybrid Authentication System (October 16, 2025)**: Implemented secure Super Admin authentication:
+  - **Dual Authentication**: Regular users use Replit OIDC; Super Admin uses separate username/password login
+  - **Session-Based Super Admin Auth**: Independent session management for platform administrators
+  - **Security Hardening**: Credentials required via environment variables (SUPER_ADMIN_USERNAME, SUPER_ADMIN_PASSWORD)
+  - **Development Mode**: Optional defaults enabled with ALLOW_DEFAULT_SUPER_ADMIN=true flag
+  - **Audit Logging**: All login attempts logged with severity levels for security monitoring
+  - **Updated Middleware**: `isSuperAdmin` now checks session auth with OIDC fallback for backward compatibility
 - **Support Modal & Keyboard Shortcut Updates (October 4, 2025)**: Enhanced support accessibility and streamlined UI:
   - **Global Keyboard Shortcut**: Integrated "?" key with centralized useHotkeys system in App.tsx for global Support modal access
   - **Smart Text Detection**: Keyboard shortcut respects input field focus (won't trigger when typing in text fields)
