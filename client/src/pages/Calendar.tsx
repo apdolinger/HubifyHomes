@@ -25,6 +25,21 @@ export default function CalendarPage() {
   const userId = (user as any)?.id;
   const isSuperAdmin = (user as any)?.isSuperAdmin || (user as any)?.role === 'super_admin';
 
+  // Fetch calendars (must be at top level before any returns)
+  const calendarsQuery = useQuery({
+    queryKey: ["/api/orgs", orgId, "calendars"],
+    enabled: !!orgId && !isSuperAdmin,
+  });
+
+  // Fetch events (must be at top level before any returns)
+  const eventsQuery = useQuery({
+    queryKey: ["/api/orgs", orgId, "events"],
+    enabled: !!orgId && !isSuperAdmin,
+  });
+
+  const calendars = calendarsQuery.data;
+  const events = eventsQuery.data;
+
   // Show loading if still fetching user
   if (userLoading) {
     return (
@@ -79,21 +94,6 @@ export default function CalendarPage() {
       </div>
     );
   }
-
-  // Fetch calendars
-  const calendarsQuery = useQuery({
-    queryKey: ["/api/orgs", orgId, "calendars"],
-    enabled: !!orgId,
-  });
-
-  // Fetch events
-  const eventsQuery = useQuery({
-    queryKey: ["/api/orgs", orgId, "events"],
-    enabled: !!orgId,
-  });
-
-  const calendars = calendarsQuery.data;
-  const events = eventsQuery.data;
 
   // Only show loading if queries are enabled and loading
   const isLoading = !!orgId && (calendarsQuery.isLoading || eventsQuery.isLoading);

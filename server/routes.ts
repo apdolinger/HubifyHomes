@@ -4709,8 +4709,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       // Get properties for this org to filter tasks
-      const properties = await storage.getPropertiesByOrg(orgId);
-      const propertyIds = new Set(properties.map(p => p.id));
+      const allProperties = await storage.getProperties();
+      const orgProperties = allProperties.filter(p => p.orgId === orgId);
+      const propertyIds = new Set(orgProperties.map(p => p.id));
       
       // Filter tasks to only those belonging to this org's properties
       const orgTasksFiltered = orgTasks.filter(task => 
