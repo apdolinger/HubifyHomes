@@ -2451,7 +2451,25 @@ export class DatabaseStorage implements IStorage {
     }
     
     // Filter by minimum confidence threshold
-    return duplicates.filter(group => group.confidence >= criteria.minimumConfidence);
+    const filteredDuplicates = duplicates.filter(group => group.confidence >= criteria.minimumConfidence);
+    
+    // Filter out ignored duplicates
+    const ignoredDuplicatesList = await db.select().from(ignoredDuplicates);
+    
+    return filteredDuplicates.filter(group => {
+      const groupRecordIds = group.records.map((r: any) => r.id.toString()).sort();
+      
+      // Check if this duplicate group matches any ignored entry
+      return !ignoredDuplicatesList.some(ignored => {
+        if (ignored.recordType !== group.type) return false;
+        
+        const ignoredIds = ignored.recordIds.sort();
+        
+        // Check if the ignored IDs match any subset of the group
+        return ignoredIds.every((id: string) => groupRecordIds.includes(id)) &&
+               ignoredIds.length >= 2;
+      });
+    });
   }
 
   async getDuplicates(): Promise<any[]> {
