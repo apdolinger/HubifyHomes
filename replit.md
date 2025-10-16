@@ -3,6 +3,26 @@
 ## Overview
 Hubify is a professional property management platform designed to streamline operations for home watch and estate management companies. It aims to enhance team efficiency and client communication by providing a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface. The platform's vision is to become a leading solution in property management, addressing workflow inefficiencies and offering significant market potential.
 
+## Recent Changes
+- **Property Merge Implementation (October 16, 2025)**: Completed full property duplicate merge functionality:
+  - **Smart Merge Logic**: Automatically selects most complete property as primary based on weighted completeness scoring (address, name, details)
+  - **Field Merging**: Intelligently combines data from duplicates (prefers longer strings, larger numbers for fields like square footage)
+  - **Related Record Reassignment**: Automatically transfers all associated records to primary property:
+    - Tasks (propertyId)
+    - Time entries (propertyId)
+    - Form submissions (propertyId)
+    - Contact-property links (handles conflicts intelligently)
+    - Rooms (propertyId)
+    - Vehicles (propertyId)
+  - **Conflict Resolution**: Smart handling of contact-property junction table conflicts (removes duplicate links)
+  - **Activity Logging**: Records merge details including merged property IDs, notes, and primary address
+  - **Organization Safety**: Enforces same-organization check to prevent cross-org merges
+- **Contact Duplicate Detection Bug Fix (October 16, 2025)**: Fixed critical field name mismatch preventing duplicate detection:
+  - **Root Cause**: Duplicate detection code used snake_case field names (`first_name`, `last_name`) but Drizzle ORM returns camelCase (`firstName`, `lastName`)
+  - **Impact**: All contact field accesses returned `undefined`, preventing any duplicates from being detected
+  - **Fix Applied**: Updated `calculateContactSimilarity()`, `calculateRecordCompleteness()`, and `getContactMatchFields()` to use camelCase field names
+  - **Ignored Duplicates System**: Enhanced to properly filter out false positive matches while detecting legitimate duplicates
+
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
