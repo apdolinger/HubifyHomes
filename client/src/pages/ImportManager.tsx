@@ -33,8 +33,15 @@ interface ValidationResult {
   hasWarnings: boolean;
 }
 
+interface ImportSummary {
+  totalRecords: number;
+  newRecords: number;
+  updates: number;
+  skipped: number;
+}
+
 type EntityType = 'properties' | 'contacts' | 'tasks';
-type ImportStep = 'upload' | 'map' | 'validate' | 'ready';
+type ImportStep = 'upload' | 'map' | 'validate' | 'preview' | 'ready';
 
 interface FieldDefinition {
   name: string;
@@ -88,6 +95,7 @@ export default function ImportManager() {
   const [entityType, setEntityType] = useState<EntityType>('properties');
   const [fieldMapping, setFieldMapping] = useState<FieldMapping>({});
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+  const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -352,7 +360,33 @@ export default function ImportManager() {
   };
 
   const handleProceedToImport = () => {
-    setCurrentStep('ready');
+    if (!validationResult || !parsedData) return;
+
+    // Analyze data to create import summary
+    const totalRecords = editedRows.length;
+    
+    // Get rows with duplicate warnings (these will be skipped)
+    const duplicateRows = new Set(
+      validationResult.issues
+        .filter(i => i.type === 'warning' && i.message.toLowerCase().includes('duplicate'))
+        .map(i => i.row)
+    );
+    const skipped = duplicateRows.size;
+
+    // NOTE: Update detection requires database lookup
+    // For now, we assume all non-duplicate records are NEW
+    // In production, this would query the database to check if records exist
+    const updates = 0; // Will be determined by backend during actual import
+    const newRecords = totalRecords - skipped; // All non-duplicates are treated as new for now
+
+    setImportSummary({
+      totalRecords,
+      newRecords,
+      updates,
+      skipped
+    });
+
+    setCurrentStep('preview');
   };
 
   const downloadErrorReport = () => {
@@ -391,6 +425,7 @@ export default function ImportManager() {
     setFieldMapping({});
     setValidationResult(null);
     setEditedRows([]);
+    setImportSummary(null);
   };
 
   const getMappedFieldsCount = () => {
@@ -423,7 +458,7 @@ export default function ImportManager() {
       </div>
 
       {/* Step Indicator */}
-      <div className="flex items-center gap-4 justify-center" data-testid="step-indicator">
+      <div className="flex items-center gap-2 justify-center" data-testid="step-indicator">
         <div className="flex items-center gap-2">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
             currentStep === 'upload' ? 'bg-blue-600 text-white' : 'bg-green-600 text-white'
@@ -436,30 +471,41 @@ export default function ImportManager() {
         <div className="flex items-center gap-2">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
             currentStep === 'map' ? 'bg-blue-600 text-white' : 
-            currentStep === 'validate' || currentStep === 'ready' ? 'bg-green-600 text-white' : 
+            currentStep === 'validate' || currentStep === 'preview' || currentStep === 'ready' ? 'bg-green-600 text-white' : 
             'bg-slate-300 text-slate-600'
           }`}>
-            {currentStep === 'validate' || currentStep === 'ready' ? <CheckCircle2 className="w-5 h-5" /> : '2'}
+            {currentStep === 'validate' || currentStep === 'preview' || currentStep === 'ready' ? <CheckCircle2 className="w-5 h-5" /> : '2'}
           </div>
-          <span className="font-medium">Map Fields</span>
+          <span className="font-medium">Map</span>
         </div>
         <ArrowRight className="text-slate-400" />
         <div className="flex items-center gap-2">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
             currentStep === 'validate' ? 'bg-blue-600 text-white' : 
-            currentStep === 'ready' ? 'bg-green-600 text-white' : 
+            currentStep === 'preview' || currentStep === 'ready' ? 'bg-green-600 text-white' : 
             'bg-slate-300 text-slate-600'
           }`}>
-            {currentStep === 'ready' ? <CheckCircle2 className="w-5 h-5" /> : '3'}
+            {currentStep === 'preview' || currentStep === 'ready' ? <CheckCircle2 className="w-5 h-5" /> : '3'}
           </div>
           <span className="font-medium">Validate</span>
         </div>
         <ArrowRight className="text-slate-400" />
         <div className="flex items-center gap-2">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+            currentStep === 'preview' ? 'bg-blue-600 text-white' : 
+            currentStep === 'ready' ? 'bg-green-600 text-white' : 
+            'bg-slate-300 text-slate-600'
+          }`}>
+            {currentStep === 'ready' ? <CheckCircle2 className="w-5 h-5" /> : '4'}
+          </div>
+          <span className="font-medium">Preview</span>
+        </div>
+        <ArrowRight className="text-slate-400" />
+        <div className="flex items-center gap-2">
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
             currentStep === 'ready' ? 'bg-blue-600 text-white' : 'bg-slate-300 text-slate-600'
           }`}>
-            4
+            5
           </div>
           <span className="font-medium">Import</span>
         </div>
@@ -868,6 +914,138 @@ export default function ImportManager() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Preview & Summary Step */}
+      {currentStep === 'preview' && parsedData && importSummary && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              Import Preview & Summary
+            </CardTitle>
+            <CardDescription>
+              Review the import summary before proceeding
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Summary Statistics */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <p className="text-3xl font-bold text-blue-600 dark:text-blue-400" data-testid="stat-total-records">
+                      {importSummary.totalRecords}
+                    </p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                      Records to Import
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <p className="text-3xl font-bold text-green-600 dark:text-green-400" data-testid="stat-new-records">
+                      {importSummary.newRecords}
+                    </p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                      New
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <p className="text-3xl font-bold text-amber-600 dark:text-amber-400" data-testid="stat-updates">
+                      {importSummary.updates}
+                    </p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                      Updates
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <p className="text-3xl font-bold text-slate-600 dark:text-slate-400" data-testid="stat-skipped">
+                      {importSummary.skipped}
+                    </p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                      Skipped (duplicates)
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Import Details */}
+            <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg space-y-3">
+              <h4 className="font-medium">Import Details</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between py-1 border-b border-slate-200 dark:border-slate-700">
+                  <span className="text-slate-600 dark:text-slate-400">Entity Type:</span>
+                  <span className="font-medium capitalize">{entityType}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-200 dark:border-slate-700">
+                  <span className="text-slate-600 dark:text-slate-400">Fields Mapped:</span>
+                  <span className="font-medium">{getMappedFieldsCount()}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-200 dark:border-slate-700">
+                  <span className="text-slate-600 dark:text-slate-400">Validation Status:</span>
+                  <Badge variant="default" className="bg-green-600">Passed</Badge>
+                </div>
+                {importSummary.skipped > 0 && (
+                  <div className="flex justify-between py-1">
+                    <span className="text-slate-600 dark:text-slate-400">Duplicates:</span>
+                    <span className="text-slate-600 dark:text-slate-400">
+                      {importSummary.skipped} record{importSummary.skipped > 1 ? 's' : ''} will be skipped
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Action Breakdown */}
+            <Alert data-testid="alert-import-breakdown">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>What will happen:</strong>
+                <ul className="list-disc list-inside mt-2 space-y-1">
+                  <li>{importSummary.newRecords} {entityType} will be processed</li>
+                  {importSummary.skipped > 0 && (
+                    <li>{importSummary.skipped} duplicate{importSummary.skipped > 1 ? 's' : ''} will be skipped</li>
+                  )}
+                  <li className="text-slate-600 dark:text-slate-400 text-sm">
+                    Note: The system will automatically check for existing records during import and update them if found.
+                  </li>
+                </ul>
+              </AlertDescription>
+            </Alert>
+
+            <div className="flex gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setCurrentStep('validate')}
+                data-testid="button-back-to-validation"
+              >
+                Back to Validation
+              </Button>
+              <Button
+                onClick={() => setCurrentStep('ready')}
+                className="bg-green-600 hover:bg-green-700"
+                data-testid="button-import-now"
+              >
+                Import Now
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Ready to Import Step */}
