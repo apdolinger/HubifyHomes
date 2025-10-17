@@ -7,7 +7,7 @@ interface PortalUser {
   email: string;
   firstName: string | null;
   lastName: string | null;
-  role: 'resident' | 'staff' | 'vendor';
+  role: 'staff' | 'vendor';
   profileImageUrl: string | null;
 }
 
