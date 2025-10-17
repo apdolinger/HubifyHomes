@@ -294,7 +294,7 @@ export const clients = pgTable("clients", {
   uniqueOrgEmail: unique().on(table.orgId, table.email),
 }));
 
-// Portal users table - for Hubify Portal (Residents, Staff, Vendors)
+// Portal users table - for Hubify Portal (Staff, Vendors)
 export const portalUsers = pgTable("portal_users", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").references(() => orgs.id).notNull(),
@@ -303,7 +303,7 @@ export const portalUsers = pgTable("portal_users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   phone: varchar("phone"),
-  role: varchar("role").$type<"resident"|"staff"|"vendor">().notNull(),
+  role: varchar("role").$type<"staff"|"vendor">().notNull(),
   profileImageUrl: varchar("profile_image_url"),
   isActive: boolean("is_active").notNull().default(true),
   emailVerified: boolean("email_verified").notNull().default(false),
@@ -356,7 +356,7 @@ export const portalInvitations = pgTable("portal_invitations", {
   orgId: uuid("org_id").references(() => orgs.id, { onDelete: "cascade" }).notNull(),
   token: varchar("token").notNull().unique(),
   email: varchar("email").notNull(),
-  role: varchar("role").$type<"resident"|"staff"|"vendor">().notNull(),
+  role: varchar("role").$type<"staff"|"vendor">().notNull(),
   propertyIds: text("property_ids").array().$type<string[]>(),
   createdByUserId: varchar("created_by_user_id").references(() => users.id).notNull(),
   isUsed: boolean("is_used").notNull().default(false),
