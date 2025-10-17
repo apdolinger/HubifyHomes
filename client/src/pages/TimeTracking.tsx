@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Clock, Edit, Trash2, Filter, Download } from "lucide-react";
+import { Clock, Edit, Trash2, Filter, Download, Shield } from "lucide-react";
 import { format } from "date-fns";
 
 interface TimeEntry {
@@ -42,10 +43,12 @@ interface User {
   firstName: string;
   lastName: string;
   email: string;
+  role?: string;
 }
 
 export default function TimeTracking() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [userFilter, setUserFilter] = useState("");
   const [propertyFilter, setPropertyFilter] = useState("");
   const [taskFilter, setTaskFilter] = useState("");
@@ -55,6 +58,14 @@ export default function TimeTracking() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editNotes, setEditNotes] = useState("");
   const [editBillableRate, setEditBillableRate] = useState("");
+  const [editClockIn, setEditClockIn] = useState("");
+  const [editClockOut, setEditClockOut] = useState("");
+  const [editPropertyId, setEditPropertyId] = useState<string>("");
+  const [editTaskId, setEditTaskId] = useState<string>("");
+  const [editUserId, setEditUserId] = useState<string>("");
+
+  // Check if user has permission to edit all time entry fields
+  const canFullyEditTimeEntries = user?.role === 'admin' || user?.role === 'supervisor';
 
   const buildQueryString = () => {
     const params = new URLSearchParams();
@@ -134,6 +145,16 @@ export default function TimeTracking() {
     setEditingEntry(entry);
     setEditNotes(entry.notes || "");
     setEditBillableRate(entry.billableRateCents ? (entry.billableRateCents / 100).toString() : "");
+    
+    // Set additional fields for full editing
+    if (canFullyEditTimeEntries) {
+      setEditClockIn(format(new Date(entry.clockIn), "yyyy-MM-dd'T'HH:mm"));
+      setEditClockOut(entry.clockOut ? format(new Date(entry.clockOut), "yyyy-MM-dd'T'HH:mm") : "");
+      setEditPropertyId(entry.propertyId?.toString() || "");
+      setEditTaskId(entry.taskId?.toString() || "");
+      setEditUserId(entry.userId || "");
+    }
+    
     setShowEditDialog(true);
   };
 
@@ -144,6 +165,19 @@ export default function TimeTracking() {
       notes: editNotes || null,
       billableRateCents: editBillableRate ? Math.round(parseFloat(editBillableRate) * 100) : null,
     };
+
+    // Add additional fields if user has permission
+    if (canFullyEditTimeEntries) {
+      if (editClockIn) {
+        updates.clockIn = new Date(editClockIn).toISOString();
+      }
+      if (editClockOut) {
+        updates.clockOut = new Date(editClockOut).toISOString();
+      }
+      updates.propertyId = editPropertyId ? parseInt(editPropertyId) : null;
+      updates.taskId = editTaskId ? parseInt(editTaskId) : null;
+      updates.userId = editUserId || editingEntry.userId;
+    }
 
     updateMutation.mutate({ id: editingEntry.id, updates });
   };
@@ -435,22 +469,101 @@ export default function TimeTracking() {
 
       {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent data-testid="dialog-edit">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dialog-edit">
           <DialogHeader>
-            <DialogTitle>Edit Time Entry</DialogTitle>
-            <DialogDescription>Update the notes or billable rate for this time entry</DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              Edit Time Entry
+              {canFullyEditTimeEntries && (
+                <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
+                  <Shield className="w-3 h-3 mr-1" />
+                  Full Edit Access
+                </span>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {canFullyEditTimeEntries 
+                ? "You have full editing access to all time entry fields" 
+                : "Update the notes or billable rate for this time entry"}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-notes">Notes</Label>
-              <Textarea
-                id="edit-notes"
-                value={editNotes}
-                onChange={(e) => setEditNotes(e.target.value)}
-                placeholder="Add any notes..."
-                data-testid="input-edit-notes"
-              />
-            </div>
+            {canFullyEditTimeEntries && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-clock-in">Clock In *</Label>
+                    <Input
+                      id="edit-clock-in"
+                      type="datetime-local"
+                      value={editClockIn}
+                      onChange={(e) => setEditClockIn(e.target.value)}
+                      data-testid="input-edit-clock-in"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-clock-out">Clock Out</Label>
+                    <Input
+                      id="edit-clock-out"
+                      type="datetime-local"
+                      value={editClockOut}
+                      onChange={(e) => setEditClockOut(e.target.value)}
+                      data-testid="input-edit-clock-out"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-user">User</Label>
+                  <Select value={editUserId} onValueChange={setEditUserId}>
+                    <SelectTrigger id="edit-user" data-testid="select-edit-user">
+                      <SelectValue placeholder="Select user" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {users.map((user) => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.firstName} {user.lastName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-property">Property</Label>
+                  <Select value={editPropertyId} onValueChange={setEditPropertyId}>
+                    <SelectTrigger id="edit-property" data-testid="select-edit-property">
+                      <SelectValue placeholder="No property" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">No property</SelectItem>
+                      {properties.map((property) => (
+                        <SelectItem key={property.id} value={property.id.toString()}>
+                          {property.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-task">Task</Label>
+                  <Select value={editTaskId} onValueChange={setEditTaskId}>
+                    <SelectTrigger id="edit-task" data-testid="select-edit-task">
+                      <SelectValue placeholder="No task" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">No task</SelectItem>
+                      {tasks.map((task) => (
+                        <SelectItem key={task.id} value={task.id.toString()}>
+                          {task.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="edit-rate">Billable Rate ($/hour)</Label>
               <Input
@@ -461,6 +574,18 @@ export default function TimeTracking() {
                 onChange={(e) => setEditBillableRate(e.target.value)}
                 placeholder="0.00"
                 data-testid="input-edit-rate"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-notes">Notes</Label>
+              <Textarea
+                id="edit-notes"
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                placeholder="Add any notes..."
+                rows={4}
+                data-testid="input-edit-notes"
               />
             </div>
           </div>

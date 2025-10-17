@@ -2877,20 +2877,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/time-entries/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/time-entries/:id", isAuthenticated, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+      const user = req.user;
       const entry = await storage.getTimeEntry(id);
       
       if (!entry) {
         return res.status(404).json({ message: "Time entry not found" });
       }
 
+      // Check if user has permission to fully edit time entries
+      const canFullyEdit = user.role === 'admin' || user.role === 'supervisor';
+
       const updates: any = {};
+      
+      // Everyone can edit notes and billable rate
       if (req.body.notes !== undefined) updates.notes = req.body.notes;
       if (req.body.billableRateCents !== undefined) updates.billableRateCents = req.body.billableRateCents;
-      if (req.body.propertyId !== undefined) updates.propertyId = req.body.propertyId ? parseInt(req.body.propertyId) : null;
-      if (req.body.taskId !== undefined) updates.taskId = req.body.taskId ? parseInt(req.body.taskId) : null;
+
+      // Only admins and supervisors can edit all other fields
+      if (canFullyEdit) {
+        if (req.body.clockIn !== undefined) updates.clockIn = req.body.clockIn;
+        if (req.body.clockOut !== undefined) updates.clockOut = req.body.clockOut;
+        if (req.body.userId !== undefined) updates.userId = req.body.userId;
+        if (req.body.propertyId !== undefined) updates.propertyId = req.body.propertyId ? parseInt(req.body.propertyId) : null;
+        if (req.body.taskId !== undefined) updates.taskId = req.body.taskId ? parseInt(req.body.taskId) : null;
+      }
 
       const updatedEntry = await storage.updateTimeEntry(id, updates);
       res.json(updatedEntry);

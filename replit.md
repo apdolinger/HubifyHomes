@@ -4,6 +4,12 @@
 Hubify is a professional property management platform designed to streamline operations for home watch and estate management companies. It aims to enhance team efficiency and client communication by providing a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface. The platform's vision is to become a leading solution in property management, addressing workflow inefficiencies and offering significant market potential.
 
 ## Recent Changes
+- **Role-Based Time Entry Editing (October 17, 2025)**: Implemented comprehensive time entry editing with permission controls:
+  - **Two-Tier Permission System**: Admin and supervisor roles can edit all time entry fields; regular staff can only edit notes and billable rates
+  - **Full Edit Capabilities**: Authorized users can modify clock in/out times, assigned user, property, task, notes, and billable rates
+  - **Permission Indicators**: UI clearly shows when a user has "Full Edit Access" with visual badge
+  - **Backend Protection**: API validates user role before allowing modifications to sensitive fields (clock times, user assignment)
+  - **Enhanced UI**: Expanded edit dialog with datetime pickers for precise time adjustments and dropdowns for property/task/user selection
 - **Property Merge Implementation (October 16, 2025)**: Completed full property duplicate merge functionality:
   - **Smart Merge Logic**: Automatically selects most complete property as primary based on weighted completeness scoring (address, name, details)
   - **Field Merging**: Intelligently combines data from duplicates (prefers longer strings, larger numbers for fields like square footage)
