@@ -40,8 +40,27 @@ interface ImportSummary {
   skipped: number;
 }
 
+interface ImportResult {
+  row: number;
+  status: 'success' | 'failed' | 'skipped';
+  action: 'created' | 'updated' | 'skipped';
+  message?: string;
+  recordId?: number;
+}
+
+interface ImportExecutionResults {
+  summary: {
+    total: number;
+    created: number;
+    updated: number;
+    failed: number;
+    skipped: number;
+  };
+  results: ImportResult[];
+}
+
 type EntityType = 'properties' | 'contacts' | 'tasks';
-type ImportStep = 'upload' | 'map' | 'validate' | 'preview' | 'ready';
+type ImportStep = 'upload' | 'map' | 'validate' | 'preview' | 'importing' | 'complete';
 
 interface FieldDefinition {
   name: string;
@@ -96,6 +115,8 @@ export default function ImportManager() {
   const [fieldMapping, setFieldMapping] = useState<FieldMapping>({});
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
+  const [importResults, setImportResults] = useState<ImportExecutionResults | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -389,6 +410,73 @@ export default function ImportManager() {
     setCurrentStep('preview');
   };
 
+  const handleExecuteImport = async () => {
+    if (!editedRows.length || !fieldMapping) return;
+
+    setIsImporting(true);
+    setCurrentStep('importing');
+    
+    try {
+      // Transform editedRows to match expected database schema
+      const transformedData = editedRows.map(row => {
+        const transformed: any = {};
+        
+        // Map CSV columns to database fields
+        Object.entries(fieldMapping).forEach(([csvCol, dbField]) => {
+          if (dbField && dbField !== '__skip__') {
+            let value = row[csvCol];
+            
+            // Data type conversions
+            const field = ENTITY_FIELDS[entityType].find(f => f.name === dbField);
+            if (field) {
+              if (field.type === 'number' && value) {
+                value = Number(value);
+              } else if (field.type === 'date' && value) {
+                value = new Date(value).toISOString();
+              }
+            }
+            
+            transformed[dbField] = value;
+          }
+        });
+        
+        return transformed;
+      });
+
+      const response = await fetch('/api/admin/import/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entityType,
+          data: transformedData,
+          fieldMapping,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Import failed' }));
+        
+        // Handle validation errors
+        if (response.status === 400 && errorData.errors) {
+          const errorMessages = errorData.errors.map((e: any) => `${e.field}: ${e.message}`).join(', ');
+          throw new Error(`Validation error: ${errorMessages}`);
+        }
+        
+        throw new Error(errorData.message || 'Import failed');
+      }
+
+      const results: ImportExecutionResults = await response.json();
+      setImportResults(results);
+      setCurrentStep('complete');
+    } catch (err) {
+      console.error('Import error:', err);
+      setError(err instanceof Error ? err.message : 'Import failed');
+      setCurrentStep('preview'); // Return to preview on error
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const downloadErrorReport = () => {
     if (!validationResult || !parsedData) return;
 
@@ -417,6 +505,27 @@ export default function ImportManager() {
     URL.revokeObjectURL(url);
   };
 
+  const downloadImportLog = () => {
+    if (!importResults) return;
+
+    const logRows = importResults.results.map(result => ({
+      'Row #': result.row,
+      'Status': result.status.toUpperCase(),
+      'Action': result.action.charAt(0).toUpperCase() + result.action.slice(1),
+      'Record ID': result.recordId || 'N/A',
+      'Message': result.message || 'Success',
+    }));
+
+    const csv = Papa.unparse(logRows);
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `import-log-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleClear = () => {
     setFile(null);
     setParsedData(null);
@@ -426,6 +535,8 @@ export default function ImportManager() {
     setValidationResult(null);
     setEditedRows([]);
     setImportSummary(null);
+    setImportResults(null);
+    setIsImporting(false);
   };
 
   const getMappedFieldsCount = () => {
@@ -471,10 +582,10 @@ export default function ImportManager() {
         <div className="flex items-center gap-2">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
             currentStep === 'map' ? 'bg-blue-600 text-white' : 
-            currentStep === 'validate' || currentStep === 'preview' || currentStep === 'ready' ? 'bg-green-600 text-white' : 
+            currentStep === 'validate' || currentStep === 'preview' || currentStep === 'importing' || currentStep === 'complete' ? 'bg-green-600 text-white' : 
             'bg-slate-300 text-slate-600'
           }`}>
-            {currentStep === 'validate' || currentStep === 'preview' || currentStep === 'ready' ? <CheckCircle2 className="w-5 h-5" /> : '2'}
+            {currentStep === 'validate' || currentStep === 'preview' || currentStep === 'importing' || currentStep === 'complete' ? <CheckCircle2 className="w-5 h-5" /> : '2'}
           </div>
           <span className="font-medium">Map</span>
         </div>
@@ -482,10 +593,10 @@ export default function ImportManager() {
         <div className="flex items-center gap-2">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
             currentStep === 'validate' ? 'bg-blue-600 text-white' : 
-            currentStep === 'preview' || currentStep === 'ready' ? 'bg-green-600 text-white' : 
+            currentStep === 'preview' || currentStep === 'importing' || currentStep === 'complete' ? 'bg-green-600 text-white' : 
             'bg-slate-300 text-slate-600'
           }`}>
-            {currentStep === 'preview' || currentStep === 'ready' ? <CheckCircle2 className="w-5 h-5" /> : '3'}
+            {currentStep === 'preview' || currentStep === 'importing' || currentStep === 'complete' ? <CheckCircle2 className="w-5 h-5" /> : '3'}
           </div>
           <span className="font-medium">Validate</span>
         </div>
@@ -493,19 +604,21 @@ export default function ImportManager() {
         <div className="flex items-center gap-2">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
             currentStep === 'preview' ? 'bg-blue-600 text-white' : 
-            currentStep === 'ready' ? 'bg-green-600 text-white' : 
+            currentStep === 'importing' || currentStep === 'complete' ? 'bg-green-600 text-white' : 
             'bg-slate-300 text-slate-600'
           }`}>
-            {currentStep === 'ready' ? <CheckCircle2 className="w-5 h-5" /> : '4'}
+            {currentStep === 'importing' || currentStep === 'complete' ? <CheckCircle2 className="w-5 h-5" /> : '4'}
           </div>
           <span className="font-medium">Preview</span>
         </div>
         <ArrowRight className="text-slate-400" />
         <div className="flex items-center gap-2">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            currentStep === 'ready' ? 'bg-blue-600 text-white' : 'bg-slate-300 text-slate-600'
+            currentStep === 'importing' ? 'bg-blue-600 text-white' : 
+            currentStep === 'complete' ? 'bg-green-600 text-white' : 
+            'bg-slate-300 text-slate-600'
           }`}>
-            5
+            {currentStep === 'complete' ? <CheckCircle2 className="w-5 h-5" /> : '5'}
           </div>
           <span className="font-medium">Import</span>
         </div>
@@ -1037,84 +1150,130 @@ export default function ImportManager() {
                 Back to Validation
               </Button>
               <Button
-                onClick={() => setCurrentStep('ready')}
+                onClick={handleExecuteImport}
+                disabled={isImporting}
                 className="bg-green-600 hover:bg-green-700"
                 data-testid="button-import-now"
               >
-                Import Now
+                {isImporting ? 'Importing...' : 'Import Now'}
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Ready to Import Step */}
-      {currentStep === 'ready' && parsedData && (
-        <Card>
+      {/* Importing Progress Step */}
+      {currentStep === 'importing' && (
+        <Card data-testid="card-importing-progress">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-              Ready to Import
+              <div className="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full" />
+              Importing Data...
             </CardTitle>
             <CardDescription>
-              Your data has been validated and is ready for import
+              Please wait while we import your data into the database
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex justify-between py-2 border-b">
-                <span className="font-medium">Data Type:</span>
-                <span className="capitalize">{entityType}</span>
+            <div className="bg-blue-50 dark:bg-blue-950 p-6 rounded-lg text-center">
+              <p className="text-slate-600 dark:text-slate-400">
+                Processing {importSummary?.totalRecords || 0} records...
+              </p>
+              <p className="text-sm text-slate-500 dark:text-slate-500 mt-2">
+                This may take a moment depending on the size of your dataset
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Import Complete Step */}
+      {currentStep === 'complete' && importResults && (
+        <Card data-testid="card-import-complete">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              Import Complete
+            </CardTitle>
+            <CardDescription>
+              Your data has been successfully imported
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Summary Statistics */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg" data-testid="result-total">
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {importResults.summary.total}
+                </div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">Total Records</div>
               </div>
-              <div className="flex justify-between py-2 border-b">
-                <span className="font-medium">Total Rows:</span>
-                <span>{parsedData.rows.length}</span>
+              <div className="bg-green-50 dark:bg-green-950 p-4 rounded-lg" data-testid="result-created">
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {importResults.summary.created}
+                </div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">Created</div>
               </div>
-              <div className="flex justify-between py-2 border-b">
-                <span className="font-medium">Mapped Fields:</span>
-                <span>{getMappedFieldsCount()}</span>
+              <div className="bg-amber-50 dark:bg-amber-950 p-4 rounded-lg" data-testid="result-updated">
+                <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                  {importResults.summary.updated}
+                </div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">Updated</div>
               </div>
-              <div className="flex justify-between py-2 border-b">
-                <span className="font-medium">Validation Status:</span>
-                <Badge variant="default" className="bg-green-600">Passed</Badge>
+              <div className="bg-red-50 dark:bg-red-950 p-4 rounded-lg" data-testid="result-failed">
+                <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                  {importResults.summary.failed}
+                </div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">Failed</div>
               </div>
             </div>
 
-            <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg space-y-2">
-              <h4 className="font-medium mb-2">Field Mapping Summary</h4>
-              {Object.entries(fieldMapping)
-                .filter(([_, dbField]) => dbField !== '' && dbField !== '__skip__')
-                .map(([csvColumn, dbField]) => (
-                  <div key={csvColumn} className="flex items-center gap-2 text-sm">
-                    <Badge variant="outline">{csvColumn}</Badge>
-                    <ArrowRight className="w-3 h-3 text-slate-400" />
-                    <Badge variant="secondary">
-                      {ENTITY_FIELDS[entityType].find(f => f.name === dbField)?.label}
-                    </Badge>
-                  </div>
-                ))}
-            </div>
+            {/* Success Message */}
+            {importResults.summary.failed === 0 && (
+              <Alert className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-800 dark:text-green-200">
+                  All records were successfully imported! {importResults.summary.created > 0 && `${importResults.summary.created} new records created.`} {importResults.summary.updated > 0 && `${importResults.summary.updated} records updated.`}
+                </AlertDescription>
+              </Alert>
+            )}
 
-            <Alert data-testid="alert-import-info">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                Import functionality coming soon. This feature will allow you to import {parsedData.rows.length} {entityType} into your database.
-              </AlertDescription>
-            </Alert>
+            {/* Partial Success Message */}
+            {importResults.summary.failed > 0 && importResults.summary.created + importResults.summary.updated > 0 && (
+              <Alert className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-800 dark:text-amber-200">
+                  Import completed with {importResults.summary.failed} failed records. {importResults.summary.created + importResults.summary.updated} records were successfully processed.
+                </AlertDescription>
+              </Alert>
+            )}
 
+            {/* Failure Message */}
+            {importResults.summary.failed > 0 && importResults.summary.created + importResults.summary.updated === 0 && (
+              <Alert className="bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-800 dark:text-red-200">
+                  Import failed. All {importResults.summary.failed} records encountered errors. Please check the import log for details.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Action Buttons */}
             <div className="flex gap-2">
               <Button
+                onClick={downloadImportLog}
                 variant="outline"
-                onClick={() => setCurrentStep('validate')}
-                data-testid="button-back-to-validation"
+                data-testid="button-download-import-log"
               >
-                Back to Validation
+                <Download className="w-4 h-4 mr-2" />
+                Download Import Log
               </Button>
               <Button
-                disabled
-                data-testid="button-start-import"
+                onClick={handleClear}
+                variant="default"
+                data-testid="button-new-import"
               >
-                Start Import (Coming Soon)
+                Start New Import
               </Button>
             </div>
           </CardContent>

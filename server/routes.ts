@@ -5804,6 +5804,212 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // CSV Import execution endpoint - Request validation schema
+  const importExecuteSchema = z.object({
+    entityType: z.enum(['properties', 'contacts', 'tasks']),
+    data: z.array(z.record(z.any())).min(1, "Data array cannot be empty"),
+    fieldMapping: z.record(z.string()),
+  });
+
+  app.post("/api/admin/import/execute", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = user?.claims?.sub || user?.id;
+      const userRole = user?.claims?.role || user?.role;
+      
+      if (!userRole || (userRole !== 'admin' && userRole !== 'supervisor' && userRole !== 'super_admin')) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Validate request body
+      const validation = importExecuteSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Invalid import request", 
+          errors: validation.error.errors.map(e => ({
+            field: e.path.join('.'),
+            message: e.message
+          }))
+        });
+      }
+
+      const { entityType, data, fieldMapping } = validation.data;
+
+      // Get orgId from claims or user
+      const orgId = user?.claims?.orgId || user?.claims?.org_id || user?.orgId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID required" });
+      }
+
+      // Validate entity-specific required fields
+      const requiredFields: Record<string, string[]> = {
+        properties: ['name', 'address1', 'city', 'state', 'zip', 'type'],
+        contacts: ['firstName', 'lastName', 'type'],
+        tasks: ['title'],
+      };
+
+      const entityRequiredFields = requiredFields[entityType];
+      const mappedFields = Object.values(fieldMapping).filter(v => v && v !== '__skip__');
+      
+      for (const requiredField of entityRequiredFields) {
+        if (!mappedFields.includes(requiredField)) {
+          return res.status(400).json({ 
+            message: `Missing required field mapping: ${requiredField}` 
+          });
+        }
+      }
+
+      const results: Array<{
+        row: number;
+        status: 'success' | 'failed' | 'skipped';
+        action: 'created' | 'updated' | 'skipped';
+        message?: string;
+        recordId?: number;
+      }> = [];
+
+      // Process each row
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i];
+        
+        try {
+          if (entityType === 'properties') {
+            // Check for existing property by accountId
+            const accountId = row.accountId?.trim();
+            let existingProperty;
+            
+            if (accountId) {
+              const [existing] = await db
+                .select()
+                .from(properties)
+                .where(eq(properties.accountId, accountId))
+                .limit(1);
+              existingProperty = existing;
+            }
+
+            if (existingProperty) {
+              // Update existing property
+              const [updated] = await db
+                .update(properties)
+                .set({
+                  ...row,
+                  updatedAt: new Date(),
+                })
+                .where(eq(properties.id, existingProperty.id))
+                .returning();
+              
+              results.push({
+                row: i + 1,
+                status: 'success',
+                action: 'updated',
+                recordId: updated.id,
+              });
+            } else {
+              // Create new property
+              const [created] = await db
+                .insert(properties)
+                .values({
+                  ...row,
+                  orgId,
+                })
+                .returning();
+              
+              results.push({
+                row: i + 1,
+                status: 'success',
+                action: 'created',
+                recordId: created.id,
+              });
+            }
+          } else if (entityType === 'contacts') {
+            // Check for existing contact by email (if provided)
+            const email = row.email?.trim().toLowerCase();
+            let existingContact;
+            
+            if (email) {
+              const [existing] = await db
+                .select()
+                .from(contacts)
+                .where(eq(contacts.email, email))
+                .limit(1);
+              existingContact = existing;
+            }
+
+            if (existingContact) {
+              // Update existing contact
+              const [updated] = await db
+                .update(contacts)
+                .set({
+                  ...row,
+                  updatedAt: new Date(),
+                })
+                .where(eq(contacts.id, existingContact.id))
+                .returning();
+              
+              results.push({
+                row: i + 1,
+                status: 'success',
+                action: 'updated',
+                recordId: updated.id,
+              });
+            } else {
+              // Create new contact
+              const [created] = await db
+                .insert(contacts)
+                .values(row)
+                .returning();
+              
+              results.push({
+                row: i + 1,
+                status: 'success',
+                action: 'created',
+                recordId: created.id,
+              });
+            }
+          } else if (entityType === 'tasks') {
+            // Tasks are always created (no update logic for CSV import)
+            const [created] = await db
+              .insert(tasks)
+              .values(row)
+              .returning();
+            
+            results.push({
+              row: i + 1,
+              status: 'success',
+              action: 'created',
+              recordId: created.id,
+            });
+          }
+        } catch (error) {
+          console.error(`Error processing row ${i + 1}:`, error);
+          results.push({
+            row: i + 1,
+            status: 'failed',
+            action: 'skipped',
+            message: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
+      }
+
+      // Calculate summary
+      const summary = {
+        total: data.length,
+        created: results.filter(r => r.action === 'created').length,
+        updated: results.filter(r => r.action === 'updated').length,
+        failed: results.filter(r => r.status === 'failed').length,
+        skipped: results.filter(r => r.action === 'skipped').length,
+      };
+
+      res.json({
+        success: true,
+        summary,
+        results,
+      });
+    } catch (error) {
+      console.error("Error executing import:", error);
+      res.status(500).json({ message: "Failed to execute import" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
