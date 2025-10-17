@@ -4,14 +4,31 @@
 Hubify is a professional property management platform designed to streamline operations for home watch and estate management companies. It aims to enhance team efficiency and client communication by providing a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface. The platform's vision is to become a leading solution in property management, addressing workflow inefficiencies and offering significant market potential.
 
 ## Recent Changes
-- **CSV Import Manager (October 17, 2025)**: Built import manager in admin area for CSV data uploads:
-  - **File Upload**: Users can upload CSV files through an intuitive interface
+- **CSV Import Manager with Data Validation (October 17, 2025)**: Built comprehensive import manager in admin area for CSV data uploads:
+  - **Four-Step Import Flow**: Upload → Map Fields → Validate → Import with visual progress indicator
+  - **Entity Type Selection**: Choose between Properties, Contacts, or Tasks for import
   - **CSV Parsing**: Integrated PapaParse library for reliable CSV parsing with header detection
-  - **Data Preview**: Displays parsed columns and rows in a paginated table view (up to 50 rows)
-  - **Summary Display**: Shows row and column counts for uploaded files
-  - **Error Handling**: Clear error messages for parsing failures or invalid files
-  - **Admin Integration**: Added navigation link in Tools & Support section of admin page
-  - **Testing Ready**: All interactive elements include data-testid attributes for automated testing
+  - **AI Field Mapping**: Automatically suggests column-to-field mappings based on:
+    - Exact name matches (e.g., "name" → "name")
+    - Partial matches (e.g., "Property Name" → "name")
+    - Common naming variations (e.g., "Street Address" → "address1", "Zip Code" → "zip")
+  - **Interactive Mapping**: Dropdown selectors for each CSV column with required field indicators
+  - **Mapping Validation**: Ensures all required fields are mapped before proceeding
+  - **Comprehensive Data Validation**:
+    - Required field checks (prevents empty required fields)
+    - Data type validation (numbers, emails, dates)
+    - Format validation (email syntax, date formats)
+    - Duplicate detection within CSV (warns about duplicate unique keys)
+  - **Visual Error Indicators**:
+    - Color-coded preview grid (Red = Error, Yellow = Warning)
+    - Row-level issue icons with tooltips
+    - Cell-level highlighting for specific field issues
+    - Error/warning count badges
+  - **Inline Editing**: Fix validation errors directly in preview table with auto-revalidation
+  - **Error Report Export**: Download CSV with all validation issues (Row #, Field, Issue Type, Message, Value)
+  - **Smart Flow Control**: Blocks import until all errors fixed; warnings allowed
+  - **Admin Integration**: Added navigation link in Tools & Support section
+  - **Testing Ready**: All interactive elements include data-testid attributes
 - **Organizational Time Tracking (October 17, 2025)**: Added dedicated tracking for non-billable organizational hours:
   - **Two-Category System**: Clock in as either "Client Work" (billable) or "Organizational Time" (non-billable)
   - **Visual Distinction**: Clear icons and descriptions differentiate between client work and organizational time
