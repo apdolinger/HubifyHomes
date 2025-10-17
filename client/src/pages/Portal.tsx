@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { usePortalAuth } from '@/contexts/PortalAuthContext';
-import ResidentDashboard from '@/components/portal/ResidentDashboard';
 import StaffDashboard from '@/components/portal/StaffDashboard';
 import VendorDashboard from '@/components/portal/VendorDashboard';
 import { Button } from '@/components/ui/button';
@@ -51,7 +50,6 @@ export default function Portal() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {user.role === 'resident' && <ResidentDashboard />}
         {user.role === 'staff' && <StaffDashboard />}
         {user.role === 'vendor' && <VendorDashboard />}
       </main>
