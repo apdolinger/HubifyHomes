@@ -5,7 +5,7 @@ Hubify is a professional property management platform designed to streamline ope
 
 ## Recent Changes
 - **CSV Import Manager with Data Validation (October 17, 2025)**: Built comprehensive import manager in admin area for CSV data uploads:
-  - **Four-Step Import Flow**: Upload → Map Fields → Validate → Import with visual progress indicator
+  - **Five-Step Import Flow**: Upload → Map Fields → Validate → Preview & Summary → Import with visual progress indicator
   - **Entity Type Selection**: Choose between Properties, Contacts, or Tasks for import
   - **CSV Parsing**: Integrated PapaParse library for reliable CSV parsing with header detection
   - **AI Field Mapping**: Automatically suggests column-to-field mappings based on:
@@ -26,6 +26,12 @@ Hubify is a professional property management platform designed to streamline ope
     - Error/warning count badges
   - **Inline Editing**: Fix validation errors directly in preview table with auto-revalidation
   - **Error Report Export**: Download CSV with all validation issues (Row #, Field, Issue Type, Message, Value)
+  - **Import Preview & Summary**: Deterministic statistics display before import:
+    - Total Records: Count of all CSV rows
+    - New Records: Non-duplicate records to be processed
+    - Updates: Reserved for backend detection (shows 0 in preview)
+    - Skipped: Duplicate records identified by validation
+    - Clear messaging that update detection happens during actual import
   - **Smart Flow Control**: Blocks import until all errors fixed; warnings allowed
   - **Admin Integration**: Added navigation link in Tools & Support section
   - **Testing Ready**: All interactive elements include data-testid attributes
