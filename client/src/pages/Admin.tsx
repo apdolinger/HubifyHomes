@@ -1603,7 +1603,16 @@ export default function Admin() {
                     <Download className="w-4 h-4 mr-2" />
                     Export All Tasks (CSV)
                   </Button>
-                  <div className="border-t pt-3">
+                  <div className="border-t pt-3 space-y-3">
+                    <Link href="/admin/import">
+                      <Button variant="outline" className="w-full justify-start">
+                        <Upload className="w-4 h-4 mr-2" />
+                        Import Manager
+                      </Button>
+                    </Link>
+                    <p className="text-xs text-slate-500">
+                      Upload and preview CSV files for data import
+                    </p>
                     <Button 
                       variant="outline" 
                       className="w-full justify-start"
@@ -1613,7 +1622,7 @@ export default function Admin() {
                       <Upload className="w-4 h-4 mr-2" />
                       {importMutation.isPending ? 'Importing...' : 'Import Sample Data'}
                     </Button>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-slate-500">
                       Import 10 properties, contacts, and tasks from your CSV dataset
                     </p>
                   </div>

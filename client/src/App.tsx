@@ -35,6 +35,7 @@ import AdminInvoices from "@/pages/AdminInvoices";
 import OrgBillingInvoices from "@/pages/OrgBillingInvoices";
 import OrgClientInvoices from "@/pages/OrgClientInvoices";
 import OrgStripeSettings from "@/pages/OrgStripeSettings";
+import ImportManager from "@/pages/ImportManager";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfService from "@/pages/TermsOfService";
 import Navigation from "@/components/Navigation";
@@ -145,6 +146,9 @@ function Router() {
           
           {/* Portal Preview */}
           <Route path="/portal-preview" component={PortalPreview} />
+          
+          {/* Admin Routes */}
+          <Route path="/admin/import" component={ImportManager} />
           
           {/* Billing Routes */}
           <Route path="/admin/billing" component={AdminBilling} />
