@@ -4,6 +4,12 @@
 Hubify is a professional property management platform designed to streamline operations for home watch and estate management companies. It aims to enhance team efficiency and client communication by providing a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface. The platform's vision is to become a leading solution in property management, addressing workflow inefficiencies and offering significant market potential.
 
 ## Recent Changes
+- **Organizational Time Tracking (October 17, 2025)**: Added dedicated tracking for non-billable organizational hours:
+  - **Two-Category System**: Clock in as either "Client Work" (billable) or "Organizational Time" (non-billable)
+  - **Visual Distinction**: Clear icons and descriptions differentiate between client work and organizational time
+  - **Automatic Handling**: Organizational time entries don't require property or task assignment
+  - **Use Cases**: Track admin work, training, meetings, internal tasks separate from client billing
+  - **Smart UI**: Property and task fields automatically hide when tracking organizational time
 - **Role-Based Time Entry Editing (October 17, 2025)**: Implemented comprehensive time entry editing with permission controls:
   - **Two-Tier Permission System**: Admin and supervisor roles can edit all time entry fields; regular staff can only edit notes and billable rates
   - **Full Edit Capabilities**: Authorized users can modify clock in/out times, assigned user, property, task, notes, and billable rates

@@ -3,12 +3,13 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Clock, Square, Play } from "lucide-react";
+import { Clock, Square, Play, Building2, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface TimeEntry {
   id: number;
@@ -35,6 +36,7 @@ interface Task {
 export function TimeTrackingDropdownItems() {
   const { toast } = useToast();
   const [showClockInDialog, setShowClockInDialog] = useState(false);
+  const [timeType, setTimeType] = useState<"client" | "organizational">("client");
   const [propertyId, setPropertyId] = useState<string>("");
   const [taskId, setTaskId] = useState<string>("");
   const [notes, setNotes] = useState("");
@@ -60,9 +62,12 @@ export function TimeTrackingDropdownItems() {
       queryClient.invalidateQueries({ queryKey: ["/api/time-entries"] });
       toast({
         title: "Clocked In",
-        description: "Your time is now being tracked.",
+        description: timeType === "organizational" 
+          ? "Tracking organizational time (non-billable)." 
+          : "Your time is now being tracked.",
       });
       setShowClockInDialog(false);
+      setTimeType("client");
       setPropertyId("");
       setTaskId("");
       setNotes("");
@@ -98,11 +103,18 @@ export function TimeTrackingDropdownItems() {
   });
 
   const handleClockIn = () => {
-    clockInMutation.mutate({
-      propertyId: propertyId && propertyId !== "none" ? parseInt(propertyId) : undefined,
-      taskId: taskId && taskId !== "none" ? parseInt(taskId) : undefined,
-      notes: notes || undefined,
-    });
+    // For organizational time, don't send property/task
+    if (timeType === "organizational") {
+      clockInMutation.mutate({
+        notes: notes || undefined,
+      });
+    } else {
+      clockInMutation.mutate({
+        propertyId: propertyId && propertyId !== "none" ? parseInt(propertyId) : undefined,
+        taskId: taskId && taskId !== "none" ? parseInt(taskId) : undefined,
+        notes: notes || undefined,
+      });
+    }
   };
 
   const handleClockOut = () => {
@@ -167,49 +179,94 @@ export function TimeTrackingDropdownItems() {
           <DialogHeader>
             <DialogTitle>Clock In</DialogTitle>
             <DialogDescription>
-              Start tracking your time. You can optionally associate this time entry with a property or task.
+              {timeType === "organizational" 
+                ? "Track non-billable organizational time (admin, training, meetings, etc.)"
+                : "Track time for client work and billable services."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="property">Property (Optional)</Label>
-              <Select value={propertyId} onValueChange={setPropertyId}>
-                <SelectTrigger id="property" data-testid="select-property">
-                  <SelectValue placeholder="Select a property" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {properties.map((property) => (
-                    <SelectItem key={property.id} value={property.id.toString()}>
-                      {property.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="space-y-3">
+              <Label>Time Type</Label>
+              <RadioGroup
+                value={timeType}
+                onValueChange={(value: "client" | "organizational") => {
+                  setTimeType(value);
+                  // Clear property/task when switching to organizational
+                  if (value === "organizational") {
+                    setPropertyId("");
+                    setTaskId("");
+                  }
+                }}
+                data-testid="radio-time-type"
+              >
+                <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer">
+                  <RadioGroupItem value="client" id="client" data-testid="radio-client" />
+                  <Label htmlFor="client" className="flex items-center cursor-pointer flex-1">
+                    <Users className="w-4 h-4 mr-2 text-blue-500" />
+                    <div>
+                      <div className="font-medium">Client Work</div>
+                      <div className="text-xs text-slate-500">Billable time for properties and tasks</div>
+                    </div>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer">
+                  <RadioGroupItem value="organizational" id="organizational" data-testid="radio-organizational" />
+                  <Label htmlFor="organizational" className="flex items-center cursor-pointer flex-1">
+                    <Building2 className="w-4 h-4 mr-2 text-slate-500" />
+                    <div>
+                      <div className="font-medium">Organizational Time</div>
+                      <div className="text-xs text-slate-500">Non-billable (admin, training, meetings)</div>
+                    </div>
+                  </Label>
+                </div>
+              </RadioGroup>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="task">Task (Optional)</Label>
-              <Select value={taskId} onValueChange={setTaskId}>
-                <SelectTrigger id="task" data-testid="select-task">
-                  <SelectValue placeholder="Select a task" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {tasks.map((task) => (
-                    <SelectItem key={task.id} value={task.id.toString()}>
-                      {task.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {timeType === "client" && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="property">Property (Optional)</Label>
+                  <Select value={propertyId} onValueChange={setPropertyId}>
+                    <SelectTrigger id="property" data-testid="select-property">
+                      <SelectValue placeholder="Select a property" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {properties.map((property) => (
+                        <SelectItem key={property.id} value={property.id.toString()}>
+                          {property.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="task">Task (Optional)</Label>
+                  <Select value={taskId} onValueChange={setTaskId}>
+                    <SelectTrigger id="task" data-testid="select-task">
+                      <SelectValue placeholder="Select a task" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {tasks.map((task) => (
+                        <SelectItem key={task.id} value={task.id.toString()}>
+                          {task.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="notes">Notes (Optional)</Label>
               <Textarea
                 id="notes"
-                placeholder="Add any notes about this time entry..."
+                placeholder={timeType === "organizational" 
+                  ? "e.g., Team meeting, training, administrative work..."
+                  : "Add any notes about this time entry..."}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 data-testid="input-notes"
