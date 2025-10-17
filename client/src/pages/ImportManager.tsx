@@ -8,7 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Upload, FileText, AlertCircle, ArrowRight, CheckCircle2, MapPin } from 'lucide-react';
+import { Upload, FileText, AlertCircle, ArrowRight, CheckCircle2, MapPin, AlertTriangle, Download, X } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ParsedData {
   columns: string[];
@@ -19,58 +20,74 @@ interface FieldMapping {
   [csvColumn: string]: string; // Maps CSV column to database field
 }
 
+interface ValidationIssue {
+  row: number;
+  field: string;
+  type: 'error' | 'warning';
+  message: string;
+}
+
+interface ValidationResult {
+  issues: ValidationIssue[];
+  hasErrors: boolean;
+  hasWarnings: boolean;
+}
+
 type EntityType = 'properties' | 'contacts' | 'tasks';
-type ImportStep = 'upload' | 'map' | 'ready';
+type ImportStep = 'upload' | 'map' | 'validate' | 'ready';
 
 interface FieldDefinition {
   name: string;
   label: string;
   required: boolean;
-  type?: string;
+  type?: 'text' | 'number' | 'email' | 'date';
+  uniqueKey?: boolean; // For duplicate detection
 }
 
 const ENTITY_FIELDS: Record<EntityType, FieldDefinition[]> = {
   properties: [
-    { name: 'name', label: 'Property Name', required: true },
-    { name: 'address1', label: 'Address Line 1', required: true },
-    { name: 'address2', label: 'Address Line 2', required: false },
-    { name: 'city', label: 'City', required: true },
-    { name: 'state', label: 'State', required: true },
-    { name: 'zip', label: 'ZIP Code', required: true },
-    { name: 'type', label: 'Property Type', required: true },
-    { name: 'accountId', label: 'Account ID', required: false },
-    { name: 'units', label: 'Number of Units', required: false },
-    { name: 'squareFootage', label: 'Square Footage', required: false },
-    { name: 'status', label: 'Status', required: false },
+    { name: 'name', label: 'Property Name', required: true, type: 'text' },
+    { name: 'address1', label: 'Address Line 1', required: true, type: 'text' },
+    { name: 'address2', label: 'Address Line 2', required: false, type: 'text' },
+    { name: 'city', label: 'City', required: true, type: 'text' },
+    { name: 'state', label: 'State', required: true, type: 'text' },
+    { name: 'zip', label: 'ZIP Code', required: true, type: 'text' },
+    { name: 'type', label: 'Property Type', required: true, type: 'text' },
+    { name: 'accountId', label: 'Account ID', required: false, type: 'text', uniqueKey: true },
+    { name: 'units', label: 'Number of Units', required: false, type: 'number' },
+    { name: 'squareFootage', label: 'Square Footage', required: false, type: 'number' },
+    { name: 'status', label: 'Status', required: false, type: 'text' },
   ],
   contacts: [
-    { name: 'firstName', label: 'First Name', required: true },
-    { name: 'lastName', label: 'Last Name', required: true },
-    { name: 'email', label: 'Email', required: false },
-    { name: 'phone', label: 'Phone', required: false },
-    { name: 'type', label: 'Contact Type', required: true },
-    { name: 'accountId', label: 'Account ID', required: false },
-    { name: 'notes', label: 'Notes', required: false },
+    { name: 'firstName', label: 'First Name', required: true, type: 'text' },
+    { name: 'lastName', label: 'Last Name', required: true, type: 'text' },
+    { name: 'email', label: 'Email', required: false, type: 'email', uniqueKey: true },
+    { name: 'phone', label: 'Phone', required: false, type: 'text' },
+    { name: 'type', label: 'Contact Type', required: true, type: 'text' },
+    { name: 'accountId', label: 'Account ID', required: false, type: 'text', uniqueKey: true },
+    { name: 'notes', label: 'Notes', required: false, type: 'text' },
   ],
   tasks: [
-    { name: 'title', label: 'Task Title', required: true },
-    { name: 'description', label: 'Description', required: false },
-    { name: 'priority', label: 'Priority', required: false },
-    { name: 'status', label: 'Status', required: false },
-    { name: 'category', label: 'Category', required: false },
-    { name: 'dueDate', label: 'Due Date', required: false },
-    { name: 'timeEstimate', label: 'Time Estimate', required: false },
+    { name: 'title', label: 'Task Title', required: true, type: 'text' },
+    { name: 'description', label: 'Description', required: false, type: 'text' },
+    { name: 'priority', label: 'Priority', required: false, type: 'text' },
+    { name: 'status', label: 'Status', required: false, type: 'text' },
+    { name: 'category', label: 'Category', required: false, type: 'text' },
+    { name: 'dueDate', label: 'Due Date', required: false, type: 'date' },
+    { name: 'timeEstimate', label: 'Time Estimate', required: false, type: 'text' },
   ],
 };
 
 export default function ImportManager() {
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
+  const [editedRows, setEditedRows] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState<ImportStep>('upload');
   const [entityType, setEntityType] = useState<EntityType>('properties');
   const [fieldMapping, setFieldMapping] = useState<FieldMapping>({});
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -80,7 +97,113 @@ export default function ImportManager() {
       setParsedData(null);
       setCurrentStep('upload');
       setFieldMapping({});
+      setValidationResult(null);
+      setEditedRows([]);
     }
+  };
+
+  // Validation functions
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validateNumber = (value: string): boolean => {
+    return !isNaN(Number(value)) && value.trim() !== '';
+  };
+
+  const validateDate = (value: string): boolean => {
+    const date = new Date(value);
+    return !isNaN(date.getTime());
+  };
+
+  const validateData = (rows: any[], mapping: FieldMapping, entityType: EntityType): ValidationResult => {
+    const issues: ValidationIssue[] = [];
+    const fields = ENTITY_FIELDS[entityType];
+    
+    // Get mapped fields
+    const mappedFields = Object.entries(mapping)
+      .filter(([_, dbField]) => dbField !== '__skip__')
+      .reduce((acc, [csvCol, dbField]) => {
+        acc[dbField] = csvCol;
+        return acc;
+      }, {} as Record<string, string>);
+
+    // Track values for duplicate detection
+    const uniqueKeyValues: Record<string, Set<string>> = {};
+    fields.filter(f => f.uniqueKey).forEach(f => {
+      uniqueKeyValues[f.name] = new Set();
+    });
+
+    rows.forEach((row, rowIndex) => {
+      fields.forEach(field => {
+        const csvColumn = mappedFields[field.name];
+        if (!csvColumn) return;
+
+        const value = row[csvColumn];
+        const trimmedValue = value?.toString().trim() || '';
+
+        // Check required fields
+        if (field.required && !trimmedValue) {
+          issues.push({
+            row: rowIndex,
+            field: field.name,
+            type: 'error',
+            message: `${field.label} is required but missing`
+          });
+        }
+
+        // Check data types
+        if (trimmedValue) {
+          if (field.type === 'email' && !validateEmail(trimmedValue)) {
+            issues.push({
+              row: rowIndex,
+              field: field.name,
+              type: 'error',
+              message: `Invalid email format: ${trimmedValue}`
+            });
+          }
+
+          if (field.type === 'number' && !validateNumber(trimmedValue)) {
+            issues.push({
+              row: rowIndex,
+              field: field.name,
+              type: 'error',
+              message: `Expected a number but got: ${trimmedValue}`
+            });
+          }
+
+          if (field.type === 'date' && !validateDate(trimmedValue)) {
+            issues.push({
+              row: rowIndex,
+              field: field.name,
+              type: 'error',
+              message: `Invalid date format: ${trimmedValue}`
+            });
+          }
+        }
+
+        // Check for duplicates within CSV
+        if (field.uniqueKey && trimmedValue) {
+          if (uniqueKeyValues[field.name].has(trimmedValue.toLowerCase())) {
+            issues.push({
+              row: rowIndex,
+              field: field.name,
+              type: 'warning',
+              message: `Duplicate ${field.label}: ${trimmedValue}`
+            });
+          } else {
+            uniqueKeyValues[field.name].add(trimmedValue.toLowerCase());
+          }
+        }
+      });
+    });
+
+    return {
+      issues,
+      hasErrors: issues.some(i => i.type === 'error'),
+      hasWarnings: issues.some(i => i.type === 'warning')
+    };
   };
 
   // Auto-suggest field mapping based on column name similarity
@@ -167,6 +290,7 @@ export default function ImportManager() {
           columns,
           rows,
         });
+        setEditedRows([...rows]);
 
         // Auto-suggest field mappings
         const suggestedMapping = suggestFieldMapping(columns, entityType);
@@ -191,7 +315,7 @@ export default function ImportManager() {
   const handleConfirmMapping = () => {
     // Validate required fields are mapped
     const requiredFields = ENTITY_FIELDS[entityType].filter(f => f.required);
-    const mappedFields = Object.values(fieldMapping).filter(v => v !== '');
+    const mappedFields = Object.values(fieldMapping).filter(v => v !== '' && v !== '__skip__');
     
     const missingRequired = requiredFields.filter(
       rf => !mappedFields.includes(rf.name)
@@ -203,7 +327,60 @@ export default function ImportManager() {
     }
 
     setError(null);
+    
+    // Run validation
+    if (parsedData) {
+      const result = validateData(editedRows, fieldMapping, entityType);
+      setValidationResult(result);
+      setCurrentStep('validate');
+    }
+  };
+
+  const handleCellEdit = (rowIndex: number, csvColumn: string, newValue: string) => {
+    const updatedRows = [...editedRows];
+    updatedRows[rowIndex] = {
+      ...updatedRows[rowIndex],
+      [csvColumn]: newValue
+    };
+    setEditedRows(updatedRows);
+
+    // Re-run validation
+    if (parsedData) {
+      const result = validateData(updatedRows, fieldMapping, entityType);
+      setValidationResult(result);
+    }
+  };
+
+  const handleProceedToImport = () => {
     setCurrentStep('ready');
+  };
+
+  const downloadErrorReport = () => {
+    if (!validationResult || !parsedData) return;
+
+    const errorRows: any[] = [];
+    
+    validationResult.issues.forEach(issue => {
+      const row = editedRows[issue.row];
+      const csvColumn = Object.entries(fieldMapping).find(([_, db]) => db === issue.field)?.[0] || issue.field;
+      
+      errorRows.push({
+        'Row #': issue.row + 1,
+        'Field': ENTITY_FIELDS[entityType].find(f => f.name === issue.field)?.label || issue.field,
+        'Issue Type': issue.type === 'error' ? 'ERROR' : 'WARNING',
+        'Message': issue.message,
+        'Current Value': row[csvColumn] || ''
+      });
+    });
+
+    const csv = Papa.unparse(errorRows);
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `import-errors-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleClear = () => {
@@ -212,6 +389,8 @@ export default function ImportManager() {
     setError(null);
     setCurrentStep('upload');
     setFieldMapping({});
+    setValidationResult(null);
+    setEditedRows([]);
   };
 
   const getMappedFieldsCount = () => {
@@ -224,12 +403,22 @@ export default function ImportManager() {
     return requiredFields.filter(rf => mappedFields.includes(rf.name)).length;
   };
 
+  const getIssuesForCell = (rowIndex: number, fieldName: string): ValidationIssue[] => {
+    if (!validationResult) return [];
+    return validationResult.issues.filter(i => i.row === rowIndex && i.field === fieldName);
+  };
+
+  const getIssuesForRow = (rowIndex: number): ValidationIssue[] => {
+    if (!validationResult) return [];
+    return validationResult.issues.filter(i => i.row === rowIndex);
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Import Manager</h1>
         <p className="text-slate-600 dark:text-slate-400 mt-2">
-          Upload CSV files and map fields to import data
+          Upload CSV files, map fields, and validate data before importing
         </p>
       </div>
 
@@ -247,19 +436,30 @@ export default function ImportManager() {
         <div className="flex items-center gap-2">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
             currentStep === 'map' ? 'bg-blue-600 text-white' : 
-            currentStep === 'ready' ? 'bg-green-600 text-white' : 
+            currentStep === 'validate' || currentStep === 'ready' ? 'bg-green-600 text-white' : 
             'bg-slate-300 text-slate-600'
           }`}>
-            {currentStep === 'ready' ? <CheckCircle2 className="w-5 h-5" /> : '2'}
+            {currentStep === 'validate' || currentStep === 'ready' ? <CheckCircle2 className="w-5 h-5" /> : '2'}
           </div>
           <span className="font-medium">Map Fields</span>
         </div>
         <ArrowRight className="text-slate-400" />
         <div className="flex items-center gap-2">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+            currentStep === 'validate' ? 'bg-blue-600 text-white' : 
+            currentStep === 'ready' ? 'bg-green-600 text-white' : 
+            'bg-slate-300 text-slate-600'
+          }`}>
+            {currentStep === 'ready' ? <CheckCircle2 className="w-5 h-5" /> : '3'}
+          </div>
+          <span className="font-medium">Validate</span>
+        </div>
+        <ArrowRight className="text-slate-400" />
+        <div className="flex items-center gap-2">
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
             currentStep === 'ready' ? 'bg-blue-600 text-white' : 'bg-slate-300 text-slate-600'
           }`}>
-            3
+            4
           </div>
           <span className="font-medium">Import</span>
         </div>
@@ -422,7 +622,7 @@ export default function ImportManager() {
                   onClick={handleConfirmMapping}
                   data-testid="button-confirm-mapping"
                 >
-                  Confirm Mapping & Continue
+                  Validate Data & Continue
                 </Button>
               </div>
             </CardContent>
@@ -446,7 +646,7 @@ export default function ImportManager() {
                         <TableHead key={index} className="font-semibold bg-slate-100 dark:bg-slate-800">
                           <div>
                             {column}
-                            {fieldMapping[column] && (
+                            {fieldMapping[column] && fieldMapping[column] !== '__skip__' && (
                               <Badge variant="secondary" className="ml-2 text-xs">
                                 → {ENTITY_FIELDS[entityType].find(f => f.name === fieldMapping[column])?.label}
                               </Badge>
@@ -478,6 +678,198 @@ export default function ImportManager() {
         </div>
       )}
 
+      {/* Validation Step */}
+      {currentStep === 'validate' && parsedData && validationResult && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                {validationResult.hasErrors ? (
+                  <AlertCircle className="h-5 w-5 text-red-600" />
+                ) : validationResult.hasWarnings ? (
+                  <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                ) : (
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                )}
+                Data Validation Results
+              </CardTitle>
+              <CardDescription>
+                Review and fix any issues before importing
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-4">
+                {validationResult.hasErrors && (
+                  <Badge variant="destructive" data-testid="badge-error-count">
+                    {validationResult.issues.filter(i => i.type === 'error').length} Errors
+                  </Badge>
+                )}
+                {validationResult.hasWarnings && (
+                  <Badge variant="outline" className="border-yellow-600 text-yellow-600" data-testid="badge-warning-count">
+                    {validationResult.issues.filter(i => i.type === 'warning').length} Warnings
+                  </Badge>
+                )}
+                {!validationResult.hasErrors && !validationResult.hasWarnings && (
+                  <Badge variant="default" className="bg-green-600" data-testid="badge-no-issues">
+                    No Issues Found
+                  </Badge>
+                )}
+              </div>
+
+              {(validationResult.hasErrors || validationResult.hasWarnings) && (
+                <>
+                  <Alert data-testid="alert-validation-info">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      {validationResult.hasErrors 
+                        ? 'Fix all errors before importing. You can edit cells directly in the table below.'
+                        : 'Warnings indicate potential issues but won\'t prevent import.'}
+                    </AlertDescription>
+                  </Alert>
+
+                  <Button
+                    variant="outline"
+                    onClick={downloadErrorReport}
+                    data-testid="button-download-errors"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download Error Report CSV
+                  </Button>
+                </>
+              )}
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentStep('map')}
+                  data-testid="button-back-to-mapping"
+                >
+                  Back to Mapping
+                </Button>
+                <Button
+                  onClick={handleProceedToImport}
+                  disabled={validationResult.hasErrors}
+                  data-testid="button-proceed-to-import"
+                >
+                  {validationResult.hasErrors ? 'Fix Errors to Continue' : 'Proceed to Import'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Validation Preview Table with Inline Editing */}
+          <Card data-testid="card-validation-preview">
+            <CardHeader>
+              <CardTitle>Data Preview with Validation</CardTitle>
+              <CardDescription>
+                Click on cells to edit values. Red = Error, Yellow = Warning
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TooltipProvider>
+                <div className="rounded-md border overflow-auto max-h-[600px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12 bg-slate-100 dark:bg-slate-800">#</TableHead>
+                        <TableHead className="w-16 bg-slate-100 dark:bg-slate-800">
+                          <AlertCircle className="w-4 h-4" />
+                        </TableHead>
+                        {parsedData.columns.map((column, index) => {
+                          const dbField = fieldMapping[column];
+                          if (dbField === '__skip__') return null;
+                          
+                          return (
+                            <TableHead key={index} className="font-semibold bg-slate-100 dark:bg-slate-800">
+                              {ENTITY_FIELDS[entityType].find(f => f.name === dbField)?.label || column}
+                            </TableHead>
+                          );
+                        })}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {editedRows.map((row, rowIndex) => {
+                        const rowIssues = getIssuesForRow(rowIndex);
+                        const hasError = rowIssues.some(i => i.type === 'error');
+                        const hasWarning = rowIssues.some(i => i.type === 'warning');
+
+                        return (
+                          <TableRow key={rowIndex} className={hasError ? 'bg-red-50 dark:bg-red-950/20' : hasWarning ? 'bg-yellow-50 dark:bg-yellow-950/20' : ''}>
+                            <TableCell className="font-medium text-slate-500">
+                              {rowIndex + 1}
+                            </TableCell>
+                            <TableCell>
+                              {rowIssues.length > 0 && (
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    {hasError ? (
+                                      <AlertCircle className="w-4 h-4 text-red-600" data-testid={`row-error-${rowIndex}`} />
+                                    ) : (
+                                      <AlertTriangle className="w-4 h-4 text-yellow-600" data-testid={`row-warning-${rowIndex}`} />
+                                    )}
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <div className="space-y-1">
+                                      {rowIssues.map((issue, idx) => (
+                                        <p key={idx} className="text-xs">
+                                          • {issue.message}
+                                        </p>
+                                      ))}
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </TableCell>
+                            {parsedData.columns.map((column, colIndex) => {
+                              const dbField = fieldMapping[column];
+                              if (dbField === '__skip__') return null;
+
+                              const cellIssues = getIssuesForCell(rowIndex, dbField);
+                              const hasError = cellIssues.some(i => i.type === 'error');
+                              const hasWarning = cellIssues.some(i => i.type === 'warning');
+
+                              return (
+                                <TableCell 
+                                  key={colIndex} 
+                                  className={`${hasError ? 'bg-red-100 dark:bg-red-900/30' : hasWarning ? 'bg-yellow-100 dark:bg-yellow-900/30' : ''}`}
+                                  data-testid={`validation-cell-${rowIndex}-${colIndex}`}
+                                >
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Input
+                                        value={row[column]?.toString() || ''}
+                                        onChange={(e) => handleCellEdit(rowIndex, column, e.target.value)}
+                                        className={`h-8 ${cellIssues.length > 0 ? 'border-2' : ''} ${hasError ? 'border-red-500' : hasWarning ? 'border-yellow-500' : ''}`}
+                                        data-testid={`input-cell-${rowIndex}-${colIndex}`}
+                                      />
+                                    </TooltipTrigger>
+                                    {cellIssues.length > 0 && (
+                                      <TooltipContent>
+                                        <div className="space-y-1">
+                                          {cellIssues.map((issue, idx) => (
+                                            <p key={idx} className="text-xs">
+                                              {issue.message}
+                                            </p>
+                                          ))}
+                                        </div>
+                                      </TooltipContent>
+                                    )}
+                                  </Tooltip>
+                                </TableCell>
+                              );
+                            })}
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TooltipProvider>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Ready to Import Step */}
       {currentStep === 'ready' && parsedData && (
         <Card>
@@ -487,7 +879,7 @@ export default function ImportManager() {
               Ready to Import
             </CardTitle>
             <CardDescription>
-              Your field mapping is complete. Review the summary below.
+              Your data has been validated and is ready for import
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -503,6 +895,10 @@ export default function ImportManager() {
               <div className="flex justify-between py-2 border-b">
                 <span className="font-medium">Mapped Fields:</span>
                 <span>{getMappedFieldsCount()}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b">
+                <span className="font-medium">Validation Status:</span>
+                <Badge variant="default" className="bg-green-600">Passed</Badge>
               </div>
             </div>
 
@@ -531,10 +927,10 @@ export default function ImportManager() {
             <div className="flex gap-2">
               <Button
                 variant="outline"
-                onClick={() => setCurrentStep('map')}
-                data-testid="button-back-to-mapping"
+                onClick={() => setCurrentStep('validate')}
+                data-testid="button-back-to-validation"
               >
-                Back to Mapping
+                Back to Validation
               </Button>
               <Button
                 disabled
