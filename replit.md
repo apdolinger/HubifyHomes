@@ -43,6 +43,10 @@ Hubify is a professional property management platform designed to streamline ope
     - **Import Log Download**: CSV export with row#, status, action, recordId, message
     - **Error Handling**: Surfaces backend validation errors, returns to preview on failure
     - **Flow Control**: Start new import or return to admin after completion
+  - **Post-Import Review**:
+    - **Success Message**: Contextual alerts with detailed counts (all success, partial, or failure)
+    - **Downloadable Report**: Complete CSV import log always available
+    - **View Imported Records**: Direct navigation link to imported entity pages (Properties → /properties, Contacts → /people, Tasks → /tasks) - only appears when records are created or updated
   - **Smart Flow Control**: Blocks import until all errors fixed; warnings allowed
   - **Admin Integration**: Added navigation link in Tools & Support section
   - **Testing Ready**: All interactive elements include data-testid attributes

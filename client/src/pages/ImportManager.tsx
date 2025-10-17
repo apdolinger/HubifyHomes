@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
+import { Link } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Upload, FileText, AlertCircle, ArrowRight, CheckCircle2, MapPin, AlertTriangle, Download, X } from 'lucide-react';
+import { Upload, FileText, AlertCircle, ArrowRight, CheckCircle2, MapPin, AlertTriangle, Download, X, Eye } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ParsedData {
@@ -1259,7 +1260,7 @@ export default function ImportManager() {
             )}
 
             {/* Action Buttons */}
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 onClick={downloadImportLog}
                 variant="outline"
@@ -1268,6 +1269,24 @@ export default function ImportManager() {
                 <Download className="w-4 h-4 mr-2" />
                 Download Import Log
               </Button>
+              
+              {(importResults.summary.created > 0 || importResults.summary.updated > 0) && (
+                <Link href={
+                  entityType === 'properties' ? '/properties' :
+                  entityType === 'contacts' ? '/people' :
+                  '/tasks'
+                }>
+                  <Button
+                    variant="outline"
+                    className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900"
+                    data-testid="button-view-imported-records"
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    View Imported {entityType === 'properties' ? 'Properties' : entityType === 'contacts' ? 'Contacts' : 'Tasks'}
+                  </Button>
+                </Link>
+              )}
+              
               <Button
                 onClick={handleClear}
                 variant="default"
