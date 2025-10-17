@@ -119,9 +119,9 @@ export default function ImportManager() {
           </div>
 
           {error && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" data-testid="alert-csv-error">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription data-testid="text-error-message">{error}</AlertDescription>
             </Alert>
           )}
 
@@ -136,10 +136,10 @@ export default function ImportManager() {
       </Card>
 
       {parsedData && (
-        <Card>
+        <Card data-testid="card-csv-preview">
           <CardHeader>
             <CardTitle>CSV Preview</CardTitle>
-            <CardDescription>
+            <CardDescription data-testid="text-csv-summary">
               {parsedData.rows.length} rows × {parsedData.columns.length} columns
             </CardDescription>
           </CardHeader>

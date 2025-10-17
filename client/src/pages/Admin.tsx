@@ -1605,7 +1605,7 @@ export default function Admin() {
                   </Button>
                   <div className="border-t pt-3 space-y-3">
                     <Link href="/admin/import">
-                      <Button variant="outline" className="w-full justify-start">
+                      <Button variant="outline" className="w-full justify-start" data-testid="button-import-manager">
                         <Upload className="w-4 h-4 mr-2" />
                         Import Manager
                       </Button>
