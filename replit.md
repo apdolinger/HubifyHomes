@@ -4,8 +4,8 @@
 Hubify is a professional property management platform designed to streamline operations for home watch and estate management companies. It aims to enhance team efficiency and client communication by providing a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface. The platform's vision is to become a leading solution in property management, addressing workflow inefficiencies and offering significant market potential.
 
 ## Recent Changes
-- **CSV Import Manager with Data Validation (October 17, 2025)**: Built comprehensive import manager in admin area for CSV data uploads:
-  - **Five-Step Import Flow**: Upload → Map Fields → Validate → Preview & Summary → Import with visual progress indicator
+- **CSV Import Manager with Full Import Execution (October 17, 2025)**: Built comprehensive import manager in admin area for CSV data uploads with complete import execution capabilities:
+  - **Six-Step Import Flow**: Upload → Map Fields → Validate → Preview & Summary → Import Execution → Complete
   - **Entity Type Selection**: Choose between Properties, Contacts, or Tasks for import
   - **CSV Parsing**: Integrated PapaParse library for reliable CSV parsing with header detection
   - **AI Field Mapping**: Automatically suggests column-to-field mappings based on:
@@ -26,15 +26,27 @@ Hubify is a professional property management platform designed to streamline ope
     - Error/warning count badges
   - **Inline Editing**: Fix validation errors directly in preview table with auto-revalidation
   - **Error Report Export**: Download CSV with all validation issues (Row #, Field, Issue Type, Message, Value)
-  - **Import Preview & Summary**: Deterministic statistics display before import:
-    - Total Records: Count of all CSV rows
-    - New Records: Non-duplicate records to be processed
-    - Updates: Reserved for backend detection (shows 0 in preview)
-    - Skipped: Duplicate records identified by validation
-    - Clear messaging that update detection happens during actual import
+  - **Import Execution Backend** (/api/admin/import/execute):
+    - **Zod Validation**: Request body validation (entityType enum, non-empty data array, field mapping)
+    - **Required Field Validation**: Entity-specific required field checks before processing
+    - **Authorization**: OIDC-compatible role check (admin/supervisor/super_admin)
+    - **Insert/Update Logic**: Smart duplicate detection and handling:
+      - Properties: Check by accountId, update if exists, create new with orgId
+      - Contacts: Check by email, update if exists, create new
+      - Tasks: Always create new records
+    - **Row-by-Row Processing**: Try-catch per record with detailed error logging
+    - **Structured Responses**: Returns summary (total, created, updated, failed, skipped) + detailed results array
+  - **Import Execution Frontend**:
+    - **Progress Tracking**: Real-time progress indicator during import
+    - **Results Display**: Four colored stat cards (Total, Created, Updated, Failed)
+    - **Status Alerts**: Success/warning/error alerts based on results
+    - **Import Log Download**: CSV export with row#, status, action, recordId, message
+    - **Error Handling**: Surfaces backend validation errors, returns to preview on failure
+    - **Flow Control**: Start new import or return to admin after completion
   - **Smart Flow Control**: Blocks import until all errors fixed; warnings allowed
   - **Admin Integration**: Added navigation link in Tools & Support section
   - **Testing Ready**: All interactive elements include data-testid attributes
+  - **Production Ready**: End-to-end tested with comprehensive validation and error handling
 - **Organizational Time Tracking (October 17, 2025)**: Added dedicated tracking for non-billable organizational hours:
   - **Two-Category System**: Clock in as either "Client Work" (billable) or "Organizational Time" (non-billable)
   - **Visual Distinction**: Clear icons and descriptions differentiate between client work and organizational time
