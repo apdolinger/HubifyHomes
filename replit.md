@@ -62,7 +62,7 @@ Preferred communication style: Simple, everyday language.
     - **Invoice Management**: Three-tier invoice system with object storage for file upload/download.
     - **Stripe Integration**: Dual-tier integration for platform subscriptions and per-organization client payments.
     - **Forms System**: Multi-tenant forms with complex field types, property-specific assignments, client submissions, and advanced profile matching.
-    - **Hubify Portal**: Client-facing portal with role-based access (Resident, Staff, Vendor dashboards) and a preview mode for administrators.
+    - **Hubify Portal**: Client-facing portal with role-based access (Staff, Vendor dashboards) and a preview mode for administrators.
     - **Super Admin Control Panel**: Internal dashboard for platform management, including organizations, users, reports, communication, revenue, feature flags, monitoring, compliance, and platform settings.
     - **Branding System**: Tier-based branding policy enforcement.
     - **Legal Compliance Pages**: Publicly accessible Privacy Policy and Terms of Service pages compliant with US (CCPA/CPRA) and Canadian (PIPEDA) legal standards.
