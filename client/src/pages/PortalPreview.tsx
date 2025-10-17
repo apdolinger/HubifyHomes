@@ -3,21 +3,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Smartphone, Monitor, Eye } from 'lucide-react';
-import ResidentDashboard from '@/components/portal/ResidentDashboard';
 import StaffDashboard from '@/components/portal/StaffDashboard';
 import VendorDashboard from '@/components/portal/VendorDashboard';
 
-type PortalRole = 'resident' | 'staff' | 'vendor';
+type PortalRole = 'staff' | 'vendor';
 type DeviceView = 'desktop' | 'mobile';
 
 export default function PortalPreview() {
-  const [selectedRole, setSelectedRole] = useState<PortalRole>('resident');
+  const [selectedRole, setSelectedRole] = useState<PortalRole>('staff');
   const [deviceView, setDeviceView] = useState<DeviceView>('desktop');
 
   const renderDashboard = () => {
     switch (selectedRole) {
-      case 'resident':
-        return <ResidentDashboard />;
       case 'staff':
         return <StaffDashboard />;
       case 'vendor':
@@ -52,7 +49,6 @@ export default function PortalPreview() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="resident" data-testid="option-resident">Resident</SelectItem>
                     <SelectItem value="staff" data-testid="option-staff">Staff</SelectItem>
                     <SelectItem value="vendor" data-testid="option-vendor">Vendor</SelectItem>
                   </SelectContent>
