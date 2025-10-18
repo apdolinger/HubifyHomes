@@ -29,6 +29,7 @@ import {
   timeEntries,
   contacts,
   contactProperties,
+  alerts,
   teamMessages,
   messageReactions,
   messageMentions,
@@ -108,6 +109,8 @@ import {
   type InsertContact,
   type ContactProperty,
   type InsertContactProperty,
+  type Alert,
+  type InsertAlert,
   type TeamMessage,
   type InsertTeamMessage,
   type MessageReaction,
@@ -314,6 +317,14 @@ export interface IStorage {
   unlinkContactFromProperty(contactId: number, propertyId: number): Promise<void>;
   deleteContactProperty(relationshipId: number): Promise<void>;
   setPrimaryProperty(contactId: number, propertyId: number): Promise<void>;
+  
+  // Alert operations
+  getAlerts(orgId: string, filters?: { type?: string; entityId?: number; isActive?: boolean }): Promise<Alert[]>;
+  getAlertsByEntity(type: "client" | "property" | "task", entityId: number): Promise<Alert[]>;
+  getAlert(id: number): Promise<Alert | undefined>;
+  createAlert(alert: InsertAlert): Promise<Alert>;
+  updateAlert(id: number, alert: Partial<InsertAlert>): Promise<Alert>;
+  deleteAlert(id: number): Promise<void>;
   
   // Team message operations
   getTeamMessages(limit?: number): Promise<TeamMessage[]>;
@@ -1829,6 +1840,58 @@ export class DatabaseStorage implements IStorage {
 
   async deleteContact(id: number): Promise<void> {
     await db.update(contacts).set({ isActive: false }).where(eq(contacts.id, id));
+  }
+
+  // Alert operations
+  async getAlerts(orgId: string, filters?: { type?: string; entityId?: number; isActive?: boolean }): Promise<Alert[]> {
+    let query = db.select().from(alerts).where(eq(alerts.orgId, orgId));
+    
+    if (filters?.type) {
+      query = query.where(eq(alerts.type, filters.type)) as any;
+    }
+    if (filters?.entityId) {
+      query = query.where(eq(alerts.entityId, filters.entityId)) as any;
+    }
+    if (filters?.isActive !== undefined) {
+      query = query.where(eq(alerts.isActive, filters.isActive)) as any;
+    }
+    
+    return await query.orderBy(desc(alerts.createdAt));
+  }
+
+  async getAlertsByEntity(type: "client" | "property" | "task", entityId: number): Promise<Alert[]> {
+    return await db
+      .select()
+      .from(alerts)
+      .where(and(
+        eq(alerts.type, type),
+        eq(alerts.entityId, entityId),
+        eq(alerts.isActive, true)
+      ))
+      .orderBy(desc(alerts.severity), desc(alerts.createdAt));
+  }
+
+  async getAlert(id: number): Promise<Alert | undefined> {
+    const [alert] = await db.select().from(alerts).where(eq(alerts.id, id));
+    return alert;
+  }
+
+  async createAlert(alert: InsertAlert): Promise<Alert> {
+    const [newAlert] = await db.insert(alerts).values(alert).returning();
+    return newAlert;
+  }
+
+  async updateAlert(id: number, alertData: Partial<InsertAlert>): Promise<Alert> {
+    const [updatedAlert] = await db
+      .update(alerts)
+      .set({ ...alertData, updatedAt: new Date() })
+      .where(eq(alerts.id, id))
+      .returning();
+    return updatedAlert;
+  }
+
+  async deleteAlert(id: number): Promise<void> {
+    await db.delete(alerts).where(eq(alerts.id, id));
   }
 
   // Contact-Property relationship operations
