@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
 import { Link } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,8 +10,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Upload, FileText, AlertCircle, ArrowRight, CheckCircle2, MapPin, AlertTriangle, Download, X, Eye } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Upload, FileText, AlertCircle, ArrowRight, CheckCircle2, MapPin, AlertTriangle, Download, X, Eye, History, User } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { format } from 'date-fns';
 
 interface ParsedData {
   columns: string[];
@@ -118,6 +121,11 @@ export default function ImportManager() {
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
   const [importResults, setImportResults] = useState<ImportExecutionResults | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+
+  // Fetch import history
+  const { data: importHistory, isLoading: historyLoading } = useQuery({
+    queryKey: ['/api/admin/import/history'],
+  });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -568,6 +576,20 @@ export default function ImportManager() {
           Upload CSV files, map fields, and validate data before importing
         </p>
       </div>
+
+      <Tabs defaultValue="import" className="w-full">
+        <TabsList>
+          <TabsTrigger value="import" data-testid="tab-import">
+            <Upload className="w-4 h-4 mr-2" />
+            New Import
+          </TabsTrigger>
+          <TabsTrigger value="history" data-testid="tab-history">
+            <History className="w-4 h-4 mr-2" />
+            Import History
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="import" className="mt-6 space-y-6">{/* Existing import content will go here */}
 
       {/* Step Indicator */}
       <div className="flex items-center gap-2 justify-center" data-testid="step-indicator">
@@ -1298,6 +1320,95 @@ export default function ImportManager() {
           </CardContent>
         </Card>
       )}
+        </TabsContent>
+
+        <TabsContent value="history" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Import History</CardTitle>
+              <CardDescription>
+                View past imports and their results
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {historyLoading ? (
+                <div className="text-center py-8">
+                  <p className="text-slate-500">Loading history...</p>
+                </div>
+              ) : !importHistory || importHistory.length === 0 ? (
+                <div className="text-center py-8">
+                  <History className="w-12 h-12 mx-auto text-slate-300 mb-2" />
+                  <p className="text-slate-500">No import history found</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date & Time</TableHead>
+                        <TableHead>Entity Type</TableHead>
+                        <TableHead>Initiated By</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Created</TableHead>
+                        <TableHead className="text-right">Updated</TableHead>
+                        <TableHead className="text-right">Failed</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {importHistory.map((item: any) => (
+                        <TableRow key={item.id} data-testid={`history-row-${item.id}`}>
+                          <TableCell className="font-medium">
+                            {format(new Date(item.initiatedAt), 'MMM d, yyyy h:mm a')}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="capitalize">
+                              {item.entityType}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <User className="w-4 h-4 text-slate-400" />
+                              <span>{item.initiatedBy.firstName} {item.initiatedBy.lastName}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {item.status === 'success' && (
+                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                Success
+                              </Badge>
+                            )}
+                            {item.status === 'partial_success' && (
+                              <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                                Partial
+                              </Badge>
+                            )}
+                            {item.status === 'failed' && (
+                              <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                                Failed
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">{item.totalRecords}</TableCell>
+                          <TableCell className="text-right text-green-600 dark:text-green-400">
+                            {item.createdRecords}
+                          </TableCell>
+                          <TableCell className="text-right text-amber-600 dark:text-amber-400">
+                            {item.updatedRecords}
+                          </TableCell>
+                          <TableCell className="text-right text-red-600 dark:text-red-400">
+                            {item.failedRecords}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
