@@ -668,7 +668,7 @@ export default function ImportManager() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="properties" data-testid="option-properties">Properties</SelectItem>
-                  <SelectItem value="contacts" data-testid="option-contacts">Contacts</SelectItem>
+                  <SelectItem value="contacts" data-testid="option-contacts">Clients</SelectItem>
                   <SelectItem value="tasks" data-testid="option-tasks">Tasks</SelectItem>
                 </SelectContent>
               </Select>
@@ -1304,7 +1304,7 @@ export default function ImportManager() {
                     data-testid="button-view-imported-records"
                   >
                     <Eye className="w-4 h-4 mr-2" />
-                    View Imported {entityType === 'properties' ? 'Properties' : entityType === 'contacts' ? 'Contacts' : 'Tasks'}
+                    View Imported {entityType === 'properties' ? 'Properties' : entityType === 'contacts' ? 'Clients' : 'Tasks'}
                   </Button>
                 </Link>
               )}

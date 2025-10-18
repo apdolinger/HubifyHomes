@@ -3,99 +3,6 @@
 ## Overview
 Hubify is a professional property management platform designed to streamline operations for home watch and estate management companies. It aims to enhance team efficiency and client communication by providing a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface. The platform's vision is to become a leading solution in property management, addressing workflow inefficiencies and offering significant market potential.
 
-## Recent Changes
-- **Import History Tracking (October 18, 2025)**: Added comprehensive tracking and audit trail for all CSV imports:
-  - **Database Schema**: Created `import_history` table to store import records with entity type, initiator, timestamp, status, and record counts
-    - **Note**: Table was created via manual SQL. Schema definition exists in `shared/schema.ts` but requires manual table creation in fresh environments using: `CREATE TABLE import_history (id SERIAL PRIMARY KEY, org_id UUID NOT NULL REFERENCES orgs(id), initiated_by VARCHAR NOT NULL REFERENCES users(id), entity_type TEXT NOT NULL, file_name VARCHAR, status TEXT NOT NULL, total_records INTEGER NOT NULL, created_records INTEGER NOT NULL DEFAULT 0, updated_records INTEGER NOT NULL DEFAULT 0, failed_records INTEGER NOT NULL DEFAULT 0, initiated_at TIMESTAMP NOT NULL DEFAULT NOW());`
-  - **Storage Methods**: Added `createImportHistory()` and `getImportHistory()` to track and retrieve import records
-  - **API Endpoints**:
-    - POST during import execution: Automatically saves history record after each import
-    - GET /api/admin/import/history: Retrieves import history for current organization with user details
-    - Authorization: Admin, supervisor, or super_admin roles required
-  - **Tabbed UI**: Import Manager now has two tabs:
-    - "New Import": The CSV import wizard workflow
-    - "Import History": Table view of past imports with filterable columns
-  - **History Display**: Shows date/time, entity type, initiator name, status badge (success/partial/failed), and record statistics
-  - **Multi-Tenancy**: All history records are scoped by organization ID
-  - **Audit Trail**: Tracks who initiated each import, when it occurred, and detailed results
-- **CSV Import Manager with Full Import Execution (October 17, 2025)**: Built comprehensive import manager in admin area for CSV data uploads with complete import execution capabilities:
-  - **Six-Step Import Flow**: Upload → Map Fields → Validate → Preview & Summary → Import Execution → Complete
-  - **Entity Type Selection**: Choose between Properties, Contacts, or Tasks for import
-  - **CSV Parsing**: Integrated PapaParse library for reliable CSV parsing with header detection
-  - **AI Field Mapping**: Automatically suggests column-to-field mappings based on:
-    - Exact name matches (e.g., "name" → "name")
-    - Partial matches (e.g., "Property Name" → "name")
-    - Common naming variations (e.g., "Street Address" → "address1", "Zip Code" → "zip")
-  - **Interactive Mapping**: Dropdown selectors for each CSV column with required field indicators
-  - **Mapping Validation**: Ensures all required fields are mapped before proceeding
-  - **Comprehensive Data Validation**:
-    - Required field checks (prevents empty required fields)
-    - Data type validation (numbers, emails, dates)
-    - Format validation (email syntax, date formats)
-    - Duplicate detection within CSV (warns about duplicate unique keys)
-  - **Visual Error Indicators**:
-    - Color-coded preview grid (Red = Error, Yellow = Warning)
-    - Row-level issue icons with tooltips
-    - Cell-level highlighting for specific field issues
-    - Error/warning count badges
-  - **Inline Editing**: Fix validation errors directly in preview table with auto-revalidation
-  - **Error Report Export**: Download CSV with all validation issues (Row #, Field, Issue Type, Message, Value)
-  - **Import Execution Backend** (/api/admin/import/execute):
-    - **Zod Validation**: Request body validation (entityType enum, non-empty data array, field mapping)
-    - **Required Field Validation**: Entity-specific required field checks before processing
-    - **Authorization**: OIDC-compatible role check (admin/supervisor/super_admin)
-    - **Insert/Update Logic**: Smart duplicate detection and handling:
-      - Properties: Check by accountId, update if exists, create new with orgId
-      - Contacts: Check by email, update if exists, create new
-      - Tasks: Always create new records
-    - **Row-by-Row Processing**: Try-catch per record with detailed error logging
-    - **Structured Responses**: Returns summary (total, created, updated, failed, skipped) + detailed results array
-  - **Import Execution Frontend**:
-    - **Progress Tracking**: Real-time progress indicator during import
-    - **Results Display**: Four colored stat cards (Total, Created, Updated, Failed)
-    - **Status Alerts**: Success/warning/error alerts based on results
-    - **Import Log Download**: CSV export with row#, status, action, recordId, message
-    - **Error Handling**: Surfaces backend validation errors, returns to preview on failure
-    - **Flow Control**: Start new import or return to admin after completion
-  - **Post-Import Review**:
-    - **Success Message**: Contextual alerts with detailed counts (all success, partial, or failure)
-    - **Downloadable Report**: Complete CSV import log always available
-    - **View Imported Records**: Direct navigation link to imported entity pages (Properties → /properties, Contacts → /people, Tasks → /tasks) - only appears when records are created or updated
-  - **Smart Flow Control**: Blocks import until all errors fixed; warnings allowed
-  - **Admin Integration**: Added navigation link in Tools & Support section
-  - **Testing Ready**: All interactive elements include data-testid attributes
-  - **Production Ready**: End-to-end tested with comprehensive validation and error handling
-- **Organizational Time Tracking (October 17, 2025)**: Added dedicated tracking for non-billable organizational hours:
-  - **Two-Category System**: Clock in as either "Client Work" (billable) or "Organizational Time" (non-billable)
-  - **Visual Distinction**: Clear icons and descriptions differentiate between client work and organizational time
-  - **Automatic Handling**: Organizational time entries don't require property or task assignment
-  - **Use Cases**: Track admin work, training, meetings, internal tasks separate from client billing
-  - **Smart UI**: Property and task fields automatically hide when tracking organizational time
-- **Role-Based Time Entry Editing (October 17, 2025)**: Implemented comprehensive time entry editing with permission controls:
-  - **Two-Tier Permission System**: Admin and supervisor roles can edit all time entry fields; regular staff can only edit notes and billable rates
-  - **Full Edit Capabilities**: Authorized users can modify clock in/out times, assigned user, property, task, notes, and billable rates
-  - **Permission Indicators**: UI clearly shows when a user has "Full Edit Access" with visual badge
-  - **Backend Protection**: API validates user role before allowing modifications to sensitive fields (clock times, user assignment)
-  - **Enhanced UI**: Expanded edit dialog with datetime pickers for precise time adjustments and dropdowns for property/task/user selection
-- **Property Merge Implementation (October 16, 2025)**: Completed full property duplicate merge functionality:
-  - **Smart Merge Logic**: Automatically selects most complete property as primary based on weighted completeness scoring (address, name, details)
-  - **Field Merging**: Intelligently combines data from duplicates (prefers longer strings, larger numbers for fields like square footage)
-  - **Related Record Reassignment**: Automatically transfers all associated records to primary property:
-    - Tasks (propertyId)
-    - Time entries (propertyId)
-    - Form submissions (propertyId)
-    - Contact-property links (handles conflicts intelligently)
-    - Rooms (propertyId)
-    - Vehicles (propertyId)
-  - **Conflict Resolution**: Smart handling of contact-property junction table conflicts (removes duplicate links)
-  - **Activity Logging**: Records merge details including merged property IDs, notes, and primary address
-  - **Organization Safety**: Enforces same-organization check to prevent cross-org merges
-- **Contact Duplicate Detection Bug Fix (October 16, 2025)**: Fixed critical field name mismatch preventing duplicate detection:
-  - **Root Cause**: Duplicate detection code used snake_case field names (`first_name`, `last_name`) but Drizzle ORM returns camelCase (`firstName`, `lastName`)
-  - **Impact**: All contact field accesses returned `undefined`, preventing any duplicates from being detected
-  - **Fix Applied**: Updated `calculateContactSimilarity()`, `calculateRecordCompleteness()`, and `getContactMatchFields()` to use camelCase field names
-  - **Ignored Duplicates System**: Enhanced to properly filter out false positive matches while detecting legitimate duplicates
-
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
@@ -127,6 +34,8 @@ Preferred communication style: Simple, everyday language.
     - **Super Admin Control Panel**: Internal dashboard for platform management, including organizations, users, reports, communication, revenue, feature flags, monitoring, compliance, and platform settings.
     - **Branding System**: Tier-based branding policy enforcement.
     - **Legal Compliance Pages**: Publicly accessible Privacy Policy and Terms of Service pages compliant with US (CCPA/CPRA) and Canadian (PIPEDA) legal standards.
+    - **Import Manager**: Comprehensive CSV import functionality for Properties, Contacts, and Tasks with AI field mapping, data validation, and import history tracking.
+    - **Time Tracking**: Dedicated tracking for both billable "Client Work" and non-billable "Organizational Time" with role-based editing permissions.
 
 ### Database
 - **Primary Database**: PostgreSQL with Drizzle ORM
