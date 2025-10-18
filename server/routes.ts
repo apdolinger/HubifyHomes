@@ -39,7 +39,8 @@ import {
   insertVehicleNoteSchema,
   insertTaskSchema,
   insertTimeEntrySchema,
-  insertContactSchema, 
+  insertContactSchema,
+  insertAlertSchema,
   insertTeamMessageSchema,
   insertFormSchema,
   insertFormSubmissionSchema,
@@ -3074,6 +3075,172 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting contact:', error);
       res.status(500).json({ message: 'Failed to delete contact' });
+    }
+  });
+
+  // Alert routes with plan-based restrictions
+  const ALERT_CHARACTER_LIMITS: Record<string, number> = {
+    starter: 100,
+    pro: 250,
+    grow: 500,
+    enterprise: 1000,
+  };
+
+  // Get all alerts for an organization
+  app.get("/api/alerts", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user.claims.orgId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+
+      const filters: any = {};
+      if (req.query.type) filters.type = req.query.type;
+      if (req.query.entityId) filters.entityId = parseInt(req.query.entityId);
+      if (req.query.isActive) filters.isActive = req.query.isActive === 'true';
+
+      const alerts = await storage.getAlerts(orgId, filters);
+      res.json(alerts);
+    } catch (error) {
+      console.error("Error fetching alerts:", error);
+      res.status(500).json({ message: "Failed to fetch alerts" });
+    }
+  });
+
+  // Get alerts for a specific entity
+  app.get("/api/alerts/entity/:type/:entityId", isAuthenticated, async (req, res) => {
+    try {
+      const { type, entityId } = req.params;
+      
+      if (!['client', 'property', 'task'].includes(type)) {
+        return res.status(400).json({ message: "Invalid alert type" });
+      }
+      
+      const id = parseInt(entityId);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid entity ID" });
+      }
+
+      const alerts = await storage.getAlertsByEntity(type as "client" | "property" | "task", id);
+      res.json(alerts);
+    } catch (error) {
+      console.error("Error fetching entity alerts:", error);
+      res.status(500).json({ message: "Failed to fetch entity alerts" });
+    }
+  });
+
+  // Create alert with plan validation
+  app.post("/api/alerts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const orgId = req.user.claims.orgId;
+      
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+
+      // Get org subscription to check plan tier
+      const subscription = await storage.getOrgSubscription(orgId);
+      const tier = subscription?.tier || 'starter';
+      const characterLimit = ALERT_CHARACTER_LIMITS[tier] || ALERT_CHARACTER_LIMITS.starter;
+
+      // Validate message length against plan limit
+      if (req.body.message && req.body.message.length > characterLimit) {
+        return res.status(400).json({ 
+          message: `Alert message exceeds your plan's limit of ${characterLimit} characters. Upgrade your plan for longer alerts.`,
+          limit: characterLimit,
+          tier: tier
+        });
+      }
+
+      const validatedData = insertAlertSchema.parse({
+        ...req.body,
+        orgId,
+        createdBy: userId,
+      });
+
+      const alert = await storage.createAlert(validatedData);
+      res.status(201).json(alert);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating alert:", error);
+      res.status(500).json({ message: "Failed to create alert" });
+    }
+  });
+
+  // Update alert
+  app.patch("/api/alerts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid alert ID" });
+      }
+
+      const orgId = req.user.claims.orgId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+
+      // Get org subscription to check plan tier
+      const subscription = await storage.getOrgSubscription(orgId);
+      const tier = subscription?.tier || 'starter';
+      const characterLimit = ALERT_CHARACTER_LIMITS[tier] || ALERT_CHARACTER_LIMITS.starter;
+
+      // Validate message length if being updated
+      if (req.body.message && req.body.message.length > characterLimit) {
+        return res.status(400).json({ 
+          message: `Alert message exceeds your plan's limit of ${characterLimit} characters. Upgrade your plan for longer alerts.`,
+          limit: characterLimit,
+          tier: tier
+        });
+      }
+
+      const updatedAlert = await storage.updateAlert(id, req.body);
+      res.json(updatedAlert);
+    } catch (error) {
+      console.error("Error updating alert:", error);
+      res.status(500).json({ message: "Failed to update alert" });
+    }
+  });
+
+  // Delete alert
+  app.delete("/api/alerts/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid alert ID" });
+      }
+
+      await storage.deleteAlert(id);
+      res.json({ message: "Alert deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting alert:", error);
+      res.status(500).json({ message: "Failed to delete alert" });
+    }
+  });
+
+  // Get character limit for current plan
+  app.get("/api/alerts/limits", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user.claims.orgId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+
+      const subscription = await storage.getOrgSubscription(orgId);
+      const tier = subscription?.tier || 'starter';
+      const characterLimit = ALERT_CHARACTER_LIMITS[tier] || ALERT_CHARACTER_LIMITS.starter;
+
+      res.json({ 
+        tier,
+        characterLimit,
+        allLimits: ALERT_CHARACTER_LIMITS
+      });
+    } catch (error) {
+      console.error("Error fetching alert limits:", error);
+      res.status(500).json({ message: "Failed to fetch alert limits" });
     }
   });
 
