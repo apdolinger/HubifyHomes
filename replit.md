@@ -26,7 +26,7 @@ Preferred communication style: Simple, everyday language.
     - **Task Management System**: Priority levels, status tracking, assignment, property association, and due date management. Integrated with calendar.
     - **Calendar System**: Full-featured calendar with event management, attendee support, customizable settings, and staff scheduling conflict detection. Tasks with due dates appear as events.
     - **Team Collaboration**: Hierarchical user roles with permissions, communication, and activity logging. Includes out-of-office management and staff time tracking.
-    - **Contact Management**: Comprehensive management of tenants, owners, vendors, and emergency contacts with duplicate detection and merge capabilities.
+    - **Contact Management**: Comprehensive management of clients (tenants, owners, emergency contacts) and vendors with duplicate detection and merge capabilities. Vendors are managed separately in the admin section for better organization.
     - **Invoice Management**: Three-tier invoice system with object storage for file upload/download.
     - **Stripe Integration**: Dual-tier integration for platform subscriptions and per-organization client payments.
     - **Forms System**: Multi-tenant forms with complex field types, property-specific assignments, client submissions, and advanced profile matching.
