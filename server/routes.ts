@@ -5999,6 +5999,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         skipped: results.filter(r => r.action === 'skipped').length,
       };
 
+      // Determine status
+      let status: 'success' | 'partial_success' | 'failed';
+      if (summary.failed === 0) {
+        status = 'success';
+      } else if (summary.created + summary.updated > 0) {
+        status = 'partial_success';
+      } else {
+        status = 'failed';
+      }
+
+      // Save import history
+      await storage.createImportHistory({
+        orgId,
+        initiatedBy: userId,
+        entityType,
+        fileName: null, // Could be added later if we capture filename
+        status,
+        totalRecords: summary.total,
+        createdRecords: summary.created,
+        updatedRecords: summary.updated,
+        failedRecords: summary.failed,
+      });
+
       res.json({
         success: true,
         summary,
