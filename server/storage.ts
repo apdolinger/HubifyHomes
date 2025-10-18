@@ -320,11 +320,11 @@ export interface IStorage {
   
   // Alert operations
   getAlerts(orgId: string, filters?: { type?: string; entityId?: number; isActive?: boolean }): Promise<Alert[]>;
-  getAlertsByEntity(type: "client" | "property" | "task", entityId: number): Promise<Alert[]>;
-  getAlert(id: number): Promise<Alert | undefined>;
+  getAlertsByEntity(orgId: string, type: "client" | "property" | "task", entityId: number): Promise<Alert[]>;
+  getAlert(id: number, orgId: string): Promise<Alert | undefined>;
   createAlert(alert: InsertAlert): Promise<Alert>;
-  updateAlert(id: number, alert: Partial<InsertAlert>): Promise<Alert>;
-  deleteAlert(id: number): Promise<void>;
+  updateAlert(id: number, orgId: string, alert: Partial<InsertAlert>): Promise<Alert>;
+  deleteAlert(id: number, orgId: string): Promise<void>;
   
   // Team message operations
   getTeamMessages(limit?: number): Promise<TeamMessage[]>;
@@ -1859,11 +1859,12 @@ export class DatabaseStorage implements IStorage {
     return await query.orderBy(desc(alerts.createdAt));
   }
 
-  async getAlertsByEntity(type: "client" | "property" | "task", entityId: number): Promise<Alert[]> {
+  async getAlertsByEntity(orgId: string, type: "client" | "property" | "task", entityId: number): Promise<Alert[]> {
     return await db
       .select()
       .from(alerts)
       .where(and(
+        eq(alerts.orgId, orgId),
         eq(alerts.type, type),
         eq(alerts.entityId, entityId),
         eq(alerts.isActive, true)
@@ -1871,8 +1872,11 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(alerts.severity), desc(alerts.createdAt));
   }
 
-  async getAlert(id: number): Promise<Alert | undefined> {
-    const [alert] = await db.select().from(alerts).where(eq(alerts.id, id));
+  async getAlert(id: number, orgId: string): Promise<Alert | undefined> {
+    const [alert] = await db
+      .select()
+      .from(alerts)
+      .where(and(eq(alerts.id, id), eq(alerts.orgId, orgId)));
     return alert;
   }
 
@@ -1881,17 +1885,17 @@ export class DatabaseStorage implements IStorage {
     return newAlert;
   }
 
-  async updateAlert(id: number, alertData: Partial<InsertAlert>): Promise<Alert> {
+  async updateAlert(id: number, orgId: string, alertData: Partial<InsertAlert>): Promise<Alert> {
     const [updatedAlert] = await db
       .update(alerts)
       .set({ ...alertData, updatedAt: new Date() })
-      .where(eq(alerts.id, id))
+      .where(and(eq(alerts.id, id), eq(alerts.orgId, orgId)))
       .returning();
     return updatedAlert;
   }
 
-  async deleteAlert(id: number): Promise<void> {
-    await db.delete(alerts).where(eq(alerts.id, id));
+  async deleteAlert(id: number, orgId: string): Promise<void> {
+    await db.delete(alerts).where(and(eq(alerts.id, id), eq(alerts.orgId, orgId)));
   }
 
   // Contact-Property relationship operations

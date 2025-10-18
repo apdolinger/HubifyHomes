@@ -3108,9 +3108,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get alerts for a specific entity
-  app.get("/api/alerts/entity/:type/:entityId", isAuthenticated, async (req, res) => {
+  app.get("/api/alerts/entity/:type/:entityId", isAuthenticated, async (req: any, res) => {
     try {
       const { type, entityId } = req.params;
+      const orgId = req.user.claims.orgId;
+      
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
       
       if (!['client', 'property', 'task'].includes(type)) {
         return res.status(400).json({ message: "Invalid alert type" });
@@ -3121,7 +3126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid entity ID" });
       }
 
-      const alerts = await storage.getAlertsByEntity(type as "client" | "property" | "task", id);
+      const alerts = await storage.getAlertsByEntity(orgId, type as "client" | "property" | "task", id);
       res.json(alerts);
     } catch (error) {
       console.error("Error fetching entity alerts:", error);
@@ -3183,6 +3188,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Organization ID not found" });
       }
 
+      // Verify alert exists and belongs to this org
+      const existingAlert = await storage.getAlert(id, orgId);
+      if (!existingAlert) {
+        return res.status(404).json({ message: "Alert not found" });
+      }
+
       // Get org subscription to check plan tier
       const subscription = await storage.getOrgSubscription(orgId);
       const tier = subscription?.tier || 'starter';
@@ -3197,7 +3208,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const updatedAlert = await storage.updateAlert(id, req.body);
+      const updatedAlert = await storage.updateAlert(id, orgId, req.body);
       res.json(updatedAlert);
     } catch (error) {
       console.error("Error updating alert:", error);
@@ -3206,14 +3217,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete alert
-  app.delete("/api/alerts/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/alerts/:id", isAuthenticated, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid alert ID" });
       }
 
-      await storage.deleteAlert(id);
+      const orgId = req.user.claims.orgId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+
+      // Verify alert exists and belongs to this org
+      const existingAlert = await storage.getAlert(id, orgId);
+      if (!existingAlert) {
+        return res.status(404).json({ message: "Alert not found" });
+      }
+
+      await storage.deleteAlert(id, orgId);
       res.json({ message: "Alert deleted successfully" });
     } catch (error) {
       console.error("Error deleting alert:", error);
