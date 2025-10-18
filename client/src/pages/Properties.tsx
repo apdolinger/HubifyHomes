@@ -1032,7 +1032,17 @@ export default function Properties() {
                       <TableCell className="text-sm text-slate-600">{formatFullAddress(property)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline">{getTypeDisplay(property.type)}</Badge>
+                          <Badge variant="outline" className="flex items-center gap-1">
+                            {property.type === "storage_unit" && <Package className="w-3 h-3" />}
+                            {property.type === "boat" && <Anchor className="w-3 h-3" />}
+                            {getTypeDisplay(property.type)}
+                          </Badge>
+                          {(property.type === "storage_unit" || property.type === "boat") && (
+                            <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200 flex items-center gap-1">
+                              <Crown className="w-3 h-3" />
+                              Premium
+                            </Badge>
+                          )}
                           {!property.isActive && (
                             <Badge variant="secondary" className="bg-red-100 text-red-800 border-red-200">Inactive</Badge>
                           )}
