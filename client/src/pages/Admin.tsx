@@ -774,10 +774,10 @@ export default function Admin() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="w-5 h-5" />
-                  People
+                  Clients
                 </CardTitle>
                 <CardDescription>
-                  Manage contacts and relationships
+                  Manage tenants, owners, and contacts
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -785,12 +785,12 @@ export default function Admin() {
                   <Link href="/people">
                     <Button variant="outline" className="w-full justify-start">
                       <Users className="w-4 h-4 mr-2" />
-                      View All Contacts
+                      View All Clients
                     </Button>
                   </Link>
                   <Button variant="outline" className="w-full justify-start">
                     <Plus className="w-4 h-4 mr-2" />
-                    Add New Contact
+                    Add New Client
                   </Button>
                   <Link href="/duplicates">
                     <Button variant="outline" className="w-full justify-start">
@@ -800,12 +800,46 @@ export default function Admin() {
                   </Link>
                   <Button variant="outline" className="w-full justify-start">
                     <Download className="w-4 h-4 mr-2" />
-                    Export Contacts
+                    Export Clients
                   </Button>
                 </div>
               </CardContent>
             </Card>
 
+            {/* Vendors Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building className="w-5 h-5" />
+                  Vendors
+                </CardTitle>
+                <CardDescription>
+                  Manage service providers and vendors
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Link href="/admin/vendors">
+                    <Button variant="outline" className="w-full justify-start" data-testid="button-view-vendors">
+                      <Building className="w-4 h-4 mr-2" />
+                      View All Vendors
+                    </Button>
+                  </Link>
+                  <Button variant="outline" className="w-full justify-start">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add New Vendor
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start">
+                    <Download className="w-4 h-4 mr-2" />
+                    Export Vendors
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Second Row - Team Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Team Section */}
             <Card>
               <CardHeader>
