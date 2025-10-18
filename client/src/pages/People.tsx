@@ -43,7 +43,7 @@ const contactSchema = z.object({
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email address").optional().or(z.literal("")),
   phone: z.string().optional(),
-  type: z.enum(["tenant", "owner", "vendor", "emergency_contact"]),
+  type: z.enum(["tenant", "owner", "emergency_contact"]),
   propertyId: z.number().optional(),
   notes: z.string().optional(),
 });
@@ -289,8 +289,6 @@ export default function People() {
         return "default";
       case "owner": 
         return "secondary";
-      case "vendor":
-        return "outline";
       case "emergency_contact":
         return "destructive";
       default:
