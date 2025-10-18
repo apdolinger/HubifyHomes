@@ -429,6 +429,11 @@ export default function People() {
 
   const filteredAndSortedContacts = contacts
     ?.filter((contact: any) => {
+      // Exclude vendors - they're managed in admin section
+      if (contact.type === "vendor") {
+        return false;
+      }
+
       // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -538,13 +543,16 @@ export default function People() {
   }, [filteredAndSortedContacts]);
 
   const getContactStats = () => {
-    if (!contacts) return { total: 0, tenants: 0, owners: 0, vendors: 0 };
+    if (!contacts) return { total: 0, tenants: 0, owners: 0, emergencyContacts: 0 };
+    
+    // Filter out vendors from stats
+    const clientContacts = contacts.filter((c: any) => c.type !== "vendor");
     
     return {
-      total: contacts.length,
-      tenants: contacts.filter((c: any) => c.type === "tenant").length,
-      owners: contacts.filter((c: any) => c.type === "owner").length,
-      vendors: contacts.filter((c: any) => c.type === "vendor").length,
+      total: clientContacts.length,
+      tenants: clientContacts.filter((c: any) => c.type === "tenant").length,
+      owners: clientContacts.filter((c: any) => c.type === "owner").length,
+      emergencyContacts: clientContacts.filter((c: any) => c.type === "emergency_contact").length,
     };
   };
 
@@ -568,9 +576,9 @@ export default function People() {
       <div className="mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">People</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Clients</h1>
             <p className="mt-1 text-sm text-slate-600">
-              Manage contacts, tenants, owners, and vendors
+              Manage property owners, tenants, and household members
             </p>
           </div>
           <div className="mt-4 sm:mt-0 flex items-center gap-4">
@@ -676,10 +684,10 @@ export default function People() {
               <div className="ml-4">
                 <dl>
                   <dt className="text-sm font-medium text-slate-500 truncate">
-                    Vendors
+                    Emergency Contacts
                   </dt>
                   <dd className="text-2xl font-semibold text-slate-900">
-                    {stats.vendors}
+                    {stats.emergencyContacts}
                   </dd>
                 </dl>
               </div>
@@ -712,7 +720,6 @@ export default function People() {
                     <SelectItem value="all">All Types</SelectItem>
                     <SelectItem value="owner">Owners</SelectItem>
                     <SelectItem value="tenant">Tenants</SelectItem>
-                    <SelectItem value="vendor">Vendors</SelectItem>
                     <SelectItem value="emergency_contact">Emergency Contacts</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1127,7 +1134,6 @@ export default function People() {
                         <SelectContent>
                           <SelectItem value="tenant">Tenant</SelectItem>
                           <SelectItem value="owner">Owner</SelectItem>
-                          <SelectItem value="vendor">Vendor</SelectItem>
                           <SelectItem value="emergency_contact">Emergency Contact</SelectItem>
                         </SelectContent>
                       </Select>
@@ -1290,7 +1296,6 @@ export default function People() {
                         <SelectContent>
                           <SelectItem value="tenant">Tenant</SelectItem>
                           <SelectItem value="owner">Owner</SelectItem>
-                          <SelectItem value="vendor">Vendor</SelectItem>
                           <SelectItem value="emergency_contact">Emergency Contact</SelectItem>
                         </SelectContent>
                       </Select>
