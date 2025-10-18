@@ -433,7 +433,7 @@ export const properties = pgTable("properties", {
   city: varchar("city").notNull(),
   state: varchar("state").notNull(),
   zip: varchar("zip").notNull(),
-  type: varchar("type").notNull(), // single-family, condo, apartment, house, commercial
+  type: varchar("type").notNull(), // single-family, condo, apartment, house, commercial, storage_unit (premium), boat (premium)
   units: integer("units").default(1),
   managerId: varchar("manager_id").references(() => users.id),
   isActive: boolean("is_active").notNull().default(true),
@@ -1966,3 +1966,17 @@ export const insertImportHistorySchema = createInsertSchema(importHistory).omit(
 });
 export type InsertImportHistory = z.infer<typeof insertImportHistorySchema>;
 export type ImportHistory = typeof importHistory.$inferSelect;
+
+// Premium property types - available only on Pro, Grow, and Enterprise tiers
+export const PREMIUM_PROPERTY_TYPES = ['storage_unit', 'boat'] as const;
+export const PREMIUM_TIER_PROPERTY_TIERS = ['pro', 'grow', 'enterprise'] as const;
+
+// Helper function to check if a property type is premium
+export function isPremiumPropertyType(type: string): boolean {
+  return PREMIUM_PROPERTY_TYPES.includes(type as any);
+}
+
+// Helper function to check if a tier allows premium property types
+export function tierAllowsPremiumProperties(tier: string): boolean {
+  return PREMIUM_TIER_PROPERTY_TIERS.includes(tier as any);
+}
