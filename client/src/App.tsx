@@ -20,6 +20,7 @@ import Team from "@/pages/Team";
 import TeamMemberProfile from "@/pages/TeamMemberProfile";
 import People from "@/pages/People";
 import PersonProfile from "@/pages/PersonProfile";
+import Vendors from "@/pages/Vendors";
 import DuplicatesManagement from "@/pages/DuplicatesManagement";
 import HubifyConsole from "@/pages/HubifyConsole";
 import PropertyPortalSettings from "@/pages/PropertyPortalSettings";
@@ -149,6 +150,7 @@ function Router() {
           
           {/* Admin Routes */}
           <Route path="/admin/import" component={ImportManager} />
+          <Route path="/admin/vendors" component={Vendors} />
           
           {/* Billing Routes */}
           <Route path="/admin/billing" component={AdminBilling} />
