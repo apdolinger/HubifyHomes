@@ -49,6 +49,7 @@ import {
   eventImports,
   securityAuditLogs,
   userSessions,
+  importHistory,
   type User,
   type UpsertUser,
   type Org,
@@ -141,6 +142,8 @@ import {
   type InsertEventImport,
   type OutOfOfficePeriod,
   type InsertOutOfOfficePeriod,
+  type ImportHistory,
+  type InsertImportHistory,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, like, count, sql } from "drizzle-orm";
@@ -453,6 +456,10 @@ export interface IStorage {
   getAdminUsers(): Promise<any[]>;
   getUserSessions(userId: string): Promise<any[]>;
   getAllActiveSessions(): Promise<any[]>;
+  
+  // Import history operations
+  createImportHistory(history: InsertImportHistory): Promise<ImportHistory>;
+  getImportHistory(orgId: string): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3640,6 +3647,37 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(users, eq(userSessions.userId, users.id))
       .where(eq(userSessions.isActive, true))
       .orderBy(desc(userSessions.lastActivityAt));
+  }
+
+  // Import history operations
+  async createImportHistory(history: InsertImportHistory): Promise<ImportHistory> {
+    const [newHistory] = await db.insert(importHistory).values(history).returning();
+    return newHistory;
+  }
+
+  async getImportHistory(orgId: string): Promise<any[]> {
+    return await db
+      .select({
+        id: importHistory.id,
+        entityType: importHistory.entityType,
+        fileName: importHistory.fileName,
+        status: importHistory.status,
+        totalRecords: importHistory.totalRecords,
+        createdRecords: importHistory.createdRecords,
+        updatedRecords: importHistory.updatedRecords,
+        failedRecords: importHistory.failedRecords,
+        initiatedAt: importHistory.initiatedAt,
+        initiatedBy: {
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+        },
+      })
+      .from(importHistory)
+      .innerJoin(users, eq(importHistory.initiatedBy, users.id))
+      .where(eq(importHistory.orgId, orgId))
+      .orderBy(desc(importHistory.initiatedAt));
   }
 }
 
