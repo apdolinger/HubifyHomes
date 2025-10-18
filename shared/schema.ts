@@ -1905,3 +1905,28 @@ export type InsertIcsFeed = z.infer<typeof insertIcsFeedSchema>;
 export type IcsFeed = typeof icsFeeds.$inferSelect;
 export type InsertEventImport = z.infer<typeof insertEventImportSchema>;
 export type EventImport = typeof eventImports.$inferSelect;
+
+// Import History table for tracking CSV imports
+export const importHistory = pgTable("import_history", {
+  id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  initiatedBy: varchar("initiated_by").references(() => users.id).notNull(),
+  entityType: text("entity_type").$type<"properties" | "contacts" | "tasks">().notNull(),
+  fileName: varchar("file_name"),
+  status: text("status").$type<"success" | "partial_success" | "failed">().notNull(),
+  totalRecords: integer("total_records").notNull(),
+  createdRecords: integer("created_records").notNull().default(0),
+  updatedRecords: integer("updated_records").notNull().default(0),
+  failedRecords: integer("failed_records").notNull().default(0),
+  initiatedAt: timestamp("initiated_at").defaultNow().notNull(),
+}, (table) => [
+  index("import_history_org_idx").on(table.orgId),
+  index("import_history_user_idx").on(table.initiatedBy),
+]);
+
+export const insertImportHistorySchema = createInsertSchema(importHistory).omit({
+  id: true,
+  initiatedAt: true,
+});
+export type InsertImportHistory = z.infer<typeof insertImportHistorySchema>;
+export type ImportHistory = typeof importHistory.$inferSelect;
