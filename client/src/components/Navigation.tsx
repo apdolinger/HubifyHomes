@@ -36,7 +36,7 @@ const getNavigationItems = (user: any) => {
     { name: "Dashboard", href: "/", icon: BarChart3 },
     { name: "Tasks", href: "/tasks", icon: CheckSquare },
     { name: "Properties", href: "/properties", icon: Building },
-    { name: "People", href: "/people", icon: UserCheck },
+    { name: "Clients", href: "/people", icon: UserCheck },
     { name: "Team", href: "/team", icon: Users },
   ];
 
