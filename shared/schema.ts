@@ -708,6 +708,23 @@ export const contactProperties = pgTable("contact_properties", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Alerts table - contextual alerts for clients, properties, and tasks
+export const alerts = pgTable("alerts", {
+  id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  type: varchar("type").$type<"client"|"property"|"task">().notNull(),
+  entityId: integer("entity_id").notNull(), // ID of the client/property/task
+  message: text("message").notNull(),
+  severity: varchar("severity").$type<"info"|"warning"|"critical">().notNull().default("info"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("alerts_org_idx").on(table.orgId),
+  index("alerts_type_entity_idx").on(table.type, table.entityId),
+]);
+
 // Team Messages table
 export const teamMessages = pgTable("team_messages", {
   id: serial("id").primaryKey(),
@@ -1348,6 +1365,17 @@ export const contactsRelations = relations(contacts, ({ one }) => ({
   }),
 }));
 
+export const alertsRelations = relations(alerts, ({ one }) => ({
+  org: one(orgs, {
+    fields: [alerts.orgId],
+    references: [orgs.id],
+  }),
+  createdBy: one(users, {
+    fields: [alerts.createdBy],
+    references: [users.id],
+  }),
+}));
+
 export const teamMessagesRelations = relations(teamMessages, ({ one, many }) => ({
   author: one(users, {
     fields: [teamMessages.authorId],
@@ -1538,6 +1566,12 @@ export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({
 });
 
 export const insertContactSchema = createInsertSchema(contacts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAlertSchema = createInsertSchema(alerts).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
@@ -1835,6 +1869,8 @@ export type InsertContact = z.infer<typeof insertContactSchema>;
 export type Contact = typeof contacts.$inferSelect;
 export type InsertContactProperty = z.infer<typeof insertContactPropertySchema>;
 export type ContactProperty = typeof contactProperties.$inferSelect;
+export type InsertAlert = z.infer<typeof insertAlertSchema>;
+export type Alert = typeof alerts.$inferSelect;
 export type InsertTeamMessage = z.infer<typeof insertTeamMessageSchema>;
 export type TeamMessage = typeof teamMessages.$inferSelect;
 export type InsertMessageReaction = z.infer<typeof insertMessageReactionSchema>;
