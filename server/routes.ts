@@ -59,7 +59,9 @@ import {
   formSubmissions,
   contactProperties,
   rooms,
-  vehicles
+  vehicles,
+  isPremiumPropertyType,
+  tierAllowsPremiumProperties
 } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
@@ -1711,6 +1713,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Data being validated:", dataToValidate);
       
       const validatedData = insertPropertySchema.parse(dataToValidate);
+      
+      // Check if trying to create a premium property type
+      if (isPremiumPropertyType(validatedData.type)) {
+        // Get org subscription to check tier
+        const subscription = await storage.getOrgSubscription(orgId);
+        const tier = subscription?.tier || 'starter';
+        
+        if (!tierAllowsPremiumProperties(tier)) {
+          return res.status(403).json({ 
+            message: `Storage units and boats are premium features available on Pro, Grow, and Enterprise plans. Your current plan is ${tier}.`,
+            upgrade_required: true,
+            current_tier: tier,
+            required_tiers: ['pro', 'grow', 'enterprise']
+          });
+        }
+      }
+      
       const property = await storage.createProperty(validatedData, userId);
       
       // If contactId is provided, create the property-contact association
@@ -1731,7 +1750,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update property
-  app.patch("/api/properties/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/properties/:id", isAuthenticated, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -1739,6 +1758,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(`Updating property ${id} with data:`, req.body);
+      
+      // Check if trying to change to a premium property type
+      if (req.body.type && isPremiumPropertyType(req.body.type)) {
+        // Get the existing property to get orgId
+        const existingProperty = await storage.getProperty(id);
+        if (!existingProperty) {
+          return res.status(404).json({ message: "Property not found" });
+        }
+        
+        // Get org subscription to check tier
+        const subscription = await storage.getOrgSubscription(existingProperty.orgId);
+        const tier = subscription?.tier || 'starter';
+        
+        if (!tierAllowsPremiumProperties(tier)) {
+          return res.status(403).json({ 
+            message: `Storage units and boats are premium features available on Pro, Grow, and Enterprise plans. Your current plan is ${tier}.`,
+            upgrade_required: true,
+            current_tier: tier,
+            required_tiers: ['pro', 'grow', 'enterprise']
+          });
+        }
+      }
+      
       const property = await storage.updateProperty(id, req.body);
       console.log("Updated property result:", property);
       res.json(property);
