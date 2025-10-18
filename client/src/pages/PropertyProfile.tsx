@@ -55,6 +55,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { AlertBanner } from "@/components/AlertBanner";
 
 export default function PropertyProfile() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -1717,6 +1718,9 @@ export default function PropertyProfile() {
             </div>
           </div>
         </div>
+
+        {/* Alert Banner */}
+        <AlertBanner type="property" entityId={parseInt(propertyId)} canManage={true} />
 
         {/* Property Details Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
