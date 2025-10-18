@@ -4,6 +4,20 @@
 Hubify is a professional property management platform designed to streamline operations for home watch and estate management companies. It aims to enhance team efficiency and client communication by providing a comprehensive solution for managing properties, tasks, team collaboration, and client relationships through a modern web interface. The platform's vision is to become a leading solution in property management, addressing workflow inefficiencies and offering significant market potential.
 
 ## Recent Changes
+- **Import History Tracking (October 18, 2025)**: Added comprehensive tracking and audit trail for all CSV imports:
+  - **Database Schema**: Created `import_history` table to store import records with entity type, initiator, timestamp, status, and record counts
+    - **Note**: Table was created via manual SQL. Schema definition exists in `shared/schema.ts` but requires manual table creation in fresh environments using: `CREATE TABLE import_history (id SERIAL PRIMARY KEY, org_id UUID NOT NULL REFERENCES orgs(id), initiated_by VARCHAR NOT NULL REFERENCES users(id), entity_type TEXT NOT NULL, file_name VARCHAR, status TEXT NOT NULL, total_records INTEGER NOT NULL, created_records INTEGER NOT NULL DEFAULT 0, updated_records INTEGER NOT NULL DEFAULT 0, failed_records INTEGER NOT NULL DEFAULT 0, initiated_at TIMESTAMP NOT NULL DEFAULT NOW());`
+  - **Storage Methods**: Added `createImportHistory()` and `getImportHistory()` to track and retrieve import records
+  - **API Endpoints**:
+    - POST during import execution: Automatically saves history record after each import
+    - GET /api/admin/import/history: Retrieves import history for current organization with user details
+    - Authorization: Admin, supervisor, or super_admin roles required
+  - **Tabbed UI**: Import Manager now has two tabs:
+    - "New Import": The CSV import wizard workflow
+    - "Import History": Table view of past imports with filterable columns
+  - **History Display**: Shows date/time, entity type, initiator name, status badge (success/partial/failed), and record statistics
+  - **Multi-Tenancy**: All history records are scoped by organization ID
+  - **Audit Trail**: Tracks who initiated each import, when it occurred, and detailed results
 - **CSV Import Manager with Full Import Execution (October 17, 2025)**: Built comprehensive import manager in admin area for CSV data uploads with complete import execution capabilities:
   - **Six-Step Import Flow**: Upload → Map Fields → Validate → Preview & Summary → Import Execution → Complete
   - **Entity Type Selection**: Choose between Properties, Contacts, or Tasks for import
