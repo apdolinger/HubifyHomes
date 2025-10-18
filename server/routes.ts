@@ -5804,6 +5804,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // CSV Import history endpoint
+  app.get("/api/admin/import/history", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userRole = user?.claims?.role || user?.role;
+      
+      if (!userRole || (userRole !== 'admin' && userRole !== 'supervisor' && userRole !== 'super_admin')) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Get orgId from claims or user
+      const orgId = user?.claims?.orgId || user?.claims?.org_id || user?.orgId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID required" });
+      }
+
+      const history = await storage.getImportHistory(orgId);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching import history:", error);
+      res.status(500).json({ message: "Failed to fetch import history" });
+    }
+  });
+
   // CSV Import execution endpoint - Request validation schema
   const importExecuteSchema = z.object({
     entityType: z.enum(['properties', 'contacts', 'tasks']),
