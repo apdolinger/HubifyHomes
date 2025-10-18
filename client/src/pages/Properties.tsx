@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Building, MapPin, Users, Plus, Home, Square, DollarSign, Activity, Eye, Edit, ToggleLeft, ToggleRight, Trash2, FileText, Mail, MessageCircle, ChevronUp, ChevronDown, Search, Filter } from "lucide-react";
+import { Building, MapPin, Users, Plus, Home, Square, DollarSign, Activity, Eye, Edit, ToggleLeft, ToggleRight, Trash2, FileText, Mail, MessageCircle, ChevronUp, ChevronDown, Search, Filter, Crown, Anchor, Package } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { apiRequest } from "@/lib/queryClient";
@@ -30,7 +30,7 @@ const propertySchema = z.object({
   city: z.string().min(1, "City is required"),
   state: z.string().min(2, "State is required").max(2, "State must be 2 characters"),
   zip: z.string().min(5, "ZIP code is required"),
-  type: z.enum(["single-family", "condo", "apartment", "house", "commercial"]),
+  type: z.enum(["single-family", "condo", "apartment", "house", "commercial", "storage_unit", "boat"]),
   units: z.number().min(1).optional(),
   squareFootage: z.number().min(1).optional(),
   billingType: z.enum(["sqft", "flat_fee"]).optional(),
@@ -92,6 +92,15 @@ export default function Properties() {
     queryKey: ["/api/users"],
     enabled: isAuthenticated,
   });
+
+  // Fetch subscription tier to determine if premium property types are available
+  const { data: subscriptionInfo } = useQuery<{ tier: string; characterLimit: number }>({
+    queryKey: ["/api/alerts/limits"],
+    enabled: isAuthenticated,
+  });
+
+  // Check if user's tier allows premium property types (Pro, Grow, Enterprise)
+  const canUsePremiumTypes = subscriptionInfo && ['pro', 'grow', 'enterprise'].includes(subscriptionInfo.tier.toLowerCase());
 
   const form = useForm<PropertyFormData>({
     resolver: zodResolver(propertySchema),
@@ -245,6 +254,10 @@ export default function Properties() {
         return "House";
       case "commercial":
         return "Commercial";
+      case "storage_unit":
+        return "Storage Unit";
+      case "boat":
+        return "Boat";
       default:
         return type;
     }
@@ -621,11 +634,43 @@ export default function Properties() {
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  <SelectItem value="single-family">Single-Family</SelectItem>
-                                  <SelectItem value="condo">Condo</SelectItem>
-                                  <SelectItem value="apartment">Apartment</SelectItem>
-                                  <SelectItem value="house">House</SelectItem>
-                                  <SelectItem value="commercial">Commercial</SelectItem>
+                                  <SelectItem value="single-family" data-testid="type-single-family">Single-Family</SelectItem>
+                                  <SelectItem value="condo" data-testid="type-condo">Condo</SelectItem>
+                                  <SelectItem value="apartment" data-testid="type-apartment">Apartment</SelectItem>
+                                  <SelectItem value="house" data-testid="type-house">House</SelectItem>
+                                  <SelectItem value="commercial" data-testid="type-commercial">Commercial</SelectItem>
+                                  {canUsePremiumTypes && (
+                                    <>
+                                      <SelectItem value="storage_unit" data-testid="type-storage-unit">
+                                        <div className="flex items-center gap-2">
+                                          <Package className="w-4 h-4" />
+                                          Storage Unit
+                                          <Badge variant="secondary" className="ml-2 text-xs">
+                                            <Crown className="w-3 h-3 mr-1" />
+                                            Premium
+                                          </Badge>
+                                        </div>
+                                      </SelectItem>
+                                      <SelectItem value="boat" data-testid="type-boat">
+                                        <div className="flex items-center gap-2">
+                                          <Anchor className="w-4 h-4" />
+                                          Boat
+                                          <Badge variant="secondary" className="ml-2 text-xs">
+                                            <Crown className="w-3 h-3 mr-1" />
+                                            Premium
+                                          </Badge>
+                                        </div>
+                                      </SelectItem>
+                                    </>
+                                  )}
+                                  {!canUsePremiumTypes && (
+                                    <div className="px-2 py-2 text-xs text-muted-foreground border-t">
+                                      <div className="flex items-center gap-1">
+                                        <Crown className="w-3 h-3" />
+                                        Storage Units & Boats available on Pro+ plans
+                                      </div>
+                                    </div>
+                                  )}
                                 </SelectContent>
                               </Select>
                               <FormMessage />
@@ -761,6 +806,8 @@ export default function Properties() {
                 <SelectItem value="apartment">Apartment</SelectItem>
                 <SelectItem value="house">House</SelectItem>
                 <SelectItem value="commercial">Commercial</SelectItem>
+                <SelectItem value="storage_unit">Storage Unit</SelectItem>
+                <SelectItem value="boat">Boat</SelectItem>
               </SelectContent>
             </Select>
             <Select value={filterStatus} onValueChange={setFilterStatus}>
