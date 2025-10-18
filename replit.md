@@ -22,7 +22,7 @@ Preferred communication style: Simple, everyday language.
 - **Authentication**: Replit Auth via OpenID Connect, session management with Express sessions and PostgreSQL store. Hybrid authentication for Super Admin (username/password) and regular users (OIDC). Invitation-based authentication for Hubify Portal.
 - **Core Features**:
     - **Multi-Tenant Architecture**: Organization-based multi-tenancy for clients, properties, forms, and submissions.
-    - **Property Management**: Support for various property types, multi-unit management, manager assignment, status tracking, and room management.
+    - **Property Management**: Support for various property types (including premium types: Storage Units and Boats on Pro+ tiers), multi-unit management, manager assignment, status tracking, room management, and tier-based property type restrictions.
     - **Task Management System**: Priority levels, status tracking, assignment, property association, and due date management. Integrated with calendar.
     - **Calendar System**: Full-featured calendar with event management, attendee support, customizable settings, and staff scheduling conflict detection. Tasks with due dates appear as events.
     - **Team Collaboration**: Hierarchical user roles with permissions, communication, and activity logging. Includes out-of-office management and staff time tracking.
