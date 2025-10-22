@@ -785,13 +785,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate credentials
       if (username !== finalUsername || password !== finalPassword) {
         // Log failed attempt
-        AuditLogger.log({
+        await AuditLogger.log({
+          req,
           action: 'super_admin_login_failed',
-          userId: 'unknown',
-          ipAddress: req.ip || 'unknown',
-          userAgent: req.get('user-agent') || 'unknown',
-          details: { username },
-          severity: 'warning'
+          actionType: 'auth',
+          resource: 'super_admin_authentication',
+          metadata: { username },
+          severity: 'warning',
+          success: false,
+          errorMessage: 'Invalid credentials'
         });
         
         return res.status(401).json({ message: "Invalid credentials" });
@@ -805,13 +807,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Log successful login
-      AuditLogger.log({
+      await AuditLogger.log({
+        req,
         action: 'super_admin_login_success',
-        userId: username,
-        ipAddress: req.ip || 'unknown',
-        userAgent: req.get('user-agent') || 'unknown',
-        details: { username },
-        severity: 'info'
+        actionType: 'auth',
+        resource: 'super_admin_authentication',
+        metadata: { username },
+        severity: 'info',
+        success: true
       });
 
       res.json({ 
@@ -825,17 +828,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Super Admin logout route
-  app.post('/api/super-admin/logout', (req, res) => {
+  app.post('/api/super-admin/logout', async (req, res) => {
     const username = (req.session as any).superAdmin?.username;
     
     if (username) {
-      AuditLogger.log({
+      await AuditLogger.log({
+        req,
         action: 'super_admin_logout',
-        userId: username,
-        ipAddress: req.ip || 'unknown',
-        userAgent: req.get('user-agent') || 'unknown',
-        details: { username },
-        severity: 'info'
+        actionType: 'auth',
+        resource: 'super_admin_authentication',
+        metadata: { username },
+        severity: 'info',
+        success: true
       });
     }
 
