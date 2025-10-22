@@ -20,7 +20,8 @@ export class AuditLogger {
   }) {
     const { req, action, actionType, resource, resourceId, changes, metadata, severity, success, errorMessage } = params;
     
-    const user = req.user as any;
+    // Safely handle undefined req.user (for unauthenticated routes)
+    const user = (req as any).user as any;
     const orgId = user?.orgId || null;
     
     const auditLog = {
