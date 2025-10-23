@@ -3255,9 +3255,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateEvent(id: string, eventData: Partial<InsertEvent>): Promise<Event> {
+    // Convert ISO string dates to Date objects if they are strings
+    const processedData: any = { ...eventData };
+    
+    if (processedData.start && typeof processedData.start === 'string') {
+      processedData.start = new Date(processedData.start);
+    }
+    
+    if (processedData.end && typeof processedData.end === 'string') {
+      processedData.end = new Date(processedData.end);
+    }
+    
     const [event] = await db
       .update(events)
-      .set({ ...eventData, updatedAt: new Date() })
+      .set({ ...processedData, updatedAt: new Date() })
       .where(eq(events.id, id))
       .returning();
     return event;
