@@ -53,6 +53,7 @@ import {
   userSessions,
   importHistory,
   platformTemplates,
+  calendarReportTemplates,
   type User,
   type UpsertUser,
   type Org,
@@ -153,6 +154,8 @@ import {
   type InsertImportHistory,
   type PlatformTemplate,
   type InsertPlatformTemplate,
+  type CalendarReportTemplate,
+  type InsertCalendarReportTemplate,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, like, count, sql } from "drizzle-orm";
@@ -497,6 +500,14 @@ export interface IStorage {
   createPlatformTemplate(template: InsertPlatformTemplate): Promise<PlatformTemplate>;
   updatePlatformTemplate(id: number, template: Partial<InsertPlatformTemplate>): Promise<PlatformTemplate>;
   deletePlatformTemplate(id: number): Promise<void>;
+  
+  // Calendar report template operations
+  getCalendarReportTemplates(): Promise<CalendarReportTemplate[]>;
+  getCalendarReportTemplate(id: number): Promise<CalendarReportTemplate | undefined>;
+  getDefaultCalendarReportTemplate(): Promise<CalendarReportTemplate | undefined>;
+  createCalendarReportTemplate(template: InsertCalendarReportTemplate): Promise<CalendarReportTemplate>;
+  updateCalendarReportTemplate(id: number, template: Partial<InsertCalendarReportTemplate>): Promise<CalendarReportTemplate>;
+  deleteCalendarReportTemplate(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3958,6 +3969,46 @@ export class DatabaseStorage implements IStorage {
 
   async deletePlatformTemplate(id: number): Promise<void> {
     await db.delete(platformTemplates).where(eq(platformTemplates.id, id));
+  }
+  
+  // Calendar report template operations
+  async getCalendarReportTemplates(): Promise<CalendarReportTemplate[]> {
+    return await db.select().from(calendarReportTemplates).where(eq(calendarReportTemplates.isActive, true)).orderBy(calendarReportTemplates.name);
+  }
+  
+  async getCalendarReportTemplate(id: number): Promise<CalendarReportTemplate | undefined> {
+    const [template] = await db.select().from(calendarReportTemplates).where(eq(calendarReportTemplates.id, id));
+    return template;
+  }
+  
+  async getDefaultCalendarReportTemplate(): Promise<CalendarReportTemplate | undefined> {
+    const [template] = await db
+      .select()
+      .from(calendarReportTemplates)
+      .where(and(
+        eq(calendarReportTemplates.isActive, true),
+        eq(calendarReportTemplates.isDefault, true)
+      ))
+      .limit(1);
+    return template;
+  }
+  
+  async createCalendarReportTemplate(template: InsertCalendarReportTemplate): Promise<CalendarReportTemplate> {
+    const [newTemplate] = await db.insert(calendarReportTemplates).values(template).returning();
+    return newTemplate;
+  }
+  
+  async updateCalendarReportTemplate(id: number, template: Partial<InsertCalendarReportTemplate>): Promise<CalendarReportTemplate> {
+    const [updated] = await db
+      .update(calendarReportTemplates)
+      .set({ ...template, updatedAt: new Date() })
+      .where(eq(calendarReportTemplates.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteCalendarReportTemplate(id: number): Promise<void> {
+    await db.delete(calendarReportTemplates).where(eq(calendarReportTemplates.id, id));
   }
 }
 
