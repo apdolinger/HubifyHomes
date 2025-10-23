@@ -238,13 +238,14 @@ export function EventModal({
         taskId: data.taskId || null,
         clientId: data.clientId || null,
       };
-      const newEvent = await apiRequest<Event>(`/api/orgs/${orgId}/events`, "POST", payload);
+      const response = await apiRequest("POST", `/api/orgs/${orgId}/events`, payload);
+      const newEvent = await response.json();
       
       // Save attendees
       if (attendees.length > 0 && newEvent?.id) {
         await Promise.all(
           attendees.map(attendee =>
-            apiRequest(`/api/orgs/${orgId}/events/${newEvent.id}/attendees`, "POST", {
+            apiRequest("POST", `/api/orgs/${orgId}/events/${newEvent.id}/attendees`, {
               eventId: newEvent.id,
               type: attendee.type,
               userId: attendee.userId || null,
@@ -307,7 +308,8 @@ export function EventModal({
         taskId: data.taskId || null,
         clientId: data.clientId || null,
       };
-      const updatedEvent = await apiRequest<Event>(`/api/orgs/${orgId}/events/${event?.id}`, "PATCH", payload);
+      const response = await apiRequest("PATCH", `/api/orgs/${orgId}/events/${event?.id}`, payload);
+      const updatedEvent = await response.json();
       
       // Reconcile attendees: delete removed ones and add new ones
       if (event?.id) {
@@ -326,7 +328,7 @@ export function EventModal({
         if (attendeesToDelete.length > 0) {
           await Promise.all(
             attendeesToDelete.map(ea =>
-              apiRequest(`/api/orgs/${orgId}/events/${event.id}/attendees/${ea.id}`, "DELETE")
+              apiRequest("DELETE", `/api/orgs/${orgId}/events/${event.id}/attendees/${ea.id}`)
             )
           );
         }
@@ -344,7 +346,7 @@ export function EventModal({
         if (attendeesToAdd.length > 0) {
           await Promise.all(
             attendeesToAdd.map(attendee =>
-              apiRequest(`/api/orgs/${orgId}/events/${event.id}/attendees`, "POST", {
+              apiRequest("POST", `/api/orgs/${orgId}/events/${event.id}/attendees`, {
                 eventId: event.id,
                 type: attendee.type,
                 userId: attendee.userId || null,
