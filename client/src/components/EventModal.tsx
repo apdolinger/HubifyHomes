@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Calendar, Clock, MapPin, AlignLeft, Users, Link as LinkIcon, X, Mail, UserPlus } from "lucide-react";
+import { Calendar, Clock, MapPin, AlignLeft, Users, Link as LinkIcon, X, Mail, UserPlus, ChevronsUpDown, Check } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +35,20 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { insertEventSchema, type Event, type EventAttendee } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 interface EventModalProps {
   open: boolean;
@@ -91,6 +105,9 @@ export function EventModal({
   const [attendeeType, setAttendeeType] = useState<'user' | 'client' | 'external'>('user');
   const [externalEmail, setExternalEmail] = useState('');
   const [externalName, setExternalName] = useState('');
+  
+  // Property combobox state
+  const [propertyOpen, setPropertyOpen] = useState(false);
 
   // Fetch calendars for the dropdown
   const { data: calendars } = useQuery({
@@ -619,30 +636,84 @@ export function EventModal({
               <FormField
                 control={form.control}
                 name="propertyId"
-                render={({ field }) => (
-                  <FormItem>
-                    <Select
-                      onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))}
-                      value={field.value?.toString() || "none"}
-                      disabled={isPending}
-                    >
-                      <FormControl>
-                        <SelectTrigger data-testid="select-property">
-                          <SelectValue placeholder="Link to property (optional)" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">No property</SelectItem>
-                        {properties && Array.isArray(properties) && (properties as any[]).map((property: any) => (
-                          <SelectItem key={property.id} value={property.id.toString()}>
-                            {property.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const selectedProperty = properties && Array.isArray(properties)
+                    ? (properties as any[]).find((p: any) => p.id === field.value)
+                    : null;
+                  
+                  return (
+                    <FormItem className="flex flex-col">
+                      <Popover open={propertyOpen} onOpenChange={setPropertyOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={propertyOpen}
+                              className={cn(
+                                "justify-between font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                              disabled={isPending}
+                              data-testid="select-property"
+                            >
+                              {selectedProperty
+                                ? selectedProperty.name
+                                : "Link to property (optional)"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search properties..." />
+                            <CommandList>
+                              <CommandEmpty>No property found.</CommandEmpty>
+                              <CommandGroup>
+                                <CommandItem
+                                  value="none"
+                                  onSelect={() => {
+                                    field.onChange(undefined);
+                                    setPropertyOpen(false);
+                                  }}
+                                  data-testid="select-property-none"
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      !field.value ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  No property
+                                </CommandItem>
+                                {properties && Array.isArray(properties) && (properties as any[]).map((property: any) => (
+                                  <CommandItem
+                                    key={property.id}
+                                    value={property.name}
+                                    onSelect={() => {
+                                      field.onChange(property.id);
+                                      setPropertyOpen(false);
+                                    }}
+                                    data-testid={`select-property-${property.id}`}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        field.value === property.id ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    {property.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
 
               {/* Task Link */}
