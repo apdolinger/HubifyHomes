@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EventModal } from "@/components/EventModal";
 import { CalendarSettings } from "@/components/CalendarSettings";
+import { ConflictResolutionPanel } from "@/components/ConflictResolutionPanel";
 import type { Event } from "@shared/schema";
 
 interface CalendarDisplaySettings {
@@ -448,6 +449,15 @@ export default function CalendarPage() {
           </Button>
         </div>
       </div>
+
+      {/* Conflict Resolution Panel */}
+      {orgId && userId && (
+        <ConflictResolutionPanel
+          orgId={orgId}
+          userId={userId}
+          userRole={(user as any)?.role || 'staff'}
+        />
+      )}
 
       <div className="grid grid-cols-12 gap-6">
         {/* Sidebar with calendars list */}
