@@ -68,8 +68,419 @@ import {
   Ban,
   Play,
   Pause,
-  Send
+  Send,
+  FileCode
 } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+
+// Template Management Component
+function TemplateManagement() {
+  const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<any>(null);
+  const [previewTemplate, setPreviewTemplate] = useState<any>(null);
+  const [formData, setFormData] = useState({
+    type: '',
+    name: '',
+    subject: '',
+    htmlContent: '',
+    variables: [] as string[],
+    isActive: true,
+  });
+
+  const { data: templates, isLoading } = useQuery({
+    queryKey: ['/api/super-admin/templates'],
+  });
+
+  const templatesList = (templates as any[]) || [];
+  const filteredTemplates = templatesList.filter((template: any) =>
+    template.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    template.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    template.subject?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleCreate = () => {
+    setFormData({
+      type: '',
+      name: '',
+      subject: '',
+      htmlContent: '',
+      variables: [],
+      isActive: true,
+    });
+    setEditingTemplate(null);
+    setIsCreating(true);
+  };
+
+  const handleEdit = (template: any) => {
+    setFormData({
+      type: template.type || '',
+      name: template.name || '',
+      subject: template.subject || '',
+      htmlContent: template.htmlContent || '',
+      variables: template.variables || [],
+      isActive: template.isActive ?? true,
+    });
+    setEditingTemplate(template);
+    setIsCreating(true);
+  };
+
+  const handleSave = async () => {
+    try {
+      if (editingTemplate) {
+        await apiRequest(`/api/super-admin/templates/${editingTemplate.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(formData),
+        });
+        toast({ title: "Template updated successfully" });
+      } else {
+        await apiRequest('/api/super-admin/templates', {
+          method: 'POST',
+          body: JSON.stringify(formData),
+        });
+        toast({ title: "Template created successfully" });
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/super-admin/templates'] });
+      setIsCreating(false);
+    } catch (error: any) {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to save template",
+        variant: "destructive" 
+      });
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this template?')) return;
+    try {
+      await apiRequest(`/api/super-admin/templates/${id}`, {
+        method: 'DELETE',
+      });
+      toast({ title: "Template deleted successfully" });
+      queryClient.invalidateQueries({ queryKey: ['/api/super-admin/templates'] });
+    } catch (error: any) {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to delete template",
+        variant: "destructive" 
+      });
+    }
+  };
+
+  const handleAddVariable = () => {
+    const varName = prompt('Enter variable name (e.g., organizationName, eventTitle):');
+    if (varName && !formData.variables.includes(varName)) {
+      setFormData({ ...formData, variables: [...formData.variables, varName] });
+    }
+  };
+
+  const handleRemoveVariable = (variable: string) => {
+    setFormData({
+      ...formData,
+      variables: formData.variables.filter(v => v !== variable)
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center">
+            <FileCode className="w-5 h-5 mr-2" />
+            Email Template Management
+          </CardTitle>
+          <Button onClick={handleCreate} data-testid="button-create-template">
+            <Plus className="w-4 h-4 mr-2" />
+            Create Template
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              placeholder="Search templates..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+              data-testid="input-search-templates"
+            />
+          </div>
+
+          {/* Templates Table */}
+          <div className="border rounded-lg">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Subject</TableHead>
+                  <TableHead>Variables</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredTemplates.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                      No templates found. Create your first template to get started.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredTemplates.map((template: any) => (
+                    <TableRow key={template.id}>
+                      <TableCell className="font-medium">{template.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{template.type}</Badge>
+                      </TableCell>
+                      <TableCell className="max-w-xs truncate">{template.subject}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {template.variables?.slice(0, 3).map((v: string) => (
+                            <Badge key={v} variant="secondary" className="text-xs">
+                              {v}
+                            </Badge>
+                          ))}
+                          {template.variables?.length > 3 && (
+                            <Badge variant="secondary" className="text-xs">
+                              +{template.variables.length - 3}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={template.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
+                          {template.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setPreviewTemplate(template)}
+                            data-testid={`button-preview-${template.id}`}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(template)}
+                            data-testid={`button-edit-${template.id}`}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(template.id)}
+                            data-testid={`button-delete-${template.id}`}
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      </CardContent>
+
+      {/* Create/Edit Dialog */}
+      <Dialog open={isCreating} onOpenChange={setIsCreating}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingTemplate ? 'Edit Template' : 'Create New Template'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingTemplate
+                ? 'Update the template details below.'
+                : 'Create a new email template for platform communications.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="template-type">Type</Label>
+                <Select
+                  value={formData.type}
+                  onValueChange={(value) => setFormData({ ...formData, type: value })}
+                >
+                  <SelectTrigger id="template-type" data-testid="select-template-type">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="email_invitation">Email Invitation</SelectItem>
+                    <SelectItem value="invoice">Invoice</SelectItem>
+                    <SelectItem value="notification">Notification</SelectItem>
+                    <SelectItem value="reminder">Reminder</SelectItem>
+                    <SelectItem value="announcement">Announcement</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="template-name">Name</Label>
+                <Input
+                  id="template-name"
+                  placeholder="e.g., Event Invitation Template"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  data-testid="input-template-name"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="template-subject">Subject Line</Label>
+              <Input
+                id="template-subject"
+                placeholder="e.g., You're invited to {{eventTitle}}"
+                value={formData.subject}
+                onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                data-testid="input-template-subject"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="template-content">HTML Content</Label>
+              <Textarea
+                id="template-content"
+                placeholder="Enter HTML content with variables like {{organizationName}}, {{eventTitle}}, etc."
+                value={formData.htmlContent}
+                onChange={(e) => setFormData({ ...formData, htmlContent: e.target.value })}
+                className="min-h-[300px] font-mono text-sm"
+                data-testid="input-template-content"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label>Template Variables</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddVariable}
+                  data-testid="button-add-variable"
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add Variable
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2 p-3 border rounded-lg min-h-[60px]">
+                {formData.variables.length === 0 ? (
+                  <p className="text-sm text-gray-500">No variables defined</p>
+                ) : (
+                  formData.variables.map((variable) => (
+                    <Badge key={variable} variant="secondary" className="text-sm">
+                      {`{{${variable}}}`}
+                      <button
+                        onClick={() => handleRemoveVariable(variable)}
+                        className="ml-2 hover:text-red-500"
+                      >
+                        ×
+                      </button>
+                    </Badge>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="template-active"
+                checked={formData.isActive}
+                onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+                data-testid="switch-template-active"
+              />
+              <Label htmlFor="template-active">Active</Label>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreating(false)} data-testid="button-cancel-template">
+              Cancel
+            </Button>
+            <Button onClick={handleSave} data-testid="button-save-template">
+              {editingTemplate ? 'Update' : 'Create'} Template
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Dialog */}
+      <Dialog open={!!previewTemplate} onOpenChange={() => setPreviewTemplate(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{previewTemplate?.name}</DialogTitle>
+            <DialogDescription>
+              Template Preview - Type: {previewTemplate?.type}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium">Subject</Label>
+              <p className="text-sm mt-1">{previewTemplate?.subject}</p>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">Variables</Label>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {previewTemplate?.variables?.map((v: string) => (
+                  <Badge key={v} variant="secondary">
+                    {`{{${v}}}`}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">HTML Preview</Label>
+              <div
+                className="border rounded-lg p-4 mt-2 bg-white"
+                dangerouslySetInnerHTML={{ __html: previewTemplate?.htmlContent || '' }}
+              />
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">HTML Source</Label>
+              <pre className="bg-gray-50 p-4 rounded-lg mt-2 overflow-x-auto text-xs">
+                <code>{previewTemplate?.htmlContent}</code>
+              </pre>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setPreviewTemplate(null)} data-testid="button-close-preview">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
 
 // Communities Report Component
 function CommunitiesReport() {
@@ -1139,21 +1550,7 @@ export default function SuperAdmin() {
 
         {/* Platform Tab */}
         <TabsContent value="platform">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Settings className="w-5 h-5 mr-2" />
-                Platform Configuration
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-slate-500">
-                <Settings className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-                <p>Platform configuration settings</p>
-                <p className="text-sm mt-2">Global defaults, API limits, security settings</p>
-              </div>
-            </CardContent>
-          </Card>
+          <TemplateManagement />
         </TabsContent>
 
         {/* Compliance Tab */}
