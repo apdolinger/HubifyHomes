@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, Edit2, Check, X } from "lucide-react";
+import { Plus, Trash2, Edit2, Check, X, Eye, EyeOff } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -298,7 +298,22 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
                       ) : (
                         <>
                           <div className="w-4 h-4 rounded" style={{ backgroundColor: calendar.color }} />
-                          <span className="flex-1">{calendar.name}</span>
+                          <span className={`flex-1 ${settings.hiddenCalendars.includes(calendar.id) ? 'text-muted-foreground line-through' : ''}`}>
+                            {calendar.name}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => toggleCalendarVisibility(calendar.id)}
+                            data-testid={`button-toggle-visibility-${calendar.id}`}
+                            title={settings.hiddenCalendars.includes(calendar.id) ? "Show calendar" : "Hide calendar"}
+                          >
+                            {settings.hiddenCalendars.includes(calendar.id) ? (
+                              <EyeOff className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </Button>
                           <Button
                             size="sm"
                             variant="ghost"
