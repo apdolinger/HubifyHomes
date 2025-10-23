@@ -2020,6 +2020,98 @@ export const insertPlatformTemplateSchema = createInsertSchema(platformTemplates
 export type InsertPlatformTemplate = z.infer<typeof insertPlatformTemplateSchema>;
 export type PlatformTemplate = typeof platformTemplates.$inferSelect;
 
+// Calendar Report Templates - for exporting calendar data with custom formatting
+export const calendarReportTemplates = pgTable("calendar_report_templates", {
+  id: serial("id").primaryKey(),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  
+  // Template content
+  headerHtml: text("header_html"), // Optional header content with {{variables}}
+  footerHtml: text("footer_html"), // Optional footer content with {{variables}}
+  
+  // Included fields configuration
+  includedFields: jsonb("included_fields").$type<{
+    title?: boolean;
+    description?: boolean;
+    startDate?: boolean;
+    endDate?: boolean;
+    startTime?: boolean;
+    endTime?: boolean;
+    duration?: boolean;
+    location?: boolean;
+    calendar?: boolean;
+    attendees?: boolean;
+    recurrence?: boolean;
+    organizer?: boolean;
+  }>().notNull().default({
+    title: true,
+    startDate: true,
+    endDate: true,
+    startTime: true,
+    endTime: true,
+    calendar: true,
+  }),
+  
+  // Format options
+  formatOptions: jsonb("format_options").$type<{
+    groupBy?: "date" | "calendar" | "none";
+    sortBy?: "startDate" | "title" | "calendar";
+    sortOrder?: "asc" | "desc";
+    dateFormat?: string;
+    timeFormat?: "12h" | "24h";
+    includeAllDayEvents?: boolean;
+    includeRecurringInstances?: boolean;
+    showEventCount?: boolean;
+  }>().notNull().default({
+    groupBy: "date",
+    sortBy: "startDate",
+    sortOrder: "asc",
+    dateFormat: "MMMM d, yyyy",
+    timeFormat: "12h",
+    includeAllDayEvents: true,
+    includeRecurringInstances: true,
+    showEventCount: true,
+  }),
+  
+  // Styling options for PDF
+  styleOptions: jsonb("style_options").$type<{
+    fontSize?: number;
+    fontFamily?: string;
+    primaryColor?: string;
+    secondaryColor?: string;
+    includeLogo?: boolean;
+  }>().default({
+    fontSize: 12,
+    fontFamily: "Arial",
+    primaryColor: "#000000",
+    secondaryColor: "#666666",
+    includeLogo: false,
+  }),
+  
+  variables: jsonb("variables").$type<string[]>().default([
+    "organizationName",
+    "reportStartDate",
+    "reportEndDate",
+    "totalEvents",
+    "generatedDate",
+    "generatedBy",
+  ]),
+  
+  isActive: boolean("is_active").notNull().default(true),
+  isDefault: boolean("is_default").notNull().default(false), // Mark one template as default
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertCalendarReportTemplateSchema = createInsertSchema(calendarReportTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCalendarReportTemplate = z.infer<typeof insertCalendarReportTemplateSchema>;
+export type CalendarReportTemplate = typeof calendarReportTemplates.$inferSelect;
+
 // Premium property types - available only on Pro, Grow, and Enterprise tiers
 export const PREMIUM_PROPERTY_TYPES = ['storage_unit', 'boat'] as const;
 export const PREMIUM_TIER_PROPERTY_TIERS = ['pro', 'grow', 'enterprise'] as const;
