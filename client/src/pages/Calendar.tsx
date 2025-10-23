@@ -70,13 +70,12 @@ export default function CalendarPage() {
     const urlParams = new URLSearchParams(window.location.search);
     const eventId = urlParams.get('eventId');
     
-    alert('Calendar page loaded. URL: ' + window.location.search + ', eventId: ' + eventId + ', events count: ' + events.length);
-    
     if (eventId) {
-      // Find the event by ID
-      const event = events.find((e: any) => e.id === parseInt(eventId));
-      
-      alert('Found event: ' + (event ? event.title : 'NOT FOUND'));
+      // Find the event by ID - handle both string and numeric IDs
+      const event = events.find((e: any) => {
+        // Convert both to strings for comparison to handle task-XX and numeric IDs
+        return String(e.id) === eventId;
+      });
       
       if (event) {
         // Use setTimeout to ensure the calendar is fully mounted
