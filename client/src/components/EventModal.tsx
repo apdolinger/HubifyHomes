@@ -910,10 +910,11 @@ export function EventModal({
                           </FormControl>
                         </PopoverTrigger>
                         <PopoverContent className="w-[400px] p-0" align="start">
-                          <Command>
+                          <Command shouldFilter={true}>
                             <CommandInput placeholder="Search properties..." />
-                            <CommandList className={cn("overflow-y-auto", showQuickAddProperty ? "max-h-[450px]" : "max-h-[300px]")}>
-                              <CommandEmpty>
+                            <div className="max-h-[400px] overflow-y-auto overflow-x-hidden">
+                              <CommandList>
+                                <CommandEmpty>
                                 {!showQuickAddProperty ? (
                                   <div className="py-6 text-center text-sm">
                                     <p className="mb-2">No property found.</p>
@@ -1023,6 +1024,7 @@ export function EventModal({
                                 ))}
                               </CommandGroup>
                             </CommandList>
+                          </div>
                           </Command>
                         </PopoverContent>
                       </Popover>
