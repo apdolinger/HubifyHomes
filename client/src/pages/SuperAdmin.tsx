@@ -129,16 +129,10 @@ function TemplateManagement() {
   const handleSave = async () => {
     try {
       if (editingTemplate) {
-        await apiRequest(`/api/super-admin/templates/${editingTemplate.id}`, {
-          method: 'PATCH',
-          body: JSON.stringify(formData),
-        });
+        await apiRequest('PATCH', `/api/super-admin/templates/${editingTemplate.id}`, formData);
         toast({ title: "Template updated successfully" });
       } else {
-        await apiRequest('/api/super-admin/templates', {
-          method: 'POST',
-          body: JSON.stringify(formData),
-        });
+        await apiRequest('POST', '/api/super-admin/templates', formData);
         toast({ title: "Template created successfully" });
       }
       queryClient.invalidateQueries({ queryKey: ['/api/super-admin/templates'] });
@@ -155,9 +149,7 @@ function TemplateManagement() {
   const handleDelete = async (id: number) => {
     if (!confirm('Are you sure you want to delete this template?')) return;
     try {
-      await apiRequest(`/api/super-admin/templates/${id}`, {
-        method: 'DELETE',
-      });
+      await apiRequest('DELETE', `/api/super-admin/templates/${id}`);
       toast({ title: "Template deleted successfully" });
       queryClient.invalidateQueries({ queryKey: ['/api/super-admin/templates'] });
     } catch (error: any) {
