@@ -157,7 +157,7 @@ export function ConflictResolutionPanel({
   ) => {
     setSelectedConflict(conflict);
     setActionType(type);
-    setNotes(conflict.resolutionNotes || "");
+    setNotes("");
   };
 
   const handleConfirmAction = () => {
