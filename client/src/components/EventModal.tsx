@@ -124,6 +124,12 @@ export function EventModal({
   
   // Client combobox state
   const [clientOpen, setClientOpen] = useState(false);
+  
+  // Team member attendee combobox state
+  const [teamMemberAttendeeOpen, setTeamMemberAttendeeOpen] = useState(false);
+  
+  // Client attendee combobox state
+  const [clientAttendeeOpen, setClientAttendeeOpen] = useState(false);
 
   // Fetch calendars for the dropdown
   const { data: calendars } = useQuery({
@@ -1296,61 +1302,113 @@ export function EventModal({
                 </Select>
 
                 {attendeeType === 'user' && (
-                  <Select
-                    onValueChange={(value) => {
-                      const user = (teamUsers as any[])?.find((u: any) => u.id === value);
-                      if (user && !attendees.find(a => a.userId === value)) {
-                        setAttendees([...attendees, {
-                          id: `temp-${Date.now()}`,
-                          type: 'user',
-                          userId: user.id,
-                          email: user.email,
-                          name: `${user.firstName} ${user.lastName}`,
-                        }]);
-                      }
-                    }}
-                    disabled={isPending}
-                  >
-                    <SelectTrigger data-testid="select-team-member">
-                      <SelectValue placeholder="Select team member" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {teamUsers && Array.isArray(teamUsers) && (teamUsers as any[]).filter(Boolean).map((user: any) => (
-                        <SelectItem key={user.id} value={user.id}>
-                          {user.firstName} {user.lastName} ({user.email})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={teamMemberAttendeeOpen} onOpenChange={setTeamMemberAttendeeOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={teamMemberAttendeeOpen}
+                        className="w-full justify-between font-normal text-muted-foreground"
+                        disabled={isPending}
+                        data-testid="select-team-member"
+                      >
+                        Select team member
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[400px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search team members..." />
+                        <CommandList>
+                          <CommandEmpty>No team member found.</CommandEmpty>
+                          <CommandGroup>
+                            {teamUsers && Array.isArray(teamUsers) && (teamUsers as any[]).filter(Boolean).map((user: any) => (
+                              <CommandItem
+                                key={user.id}
+                                value={`${user.firstName} ${user.lastName} ${user.email}`}
+                                onSelect={() => {
+                                  if (!attendees.find(a => a.userId === user.id)) {
+                                    setAttendees([...attendees, {
+                                      id: `temp-${Date.now()}`,
+                                      type: 'user',
+                                      userId: user.id,
+                                      email: user.email,
+                                      name: `${user.firstName} ${user.lastName}`,
+                                    }]);
+                                  }
+                                  setTeamMemberAttendeeOpen(false);
+                                }}
+                                data-testid={`select-team-member-${user.id}`}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    attendees.find(a => a.userId === user.id) ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {user.firstName} {user.lastName} ({user.email})
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 )}
 
                 {attendeeType === 'client' && (
-                  <Select
-                    onValueChange={(value) => {
-                      const client = (clients as any[])?.find((c: any) => c.id === value);
-                      if (client && !attendees.find(a => a.clientId === value)) {
-                        setAttendees([...attendees, {
-                          id: `temp-${Date.now()}`,
-                          type: 'client',
-                          clientId: client.id,
-                          email: client.email,
-                          name: `${client.firstName} ${client.lastName}`,
-                        }]);
-                      }
-                    }}
-                    disabled={isPending}
-                  >
-                    <SelectTrigger data-testid="select-client-attendee">
-                      <SelectValue placeholder="Select client" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients && Array.isArray(clients) && (clients as any[]).filter(Boolean).map((client: any) => (
-                        <SelectItem key={client.id} value={client.id}>
-                          {client.firstName} {client.lastName} ({client.email})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={clientAttendeeOpen} onOpenChange={setClientAttendeeOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={clientAttendeeOpen}
+                        className="w-full justify-between font-normal text-muted-foreground"
+                        disabled={isPending}
+                        data-testid="select-client-attendee"
+                      >
+                        Select client
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[400px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search clients..." />
+                        <CommandList>
+                          <CommandEmpty>No client found.</CommandEmpty>
+                          <CommandGroup>
+                            {clients && Array.isArray(clients) && (clients as any[]).filter(Boolean).map((client: any) => (
+                              <CommandItem
+                                key={client.id}
+                                value={`${client.firstName} ${client.lastName} ${client.email}`}
+                                onSelect={() => {
+                                  if (!attendees.find(a => a.clientId === client.id)) {
+                                    setAttendees([...attendees, {
+                                      id: `temp-${Date.now()}`,
+                                      type: 'client',
+                                      clientId: client.id,
+                                      email: client.email,
+                                      name: `${client.firstName} ${client.lastName}`,
+                                    }]);
+                                  }
+                                  setClientAttendeeOpen(false);
+                                }}
+                                data-testid={`select-client-attendee-${client.id}`}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    attendees.find(a => a.clientId === client.id) ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {client.firstName} {client.lastName} ({client.email})
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 )}
 
                 {attendeeType === 'external' && (
