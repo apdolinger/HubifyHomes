@@ -30,6 +30,8 @@ export function CalendarWidget({ className }: CalendarWidgetProps) {
   const { data: events, isLoading } = useQuery({
     queryKey: [`/api/orgs/${orgId}/events`],
     enabled: !!orgId,
+    refetchInterval: 30000, // Auto-refresh every 30 seconds
+    refetchOnWindowFocus: true, // Refresh when user returns to tab
   });
 
   // Detect scheduling conflicts for staff members
