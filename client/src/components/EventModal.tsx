@@ -121,6 +121,9 @@ export function EventModal({
   const [quickTaskTitle, setQuickTaskTitle] = useState('');
   const [quickTaskDescription, setQuickTaskDescription] = useState('');
   const [quickTaskPriority, setQuickTaskPriority] = useState<'urgent' | 'high' | 'normal' | 'low'>('normal');
+  
+  // Client combobox state
+  const [clientOpen, setClientOpen] = useState(false);
 
   // Fetch calendars for the dropdown
   const { data: calendars } = useQuery({
@@ -1112,30 +1115,84 @@ export function EventModal({
               <FormField
                 control={form.control}
                 name="clientId"
-                render={({ field }) => (
-                  <FormItem>
-                    <Select
-                      onValueChange={(value) => field.onChange(value === "none" ? undefined : value)}
-                      value={field.value || "none"}
-                      disabled={isPending}
-                    >
-                      <FormControl>
-                        <SelectTrigger data-testid="select-client">
-                          <SelectValue placeholder="Link to client (optional)" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">No client</SelectItem>
-                        {clients && Array.isArray(clients) && (clients as any[]).map((client: any) => (
-                          <SelectItem key={client.id} value={client.id}>
-                            {client.firstName} {client.lastName} ({client.email})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const selectedClient = clients && Array.isArray(clients)
+                    ? (clients as any[]).find((c: any) => c.id === field.value)
+                    : null;
+                  
+                  return (
+                    <FormItem className="flex flex-col">
+                      <Popover open={clientOpen} onOpenChange={setClientOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={clientOpen}
+                              className={cn(
+                                "justify-between font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                              disabled={isPending}
+                              data-testid="select-client"
+                            >
+                              {selectedClient
+                                ? `${selectedClient.firstName} ${selectedClient.lastName} (${selectedClient.email})`
+                                : "Link to client (optional)"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search clients..." />
+                            <CommandList>
+                              <CommandEmpty>No client found.</CommandEmpty>
+                              <CommandGroup>
+                                <CommandItem
+                                  value="none"
+                                  onSelect={() => {
+                                    field.onChange(undefined);
+                                    setClientOpen(false);
+                                  }}
+                                  data-testid="select-client-none"
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      !field.value ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  No client
+                                </CommandItem>
+                                {clients && Array.isArray(clients) && (clients as any[]).map((client: any) => (
+                                  <CommandItem
+                                    key={client.id}
+                                    value={`${client.firstName} ${client.lastName} ${client.email}`}
+                                    onSelect={() => {
+                                      field.onChange(client.id);
+                                      setClientOpen(false);
+                                    }}
+                                    data-testid={`select-client-${client.id}`}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        field.value === client.id ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    {client.firstName} {client.lastName} ({client.email})
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
             </div>
 
