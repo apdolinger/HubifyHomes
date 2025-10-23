@@ -5542,6 +5542,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const attendee = await storage.addEventAttendee(validation.data);
+      
+      // Send email invitation after successfully adding attendee
+      try {
+        // Get organization for branding
+        const org = await storage.getOrg(orgId);
+        if (!org) {
+          console.warn("Organization not found for email invitation");
+          return res.status(201).json(attendee);
+        }
+        
+        // Get attendee email and name
+        let attendeeEmail: string | undefined;
+        let attendeeName: string | undefined;
+        
+        if (attendee.userId) {
+          const user = await storage.getUser(attendee.userId);
+          if (user) {
+            attendeeEmail = user.email;
+            attendeeName = `${user.firstName} ${user.lastName}`;
+          }
+        } else if (attendee.clientId) {
+          const client = await storage.getClient(attendee.clientId);
+          if (client) {
+            attendeeEmail = client.email;
+            attendeeName = `${client.firstName} ${client.lastName}`;
+          }
+        } else if (attendee.email) {
+          attendeeEmail = attendee.email;
+          attendeeName = attendee.name || attendee.email;
+        }
+        
+        if (!attendeeEmail) {
+          console.warn("No email found for attendee, skipping invitation");
+          return res.status(201).json(attendee);
+        }
+        
+        // Get related entities for email content
+        let propertyName: string | undefined;
+        let taskTitle: string | undefined;
+        let clientName: string | undefined;
+        
+        if (event.propertyId) {
+          const property = await storage.getProperty(event.propertyId);
+          if (property) {
+            propertyName = property.name;
+          }
+        }
+        
+        if (event.taskId) {
+          const task = await storage.getTask(event.taskId);
+          if (task) {
+            taskTitle = task.title;
+          }
+        }
+        
+        if (event.clientId) {
+          const client = await storage.getClient(event.clientId);
+          if (client) {
+            clientName = `${client.firstName} ${client.lastName}`;
+          }
+        }
+        
+        // Send email invitation
+        const { sendEventInvitationEmail } = await import('./emailUtils.js');
+        await sendEventInvitationEmail(
+          attendeeEmail,
+          attendeeName,
+          {
+            eventTitle: event.title,
+            eventDescription: event.description || undefined,
+            eventLocation: event.location || undefined,
+            eventStart: new Date(event.start),
+            eventEnd: new Date(event.end),
+            organizationName: org.name,
+            organizationBranding: org.branding as any,
+            propertyName,
+            taskTitle,
+            clientName,
+          }
+        );
+        
+        console.log(`Event invitation email sent to ${attendeeEmail} (${attendeeName})`);
+      } catch (emailError) {
+        // Log email error but don't fail the request
+        console.error("Error sending event invitation email:", emailError);
+      }
+      
       res.status(201).json(attendee);
     } catch (error) {
       console.error("Error adding attendee:", error);
@@ -5582,6 +5669,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error removing attendee:", error);
       res.status(500).json({ message: "Failed to remove attendee" });
+    }
+  });
+
+  // Preview event invitation email
+  app.get("/api/orgs/:orgId/events/:eventId/email-preview", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, eventId } = req.params;
+      
+      // Get event
+      const event = await storage.getEvent(eventId);
+      if (!event || event.orgId !== orgId) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      // Get organization for branding
+      const org = await storage.getOrg(orgId);
+      if (!org) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+      
+      // Get related entities for display
+      let propertyName: string | undefined;
+      let taskTitle: string | undefined;
+      let clientName: string | undefined;
+      
+      if (event.propertyId) {
+        const property = await storage.getProperty(event.propertyId);
+        if (property) {
+          propertyName = property.name;
+        }
+      }
+      
+      if (event.taskId) {
+        const task = await storage.getTask(event.taskId);
+        if (task) {
+          taskTitle = task.title;
+        }
+      }
+      
+      if (event.clientId) {
+        const client = await storage.getClient(event.clientId);
+        if (client) {
+          clientName = `${client.firstName} ${client.lastName}`;
+        }
+      }
+      
+      // Generate preview HTML
+      const { generateEventInvitationHTML } = await import('./emailUtils.js');
+      const html = generateEventInvitationHTML({
+        eventTitle: event.title,
+        eventDescription: event.description || undefined,
+        eventLocation: event.location || undefined,
+        eventStart: new Date(event.start),
+        eventEnd: new Date(event.end),
+        organizationName: org.name,
+        organizationBranding: org.branding as any,
+        propertyName,
+        taskTitle,
+        clientName,
+      });
+      
+      res.send(html);
+    } catch (error) {
+      console.error("Error generating email preview:", error);
+      res.status(500).json({ message: "Failed to generate email preview" });
     }
   });
 

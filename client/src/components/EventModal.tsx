@@ -130,6 +130,10 @@ export function EventModal({
   
   // Client attendee combobox state
   const [clientAttendeeOpen, setClientAttendeeOpen] = useState(false);
+  
+  // Email preview state
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState<string>("");
 
   // Fetch calendars for the dropdown
   const { data: calendars } = useQuery({
@@ -631,6 +635,7 @@ export function EventModal({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) handleClose(); }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="modal-event">
         <DialogHeader>
@@ -1453,23 +1458,91 @@ export function EventModal({
             </div>
 
             {/* Form Actions */}
-            <div className="flex justify-end gap-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleClose}
-                disabled={isPending}
-                data-testid="button-cancel"
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isPending} data-testid="button-save-event">
-                {isPending ? "Saving..." : isEditing ? "Update Event" : "Create Event"}
-              </Button>
+            <div className="flex justify-between items-center gap-3 pt-4">
+              {isEditing && event?.id && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={async () => {
+                    try {
+                      const response = await fetch(`/api/orgs/${orgId}/events/${event.id}/email-preview`);
+                      if (response.ok) {
+                        const html = await response.text();
+                        setPreviewHtml(html);
+                        setShowPreview(true);
+                      } else {
+                        toast({
+                          title: "Preview Error",
+                          description: "Could not load email preview",
+                          variant: "destructive",
+                        });
+                      }
+                    } catch (error) {
+                      toast({
+                        title: "Preview Error",
+                        description: "Could not load email preview",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                  disabled={isPending}
+                  data-testid="button-preview-email"
+                >
+                  <Mail className="mr-2 h-4 w-4" />
+                  Preview Email
+                </Button>
+              )}
+              <div className="flex gap-3 ml-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleClose}
+                  disabled={isPending}
+                  data-testid="button-cancel"
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isPending} data-testid="button-save-event">
+                  {isPending ? "Saving..." : isEditing ? "Update Event" : "Create Event"}
+                </Button>
+              </div>
             </div>
           </form>
         </Form>
       </DialogContent>
     </Dialog>
+    
+    {/* Email Preview Modal */}
+    <Dialog open={showPreview} onOpenChange={setShowPreview}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Email Invitation Preview</DialogTitle>
+          <DialogDescription>
+            This is how the email invitation will appear to recipients with your organization's branding.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex-1 overflow-auto border rounded-lg bg-gray-50">
+          {previewHtml && (
+            <iframe
+              srcDoc={previewHtml}
+              className="w-full h-full min-h-[600px]"
+              title="Email Preview"
+              sandbox="allow-same-origin"
+              data-testid="email-preview-iframe"
+            />
+          )}
+        </div>
+        <div className="flex justify-end pt-4">
+          <Button
+            variant="outline"
+            onClick={() => setShowPreview(false)}
+            data-testid="button-close-preview"
+          >
+            Close
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
