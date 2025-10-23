@@ -24,7 +24,7 @@ Preferred communication style: Simple, everyday language.
     - **Multi-Tenant Architecture**: Organization-based multi-tenancy for clients, properties, forms, and submissions.
     - **Property Management**: Support for various property types (including premium types: Storage Units and Boats on Pro+ tiers), multi-unit management, manager assignment, status tracking, room management, and tier-based property type restrictions.
     - **Task Management System**: Priority levels, status tracking, assignment, property association, and due date management. Integrated with calendar.
-    - **Calendar System**: Full-featured calendar with event management, attendee support, customizable settings, and staff scheduling conflict detection. Tasks with due dates appear as events.
+    - **Calendar System**: Full-featured calendar with event management, attendee support, customizable settings, and staff scheduling conflict detection. Tasks with due dates appear as events. Dashboard calendar widget with auto-refresh (30-second interval) and clickable events that navigate to the calendar page with auto-opening event details modal.
     - **Team Collaboration**: Hierarchical user roles with permissions, communication, and activity logging. Includes out-of-office management and staff time tracking.
     - **Contact Management**: Comprehensive management of clients (tenants, owners, emergency contacts) and vendors with duplicate detection and merge capabilities. Vendors are managed separately in the admin section for better organization.
     - **Invoice Management**: Three-tier invoice system with object storage for file upload/download.
