@@ -1735,6 +1735,251 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Calendar Report Template Management Routes (Super Admin only)
+  app.get("/api/super-admin/calendar-report-templates", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const templates = await storage.getCalendarReportTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching calendar report templates:", error);
+      res.status(500).json({ message: "Failed to fetch calendar report templates" });
+    }
+  });
+
+  app.get("/api/super-admin/calendar-report-templates/:id", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const template = await storage.getCalendarReportTemplate(parseInt(id));
+      if (!template) {
+        return res.status(404).json({ message: "Calendar report template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Error fetching calendar report template:", error);
+      res.status(500).json({ message: "Failed to fetch calendar report template" });
+    }
+  });
+
+  app.post("/api/super-admin/calendar-report-templates", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { insertCalendarReportTemplateSchema } = await import("@shared/schema");
+      const validation = insertCalendarReportTemplateSchema.safeParse(req.body);
+      
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid template data", errors: validation.error.issues });
+      }
+
+      const template = await storage.createCalendarReportTemplate(validation.data);
+      
+      await AuditLogger.log({
+        req,
+        action: "create_calendar_report_template",
+        actionType: "create",
+        resource: "calendar_report_template",
+        resourceId: template.id.toString(),
+        severity: "info",
+        success: true,
+      });
+      
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Error creating calendar report template:", error);
+      res.status(500).json({ message: "Failed to create calendar report template" });
+    }
+  });
+
+  app.patch("/api/super-admin/calendar-report-templates/:id", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const template = await storage.updateCalendarReportTemplate(parseInt(id), req.body);
+      
+      await AuditLogger.log({
+        req,
+        action: "update_calendar_report_template",
+        actionType: "update",
+        resource: "calendar_report_template",
+        resourceId: id,
+        severity: "info",
+        success: true,
+      });
+      
+      res.json(template);
+    } catch (error) {
+      console.error("Error updating calendar report template:", error);
+      res.status(500).json({ message: "Failed to update calendar report template" });
+    }
+  });
+
+  app.delete("/api/super-admin/calendar-report-templates/:id", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteCalendarReportTemplate(parseInt(id));
+      
+      await AuditLogger.log({
+        req,
+        action: "delete_calendar_report_template",
+        actionType: "delete",
+        resource: "calendar_report_template",
+        resourceId: id,
+        severity: "warning",
+        success: true,
+      });
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting calendar report template:", error);
+      res.status(500).json({ message: "Failed to delete calendar report template" });
+    }
+  });
+
+  // Get calendar report templates (for regular users)
+  app.get("/api/calendar-report-templates", isAuthenticated, async (req, res) => {
+    try {
+      const templates = await storage.getCalendarReportTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching calendar report templates:", error);
+      res.status(500).json({ message: "Failed to fetch calendar report templates" });
+    }
+  });
+
+  // Calendar Report Generation (For regular users)
+  app.post("/api/calendar/export", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const orgId = req.user?.orgId;
+      
+      if (!userId || !orgId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const { startDate, endDate, templateId, format } = req.body;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ message: "Start and end dates are required" });
+      }
+      
+      // Get template (or use default)
+      let template;
+      if (templateId) {
+        template = await storage.getCalendarReportTemplate(templateId);
+      } else {
+        template = await storage.getDefaultCalendarReportTemplate();
+      }
+      
+      if (!template) {
+        return res.status(404).json({ message: "No report template found" });
+      }
+      
+      // Fetch events for the date range
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const events = await storage.getEvents(orgId, start, end);
+      
+      // Fetch attendees for each event
+      const eventsWithAttendees = await Promise.all(
+        events.map(async (event) => {
+          const attendees = await storage.getEventAttendees(event.id);
+          return { ...event, attendees };
+        })
+      );
+      
+      // Get organization details for template variables
+      const org = await storage.getOrg(orgId);
+      const user = await storage.getUser(userId);
+      
+      // Apply template configuration to filter/format events
+      const { includedFields, formatOptions } = template;
+      
+      // Filter events based on template options
+      let filteredEvents = eventsWithAttendees.filter(event => {
+        if (!formatOptions.includeAllDayEvents && event.allDay) return false;
+        return true;
+      });
+      
+      // Sort events
+      if (formatOptions.sortBy === 'startDate') {
+        filteredEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+      } else if (formatOptions.sortBy === 'title') {
+        filteredEvents.sort((a, b) => a.title.localeCompare(b.title));
+      }
+      
+      if (formatOptions.sortOrder === 'desc') {
+        filteredEvents.reverse();
+      }
+      
+      // Generate report based on format
+      if (format === 'csv') {
+        // Generate CSV
+        const csvRows = [];
+        
+        // Header row
+        const headers = [];
+        if (includedFields.title) headers.push('Title');
+        if (includedFields.description) headers.push('Description');
+        if (includedFields.startDate) headers.push('Start Date');
+        if (includedFields.startTime) headers.push('Start Time');
+        if (includedFields.endDate) headers.push('End Date');
+        if (includedFields.endTime) headers.push('End Time');
+        if (includedFields.location) headers.push('Location');
+        if (includedFields.calendar) headers.push('Calendar');
+        if (includedFields.attendees) headers.push('Attendees');
+        
+        csvRows.push(headers.join(','));
+        
+        // Data rows
+        for (const event of filteredEvents) {
+          const row = [];
+          if (includedFields.title) row.push(`"${(event.title || '').replace(/"/g, '""')}"`);
+          if (includedFields.description) row.push(`"${(event.description || '').replace(/"/g, '""')}"`);
+          if (includedFields.startDate) row.push(new Date(event.start).toLocaleDateString());
+          if (includedFields.startTime) row.push(event.allDay ? 'All Day' : new Date(event.start).toLocaleTimeString());
+          if (includedFields.endDate) row.push(event.end ? new Date(event.end).toLocaleDateString() : '');
+          if (includedFields.endTime) row.push(event.end && !event.allDay ? new Date(event.end).toLocaleTimeString() : '');
+          if (includedFields.location) row.push(`"${(event.location || '').replace(/"/g, '""')}"`);
+          if (includedFields.calendar) row.push(event.calendarId || '');
+          if (includedFields.attendees) row.push(`"${event.attendees?.map((a: any) => a.email || a.name).join('; ') || ''}"`);
+          
+          csvRows.push(row.join(','));
+        }
+        
+        const csvContent = csvRows.join('\n');
+        
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="calendar-report-${startDate}-to-${endDate}.csv"`);
+        res.send(csvContent);
+      } else {
+        // For PDF, return JSON for now (PDF generation can be handled client-side or with a library later)
+        res.json({
+          template,
+          events: filteredEvents,
+          metadata: {
+            organizationName: org?.name || '',
+            reportStartDate: startDate,
+            reportEndDate: endDate,
+            totalEvents: filteredEvents.length,
+            generatedDate: new Date().toISOString(),
+            generatedBy: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.email || 'Unknown',
+          }
+        });
+      }
+      
+      await AuditLogger.log({
+        req,
+        action: "export_calendar_report",
+        actionType: "read",
+        resource: "calendar_report",
+        resourceId: templateId?.toString() || 'default',
+        severity: "info",
+        success: true,
+        metadata: { startDate, endDate, format, eventCount: filteredEvents.length },
+      });
+    } catch (error) {
+      console.error("Error generating calendar report:", error);
+      res.status(500).json({ message: "Failed to generate calendar report" });
+    }
+  });
+
   app.post("/api/communities", isAuthenticated, async (req, res) => {
     try {
       const userId = (req.user as any)?.claims?.sub;

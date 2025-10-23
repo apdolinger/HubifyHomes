@@ -8,9 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, Edit2, Check, X, Eye, EyeOff, Copy, RefreshCw } from "lucide-react";
+import { Plus, Trash2, Edit2, Check, X, Eye, EyeOff, Copy, RefreshCw, FileDown, Calendar as CalendarIcon } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 interface CalendarSettingsProps {
   open: boolean;
@@ -63,6 +64,17 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
   const [newCalendarName, setNewCalendarName] = useState("");
   const [newCalendarColor, setNewCalendarColor] = useState(CALENDAR_COLORS[0]);
   
+  // Reports tab state
+  const [reportStartDate, setReportStartDate] = useState("");
+  const [reportEndDate, setReportEndDate] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  
+  // Fetch templates for reports
+  const { data: reportTemplates } = useQuery<any[]>({
+    queryKey: ['/api/calendar-report-templates'],
+  });
+  
   // Fetch current user for personal feed URL
   const { data: currentUser } = useQuery<any>({
     queryKey: ['/api/user'],
@@ -114,6 +126,61 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast({ title: `${label} copied to clipboard` });
+  };
+  
+  const handleExportReport = async (format: 'csv' | 'pdf') => {
+    if (!reportStartDate || !reportEndDate) {
+      toast({
+        title: "Missing dates",
+        description: "Please select both start and end dates",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsExporting(true);
+    try {
+      const response = await fetch('/api/calendar/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startDate: reportStartDate,
+          endDate: reportEndDate,
+          templateId: selectedTemplate,
+          format
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate report');
+      }
+      
+      if (format === 'csv') {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `calendar-report-${reportStartDate}-to-${reportEndDate}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast({ title: "CSV report downloaded successfully" });
+      } else {
+        // For PDF, get JSON data and handle client-side (future enhancement)
+        const data = await response.json();
+        toast({ title: "Report data generated", description: "PDF generation coming soon" });
+        console.log('PDF report data:', data);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Export failed",
+        description: error.message || "Failed to export report",
+        variant: "destructive"
+      });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Load settings from localStorage on mount
@@ -251,12 +318,13 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
         </DialogHeader>
 
         <Tabs defaultValue="calendars" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="calendars" data-testid="tab-calendars">Calendars</TabsTrigger>
             <TabsTrigger value="filters" data-testid="tab-filters">Filters</TabsTrigger>
             <TabsTrigger value="display" data-testid="tab-display">Display</TabsTrigger>
             <TabsTrigger value="colors" data-testid="tab-colors">Colors</TabsTrigger>
             <TabsTrigger value="sync" data-testid="tab-sync">Sync</TabsTrigger>
+            <TabsTrigger value="reports" data-testid="tab-reports">Reports</TabsTrigger>
           </TabsList>
 
           {/* Calendar Management Tab */}
@@ -781,6 +849,121 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
                   <li>Changes made in Google Calendar will NOT sync back to Hubify</li>
                   <li>Regenerating the URL will invalidate the previous feed link</li>
                   <li>Keep your feed URL private - anyone with it can view your events</li>
+                </ul>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Reports Tab */}
+          <TabsContent value="reports" className="space-y-6 mt-4">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold">Export Calendar Report</h3>
+                <p className="text-sm text-muted-foreground">
+                  Generate and download calendar reports for a specific date range using customizable templates.
+                </p>
+              </div>
+
+              <div className="space-y-4 border rounded-lg p-4">
+                <div className="grid gap-4">
+                  {/* Date Range Selection */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="report-start-date">Start Date</Label>
+                      <Input
+                        id="report-start-date"
+                        type="date"
+                        value={reportStartDate}
+                        onChange={(e) => setReportStartDate(e.target.value)}
+                        data-testid="input-report-start-date"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="report-end-date">End Date</Label>
+                      <Input
+                        id="report-end-date"
+                        type="date"
+                        value={reportEndDate}
+                        onChange={(e) => setReportEndDate(e.target.value)}
+                        data-testid="input-report-end-date"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Template Selection */}
+                  <div className="space-y-2">
+                    <Label htmlFor="report-template">Report Template</Label>
+                    <Select
+                      value={selectedTemplate?.toString() || "default"}
+                      onValueChange={(value) => setSelectedTemplate(value === "default" ? null : parseInt(value))}
+                    >
+                      <SelectTrigger id="report-template" data-testid="select-report-template">
+                        <SelectValue placeholder="Select template" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">Default Template</SelectItem>
+                        {reportTemplates?.map((template: any) => (
+                          <SelectItem key={template.id} value={template.id.toString()}>
+                            {template.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Export Buttons */}
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      onClick={() => handleExportReport('csv')}
+                      disabled={isExporting || !reportStartDate || !reportEndDate}
+                      className="flex-1"
+                      data-testid="button-export-csv"
+                    >
+                      <FileDown className="w-4 h-4 mr-2" />
+                      {isExporting ? 'Exporting...' : 'Export as CSV'}
+                    </Button>
+                    <Button
+                      onClick={() => handleExportReport('pdf')}
+                      disabled={isExporting || !reportStartDate || !reportEndDate}
+                      variant="outline"
+                      className="flex-1"
+                      data-testid="button-export-pdf"
+                    >
+                      <FileDown className="w-4 h-4 mr-2" />
+                      {isExporting ? 'Exporting...' : 'Export as PDF'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Template Information */}
+              {reportTemplates && reportTemplates.length > 0 && (
+                <div className="bg-muted p-4 rounded-lg">
+                  <h4 className="font-semibold mb-2">Available Templates</h4>
+                  <div className="space-y-2 text-sm">
+                    {reportTemplates.map((template: any) => (
+                      <div key={template.id} className="flex items-start gap-2">
+                        <CalendarIcon className="w-4 h-4 mt-0.5 text-muted-foreground" />
+                        <div>
+                          <p className="font-medium">{template.name}</p>
+                          {template.description && (
+                            <p className="text-muted-foreground text-xs">{template.description}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Help Text */}
+              <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-2">
+                <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">Export Options:</p>
+                <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
+                  <li>CSV: Downloads a spreadsheet file with event details</li>
+                  <li>PDF: Generates a formatted report document (coming soon)</li>
+                  <li>Templates control which fields are included and how data is organized</li>
+                  <li>Administrators can manage templates in the Super Admin section</li>
                 </ul>
               </div>
             </div>
