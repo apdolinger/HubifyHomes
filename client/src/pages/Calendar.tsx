@@ -63,27 +63,24 @@ export default function CalendarPage() {
 
   // Auto-open event from URL parameter (when clicked from dashboard widget)
   useEffect(() => {
-    console.log('useEffect running, events:', events ? events.length : 0);
     if (!events || !Array.isArray(events) || events.length === 0) {
-      console.log('No events yet, waiting...');
       return;
     }
     
     const urlParams = new URLSearchParams(window.location.search);
     const eventId = urlParams.get('eventId');
-    console.log('URL params:', window.location.search, 'eventId:', eventId);
+    
+    alert('Calendar page loaded. URL: ' + window.location.search + ', eventId: ' + eventId + ', events count: ' + events.length);
     
     if (eventId) {
-      console.log('Opening event from URL:', eventId);
-      
       // Find the event by ID
       const event = events.find((e: any) => e.id === parseInt(eventId));
-      console.log('Found event:', event);
+      
+      alert('Found event: ' + (event ? event.title : 'NOT FOUND'));
       
       if (event) {
         // Use setTimeout to ensure the calendar is fully mounted
         setTimeout(() => {
-          console.log('Setting selected event and opening modal');
           setSelectedEvent(event);
           setEventModalOpen(true);
           
@@ -101,8 +98,6 @@ export default function CalendarPage() {
           const newUrl = window.location.pathname;
           window.history.replaceState({}, '', newUrl);
         }, 100);
-      } else {
-        console.warn('Event not found with ID:', eventId);
       }
     }
   }, [events]);
