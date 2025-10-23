@@ -345,25 +345,29 @@ export function EventModal({
         endDate = new Date(data.end);
       }
 
-      const payload = {
+      // Build payload object, omitting undefined/null optional fields
+      const payload: any = {
         orgId: data.orgId,
         calendarId: data.calendarId,
         title: data.title,
-        description: data.description?.trim() || null,
-        location: data.location?.trim() || null,
         allDay: data.allDay,
-        start: startDate.toISOString(),
-        end: endDate.toISOString(),
+        start: startDate,
+        end: endDate,
         timezone: data.timezone,
         visibility: data.visibility,
         organizerId: data.organizerId,
         createdById: data.createdById,
-        propertyId: data.propertyId || null,
-        taskId: data.taskId || null,
-        clientId: data.clientId || null,
-        recurrenceRule: data.recurrenceRule || null,
-        recurrenceExDates: data.recurrenceExDates || null,
       };
+      
+      // Only include optional fields if they have values
+      if (data.description?.trim()) payload.description = data.description.trim();
+      if (data.location?.trim()) payload.location = data.location.trim();
+      if (data.propertyId) payload.propertyId = data.propertyId;
+      if (data.taskId) payload.taskId = data.taskId;
+      if (data.clientId) payload.clientId = data.clientId;
+      if (data.recurrenceRule) payload.recurrenceRule = data.recurrenceRule;
+      if (data.recurrenceExDates) payload.recurrenceExDates = data.recurrenceExDates;
+      
       const response = await apiRequest("PATCH", `/api/orgs/${orgId}/events/${event?.id}`, payload);
       const updatedEvent = await response.json();
       
