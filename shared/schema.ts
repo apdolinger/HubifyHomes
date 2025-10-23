@@ -46,6 +46,7 @@ export const orgs = pgTable("orgs", {
     customCss?: string;
   }>().default({}),
   isActive: boolean("is_active").notNull().default(true),
+  iCalFeedToken: varchar("ical_feed_token"), // Secret token for organization-wide iCal feed subscription
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -383,6 +384,7 @@ export const users = pgTable("users", {
   isAdminAccount: boolean("is_admin_account").notNull().default(false), // For least privilege: separate admin accounts
   isActive: boolean("is_active").notNull().default(true),
   lastActiveAt: timestamp("last_active_at"),
+  iCalFeedToken: varchar("ical_feed_token"), // Secret token for personal iCal feed subscription
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1074,6 +1076,8 @@ export const calendars = pgTable("calendars", {
   name: varchar("name").notNull(),
   color: varchar("color").default("#3b82f6"), // Hex color code
   isDefault: boolean("is_default").default(false),
+  isPrivate: boolean("is_private").default(false), // Private calendars only visible to owner
+  ownerId: varchar("owner_id").references(() => users.id), // Owner for private calendars
   createdById: varchar("created_by_id").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
