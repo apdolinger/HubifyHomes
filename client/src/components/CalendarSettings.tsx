@@ -155,23 +155,17 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
         throw new Error('Failed to generate report');
       }
       
-      if (format === 'csv') {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `calendar-report-${reportStartDate}-to-${reportEndDate}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        toast({ title: "CSV report downloaded successfully" });
-      } else {
-        // For PDF, get JSON data and handle client-side (future enhancement)
-        const data = await response.json();
-        toast({ title: "Report data generated", description: "PDF generation coming soon" });
-        console.log('PDF report data:', data);
-      }
+      // Handle both CSV and PDF as blob downloads
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `calendar-report-${reportStartDate}-to-${reportEndDate}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast({ title: `${format.toUpperCase()} report downloaded successfully` });
     } catch (error: any) {
       toast({
         title: "Export failed",
@@ -961,7 +955,7 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
                 <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">Export Options:</p>
                 <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
                   <li>CSV: Downloads a spreadsheet file with event details</li>
-                  <li>PDF: Generates a formatted report document (coming soon)</li>
+                  <li>PDF: Generates a professionally formatted report document</li>
                   <li>Templates control which fields are included and how data is organized</li>
                   <li>Administrators can manage templates in the Super Admin section</li>
                 </ul>
