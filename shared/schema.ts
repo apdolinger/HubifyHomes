@@ -1148,6 +1148,24 @@ export const eventImports = pgTable("event_imports", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const conflictResolutions = pgTable("conflict_resolutions", {
+  id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  conflictType: varchar("conflict_type").notNull(), // 'staff', 'property', 'resource'
+  eventIds: text("event_ids").array().notNull(), // Array of conflicting event IDs
+  propertyId: integer("property_id").references(() => properties.id),
+  userIds: text("user_ids").array(), // Array of affected user IDs
+  status: varchar("status").default("pending").notNull(), // 'pending', 'approved', 'rejected', 'resolved'
+  supervisorId: varchar("supervisor_id").references(() => users.id),
+  requestedById: varchar("requested_by_id").references(() => users.id).notNull(),
+  resolutionNotes: text("resolution_notes"),
+  approvedAt: timestamp("approved_at"),
+  rejectedAt: timestamp("rejected_at"),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const orgsRelations = relations(orgs, ({ one, many }) => ({
   subscription: one(orgSubscriptions),
@@ -1822,6 +1840,12 @@ export const insertEventImportSchema = createInsertSchema(eventImports).omit({
   updatedAt: true,
 });
 
+export const insertConflictResolutionSchema = createInsertSchema(conflictResolutions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -1941,6 +1965,8 @@ export type InsertIcsFeed = z.infer<typeof insertIcsFeedSchema>;
 export type IcsFeed = typeof icsFeeds.$inferSelect;
 export type InsertEventImport = z.infer<typeof insertEventImportSchema>;
 export type EventImport = typeof eventImports.$inferSelect;
+export type InsertConflictResolution = z.infer<typeof insertConflictResolutionSchema>;
+export type ConflictResolution = typeof conflictResolutions.$inferSelect;
 
 // Import History table for tracking CSV imports
 export const importHistory = pgTable("import_history", {
