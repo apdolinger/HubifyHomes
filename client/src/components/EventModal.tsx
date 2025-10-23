@@ -215,6 +215,9 @@ export function EventModal({
   // Reset form when event changes
   useEffect(() => {
     if (event) {
+      // For all-day events, use date-only format; for timed events, use datetime format
+      const dateFormat = event.allDay ? "yyyy-MM-dd" : "yyyy-MM-dd'T'HH:mm";
+      
       form.reset({
         orgId: event.orgId,
         calendarId: event.calendarId,
@@ -222,8 +225,8 @@ export function EventModal({
         description: (event.description || "") as string | null,
         location: (event.location || "") as string | null,
         allDay: event.allDay ?? false,
-        start: event.start ? format(new Date(event.start), "yyyy-MM-dd'T'HH:mm") : "",
-        end: event.end ? format(new Date(event.end), "yyyy-MM-dd'T'HH:mm") : "",
+        start: event.start ? format(new Date(event.start), dateFormat) : "",
+        end: event.end ? format(new Date(event.end), dateFormat) : "",
         timezone: event.timezone || "UTC",
         visibility: (event.visibility || "org") as string | null,
         organizerId: event.organizerId,
@@ -273,6 +276,43 @@ export function EventModal({
       setExternalName('');
     }
   }, [event, orgId, userId, defaultDate, defaultCalendarId, existingAttendees, form, open]);
+
+  // Watch allDay field and convert date format when it changes
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (name === 'allDay') {
+        const currentStart = form.getValues('start');
+        const currentEnd = form.getValues('end');
+        
+        if (currentStart) {
+          if (value.allDay) {
+            // Converting to all-day: extract date only (YYYY-MM-DD)
+            const startDate = currentStart.split('T')[0];
+            form.setValue('start', startDate);
+          } else {
+            // Converting to timed: add default time
+            if (!currentStart.includes('T')) {
+              form.setValue('start', `${currentStart}T09:00`);
+            }
+          }
+        }
+        
+        if (currentEnd) {
+          if (value.allDay) {
+            // Converting to all-day: extract date only (YYYY-MM-DD)
+            const endDate = currentEnd.split('T')[0];
+            form.setValue('end', endDate);
+          } else {
+            // Converting to timed: add default time
+            if (!currentEnd.includes('T')) {
+              form.setValue('end', `${currentEnd}T10:00`);
+            }
+          }
+        }
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
 
   const createEventMutation = useMutation({
     mutationFn: async (data: FormData) => {
