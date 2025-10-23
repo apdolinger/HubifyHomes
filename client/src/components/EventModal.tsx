@@ -230,8 +230,8 @@ export function EventModal({
 
       const payload = {
         ...data,
-        start: startDate.toISOString(),
-        end: endDate.toISOString(),
+        start: startDate,
+        end: endDate,
         description: data.description?.trim() || null,
         location: data.location?.trim() || null,
         propertyId: data.propertyId || null,
@@ -300,8 +300,8 @@ export function EventModal({
 
       const payload = {
         ...data,
-        start: startDate.toISOString(),
-        end: endDate.toISOString(),
+        start: startDate,
+        end: endDate,
         description: data.description?.trim() || null,
         location: data.location?.trim() || null,
         propertyId: data.propertyId || null,
