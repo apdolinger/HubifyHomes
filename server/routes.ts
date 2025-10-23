@@ -5210,8 +5210,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { attendees, reminders, ...eventData } = req.body;
 
-      const validation = insertEventSchema.safeParse({
+      // Convert date strings to Date objects for validation
+      const processedEventData = {
         ...eventData,
+        start: eventData.start ? new Date(eventData.start) : eventData.start,
+        end: eventData.end ? new Date(eventData.end) : eventData.end,
+      };
+
+      const validation = insertEventSchema.safeParse({
+        ...processedEventData,
         orgId,
         organizerId: userId,
         createdById: userId
