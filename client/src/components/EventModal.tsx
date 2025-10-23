@@ -912,8 +912,7 @@ export function EventModal({
                         <PopoverContent className="w-[400px] p-0" align="start">
                           <Command shouldFilter={true}>
                             <CommandInput placeholder="Search properties..." />
-                            <div className="max-h-[400px] overflow-y-auto overflow-x-hidden">
-                              <CommandList>
+                              <CommandList className="max-h-[400px] overflow-y-scroll overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
                                 <CommandEmpty>
                                 {!showQuickAddProperty ? (
                                   <div className="py-6 text-center text-sm">
@@ -1024,7 +1023,6 @@ export function EventModal({
                                 ))}
                               </CommandGroup>
                             </CommandList>
-                          </div>
                           </Command>
                         </PopoverContent>
                       </Popover>
