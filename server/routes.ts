@@ -5614,14 +5614,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Scan each event for conflicts
       for (const event of allEvents) {
-        await detectAndCreateEventConflicts(event, orgId, userId);
-        conflictsCreated++;
+        const count = await detectAndCreateEventConflicts(event, orgId, userId);
+        conflictsCreated += count;
       }
       
       res.json({ 
         message: "Conflict scan complete", 
         eventsScanned: allEvents.length,
-        note: "Conflict resolution records created for any overlapping events found"
+        conflictsDetected: conflictsCreated
       });
     } catch (error) {
       console.error("Error scanning for conflicts:", error);

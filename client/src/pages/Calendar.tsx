@@ -551,10 +551,20 @@ export default function CalendarPage() {
                   throw new Error('Scan failed');
                 }
                 const data = await response.json();
-                alert(`Scan complete! Checked ${data.eventsScanned} events for conflicts. Refresh the page to see any conflicts detected.`);
-                window.location.reload();
+                
+                // Invalidate conflicts cache to automatically show new conflicts
+                await queryClient.invalidateQueries({ queryKey: ['/api/orgs', orgId, 'conflicts'] });
+                
+                toast({
+                  title: "Scan Complete",
+                  description: `Checked ${data.eventsScanned} events and found ${data.conflictsDetected || 0} conflicts.`,
+                });
               } catch (error) {
-                alert('Failed to scan for conflicts');
+                toast({
+                  title: "Scan Failed",
+                  description: "Failed to scan for conflicts. Please try again.",
+                  variant: "destructive",
+                });
               }
             }}
             data-testid="button-scan-conflicts"
