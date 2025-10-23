@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -137,7 +137,7 @@ export function EventModal({
   const [previewHtml, setPreviewHtml] = useState<string>("");
   
   // Ref for property combobox scrolling
-  const propertyListRef = React.useRef<HTMLDivElement>(null);
+  const propertyListRef = useRef<HTMLDivElement>(null);
 
   // Fetch calendars for the dropdown
   const { data: calendars } = useQuery({
