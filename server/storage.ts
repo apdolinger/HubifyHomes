@@ -399,6 +399,7 @@ export interface IStorage {
   
   // Event operations
   getEvents(orgId: string, startDate?: Date, endDate?: Date, calendarId?: string): Promise<Event[]>;
+  getOrgEvents(orgId: string): Promise<any[]>; // Get all events with calendar info for iCal feeds
   getEvent(id: string): Promise<Event | undefined>;
   createEvent(event: InsertEvent): Promise<Event>;
   updateEvent(id: string, event: Partial<InsertEvent>): Promise<Event>;
@@ -3247,6 +3248,33 @@ export class DatabaseStorage implements IStorage {
       .from(events)
       .where(and(...conditions))
       .orderBy(events.start);
+  }
+
+  async getOrgEvents(orgId: string): Promise<any[]> {
+    // Get all events with calendar information for iCal feed generation
+    const results = await db
+      .select({
+        id: events.id,
+        title: events.title,
+        description: events.description,
+        start: events.start,
+        end: events.end,
+        allDay: events.allDay,
+        location: events.location,
+        recurrenceRule: events.recurrenceRule,
+        calendar: {
+          id: calendars.id,
+          name: calendars.name,
+          isPrivate: calendars.isPrivate,
+          ownerId: calendars.ownerId,
+        }
+      })
+      .from(events)
+      .leftJoin(calendars, eq(events.calendarId, calendars.id))
+      .where(eq(events.orgId, orgId))
+      .orderBy(events.start);
+    
+    return results;
   }
 
   async getEvent(id: string): Promise<Event | undefined> {

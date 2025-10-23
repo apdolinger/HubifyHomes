@@ -7058,6 +7058,216 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // iCal Feed Routes (public, no auth required)
+  
+  // Helper function to generate iCal feed content
+  function generateICalFeed(events: any[], calendarName: string) {
+    const lines = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Hubify//Calendar Feed//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      `X-WR-CALNAME:${calendarName}`,
+      'X-WR-TIMEZONE:UTC',
+    ];
+
+    for (const event of events) {
+      lines.push('BEGIN:VEVENT');
+      lines.push(`UID:${event.id}@hubify.app`);
+      lines.push(`DTSTAMP:${formatICalDate(new Date())}`);
+      
+      // Handle all-day vs timed events
+      if (event.allDay) {
+        lines.push(`DTSTART;VALUE=DATE:${formatICalDate(new Date(event.start), true)}`);
+        if (event.end) {
+          // For all-day events, end date is exclusive in iCal
+          const endDate = new Date(event.end);
+          endDate.setDate(endDate.getDate() + 1);
+          lines.push(`DTEND;VALUE=DATE:${formatICalDate(endDate, true)}`);
+        }
+      } else {
+        lines.push(`DTSTART:${formatICalDate(new Date(event.start))}`);
+        
+        // RFC 5545: DTEND and DURATION are mutually exclusive
+        // For recurring events, use DURATION instead of DTEND
+        if (event.recurrenceRule && event.start && event.end) {
+          const duration = new Date(event.end).getTime() - new Date(event.start).getTime();
+          const hours = Math.floor(duration / (1000 * 60 * 60));
+          const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
+          if (hours > 0 || minutes > 0) {
+            lines.push(`DURATION:PT${hours}H${minutes}M`);
+          }
+        } else if (event.end) {
+          // For non-recurring events, use DTEND
+          lines.push(`DTEND:${formatICalDate(new Date(event.end))}`);
+        }
+      }
+      
+      lines.push(`SUMMARY:${escapeICalText(event.title)}`);
+      
+      if (event.description) {
+        lines.push(`DESCRIPTION:${escapeICalText(event.description)}`);
+      }
+      
+      if (event.location) {
+        lines.push(`LOCATION:${escapeICalText(event.location)}`);
+      }
+      
+      // Add recurrence rule if present
+      if (event.recurrenceRule) {
+        lines.push(`RRULE:${event.recurrenceRule}`);
+      }
+      
+      lines.push('END:VEVENT');
+    }
+
+    lines.push('END:VCALENDAR');
+    return lines.join('\r\n');
+  }
+
+  function formatICalDate(date: Date, dateOnly = false): string {
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    
+    if (dateOnly) {
+      return `${year}${month}${day}`;
+    }
+    
+    const hours = String(date.getUTCHours()).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+    return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;
+  }
+
+  function escapeICalText(text: string): string {
+    return text
+      .replace(/\\/g, '\\\\')
+      .replace(/;/g, '\\;')
+      .replace(/,/g, '\\,')
+      .replace(/\n/g, '\\n');
+  }
+
+  // Organization-wide calendar feed
+  app.get("/ical/org/:orgId/:token", async (req, res) => {
+    try {
+      const { orgId, token } = req.params;
+      
+      // Verify token
+      const org = await storage.getOrg(orgId);
+      if (!org || org.iCalFeedToken !== token) {
+        return res.status(404).send('Calendar feed not found');
+      }
+      
+      // Get all non-private events for the organization
+      const events = await storage.getOrgEvents(orgId);
+      const nonPrivateEvents = events.filter((e: any) => {
+        // Filter out events from private calendars
+        return !e.calendar?.isPrivate;
+      });
+      
+      const icalContent = generateICalFeed(nonPrivateEvents, `${org.name} Calendar`);
+      
+      res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${org.name.replace(/[^a-zA-Z0-9]/g, '_')}_calendar.ics"`);
+      res.send(icalContent);
+    } catch (error) {
+      console.error("Error generating org iCal feed:", error);
+      res.status(500).send('Error generating calendar feed');
+    }
+  });
+
+  // Personal calendar feed
+  app.get("/ical/user/:userId/:token", async (req, res) => {
+    try {
+      const { userId, token } = req.params;
+      
+      // Verify token
+      const user = await storage.getUser(userId);
+      if (!user || user.iCalFeedToken !== token) {
+        return res.status(404).send('Calendar feed not found');
+      }
+      
+      if (!user.orgId) {
+        return res.status(400).send('User not associated with an organization');
+      }
+      
+      // Get all events for the user (org events + their private calendar events)
+      const orgEvents = await storage.getOrgEvents(user.orgId);
+      const userEvents = orgEvents.filter((e: any) => {
+        // Include non-private org events + user's own private calendar events
+        if (e.calendar?.isPrivate) {
+          return e.calendar.ownerId === userId;
+        }
+        return true;
+      });
+      
+      const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'User';
+      const icalContent = generateICalFeed(userEvents, `${userName}'s Calendar`);
+      
+      res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${userName.replace(/[^a-zA-Z0-9]/g, '_')}_calendar.ics"`);
+      res.send(icalContent);
+    } catch (error) {
+      console.error("Error generating user iCal feed:", error);
+      res.status(500).send('Error generating calendar feed');
+    }
+  });
+
+  // Generate/regenerate iCal feed token for organization
+  app.post("/api/orgs/:orgId/ical-token/generate", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+      
+      // Check if user is admin
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: "Only admins can generate organization calendar tokens" });
+      }
+      
+      // Generate new token
+      const token = nanoid(32);
+      await storage.updateOrg(orgId, { iCalFeedToken: token });
+      
+      res.json({ token });
+    } catch (error) {
+      console.error("Error generating org iCal token:", error);
+      res.status(500).json({ message: "Failed to generate calendar token" });
+    }
+  });
+
+  // Generate/regenerate iCal feed token for user
+  app.post("/api/users/:userId/ical-token/generate", isAuthenticated, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const currentUserId = req.user?.id;
+      
+      if (!currentUserId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+      
+      // Users can only generate tokens for themselves
+      if (userId !== currentUserId) {
+        return res.status(403).json({ message: "You can only generate tokens for yourself" });
+      }
+      
+      // Generate new token
+      const token = nanoid(32);
+      await storage.updateUser(userId, { iCalFeedToken: token });
+      
+      res.json({ token });
+    } catch (error) {
+      console.error("Error generating user iCal token:", error);
+      res.status(500).json({ message: "Failed to generate calendar token" });
+    }
+  });
+
   // Register the conflict detector for scheduled tasks
   const { setConflictDetector } = await import('./scheduledTasks');
   setConflictDetector(detectAndCreateEventConflicts);

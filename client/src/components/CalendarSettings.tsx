@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, Edit2, Check, X, Eye, EyeOff } from "lucide-react";
+import { Plus, Trash2, Edit2, Check, X, Eye, EyeOff, Copy, RefreshCw } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -62,6 +62,59 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
   const [editColor, setEditColor] = useState("");
   const [newCalendarName, setNewCalendarName] = useState("");
   const [newCalendarColor, setNewCalendarColor] = useState(CALENDAR_COLORS[0]);
+  
+  // Fetch current user for personal feed URL
+  const { data: currentUser } = useQuery<any>({
+    queryKey: ['/api/user'],
+  });
+  
+  // Fetch organization for org feed URL
+  const { data: org } = useQuery<any>({
+    queryKey: [`/api/orgs/${orgId}`],
+    enabled: !!orgId,
+  });
+  
+  // Generate organization iCal token mutation
+  const generateOrgToken = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", `/api/orgs/${orgId}/ical-token/generate`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}`] });
+      toast({ title: "Organization calendar feed URL generated" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to generate feed URL", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+  
+  // Generate user iCal token mutation
+  const generateUserToken = useMutation({
+    mutationFn: async () => {
+      if (!currentUser?.id) throw new Error("User not authenticated");
+      return apiRequest("POST", `/api/users/${currentUser.id}/ical-token/generate`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      toast({ title: "Personal calendar feed URL generated" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to generate feed URL", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+  
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: `${label} copied to clipboard` });
+  };
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -198,11 +251,12 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
         </DialogHeader>
 
         <Tabs defaultValue="calendars" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="calendars" data-testid="tab-calendars">Calendars</TabsTrigger>
             <TabsTrigger value="filters" data-testid="tab-filters">Filters</TabsTrigger>
             <TabsTrigger value="display" data-testid="tab-display">Display</TabsTrigger>
             <TabsTrigger value="colors" data-testid="tab-colors">Colors</TabsTrigger>
+            <TabsTrigger value="sync" data-testid="tab-sync">Sync</TabsTrigger>
           </TabsList>
 
           {/* Calendar Management Tab */}
@@ -600,6 +654,134 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
                 >
                   Reset to Default Colors
                 </Button>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Calendar Sync Tab */}
+          <TabsContent value="sync" className="space-y-6 mt-4">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold">Sync with Google Calendar</h3>
+                <p className="text-sm text-muted-foreground">
+                  Subscribe to your Hubify calendar in Google Calendar or other calendar apps using iCal feeds.
+                  This is a one-way sync - events you create in Hubify will appear in Google Calendar.
+                </p>
+              </div>
+
+              {/* Organization Calendar Feed */}
+              <div className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold">Organization Calendar</h4>
+                  {currentUser?.role === 'admin' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => generateOrgToken.mutate()}
+                      disabled={generateOrgToken.isPending}
+                      data-testid="button-generate-org-token"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      {org?.iCalFeedToken ? 'Regenerate' : 'Generate'} URL
+                    </Button>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Includes all non-private organization calendars and events.
+                  {currentUser?.role !== 'admin' && ' Only admins can generate this feed.'}
+                </p>
+                {org?.iCalFeedToken && (
+                  <>
+                    <div className="flex gap-2">
+                      <Input
+                        value={`${window.location.origin}/ical/org/${orgId}/${org.iCalFeedToken}`}
+                        readOnly
+                        className="font-mono text-xs"
+                        data-testid="input-org-feed-url"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyToClipboard(`${window.location.origin}/ical/org/${orgId}/${org.iCalFeedToken}`, 'Organization feed URL')}
+                        data-testid="button-copy-org-url"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="text-xs text-muted-foreground bg-muted p-3 rounded">
+                      <p className="font-semibold mb-1">To add to Google Calendar:</p>
+                      <ol className="list-decimal list-inside space-y-1">
+                        <li>Copy the URL above</li>
+                        <li>Open Google Calendar in your browser</li>
+                        <li>Click the "+" next to "Other calendars"</li>
+                        <li>Select "From URL"</li>
+                        <li>Paste the URL and click "Add calendar"</li>
+                      </ol>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Personal Calendar Feed */}
+              <div className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold">Personal Calendar</h4>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => generateUserToken.mutate()}
+                    disabled={generateUserToken.isPending || !currentUser}
+                    data-testid="button-generate-user-token"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    {currentUser?.iCalFeedToken ? 'Regenerate' : 'Generate'} URL
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Includes all organization events plus your private calendar events.
+                </p>
+                {currentUser?.iCalFeedToken && (
+                  <>
+                    <div className="flex gap-2">
+                      <Input
+                        value={`${window.location.origin}/ical/user/${currentUser.id}/${currentUser.iCalFeedToken}`}
+                        readOnly
+                        className="font-mono text-xs"
+                        data-testid="input-user-feed-url"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyToClipboard(`${window.location.origin}/ical/user/${currentUser.id}/${currentUser.iCalFeedToken}`, 'Personal feed URL')}
+                        data-testid="button-copy-user-url"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="text-xs text-muted-foreground bg-muted p-3 rounded">
+                      <p className="font-semibold mb-1">To add to Google Calendar:</p>
+                      <ol className="list-decimal list-inside space-y-1">
+                        <li>Copy the URL above</li>
+                        <li>Open Google Calendar in your browser</li>
+                        <li>Click the "+" next to "Other calendars"</li>
+                        <li>Select "From URL"</li>
+                        <li>Paste the URL and click "Add calendar"</li>
+                      </ol>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Important Notes */}
+              <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-2">
+                <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">Important Notes:</p>
+                <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
+                  <li>This is a one-way sync from Hubify to Google Calendar</li>
+                  <li>Changes in Hubify will appear in Google Calendar automatically</li>
+                  <li>Changes made in Google Calendar will NOT sync back to Hubify</li>
+                  <li>Regenerating the URL will invalidate the previous feed link</li>
+                  <li>Keep your feed URL private - anyone with it can view your events</li>
+                </ul>
               </div>
             </div>
           </TabsContent>
