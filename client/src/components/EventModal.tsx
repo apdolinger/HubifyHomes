@@ -94,7 +94,7 @@ export function EventModal({
 
   // Fetch calendars for the dropdown
   const { data: calendars } = useQuery({
-    queryKey: ["/api/orgs", orgId, "calendars"],
+    queryKey: [`/api/orgs/${orgId}/calendars`],
     enabled: !!orgId && open,
   });
 
@@ -124,7 +124,7 @@ export function EventModal({
 
   // Fetch existing attendees when editing
   const { data: existingAttendees } = useQuery<EventAttendee[]>({
-    queryKey: ["/api/orgs", orgId, "events", event?.id, "attendees"],
+    queryKey: [`/api/orgs/${orgId}/events/${event?.id}/attendees`],
     enabled: open && !!event?.id,
   });
 
