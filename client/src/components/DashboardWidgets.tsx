@@ -24,6 +24,7 @@ interface CalendarWidgetProps {
 }
 
 export function CalendarWidget({ className }: CalendarWidgetProps) {
+  const [, setLocation] = useLocation();
   const { data: user } = useQuery({ queryKey: ["/api/auth/user"] });
   const orgId = (user as any)?.orgId;
 
@@ -122,7 +123,17 @@ export function CalendarWidget({ className }: CalendarWidgetProps) {
               const colors = getEventColors(event);
               const hasConflict = conflicts.has(event.id);
               return (
-                <div key={event.id} className={`flex items-center justify-between p-3 ${colors.bg} rounded-lg border-l-4 ${colors.border}`}>
+                <div 
+                  key={event.id} 
+                  className={`flex items-center justify-between p-3 ${colors.bg} rounded-lg border-l-4 ${colors.border} cursor-pointer hover:shadow-md transition-shadow`}
+                  onClick={() => {
+                    // Navigate to calendar with the event's date
+                    const eventDate = parseISO(event.start);
+                    const dateParam = format(eventDate, 'yyyy-MM-dd');
+                    setLocation(`/calendar?date=${dateParam}&eventId=${event.id}`);
+                  }}
+                  data-testid={`calendar-event-${event.id}`}
+                >
                   <div>
                     <p className={`font-medium ${colors.text}`}>{event.title}</p>
                     <p className={`text-sm ${colors.subtext}`}>
