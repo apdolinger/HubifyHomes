@@ -407,10 +407,14 @@ export function ConflictResolutionPanel({
                         variant="outline"
                         className="w-full justify-start text-left h-auto py-3"
                         onClick={() => {
-                          onEditEvent(event);
+                          // Close this dialog first
                           setSelectedConflict(null);
                           setActionType(null);
                           setNotes("");
+                          // Then open the event modal after dialog closes
+                          setTimeout(() => {
+                            onEditEvent(event);
+                          }, 150);
                         }}
                         data-testid={`button-edit-event-${eventId}`}
                       >

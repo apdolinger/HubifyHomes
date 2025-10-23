@@ -77,7 +77,14 @@ export async function setupAuth(app: Express) {
       id: claims["sub"], // Add user ID for session tracking
     };
     updateUserSession(user, tokens);
-    await upsertUser(claims);
+    
+    try {
+      await upsertUser(claims);
+    } catch (error) {
+      console.error('[OIDC] Error upserting user:', error);
+      // Continue anyway - user session will still work with just claims
+    }
+    
     verified(null, user);
   };
 

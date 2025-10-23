@@ -1,6 +1,6 @@
 import { Request } from "express";
 import { db } from "./db";
-import { securityAuditLogs, userMfaSettings, adminIpAllowlist, userSessions } from "@shared/schema";
+import { securityAuditLogs, userMfaSettings, adminIpAllowlist, userSessions, users } from "@shared/schema";
 import type { InsertSecurityAuditLog } from "@shared/schema";
 import { eq, and, gte } from "drizzle-orm";
 
@@ -183,7 +183,19 @@ export class IPAllowlist {
 export class SessionManager {
   static async trackSession(req: Request): Promise<void> {
     const user = req.user as any;
-    if (!user) return;
+    if (!user || !user.id) return;
+
+    // Verify user exists in database before creating session
+    const [dbUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, user.id))
+      .limit(1);
+    
+    if (!dbUser) {
+      console.log(`[trackSession] User ${user.id} not found in database, skipping session tracking`);
+      return;
+    }
 
     const ipAddress = req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress;
     const userAgent = req.headers['user-agent'];
@@ -203,15 +215,20 @@ export class SessionManager {
 
     if (existing.length === 0) {
       // Create new session record
-      await db.insert(userSessions).values({
-        userId: user.id,
-        sessionId,
-        ipAddress,
-        userAgent,
-        isActive: true,
-        lastActivityAt: new Date(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-      });
+      try {
+        await db.insert(userSessions).values({
+          userId: user.id,
+          sessionId,
+          ipAddress,
+          userAgent,
+          isActive: true,
+          lastActivityAt: new Date(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+        });
+      } catch (error) {
+        console.error('[trackSession] Error creating session:', error);
+        // Don't throw - session tracking shouldn't break the request
+      }
     } else {
       // Update last activity
       await db
