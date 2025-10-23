@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -114,6 +114,9 @@ export function EventModal({
   const [quickPropertyCity, setQuickPropertyCity] = useState('');
   const [quickPropertyState, setQuickPropertyState] = useState('');
   const [quickPropertyZip, setQuickPropertyZip] = useState('');
+  
+  // Task combobox state
+  const [taskOpen, setTaskOpen] = useState(false);
 
   // Fetch calendars for the dropdown
   const { data: calendars } = useQuery({
@@ -173,6 +176,20 @@ export function EventModal({
       recurrenceExDates: null,
     },
   });
+  
+  // Watch propertyId to filter tasks
+  const selectedPropertyId = form.watch('propertyId');
+  
+  // Filter tasks by selected property
+  const filteredTasks = useMemo(() => {
+    if (!tasks || !Array.isArray(tasks)) return [];
+    
+    // If no property selected, show all tasks
+    if (!selectedPropertyId) return tasks as any[];
+    
+    // Filter tasks by selected property
+    return (tasks as any[]).filter((task: any) => task.propertyId === selectedPropertyId);
+  }, [tasks, selectedPropertyId]);
 
   // Reset form when event changes
   useEffect(() => {
@@ -876,30 +893,93 @@ export function EventModal({
               <FormField
                 control={form.control}
                 name="taskId"
-                render={({ field }) => (
-                  <FormItem>
-                    <Select
-                      onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))}
-                      value={field.value?.toString() || "none"}
-                      disabled={isPending}
-                    >
-                      <FormControl>
-                        <SelectTrigger data-testid="select-task">
-                          <SelectValue placeholder="Link to task (optional)" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">No task</SelectItem>
-                        {tasks && Array.isArray(tasks) && (tasks as any[]).map((task: any) => (
-                          <SelectItem key={task.id} value={task.id.toString()}>
-                            {task.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const selectedTask = filteredTasks.find((t: any) => t.id === field.value);
+                  
+                  return (
+                    <FormItem className="flex flex-col">
+                      <Popover open={taskOpen} onOpenChange={setTaskOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={taskOpen}
+                              className={cn(
+                                "justify-between font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                              disabled={isPending}
+                              data-testid="select-task"
+                            >
+                              {selectedTask
+                                ? selectedTask.title
+                                : selectedPropertyId && filteredTasks.length === 0
+                                ? "No tasks for this property"
+                                : "Link to task (optional)"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search tasks..." />
+                            <CommandList>
+                              <CommandEmpty>
+                                {selectedPropertyId 
+                                  ? "No tasks found for this property." 
+                                  : "No tasks found."}
+                              </CommandEmpty>
+                              <CommandGroup>
+                                <CommandItem
+                                  value="none"
+                                  onSelect={() => {
+                                    field.onChange(undefined);
+                                    setTaskOpen(false);
+                                  }}
+                                  data-testid="select-task-none"
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      !field.value ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  No task
+                                </CommandItem>
+                                {filteredTasks.map((task: any) => (
+                                  <CommandItem
+                                    key={task.id}
+                                    value={task.title}
+                                    onSelect={() => {
+                                      field.onChange(task.id);
+                                      setTaskOpen(false);
+                                    }}
+                                    data-testid={`select-task-${task.id}`}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        field.value === task.id ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    {task.title}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      {selectedPropertyId && filteredTasks.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Showing tasks for selected property
+                        </p>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
 
               {/* Client Link */}
