@@ -5589,14 +5589,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/orgs/:orgId/conflicts/scan", isAuthenticated, async (req, res) => {
     try {
       const { orgId } = req.params;
-      const userId = req.user?.id;
       
-      if (!userId) {
-        return res.status(401).json({ message: "User not authenticated" });
+      // Get full user data from database
+      const userId = (req.user as any)?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
       }
       
-      // Verify user belongs to org or is admin
-      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+      // Only supervisors and admins can scan for conflicts
+      if (user.role !== 'supervisor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied. Only supervisors and admins can scan for conflicts." });
+      }
+      
+      // Verify user belongs to org
+      if (user.orgId !== orgId) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -5627,8 +5635,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { orgId } = req.params;
       const { status } = req.query;
       
-      // Verify user belongs to org or is admin
-      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+      // Get full user data from database
+      const userId = (req.user as any)?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      // Only supervisors and admins can view conflicts
+      if (user.role !== 'supervisor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied. Only supervisors and admins can view conflicts." });
+      }
+      
+      // Verify user belongs to org
+      if (user.orgId !== orgId) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -5644,8 +5665,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { orgId, id } = req.params;
       
-      // Verify user belongs to org or is admin
-      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+      // Get full user data from database
+      const userId = (req.user as any)?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      // Only supervisors and admins can view conflicts
+      if (user.role !== 'supervisor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied. Only supervisors and admins can view conflicts." });
+      }
+      
+      // Verify user belongs to org
+      if (user.orgId !== orgId) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -5664,14 +5698,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/orgs/:orgId/conflicts", isAuthenticated, async (req, res) => {
     try {
       const { orgId } = req.params;
-      const userId = req.user?.id;
       
-      if (!userId) {
-        return res.status(401).json({ message: "User not authenticated" });
+      // Get full user data from database
+      const userId = (req.user as any)?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
       }
       
-      // Verify user belongs to org or is admin
-      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+      // Only supervisors and admins can create conflicts
+      if (user.role !== 'supervisor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied. Only supervisors and admins can create conflicts." });
+      }
+      
+      // Verify user belongs to org
+      if (user.orgId !== orgId) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -5697,15 +5739,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { orgId, id } = req.params;
       const { notes } = req.body;
-      const supervisorId = req.user?.id;
       
-      if (!supervisorId) {
-        return res.status(401).json({ message: "User not authenticated" });
+      // Get full user data from database
+      const userId = (req.user as any)?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
       }
       
-      // Verify user has supervisor or admin role
-      if (req.user?.role !== "supervisor" && req.user?.role !== "admin") {
-        return res.status(403).json({ message: "Supervisor access required" });
+      // Only supervisors and admins can approve conflicts
+      if (user.role !== 'supervisor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied. Only supervisors and admins can approve conflicts." });
+      }
+      
+      // Verify user belongs to org
+      if (user.orgId !== orgId) {
+        return res.status(403).json({ message: "Access denied" });
       }
       
       const conflict = await storage.getConflictResolution(parseInt(id));
@@ -5713,7 +5763,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Conflict not found" });
       }
       
-      const updated = await storage.approveConflictResolution(parseInt(id), supervisorId, notes);
+      const updated = await storage.approveConflictResolution(parseInt(id), userId, notes);
       res.json(updated);
     } catch (error) {
       console.error("Error approving conflict:", error);
@@ -5725,15 +5775,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { orgId, id } = req.params;
       const { notes } = req.body;
-      const supervisorId = req.user?.id;
       
-      if (!supervisorId) {
-        return res.status(401).json({ message: "User not authenticated" });
+      // Get full user data from database
+      const userId = (req.user as any)?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
       }
       
-      // Verify user has supervisor or admin role
-      if (req.user?.role !== "supervisor" && req.user?.role !== "admin") {
-        return res.status(403).json({ message: "Supervisor access required" });
+      // Only supervisors and admins can reject conflicts
+      if (user.role !== 'supervisor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied. Only supervisors and admins can reject conflicts." });
+      }
+      
+      // Verify user belongs to org
+      if (user.orgId !== orgId) {
+        return res.status(403).json({ message: "Access denied" });
       }
       
       const conflict = await storage.getConflictResolution(parseInt(id));
@@ -5741,7 +5799,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Conflict not found" });
       }
       
-      const updated = await storage.rejectConflictResolution(parseInt(id), supervisorId, notes);
+      const updated = await storage.rejectConflictResolution(parseInt(id), userId, notes);
       res.json(updated);
     } catch (error) {
       console.error("Error rejecting conflict:", error);
@@ -5754,13 +5812,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { orgId, id } = req.params;
       const { notes } = req.body;
       
-      // Verify user has supervisor or admin role
-      if (req.user?.role !== "supervisor" && req.user?.role !== "admin") {
-        return res.status(403).json({ message: "Supervisor access required" });
+      // Get full user data from database
+      const userId = (req.user as any)?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
       }
       
-      // Verify user belongs to org or is admin
-      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+      // Only supervisors and admins can resolve conflicts
+      if (user.role !== 'supervisor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied. Only supervisors and admins can resolve conflicts." });
+      }
+      
+      // Verify user belongs to org
+      if (user.orgId !== orgId) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -5781,9 +5847,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { orgId, id } = req.params;
       
-      // Verify user has admin role
-      if (req.user?.role !== "admin") {
-        return res.status(403).json({ message: "Admin access required" });
+      // Get full user data from database
+      const userId = (req.user as any)?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      // Only supervisors and admins can delete conflicts
+      if (user.role !== 'supervisor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied. Only supervisors and admins can delete conflicts." });
+      }
+      
+      // Verify user belongs to org
+      if (user.orgId !== orgId) {
+        return res.status(403).json({ message: "Access denied" });
       }
       
       const conflict = await storage.getConflictResolution(parseInt(id));
