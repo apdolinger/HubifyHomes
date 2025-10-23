@@ -486,6 +486,34 @@ export function EventModal({
     },
   });
 
+  const deleteEventMutation = useMutation({
+    mutationFn: async () => {
+      if (!event?.id) throw new Error("No event to delete");
+      await apiRequest("DELETE", `/api/orgs/${orgId}/events/${event.id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}/events`] });
+      toast({
+        title: "Event deleted",
+        description: "The event has been deleted successfully.",
+      });
+      onClose();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete event",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDelete = () => {
+    if (confirm("Are you sure you want to delete this event? This action cannot be undone.")) {
+      deleteEventMutation.mutate();
+    }
+  };
+
   const quickAddPropertyMutation = useMutation({
     mutationFn: async (propertyData: {
       name: string;
@@ -1492,6 +1520,21 @@ export function EventModal({
                   Preview Email
                 </Button>
               )}
+              
+              {/* Delete button (only for existing events) */}
+              {isEditing && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleDelete}
+                  disabled={isPending || deleteEventMutation.isPending}
+                  data-testid="button-delete-event"
+                  className="mr-auto"
+                >
+                  {deleteEventMutation.isPending ? "Deleting..." : "Delete Event"}
+                </Button>
+              )}
+              
               <div className="flex gap-3 ml-auto">
                 <Button
                   type="button"
