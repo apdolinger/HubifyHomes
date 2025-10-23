@@ -346,14 +346,23 @@ export function EventModal({
       }
 
       const payload = {
-        ...data,
-        start: startDate.toISOString(),
-        end: endDate.toISOString(),
+        orgId: data.orgId,
+        calendarId: data.calendarId,
+        title: data.title,
         description: data.description?.trim() || null,
         location: data.location?.trim() || null,
+        allDay: data.allDay,
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+        timezone: data.timezone,
+        visibility: data.visibility,
+        organizerId: data.organizerId,
+        createdById: data.createdById,
         propertyId: data.propertyId || null,
         taskId: data.taskId || null,
         clientId: data.clientId || null,
+        recurrenceRule: data.recurrenceRule || null,
+        recurrenceExDates: data.recurrenceExDates || null,
       };
       const response = await apiRequest("PATCH", `/api/orgs/${orgId}/events/${event?.id}`, payload);
       const updatedEvent = await response.json();
