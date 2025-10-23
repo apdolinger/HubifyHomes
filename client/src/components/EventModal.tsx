@@ -4,7 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Calendar, Clock, MapPin, AlignLeft, Users, Link as LinkIcon, X, Mail, UserPlus, ChevronsUpDown, Check } from "lucide-react";
+import { Link } from "wouter";
+import { Calendar, Clock, MapPin, AlignLeft, Users, Link as LinkIcon, X, Mail, UserPlus, ChevronsUpDown, Check, ExternalLink } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -1025,6 +1026,14 @@ export function EventModal({
                           </Command>
                         </PopoverContent>
                       </Popover>
+                      {selectedProperty && (
+                        <Link href={`/properties/${selectedProperty.id}`}>
+                          <div className="text-sm text-primary hover:underline flex items-center gap-1 cursor-pointer mt-1">
+                            <ExternalLink className="h-3 w-3" />
+                            View property profile
+                          </div>
+                        </Link>
+                      )}
                       <FormMessage />
                     </FormItem>
                   );
@@ -1188,6 +1197,14 @@ export function EventModal({
                           Showing tasks for selected property
                         </p>
                       )}
+                      {selectedTask && (
+                        <Link href={`/tasks/${selectedTask.id}`}>
+                          <div className="text-sm text-primary hover:underline flex items-center gap-1 cursor-pointer mt-1">
+                            <ExternalLink className="h-3 w-3" />
+                            View task profile
+                          </div>
+                        </Link>
+                      )}
                       <FormMessage />
                     </FormItem>
                   );
@@ -1272,6 +1289,14 @@ export function EventModal({
                           </Command>
                         </PopoverContent>
                       </Popover>
+                      {selectedClient && (
+                        <Link href={`/people/${selectedClient.id}`}>
+                          <div className="text-sm text-primary hover:underline flex items-center gap-1 cursor-pointer mt-1">
+                            <ExternalLink className="h-3 w-3" />
+                            View client profile
+                          </div>
+                        </Link>
+                      )}
                       <FormMessage />
                     </FormItem>
                   );
