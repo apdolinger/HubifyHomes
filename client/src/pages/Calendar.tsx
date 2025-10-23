@@ -4,7 +4,7 @@ import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
-import { Calendar, Plus, ChevronLeft, ChevronRight, Settings, Eye, EyeOff } from "lucide-react";
+import { Calendar, Plus, ChevronLeft, ChevronRight, Settings, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -451,12 +451,38 @@ export default function CalendarPage() {
       </div>
 
       {/* Conflict Resolution Panel */}
-      {orgId && userId && (
-        <ConflictResolutionPanel
-          orgId={orgId}
-          userId={userId}
-          userRole={(user as any)?.role || 'staff'}
-        />
+      {orgId && userId && (user as any)?.role === 'supervisor' && (
+        <div className="space-y-4">
+          <ConflictResolutionPanel
+            orgId={orgId}
+            userId={userId}
+            userRole={(user as any)?.role || 'staff'}
+          />
+          <Button
+            variant="outline"
+            onClick={async () => {
+              try {
+                const response = await fetch(`/api/orgs/${orgId}/conflicts/scan`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                });
+                if (!response.ok) {
+                  throw new Error('Scan failed');
+                }
+                const data = await response.json();
+                alert(`Scan complete! Checked ${data.eventsScanned} events for conflicts. Refresh the page to see any conflicts detected.`);
+                window.location.reload();
+              } catch (error) {
+                alert('Failed to scan for conflicts');
+              }
+            }}
+            data-testid="button-scan-conflicts"
+            className="w-full"
+          >
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            Scan All Events for Conflicts
+          </Button>
+        </div>
       )}
 
       <div className="grid grid-cols-12 gap-6">

@@ -5114,6 +5114,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Event routes
+  // Helper function to detect and create conflict resolutions for overlapping events
+  async function detectAndCreateEventConflicts(newEvent: any, orgId: string, requestedById: string) {
+    try {
+      // Get all events in the org
+      const allEvents = await storage.getEvents(orgId);
+      
+      const newStart = new Date(newEvent.start).getTime();
+      const newEnd = new Date(newEvent.end).getTime();
+      
+      const conflictingEvents: string[] = [];
+      const conflictingUserIds: Set<string> = new Set();
+      let conflictingPropertyId: number | null = null;
+      let conflictType: 'staff' | 'property' | 'resource' = 'resource';
+      
+      // Check for overlapping events
+      for (const event of allEvents) {
+        // Skip the same event
+        if (event.id === newEvent.id) continue;
+        
+        const eventStart = new Date(event.start).getTime();
+        const eventEnd = new Date(event.end).getTime();
+        
+        // Check if events overlap
+        const overlaps = (newStart < eventEnd && newEnd > eventStart);
+        
+        if (overlaps) {
+          // Check for property conflicts
+          if (event.propertyId && newEvent.propertyId && event.propertyId === newEvent.propertyId) {
+            conflictingEvents.push(event.id);
+            conflictingPropertyId = event.propertyId;
+            conflictType = 'property';
+          }
+          
+          // Check for staff conflicts (overlapping attendees)
+          const eventAttendees = await storage.getEventAttendees(event.id);
+          const newEventAttendees = await storage.getEventAttendees(newEvent.id);
+          
+          for (const eventAttendee of eventAttendees) {
+            for (const newAttendee of newEventAttendees) {
+              if (eventAttendee.userId && newAttendee.userId && eventAttendee.userId === newAttendee.userId) {
+                conflictingEvents.push(event.id);
+                conflictingUserIds.add(eventAttendee.userId);
+                if (conflictType !== 'property') {
+                  conflictType = 'staff';
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      // If conflicts found, create a conflict resolution record
+      if (conflictingEvents.length > 0) {
+        // Add the new event to the list of conflicting events
+        const allConflictingEventIds = [...new Set([newEvent.id, ...conflictingEvents])];
+        
+        const conflictData = {
+          orgId,
+          conflictType,
+          eventIds: allConflictingEventIds,
+          userIds: Array.from(conflictingUserIds),
+          propertyId: conflictingPropertyId,
+          status: 'pending' as const,
+          requestedById,
+          resolutionNotes: `Automatically detected: ${conflictType} conflict with ${conflictingEvents.length} event(s)`
+        };
+        
+        await storage.createConflictResolution(conflictData);
+        console.log(`Created conflict resolution for event ${newEvent.id} - ${conflictType} conflict detected`);
+      }
+    } catch (error) {
+      console.error('Error detecting event conflicts:', error);
+      // Don't fail the event creation/update if conflict detection fails
+    }
+  }
+
   app.get("/api/orgs/:orgId/events", isAuthenticated, async (req, res) => {
     try {
       const { orgId } = req.params;
@@ -5249,6 +5325,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Detect and create conflict resolutions for overlapping events
+      await detectAndCreateEventConflicts(event, orgId, userId);
+      
       res.status(201).json(event);
     } catch (error) {
       console.error("Error creating event:", error);
@@ -5258,8 +5337,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/orgs/:orgId/events/:eventId", isAuthenticated, async (req, res) => {
     try {
-      const { eventId } = req.params;
+      const { orgId, eventId } = req.params;
       const { attendees, reminders, ...eventData } = req.body;
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
       
       const event = await storage.updateEvent(eventId, eventData);
       
@@ -5290,6 +5374,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
+      
+      // Detect and create conflict resolutions for overlapping events
+      await detectAndCreateEventConflicts(event, orgId, userId);
       
       res.json(event);
     } catch (error) {
@@ -5388,6 +5475,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error removing attendee:", error);
       res.status(500).json({ message: "Failed to remove attendee" });
+    }
+  });
+
+  // Scan all existing events for conflicts
+  app.post("/api/orgs/:orgId/conflicts/scan", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+      
+      // Verify user belongs to org or is admin
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      // Get all events
+      const allEvents = await storage.getEvents(orgId);
+      let conflictsCreated = 0;
+      
+      // Scan each event for conflicts
+      for (const event of allEvents) {
+        await detectAndCreateEventConflicts(event, orgId, userId);
+        conflictsCreated++;
+      }
+      
+      res.json({ 
+        message: "Conflict scan complete", 
+        eventsScanned: allEvents.length,
+        note: "Conflict resolution records created for any overlapping events found"
+      });
+    } catch (error) {
+      console.error("Error scanning for conflicts:", error);
+      res.status(500).json({ message: "Failed to scan for conflicts" });
     }
   });
 
