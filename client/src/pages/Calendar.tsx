@@ -64,27 +64,40 @@ export default function CalendarPage() {
 
   // Auto-open event from URL parameter (when clicked from dashboard widget)
   useEffect(() => {
-    if (!events || !Array.isArray(events)) return;
+    if (!events || !Array.isArray(events) || events.length === 0) return;
     
     const urlParams = new URLSearchParams(window.location.search);
     const eventId = urlParams.get('eventId');
     
     if (eventId) {
+      console.log('Opening event from URL:', eventId);
+      
       // Find the event by ID
       const event = events.find((e: any) => e.id === parseInt(eventId));
+      console.log('Found event:', event);
+      
       if (event) {
-        setSelectedEvent(event);
-        setEventModalOpen(true);
-        
-        // Navigate to the event's date
-        if (calendarRef.current) {
-          const calendarApi = calendarRef.current.getApi();
-          calendarApi.gotoDate(event.start);
-        }
-        
-        // Clean up URL parameter after opening
-        const newUrl = window.location.pathname;
-        window.history.replaceState({}, '', newUrl);
+        // Use setTimeout to ensure the calendar is fully mounted
+        setTimeout(() => {
+          setSelectedEvent(event);
+          setEventModalOpen(true);
+          
+          // Navigate to the event's date
+          if (calendarRef.current) {
+            try {
+              const calendarApi = calendarRef.current.getApi();
+              calendarApi.gotoDate(event.start);
+            } catch (err) {
+              console.error('Error navigating calendar to date:', err);
+            }
+          }
+          
+          // Clean up URL parameter after opening
+          const newUrl = window.location.pathname;
+          window.history.replaceState({}, '', newUrl);
+        }, 100);
+      } else {
+        console.warn('Event not found with ID:', eventId);
       }
     }
   }, [events]);
