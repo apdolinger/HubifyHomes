@@ -5,7 +5,7 @@ import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Link } from "wouter";
-import { Calendar, Clock, MapPin, AlignLeft, Users, Link as LinkIcon, X, Mail, UserPlus, ChevronsUpDown, Check, ExternalLink } from "lucide-react";
+import { Calendar, Clock, MapPin, AlignLeft, Users, Link as LinkIcon, X, Mail, UserPlus, ChevronsUpDown, Check, ExternalLink, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -1180,6 +1180,17 @@ export function EventModal({
                                     )}
                                   />
                                   No task
+                                </CommandItem>
+                                <CommandItem
+                                  value="create-new-task"
+                                  onSelect={() => {
+                                    setShowQuickAddTask(true);
+                                  }}
+                                  data-testid="select-task-create-new"
+                                  className="text-primary"
+                                >
+                                  <Plus className="mr-2 h-4 w-4" />
+                                  Create a new task
                                 </CommandItem>
                                 {filteredTasks.map((task: any) => (
                                   <CommandItem
