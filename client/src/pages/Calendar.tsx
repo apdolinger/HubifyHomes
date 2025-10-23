@@ -5,6 +5,7 @@ import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
+import rrulePlugin from "@fullcalendar/rrule";
 import { Calendar, Plus, ChevronLeft, ChevronRight, Settings, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -303,7 +304,7 @@ export default function CalendarPage() {
       startDate = event.start.split('T')[0];
     }
     
-    return {
+    const calendarEvent: any = {
       id: event.id,
       title: hasConflict ? `⚠️ ${event.title}` : event.title,
       start: startDate,
@@ -326,6 +327,22 @@ export default function CalendarPage() {
         attendees: event.attendees,
       },
     };
+    
+    // Add recurrence rule if it exists
+    if (event.recurrenceRule) {
+      calendarEvent.rrule = event.recurrenceRule;
+      // For recurring events, we need to provide duration instead of end
+      if (event.start && event.end) {
+        const start = new Date(event.start);
+        const end = new Date(event.end);
+        const duration = end.getTime() - start.getTime();
+        calendarEvent.duration = duration;
+        // Remove end property for recurring events
+        delete calendarEvent.end;
+      }
+    }
+    
+    return calendarEvent;
   });
 
   const handleDateClick = (arg: any) => {
@@ -528,7 +545,7 @@ export default function CalendarPage() {
         <Card className="col-span-9 p-4">
           <FullCalendar
             ref={calendarRef}
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, rrulePlugin]}
             initialView={settings.defaultView}
             headerToolbar={{
               left: "",

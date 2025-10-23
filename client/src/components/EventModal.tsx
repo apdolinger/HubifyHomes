@@ -5,7 +5,8 @@ import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Link } from "wouter";
-import { Calendar, Clock, MapPin, AlignLeft, Users, Link as LinkIcon, X, Mail, UserPlus, ChevronsUpDown, Check, ExternalLink, Plus } from "lucide-react";
+import { Calendar, Clock, MapPin, AlignLeft, Users, Link as LinkIcon, X, Mail, UserPlus, ChevronsUpDown, Check, ExternalLink, Plus, Repeat } from "lucide-react";
+import { RRule, Frequency } from "rrule";
 import {
   Dialog,
   DialogContent,
@@ -136,6 +137,18 @@ export function EventModal({
   const [showPreview, setShowPreview] = useState(false);
   const [previewHtml, setPreviewHtml] = useState<string>("");
   
+  // Recurrence state
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceFreq, setRecurrenceFreq] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('weekly');
+  const [recurrenceInterval, setRecurrenceInterval] = useState(1);
+  const [recurrenceByWeekday, setRecurrenceByWeekday] = useState<number[]>([]);
+  const [recurrenceByMonthday, setRecurrenceByMonthday] = useState<number[]>([]);
+  const [recurrenceBySetPos, setRecurrenceBySetPos] = useState<number | null>(null);
+  const [recurrenceByMonth, setRecurrenceByMonth] = useState<number[]>([]);
+  const [recurrenceEndType, setRecurrenceEndType] = useState<'never' | 'after' | 'on'>('never');
+  const [recurrenceCount, setRecurrenceCount] = useState(10);
+  const [recurrenceUntil, setRecurrenceUntil] = useState('');
+  
   // Ref for property combobox scrolling
   const propertyListRef = useRef<HTMLDivElement>(null);
 
@@ -212,6 +225,86 @@ export function EventModal({
     return (tasks as any[]).filter((task: any) => task.propertyId === selectedPropertyId);
   }, [tasks, selectedPropertyId]);
 
+  // Parse RRULE string and populate recurrence state
+  const parseRRule = (rruleString: string) => {
+    try {
+      const rule = RRule.fromString(`RRULE:${rruleString}`);
+      const options = rule.options;
+      
+      setIsRecurring(true);
+      
+      // Set frequency
+      if (options.freq === Frequency.DAILY) setRecurrenceFreq('daily');
+      else if (options.freq === Frequency.WEEKLY) setRecurrenceFreq('weekly');
+      else if (options.freq === Frequency.MONTHLY) setRecurrenceFreq('monthly');
+      else if (options.freq === Frequency.YEARLY) setRecurrenceFreq('yearly');
+      
+      // Set interval
+      setRecurrenceInterval(options.interval || 1);
+      
+      // Set weekdays (handle both single and array values)
+      // Also extract position from Weekday objects with 'n' property
+      let extractedSetPos: number | null = null;
+      
+      if (options.byweekday) {
+        const weekdayArray = Array.isArray(options.byweekday) ? options.byweekday : [options.byweekday];
+        const weekdays = weekdayArray.map((wd: any) => {
+          if (typeof wd === 'number') return wd;
+          // Handle Weekday objects from RRule
+          if (typeof wd === 'object' && 'weekday' in wd) {
+            // Extract position if present (e.g., "first Monday" = {weekday: 0, n: 1})
+            if ('n' in wd && wd.n !== undefined && wd.n !== null) {
+              extractedSetPos = wd.n;
+            }
+            return wd.weekday;
+          }
+          return wd;
+        });
+        setRecurrenceByWeekday(weekdays);
+      } else {
+        setRecurrenceByWeekday([]);
+      }
+      
+      // Set month days
+      if (options.bymonthday) {
+        setRecurrenceByMonthday(Array.isArray(options.bymonthday) ? options.bymonthday : [options.bymonthday]);
+      } else {
+        setRecurrenceByMonthday([]);
+      }
+      
+      // Set position (first, second, last, etc.)
+      // Prefer extracted position from Weekday.n over explicit BYSETPOS
+      if (extractedSetPos !== null) {
+        setRecurrenceBySetPos(extractedSetPos);
+      } else if (options.bysetpos) {
+        const pos = Array.isArray(options.bysetpos) ? options.bysetpos[0] : options.bysetpos;
+        setRecurrenceBySetPos(pos);
+      } else {
+        setRecurrenceBySetPos(null);
+      }
+      
+      // Set months
+      if (options.bymonth) {
+        setRecurrenceByMonth(Array.isArray(options.bymonth) ? options.bymonth : [options.bymonth]);
+      } else {
+        setRecurrenceByMonth([]);
+      }
+      
+      // Set end type
+      if (options.count) {
+        setRecurrenceEndType('after');
+        setRecurrenceCount(options.count);
+      } else if (options.until) {
+        setRecurrenceEndType('on');
+        setRecurrenceUntil(format(new Date(options.until), 'yyyy-MM-dd'));
+      } else {
+        setRecurrenceEndType('never');
+      }
+    } catch (error) {
+      console.error('Failed to parse RRULE:', error);
+    }
+  };
+
   // Reset form when event changes
   useEffect(() => {
     if (event) {
@@ -237,6 +330,13 @@ export function EventModal({
         recurrenceRule: event.recurrenceRule || null,
         recurrenceExDates: event.recurrenceExDates || null,
       });
+      
+      // Parse and populate recurrence state if exists
+      if (event.recurrenceRule) {
+        parseRRule(event.recurrenceRule);
+      } else {
+        setIsRecurring(false);
+      }
     } else {
       form.reset({
         orgId,
@@ -257,6 +357,18 @@ export function EventModal({
         recurrenceRule: null,
         recurrenceExDates: null,
       });
+      
+      // Reset recurrence state
+      setIsRecurring(false);
+      setRecurrenceFreq('weekly');
+      setRecurrenceInterval(1);
+      setRecurrenceByWeekday([]);
+      setRecurrenceByMonthday([]);
+      setRecurrenceBySetPos(null);
+      setRecurrenceByMonth([]);
+      setRecurrenceEndType('never');
+      setRecurrenceCount(10);
+      setRecurrenceUntil('');
     }
 
     // Load existing attendees when editing
@@ -689,11 +801,62 @@ export function EventModal({
     });
   };
 
+  const generateRRule = () => {
+    if (!isRecurring) return null;
+    
+    const startDate = new Date(form.getValues('start'));
+    
+    const options: any = {
+      freq: recurrenceFreq === 'daily' ? Frequency.DAILY :
+            recurrenceFreq === 'weekly' ? Frequency.WEEKLY :
+            recurrenceFreq === 'monthly' ? Frequency.MONTHLY :
+            Frequency.YEARLY,
+      interval: recurrenceInterval,
+      dtstart: startDate,
+    };
+    
+    if (recurrenceByWeekday.length > 0) {
+      options.byweekday = recurrenceByWeekday.map(day => day === 0 ? RRule.SU : 
+                                                         day === 1 ? RRule.MO :
+                                                         day === 2 ? RRule.TU :
+                                                         day === 3 ? RRule.WE :
+                                                         day === 4 ? RRule.TH :
+                                                         day === 5 ? RRule.FR : RRule.SA);
+    }
+    
+    if (recurrenceByMonthday.length > 0) {
+      options.bymonthday = recurrenceByMonthday;
+    }
+    
+    if (recurrenceBySetPos !== null && recurrenceByWeekday.length > 0) {
+      options.bysetpos = recurrenceBySetPos;
+    }
+    
+    if (recurrenceByMonth.length > 0) {
+      options.bymonth = recurrenceByMonth;
+    }
+    
+    if (recurrenceEndType === 'after') {
+      options.count = recurrenceCount;
+    } else if (recurrenceEndType === 'on' && recurrenceUntil) {
+      options.until = new Date(recurrenceUntil);
+    }
+    
+    const rule = new RRule(options);
+    return rule.toString().replace('RRULE:', '');
+  };
+
   const onSubmit = (data: FormData) => {
+    const rruleString = generateRRule();
+    const submissionData = {
+      ...data,
+      recurrenceRule: rruleString,
+    };
+    
     if (isEditing) {
-      updateEventMutation.mutate(data);
+      updateEventMutation.mutate(submissionData);
     } else {
-      createEventMutation.mutate(data);
+      createEventMutation.mutate(submissionData);
     }
   };
 
@@ -838,6 +1001,258 @@ export function EventModal({
                 </FormItem>
               )}
             />
+
+            {/* Recurring Toggle */}
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="space-y-0.5">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Repeat className="h-4 w-4" />
+                  Recurring Event
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Event repeats on a schedule
+                </p>
+              </div>
+              <Switch
+                checked={isRecurring}
+                onCheckedChange={setIsRecurring}
+                data-testid="switch-recurring"
+              />
+            </div>
+
+            {/* Recurrence Options */}
+            {isRecurring && (
+              <div className="space-y-4 rounded-lg border p-4 bg-muted/50">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Frequency</label>
+                    <Select value={recurrenceFreq} onValueChange={(value: any) => setRecurrenceFreq(value)}>
+                      <SelectTrigger data-testid="select-recurrence-frequency">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="yearly">Yearly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Repeat Every</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={recurrenceInterval}
+                      onChange={(e) => setRecurrenceInterval(parseInt(e.target.value) || 1)}
+                      data-testid="input-recurrence-interval"
+                    />
+                  </div>
+                </div>
+
+                {/* Weekly: Day Selection */}
+                {recurrenceFreq === 'weekly' && (
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Repeat On</label>
+                    <div className="flex gap-2 flex-wrap">
+                      {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
+                        <Button
+                          key={index}
+                          type="button"
+                          variant={recurrenceByWeekday.includes(index) ? "default" : "outline"}
+                          size="sm"
+                          className="w-10 h-10 p-0"
+                          onClick={() => {
+                            setRecurrenceByWeekday(prev =>
+                              prev.includes(index)
+                                ? prev.filter(d => d !== index)
+                                : [...prev, index]
+                            );
+                          }}
+                          data-testid={`button-weekday-${index}`}
+                        >
+                          {day}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Monthly: Week and Day Selection */}
+                {recurrenceFreq === 'monthly' && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Repeat By</label>
+                      <Select
+                        value={recurrenceBySetPos !== null ? 'position' : 'day'}
+                        onValueChange={(value) => {
+                          if (value === 'day') {
+                            setRecurrenceBySetPos(null);
+                            setRecurrenceByWeekday([]);
+                          } else {
+                            setRecurrenceByMonthday([]);
+                          }
+                        }}
+                      >
+                        <SelectTrigger data-testid="select-monthly-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="day">Day of Month</SelectItem>
+                          <SelectItem value="position">Week of Month</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {recurrenceBySetPos === null ? (
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">Day of Month</label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={31}
+                          placeholder="e.g., 15"
+                          value={recurrenceByMonthday[0] || ''}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value);
+                            setRecurrenceByMonthday(val ? [val] : []);
+                          }}
+                          data-testid="input-monthday"
+                        />
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Week</label>
+                          <Select
+                            value={recurrenceBySetPos?.toString()}
+                            onValueChange={(value) => setRecurrenceBySetPos(parseInt(value))}
+                          >
+                            <SelectTrigger data-testid="select-week-position">
+                              <SelectValue placeholder="Select week" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">First</SelectItem>
+                              <SelectItem value="2">Second</SelectItem>
+                              <SelectItem value="3">Third</SelectItem>
+                              <SelectItem value="4">Fourth</SelectItem>
+                              <SelectItem value="-1">Last</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Day</label>
+                          <Select
+                            value={recurrenceByWeekday[0]?.toString()}
+                            onValueChange={(value) => setRecurrenceByWeekday([parseInt(value)])}
+                          >
+                            <SelectTrigger data-testid="select-weekday">
+                              <SelectValue placeholder="Select day" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="0">Sunday</SelectItem>
+                              <SelectItem value="1">Monday</SelectItem>
+                              <SelectItem value="2">Tuesday</SelectItem>
+                              <SelectItem value="3">Wednesday</SelectItem>
+                              <SelectItem value="4">Thursday</SelectItem>
+                              <SelectItem value="5">Friday</SelectItem>
+                              <SelectItem value="6">Saturday</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Yearly: Month and Day Selection */}
+                {recurrenceFreq === 'yearly' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Month</label>
+                      <Select
+                        value={recurrenceByMonth[0]?.toString()}
+                        onValueChange={(value) => setRecurrenceByMonth([parseInt(value)])}
+                      >
+                        <SelectTrigger data-testid="select-month">
+                          <SelectValue placeholder="Select month" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">January</SelectItem>
+                          <SelectItem value="2">February</SelectItem>
+                          <SelectItem value="3">March</SelectItem>
+                          <SelectItem value="4">April</SelectItem>
+                          <SelectItem value="5">May</SelectItem>
+                          <SelectItem value="6">June</SelectItem>
+                          <SelectItem value="7">July</SelectItem>
+                          <SelectItem value="8">August</SelectItem>
+                          <SelectItem value="9">September</SelectItem>
+                          <SelectItem value="10">October</SelectItem>
+                          <SelectItem value="11">November</SelectItem>
+                          <SelectItem value="12">December</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Day</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={31}
+                        placeholder="e.g., 15"
+                        value={recurrenceByMonthday[0] || ''}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value);
+                          setRecurrenceByMonthday(val ? [val] : []);
+                        }}
+                        data-testid="input-yearly-day"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* End Type */}
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Ends</label>
+                  <Select value={recurrenceEndType} onValueChange={(value: any) => setRecurrenceEndType(value)}>
+                    <SelectTrigger data-testid="select-end-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="never">Never</SelectItem>
+                      <SelectItem value="after">After</SelectItem>
+                      <SelectItem value="on">On Date</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {recurrenceEndType === 'after' && (
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Number of Occurrences</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={recurrenceCount}
+                      onChange={(e) => setRecurrenceCount(parseInt(e.target.value) || 1)}
+                      data-testid="input-occurrence-count"
+                    />
+                  </div>
+                )}
+
+                {recurrenceEndType === 'on' && (
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">End Date</label>
+                    <Input
+                      type="date"
+                      value={recurrenceUntil}
+                      onChange={(e) => setRecurrenceUntil(e.target.value)}
+                      data-testid="input-until-date"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Location */}
             <FormField
