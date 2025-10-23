@@ -450,41 +450,6 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* Conflict Resolution Panel */}
-      {orgId && userId && (user as any)?.role === 'supervisor' && (
-        <div className="space-y-4">
-          <ConflictResolutionPanel
-            orgId={orgId}
-            userId={userId}
-            userRole={(user as any)?.role || 'staff'}
-          />
-          <Button
-            variant="outline"
-            onClick={async () => {
-              try {
-                const response = await fetch(`/api/orgs/${orgId}/conflicts/scan`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                });
-                if (!response.ok) {
-                  throw new Error('Scan failed');
-                }
-                const data = await response.json();
-                alert(`Scan complete! Checked ${data.eventsScanned} events for conflicts. Refresh the page to see any conflicts detected.`);
-                window.location.reload();
-              } catch (error) {
-                alert('Failed to scan for conflicts');
-              }
-            }}
-            data-testid="button-scan-conflicts"
-            className="w-full"
-          >
-            <AlertTriangle className="h-4 w-4 mr-2" />
-            Scan All Events for Conflicts
-          </Button>
-        </div>
-      )}
-
       <div className="grid grid-cols-12 gap-6">
         {/* Sidebar with calendars list */}
         <Card className="col-span-3 p-4">
@@ -561,6 +526,41 @@ export default function CalendarPage() {
           />
         </Card>
       </div>
+
+      {/* Conflict Resolution Panel - Below Calendar */}
+      {orgId && userId && ((user as any)?.role === 'supervisor' || (user as any)?.role === 'admin') && (
+        <div className="mt-6 space-y-4">
+          <ConflictResolutionPanel
+            orgId={orgId}
+            userId={userId}
+            userRole={(user as any)?.role || 'staff'}
+          />
+          <Button
+            variant="outline"
+            onClick={async () => {
+              try {
+                const response = await fetch(`/api/orgs/${orgId}/conflicts/scan`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                });
+                if (!response.ok) {
+                  throw new Error('Scan failed');
+                }
+                const data = await response.json();
+                alert(`Scan complete! Checked ${data.eventsScanned} events for conflicts. Refresh the page to see any conflicts detected.`);
+                window.location.reload();
+              } catch (error) {
+                alert('Failed to scan for conflicts');
+              }
+            }}
+            data-testid="button-scan-conflicts"
+            className="w-full max-w-xs"
+          >
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            Scan All Events for Conflicts
+          </Button>
+        </div>
+      )}
 
       {/* Event Modal */}
       {orgId && userId && (
