@@ -108,6 +108,12 @@ export function EventModal({
   
   // Property combobox state
   const [propertyOpen, setPropertyOpen] = useState(false);
+  const [showQuickAddProperty, setShowQuickAddProperty] = useState(false);
+  const [quickPropertyName, setQuickPropertyName] = useState('');
+  const [quickPropertyAddress, setQuickPropertyAddress] = useState('');
+  const [quickPropertyCity, setQuickPropertyCity] = useState('');
+  const [quickPropertyState, setQuickPropertyState] = useState('');
+  const [quickPropertyZip, setQuickPropertyZip] = useState('');
 
   // Fetch calendars for the dropdown
   const { data: calendars } = useQuery({
@@ -402,6 +408,85 @@ export function EventModal({
     },
   });
 
+  const quickAddPropertyMutation = useMutation({
+    mutationFn: async (propertyData: {
+      name: string;
+      address1: string;
+      city: string;
+      state: string;
+      zip: string;
+    }) => {
+      const response = await apiRequest("POST", "/api/properties", {
+        ...propertyData,
+        type: "single-family",
+        status: "occupied",
+        units: 1,
+      });
+      return response.json();
+    },
+    onSuccess: (newProperty) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
+      toast({
+        title: "Property added",
+        description: `"${newProperty.name}" has been added successfully.`,
+      });
+      // Auto-select the new property
+      form.setValue('propertyId', newProperty.id);
+      // Reset quick add form
+      setQuickPropertyName('');
+      setQuickPropertyAddress('');
+      setQuickPropertyCity('');
+      setQuickPropertyState('');
+      setQuickPropertyZip('');
+      setShowQuickAddProperty(false);
+      setPropertyOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add property",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleQuickAddProperty = () => {
+    if (!quickPropertyName || !quickPropertyAddress || !quickPropertyCity || !quickPropertyState || !quickPropertyZip) {
+      toast({
+        title: "Missing fields",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (quickPropertyState.length !== 2) {
+      toast({
+        title: "Invalid state",
+        description: "State must be 2 characters (e.g., CA, NY)",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (quickPropertyZip.length < 5) {
+      toast({
+        title: "Invalid ZIP",
+        description: "ZIP code must be at least 5 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    quickAddPropertyMutation.mutate({
+      name: quickPropertyName,
+      address1: quickPropertyAddress,
+      city: quickPropertyCity,
+      state: quickPropertyState.toUpperCase(),
+      zip: quickPropertyZip,
+    });
+  };
+
   const onSubmit = (data: FormData) => {
     if (isEditing) {
       updateEventMutation.mutate(data);
@@ -410,7 +495,7 @@ export function EventModal({
     }
   };
 
-  const isPending = createEventMutation.isPending || updateEventMutation.isPending;
+  const isPending = createEventMutation.isPending || updateEventMutation.isPending || quickAddPropertyMutation.isPending;
 
   const handleClose = () => {
     setAttendees([]);
@@ -668,7 +753,78 @@ export function EventModal({
                           <Command>
                             <CommandInput placeholder="Search properties..." />
                             <CommandList>
-                              <CommandEmpty>No property found.</CommandEmpty>
+                              <CommandEmpty>
+                                {!showQuickAddProperty ? (
+                                  <div className="py-6 text-center text-sm">
+                                    <p className="mb-2">No property found.</p>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setShowQuickAddProperty(true)}
+                                      data-testid="button-add-new-property"
+                                    >
+                                      Add New Property
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="p-4 space-y-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <h4 className="font-medium text-sm">Quick Add Property</h4>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setShowQuickAddProperty(false)}
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                    <Input
+                                      placeholder="Property name *"
+                                      value={quickPropertyName}
+                                      onChange={(e) => setQuickPropertyName(e.target.value)}
+                                      data-testid="input-quick-property-name"
+                                    />
+                                    <Input
+                                      placeholder="Address *"
+                                      value={quickPropertyAddress}
+                                      onChange={(e) => setQuickPropertyAddress(e.target.value)}
+                                      data-testid="input-quick-property-address"
+                                    />
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <Input
+                                        placeholder="City *"
+                                        value={quickPropertyCity}
+                                        onChange={(e) => setQuickPropertyCity(e.target.value)}
+                                        data-testid="input-quick-property-city"
+                                      />
+                                      <Input
+                                        placeholder="State (e.g., CA) *"
+                                        value={quickPropertyState}
+                                        onChange={(e) => setQuickPropertyState(e.target.value)}
+                                        maxLength={2}
+                                        data-testid="input-quick-property-state"
+                                      />
+                                    </div>
+                                    <Input
+                                      placeholder="ZIP code *"
+                                      value={quickPropertyZip}
+                                      onChange={(e) => setQuickPropertyZip(e.target.value)}
+                                      data-testid="input-quick-property-zip"
+                                    />
+                                    <Button
+                                      type="button"
+                                      onClick={handleQuickAddProperty}
+                                      disabled={quickAddPropertyMutation.isPending}
+                                      className="w-full"
+                                      data-testid="button-save-quick-property"
+                                    >
+                                      {quickAddPropertyMutation.isPending ? "Adding..." : "Add Property"}
+                                    </Button>
+                                  </div>
+                                )}
+                              </CommandEmpty>
                               <CommandGroup>
                                 <CommandItem
                                   value="none"
