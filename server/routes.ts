@@ -1334,6 +1334,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const period = await storage.createOutOfOfficePeriod(validatedData);
+      
+      // Detect conflicts with scheduled events during the OOO period
+      if (currentUser.orgId) {
+        await detectOOOConflicts(
+          currentUserId, 
+          new Date(period.startDate), 
+          new Date(period.endDate), 
+          currentUser.orgId, 
+          currentUserId
+        );
+      }
+      
       res.status(201).json(period);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -5126,6 +5138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const conflictingEvents: string[] = [];
       const conflictingUserIds: Set<string> = new Set();
       let conflictingPropertyId: number | null = null;
+      let conflictingRoomId: number | null = null;
       let conflictType: 'staff' | 'property' | 'resource' = 'resource';
       
       // Check for overlapping events
@@ -5147,6 +5160,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             conflictType = 'property';
           }
           
+          // Check for room conflicts
+          if (event.roomId && newEvent.roomId && event.roomId === newEvent.roomId) {
+            if (!conflictingEvents.includes(event.id)) {
+              conflictingEvents.push(event.id);
+            }
+            conflictingRoomId = event.roomId;
+            if (conflictType !== 'property') {
+              conflictType = 'resource';
+            }
+          }
+          
           // Check for staff conflicts (overlapping attendees)
           const eventAttendees = await storage.getEventAttendees(event.id);
           const newEventAttendees = await storage.getEventAttendees(newEvent.id);
@@ -5154,10 +5178,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
           for (const eventAttendee of eventAttendees) {
             for (const newAttendee of newEventAttendees) {
               if (eventAttendee.userId && newAttendee.userId && eventAttendee.userId === newAttendee.userId) {
-                conflictingEvents.push(event.id);
+                if (!conflictingEvents.includes(event.id)) {
+                  conflictingEvents.push(event.id);
+                }
                 conflictingUserIds.add(eventAttendee.userId);
                 if (conflictType !== 'property') {
                   conflictType = 'staff';
+                }
+              }
+            }
+          }
+          
+          // Check for staff out-of-office conflicts
+          for (const newAttendee of newEventAttendees) {
+            if (newAttendee.userId) {
+              const activeOOO = await storage.getActiveOutOfOfficePeriod(newAttendee.userId);
+              if (activeOOO) {
+                const oooStart = new Date(activeOOO.startDate).getTime();
+                const oooEnd = new Date(activeOOO.endDate).getTime();
+                
+                // Check if event falls within OOO period
+                if ((newStart >= oooStart && newStart <= oooEnd) || 
+                    (newEnd >= oooStart && newEnd <= oooEnd) ||
+                    (newStart <= oooStart && newEnd >= oooEnd)) {
+                  if (!conflictingEvents.includes(event.id)) {
+                    conflictingEvents.push(event.id);
+                  }
+                  conflictingUserIds.add(newAttendee.userId);
+                  if (conflictType !== 'property') {
+                    conflictType = 'staff';
+                  }
                 }
               }
             }
@@ -5170,6 +5220,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Add the new event to the list of conflicting events
         const allConflictingEventIds = [...new Set([newEvent.id, ...conflictingEvents])];
         
+        let resolutionNotes = `Automatically detected: ${conflictType} conflict with ${conflictingEvents.length} event(s)`;
+        if (conflictingRoomId) {
+          resolutionNotes += ` (Room ID: ${conflictingRoomId})`;
+        }
+        
         const conflictData = {
           orgId,
           conflictType,
@@ -5178,7 +5233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           propertyId: conflictingPropertyId,
           status: 'pending' as const,
           requestedById,
-          resolutionNotes: `Automatically detected: ${conflictType} conflict with ${conflictingEvents.length} event(s)`
+          resolutionNotes
         };
         
         await storage.createConflictResolution(conflictData);
@@ -5187,6 +5242,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error detecting event conflicts:', error);
       // Don't fail the event creation/update if conflict detection fails
+    }
+  }
+  
+  // Helper function to detect conflicts when staff activates out-of-office
+  async function detectOOOConflicts(userId: string, oooStart: Date, oooEnd: Date, orgId: string, requestedById: string) {
+    try {
+      // Get all future events in the org
+      const allEvents = await storage.getEvents(orgId);
+      
+      const oooStartTime = new Date(oooStart).getTime();
+      const oooEndTime = new Date(oooEnd).getTime();
+      
+      const conflictingEventIds: string[] = [];
+      
+      // Check each event to see if this user is an attendee and it falls within OOO period
+      for (const event of allEvents) {
+        const eventStart = new Date(event.start).getTime();
+        const eventEnd = new Date(event.end).getTime();
+        
+        // Check if event overlaps with OOO period
+        const overlapsOOO = (eventStart < oooEndTime && eventEnd > oooStartTime);
+        
+        if (overlapsOOO) {
+          // Check if the OOO user is an attendee
+          const attendees = await storage.getEventAttendees(event.id);
+          const isAttendee = attendees.some(a => a.userId === userId);
+          
+          if (isAttendee) {
+            conflictingEventIds.push(event.id);
+          }
+        }
+      }
+      
+      // If conflicts found, create a conflict resolution record
+      if (conflictingEventIds.length > 0) {
+        const conflictData = {
+          orgId,
+          conflictType: 'staff' as const,
+          eventIds: conflictingEventIds,
+          userIds: [userId],
+          propertyId: null,
+          status: 'pending' as const,
+          requestedById,
+          resolutionNotes: `Staff member activated out-of-office from ${oooStart.toLocaleDateString()} to ${oooEnd.toLocaleDateString()}. ${conflictingEventIds.length} event(s) affected.`
+        };
+        
+        await storage.createConflictResolution(conflictData);
+        console.log(`Created OOO conflict resolution for user ${userId} - ${conflictingEventIds.length} events affected`);
+      }
+    } catch (error) {
+      console.error('Error detecting OOO conflicts:', error);
+      // Don't fail the OOO creation if conflict detection fails
     }
   }
 
