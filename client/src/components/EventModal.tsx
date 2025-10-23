@@ -912,7 +912,7 @@ export function EventModal({
                         <PopoverContent className="w-[400px] p-0" align="start">
                           <Command>
                             <CommandInput placeholder="Search properties..." />
-                            <CommandList className={cn(showQuickAddProperty ? "max-h-[450px]" : "max-h-[300px]")}>
+                            <CommandList className={cn("overflow-y-auto", showQuickAddProperty ? "max-h-[450px]" : "max-h-[300px]")}>
                               <CommandEmpty>
                                 {!showQuickAddProperty ? (
                                   <div className="py-6 text-center text-sm">

@@ -5605,6 +5605,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { orgId, eventId } = req.params;
       
+      // Tasks displayed as events (e.g., "task-36") don't have attendees
+      if (eventId.startsWith('task-')) {
+        return res.json([]);
+      }
+      
       // Verify event belongs to org
       const event = await storage.getEvent(eventId);
       if (!event || event.orgId !== orgId) {
