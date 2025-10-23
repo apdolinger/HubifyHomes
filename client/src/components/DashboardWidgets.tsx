@@ -132,7 +132,7 @@ export function CalendarWidget({ className }: CalendarWidgetProps) {
                     const dateParam = format(eventDate, 'yyyy-MM-dd');
                     const targetUrl = `/calendar?date=${dateParam}&eventId=${event.id}`;
                     console.log('Navigating to calendar with event:', event.id, targetUrl);
-                    setLocation(targetUrl);
+                    window.location.href = targetUrl;
                   }}
                   data-testid={`calendar-event-${event.id}`}
                 >
