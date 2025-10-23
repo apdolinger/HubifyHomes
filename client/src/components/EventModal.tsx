@@ -1040,7 +1040,7 @@ export function EventModal({
                         </PopoverContent>
                       </Popover>
                       {selectedProperty && (
-                        <Link href={`/properties/${selectedProperty.id}`}>
+                        <Link href={`/property-profile/${selectedProperty.id}`}>
                           <div className="text-sm text-primary hover:underline flex items-center gap-1 cursor-pointer mt-1">
                             <ExternalLink className="h-3 w-3" />
                             View property profile
@@ -1211,7 +1211,7 @@ export function EventModal({
                         </p>
                       )}
                       {selectedTask && (
-                        <Link href={`/tasks/${selectedTask.id}`}>
+                        <Link href={`/task-profile/${selectedTask.id}`}>
                           <div className="text-sm text-primary hover:underline flex items-center gap-1 cursor-pointer mt-1">
                             <ExternalLink className="h-3 w-3" />
                             View task profile
@@ -1303,7 +1303,7 @@ export function EventModal({
                         </PopoverContent>
                       </Popover>
                       {selectedClient && (
-                        <Link href={`/people/${selectedClient.id}`}>
+                        <Link href={`/person-profile/${selectedClient.id}`}>
                           <div className="text-sm text-primary hover:underline flex items-center gap-1 cursor-pointer mt-1">
                             <ExternalLink className="h-3 w-3" />
                             View client profile
