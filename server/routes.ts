@@ -6804,6 +6804,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Register the conflict detector for scheduled tasks
+  const { setConflictDetector } = await import('./scheduledTasks');
+  setConflictDetector(detectAndCreateEventConflicts);
+  
   const httpServer = createServer(app);
   return httpServer;
 }
