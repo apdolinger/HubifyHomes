@@ -48,6 +48,7 @@ import {
   eventReminders,
   icsFeeds,
   eventImports,
+  conflictResolutions,
   securityAuditLogs,
   userSessions,
   importHistory,
@@ -143,6 +144,8 @@ import {
   type InsertIcsFeed,
   type EventImport,
   type InsertEventImport,
+  type ConflictResolution,
+  type InsertConflictResolution,
   type OutOfOfficePeriod,
   type InsertOutOfOfficePeriod,
   type ImportHistory,
@@ -422,6 +425,17 @@ export interface IStorage {
   createEventImport(importData: InsertEventImport): Promise<EventImport>;
   updateEventImport(id: number, importData: Partial<InsertEventImport>): Promise<EventImport>;
   deleteEventImport(id: number): Promise<void>;
+  
+  // Conflict resolution operations
+  getConflictResolutions(orgId: string, status?: string): Promise<ConflictResolution[]>;
+  getConflictResolution(id: number): Promise<ConflictResolution | undefined>;
+  createConflictResolution(data: InsertConflictResolution): Promise<ConflictResolution>;
+  updateConflictResolution(id: number, data: Partial<InsertConflictResolution>): Promise<ConflictResolution>;
+  deleteConflictResolution(id: number): Promise<void>;
+  approveConflictResolution(id: number, supervisorId: string, notes?: string): Promise<ConflictResolution>;
+  rejectConflictResolution(id: number, supervisorId: string, notes?: string): Promise<ConflictResolution>;
+  resolveConflictResolution(id: number, notes?: string): Promise<ConflictResolution>;
+  getPendingConflictsByUser(userId: string): Promise<ConflictResolution[]>;
   
   // Stripe operations - Master billing (Hubify billing organizations)
   getOrgSubscription(orgId: string): Promise<OrgSubscription | undefined>;
@@ -3382,6 +3396,107 @@ export class DatabaseStorage implements IStorage {
 
   async deleteEventImport(id: number): Promise<void> {
     await db.delete(eventImports).where(eq(eventImports.id, id));
+  }
+
+  // Conflict resolution operations
+  async getConflictResolutions(orgId: string, status?: string): Promise<ConflictResolution[]> {
+    let query = db
+      .select()
+      .from(conflictResolutions)
+      .where(eq(conflictResolutions.orgId, orgId));
+    
+    if (status) {
+      query = query.where(and(
+        eq(conflictResolutions.orgId, orgId),
+        eq(conflictResolutions.status, status)
+      )) as any;
+    }
+    
+    return await query.orderBy(desc(conflictResolutions.createdAt));
+  }
+
+  async getConflictResolution(id: number): Promise<ConflictResolution | undefined> {
+    const [resolution] = await db
+      .select()
+      .from(conflictResolutions)
+      .where(eq(conflictResolutions.id, id));
+    return resolution;
+  }
+
+  async createConflictResolution(data: InsertConflictResolution): Promise<ConflictResolution> {
+    const [resolution] = await db
+      .insert(conflictResolutions)
+      .values(data)
+      .returning();
+    return resolution;
+  }
+
+  async updateConflictResolution(id: number, data: Partial<InsertConflictResolution>): Promise<ConflictResolution> {
+    const [resolution] = await db
+      .update(conflictResolutions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(conflictResolutions.id, id))
+      .returning();
+    return resolution;
+  }
+
+  async deleteConflictResolution(id: number): Promise<void> {
+    await db.delete(conflictResolutions).where(eq(conflictResolutions.id, id));
+  }
+
+  async approveConflictResolution(id: number, supervisorId: string, notes?: string): Promise<ConflictResolution> {
+    const [resolution] = await db
+      .update(conflictResolutions)
+      .set({
+        status: 'approved',
+        supervisorId,
+        resolutionNotes: notes || null,
+        approvedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(conflictResolutions.id, id))
+      .returning();
+    return resolution;
+  }
+
+  async rejectConflictResolution(id: number, supervisorId: string, notes?: string): Promise<ConflictResolution> {
+    const [resolution] = await db
+      .update(conflictResolutions)
+      .set({
+        status: 'rejected',
+        supervisorId,
+        resolutionNotes: notes || null,
+        rejectedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(conflictResolutions.id, id))
+      .returning();
+    return resolution;
+  }
+
+  async resolveConflictResolution(id: number, notes?: string): Promise<ConflictResolution> {
+    const [resolution] = await db
+      .update(conflictResolutions)
+      .set({
+        status: 'resolved',
+        resolutionNotes: notes || null,
+        resolvedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(conflictResolutions.id, id))
+      .returning();
+    return resolution;
+  }
+
+  async getPendingConflictsByUser(userId: string): Promise<ConflictResolution[]> {
+    return await db
+      .select()
+      .from(conflictResolutions)
+      .where(and(
+        eq(conflictResolutions.supervisorId, userId),
+        eq(conflictResolutions.status, 'pending')
+      ))
+      .orderBy(desc(conflictResolutions.createdAt));
   }
 
   // Stripe operations - Master billing (Hubify billing organizations)
