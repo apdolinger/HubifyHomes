@@ -337,7 +337,8 @@ export function generateICalendarFile(data: EventInvitationData, attendeeEmail: 
 export async function sendEventInvitationEmail(
   recipientEmail: string,
   recipientName: string,
-  eventData: EventInvitationData
+  eventData: EventInvitationData,
+  organizerName?: string
 ): Promise<void> {
   if (!SENDGRID_API_KEY) {
     console.warn("SendGrid API key not configured. Skipping event invitation email.");
@@ -345,13 +346,52 @@ export async function sendEventInvitationEmail(
   }
 
   try {
-    const htmlContent = generateEventInvitationHTML(eventData);
+    const { storage } = await import('./storage.js');
+    const { processTemplate } = await import('./templateUtils.js');
+    const { createEventInvitationVariables } = await import('./templateUtils.js');
+    
+    let htmlContent: string;
+    let subject: string;
+    
+    // Try to load the template from database
+    const template = await storage.getPlatformTemplateByType('email_invitation');
+    
+    if (template) {
+      // Use stored template with variable replacement
+      const variables = createEventInvitationVariables({
+        organizationName: eventData.organizationName,
+        organizationLogoUrl: eventData.organizationBranding?.logo || null,
+        eventTitle: eventData.eventTitle,
+        eventDescription: eventData.eventDescription || null,
+        eventLocation: eventData.eventLocation || null,
+        eventStartTime: eventData.eventStart,
+        eventEndTime: eventData.eventEnd,
+        recipientName: recipientName,
+        organizerName: organizerName || eventData.organizationName,
+      });
+      
+      const processed = processTemplate({
+        subject: template.subject,
+        htmlContent: template.htmlContent,
+      }, variables);
+      
+      htmlContent = processed.htmlContent;
+      subject = processed.subject;
+      
+      console.log(`Using stored template: ${template.name}`);
+    } else {
+      // Fall back to hardcoded template
+      htmlContent = generateEventInvitationHTML(eventData);
+      subject = `Event Invitation: ${eventData.eventTitle}`;
+      console.log('No stored template found, using fallback HTML generation');
+    }
+    
     const icalContent = generateICalendarFile(eventData, recipientEmail);
     
     const msg = {
       to: recipientEmail,
       from: process.env.SENDGRID_FROM_EMAIL || "noreply@hubify.com",
-      subject: `Event Invitation: ${eventData.eventTitle}`,
+      subject,
       html: htmlContent,
       attachments: [
         {

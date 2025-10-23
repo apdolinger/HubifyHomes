@@ -65,10 +65,18 @@ app.use((req, res, next) => {
     port,
     host: "0.0.0.0",
     reusePort: true,
-  }, () => {
+  }, async () => {
     log(`serving on port ${port}`);
     
     // Start scheduled background tasks
     startScheduledTasks();
+    
+    // Initialize default platform templates (only creates if not exists)
+    try {
+      const { initializeTemplates } = await import('./seedTemplates.js');
+      await initializeTemplates();
+    } catch (error) {
+      console.error('Error initializing templates:', error);
+    }
   });
 })();
