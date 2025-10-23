@@ -12,7 +12,9 @@ import {
   Lightbulb,
   Users,
   Eye,
-  ArrowRight
+  ArrowRight,
+  RefreshCw,
+  CheckCircle
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
@@ -318,20 +320,49 @@ interface DuplicatesWidgetProps {
 export function DuplicatesWidget({ className }: DuplicatesWidgetProps) {
   const [, setLocation] = useLocation();
 
-  const handleReviewContact = (contactName: string) => {
-    // Navigate to duplicates management page to review the specific contact duplicate
-    setLocation("/duplicates");
-  };
-
-  const handleReviewProperty = (propertyAddress: string) => {
-    // Navigate to duplicates management page to review the specific property duplicate
-    setLocation("/duplicates");
-  };
+  // Fetch live duplicate data
+  const { data: duplicateGroups, isLoading } = useQuery<any[]>({
+    queryKey: ['/api/duplicates'],
+  });
 
   const handleViewAllDuplicates = () => {
-    // Navigate to the dedicated duplicates management page
     setLocation("/duplicates");
   };
+
+  const getConfidenceColor = (confidence: number) => {
+    if (confidence >= 95) return 'bg-red-50 border-red-500 text-red-900';
+    if (confidence >= 85) return 'bg-orange-50 border-orange-500 text-orange-900';
+    if (confidence >= 70) return 'bg-yellow-50 border-yellow-500 text-yellow-900';
+    return 'bg-blue-50 border-blue-500 text-blue-900';
+  };
+
+  const getConfidenceBadgeColor = (confidence: number) => {
+    if (confidence >= 95) return 'bg-red-100 text-red-800';
+    if (confidence >= 85) return 'bg-orange-100 text-orange-800';
+    if (confidence >= 70) return 'bg-yellow-100 text-yellow-800';
+    return 'bg-blue-100 text-blue-800';
+  };
+
+  const formatDuplicateLabel = (group: any) => {
+    const firstRecord = group.records?.[0];
+    if (!firstRecord) return 'Unknown Duplicate';
+    
+    if (group.type === 'contact') {
+      return `${firstRecord.first_name || ''} ${firstRecord.last_name || ''}`.trim() || 'Unknown Contact';
+    } else {
+      return firstRecord.name || firstRecord.address1 || 'Unknown Property';
+    }
+  };
+
+  const formatDuplicateSubtext = (group: any) => {
+    const matchFields = group.matchFields?.join(', ') || 'similar records';
+    return `${group.confidence}% match on ${matchFields}`;
+  };
+
+  // Show top 3 duplicates sorted by confidence (clone array to avoid mutating React Query cache)
+  const topDuplicates = duplicateGroups
+    ? [...duplicateGroups].sort((a, b) => b.confidence - a.confidence).slice(0, 3)
+    : [];
 
   return (
     <Card className={className}>
@@ -341,68 +372,80 @@ export function DuplicatesWidget({ className }: DuplicatesWidgetProps) {
             <UserX className="w-5 h-5 mr-2" />
             Duplicates
           </div>
-          <Badge variant="secondary">3 found</Badge>
+          {isLoading ? (
+            <Badge variant="secondary" data-testid="badge-duplicates-loading">Loading...</Badge>
+          ) : (
+            <Badge 
+              variant="secondary" 
+              className={duplicateGroups && duplicateGroups.length > 0 ? "bg-red-100 text-red-800" : ""}
+              data-testid="badge-duplicates-count"
+            >
+              {duplicateGroups?.length || 0} found
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border-l-4 border-orange-500">
-            <div>
-              <p className="font-medium text-orange-900">John Smith</p>
-              <p className="text-sm text-orange-700">Possible duplicate contact</p>
-            </div>
+        {isLoading ? (
+          <div className="text-center py-4 text-muted-foreground" data-testid="duplicates-loading">
+            <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" />
+            Checking for duplicates...
+          </div>
+        ) : !duplicateGroups || duplicateGroups.length === 0 ? (
+          <div className="text-center py-6" data-testid="duplicates-empty">
+            <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+            <p className="text-sm font-medium text-gray-700 mb-1">All Clear!</p>
+            <p className="text-xs text-gray-500">No duplicate records found</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {topDuplicates.map((group, idx) => (
+              <div 
+                key={group.id || idx}
+                className={`flex items-center justify-between p-3 rounded-lg border-l-4 cursor-pointer hover:opacity-80 transition-opacity ${getConfidenceColor(group.confidence)}`}
+                onClick={handleViewAllDuplicates}
+                data-testid={`duplicate-item-${idx}`}
+              >
+                <div className="flex-1">
+                  <p className="font-medium">{formatDuplicateLabel(group)}</p>
+                  <p className="text-sm opacity-80">{formatDuplicateSubtext(group)}</p>
+                  <Badge className={`mt-1 text-xs ${getConfidenceBadgeColor(group.confidence)}`}>
+                    {group.records?.length || 0} records
+                  </Badge>
+                </div>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewAllDuplicates();
+                  }}
+                  className="hover:bg-white/50"
+                  data-testid={`button-review-${idx}`}
+                >
+                  <Eye className="w-3 h-3 mr-1" />
+                  Review
+                </Button>
+              </div>
+            ))}
+            
+            {duplicateGroups.length > 3 && (
+              <div className="text-center text-sm text-muted-foreground pt-2">
+                +{duplicateGroups.length - 3} more duplicate{duplicateGroups.length - 3 !== 1 ? 's' : ''}
+              </div>
+            )}
+            
             <Button 
-              size="sm" 
               variant="outline" 
-              onClick={() => handleReviewContact("John Smith")}
-              className="hover:bg-orange-100"
+              className="w-full hover:bg-slate-50 mt-2" 
+              onClick={handleViewAllDuplicates}
+              data-testid="button-view-all-duplicates"
             >
-              <Eye className="w-3 h-3 mr-1" />
-              Review
+              <ArrowRight className="w-4 h-4 mr-2" />
+              View All Duplicates
             </Button>
           </div>
-          
-          <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg border-l-4 border-red-500">
-            <div>
-              <p className="font-medium text-red-900">456 Oak Street</p>
-              <p className="text-sm text-red-700">Similar property address</p>
-            </div>
-            <Button 
-              size="sm" 
-              variant="outline" 
-              onClick={() => handleReviewProperty("456 Oak Street")}
-              className="hover:bg-red-100"
-            >
-              <Eye className="w-3 h-3 mr-1" />
-              Review
-            </Button>
-          </div>
-          
-          <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border-l-4 border-yellow-500">
-            <div>
-              <p className="font-medium text-yellow-900">Sarah Johnson</p>
-              <p className="text-sm text-yellow-700">Phone number match</p>
-            </div>
-            <Button 
-              size="sm" 
-              variant="outline" 
-              onClick={() => handleReviewContact("Sarah Johnson")}
-              className="hover:bg-yellow-100"
-            >
-              <Eye className="w-3 h-3 mr-1" />
-              Review
-            </Button>
-          </div>
-          
-          <Button 
-            variant="outline" 
-            className="w-full hover:bg-slate-50" 
-            onClick={handleViewAllDuplicates}
-          >
-            <ArrowRight className="w-4 h-4 mr-2" />
-            View All Duplicates
-          </Button>
-        </div>
+        )}
       </CardContent>
     </Card>
   );
