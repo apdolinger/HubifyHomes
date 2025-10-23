@@ -42,24 +42,27 @@ export function ConflictResolutionPanel({
   >(null);
   const [notes, setNotes] = useState("");
 
+  // Only allow supervisors and admins to access this component
+  const isSupervisor = userRole === "supervisor" || userRole === "admin";
+
   const { data: conflicts, isLoading } = useQuery<ConflictResolution[]>({
     queryKey: [`/api/orgs/${orgId}/conflicts`, "pending"],
-    enabled: !!orgId,
+    enabled: !!orgId && isSupervisor,
   });
 
   const { data: events } = useQuery({
     queryKey: [`/api/orgs/${orgId}/events`],
-    enabled: !!orgId,
+    enabled: !!orgId && isSupervisor,
   });
 
   const { data: users } = useQuery({
     queryKey: [`/api/orgs/${orgId}/users`],
-    enabled: !!orgId,
+    enabled: !!orgId && isSupervisor,
   });
 
   const { data: properties } = useQuery({
     queryKey: [`/api/orgs/${orgId}/properties`],
-    enabled: !!orgId,
+    enabled: !!orgId && isSupervisor,
   });
 
   const approveMutation = useMutation({
@@ -223,7 +226,11 @@ export function ConflictResolutionPanel({
   }
 
   const pendingConflicts = conflicts?.filter((c) => c.status === "pending") || [];
-  const isSupervisor = userRole === "supervisor" || userRole === "admin";
+
+  // Only show the panel to supervisors and admins
+  if (!isSupervisor) {
+    return null;
+  }
 
   return (
     <>

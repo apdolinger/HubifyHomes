@@ -5524,6 +5524,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { orgId, id } = req.params;
       const { notes } = req.body;
       
+      // Verify user has supervisor or admin role
+      if (req.user?.role !== "supervisor" && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Supervisor access required" });
+      }
+      
       // Verify user belongs to org or is admin
       if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
         return res.status(403).json({ message: "Access denied" });
