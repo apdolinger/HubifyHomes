@@ -49,6 +49,7 @@ import {
   insertEventSchema,
   insertEventAttendeeSchema,
   insertEventReminderSchema,
+  insertConflictResolutionSchema,
   insertPlatformInvoiceSchema,
   insertClientInvoiceSchema,
   type Form,
@@ -5387,6 +5388,196 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error removing attendee:", error);
       res.status(500).json({ message: "Failed to remove attendee" });
+    }
+  });
+
+  // Conflict resolution routes
+  app.get("/api/orgs/:orgId/conflicts", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const { status } = req.query;
+      
+      // Verify user belongs to org or is admin
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const conflicts = await storage.getConflictResolutions(orgId, status as string);
+      res.json(conflicts);
+    } catch (error) {
+      console.error("Error fetching conflicts:", error);
+      res.status(500).json({ message: "Failed to fetch conflicts" });
+    }
+  });
+
+  app.get("/api/orgs/:orgId/conflicts/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, id } = req.params;
+      
+      // Verify user belongs to org or is admin
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const conflict = await storage.getConflictResolution(parseInt(id));
+      if (!conflict || conflict.orgId !== orgId) {
+        return res.status(404).json({ message: "Conflict not found" });
+      }
+      
+      res.json(conflict);
+    } catch (error) {
+      console.error("Error fetching conflict:", error);
+      res.status(500).json({ message: "Failed to fetch conflict" });
+    }
+  });
+
+  app.post("/api/orgs/:orgId/conflicts", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+      
+      // Verify user belongs to org or is admin
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const validation = insertConflictResolutionSchema.safeParse({
+        ...req.body,
+        orgId,
+        requestedById: userId
+      });
+      
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid conflict data", errors: validation.error.issues });
+      }
+      
+      const conflict = await storage.createConflictResolution(validation.data);
+      res.status(201).json(conflict);
+    } catch (error) {
+      console.error("Error creating conflict:", error);
+      res.status(500).json({ message: "Failed to create conflict" });
+    }
+  });
+
+  app.patch("/api/orgs/:orgId/conflicts/:id/approve", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, id } = req.params;
+      const { notes } = req.body;
+      const supervisorId = req.user?.id;
+      
+      if (!supervisorId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+      
+      // Verify user has supervisor or admin role
+      if (req.user?.role !== "supervisor" && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Supervisor access required" });
+      }
+      
+      const conflict = await storage.getConflictResolution(parseInt(id));
+      if (!conflict || conflict.orgId !== orgId) {
+        return res.status(404).json({ message: "Conflict not found" });
+      }
+      
+      const updated = await storage.approveConflictResolution(parseInt(id), supervisorId, notes);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error approving conflict:", error);
+      res.status(500).json({ message: "Failed to approve conflict" });
+    }
+  });
+
+  app.patch("/api/orgs/:orgId/conflicts/:id/reject", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, id } = req.params;
+      const { notes } = req.body;
+      const supervisorId = req.user?.id;
+      
+      if (!supervisorId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+      
+      // Verify user has supervisor or admin role
+      if (req.user?.role !== "supervisor" && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Supervisor access required" });
+      }
+      
+      const conflict = await storage.getConflictResolution(parseInt(id));
+      if (!conflict || conflict.orgId !== orgId) {
+        return res.status(404).json({ message: "Conflict not found" });
+      }
+      
+      const updated = await storage.rejectConflictResolution(parseInt(id), supervisorId, notes);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error rejecting conflict:", error);
+      res.status(500).json({ message: "Failed to reject conflict" });
+    }
+  });
+
+  app.patch("/api/orgs/:orgId/conflicts/:id/resolve", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, id } = req.params;
+      const { notes } = req.body;
+      
+      // Verify user belongs to org or is admin
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const conflict = await storage.getConflictResolution(parseInt(id));
+      if (!conflict || conflict.orgId !== orgId) {
+        return res.status(404).json({ message: "Conflict not found" });
+      }
+      
+      const updated = await storage.resolveConflictResolution(parseInt(id), notes);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error resolving conflict:", error);
+      res.status(500).json({ message: "Failed to resolve conflict" });
+    }
+  });
+
+  app.delete("/api/orgs/:orgId/conflicts/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, id } = req.params;
+      
+      // Verify user has admin role
+      if (req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const conflict = await storage.getConflictResolution(parseInt(id));
+      if (!conflict || conflict.orgId !== orgId) {
+        return res.status(404).json({ message: "Conflict not found" });
+      }
+      
+      await storage.deleteConflictResolution(parseInt(id));
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting conflict:", error);
+      res.status(500).json({ message: "Failed to delete conflict" });
+    }
+  });
+
+  app.get("/api/users/:userId/pending-conflicts", isAuthenticated, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      
+      // Verify user is requesting their own conflicts or is an admin
+      if (req.user?.id !== userId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const conflicts = await storage.getPendingConflictsByUser(userId);
+      res.json(conflicts);
+    } catch (error) {
+      console.error("Error fetching pending conflicts:", error);
+      res.status(500).json({ message: "Failed to fetch pending conflicts" });
     }
   });
 
