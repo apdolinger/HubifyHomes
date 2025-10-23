@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -11,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EventModal } from "@/components/EventModal";
 import { CalendarSettings } from "@/components/CalendarSettings";
 import { ConflictResolutionPanel } from "@/components/ConflictResolutionPanel";
+import { useToast } from "@/hooks/use-toast";
 import type { Event } from "@shared/schema";
 
 interface CalendarDisplaySettings {
@@ -52,6 +54,7 @@ export default function CalendarPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettings] = useState<CalendarDisplaySettings>(DEFAULT_SETTINGS);
   const calendarRef = useRef<FullCalendar>(null);
+  const { toast } = useToast();
 
   // Get user's org from session
   const { data: user, isLoading: userLoading, isError: userError } = useQuery({ queryKey: ["/api/auth/user"] });
