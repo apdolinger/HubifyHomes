@@ -284,11 +284,30 @@ export default function CalendarPage() {
     const borderColor = hasConflict ? '#dc2626' : backgroundColor;
     const classNames = hasConflict ? 'event-conflict' : '';
     
+    // For all-day events, FullCalendar expects the end date to be EXCLUSIVE
+    // (the day after the last day of the event)
+    // Extract just the date portion (YYYY-MM-DD) and add 1 day
+    let startDate = event.start;
+    let endDate = event.end;
+    
+    if (event.allDay && event.end) {
+      // Parse the ISO date string to get date components
+      const endStr = event.end.split('T')[0]; // Get YYYY-MM-DD part
+      const [year, month, day] = endStr.split('-').map(Number);
+      
+      // Create date at midnight UTC and add 1 day for exclusive end
+      const exclusiveEnd = new Date(Date.UTC(year, month - 1, day + 1, 0, 0, 0, 0));
+      endDate = exclusiveEnd.toISOString().split('T')[0]; // Return just the date part
+      
+      // Also ensure start is just the date
+      startDate = event.start.split('T')[0];
+    }
+    
     return {
       id: event.id,
       title: hasConflict ? `⚠️ ${event.title}` : event.title,
-      start: event.start,
-      end: event.end,
+      start: startDate,
+      end: endDate,
       allDay: event.allDay,
       backgroundColor,
       borderColor,
