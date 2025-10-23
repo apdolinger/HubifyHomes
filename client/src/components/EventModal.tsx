@@ -345,28 +345,59 @@ export function EventModal({
         endDate = new Date(data.end);
       }
 
-      // Build payload object, omitting undefined/null optional fields
+      // Build payload object with only the fields that should be updated
       const payload: any = {
-        orgId: data.orgId,
-        calendarId: data.calendarId,
         title: data.title,
+        calendarId: data.calendarId,
         allDay: data.allDay,
-        start: startDate,
-        end: endDate,
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
         timezone: data.timezone,
         visibility: data.visibility,
-        organizerId: data.organizerId,
-        createdById: data.createdById,
       };
       
       // Only include optional fields if they have values
-      if (data.description?.trim()) payload.description = data.description.trim();
-      if (data.location?.trim()) payload.location = data.location.trim();
-      if (data.propertyId) payload.propertyId = data.propertyId;
-      if (data.taskId) payload.taskId = data.taskId;
-      if (data.clientId) payload.clientId = data.clientId;
-      if (data.recurrenceRule) payload.recurrenceRule = data.recurrenceRule;
-      if (data.recurrenceExDates) payload.recurrenceExDates = data.recurrenceExDates;
+      if (data.description?.trim()) {
+        payload.description = data.description.trim();
+      } else {
+        payload.description = null;
+      }
+      
+      if (data.location?.trim()) {
+        payload.location = data.location.trim();
+      } else {
+        payload.location = null;
+      }
+      
+      if (data.propertyId) {
+        payload.propertyId = data.propertyId;
+      } else {
+        payload.propertyId = null;
+      }
+      
+      if (data.taskId) {
+        payload.taskId = data.taskId;
+      } else {
+        payload.taskId = null;
+      }
+      
+      if (data.clientId) {
+        payload.clientId = data.clientId;
+      } else {
+        payload.clientId = null;
+      }
+      
+      if (data.recurrenceRule) {
+        payload.recurrenceRule = data.recurrenceRule;
+      } else {
+        payload.recurrenceRule = null;
+      }
+      
+      if (data.recurrenceExDates && data.recurrenceExDates.length > 0) {
+        payload.recurrenceExDates = data.recurrenceExDates;
+      } else {
+        payload.recurrenceExDates = null;
+      }
       
       const response = await apiRequest("PATCH", `/api/orgs/${orgId}/events/${event?.id}`, payload);
       const updatedEvent = await response.json();
