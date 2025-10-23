@@ -117,6 +117,10 @@ export function EventModal({
   
   // Task combobox state
   const [taskOpen, setTaskOpen] = useState(false);
+  const [showQuickAddTask, setShowQuickAddTask] = useState(false);
+  const [quickTaskTitle, setQuickTaskTitle] = useState('');
+  const [quickTaskDescription, setQuickTaskDescription] = useState('');
+  const [quickTaskPriority, setQuickTaskPriority] = useState<'urgent' | 'high' | 'normal' | 'low'>('normal');
 
   // Fetch calendars for the dropdown
   const { data: calendars } = useQuery({
@@ -504,6 +508,58 @@ export function EventModal({
     });
   };
 
+  const quickAddTaskMutation = useMutation({
+    mutationFn: async (taskData: {
+      title: string;
+      description?: string;
+      priority: 'urgent' | 'high' | 'normal' | 'low';
+      propertyId?: number;
+    }) => {
+      const response = await apiRequest("POST", "/api/tasks", taskData);
+      return response.json();
+    },
+    onSuccess: (newTask) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      toast({
+        title: "Task added",
+        description: `"${newTask.title}" has been added successfully.`,
+      });
+      // Auto-select the new task
+      form.setValue('taskId', newTask.id);
+      // Reset quick add form
+      setQuickTaskTitle('');
+      setQuickTaskDescription('');
+      setQuickTaskPriority('normal');
+      setShowQuickAddTask(false);
+      setTaskOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add task",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleQuickAddTask = () => {
+    if (!quickTaskTitle) {
+      toast({
+        title: "Missing title",
+        description: "Please enter a task title",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    quickAddTaskMutation.mutate({
+      title: quickTaskTitle,
+      description: quickTaskDescription || undefined,
+      priority: quickTaskPriority,
+      propertyId: selectedPropertyId || undefined,
+    });
+  };
+
   const onSubmit = (data: FormData) => {
     if (isEditing) {
       updateEventMutation.mutate(data);
@@ -512,7 +568,7 @@ export function EventModal({
     }
   };
 
-  const isPending = createEventMutation.isPending || updateEventMutation.isPending || quickAddPropertyMutation.isPending;
+  const isPending = createEventMutation.isPending || updateEventMutation.isPending || quickAddPropertyMutation.isPending || quickAddTaskMutation.isPending;
 
   const handleClose = () => {
     setAttendees([]);
@@ -924,11 +980,81 @@ export function EventModal({
                         <PopoverContent className="w-[400px] p-0" align="start">
                           <Command>
                             <CommandInput placeholder="Search tasks..." />
-                            <CommandList>
+                            <CommandList className={cn(showQuickAddTask ? "max-h-[450px]" : "max-h-[300px]")}>
                               <CommandEmpty>
-                                {selectedPropertyId 
-                                  ? "No tasks found for this property." 
-                                  : "No tasks found."}
+                                {!showQuickAddTask ? (
+                                  <div className="py-6 text-center text-sm">
+                                    <p className="mb-2">
+                                      {selectedPropertyId 
+                                        ? "No tasks found for this property." 
+                                        : "No tasks found."}
+                                    </p>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setShowQuickAddTask(true)}
+                                      data-testid="button-add-new-task"
+                                    >
+                                      Add New Task
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="p-4 space-y-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <h4 className="font-medium text-sm">Quick Add Task</h4>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setShowQuickAddTask(false)}
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                    <Input
+                                      placeholder="Task title *"
+                                      value={quickTaskTitle}
+                                      onChange={(e) => setQuickTaskTitle(e.target.value)}
+                                      data-testid="input-quick-task-title"
+                                    />
+                                    <Textarea
+                                      placeholder="Description (optional)"
+                                      value={quickTaskDescription}
+                                      onChange={(e) => setQuickTaskDescription(e.target.value)}
+                                      data-testid="input-quick-task-description"
+                                      rows={2}
+                                    />
+                                    <Select
+                                      value={quickTaskPriority}
+                                      onValueChange={(value: 'urgent' | 'high' | 'normal' | 'low') => setQuickTaskPriority(value)}
+                                    >
+                                      <SelectTrigger data-testid="select-quick-task-priority">
+                                        <SelectValue placeholder="Priority" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="urgent">Urgent</SelectItem>
+                                        <SelectItem value="high">High</SelectItem>
+                                        <SelectItem value="normal">Normal</SelectItem>
+                                        <SelectItem value="low">Low</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    {selectedPropertyId && (
+                                      <p className="text-xs text-muted-foreground">
+                                        This task will be linked to the selected property
+                                      </p>
+                                    )}
+                                    <Button
+                                      type="button"
+                                      onClick={handleQuickAddTask}
+                                      disabled={quickAddTaskMutation.isPending}
+                                      className="w-full"
+                                      data-testid="button-save-quick-task"
+                                    >
+                                      {quickAddTaskMutation.isPending ? "Adding..." : "Add Task"}
+                                    </Button>
+                                  </div>
+                                )}
                               </CommandEmpty>
                               <CommandGroup>
                                 <CommandItem
