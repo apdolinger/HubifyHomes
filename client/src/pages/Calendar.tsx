@@ -542,40 +542,44 @@ export default function CalendarPage() {
               setEventModalOpen(true);
             }}
           />
-          <Button
-            variant="outline"
-            onClick={async () => {
-              try {
-                const response = await fetch(`/api/orgs/${orgId}/conflicts/scan`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                });
-                if (!response.ok) {
-                  throw new Error('Scan failed');
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                try {
+                  const response = await fetch(`/api/orgs/${orgId}/conflicts/scan`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                  });
+                  if (!response.ok) {
+                    throw new Error('Scan failed');
+                  }
+                  const data = await response.json();
+                  
+                  // Invalidate conflicts cache to automatically show new conflicts
+                  await queryClient.invalidateQueries({ queryKey: ['/api/orgs', orgId, 'conflicts'] });
+                  
+                  toast({
+                    title: "Scan Complete",
+                    description: `Checked ${data.eventsScanned} events and found ${data.conflictsDetected || 0} conflicts.`,
+                  });
+                } catch (error) {
+                  toast({
+                    title: "Scan Failed",
+                    description: "Failed to scan for conflicts. Please try again.",
+                    variant: "destructive",
+                  });
                 }
-                const data = await response.json();
-                
-                // Invalidate conflicts cache to automatically show new conflicts
-                await queryClient.invalidateQueries({ queryKey: ['/api/orgs', orgId, 'conflicts'] });
-                
-                toast({
-                  title: "Scan Complete",
-                  description: `Checked ${data.eventsScanned} events and found ${data.conflictsDetected || 0} conflicts.`,
-                });
-              } catch (error) {
-                toast({
-                  title: "Scan Failed",
-                  description: "Failed to scan for conflicts. Please try again.",
-                  variant: "destructive",
-                });
-              }
-            }}
-            data-testid="button-scan-conflicts"
-            className="w-full max-w-xs"
-          >
-            <AlertTriangle className="h-4 w-4 mr-2" />
-            Scan for Conflicts
-          </Button>
+              }}
+              data-testid="button-scan-conflicts"
+            >
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Scan for Conflicts
+            </Button>
+            <p className="text-sm text-muted-foreground">
+              Conflict scanner automatically runs every 12 hours
+            </p>
+          </div>
         </div>
       )}
 
