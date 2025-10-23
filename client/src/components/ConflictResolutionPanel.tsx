@@ -46,7 +46,7 @@ export function ConflictResolutionPanel({
   const isSupervisor = userRole === "supervisor" || userRole === "admin";
 
   const { data: conflicts, isLoading } = useQuery<ConflictResolution[]>({
-    queryKey: [`/api/orgs/${orgId}/conflicts`, "pending"],
+    queryKey: [`/api/orgs/${orgId}/conflicts?status=pending`],
     enabled: !!orgId && isSupervisor,
   });
 
