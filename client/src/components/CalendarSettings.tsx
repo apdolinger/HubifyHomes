@@ -26,6 +26,12 @@ interface CalendarDisplaySettings {
   hiddenCalendars: string[];
   filterEventType: 'all' | 'events' | 'tasks';
   filterPriority: 'all' | 'urgent' | 'high' | 'normal' | 'low';
+  colorPreferences: {
+    events: string;
+    taskUrgent: string;
+    taskHigh: string;
+    taskNormalLow: string;
+  };
 }
 
 const DEFAULT_SETTINGS: CalendarDisplaySettings = {
@@ -35,6 +41,12 @@ const DEFAULT_SETTINGS: CalendarDisplaySettings = {
   hiddenCalendars: [],
   filterEventType: 'all',
   filterPriority: 'all',
+  colorPreferences: {
+    events: '#3b82f6',      // Blue
+    taskUrgent: '#ef4444',  // Red
+    taskHigh: '#f59e0b',    // Orange
+    taskNormalLow: '#10b981' // Green
+  }
 };
 
 const CALENDAR_COLORS = [
@@ -57,8 +69,19 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        setSettings(parsed);
-        onSettingsChange?.(parsed);
+        // Merge with DEFAULT_SETTINGS to handle legacy settings without colorPreferences
+        const mergedSettings = {
+          ...DEFAULT_SETTINGS,
+          ...parsed,
+          colorPreferences: {
+            ...DEFAULT_SETTINGS.colorPreferences,
+            ...(parsed.colorPreferences || {})
+          }
+        };
+        setSettings(mergedSettings);
+        // Persist the upgraded settings back to localStorage
+        localStorage.setItem(`calendar-settings-${orgId}`, JSON.stringify(mergedSettings));
+        onSettingsChange?.(mergedSettings);
       } catch (e) {
         console.error('Failed to parse calendar settings:', e);
       }
@@ -175,10 +198,11 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
         </DialogHeader>
 
         <Tabs defaultValue="calendars" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="calendars" data-testid="tab-calendars">Calendars</TabsTrigger>
             <TabsTrigger value="filters" data-testid="tab-filters">Filters</TabsTrigger>
             <TabsTrigger value="display" data-testid="tab-display">Display</TabsTrigger>
+            <TabsTrigger value="colors" data-testid="tab-colors">Colors</TabsTrigger>
           </TabsList>
 
           {/* Calendar Management Tab */}
@@ -423,6 +447,144 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
                     <SelectItem value="6">Saturday</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Color Preferences Tab */}
+          <TabsContent value="colors" className="space-y-4 mt-4">
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold mb-3">Event & Task Colors</h3>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Customize the colors used to display events and tasks in your calendar and dashboard widget.
+                </p>
+              </div>
+
+              {/* Calendar Events Color */}
+              <div className="space-y-2">
+                <Label>Calendar Events</Label>
+                <Select 
+                  value={settings.colorPreferences.events} 
+                  onValueChange={(value) => saveSettings({ 
+                    ...settings, 
+                    colorPreferences: { ...settings.colorPreferences, events: value } 
+                  })}
+                >
+                  <SelectTrigger data-testid="select-color-events">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded" style={{ backgroundColor: settings.colorPreferences.events }} />
+                      <span>{settings.colorPreferences.events}</span>
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CALENDAR_COLORS.map((color) => (
+                      <SelectItem key={color} value={color}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded" style={{ backgroundColor: color }} />
+                          <span className="text-xs">{color}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Urgent Tasks Color */}
+              <div className="space-y-2">
+                <Label>Urgent Priority Tasks</Label>
+                <Select 
+                  value={settings.colorPreferences.taskUrgent} 
+                  onValueChange={(value) => saveSettings({ 
+                    ...settings, 
+                    colorPreferences: { ...settings.colorPreferences, taskUrgent: value } 
+                  })}
+                >
+                  <SelectTrigger data-testid="select-color-task-urgent">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded" style={{ backgroundColor: settings.colorPreferences.taskUrgent }} />
+                      <span>{settings.colorPreferences.taskUrgent}</span>
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CALENDAR_COLORS.map((color) => (
+                      <SelectItem key={color} value={color}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded" style={{ backgroundColor: color }} />
+                          <span className="text-xs">{color}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* High Priority Tasks Color */}
+              <div className="space-y-2">
+                <Label>High Priority Tasks</Label>
+                <Select 
+                  value={settings.colorPreferences.taskHigh} 
+                  onValueChange={(value) => saveSettings({ 
+                    ...settings, 
+                    colorPreferences: { ...settings.colorPreferences, taskHigh: value } 
+                  })}
+                >
+                  <SelectTrigger data-testid="select-color-task-high">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded" style={{ backgroundColor: settings.colorPreferences.taskHigh }} />
+                      <span>{settings.colorPreferences.taskHigh}</span>
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CALENDAR_COLORS.map((color) => (
+                      <SelectItem key={color} value={color}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded" style={{ backgroundColor: color }} />
+                          <span className="text-xs">{color}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Normal/Low Priority Tasks Color */}
+              <div className="space-y-2">
+                <Label>Normal & Low Priority Tasks</Label>
+                <Select 
+                  value={settings.colorPreferences.taskNormalLow} 
+                  onValueChange={(value) => saveSettings({ 
+                    ...settings, 
+                    colorPreferences: { ...settings.colorPreferences, taskNormalLow: value } 
+                  })}
+                >
+                  <SelectTrigger data-testid="select-color-task-normal-low">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded" style={{ backgroundColor: settings.colorPreferences.taskNormalLow }} />
+                      <span>{settings.colorPreferences.taskNormalLow}</span>
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CALENDAR_COLORS.map((color) => (
+                      <SelectItem key={color} value={color}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded" style={{ backgroundColor: color }} />
+                          <span className="text-xs">{color}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="pt-3 border-t">
+                <Button 
+                  variant="outline" 
+                  onClick={() => saveSettings({ ...settings, colorPreferences: DEFAULT_SETTINGS.colorPreferences })}
+                  data-testid="button-reset-colors"
+                >
+                  Reset to Default Colors
+                </Button>
               </div>
             </div>
           </TabsContent>

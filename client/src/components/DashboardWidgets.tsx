@@ -14,7 +14,7 @@ import {
   Eye,
   ArrowRight
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { format, isToday, isTomorrow, parseISO } from "date-fns";
@@ -23,10 +23,46 @@ interface CalendarWidgetProps {
   className?: string;
 }
 
+interface ColorPreferences {
+  events: string;
+  taskUrgent: string;
+  taskHigh: string;
+  taskNormalLow: string;
+}
+
+const DEFAULT_COLOR_PREFERENCES: ColorPreferences = {
+  events: '#3b82f6',      // Blue
+  taskUrgent: '#ef4444',  // Red
+  taskHigh: '#f59e0b',    // Orange
+  taskNormalLow: '#10b981' // Green
+};
+
 export function CalendarWidget({ className }: CalendarWidgetProps) {
   const [, setLocation] = useLocation();
   const { data: user } = useQuery({ queryKey: ["/api/auth/user"] });
   const orgId = (user as any)?.orgId;
+  const [colorPreferences, setColorPreferences] = useState<ColorPreferences>(DEFAULT_COLOR_PREFERENCES);
+
+  // Load color preferences from localStorage
+  useEffect(() => {
+    if (!orgId) return;
+    
+    const stored = localStorage.getItem(`calendar-settings-${orgId}`);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed.colorPreferences) {
+          // Merge with defaults to handle missing properties
+          setColorPreferences({
+            ...DEFAULT_COLOR_PREFERENCES,
+            ...parsed.colorPreferences
+          });
+        }
+      } catch (e) {
+        console.error('Failed to parse calendar settings:', e);
+      }
+    }
+  }, [orgId]);
 
   const { data: events, isLoading } = useQuery({
     queryKey: [`/api/orgs/${orgId}/events`],
@@ -82,14 +118,38 @@ export function CalendarWidget({ className }: CalendarWidgetProps) {
     .slice(0, 3);
 
   const getEventColors = (event: any) => {
+    // Helper to convert hex color to tailwind-compatible bg/border/text classes
+    const hexToRgb = (hex: string) => {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : { r: 59, g: 130, b: 246 }; // default blue
+    };
+
+    let color = colorPreferences.events;
+    
     if (event.type === 'task') {
       // Task colors based on priority
-      if (event.priority === 'urgent') return { bg: 'bg-red-50', border: 'border-red-500', text: 'text-red-900', subtext: 'text-red-700' };
-      if (event.priority === 'high') return { bg: 'bg-orange-50', border: 'border-orange-500', text: 'text-orange-900', subtext: 'text-orange-700' };
-      return { bg: 'bg-green-50', border: 'border-green-500', text: 'text-green-900', subtext: 'text-green-700' };
+      if (event.priority === 'urgent') color = colorPreferences.taskUrgent;
+      else if (event.priority === 'high') color = colorPreferences.taskHigh;
+      else color = colorPreferences.taskNormalLow;
     }
-    // Calendar events use blue
-    return { bg: 'bg-blue-50', border: 'border-blue-500', text: 'text-blue-900', subtext: 'text-blue-700' };
+
+    const rgb = hexToRgb(color);
+    
+    return {
+      bg: '',
+      border: '',
+      text: '',
+      subtext: '',
+      customStyle: {
+        backgroundColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`,
+        borderLeftColor: color,
+        color: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 1)`
+      }
+    };
   };
 
   const formatEventDate = (dateStr: string) => {
@@ -125,7 +185,8 @@ export function CalendarWidget({ className }: CalendarWidgetProps) {
               return (
                 <div 
                   key={event.id} 
-                  className={`flex items-center justify-between p-3 ${colors.bg} rounded-lg border-l-4 ${colors.border} cursor-pointer hover:shadow-md transition-shadow`}
+                  className="flex items-center justify-between p-3 rounded-lg border-l-4 cursor-pointer hover:shadow-md transition-shadow"
+                  style={colors.customStyle}
                   onClick={() => {
                     // Navigate to calendar with the event's date and ID
                     const eventDate = parseISO(event.start);
@@ -136,8 +197,8 @@ export function CalendarWidget({ className }: CalendarWidgetProps) {
                   data-testid={`calendar-event-${event.id}`}
                 >
                   <div>
-                    <p className={`font-medium ${colors.text}`}>{event.title}</p>
-                    <p className={`text-sm ${colors.subtext}`}>
+                    <p className="font-medium" style={{ color: colors.customStyle.borderLeftColor }}>{event.title}</p>
+                    <p className="text-sm opacity-80">
                       {hasConflict 
                         ? '⚠️ Conflict' 
                         : event.propertyName || event.location || (event.type === 'task' ? 'Task' : 'Event')
@@ -145,8 +206,8 @@ export function CalendarWidget({ className }: CalendarWidgetProps) {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className={`text-sm font-medium ${colors.text}`}>{formatEventDate(event.start)}</p>
-                    <p className={`text-xs ${colors.subtext}`}>{formatEventTime(event.start, event.allDay)}</p>
+                    <p className="text-sm font-medium" style={{ color: colors.customStyle.borderLeftColor }}>{formatEventDate(event.start)}</p>
+                    <p className="text-xs opacity-80">{formatEventTime(event.start, event.allDay)}</p>
                   </div>
                 </div>
               );

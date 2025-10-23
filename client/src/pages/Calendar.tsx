@@ -19,6 +19,12 @@ interface CalendarDisplaySettings {
   hiddenCalendars: string[];
   filterEventType: 'all' | 'events' | 'tasks';
   filterPriority: 'all' | 'urgent' | 'high' | 'normal' | 'low';
+  colorPreferences: {
+    events: string;
+    taskUrgent: string;
+    taskHigh: string;
+    taskNormalLow: string;
+  };
 }
 
 const DEFAULT_SETTINGS: CalendarDisplaySettings = {
@@ -28,6 +34,12 @@ const DEFAULT_SETTINGS: CalendarDisplaySettings = {
   hiddenCalendars: [],
   filterEventType: 'all',
   filterPriority: 'all',
+  colorPreferences: {
+    events: '#3b82f6',      // Blue
+    taskUrgent: '#ef4444',  // Red
+    taskHigh: '#f59e0b',    // Orange
+    taskNormalLow: '#10b981' // Green
+  }
 };
 
 export default function CalendarPage() {
@@ -60,6 +72,29 @@ export default function CalendarPage() {
 
   const calendars = calendarsQuery.data;
   const events = eventsQuery.data;
+
+  // Load settings from localStorage on mount
+  useEffect(() => {
+    if (!orgId) return;
+    
+    const stored = localStorage.getItem(`calendar-settings-${orgId}`);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        // Merge with DEFAULT_SETTINGS to handle missing colorPreferences
+        setSettings({
+          ...DEFAULT_SETTINGS,
+          ...parsed,
+          colorPreferences: {
+            ...DEFAULT_SETTINGS.colorPreferences,
+            ...(parsed.colorPreferences || {})
+          }
+        });
+      } catch (e) {
+        console.error('Failed to parse calendar settings:', e);
+      }
+    }
+  }, [orgId]);
 
   // Auto-open event from URL parameter (when clicked from dashboard widget)
   useEffect(() => {
@@ -236,8 +271,10 @@ export default function CalendarPage() {
     const hasConflict = conflicts.has(event.id);
     
     let backgroundColor = isTask 
-      ? (event.priority === 'urgent' ? '#ef4444' : event.priority === 'high' ? '#ea580c' : '#059669') 
-      : (calendars && Array.isArray(calendars)) ? calendars.find((cal: any) => cal.id === event.calendarId)?.color || "#3b82f6" : "#3b82f6";
+      ? (event.priority === 'urgent' ? settings.colorPreferences.taskUrgent : 
+         event.priority === 'high' ? settings.colorPreferences.taskHigh : 
+         settings.colorPreferences.taskNormalLow) 
+      : (calendars && Array.isArray(calendars)) ? calendars.find((cal: any) => cal.id === event.calendarId)?.color || settings.colorPreferences.events : settings.colorPreferences.events;
     
     // Add visual indicator for conflicts
     const borderColor = hasConflict ? '#dc2626' : backgroundColor;
