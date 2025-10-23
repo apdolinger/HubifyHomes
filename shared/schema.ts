@@ -1082,7 +1082,7 @@ export const calendars = pgTable("calendars", {
 export const events = pgTable("events", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").references(() => orgs.id).notNull(),
-  calendarId: uuid("calendar_id").references(() => calendars.id, { onDelete: "cascade" }).notNull(),
+  calendarId: uuid("calendar_id").references(() => calendars.id, { onDelete: "cascade" }),
   title: varchar("title").notNull(),
   description: text("description"),
   location: varchar("location"),

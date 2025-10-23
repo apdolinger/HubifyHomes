@@ -708,9 +708,9 @@ export function EventModal({
                 <FormItem>
                   <FormLabel className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
-                    Calendar *
+                    Calendar
                   </FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} disabled={isPending}>
+                  <Select onValueChange={field.onChange} value={field.value ?? undefined} disabled={isPending}>
                     <FormControl>
                       <SelectTrigger data-testid="select-calendar">
                         <SelectValue placeholder="Select a calendar" />

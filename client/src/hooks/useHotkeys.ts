@@ -15,6 +15,10 @@ function isInInputField(): boolean {
   ));
 }
 
+function isModalOpen(): boolean {
+  return !!document.querySelector('[role="dialog"]');
+}
+
 export function useHotkeys(hotkeys: HotkeyConfig) {
   const hotkeysRef = useRef(hotkeys);
   hotkeysRef.current = hotkeys;
@@ -25,7 +29,7 @@ export function useHotkeys(hotkeys: HotkeyConfig) {
       
       if (!handler) return;
 
-      // Always handle Escape key regardless of input focus
+      // Always handle Escape key regardless of input focus or modal state
       if (event.key === 'Escape') {
         handler();
         return;
@@ -33,6 +37,11 @@ export function useHotkeys(hotkeys: HotkeyConfig) {
 
       // Don't trigger shortcuts when typing in form fields
       if (isInInputField()) {
+        return;
+      }
+
+      // Don't trigger shortcuts when a modal is open (except Escape)
+      if (isModalOpen()) {
         return;
       }
 
