@@ -574,7 +574,7 @@ export default function CalendarPage() {
             className="w-full max-w-xs"
           >
             <AlertTriangle className="h-4 w-4 mr-2" />
-            Scan All Events for Conflicts
+            Scan for Conflicts
           </Button>
         </div>
       )}
