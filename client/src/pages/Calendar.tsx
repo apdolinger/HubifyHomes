@@ -1,5 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -60,6 +61,33 @@ export default function CalendarPage() {
 
   const calendars = calendarsQuery.data;
   const events = eventsQuery.data;
+
+  // Auto-open event from URL parameter (when clicked from dashboard widget)
+  useEffect(() => {
+    if (!events || !Array.isArray(events)) return;
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const eventId = urlParams.get('eventId');
+    
+    if (eventId) {
+      // Find the event by ID
+      const event = events.find((e: any) => e.id === parseInt(eventId));
+      if (event) {
+        setSelectedEvent(event);
+        setEventModalOpen(true);
+        
+        // Navigate to the event's date
+        if (calendarRef.current) {
+          const calendarApi = calendarRef.current.getApi();
+          calendarApi.gotoDate(event.start);
+        }
+        
+        // Clean up URL parameter after opening
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, [events]);
 
   // Show loading if still fetching user
   if (userLoading) {
