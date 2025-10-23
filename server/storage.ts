@@ -52,6 +52,7 @@ import {
   securityAuditLogs,
   userSessions,
   importHistory,
+  platformTemplates,
   type User,
   type UpsertUser,
   type Org,
@@ -150,6 +151,8 @@ import {
   type InsertOutOfOfficePeriod,
   type ImportHistory,
   type InsertImportHistory,
+  type PlatformTemplate,
+  type InsertPlatformTemplate,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, like, count, sql } from "drizzle-orm";
@@ -485,6 +488,14 @@ export interface IStorage {
   // Import history operations
   createImportHistory(history: InsertImportHistory): Promise<ImportHistory>;
   getImportHistory(orgId: string): Promise<any[]>;
+  
+  // Platform template operations
+  getPlatformTemplates(): Promise<PlatformTemplate[]>;
+  getPlatformTemplate(id: number): Promise<PlatformTemplate | undefined>;
+  getPlatformTemplateByType(type: string): Promise<PlatformTemplate | undefined>;
+  createPlatformTemplate(template: InsertPlatformTemplate): Promise<PlatformTemplate>;
+  updatePlatformTemplate(id: number, template: Partial<InsertPlatformTemplate>): Promise<PlatformTemplate>;
+  deletePlatformTemplate(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3879,6 +3890,46 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(users, eq(importHistory.initiatedBy, users.id))
       .where(eq(importHistory.orgId, orgId))
       .orderBy(desc(importHistory.initiatedAt));
+  }
+
+  // Platform template operations
+  async getPlatformTemplates(): Promise<PlatformTemplate[]> {
+    return await db.select().from(platformTemplates).orderBy(platformTemplates.type, platformTemplates.name);
+  }
+
+  async getPlatformTemplate(id: number): Promise<PlatformTemplate | undefined> {
+    const [template] = await db.select().from(platformTemplates).where(eq(platformTemplates.id, id));
+    return template;
+  }
+
+  async getPlatformTemplateByType(type: string): Promise<PlatformTemplate | undefined> {
+    const [template] = await db
+      .select()
+      .from(platformTemplates)
+      .where(and(
+        eq(platformTemplates.type, type),
+        eq(platformTemplates.isActive, true)
+      ))
+      .limit(1);
+    return template;
+  }
+
+  async createPlatformTemplate(template: InsertPlatformTemplate): Promise<PlatformTemplate> {
+    const [newTemplate] = await db.insert(platformTemplates).values(template).returning();
+    return newTemplate;
+  }
+
+  async updatePlatformTemplate(id: number, template: Partial<InsertPlatformTemplate>): Promise<PlatformTemplate> {
+    const [updated] = await db
+      .update(platformTemplates)
+      .set({ ...template, updatedAt: new Date() })
+      .where(eq(platformTemplates.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePlatformTemplate(id: number): Promise<void> {
+    await db.delete(platformTemplates).where(eq(platformTemplates.id, id));
   }
 }
 

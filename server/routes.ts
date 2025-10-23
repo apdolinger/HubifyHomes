@@ -1638,6 +1638,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Platform Template Management Routes (Super Admin only)
+  app.get("/api/super-admin/templates", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const templates = await storage.getPlatformTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching templates:", error);
+      res.status(500).json({ message: "Failed to fetch templates" });
+    }
+  });
+
+  app.get("/api/super-admin/templates/:id", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const template = await storage.getPlatformTemplate(parseInt(id));
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Error fetching template:", error);
+      res.status(500).json({ message: "Failed to fetch template" });
+    }
+  });
+
+  app.post("/api/super-admin/templates", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { insertPlatformTemplateSchema } = await import("@shared/schema");
+      const validation = insertPlatformTemplateSchema.safeParse(req.body);
+      
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid template data", errors: validation.error.issues });
+      }
+
+      const template = await storage.createPlatformTemplate(validation.data);
+      
+      await AuditLogger.log({
+        req,
+        action: "create_platform_template",
+        actionType: "create",
+        resource: "platform_template",
+        resourceId: template.id.toString(),
+        severity: "info",
+        success: true,
+      });
+      
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Error creating template:", error);
+      res.status(500).json({ message: "Failed to create template" });
+    }
+  });
+
+  app.patch("/api/super-admin/templates/:id", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const template = await storage.updatePlatformTemplate(parseInt(id), req.body);
+      
+      await AuditLogger.log({
+        req,
+        action: "update_platform_template",
+        actionType: "update",
+        resource: "platform_template",
+        resourceId: id,
+        severity: "info",
+        success: true,
+      });
+      
+      res.json(template);
+    } catch (error) {
+      console.error("Error updating template:", error);
+      res.status(500).json({ message: "Failed to update template" });
+    }
+  });
+
+  app.delete("/api/super-admin/templates/:id", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deletePlatformTemplate(parseInt(id));
+      
+      await AuditLogger.log({
+        req,
+        action: "delete_platform_template",
+        actionType: "delete",
+        resource: "platform_template",
+        resourceId: id,
+        severity: "warning",
+        success: true,
+      });
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting template:", error);
+      res.status(500).json({ message: "Failed to delete template" });
+    }
+  });
+
   app.post("/api/communities", isAuthenticated, async (req, res) => {
     try {
       const userId = (req.user as any)?.claims?.sub;

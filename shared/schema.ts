@@ -1993,6 +1993,29 @@ export const insertImportHistorySchema = createInsertSchema(importHistory).omit(
 export type InsertImportHistory = z.infer<typeof insertImportHistorySchema>;
 export type ImportHistory = typeof importHistory.$inferSelect;
 
+// Platform Templates - for managing email, invoice, and other document templates
+export const platformTemplates = pgTable("platform_templates", {
+  id: serial("id").primaryKey(),
+  type: text("type").$type<"email_invitation" | "invoice" | "notification" | "email_general">().notNull(),
+  name: varchar("name").notNull(),
+  subject: varchar("subject"), // Email subject line (for email templates)
+  htmlContent: text("html_content").notNull(), // HTML template with {{variables}}
+  variables: jsonb("variables").$type<string[]>().default([]), // Available template variables
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("platform_templates_type_idx").on(table.type),
+]);
+
+export const insertPlatformTemplateSchema = createInsertSchema(platformTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertPlatformTemplate = z.infer<typeof insertPlatformTemplateSchema>;
+export type PlatformTemplate = typeof platformTemplates.$inferSelect;
+
 // Premium property types - available only on Pro, Grow, and Enterprise tiers
 export const PREMIUM_PROPERTY_TYPES = ['storage_unit', 'boat'] as const;
 export const PREMIUM_TIER_PROPERTY_TIERS = ['pro', 'grow', 'enterprise'] as const;
