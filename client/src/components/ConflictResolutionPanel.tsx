@@ -21,18 +21,20 @@ import {
 import { AlertTriangle, CheckCircle, XCircle, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { ConflictResolution } from "@shared/schema";
+import type { ConflictResolution, Event } from "@shared/schema";
 
 interface ConflictResolutionPanelProps {
   orgId: string;
   userId: string;
   userRole: string;
+  onEditEvent?: (event: Event) => void;
 }
 
 export function ConflictResolutionPanel({
   orgId,
   userId,
   userRole,
+  onEditEvent,
 }: ConflictResolutionPanelProps) {
   const { toast } = useToast();
   const [selectedConflict, setSelectedConflict] =
@@ -383,13 +385,49 @@ export function ConflictResolutionPanel({
               {actionType === "approve" &&
                 "Approve this scheduling conflict to allow it to proceed."}
               {actionType === "reject" &&
-                "Reject this scheduling conflict. The events will need to be rescheduled."}
+                "Reject this scheduling conflict. Click on an event below to edit it and resolve the conflict."}
               {actionType === "resolve" &&
                 "Mark this conflict as resolved after it has been addressed."}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            {actionType === "reject" && selectedConflict && onEditEvent && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Select an event to edit:
+                </label>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {selectedConflict.eventIds.map((eventId) => {
+                    const event = getEventDetails(eventId);
+                    if (!event) return null;
+                    return (
+                      <Button
+                        key={eventId}
+                        variant="outline"
+                        className="w-full justify-start text-left h-auto py-3"
+                        onClick={() => {
+                          onEditEvent(event);
+                          setSelectedConflict(null);
+                          setActionType(null);
+                          setNotes("");
+                        }}
+                        data-testid={`button-edit-event-${eventId}`}
+                      >
+                        <div className="flex flex-col gap-1 w-full">
+                          <div className="font-medium">{event.title}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {new Date(event.start).toLocaleString()} -{" "}
+                            {new Date(event.end).toLocaleString()}
+                          </div>
+                        </div>
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            
             <div>
               <label
                 htmlFor="notes"

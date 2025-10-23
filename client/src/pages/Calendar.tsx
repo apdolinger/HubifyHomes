@@ -534,6 +534,10 @@ export default function CalendarPage() {
             orgId={orgId}
             userId={userId}
             userRole={(user as any)?.role || 'staff'}
+            onEditEvent={(event) => {
+              setSelectedEvent(event);
+              setEventModalOpen(true);
+            }}
           />
           <Button
             variant="outline"
