@@ -135,6 +135,9 @@ export function EventModal({
   // Email preview state
   const [showPreview, setShowPreview] = useState(false);
   const [previewHtml, setPreviewHtml] = useState<string>("");
+  
+  // Ref for property combobox scrolling
+  const propertyListRef = React.useRef<HTMLDivElement>(null);
 
   // Fetch calendars for the dropdown
   const { data: calendars } = useQuery({
@@ -912,7 +915,17 @@ export function EventModal({
                         <PopoverContent className="w-[400px] p-0" align="start">
                           <Command shouldFilter={true}>
                             <CommandInput placeholder="Search properties..." />
-                              <CommandList className="max-h-[400px] overflow-y-scroll overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+                              <CommandList 
+                                ref={propertyListRef}
+                                className="max-h-[400px] overflow-y-scroll overscroll-contain" 
+                                style={{ WebkitOverflowScrolling: 'touch' }}
+                                onWheel={(e) => {
+                                  e.stopPropagation();
+                                  if (propertyListRef.current) {
+                                    propertyListRef.current.scrollTop += e.deltaY;
+                                  }
+                                }}
+                              >
                                 <CommandEmpty>
                                 {!showQuickAddProperty ? (
                                   <div className="py-6 text-center text-sm">
