@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -64,10 +63,15 @@ export default function CalendarPage() {
 
   // Auto-open event from URL parameter (when clicked from dashboard widget)
   useEffect(() => {
-    if (!events || !Array.isArray(events) || events.length === 0) return;
+    console.log('useEffect running, events:', events ? events.length : 0);
+    if (!events || !Array.isArray(events) || events.length === 0) {
+      console.log('No events yet, waiting...');
+      return;
+    }
     
     const urlParams = new URLSearchParams(window.location.search);
     const eventId = urlParams.get('eventId');
+    console.log('URL params:', window.location.search, 'eventId:', eventId);
     
     if (eventId) {
       console.log('Opening event from URL:', eventId);
@@ -79,6 +83,7 @@ export default function CalendarPage() {
       if (event) {
         // Use setTimeout to ensure the calendar is fully mounted
         setTimeout(() => {
+          console.log('Setting selected event and opening modal');
           setSelectedEvent(event);
           setEventModalOpen(true);
           

@@ -127,10 +127,12 @@ export function CalendarWidget({ className }: CalendarWidgetProps) {
                   key={event.id} 
                   className={`flex items-center justify-between p-3 ${colors.bg} rounded-lg border-l-4 ${colors.border} cursor-pointer hover:shadow-md transition-shadow`}
                   onClick={() => {
-                    // Navigate to calendar with the event's date
+                    // Navigate to calendar with the event's date and ID
                     const eventDate = parseISO(event.start);
                     const dateParam = format(eventDate, 'yyyy-MM-dd');
-                    setLocation(`/calendar?date=${dateParam}&eventId=${event.id}`);
+                    const targetUrl = `/calendar?date=${dateParam}&eventId=${event.id}`;
+                    console.log('Navigating to calendar with event:', event.id, targetUrl);
+                    setLocation(targetUrl);
                   }}
                   data-testid={`calendar-event-${event.id}`}
                 >
