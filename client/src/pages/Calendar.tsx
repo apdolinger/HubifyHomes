@@ -4,7 +4,7 @@ import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
-import { Calendar, Plus, ChevronLeft, ChevronRight, Settings } from "lucide-react";
+import { Calendar, Plus, ChevronLeft, ChevronRight, Settings, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -348,6 +348,17 @@ export default function CalendarPage() {
     calendarApi?.today();
   };
 
+  const toggleCalendarVisibility = (calendarId: string) => {
+    const newSettings = {
+      ...settings,
+      hiddenCalendars: settings.hiddenCalendars.includes(calendarId)
+        ? settings.hiddenCalendars.filter(id => id !== calendarId)
+        : [...settings.hiddenCalendars, calendarId]
+    };
+    setSettings(newSettings);
+    localStorage.setItem(`calendar-settings-${orgId}`, JSON.stringify(newSettings));
+  };
+
   if (isLoading) {
     return (
       <div className="container mx-auto p-6 space-y-6">
@@ -444,19 +455,36 @@ export default function CalendarPage() {
           <h2 className="font-semibold mb-4">My Calendars</h2>
           <div className="space-y-2">
             {calendars && Array.isArray(calendars) && calendars.length > 0 ? (
-              calendars.map((calendar: any) => (
-                <div
-                  key={calendar.id}
-                  className="flex items-center gap-2 p-2 rounded hover:bg-accent cursor-pointer"
-                  data-testid={`calendar-item-${calendar.id}`}
-                >
+              calendars.map((calendar: any) => {
+                const isHidden = settings.hiddenCalendars.includes(calendar.id);
+                return (
                   <div
-                    className="w-4 h-4 rounded"
-                    style={{ backgroundColor: calendar.color }}
-                  />
-                  <span className="text-sm">{calendar.name}</span>
-                </div>
-              ))
+                    key={calendar.id}
+                    className="flex items-center gap-2 p-2 rounded hover:bg-accent"
+                    data-testid={`calendar-item-${calendar.id}`}
+                  >
+                    <div
+                      className="w-4 h-4 rounded flex-shrink-0"
+                      style={{ backgroundColor: calendar.color }}
+                    />
+                    <span className={`text-sm flex-1 ${isHidden ? 'text-muted-foreground line-through' : ''}`}>
+                      {calendar.name}
+                    </span>
+                    <button
+                      onClick={() => toggleCalendarVisibility(calendar.id)}
+                      className="p-1 hover:bg-accent-foreground/10 rounded"
+                      data-testid={`button-toggle-calendar-${calendar.id}`}
+                      aria-label={isHidden ? 'Show calendar' : 'Hide calendar'}
+                    >
+                      {isHidden ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </button>
+                  </div>
+                );
+              })
             ) : (
               <p className="text-sm text-muted-foreground">No calendars yet</p>
             )}
