@@ -62,7 +62,6 @@ interface EventModalProps {
 }
 
 const formSchema = insertEventSchema.extend({
-  calendarId: z.string().min(1, "Calendar category is required"),
   start: z.string().min(1, "Start date and time is required"),
   end: z.string().min(1, "End date and time is required"),
 }).refine(
