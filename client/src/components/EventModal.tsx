@@ -1127,131 +1127,133 @@ export function EventModal({
                         </PopoverTrigger>
                         <PopoverContent className="w-[400px] p-0" align="start">
                           <Command>
-                            <CommandInput placeholder="Search tasks..." />
+                            {!showQuickAddTask && <CommandInput placeholder="Search tasks..." />}
                             <CommandList className={cn(showQuickAddTask ? "max-h-[450px]" : "max-h-[300px]")}>
-                              <CommandEmpty>
-                                {!showQuickAddTask ? (
-                                  <div className="py-6 text-center text-sm">
-                                    <p className="mb-2">
-                                      {selectedPropertyId 
-                                        ? "No tasks found for this property." 
-                                        : "No tasks found."}
-                                    </p>
+                              {showQuickAddTask ? (
+                                <div className="p-4 space-y-3">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h4 className="font-medium text-sm">Quick Add Task</h4>
                                     <Button
                                       type="button"
-                                      variant="outline"
+                                      variant="ghost"
                                       size="sm"
-                                      onClick={() => setShowQuickAddTask(true)}
-                                      data-testid="button-add-new-task"
+                                      onClick={() => setShowQuickAddTask(false)}
                                     >
-                                      Add New Task
+                                      <X className="h-4 w-4" />
                                     </Button>
                                   </div>
-                                ) : (
-                                  <div className="p-4 space-y-3">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <h4 className="font-medium text-sm">Quick Add Task</h4>
+                                  <Input
+                                    placeholder="Task title *"
+                                    value={quickTaskTitle}
+                                    onChange={(e) => setQuickTaskTitle(e.target.value)}
+                                    data-testid="input-quick-task-title"
+                                  />
+                                  <Textarea
+                                    placeholder="Description (optional)"
+                                    value={quickTaskDescription}
+                                    onChange={(e) => setQuickTaskDescription(e.target.value)}
+                                    data-testid="input-quick-task-description"
+                                    rows={2}
+                                  />
+                                  <Select
+                                    value={quickTaskPriority}
+                                    onValueChange={(value: 'urgent' | 'high' | 'normal' | 'low') => setQuickTaskPriority(value)}
+                                  >
+                                    <SelectTrigger data-testid="select-quick-task-priority">
+                                      <SelectValue placeholder="Priority" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="urgent">Urgent</SelectItem>
+                                      <SelectItem value="high">High</SelectItem>
+                                      <SelectItem value="normal">Normal</SelectItem>
+                                      <SelectItem value="low">Low</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  {selectedPropertyId && (
+                                    <p className="text-xs text-muted-foreground">
+                                      This task will be linked to the selected property
+                                    </p>
+                                  )}
+                                  <Button
+                                    type="button"
+                                    onClick={handleQuickAddTask}
+                                    disabled={quickAddTaskMutation.isPending}
+                                    className="w-full"
+                                    data-testid="button-save-quick-task"
+                                  >
+                                    {quickAddTaskMutation.isPending ? "Adding..." : "Add Task"}
+                                  </Button>
+                                </div>
+                              ) : (
+                                <>
+                                  <CommandEmpty>
+                                    <div className="py-6 text-center text-sm">
+                                      <p className="mb-2">
+                                        {selectedPropertyId 
+                                          ? "No tasks found for this property." 
+                                          : "No tasks found."}
+                                      </p>
                                       <Button
                                         type="button"
-                                        variant="ghost"
+                                        variant="outline"
                                         size="sm"
-                                        onClick={() => setShowQuickAddTask(false)}
+                                        onClick={() => setShowQuickAddTask(true)}
+                                        data-testid="button-add-new-task"
                                       >
-                                        <X className="h-4 w-4" />
+                                        Add New Task
                                       </Button>
                                     </div>
-                                    <Input
-                                      placeholder="Task title *"
-                                      value={quickTaskTitle}
-                                      onChange={(e) => setQuickTaskTitle(e.target.value)}
-                                      data-testid="input-quick-task-title"
-                                    />
-                                    <Textarea
-                                      placeholder="Description (optional)"
-                                      value={quickTaskDescription}
-                                      onChange={(e) => setQuickTaskDescription(e.target.value)}
-                                      data-testid="input-quick-task-description"
-                                      rows={2}
-                                    />
-                                    <Select
-                                      value={quickTaskPriority}
-                                      onValueChange={(value: 'urgent' | 'high' | 'normal' | 'low') => setQuickTaskPriority(value)}
+                                  </CommandEmpty>
+                                  <CommandGroup>
+                                    <CommandItem
+                                      value="none"
+                                      onSelect={() => {
+                                        field.onChange(undefined);
+                                        setTaskOpen(false);
+                                      }}
+                                      data-testid="select-task-none"
                                     >
-                                      <SelectTrigger data-testid="select-quick-task-priority">
-                                        <SelectValue placeholder="Priority" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="urgent">Urgent</SelectItem>
-                                        <SelectItem value="high">High</SelectItem>
-                                        <SelectItem value="normal">Normal</SelectItem>
-                                        <SelectItem value="low">Low</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                    {selectedPropertyId && (
-                                      <p className="text-xs text-muted-foreground">
-                                        This task will be linked to the selected property
-                                      </p>
-                                    )}
-                                    <Button
-                                      type="button"
-                                      onClick={handleQuickAddTask}
-                                      disabled={quickAddTaskMutation.isPending}
-                                      className="w-full"
-                                      data-testid="button-save-quick-task"
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          !field.value ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      No task
+                                    </CommandItem>
+                                    <CommandItem
+                                      value="create-new-task"
+                                      onSelect={() => {
+                                        setShowQuickAddTask(true);
+                                      }}
+                                      data-testid="select-task-create-new"
+                                      className="text-primary"
                                     >
-                                      {quickAddTaskMutation.isPending ? "Adding..." : "Add Task"}
-                                    </Button>
-                                  </div>
-                                )}
-                              </CommandEmpty>
-                              <CommandGroup>
-                                <CommandItem
-                                  value="none"
-                                  onSelect={() => {
-                                    field.onChange(undefined);
-                                    setTaskOpen(false);
-                                  }}
-                                  data-testid="select-task-none"
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      !field.value ? "opacity-100" : "opacity-0"
-                                    )}
-                                  />
-                                  No task
-                                </CommandItem>
-                                <CommandItem
-                                  value="create-new-task"
-                                  onSelect={() => {
-                                    setShowQuickAddTask(true);
-                                  }}
-                                  data-testid="select-task-create-new"
-                                  className="text-primary"
-                                >
-                                  <Plus className="mr-2 h-4 w-4" />
-                                  Create a new task
-                                </CommandItem>
-                                {filteredTasks.map((task: any) => (
-                                  <CommandItem
-                                    key={task.id}
-                                    value={task.title}
-                                    onSelect={() => {
-                                      field.onChange(task.id);
-                                      setTaskOpen(false);
-                                    }}
-                                    data-testid={`select-task-${task.id}`}
-                                  >
-                                    <Check
-                                      className={cn(
-                                        "mr-2 h-4 w-4",
-                                        field.value === task.id ? "opacity-100" : "opacity-0"
-                                      )}
-                                    />
-                                    {task.title}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
+                                      <Plus className="mr-2 h-4 w-4" />
+                                      Create a new task
+                                    </CommandItem>
+                                    {filteredTasks.map((task: any) => (
+                                      <CommandItem
+                                        key={task.id}
+                                        value={task.title}
+                                        onSelect={() => {
+                                          field.onChange(task.id);
+                                          setTaskOpen(false);
+                                        }}
+                                        data-testid={`select-task-${task.id}`}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            field.value === task.id ? "opacity-100" : "opacity-0"
+                                          )}
+                                        />
+                                        {task.title}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </>
+                              )}
                             </CommandList>
                           </Command>
                         </PopoverContent>
