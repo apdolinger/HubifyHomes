@@ -62,6 +62,7 @@ import {
   contactProperties,
   rooms,
   vehicles,
+  alerts,
   ignoredDuplicates,
   duplicateHistory,
   isPremiumPropertyType,
@@ -69,7 +70,7 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
-import { eq, lt } from "drizzle-orm";
+import { eq, lt, and } from "drizzle-orm";
 import sgMail from "@sendgrid/mail";
 
 // Initialize SendGrid if API key is available
