@@ -477,6 +477,486 @@ function TemplateManagement() {
   );
 }
 
+// Email Templates Component
+function EmailTemplates() {
+  const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<any>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<any>(null);
+  
+  const [formData, setFormData] = useState({
+    name: '',
+    type: '' as 'ticket_receipt' | 'ticket_notification' | 'status_update' | '',
+    subject: '',
+    fromEmail: '',
+    fromName: '',
+    bodyHtml: '',
+    bodyText: '',
+    isActive: true,
+  });
+
+  const { data: templates, isLoading } = useQuery({
+    queryKey: ['/api/super-admin/email-templates'],
+  });
+
+  const templatesList = (templates as any[]) || [];
+  const filteredTemplates = templatesList.filter((template: any) =>
+    template.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    template.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    template.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    template.fromEmail?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Variable hints based on template type
+  const getVariableHints = (type: string) => {
+    switch (type) {
+      case 'ticket_receipt':
+        return ['userName', 'subject', 'message', 'ticketId', 'createdAt'];
+      case 'ticket_notification':
+        return ['userName', 'organizationName', 'subject', 'message', 'ticketId', 'email', 'createdAt'];
+      case 'status_update':
+        return ['userName', 'subject', 'status', 'ticketId'];
+      default:
+        return [];
+    }
+  };
+
+  const handleCreate = () => {
+    setFormData({
+      name: '',
+      type: '',
+      subject: '',
+      fromEmail: '',
+      fromName: '',
+      bodyHtml: '',
+      bodyText: '',
+      isActive: true,
+    });
+    setEditingTemplate(null);
+    setIsCreating(true);
+  };
+
+  const handleEdit = (template: any) => {
+    setFormData({
+      name: template.name || '',
+      type: template.type || '',
+      subject: template.subject || '',
+      fromEmail: template.fromEmail || '',
+      fromName: template.fromName || '',
+      bodyHtml: template.bodyHtml || '',
+      bodyText: template.bodyText || '',
+      isActive: template.isActive ?? true,
+    });
+    setEditingTemplate(template);
+    setIsCreating(true);
+  };
+
+  const handleSave = async () => {
+    try {
+      // Basic validation
+      if (!formData.name || !formData.type || !formData.subject || !formData.fromEmail || !formData.fromName) {
+        toast({
+          title: "Validation Error",
+          description: "Please fill in all required fields",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!formData.bodyHtml || !formData.bodyText) {
+        toast({
+          title: "Validation Error",
+          description: "Both HTML and Text body are required",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (editingTemplate) {
+        await apiRequest('PATCH', `/api/super-admin/email-templates/${editingTemplate.id}`, formData);
+        toast({ title: "Template updated successfully" });
+      } else {
+        await apiRequest('POST', '/api/super-admin/email-templates', formData);
+        toast({ title: "Template created successfully" });
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/super-admin/email-templates'] });
+      setIsCreating(false);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save template",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const confirmDelete = (template: any) => {
+    setTemplateToDelete(template);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDelete = async () => {
+    if (!templateToDelete) return;
+    try {
+      await apiRequest('DELETE', `/api/super-admin/email-templates/${templateToDelete.id}`);
+      toast({ title: "Template deleted successfully" });
+      queryClient.invalidateQueries({ queryKey: ['/api/super-admin/email-templates'] });
+      setShowDeleteDialog(false);
+      setTemplateToDelete(null);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete template",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleToggleStatus = async (template: any) => {
+    try {
+      await apiRequest('PATCH', `/api/super-admin/email-templates/${template.id}`, {
+        ...template,
+        isActive: !template.isActive
+      });
+      toast({ title: `Template ${!template.isActive ? 'activated' : 'deactivated'} successfully` });
+      queryClient.invalidateQueries({ queryKey: ['/api/super-admin/email-templates'] });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update template status",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case 'ticket_receipt':
+        return 'Ticket Receipt';
+      case 'ticket_notification':
+        return 'Ticket Notification';
+      case 'status_update':
+        return 'Status Update';
+      default:
+        return type;
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center">
+              <Mail className="w-5 h-5 mr-2" />
+              Email Templates for Support Tickets
+            </CardTitle>
+            <Button onClick={handleCreate} data-testid="button-create-email-template">
+              <Plus className="w-4 h-4 mr-2" />
+              Create Template
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                placeholder="Search templates by name, type, subject, or from email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+                data-testid="input-search-email-templates"
+              />
+            </div>
+
+            {/* Templates Table */}
+            <div className="border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>From Email</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredTemplates.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                        {searchTerm
+                          ? 'No templates match your search.'
+                          : 'No email templates found. Create your first template to get started.'}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredTemplates.map((template: any) => (
+                      <TableRow key={template.id} data-testid={`row-email-template-${template.id}`}>
+                        <TableCell className="font-medium">{template.name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{getTypeLabel(template.type)}</Badge>
+                        </TableCell>
+                        <TableCell className="max-w-xs truncate">{template.subject}</TableCell>
+                        <TableCell className="text-sm text-gray-600">{template.fromEmail}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              checked={template.isActive}
+                              onCheckedChange={() => handleToggleStatus(template)}
+                              data-testid={`switch-status-${template.id}`}
+                            />
+                            <span className="text-sm text-gray-600">
+                              {template.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(template)}
+                              data-testid={`button-edit-${template.id}`}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => confirmDelete(template)}
+                              data-testid={`button-delete-${template.id}`}
+                            >
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {filteredTemplates.length > 0 && (
+              <div className="text-sm text-gray-500">
+                Showing {filteredTemplates.length} of {templatesList.length} email templates
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Create/Edit Dialog */}
+      <Dialog open={isCreating} onOpenChange={setIsCreating}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingTemplate ? 'Edit Email Template' : 'Create New Email Template'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingTemplate
+                ? 'Update the email template details below.'
+                : 'Create a new email template for support ticket communications.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="template-name">
+                  Name <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="template-name"
+                  placeholder="e.g., Support Ticket Receipt"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  data-testid="input-template-name"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="template-type">
+                  Type <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={formData.type}
+                  onValueChange={(value: any) => setFormData({ ...formData, type: value })}
+                >
+                  <SelectTrigger id="template-type" data-testid="select-template-type">
+                    <SelectValue placeholder="Select template type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ticket_receipt">Ticket Receipt</SelectItem>
+                    <SelectItem value="ticket_notification">Ticket Notification</SelectItem>
+                    <SelectItem value="status_update">Status Update</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="template-subject">
+                Subject <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="template-subject"
+                placeholder="e.g., Your support ticket has been received - {{ticketId}}"
+                value={formData.subject}
+                onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                data-testid="input-template-subject"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="template-from-email">
+                  From Email <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="template-from-email"
+                  type="email"
+                  placeholder="e.g., support@hubify.com"
+                  value={formData.fromEmail}
+                  onChange={(e) => setFormData({ ...formData, fromEmail: e.target.value })}
+                  data-testid="input-template-from-email"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="template-from-name">
+                  From Name <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="template-from-name"
+                  placeholder="e.g., Hubify Support Team"
+                  value={formData.fromName}
+                  onChange={(e) => setFormData({ ...formData, fromName: e.target.value })}
+                  data-testid="input-template-from-name"
+                />
+              </div>
+            </div>
+
+            {formData.type && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <Label className="text-sm font-medium text-blue-900">Available Variables</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {getVariableHints(formData.type).map((variable) => (
+                    <Badge key={variable} variant="secondary" className="text-xs font-mono">
+                      {`{{${variable}}}`}
+                    </Badge>
+                  ))}
+                </div>
+                <p className="text-xs text-blue-700 mt-2">
+                  Use these variables in your subject and body to personalize emails. They will be replaced with actual values when emails are sent.
+                </p>
+              </div>
+            )}
+
+            <div>
+              <Label htmlFor="template-body-html">
+                Body HTML <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                id="template-body-html"
+                placeholder="Enter HTML content with variables like {{userName}}, {{ticketId}}, etc."
+                value={formData.bodyHtml}
+                onChange={(e) => setFormData({ ...formData, bodyHtml: e.target.value })}
+                className="min-h-[200px] font-mono text-sm"
+                data-testid="input-template-body-html"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                HTML version of the email for rich formatting
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="template-body-text">
+                Body Text <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                id="template-body-text"
+                placeholder="Enter plain text content with variables like {{userName}}, {{ticketId}}, etc."
+                value={formData.bodyText}
+                onChange={(e) => setFormData({ ...formData, bodyText: e.target.value })}
+                className="min-h-[200px] font-mono text-sm"
+                data-testid="input-template-body-text"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Plain text version for email clients that don't support HTML
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="template-active"
+                checked={formData.isActive}
+                onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+                data-testid="switch-template-active"
+              />
+              <Label htmlFor="template-active">Active</Label>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreating(false)} data-testid="button-cancel-email-template">
+              Cancel
+            </Button>
+            <Button onClick={handleSave} data-testid="button-save-email-template">
+              {editingTemplate ? 'Update' : 'Create'} Template
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Email Template</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete the template "{templateToDelete?.name}"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowDeleteDialog(false);
+                setTemplateToDelete(null);
+              }}
+              data-testid="button-cancel-delete"
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDelete}
+              data-testid="button-confirm-delete"
+            >
+              Delete Template
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 // Support Tickets Component
 function SupportTickets() {
   const { toast } = useToast();
@@ -1256,11 +1736,12 @@ export default function SuperAdmin() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-11">
+        <TabsList className="grid w-full grid-cols-12">
           <TabsTrigger value="organizations">Organizations</TabsTrigger>
           <TabsTrigger value="users">All Users</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="support">Support</TabsTrigger>
+          <TabsTrigger value="email-templates" data-testid="tab-email-templates">Email Templates</TabsTrigger>
           <TabsTrigger value="communication">Communication</TabsTrigger>
           <TabsTrigger value="revenue">Revenue</TabsTrigger>
           <TabsTrigger value="features">Feature Flags</TabsTrigger>
@@ -1384,6 +1865,11 @@ export default function SuperAdmin() {
         {/* Support Tab */}
         <TabsContent value="support">
           <SupportTickets />
+        </TabsContent>
+
+        {/* Email Templates Tab */}
+        <TabsContent value="email-templates">
+          <EmailTemplates />
         </TabsContent>
 
         {/* All Users Tab */}

@@ -55,6 +55,7 @@ import {
   platformTemplates,
   calendarReportTemplates,
   supportRequests,
+  emailTemplates,
   type User,
   type UpsertUser,
   type Org,
@@ -159,6 +160,8 @@ import {
   type InsertCalendarReportTemplate,
   type SupportRequest,
   type InsertSupportRequest,
+  type EmailTemplate,
+  type InsertEmailTemplate,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, like, count, sql } from "drizzle-orm";
@@ -517,6 +520,14 @@ export interface IStorage {
   getSupportRequests(): Promise<SupportRequest[]>;
   getSupportRequest(id: number): Promise<SupportRequest | undefined>;
   updateSupportRequestStatus(id: number, status: "new"|"in_progress"|"resolved"): Promise<SupportRequest>;
+  
+  // Email template operations
+  createEmailTemplate(template: InsertEmailTemplate): Promise<EmailTemplate>;
+  getEmailTemplates(): Promise<EmailTemplate[]>;
+  getEmailTemplate(id: number): Promise<EmailTemplate | undefined>;
+  getEmailTemplateByType(type: "ticket_receipt"|"ticket_notification"|"status_update"): Promise<EmailTemplate | undefined>;
+  updateEmailTemplate(id: number, template: Partial<InsertEmailTemplate>): Promise<EmailTemplate>;
+  deleteEmailTemplate(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4067,6 +4078,45 @@ export class DatabaseStorage implements IStorage {
       .where(eq(supportRequests.id, id))
       .returning();
     return updated;
+  }
+  
+  // Email template operations
+  async createEmailTemplate(template: InsertEmailTemplate): Promise<EmailTemplate> {
+    const [newTemplate] = await db.insert(emailTemplates).values(template).returning();
+    return newTemplate;
+  }
+  
+  async getEmailTemplates(): Promise<EmailTemplate[]> {
+    return await db.select().from(emailTemplates).orderBy(emailTemplates.type);
+  }
+  
+  async getEmailTemplate(id: number): Promise<EmailTemplate | undefined> {
+    const [template] = await db.select().from(emailTemplates).where(eq(emailTemplates.id, id));
+    return template;
+  }
+  
+  async getEmailTemplateByType(type: "ticket_receipt"|"ticket_notification"|"status_update"): Promise<EmailTemplate | undefined> {
+    const [template] = await db
+      .select()
+      .from(emailTemplates)
+      .where(and(
+        eq(emailTemplates.type, type),
+        eq(emailTemplates.isActive, true)
+      ));
+    return template;
+  }
+  
+  async updateEmailTemplate(id: number, template: Partial<InsertEmailTemplate>): Promise<EmailTemplate> {
+    const [updated] = await db
+      .update(emailTemplates)
+      .set({ ...template, updatedAt: new Date() })
+      .where(eq(emailTemplates.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteEmailTemplate(id: number): Promise<void> {
+    await db.delete(emailTemplates).where(eq(emailTemplates.id, id));
   }
 }
 
