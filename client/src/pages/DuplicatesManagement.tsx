@@ -324,7 +324,7 @@ export default function DuplicatesManagement() {
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={() => setLocation("/dashboard")}
+              onClick={() => setLocation("/")}
               className="text-gray-600 hover:text-gray-900"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
