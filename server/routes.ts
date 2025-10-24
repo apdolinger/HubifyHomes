@@ -4341,18 +4341,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Log the merge activity
-        await storage.createActivity({
-          user_id: req.user?.claims?.sub,
-          type: 'contact_merge',
-          entity_type: 'contact',
-          entity_id: primary.id,
-          description: `Merged ${duplicates.length} duplicate contacts into primary record`,
-          details: JSON.stringify({ 
-            mergedContactIds: duplicateIds,
-            mergeNotes,
-            totalRecords: contactsToMerge.length,
-            transferredRecords: transferCounts
-          })
+        await storage.logActivity({
+          userId: req.user?.claims?.sub,
+          action: 'contact_merge',
+          entityType: 'contact',
+          entityId: primary.id.toString(),
+          description: `Merged ${duplicates.length} duplicate contacts into primary record. Transferred: ${transferCounts.tasks} tasks, ${transferCounts.formSubmissions} form submissions, ${transferCounts.contactProperties} property links, ${transferCounts.alerts} alerts`
         });
         
         // Add to duplicate history with notes
@@ -4608,19 +4602,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Log the merge activity
-        await storage.createActivity({
-          user_id: req.user?.claims?.sub,
-          type: 'property_merge',
-          entity_type: 'property',
-          entity_id: primary.id,
-          description: `Merged ${duplicates.length} duplicate properties into primary record`,
-          details: JSON.stringify({ 
-            mergedPropertyIds: duplicateIds,
-            mergeNotes,
-            totalRecords: propertiesToMerge.length,
-            primaryAddress: `${primary.address1}, ${primary.city}, ${primary.state}`,
-            transferredRecords: propertyTransferCounts
-          })
+        await storage.logActivity({
+          userId: req.user?.claims?.sub,
+          action: 'property_merge',
+          entityType: 'property',
+          entityId: primary.id.toString(),
+          description: `Merged ${duplicates.length} duplicate properties into primary record at ${primary.address1}, ${primary.city}, ${primary.state}. Transferred: ${propertyTransferCounts.tasks} tasks, ${propertyTransferCounts.timeEntries} time entries, ${propertyTransferCounts.formSubmissions} form submissions, ${propertyTransferCounts.contactProperties} contact links, ${propertyTransferCounts.rooms} rooms, ${propertyTransferCounts.vehicles} vehicles, ${propertyTransferCounts.alerts} alerts, ${propertyTransferCounts.events} events`
         });
         
         // Add to duplicate history with notes
