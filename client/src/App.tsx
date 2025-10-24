@@ -22,6 +22,7 @@ import People from "@/pages/People";
 import PersonProfile from "@/pages/PersonProfile";
 import Vendors from "@/pages/Vendors";
 import DuplicatesManagement from "@/pages/DuplicatesManagement";
+import TeamMessages from "@/pages/TeamMessages";
 import HubifyConsole from "@/pages/HubifyConsole";
 import PropertyPortalSettings from "@/pages/PropertyPortalSettings";
 import AdminClientPortal from "@/pages/AdminClientPortal";
@@ -139,6 +140,7 @@ function Router() {
           <Route path="/people" component={People} />
           <Route path="/person-profile/:id" component={PersonProfile} />
           <Route path="/duplicates" component={DuplicatesManagement} />
+          <Route path="/messages" component={TeamMessages} />
           <Route path="/admin" component={Admin} />
           
           {/* Hubify Console (Admin Back-End) */}

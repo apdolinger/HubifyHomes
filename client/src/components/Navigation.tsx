@@ -28,7 +28,8 @@ import {
   Clock,
   CreditCard,
   Wrench,
-  Bell
+  Bell,
+  MessageSquare
 } from "lucide-react";
 
 const getNavigationItems = (user: any) => {
@@ -167,6 +168,10 @@ export default function Navigation() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <TimeTrackingDropdownItems />
+                <DropdownMenuItem onClick={() => window.location.href = '/messages'}>
+                  <MessageSquare className="w-4 h-4 mr-2" />
+                  Messages
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => window.location.href = '/calendar'}>
                   <Calendar className="w-4 h-4 mr-2" />
                   Calendar

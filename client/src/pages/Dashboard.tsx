@@ -964,6 +964,16 @@ function renderMessageWithMentions(content: string) {
                           </Button>
                         </div>
                       </div>
+                      
+                      <Button 
+                        variant="outline" 
+                        className="w-full hover:bg-slate-50 mt-3" 
+                        onClick={() => setLocation('/messages')}
+                        data-testid="button-view-all-messages"
+                      >
+                        <ArrowRight className="w-4 h-4 mr-2" />
+                        View All Messages
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
