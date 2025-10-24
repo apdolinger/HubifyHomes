@@ -721,14 +721,36 @@ export default function DuplicatesManagement() {
                     <UserX className="w-5 h-5 text-orange-600 mr-2" />
                     Duplicate Record
                   </h3>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleSwapPrimary}
-                  >
-                    <RotateCcw className="w-4 h-4 mr-1" />
-                    Swap Primary
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    {selectedDuplicate && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        asChild
+                        data-testid="btn-view-duplicate-profile"
+                      >
+                        <a 
+                          href={selectedDuplicateGroup?.type === 'contact' 
+                            ? `/person-profile/${selectedDuplicate.id}` 
+                            : `/property-profile/${selectedDuplicate.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center"
+                        >
+                          <ExternalLink className="w-4 h-4 mr-1" />
+                          View Profile
+                        </a>
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleSwapPrimary}
+                    >
+                      <RotateCcw className="w-4 h-4 mr-1" />
+                      Swap Primary
+                    </Button>
+                  </div>
                 </div>
                 
                 <Card className="border-2 border-orange-200 bg-orange-50">
