@@ -2150,3 +2150,30 @@ export const insertSupportRequestSchema = createInsertSchema(supportRequests).om
 });
 export type InsertSupportRequest = z.infer<typeof insertSupportRequestSchema>;
 export type SupportRequest = typeof supportRequests.$inferSelect;
+
+// Email Templates table - Super Admin only, for customizable email notifications
+export const emailTemplates = pgTable("email_templates", {
+  id: serial("id").primaryKey(),
+  name: varchar("name").notNull(), // User-friendly name
+  type: varchar("type").$type<"ticket_receipt"|"ticket_notification"|"status_update">().notNull().unique(),
+  subject: text("subject").notNull(),
+  bodyHtml: text("body_html").notNull(),
+  bodyText: text("body_text").notNull(),
+  fromEmail: varchar("from_email").notNull(),
+  fromName: varchar("from_name").notNull(),
+  
+  // Available variables that can be used in templates
+  availableVariables: jsonb("available_variables").$type<string[]>().default([]),
+  
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
+export type EmailTemplate = typeof emailTemplates.$inferSelect;
