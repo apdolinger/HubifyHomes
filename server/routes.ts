@@ -4276,7 +4276,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Transfer all related records to primary contact
         let transferCounts = {
           tasks: 0,
-          timeEntries: 0,
           formSubmissions: 0,
           contactProperties: 0,
           alerts: 0
@@ -4289,13 +4288,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(eq(tasks.contactId, duplicateId))
             .returning();
           transferCounts.tasks += tasksResult.length;
-          
-          // Transfer time entries
-          const timeEntriesResult = await db.update(timeEntries)
-            .set({ contactId: primary.id })
-            .where(eq(timeEntries.contactId, duplicateId))
-            .returning();
-          transferCounts.timeEntries += timeEntriesResult.length;
           
           // Transfer form submissions
           const formSubmissionsResult = await db.update(formSubmissions)
