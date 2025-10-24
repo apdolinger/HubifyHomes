@@ -859,6 +859,15 @@ export default function DuplicatesManagement() {
                           <div className="text-gray-600">
                             Square Footage: {selectedDuplicate.squareFootage?.toLocaleString() ?? 'N/A'} {selectedDuplicate.squareFootage ? 'sq ft' : ''}
                           </div>
+                          
+                          {selectedDuplicate.createdAt && (
+                            <div className="flex items-center space-x-2 pt-2 border-t mt-2">
+                              <Calendar className="w-4 h-4 text-gray-500" />
+                              <span className="text-gray-600">
+                                Created: {format(new Date(selectedDuplicate.createdAt), 'MMM d, yyyy h:mm a')}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ) : (
