@@ -603,6 +603,26 @@ export default function DuplicatesManagement() {
                     <Crown className="w-5 h-5 text-blue-600 mr-2" />
                     Primary Record
                   </h3>
+                  {selectedPrimary && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      asChild
+                      data-testid="btn-view-primary-profile"
+                    >
+                      <a 
+                        href={selectedDuplicateGroup?.type === 'contact' 
+                          ? `/person-profile/${selectedPrimary.id}` 
+                          : `/property-profile/${selectedPrimary.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center"
+                      >
+                        <ExternalLink className="w-4 h-4 mr-1" />
+                        View Profile
+                      </a>
+                    </Button>
+                  )}
                 </div>
                 
                 <Card className="border-2 border-blue-200 bg-blue-50">
