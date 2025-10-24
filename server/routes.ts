@@ -4285,43 +4285,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const duplicateId of duplicateIds) {
           // Transfer tasks
           const tasksResult = await db.update(tasks)
-            .set({ contact_id: primary.id })
-            .where(eq(tasks.contact_id, duplicateId))
+            .set({ contactId: primary.id })
+            .where(eq(tasks.contactId, duplicateId))
             .returning();
           transferCounts.tasks += tasksResult.length;
           
           // Transfer time entries
           const timeEntriesResult = await db.update(timeEntries)
-            .set({ contact_id: primary.id })
-            .where(eq(timeEntries.contact_id, duplicateId))
+            .set({ contactId: primary.id })
+            .where(eq(timeEntries.contactId, duplicateId))
             .returning();
           transferCounts.timeEntries += timeEntriesResult.length;
           
           // Transfer form submissions
           const formSubmissionsResult = await db.update(formSubmissions)
-            .set({ profile_id: primary.id })
-            .where(eq(formSubmissions.profile_id, duplicateId))
+            .set({ profileId: primary.id })
+            .where(eq(formSubmissions.profileId, duplicateId))
             .returning();
           transferCounts.formSubmissions += formSubmissionsResult.length;
           
           // Transfer contact-property links (with deduplication)
           const existingLinks = await db.select()
             .from(contactProperties)
-            .where(eq(contactProperties.contact_id, primary.id));
+            .where(eq(contactProperties.contactId, primary.id));
           
           const duplicateLinks = await db.select()
             .from(contactProperties)
-            .where(eq(contactProperties.contact_id, duplicateId));
+            .where(eq(contactProperties.contactId, duplicateId));
           
           for (const dupLink of duplicateLinks) {
             const alreadyExists = existingLinks.some(
-              link => link.property_id === dupLink.property_id
+              link => link.propertyId === dupLink.propertyId
             );
             
             if (!alreadyExists) {
               // Transfer the link
               await db.update(contactProperties)
-                .set({ contact_id: primary.id })
+                .set({ contactId: primary.id })
                 .where(eq(contactProperties.id, dupLink.id));
               transferCounts.contactProperties++;
             } else {
@@ -4333,10 +4333,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Transfer alerts
           const alertsResult = await db.update(alerts)
-            .set({ entity_id: primary.id })
+            .set({ entityId: primary.id })
             .where(and(
               eq(alerts.type, 'client'),
-              eq(alerts.entity_id, duplicateId)
+              eq(alerts.entityId, duplicateId)
             ))
             .returning();
           transferCounts.alerts += alertsResult.length;
@@ -4560,25 +4560,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Transfer events
           const eventsResult = await db.update(events)
-            .set({ property_id: primary.id })
-            .where(eq(events.property_id, duplicateId))
+            .set({ propertyId: primary.id })
+            .where(eq(events.propertyId, duplicateId))
             .returning();
           propertyTransferCounts.events += eventsResult.length;
           
           // Transfer alerts
           const alertsResult = await db.update(alerts)
-            .set({ entity_id: primary.id })
+            .set({ entityId: primary.id })
             .where(and(
               eq(alerts.type, 'property'),
-              eq(alerts.entity_id, duplicateId)
+              eq(alerts.entityId, duplicateId)
             ))
             .returning();
           propertyTransferCounts.alerts += alertsResult.length;
           
           // Transfer contacts (if they reference propertyId directly)
           const contactsResult = await db.update(contacts)
-            .set({ property_id: primary.id })
-            .where(eq(contacts.property_id, duplicateId))
+            .set({ propertyId: primary.id })
+            .where(eq(contacts.propertyId, duplicateId))
             .returning();
           propertyTransferCounts.contacts += contactsResult.length;
           
