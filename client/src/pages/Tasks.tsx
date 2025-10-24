@@ -311,10 +311,10 @@ export default function Tasks() {
             {/* Assigned Filter */}
             <Select value={assignedFilter} onValueChange={setAssignedFilter}>
               <SelectTrigger>
-                <SelectValue placeholder="All Assignees" />
+                <SelectValue placeholder="All Team/Staff" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Assignees</SelectItem>
+                <SelectItem value="all">All Team/Staff</SelectItem>
                 <SelectItem value="unassigned">Unassigned</SelectItem>
                 {uniqueUsers.map((user: any) => (
                   <SelectItem key={user.id} value={user.id}>

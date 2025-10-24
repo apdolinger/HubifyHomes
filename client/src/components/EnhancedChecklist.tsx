@@ -191,9 +191,9 @@ function SortableChecklistItem({
                 </Popover>
               </div>
 
-              {/* Assignee */}
+              {/* Team/Staff */}
               <div>
-                <Label className="text-xs text-slate-600">Assigned To</Label>
+                <Label className="text-xs text-slate-600">Team/Staff</Label>
                 <Popover open={isAssigneeOpen} onOpenChange={setIsAssigneeOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="outline" role="combobox" className="w-full justify-between">
@@ -212,7 +212,7 @@ function SortableChecklistItem({
                           )}
                         </div>
                       ) : (
-                        "Select assignee..."
+                        "Select team/staff..."
                       )}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
