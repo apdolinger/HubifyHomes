@@ -19,6 +19,7 @@ const taskSchema = z.object({
   description: z.string().optional(),
   priority: z.enum(["urgent", "high", "normal", "low"]).default("normal"),
   propertyId: z.number().optional(),
+  contactId: z.number().optional(),
 });
 
 type TaskFormData = z.infer<typeof taskSchema>;
@@ -46,6 +47,12 @@ export default function QuickAddTaskModal({ isOpen, onClose }: QuickAddTaskModal
   // Fetch properties for dropdown
   const { data: properties } = useQuery({
     queryKey: ["/api/properties"],
+    enabled: isOpen,
+  });
+
+  // Fetch contacts/clients for dropdown
+  const { data: contacts } = useQuery({
+    queryKey: ["/api/contacts"],
     enabled: isOpen,
   });
 
@@ -156,6 +163,33 @@ export default function QuickAddTaskModal({ isOpen, onClose }: QuickAddTaskModal
                       {properties?.map((property: any) => (
                         <SelectItem key={property.id} value={property.id.toString()}>
                           {property.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="contactId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Client</FormLabel>
+                  <Select 
+                    onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select client..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {contacts?.map((contact: any) => (
+                        <SelectItem key={contact.id} value={contact.id.toString()}>
+                          {contact.firstName} {contact.lastName}
                         </SelectItem>
                       ))}
                     </SelectContent>

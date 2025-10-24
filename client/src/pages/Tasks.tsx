@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation } from "wouter";
 
-type SortField = 'title' | 'priority' | 'status' | 'dueDate' | 'createdAt' | 'assignedUser' | 'property';
+type SortField = 'title' | 'priority' | 'status' | 'dueDate' | 'createdAt' | 'assignedUser' | 'property' | 'client';
 type SortDirection = 'asc' | 'desc';
 
 export default function Tasks() {
@@ -27,6 +27,7 @@ export default function Tasks() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [assignedFilter, setAssignedFilter] = useState("all");
+  const [clientFilter, setClientFilter] = useState("all");
   
   // Parse URL search parameters and update filters when location changes
   useEffect(() => {
@@ -77,6 +78,12 @@ export default function Tasks() {
     enabled: isAuthenticated,
   });
 
+  // Fetch all contacts for the client filter dropdown
+  const { data: allContacts } = useQuery({
+    queryKey: ["/api/contacts"],
+    enabled: isAuthenticated,
+  });
+
   // Sort and filter tasks
   const filteredAndSortedTasks = useMemo(() => {
     if (!tasks || !Array.isArray(tasks)) return [];
@@ -91,7 +98,9 @@ export default function Tasks() {
         task.description?.toLowerCase().includes(query) ||
         task.property?.name?.toLowerCase().includes(query) ||
         task.assignedUser?.firstName?.toLowerCase().includes(query) ||
-        task.assignedUser?.lastName?.toLowerCase().includes(query)
+        task.assignedUser?.lastName?.toLowerCase().includes(query) ||
+        task.contact?.firstName?.toLowerCase().includes(query) ||
+        task.contact?.lastName?.toLowerCase().includes(query)
       );
     }
     
@@ -121,6 +130,15 @@ export default function Tasks() {
         filtered = filtered.filter(task => !task.assignedUser);
       } else {
         filtered = filtered.filter(task => task.assignedUser?.id === assignedFilter);
+      }
+    }
+    
+    // Apply client filter
+    if (clientFilter !== "all") {
+      if (clientFilter === "none") {
+        filtered = filtered.filter(task => !task.contact);
+      } else {
+        filtered = filtered.filter(task => task.contact?.id === parseInt(clientFilter));
       }
     }
     
@@ -160,6 +178,10 @@ export default function Tasks() {
           aValue = a.property?.name?.toLowerCase() || '';
           bValue = b.property?.name?.toLowerCase() || '';
           break;
+        case 'client':
+          aValue = a.contact ? `${a.contact.firstName} ${a.contact.lastName}`.toLowerCase() : '';
+          bValue = b.contact ? `${b.contact.firstName} ${b.contact.lastName}`.toLowerCase() : '';
+          break;
         default:
           return 0;
       }
@@ -172,7 +194,7 @@ export default function Tasks() {
     });
     
     return filtered;
-  }, [tasks, searchQuery, statusFilter, priorityFilter, assignedFilter, sortField, sortDirection]);
+  }, [tasks, searchQuery, statusFilter, priorityFilter, assignedFilter, clientFilter, sortField, sortDirection]);
 
   // Get all team members for the filter dropdown
   const teamMembers = useMemo(() => {
@@ -266,7 +288,7 @@ export default function Tasks() {
       {/* Filters and Search */}
       <Card className="mb-6">
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
             {/* Search */}
             <div className="lg:col-span-2">
               <div className="relative">
@@ -324,10 +346,26 @@ export default function Tasks() {
                 ))}
               </SelectContent>
             </Select>
+            
+            {/* Client Filter */}
+            <Select value={clientFilter} onValueChange={setClientFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Clients" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Clients</SelectItem>
+                <SelectItem value="none">No Client</SelectItem>
+                {allContacts?.map((contact: any) => (
+                  <SelectItem key={contact.id} value={contact.id.toString()}>
+                    {contact.firstName} {contact.lastName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           
           {/* Clear Filters */}
-          {(searchQuery || statusFilter !== "all" || priorityFilter !== "all" || assignedFilter !== "all") && (
+          {(searchQuery || statusFilter !== "all" || priorityFilter !== "all" || assignedFilter !== "all" || clientFilter !== "all") && (
             <div className="mt-4 flex items-center justify-between">
               <div className="flex items-center space-x-2 text-sm text-slate-600">
                 <Filter className="w-4 h-4" />
@@ -341,6 +379,7 @@ export default function Tasks() {
                   setStatusFilter("all");
                   setPriorityFilter("all");
                   setAssignedFilter("all");
+                  setClientFilter("all");
                 }}
               >
                 Clear all filters
@@ -374,6 +413,12 @@ export default function Tasks() {
                     <div className="flex items-center">
                       Property
                       {getSortIcon('property')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('client')}>
+                    <div className="flex items-center">
+                      Client
+                      {getSortIcon('client')}
                     </div>
                   </TableHead>
                   <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('assignedUser')}>
@@ -442,6 +487,18 @@ export default function Tasks() {
                         </div>
                       ) : (
                         <span className="text-slate-400">No property</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {task.contact ? (
+                        <div className="text-sm">
+                          <div className="font-medium">{task.contact.firstName} {task.contact.lastName}</div>
+                          {task.contact.email && (
+                            <div className="text-slate-600">{task.contact.email}</div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">No client</span>
                       )}
                     </TableCell>
                     <TableCell>
