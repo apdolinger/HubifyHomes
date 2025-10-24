@@ -257,19 +257,19 @@ export default function TaskProfile() {
 
   // Fetch task details
   const { data: task, isLoading: taskLoading } = useQuery({
-    queryKey: ["/api/tasks", taskId],
+    queryKey: [`/api/tasks/${taskId}`],
     enabled: isAuthenticated && !!taskId,
   });
 
   // Fetch task comments/notes
   const { data: fetchedComments } = useQuery({
-    queryKey: ["/api/tasks", taskId, "comments"],
+    queryKey: [`/api/tasks/${taskId}/comments`],
     enabled: isAuthenticated && !!taskId,
   });
 
   // Fetch task history
   const { data: history } = useQuery({
-    queryKey: ["/api/tasks", taskId, "history"],
+    queryKey: [`/api/tasks/${taskId}/history`],
     enabled: isAuthenticated && !!taskId,
   });
 
@@ -304,7 +304,7 @@ export default function TaskProfile() {
     },
     onSuccess: async () => {
       // Refetch the task to get updated data immediately
-      await queryClient.refetchQueries({ queryKey: ["/api/tasks", taskId] });
+      await queryClient.refetchQueries({ queryKey: [`/api/tasks/${taskId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       // Invalidate dashboard queries to update statistics
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
@@ -698,7 +698,7 @@ export default function TaskProfile() {
     },
     onSuccess: async (newProperty) => {
       // Refetch the task to get the updated property
-      await queryClient.refetchQueries({ queryKey: ["/api/tasks", taskId] });
+      await queryClient.refetchQueries({ queryKey: [`/api/tasks/${taskId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       toast({
@@ -737,7 +737,7 @@ export default function TaskProfile() {
     },
     onSuccess: async (newContact) => {
       // Refetch the task to get the updated contact
-      await queryClient.refetchQueries({ queryKey: ["/api/tasks", taskId] });
+      await queryClient.refetchQueries({ queryKey: [`/api/tasks/${taskId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       toast({
