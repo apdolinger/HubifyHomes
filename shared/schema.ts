@@ -770,6 +770,7 @@ export const userNotificationPreferences = pgTable("user_notification_preference
   emailOnMention: boolean("email_on_mention").notNull().default(true),
   emailOnReply: boolean("email_on_reply").notNull().default(true),
   emailOnReaction: boolean("email_on_reaction").notNull().default(false),
+  emailOnBroadcast: boolean("email_on_broadcast").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

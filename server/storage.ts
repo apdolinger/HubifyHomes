@@ -2268,6 +2268,7 @@ export class DatabaseStorage implements IStorage {
           emailOnMention: preferences.emailOnMention,
           emailOnReply: preferences.emailOnReply,
           emailOnReaction: preferences.emailOnReaction,
+          emailOnBroadcast: preferences.emailOnBroadcast,
           updatedAt: new Date(),
         }
       })
