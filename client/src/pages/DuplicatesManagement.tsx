@@ -34,7 +34,8 @@ import {
   TrendingUp,
   Eye,
   RotateCcw,
-  History
+  History,
+  ExternalLink
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
