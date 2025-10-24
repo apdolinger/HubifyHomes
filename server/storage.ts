@@ -4053,6 +4053,7 @@ export class DatabaseStorage implements IStorage {
         hyperlinks: supportRequests.hyperlinks,
         attachmentUrls: supportRequests.attachmentUrls,
         status: supportRequests.status,
+        urgency: supportRequests.urgency,
         resolvedAt: supportRequests.resolvedAt,
         createdAt: supportRequests.createdAt,
       })

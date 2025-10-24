@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import {
   MessageSquare,
@@ -131,6 +132,7 @@ export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [email, setEmail] = useState('');
+  const [urgency, setUrgency] = useState<'low'|'medium'|'high'|'critical'>('medium');
   const [hyperlinks, setHyperlinks] = useState<string[]>(['']);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -320,6 +322,7 @@ export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
           subject: subject.trim(),
           message: message.trim(),
           email: email.trim(),
+          urgency,
           hyperlinks: validHyperlinks,
           attachmentUrls,
           status: 'new',
@@ -339,6 +342,7 @@ export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
       setSubject('');
       setMessage('');
       setEmail('');
+      setUrgency('medium');
       setHyperlinks(['']);
       setAttachments([]);
       setSuggestedArticles([]);
@@ -409,6 +413,43 @@ export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
               rows={6}
               required
             />
+          </div>
+
+          {/* Urgency Level */}
+          <div className="space-y-2">
+            <Label htmlFor="urgency">Urgency Level *</Label>
+            <Select value={urgency} onValueChange={(value: 'low'|'medium'|'high'|'critical') => setUrgency(value)}>
+              <SelectTrigger id="urgency" data-testid="select-urgency">
+                <SelectValue placeholder="Select urgency level" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low" data-testid="urgency-low">
+                  <div className="flex items-center space-x-2">
+                    <Badge variant="secondary" className="bg-slate-100 text-slate-700">Low</Badge>
+                    <span className="text-sm text-slate-600">- General questions, non-urgent</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="medium" data-testid="urgency-medium">
+                  <div className="flex items-center space-x-2">
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-700">Medium</Badge>
+                    <span className="text-sm text-slate-600">- Needs attention soon</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="high" data-testid="urgency-high">
+                  <div className="flex items-center space-x-2">
+                    <Badge variant="secondary" className="bg-orange-100 text-orange-700">High</Badge>
+                    <span className="text-sm text-slate-600">- Urgent, affecting work</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="critical" data-testid="urgency-critical">
+                  <div className="flex items-center space-x-2">
+                    <Badge variant="secondary" className="bg-red-100 text-red-700">Critical</Badge>
+                    <span className="text-sm text-slate-600">- Emergency, system down</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-slate-500">Help us prioritize your request by selecting the urgency level</p>
           </div>
 
           {/* Hyperlinks Section */}

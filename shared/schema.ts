@@ -2140,6 +2140,7 @@ export const supportRequests = pgTable("support_requests", {
   hyperlinks: text("hyperlinks").array().default([]),
   attachmentUrls: text("attachment_urls").array().default([]),
   status: varchar("status").$type<"new"|"in_progress"|"resolved">().notNull().default("new"),
+  urgency: varchar("urgency").$type<"low"|"medium"|"high"|"critical">().notNull().default("medium"),
   resolvedAt: timestamp("resolved_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

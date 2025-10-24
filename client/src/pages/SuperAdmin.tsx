@@ -962,6 +962,7 @@ function SupportTickets() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedUrgency, setSelectedUrgency] = useState('all');
   const [selectedOrg, setSelectedOrg] = useState('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -992,6 +993,8 @@ function SupportTickets() {
     
     const matchesStatus = statusFilter === 'all' || request.status === statusFilter;
     
+    const matchesUrgency = selectedUrgency === 'all' || request.urgency === selectedUrgency;
+    
     const matchesOrg = selectedOrg === 'all' || request.organizationName === selectedOrg;
     
     let matchesDate = true;
@@ -1013,7 +1016,7 @@ function SupportTickets() {
       }
     }
     
-    return matchesSearch && matchesStatus && matchesOrg && matchesDate;
+    return matchesSearch && matchesStatus && matchesUrgency && matchesOrg && matchesDate;
   });
   
   const handleClearDates = () => {
@@ -1065,6 +1068,26 @@ function SupportTickets() {
       default:
         return status;
     }
+  };
+
+  const getUrgencyBadgeClass = (urgency: string) => {
+    switch (urgency) {
+      case 'low':
+        return 'bg-slate-100 text-slate-700';
+      case 'medium':
+        return 'bg-blue-100 text-blue-700';
+      case 'high':
+        return 'bg-orange-100 text-orange-700';
+      case 'critical':
+        return 'bg-red-100 text-red-700';
+      default:
+        return 'bg-slate-100 text-slate-700';
+    }
+  };
+
+  const getUrgencyLabel = (urgency: string) => {
+    if (!urgency) return 'Low';
+    return urgency.charAt(0).toUpperCase() + urgency.slice(1);
   };
 
   if (isLoading) {
@@ -1135,6 +1158,18 @@ function SupportTickets() {
                   <SelectItem value="resolved">Resolved</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={selectedUrgency} onValueChange={setSelectedUrgency}>
+                <SelectTrigger className="w-[180px]" data-testid="select-urgency-filter">
+                  <SelectValue placeholder="Filter by urgency" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" data-testid="urgency-all">All Urgencies</SelectItem>
+                  <SelectItem value="low" data-testid="urgency-low">Low</SelectItem>
+                  <SelectItem value="medium" data-testid="urgency-medium">Medium</SelectItem>
+                  <SelectItem value="high" data-testid="urgency-high">High</SelectItem>
+                  <SelectItem value="critical" data-testid="urgency-critical">Critical</SelectItem>
+                </SelectContent>
+              </Select>
               <Input
                 type="date"
                 value={startDate}
@@ -1168,10 +1203,11 @@ function SupportTickets() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-20">ID</TableHead>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Urgency</TableHead>
                     <TableHead>Organization</TableHead>
                     <TableHead>User Name</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Subject</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created Date</TableHead>
                   </TableRow>
@@ -1179,8 +1215,8 @@ function SupportTickets() {
                 <TableBody>
                   {filteredRequests.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-gray-500 py-8">
-                        {searchTerm || statusFilter !== 'all' || selectedOrg !== 'all' || startDate || endDate
+                      <TableCell colSpan={8} className="text-center text-gray-500 py-8">
+                        {searchTerm || statusFilter !== 'all' || selectedUrgency !== 'all' || selectedOrg !== 'all' || startDate || endDate
                           ? 'No support requests match your filters.'
                           : 'No support requests found.'}
                       </TableCell>
@@ -1194,14 +1230,19 @@ function SupportTickets() {
                         data-testid={`row-support-${request.id}`}
                       >
                         <TableCell className="font-mono text-sm">#{request.id}</TableCell>
+                        <TableCell className="max-w-xs truncate">
+                          {request.subject}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getUrgencyBadgeClass(request.urgency || 'low')} data-testid={`badge-urgency-${request.id}`}>
+                            {getUrgencyLabel(request.urgency || 'low')}
+                          </Badge>
+                        </TableCell>
                         <TableCell className="font-medium">
                           {request.organizationName || 'N/A'}
                         </TableCell>
                         <TableCell>{request.userName || 'Anonymous'}</TableCell>
                         <TableCell>{request.email}</TableCell>
-                        <TableCell className="max-w-xs truncate">
-                          {request.subject}
-                        </TableCell>
                         <TableCell>
                           <Badge variant={getStatusBadgeVariant(request.status)}>
                             {getStatusLabel(request.status)}
@@ -1282,6 +1323,18 @@ function SupportTickets() {
                   </Select>
                 </div>
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-500">Urgency</Label>
+                <div className="mt-1">
+                  <Badge className={getUrgencyBadgeClass(selectedRequest?.urgency || 'low')}>
+                    {getUrgencyLabel(selectedRequest?.urgency || 'low')}
+                  </Badge>
+                </div>
+              </div>
+              <div></div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
