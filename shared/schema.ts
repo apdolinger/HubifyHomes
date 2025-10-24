@@ -650,8 +650,10 @@ export const tasks = pgTable("tasks", {
   completedAt: timestamp("completed_at"),
   timeEstimate: varchar("time_estimate"), // e.g., "1 days 2 hours 30 minutes"
   category: varchar("category"), // maintenance, inspection, cleaning, repair, administrative
-  isRecurring: boolean("is_recurring").notNull().default(false),
-  recurrenceFrequency: varchar("recurrence_frequency"), // daily, weekly, monthly, quarterly
+  isRecurring: boolean("is_recurring").notNull().default(false), // Legacy field, keep for backward compatibility
+  recurrenceFrequency: varchar("recurrence_frequency"), // Legacy field, keep for backward compatibility
+  recurrenceRule: text("recurrence_rule"), // RFC5545 RRULE string for recurring tasks
+  recurrenceExDates: text("recurrence_ex_dates").array(), // Exception dates for recurring tasks
   billedSeparately: boolean("billed_separately").notNull().default(false),
   billingAmount: varchar("billing_amount"), // dollar amount as string, e.g., "125.00"
   billableRateCents: integer("billable_rate_cents"), // Hourly billable rate in cents for time tracking
