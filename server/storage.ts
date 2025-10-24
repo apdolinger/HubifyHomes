@@ -54,6 +54,7 @@ import {
   importHistory,
   platformTemplates,
   calendarReportTemplates,
+  supportRequests,
   type User,
   type UpsertUser,
   type Org,
@@ -156,6 +157,8 @@ import {
   type InsertPlatformTemplate,
   type CalendarReportTemplate,
   type InsertCalendarReportTemplate,
+  type SupportRequest,
+  type InsertSupportRequest,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, like, count, sql } from "drizzle-orm";
@@ -508,6 +511,12 @@ export interface IStorage {
   createCalendarReportTemplate(template: InsertCalendarReportTemplate): Promise<CalendarReportTemplate>;
   updateCalendarReportTemplate(id: number, template: Partial<InsertCalendarReportTemplate>): Promise<CalendarReportTemplate>;
   deleteCalendarReportTemplate(id: number): Promise<void>;
+  
+  // Support request operations
+  createSupportRequest(request: InsertSupportRequest): Promise<SupportRequest>;
+  getSupportRequests(): Promise<SupportRequest[]>;
+  getSupportRequest(id: number): Promise<SupportRequest | undefined>;
+  updateSupportRequestStatus(id: number, status: "new"|"in_progress"|"resolved"): Promise<SupportRequest>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4011,6 +4020,53 @@ export class DatabaseStorage implements IStorage {
   
   async deleteCalendarReportTemplate(id: number): Promise<void> {
     await db.delete(calendarReportTemplates).where(eq(calendarReportTemplates.id, id));
+  }
+  
+  // Support request operations
+  async createSupportRequest(request: InsertSupportRequest): Promise<SupportRequest> {
+    const [newRequest] = await db.insert(supportRequests).values(request).returning();
+    return newRequest;
+  }
+  
+  async getSupportRequests(): Promise<any[]> {
+    const results = await db
+      .select({
+        id: supportRequests.id,
+        organizationId: supportRequests.organizationId,
+        organizationName: orgs.name,
+        userId: supportRequests.userId,
+        userName: supportRequests.userName,
+        email: supportRequests.email,
+        subject: supportRequests.subject,
+        message: supportRequests.message,
+        hyperlinks: supportRequests.hyperlinks,
+        attachmentUrls: supportRequests.attachmentUrls,
+        status: supportRequests.status,
+        resolvedAt: supportRequests.resolvedAt,
+        createdAt: supportRequests.createdAt,
+      })
+      .from(supportRequests)
+      .leftJoin(orgs, eq(supportRequests.organizationId, orgs.id))
+      .orderBy(desc(supportRequests.createdAt));
+    return results;
+  }
+  
+  async getSupportRequest(id: number): Promise<SupportRequest | undefined> {
+    const [request] = await db.select().from(supportRequests).where(eq(supportRequests.id, id));
+    return request;
+  }
+  
+  async updateSupportRequestStatus(id: number, status: "new"|"in_progress"|"resolved"): Promise<SupportRequest> {
+    const updates: any = { status };
+    if (status === "resolved") {
+      updates.resolvedAt = new Date();
+    }
+    const [updated] = await db
+      .update(supportRequests)
+      .set(updates)
+      .where(eq(supportRequests.id, id))
+      .returning();
+    return updated;
   }
 }
 

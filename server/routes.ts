@@ -53,6 +53,7 @@ import {
   insertConflictResolutionSchema,
   insertPlatformInvoiceSchema,
   insertClientInvoiceSchema,
+  insertSupportRequestSchema,
   type Form,
   contacts,
   properties,
@@ -8006,6 +8007,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error generating user iCal token:", error);
       res.status(500).json({ message: "Failed to generate calendar token" });
+    }
+  });
+
+  // Support request endpoints
+  app.post("/api/support-requests", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const validatedData = insertSupportRequestSchema.parse({
+        ...req.body,
+        organizationId: user.orgId,
+        userId: user.id,
+        userName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+      });
+
+      const supportRequest = await storage.createSupportRequest(validatedData);
+      
+      res.status(201).json(supportRequest);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating support request:", error);
+      res.status(500).json({ message: "Failed to create support request" });
+    }
+  });
+
+  app.get("/api/super-admin/support-requests", isSuperAdmin, async (req, res) => {
+    try {
+      const requests = await storage.getSupportRequests();
+      res.json(requests);
+    } catch (error) {
+      console.error("Error fetching support requests:", error);
+      res.status(500).json({ message: "Failed to fetch support requests" });
+    }
+  });
+
+  app.patch("/api/super-admin/support-requests/:id/status", isSuperAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { status } = req.body;
+
+      if (!["new", "in_progress", "resolved"].includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+
+      const updated = await storage.updateSupportRequestStatus(id, status);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating support request status:", error);
+      res.status(500).json({ message: "Failed to update support request status" });
     }
   });
 

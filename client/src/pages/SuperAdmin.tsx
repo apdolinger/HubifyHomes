@@ -69,7 +69,10 @@ import {
   Play,
   Pause,
   Send,
-  FileCode
+  FileCode,
+  Headphones,
+  ExternalLink,
+  Paperclip
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -474,6 +477,432 @@ function TemplateManagement() {
   );
 }
 
+// Support Tickets Component
+function SupportTickets() {
+  const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedOrg, setSelectedOrg] = useState('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [selectedRequest, setSelectedRequest] = useState<any>(null);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  const { data: supportRequests, isLoading, error } = useQuery({
+    queryKey: ['/api/super-admin/support-requests'],
+  });
+
+  const requestsList = (supportRequests as any[]) || [];
+  
+  // Extract unique organizations
+  const uniqueOrganizations = Array.from(
+    new Set(
+      requestsList
+        .map((req: any) => req.organizationName)
+        .filter((name: any) => name && name !== 'N/A')
+    )
+  ).sort();
+  
+  const filteredRequests = requestsList.filter((request: any) => {
+    const matchesSearch = 
+      request.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      request.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      request.organizationName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      request.userName?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === 'all' || request.status === statusFilter;
+    
+    const matchesOrg = selectedOrg === 'all' || request.organizationName === selectedOrg;
+    
+    let matchesDate = true;
+    if (startDate || endDate) {
+      const requestDate = request.createdAt ? new Date(request.createdAt) : null;
+      if (requestDate) {
+        if (startDate) {
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          if (requestDate < start) matchesDate = false;
+        }
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          if (requestDate > end) matchesDate = false;
+        }
+      } else {
+        matchesDate = false;
+      }
+    }
+    
+    return matchesSearch && matchesStatus && matchesOrg && matchesDate;
+  });
+  
+  const handleClearDates = () => {
+    setStartDate('');
+    setEndDate('');
+  };
+
+  const handleStatusUpdate = async (requestId: number, newStatus: string) => {
+    setUpdatingStatus(true);
+    try {
+      await apiRequest('PATCH', `/api/super-admin/support-requests/${requestId}`, { status: newStatus });
+      toast({ title: "Status updated successfully" });
+      queryClient.invalidateQueries({ queryKey: ['/api/super-admin/support-requests'] });
+      if (selectedRequest && selectedRequest.id === requestId) {
+        setSelectedRequest({ ...selectedRequest, status: newStatus });
+      }
+    } catch (error: any) {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to update status",
+        variant: "destructive" 
+      });
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case 'new':
+        return 'destructive';
+      case 'in_progress':
+        return 'secondary';
+      case 'resolved':
+        return 'default';
+      default:
+        return 'outline';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'new':
+        return 'New';
+      case 'in_progress':
+        return 'In Progress';
+      case 'resolved':
+        return 'Resolved';
+      default:
+        return status;
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 bg-red-50 text-red-700 rounded-lg">
+        <AlertCircle className="w-5 h-5 inline mr-2" />
+        Error loading support requests: {error.message}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center">
+              <Headphones className="w-5 h-5 mr-2" />
+              Support Tickets
+            </CardTitle>
+            <Badge variant="outline" className="px-3 py-1">
+              {filteredRequests.length} tickets
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  placeholder="Search by subject, email, or organization..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-search-support"
+                />
+              </div>
+              <Select value={selectedOrg} onValueChange={setSelectedOrg}>
+                <SelectTrigger className="w-[200px]" data-testid="select-organization-filter">
+                  <SelectValue placeholder="Filter by organization" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Organizations</SelectItem>
+                  {uniqueOrganizations.map((org: string) => (
+                    <SelectItem key={org} value={org}>
+                      {org}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="new">New</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="resolved">Resolved</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-[160px]"
+                placeholder="Start date"
+                data-testid="input-start-date"
+              />
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-[160px]"
+                placeholder="End date"
+                data-testid="input-end-date"
+              />
+              {(startDate || endDate) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearDates}
+                  data-testid="button-clear-dates"
+                >
+                  Clear Dates
+                </Button>
+              )}
+            </div>
+
+            <div className="border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-20">ID</TableHead>
+                    <TableHead>Organization</TableHead>
+                    <TableHead>User Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredRequests.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-gray-500 py-8">
+                        {searchTerm || statusFilter !== 'all' || selectedOrg !== 'all' || startDate || endDate
+                          ? 'No support requests match your filters.'
+                          : 'No support requests found.'}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredRequests.map((request: any) => (
+                      <TableRow 
+                        key={request.id} 
+                        className="cursor-pointer hover:bg-gray-50"
+                        onClick={() => setSelectedRequest(request)}
+                        data-testid={`row-support-${request.id}`}
+                      >
+                        <TableCell className="font-mono text-sm">#{request.id}</TableCell>
+                        <TableCell className="font-medium">
+                          {request.organizationName || 'N/A'}
+                        </TableCell>
+                        <TableCell>{request.userName || 'Anonymous'}</TableCell>
+                        <TableCell>{request.email}</TableCell>
+                        <TableCell className="max-w-xs truncate">
+                          {request.subject}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusBadgeVariant(request.status)}>
+                            {getStatusLabel(request.status)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-500">
+                          {request.createdAt 
+                            ? new Date(request.createdAt).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })
+                            : 'N/A'}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {filteredRequests.length > 0 && (
+              <div className="text-sm text-gray-500">
+                Showing {filteredRequests.length} of {requestsList.length} support requests
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Details Modal */}
+      <Dialog open={!!selectedRequest} onOpenChange={() => setSelectedRequest(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Headphones className="w-5 h-5" />
+              Support Request #{selectedRequest?.id}
+            </DialogTitle>
+            <DialogDescription>
+              Submitted on {selectedRequest?.createdAt 
+                ? new Date(selectedRequest.createdAt).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })
+                : 'N/A'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-500">Organization</Label>
+                <p className="text-sm mt-1 font-medium">
+                  {selectedRequest?.organizationName || 'N/A'}
+                </p>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-500">Status</Label>
+                <div className="mt-1">
+                  <Select 
+                    value={selectedRequest?.status || 'new'}
+                    onValueChange={(value) => handleStatusUpdate(selectedRequest?.id, value)}
+                    disabled={updatingStatus}
+                  >
+                    <SelectTrigger className="w-full" data-testid="select-update-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new">New</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="resolved">Resolved</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-500">User Name</Label>
+                <p className="text-sm mt-1">{selectedRequest?.userName || 'Anonymous'}</p>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-500">Email</Label>
+                <p className="text-sm mt-1">
+                  <a 
+                    href={`mailto:${selectedRequest?.email}`}
+                    className="text-blue-600 hover:underline"
+                  >
+                    {selectedRequest?.email}
+                  </a>
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium text-gray-500">Subject</Label>
+              <p className="text-sm mt-1 font-medium">{selectedRequest?.subject}</p>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium text-gray-500">Message</Label>
+              <div className="mt-2 p-4 bg-gray-50 rounded-lg border">
+                <p className="text-sm whitespace-pre-wrap">
+                  {selectedRequest?.message || 'No message provided.'}
+                </p>
+              </div>
+            </div>
+
+            {selectedRequest?.hyperlinks && selectedRequest.hyperlinks.length > 0 && (
+              <div>
+                <Label className="text-sm font-medium text-gray-500">Links</Label>
+                <div className="mt-2 space-y-2">
+                  {selectedRequest.hyperlinks.map((link: string, index: number) => (
+                    <a
+                      key={index}
+                      href={link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
+                      data-testid={`link-hyperlink-${index}`}
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      {link}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {selectedRequest?.attachments && selectedRequest.attachments.length > 0 && (
+              <div>
+                <Label className="text-sm font-medium text-gray-500">Attachments</Label>
+                <div className="mt-2 space-y-2">
+                  {selectedRequest.attachments.map((attachment: any, index: number) => (
+                    <a
+                      key={index}
+                      href={attachment.url || attachment}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 p-2 border rounded-lg hover:bg-gray-50"
+                      data-testid={`link-attachment-${index}`}
+                    >
+                      <Paperclip className="w-4 h-4" />
+                      <span className="text-sm">
+                        {attachment.name || attachment.url || attachment}
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setSelectedRequest(null)}
+              data-testid="button-close-details"
+            >
+              Close
+            </Button>
+            <Button 
+              onClick={() => window.open(`mailto:${selectedRequest?.email}`, '_blank')}
+              data-testid="button-reply-email"
+            >
+              <Mail className="w-4 h-4 mr-2" />
+              Reply via Email
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 // Communities Report Component
 function CommunitiesReport() {
   const { data: communitiesData, isLoading, error } = useQuery({
@@ -827,10 +1256,11 @@ export default function SuperAdmin() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-10">
+        <TabsList className="grid w-full grid-cols-11">
           <TabsTrigger value="organizations">Organizations</TabsTrigger>
           <TabsTrigger value="users">All Users</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
+          <TabsTrigger value="support">Support</TabsTrigger>
           <TabsTrigger value="communication">Communication</TabsTrigger>
           <TabsTrigger value="revenue">Revenue</TabsTrigger>
           <TabsTrigger value="features">Feature Flags</TabsTrigger>
@@ -949,6 +1379,11 @@ export default function SuperAdmin() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Support Tab */}
+        <TabsContent value="support">
+          <SupportTickets />
         </TabsContent>
 
         {/* All Users Tab */}

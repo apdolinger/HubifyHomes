@@ -282,8 +282,53 @@ export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
     setIsSubmitting(true);
 
     try {
-      // Simulate API call to submit support request
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Upload attachments to object storage
+      const attachmentUrls: string[] = [];
+      
+      for (const file of attachments) {
+        const formData = new FormData();
+        formData.append('files', file);
+        formData.append('directory', '.private/support-attachments');
+        
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+          credentials: 'include',
+        });
+        
+        if (!uploadResponse.ok) {
+          throw new Error('Failed to upload attachment');
+        }
+        
+        const uploadData = await uploadResponse.json();
+        if (uploadData.urls && uploadData.urls.length > 0) {
+          attachmentUrls.push(uploadData.urls[0]);
+        }
+      }
+      
+      // Filter out empty hyperlinks
+      const validHyperlinks = hyperlinks.filter(link => link.trim().length > 0);
+      
+      // Submit support request
+      const response = await fetch('/api/support-requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          subject: subject.trim(),
+          message: message.trim(),
+          email: email.trim(),
+          hyperlinks: validHyperlinks,
+          attachmentUrls,
+          status: 'new',
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to submit support request');
+      }
       
       toast({
         title: "Support Request Submitted",

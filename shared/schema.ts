@@ -2127,3 +2127,26 @@ export function isPremiumPropertyType(type: string): boolean {
 export function tierAllowsPremiumProperties(tier: string): boolean {
   return PREMIUM_TIER_PROPERTY_TIERS.includes(tier as any);
 }
+
+// Support Requests table - Super Admin only visibility
+export const supportRequests = pgTable("support_requests", {
+  id: serial("id").primaryKey(),
+  organizationId: uuid("organization_id").references(() => orgs.id).notNull(),
+  userId: text("user_id").notNull(), // Replit Auth sub
+  userName: varchar("user_name").notNull(),
+  email: varchar("email").notNull(),
+  subject: varchar("subject").notNull(),
+  message: text("message").notNull(),
+  hyperlinks: text("hyperlinks").array().default([]),
+  attachmentUrls: text("attachment_urls").array().default([]),
+  status: varchar("status").$type<"new"|"in_progress"|"resolved">().notNull().default("new"),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertSupportRequestSchema = createInsertSchema(supportRequests).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertSupportRequest = z.infer<typeof insertSupportRequestSchema>;
+export type SupportRequest = typeof supportRequests.$inferSelect;
