@@ -3776,6 +3776,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Team message routes
+  app.get("/api/team-messages", isAuthenticated, async (req, res) => {
+    try {
+      const messages = await storage.getTeamMessages();
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching team messages:", error);
+      res.status(500).json({ message: "Failed to fetch team messages" });
+    }
+  });
+
   app.post("/api/team-messages", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
