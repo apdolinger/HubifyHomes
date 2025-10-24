@@ -562,7 +562,7 @@ export default function DuplicatesManagement() {
                   <span>Cleanup Duplicate History</span>
                 </CardTitle>
                 <p className="text-sm text-gray-600 mt-2">
-                  Remove old duplicate records and history to keep your database clean. This action cannot be undone.
+                  Remove old duplicate records and history to keep your database clean. Cleaning up duplicate record history reduces the overall storage needed, reducing your operating costs. This action cannot be undone.
                 </p>
               </CardHeader>
               <CardContent className="space-y-6">
