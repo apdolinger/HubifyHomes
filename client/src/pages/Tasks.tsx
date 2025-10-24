@@ -71,6 +71,12 @@ export default function Tasks() {
     enabled: isAuthenticated,
   });
 
+  // Fetch all users for the filter dropdown
+  const { data: allUsers } = useQuery({
+    queryKey: ["/api/users"],
+    enabled: isAuthenticated,
+  });
+
   // Sort and filter tasks
   const filteredAndSortedTasks = useMemo(() => {
     if (!tasks || !Array.isArray(tasks)) return [];
@@ -168,17 +174,12 @@ export default function Tasks() {
     return filtered;
   }, [tasks, searchQuery, statusFilter, priorityFilter, assignedFilter, sortField, sortDirection]);
 
-  // Get unique users for assigned filter
-  const uniqueUsers = useMemo(() => {
-    if (!tasks || !Array.isArray(tasks)) return [];
-    const users = new Map();
-    (tasks as any[]).forEach(task => {
-      if (task.assignedUser) {
-        users.set(task.assignedUser.id, task.assignedUser);
-      }
-    });
-    return Array.from(users.values());
-  }, [tasks]);
+  // Get all team members for the filter dropdown
+  const teamMembers = useMemo(() => {
+    if (!allUsers || !Array.isArray(allUsers)) return [];
+    // Filter to only include users from the current organization (exclude super admin)
+    return (allUsers as any[]).filter(user => user.orgId !== null);
+  }, [allUsers]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -316,7 +317,7 @@ export default function Tasks() {
               <SelectContent>
                 <SelectItem value="all">All Team/Staff</SelectItem>
                 <SelectItem value="unassigned">Unassigned</SelectItem>
-                {uniqueUsers.map((user: any) => (
+                {teamMembers.map((user: any) => (
                   <SelectItem key={user.id} value={user.id}>
                     {user.firstName} {user.lastName}
                   </SelectItem>
