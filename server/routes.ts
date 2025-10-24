@@ -3852,14 +3852,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allUsers = await storage.getUsers();
       const mentionedUserIds = parseMentions(validatedData.content, allUsers);
       
+      // Get author info (used for both mentions and broadcasts)
+      const author = await storage.getUser(userId);
+      const authorName = author ? `${author.firstName || ''} ${author.lastName || ''}`.trim() || 'A team member' : 'A team member';
+      
       // Create mention records
       if (mentionedUserIds.length > 0) {
         await storage.createMentions(message.id, mentionedUserIds);
         
         // Send email notifications to mentioned users
-        const author = await storage.getUser(userId);
-        const authorName = author ? `${author.firstName || ''} ${author.lastName || ''}`.trim() || 'A team member' : 'A team member';
-        
         for (const mentionedUserId of mentionedUserIds) {
           const mentionedUser = await storage.getUser(mentionedUserId);
           if (mentionedUser && mentionedUser.email) {
@@ -3870,6 +3871,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await sendMentionNotification(
                 mentionedUser.email,
                 mentionedUserName,
+                authorName,
+                validatedData.content
+              );
+            }
+          }
+        }
+      }
+      
+      // Send broadcast emails if emailNotification is enabled
+      if (validatedData.emailNotification) {
+        for (const user of allUsers) {
+          // Skip the author
+          if (user.id === userId) continue;
+          
+          // Skip if user was already mentioned (they'll get the mention email)
+          if (mentionedUserIds.includes(user.id)) continue;
+          
+          if (user.email) {
+            // Check user's notification preferences for broadcasts
+            const prefs = await storage.getUserNotificationPreferences(user.id);
+            if (!prefs || prefs.emailOnBroadcast) { // Send email by default
+              const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'there';
+              await sendBroadcastNotification(
+                user.email,
+                userName,
                 authorName,
                 validatedData.content
               );
@@ -3977,14 +4003,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allUsers = await storage.getUsers();
       const mentionedUserIds = parseMentions(content.trim(), allUsers);
       
+      // Get author info (used for both mentions and broadcasts)
+      const author = await storage.getUser(req.user.claims.sub);
+      const authorName = author ? `${author.firstName || ''} ${author.lastName || ''}`.trim() || 'A team member' : 'A team member';
+      
       // Create mention records
       if (mentionedUserIds.length > 0) {
         await storage.createMentions(reply.id, mentionedUserIds);
         
         // Send email notifications to mentioned users
-        const author = await storage.getUser(req.user.claims.sub);
-        const authorName = author ? `${author.firstName || ''} ${author.lastName || ''}`.trim() || 'A team member' : 'A team member';
-        
         for (const mentionedUserId of mentionedUserIds) {
           const mentionedUser = await storage.getUser(mentionedUserId);
           if (mentionedUser && mentionedUser.email) {
@@ -3994,6 +4021,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await sendMentionNotification(
                 mentionedUser.email,
                 mentionedUserName,
+                authorName,
+                content.trim()
+              );
+            }
+          }
+        }
+      }
+      
+      // Send broadcast emails if emailNotification is enabled
+      if (emailNotification) {
+        for (const user of allUsers) {
+          // Skip the author
+          if (user.id === req.user.claims.sub) continue;
+          
+          // Skip if user was already mentioned (they'll get the mention email)
+          if (mentionedUserIds.includes(user.id)) continue;
+          
+          if (user.email) {
+            // Check user's notification preferences for broadcasts
+            const prefs = await storage.getUserNotificationPreferences(user.id);
+            if (!prefs || prefs.emailOnBroadcast) { // Send email by default
+              const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'there';
+              await sendBroadcastNotification(
+                user.email,
+                userName,
                 authorName,
                 content.trim()
               );
