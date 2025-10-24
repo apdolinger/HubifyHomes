@@ -62,12 +62,14 @@ import {
   contactProperties,
   rooms,
   vehicles,
+  ignoredDuplicates,
+  duplicateHistory,
   isPremiumPropertyType,
   tierAllowsPremiumProperties
 } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, lt } from "drizzle-orm";
 import sgMail from "@sendgrid/mail";
 
 // Initialize SendGrid if API key is available
@@ -4094,6 +4096,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching duplicate history:", error);
       res.status(500).json({ message: "Failed to fetch duplicate history" });
+    }
+  });
+
+  // Cleanup duplicate history (admin only)
+  const cleanupSchema = z.object({
+    type: z.enum(['ignored', 'history', 'all']),
+    daysOld: z.number().int().positive().min(1).max(365)
+  });
+  
+  app.post("/api/duplicates/cleanup", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      // Validate request body
+      const validation = cleanupSchema.safeParse(req.body);
+      
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Invalid request", 
+          errors: validation.error.errors 
+        });
+      }
+      
+      const { type, daysOld } = validation.data;
+      
+      // Calculate the cutoff date
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+      
+      let deletedCount = 0;
+      
+      // Delete old ignored duplicates
+      if (type === 'ignored' || type === 'all') {
+        const ignoredResult = await db
+          .delete(ignoredDuplicates)
+          .where(lt(ignoredDuplicates.createdAt, cutoffDate))
+          .returning();
+        deletedCount += ignoredResult.length;
+      }
+      
+      // Delete old duplicate history
+      if (type === 'history' || type === 'all') {
+        const historyResult = await db
+          .delete(duplicateHistory)
+          .where(lt(duplicateHistory.performedAt, cutoffDate))
+          .returning();
+        deletedCount += historyResult.length;
+      }
+      
+      console.log(`[Duplicate Cleanup] User ${req.user.claims.email} cleaned up ${deletedCount} ${type} records older than ${daysOld} days`);
+      
+      res.json({ 
+        message: "Cleanup completed successfully", 
+        deletedCount,
+        type,
+        daysOld 
+      });
+    } catch (error) {
+      console.error("Error cleaning up duplicate history:", error);
+      res.status(500).json({ message: "Failed to clean up duplicate history" });
     }
   });
 
