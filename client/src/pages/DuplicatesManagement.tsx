@@ -40,6 +40,7 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useLocation } from "wouter";
+import { format } from "date-fns";
 
 export default function DuplicatesManagement() {
   const { user, isAuthenticated, isLoading } = useAuth();
