@@ -3891,7 +3891,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (user.email) {
             // Check user's notification preferences for broadcasts
             const prefs = await storage.getUserNotificationPreferences(user.id);
-            if (!prefs || prefs.emailOnBroadcast) { // Send email by default
+            // Send email by default (no prefs or emailOnBroadcast is true/undefined)
+            // Only skip if emailOnBroadcast is explicitly false
+            const shouldSend = !prefs || prefs.emailOnBroadcast === undefined || prefs.emailOnBroadcast === true;
+            if (shouldSend) {
               const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'there';
               await sendBroadcastNotification(
                 user.email,
@@ -4041,7 +4044,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (user.email) {
             // Check user's notification preferences for broadcasts
             const prefs = await storage.getUserNotificationPreferences(user.id);
-            if (!prefs || prefs.emailOnBroadcast) { // Send email by default
+            // Send email by default (no prefs or emailOnBroadcast is true/undefined)
+            // Only skip if emailOnBroadcast is explicitly false
+            const shouldSend = !prefs || prefs.emailOnBroadcast === undefined || prefs.emailOnBroadcast === true;
+            if (shouldSend) {
               const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'there';
               await sendBroadcastNotification(
                 user.email,
