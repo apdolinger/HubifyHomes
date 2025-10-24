@@ -543,8 +543,7 @@ export default function Tasks() {
             onClick={() => setIsCustomizeModalOpen(true)}
             data-testid="customize-table-btn"
           >
-            <Settings className="w-4 h-4 mr-2" />
-            Customize
+            <Settings className="w-4 h-4" />
           </Button>
         </CardHeader>
         <CardContent>
