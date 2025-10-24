@@ -389,9 +389,9 @@ export interface IStorage {
   // Duplicate detection operations
   scanForDuplicates(criteria: any): Promise<any[]>;
   getDuplicates(): Promise<any[]>;
-  ignoreDuplicate(recordType: string, recordIds: number[], userId: string, reason?: string): Promise<void>;
+  ignoreDuplicate(recordType: string, recordIds: number[], userId: string, reason?: string, notes?: string): Promise<void>;
   getDuplicateHistory(): Promise<DuplicateHistory[]>;
-  addDuplicateHistory(action: string, recordType: string, recordIds: number[], userId: string, details?: any): Promise<void>;
+  addDuplicateHistory(action: string, recordType: string, recordIds: number[], userId: string, details?: any, notes?: string): Promise<void>;
   
   // Calendar operations
   getCalendars(orgId: string): Promise<Calendar[]>;
@@ -2941,7 +2941,7 @@ export class DatabaseStorage implements IStorage {
     return matchFields;
   }
 
-  async ignoreDuplicate(recordType: string, recordIds: number[], userId: string, reason?: string): Promise<void> {
+  async ignoreDuplicate(recordType: string, recordIds: number[], userId: string, reason?: string, notes?: string): Promise<void> {
     await db.insert(ignoredDuplicates).values({
       recordType,
       recordIds: recordIds.map(id => id.toString()),
@@ -2950,7 +2950,7 @@ export class DatabaseStorage implements IStorage {
     });
 
     // Add to history
-    await this.addDuplicateHistory('ignore', recordType, recordIds, userId, { reason });
+    await this.addDuplicateHistory('ignore', recordType, recordIds, userId, { reason }, notes);
   }
 
   async getDuplicateHistory(): Promise<DuplicateHistory[]> {
@@ -2962,7 +2962,7 @@ export class DatabaseStorage implements IStorage {
     return results;
   }
 
-  async addDuplicateHistory(action: string, recordType: string, recordIds: number[], userId: string, details?: any): Promise<void> {
+  async addDuplicateHistory(action: string, recordType: string, recordIds: number[], userId: string, details?: any, notes?: string): Promise<void> {
     // Get user name for the history record
     const user = await this.getUser(userId);
     const userName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown User' : 'Unknown User';
@@ -2974,6 +2974,7 @@ export class DatabaseStorage implements IStorage {
       performedBy: userId,
       performedByName: userName,
       details: details || null,
+      notes: notes || null,
     });
   }
 

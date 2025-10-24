@@ -4075,13 +4075,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/duplicates/ignore", isAuthenticated, async (req: any, res) => {
     try {
-      const { recordType, recordIds, reason } = req.body;
+      const { recordType, recordIds, reason, mergeNotes } = req.body;
       
       if (!recordType || !recordIds || !Array.isArray(recordIds)) {
         return res.status(400).json({ message: "recordType and recordIds array are required" });
       }
       
-      await storage.ignoreDuplicate(recordType, recordIds, req.user.claims.sub, reason);
+      await storage.ignoreDuplicate(recordType, recordIds, req.user.claims.sub, reason, mergeNotes);
       res.json({ message: "Duplicate ignored successfully" });
     } catch (error) {
       console.error("Error ignoring duplicate:", error);
@@ -4362,6 +4362,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })
         });
         
+        // Add to duplicate history with notes
+        await storage.addDuplicateHistory(
+          'merge',
+          'contact',
+          recordIds,
+          req.user?.claims?.sub,
+          { 
+            mergedContactIds: duplicateIds,
+            totalRecords: contactsToMerge.length,
+            transferredRecords: transferCounts
+          },
+          mergeNotes
+        );
+        
         res.json({ 
           success: true, 
           primaryId: primary.id, 
@@ -4615,6 +4629,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             transferredRecords: propertyTransferCounts
           })
         });
+        
+        // Add to duplicate history with notes
+        await storage.addDuplicateHistory(
+          'merge',
+          'property',
+          recordIds,
+          req.user?.claims?.sub,
+          { 
+            mergedPropertyIds: duplicateIds,
+            totalRecords: propertiesToMerge.length,
+            primaryAddress: `${primary.address1}, ${primary.city}, ${primary.state}`,
+            transferredRecords: propertyTransferCounts
+          },
+          mergeNotes
+        );
         
         res.json({ 
           success: true, 

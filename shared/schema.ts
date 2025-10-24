@@ -1067,6 +1067,7 @@ export const duplicateHistory = pgTable("duplicate_history", {
   performedByName: varchar("performed_by_name", { length: 255 }), // Cache the user name
   performedAt: timestamp("performed_at").defaultNow(),
   details: jsonb("details"), // Additional details about the action
+  notes: text("notes"), // User-provided notes explaining the action
 });
 
 // Calendar tables

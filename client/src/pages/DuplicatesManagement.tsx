@@ -192,7 +192,8 @@ export default function DuplicatesManagement() {
       await apiRequest("POST", "/api/duplicates/ignore", {
         recordType: selectedDuplicateGroup.type,
         recordIds: recordIds,
-        reason: "User manually ignored this duplicate group"
+        reason: "User manually ignored this duplicate group",
+        mergeNotes
       });
       
       toast({
@@ -201,6 +202,7 @@ export default function DuplicatesManagement() {
       });
       
       setMergeScreenOpen(false);
+      setMergeNotes("");
       queryClient.invalidateQueries({ queryKey: ["/api/duplicates"] });
       queryClient.invalidateQueries({ queryKey: ["/api/duplicates/history"] });
     } catch (error) {
@@ -734,6 +736,11 @@ export default function DuplicatesManagement() {
                         {new Date(entry.performedAt).toLocaleDateString()} by {entry.performedByName || 'Unknown'}
                       </div>
                     </div>
+                    {entry.notes && (
+                      <div className="mt-2 text-sm text-gray-700 bg-blue-50 border-l-4 border-blue-500 p-3 rounded">
+                        <strong>Notes:</strong> {entry.notes}
+                      </div>
+                    )}
                     {entry.details?.reason && (
                       <div className="mt-2 text-sm text-gray-600">
                         <strong>Reason:</strong> {entry.details.reason}
