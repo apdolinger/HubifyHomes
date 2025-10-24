@@ -35,7 +35,9 @@ import {
   Eye,
   RotateCcw,
   History,
-  ExternalLink
+  ExternalLink,
+  Trash2,
+  Archive
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -66,6 +68,10 @@ export default function DuplicatesManagement() {
     includeContacts: true,
     includeProperties: false
   });
+  
+  const [cleanupDaysOld, setCleanupDaysOld] = useState(90);
+  const [cleanupConfirmOpen, setCleanupConfirmOpen] = useState(false);
+  const [cleanupType, setCleanupType] = useState<'ignored' | 'history' | 'all'>('ignored');
 
   // Check authentication
   useEffect(() => {
@@ -251,6 +257,35 @@ export default function DuplicatesManagement() {
     }
   };
 
+  // Handle cleanup of duplicate history
+  const cleanupMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/duplicates/cleanup", {
+        type: cleanupType,
+        daysOld: cleanupDaysOld
+      });
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Cleanup Complete",
+        description: `Successfully deleted ${data.deletedCount} records older than ${cleanupDaysOld} days`,
+      });
+      setCleanupConfirmOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/duplicates/history"] });
+    },
+    onError: () => {
+      toast({
+        title: "Cleanup Failed",
+        description: "Failed to clean up duplicate history. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleCleanup = () => {
+    cleanupMutation.mutate();
+  };
+
   const getInitials = (firstName: string, lastName: string) => {
     return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
   };
@@ -340,7 +375,7 @@ export default function DuplicatesManagement() {
       {/* Duplicates with Tabs */}
       <div className="space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="people" className="flex items-center space-x-2">
               <Users className="w-4 h-4" />
               <span>People Duplicates</span>
@@ -348,6 +383,10 @@ export default function DuplicatesManagement() {
             <TabsTrigger value="properties" className="flex items-center space-x-2">
               <Building className="w-4 h-4" />
               <span>Property Duplicates</span>
+            </TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center space-x-2">
+              <Archive className="w-4 h-4" />
+              <span>History & Cleanup</span>
             </TabsTrigger>
           </TabsList>
 
@@ -513,6 +552,135 @@ export default function DuplicatesManagement() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          <TabsContent value="history" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Archive className="w-5 h-5" />
+                  <span>Cleanup Duplicate History</span>
+                </CardTitle>
+                <p className="text-sm text-gray-600 mt-2">
+                  Remove old duplicate records and history to keep your database clean. This action cannot be undone.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card className="border-2">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <Trash2 className="w-8 h-8 text-orange-500" />
+                        <Badge variant="secondary">Ignored</Badge>
+                      </div>
+                      <h3 className="font-semibold mb-2">Ignored Duplicates</h3>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Clean up duplicate groups you've previously ignored
+                      </p>
+                      <Button
+                        onClick={() => {
+                          setCleanupType('ignored');
+                          setCleanupConfirmOpen(true);
+                        }}
+                        variant="outline"
+                        className="w-full"
+                        data-testid="btn-cleanup-ignored"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Clean Up Ignored
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-2">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <History className="w-8 h-8 text-blue-500" />
+                        <Badge variant="secondary">History</Badge>
+                      </div>
+                      <h3 className="font-semibold mb-2">Action History</h3>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Remove old merge and ignore action records
+                      </p>
+                      <Button
+                        onClick={() => {
+                          setCleanupType('history');
+                          setCleanupConfirmOpen(true);
+                        }}
+                        variant="outline"
+                        className="w-full"
+                        data-testid="btn-cleanup-history"
+                      >
+                        <History className="w-4 h-4 mr-2" />
+                        Clean Up History
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-2 border-red-200">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <AlertTriangle className="w-8 h-8 text-red-500" />
+                        <Badge variant="destructive">All</Badge>
+                      </div>
+                      <h3 className="font-semibold mb-2">Complete Cleanup</h3>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Remove both ignored duplicates and history
+                      </p>
+                      <Button
+                        onClick={() => {
+                          setCleanupType('all');
+                          setCleanupConfirmOpen(true);
+                        }}
+                        variant="destructive"
+                        className="w-full"
+                        data-testid="btn-cleanup-all"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Clean Up All
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="border-t pt-6">
+                  <Label htmlFor="cleanupDays" className="text-base font-semibold mb-2 block">
+                    Age Filter
+                  </Label>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Only delete records older than the specified number of days
+                  </p>
+                  <div className="flex items-center space-x-4">
+                    <Input
+                      id="cleanupDays"
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={cleanupDaysOld}
+                      onChange={(e) => setCleanupDaysOld(parseInt(e.target.value) || 90)}
+                      className="w-32"
+                      data-testid="input-cleanup-days"
+                    />
+                    <span className="text-sm text-gray-600">days old or older</span>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
+                    <div>
+                      <h4 className="font-semibold text-yellow-900">Important Notes</h4>
+                      <ul className="text-sm text-yellow-800 mt-2 space-y-1 list-disc list-inside">
+                        <li>This action cannot be undone</li>
+                        <li>Only records older than {cleanupDaysOld} days will be deleted</li>
+                        <li>Active duplicate groups will not be affected</li>
+                        <li>Only administrators can perform cleanup</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
 
@@ -1014,6 +1182,61 @@ export default function DuplicatesManagement() {
                 <>
                   <Search className="w-4 h-4 mr-2" />
                   Start Scan
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cleanup Confirmation Dialog */}
+      <Dialog open={cleanupConfirmOpen} onOpenChange={setCleanupConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <AlertTriangle className="w-5 h-5 text-red-500" />
+              <span>Confirm Cleanup</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-sm text-red-900">
+                {cleanupType === 'ignored' && `You are about to delete all ignored duplicate records older than ${cleanupDaysOld} days.`}
+                {cleanupType === 'history' && `You are about to delete all duplicate action history older than ${cleanupDaysOld} days.`}
+                {cleanupType === 'all' && `You are about to delete all ignored duplicates AND history records older than ${cleanupDaysOld} days.`}
+              </p>
+              <p className="text-sm text-red-900 mt-2 font-semibold">
+                This action cannot be undone.
+              </p>
+            </div>
+            <p className="text-sm text-gray-600">
+              Are you sure you want to proceed?
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCleanupConfirmOpen(false)}
+              disabled={cleanupMutation.isPending}
+              data-testid="btn-cancel-cleanup"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleCleanup}
+              disabled={cleanupMutation.isPending}
+              data-testid="btn-confirm-cleanup"
+            >
+              {cleanupMutation.isPending ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                  Cleaning...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Confirm Cleanup
                 </>
               )}
             </Button>
