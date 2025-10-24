@@ -58,6 +58,7 @@ export default function DuplicatesManagement() {
   const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
   const [scanConfigOpen, setScanConfigOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("people");
+  const [hasAutoOpened, setHasAutoOpened] = useState(false);
   
   const [scanConfig, setScanConfig] = useState({
     nameThreshold: 85,
@@ -101,6 +102,25 @@ export default function DuplicatesManagement() {
     retry: false,
     enabled: isAuthenticated
   });
+
+  // Auto-open duplicate modal from URL parameter
+  useEffect(() => {
+    if (hasAutoOpened || !duplicateGroups || duplicatesLoading || !Array.isArray(duplicateGroups)) return;
+    
+    const params = new URLSearchParams(window.location.search);
+    const groupId = params.get('groupId');
+    
+    if (groupId) {
+      const targetGroup = duplicateGroups.find((group: any) => group.id === parseInt(groupId));
+      if (targetGroup) {
+        handleSelectDuplicate(targetGroup);
+        setHasAutoOpened(true);
+        
+        // Clean up URL parameter
+        window.history.replaceState({}, '', '/duplicates');
+      }
+    }
+  }, [duplicateGroups, duplicatesLoading, hasAutoOpened]);
 
   // Scan for duplicates mutation
   const scanMutation = useMutation({

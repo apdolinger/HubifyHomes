@@ -329,6 +329,10 @@ export function DuplicatesWidget({ className }: DuplicatesWidgetProps) {
     setLocation("/duplicates");
   };
 
+  const handleViewDuplicate = (groupId: number) => {
+    setLocation(`/duplicates?groupId=${groupId}`);
+  };
+
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 95) return 'bg-red-50 border-red-500 text-red-900';
     if (confidence >= 85) return 'bg-orange-50 border-orange-500 text-orange-900';
@@ -403,7 +407,7 @@ export function DuplicatesWidget({ className }: DuplicatesWidgetProps) {
               <div 
                 key={group.id || idx}
                 className={`flex items-center justify-between p-3 rounded-lg border-l-4 cursor-pointer hover:opacity-80 transition-opacity ${getConfidenceColor(group.confidence)}`}
-                onClick={handleViewAllDuplicates}
+                onClick={() => handleViewDuplicate(group.id)}
                 data-testid={`duplicate-item-${idx}`}
               >
                 <div className="flex-1">
@@ -418,7 +422,7 @@ export function DuplicatesWidget({ className }: DuplicatesWidgetProps) {
                   variant="outline" 
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleViewAllDuplicates();
+                    handleViewDuplicate(group.id);
                   }}
                   className="hover:bg-white/50"
                   data-testid={`button-review-${idx}`}
