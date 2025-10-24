@@ -8,10 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckSquare, Clock, User, Building, Eye, Edit, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { CheckSquare, Clock, User, Building, Eye, Edit, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation } from "wouter";
+import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
 
 type SortField = 'title' | 'priority' | 'status' | 'dueDate' | 'createdAt' | 'assignedUser' | 'property' | 'client';
 type SortDirection = 'asc' | 'desc';
@@ -51,6 +52,45 @@ export default function Tasks() {
   // Sort state
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  // Table customization state
+  const [isCustomizeModalOpen, setIsCustomizeModalOpen] = useState(false);
+  
+  // Default column configuration
+  const defaultColumns: ColumnConfig[] = [
+    { id: 'title', label: 'Task Title', visible: true, required: true },
+    { id: 'property', label: 'Property', visible: true },
+    { id: 'client', label: 'Client', visible: true },
+    { id: 'assignedUser', label: 'Team/Staff', visible: true },
+    { id: 'priority', label: 'Priority', visible: true },
+    { id: 'status', label: 'Status', visible: true },
+    { id: 'dueDate', label: 'Due Date', visible: true },
+    { id: 'createdAt', label: 'Created', visible: true },
+  ];
+
+  // Load column configuration from localStorage
+  const [columns, setColumns] = useState<ColumnConfig[]>(() => {
+    const saved = localStorage.getItem('taskTableColumns');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return defaultColumns;
+      }
+    }
+    return defaultColumns;
+  });
+
+  // Save column configuration to localStorage
+  const handleSaveColumns = (newColumns: ColumnConfig[]) => {
+    setColumns(newColumns);
+    localStorage.setItem('taskTableColumns', JSON.stringify(newColumns));
+  };
+
+  // Get visible columns in order
+  const visibleColumns = useMemo(() => {
+    return columns.filter(col => col.visible);
+  }, [columns]);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -253,6 +293,110 @@ export default function Tasks() {
     navigate(`/task-profile/${taskId}`);
   };
 
+  // Render table cell content based on column ID
+  const renderCellContent = (columnId: string, task: any) => {
+    switch (columnId) {
+      case 'title':
+        return (
+          <div>
+            <div className="font-semibold">{task.title}</div>
+            {task.description && (
+              <div className="text-sm text-slate-600 truncate max-w-xs">
+                {task.description}
+              </div>
+            )}
+          </div>
+        );
+      case 'property':
+        return task.property ? (
+          <div className="text-sm">
+            <div className="font-medium">{task.property.name}</div>
+            <div className="text-slate-600 truncate max-w-xs">
+              {[
+                task.property.address1,
+                task.property.address2,
+                task.property.city,
+                task.property.state,
+                task.property.zip
+              ].filter(Boolean).join(", ")}
+            </div>
+          </div>
+        ) : (
+          <span className="text-slate-400">No property</span>
+        );
+      case 'client':
+        return task.contact ? (
+          <div className="text-sm">
+            <div className="font-medium">{task.contact.firstName} {task.contact.lastName}</div>
+            {task.contact.email && (
+              <div className="text-slate-600">{task.contact.email}</div>
+            )}
+          </div>
+        ) : (
+          <span className="text-slate-400">No client</span>
+        );
+      case 'assignedUser':
+        return task.assignedUser ? (
+          <div className="space-y-1">
+            <div className="flex items-center space-x-2">
+              <Avatar className="w-6 h-6">
+                <AvatarImage src={task.assignedUser.profileImageUrl} alt={`${task.assignedUser.firstName} ${task.assignedUser.lastName}`} />
+                <AvatarFallback className="text-xs">
+                  {task.assignedUser.firstName?.[0]}{task.assignedUser.lastName?.[0]}
+                </AvatarFallback>
+              </Avatar>
+              <div className="text-sm">
+                <div className="font-medium">{task.assignedUser.firstName} {task.assignedUser.lastName}</div>
+                <div className="text-slate-600">{task.assignedUser.email}</div>
+              </div>
+            </div>
+            {task.oooConflict?.hasConflict && (
+              <Badge 
+                variant="outline" 
+                className="bg-yellow-50 text-yellow-700 border-yellow-300 text-xs"
+                data-testid={`ooo-conflict-badge-${task.id}`}
+              >
+                Out of Office Conflict
+              </Badge>
+            )}
+          </div>
+        ) : (
+          <span className="text-slate-400">Unassigned</span>
+        );
+      case 'priority':
+        return (
+          <Badge variant={getPriorityColor(task.priority)} className="capitalize">
+            {task.priority}
+          </Badge>
+        );
+      case 'status':
+        return (
+          <Badge variant={getStatusColor(task.status)} className="capitalize">
+            {task.status.replace('_', ' ')}
+          </Badge>
+        );
+      case 'dueDate':
+        return task.dueDate ? (
+          <div className="text-sm">
+            <div>{new Date(task.dueDate).toLocaleDateString()}</div>
+            {new Date(task.dueDate) < new Date() && task.status !== "completed" && (
+              <Badge variant="destructive" className="text-xs mt-1">Overdue</Badge>
+            )}
+          </div>
+        ) : (
+          <span className="text-slate-400">No due date</span>
+        );
+      case 'createdAt':
+        return (
+          <span className="text-sm text-slate-600">
+            {new Date(task.createdAt).toLocaleDateString()}
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -391,8 +535,17 @@ export default function Tasks() {
 
       {/* Tasks Table */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Tasks List</CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsCustomizeModalOpen(true)}
+            data-testid="customize-table-btn"
+          >
+            <Settings className="w-4 h-4 mr-2" />
+            Customize
+          </Button>
         </CardHeader>
         <CardContent>
           {tasksLoading ? (
@@ -403,54 +556,18 @@ export default function Tasks() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('title')}>
-                    <div className="flex items-center">
-                      Task Title
-                      {getSortIcon('title')}
-                    </div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('property')}>
-                    <div className="flex items-center">
-                      Property
-                      {getSortIcon('property')}
-                    </div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('client')}>
-                    <div className="flex items-center">
-                      Client
-                      {getSortIcon('client')}
-                    </div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('assignedUser')}>
-                    <div className="flex items-center">
-                      Assigned To
-                      {getSortIcon('assignedUser')}
-                    </div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('priority')}>
-                    <div className="flex items-center">
-                      Priority
-                      {getSortIcon('priority')}
-                    </div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('status')}>
-                    <div className="flex items-center">
-                      Status
-                      {getSortIcon('status')}
-                    </div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('dueDate')}>
-                    <div className="flex items-center">
-                      Due Date
-                      {getSortIcon('dueDate')}
-                    </div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('createdAt')}>
-                    <div className="flex items-center">
-                      Created
-                      {getSortIcon('createdAt')}
-                    </div>
-                  </TableHead>
+                  {visibleColumns.map((column) => (
+                    <TableHead 
+                      key={column.id}
+                      className="cursor-pointer hover:bg-slate-50" 
+                      onClick={() => handleSort(column.id as SortField)}
+                    >
+                      <div className="flex items-center">
+                        {column.label}
+                        {getSortIcon(column.id as SortField)}
+                      </div>
+                    </TableHead>
+                  ))}
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -461,99 +578,11 @@ export default function Tasks() {
                     className="cursor-pointer hover:bg-slate-50"
                     onClick={() => handleTaskClick(task.id)}
                   >
-                    <TableCell className="font-medium">
-                      <div>
-                        <div className="font-semibold">{task.title}</div>
-                        {task.description && (
-                          <div className="text-sm text-slate-600 truncate max-w-xs">
-                            {task.description}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {task.property ? (
-                        <div className="text-sm">
-                          <div className="font-medium">{task.property.name}</div>
-                          <div className="text-slate-600 truncate max-w-xs">
-                            {[
-                              task.property.address1,
-                              task.property.address2,
-                              task.property.city,
-                              task.property.state,
-                              task.property.zip
-                            ].filter(Boolean).join(", ")}
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-slate-400">No property</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {task.contact ? (
-                        <div className="text-sm">
-                          <div className="font-medium">{task.contact.firstName} {task.contact.lastName}</div>
-                          {task.contact.email && (
-                            <div className="text-slate-600">{task.contact.email}</div>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400">No client</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {task.assignedUser ? (
-                        <div className="space-y-1">
-                          <div className="flex items-center space-x-2">
-                            <Avatar className="w-6 h-6">
-                              <AvatarImage src={task.assignedUser.profileImageUrl} alt={`${task.assignedUser.firstName} ${task.assignedUser.lastName}`} />
-                              <AvatarFallback className="text-xs">
-                                {task.assignedUser.firstName?.[0]}{task.assignedUser.lastName?.[0]}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="text-sm">
-                              <div className="font-medium">{task.assignedUser.firstName} {task.assignedUser.lastName}</div>
-                              <div className="text-slate-600">{task.assignedUser.email}</div>
-                            </div>
-                          </div>
-                          {(task as any).oooConflict?.hasConflict && (
-                            <Badge 
-                              variant="outline" 
-                              className="bg-yellow-50 text-yellow-700 border-yellow-300 text-xs"
-                              data-testid={`ooo-conflict-badge-${task.id}`}
-                            >
-                              Out of Office Conflict
-                            </Badge>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400">Unassigned</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getPriorityColor(task.priority)} className="capitalize">
-                        {task.priority}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusColor(task.status)} className="capitalize">
-                        {task.status.replace('_', ' ')}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {task.dueDate ? (
-                        <span className="text-sm">
-                          {new Date(task.dueDate).toLocaleDateString()}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">No due date</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-slate-600">
-                        {new Date(task.createdAt).toLocaleDateString()}
-                      </span>
-                    </TableCell>
+                    {visibleColumns.map((column) => (
+                      <TableCell key={column.id} className={column.id === 'title' ? 'font-medium' : ''}>
+                        {renderCellContent(column.id, task)}
+                      </TableCell>
+                    ))}
                     <TableCell>
                       <div className="flex items-center space-x-2">
                         <Button 
@@ -626,6 +655,15 @@ export default function Tasks() {
           )}
         </CardContent>
       </Card>
+
+      {/* Table Customization Modal */}
+      <TableCustomizationModal
+        isOpen={isCustomizeModalOpen}
+        onClose={() => setIsCustomizeModalOpen(false)}
+        columns={columns}
+        defaultColumns={defaultColumns}
+        onSave={handleSaveColumns}
+      />
     </main>
   );
 }
