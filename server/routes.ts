@@ -4199,10 +4199,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create smart merged record
         const mergedData = { ...primary };
         
+        // Collect all notes for intelligent combination
+        const allNotes: Array<{ text: string; createdAt: Date | null }> = [];
+        
+        // Add primary's notes if exists
+        if (primary.notes) {
+          allNotes.push({ 
+            text: primary.notes, 
+            createdAt: primary.created_at 
+          });
+        }
+        
         duplicates.forEach(duplicate => {
-          // Fill in missing fields from duplicates
+          // Add duplicate's notes if exists
+          if (duplicate.notes) {
+            allNotes.push({ 
+              text: duplicate.notes, 
+              createdAt: duplicate.created_at 
+            });
+          }
+          
+          // Fill in missing fields from duplicates (excluding notes - handled separately)
           Object.keys(duplicate).forEach(key => {
-            if (key === 'id') return;
+            if (key === 'id' || key === 'notes') return;
             
             if (!mergedData[key] && duplicate[key]) {
               mergedData[key] = duplicate[key];
@@ -4217,6 +4236,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         });
         
+        // Intelligently combine notes
+        if (allNotes.length > 0) {
+          // Sort by creation date (oldest first)
+          allNotes.sort((a, b) => {
+            if (!a.createdAt) return 1;
+            if (!b.createdAt) return -1;
+            return a.createdAt.getTime() - b.createdAt.getTime();
+          });
+          
+          // Combine notes with separators (all notes get date headers)
+          const combinedNotes = allNotes
+            .map((note) => {
+              const timestamp = note.createdAt 
+                ? new Date(note.createdAt).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric' 
+                  })
+                : 'Unknown date';
+              
+              return `--- Notes from ${timestamp} ---\n${note.text}`;
+            })
+            .join('\n\n');
+          
+          mergedData.notes = combinedNotes;
+        }
+        
         // Update primary record with merged data
         await db.update(contacts)
           .set({
@@ -4225,8 +4271,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })
           .where(eq(contacts.id, primary.id));
         
-        // Delete duplicate records
         const duplicateIds = duplicates.map(d => d.id);
+        
+        // Transfer all related records to primary contact
+        let transferCounts = {
+          tasks: 0,
+          timeEntries: 0,
+          formSubmissions: 0,
+          contactProperties: 0,
+          alerts: 0
+        };
+        
+        for (const duplicateId of duplicateIds) {
+          // Transfer tasks
+          const tasksResult = await db.update(tasks)
+            .set({ contact_id: primary.id })
+            .where(eq(tasks.contact_id, duplicateId))
+            .returning();
+          transferCounts.tasks += tasksResult.length;
+          
+          // Transfer time entries
+          const timeEntriesResult = await db.update(timeEntries)
+            .set({ contact_id: primary.id })
+            .where(eq(timeEntries.contact_id, duplicateId))
+            .returning();
+          transferCounts.timeEntries += timeEntriesResult.length;
+          
+          // Transfer form submissions
+          const formSubmissionsResult = await db.update(formSubmissions)
+            .set({ profile_id: primary.id })
+            .where(eq(formSubmissions.profile_id, duplicateId))
+            .returning();
+          transferCounts.formSubmissions += formSubmissionsResult.length;
+          
+          // Transfer contact-property links (with deduplication)
+          const existingLinks = await db.select()
+            .from(contactProperties)
+            .where(eq(contactProperties.contact_id, primary.id));
+          
+          const duplicateLinks = await db.select()
+            .from(contactProperties)
+            .where(eq(contactProperties.contact_id, duplicateId));
+          
+          for (const dupLink of duplicateLinks) {
+            const alreadyExists = existingLinks.some(
+              link => link.property_id === dupLink.property_id
+            );
+            
+            if (!alreadyExists) {
+              // Transfer the link
+              await db.update(contactProperties)
+                .set({ contact_id: primary.id })
+                .where(eq(contactProperties.id, dupLink.id));
+              transferCounts.contactProperties++;
+            } else {
+              // Delete duplicate link
+              await db.delete(contactProperties)
+                .where(eq(contactProperties.id, dupLink.id));
+            }
+          }
+          
+          // Transfer alerts
+          const alertsResult = await db.update(alerts)
+            .set({ entity_id: primary.id })
+            .where(and(
+              eq(alerts.type, 'client'),
+              eq(alerts.entity_id, duplicateId)
+            ))
+            .returning();
+          transferCounts.alerts += alertsResult.length;
+        }
+        
+        // Delete duplicate records
         for (const duplicateId of duplicateIds) {
           await db.delete(contacts).where(eq(contacts.id, duplicateId));
         }
@@ -4241,7 +4357,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           details: JSON.stringify({ 
             mergedContactIds: duplicateIds,
             mergeNotes,
-            totalRecords: contactsToMerge.length 
+            totalRecords: contactsToMerge.length,
+            transferredRecords: transferCounts
           })
         });
         
@@ -4296,10 +4413,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create smart merged record
         const mergedData = { ...primary };
         
+        // Collect all notes for intelligent combination
+        const allPropertyNotes: Array<{ text: string; createdAt: Date | null }> = [];
+        
+        // Add primary's notes if exists
+        if (primary.notes) {
+          allPropertyNotes.push({ 
+            text: primary.notes, 
+            createdAt: primary.createdAt 
+          });
+        }
+        
         duplicates.forEach(duplicate => {
-          // Fill in missing fields from duplicates
+          // Add duplicate's notes if exists
+          if (duplicate.notes) {
+            allPropertyNotes.push({ 
+              text: duplicate.notes, 
+              createdAt: duplicate.createdAt 
+            });
+          }
+          
+          // Fill in missing fields from duplicates (excluding notes - handled separately)
           Object.keys(duplicate).forEach(key => {
-            if (key === 'id') return;
+            if (key === 'id' || key === 'notes') return;
             
             if (!mergedData[key] && duplicate[key]) {
               mergedData[key] = duplicate[key];
@@ -4321,6 +4457,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         });
         
+        // Intelligently combine notes
+        if (allPropertyNotes.length > 0) {
+          // Sort by creation date (oldest first)
+          allPropertyNotes.sort((a, b) => {
+            if (!a.createdAt) return 1;
+            if (!b.createdAt) return -1;
+            return a.createdAt.getTime() - b.createdAt.getTime();
+          });
+          
+          // Combine notes with separators (all notes get date headers)
+          const combinedNotes = allPropertyNotes
+            .map((note) => {
+              const timestamp = note.createdAt 
+                ? new Date(note.createdAt).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric' 
+                  })
+                : 'Unknown date';
+              
+              return `--- Notes from ${timestamp} ---\n${note.text}`;
+            })
+            .join('\n\n');
+          
+          mergedData.notes = combinedNotes;
+        }
+        
         // Update primary record with merged data
         await db.update(properties)
           .set({
@@ -4332,30 +4495,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Reassign all related records to the primary property
         const duplicateIds = duplicates.map(d => d.id);
         
-        // Update tasks
-        for (const duplicateId of duplicateIds) {
-          await db.update(tasks)
-            .set({ propertyId: primary.id })
-            .where(eq(tasks.propertyId, duplicateId));
-        }
+        // Transfer all related records with tracking
+        let propertyTransferCounts = {
+          tasks: 0,
+          timeEntries: 0,
+          formSubmissions: 0,
+          contactProperties: 0,
+          rooms: 0,
+          vehicles: 0,
+          alerts: 0,
+          events: 0,
+          contacts: 0
+        };
         
-        // Update time entries
         for (const duplicateId of duplicateIds) {
-          await db.update(timeEntries)
+          // Transfer tasks
+          const tasksResult = await db.update(tasks)
             .set({ propertyId: primary.id })
-            .where(eq(timeEntries.propertyId, duplicateId));
-        }
-        
-        // Update form submissions
-        for (const duplicateId of duplicateIds) {
-          await db.update(formSubmissions)
+            .where(eq(tasks.propertyId, duplicateId))
+            .returning();
+          propertyTransferCounts.tasks += tasksResult.length;
+          
+          // Transfer time entries
+          const timeEntriesResult = await db.update(timeEntries)
             .set({ propertyId: primary.id })
-            .where(eq(formSubmissions.propertyId, duplicateId));
-        }
-        
-        // Update contact_properties junction records
-        for (const duplicateId of duplicateIds) {
-          // First check if there are any conflicting records
+            .where(eq(timeEntries.propertyId, duplicateId))
+            .returning();
+          propertyTransferCounts.timeEntries += timeEntriesResult.length;
+          
+          // Transfer form submissions
+          const formSubmissionsResult = await db.update(formSubmissions)
+            .set({ propertyId: primary.id })
+            .where(eq(formSubmissions.propertyId, duplicateId))
+            .returning();
+          propertyTransferCounts.formSubmissions += formSubmissionsResult.length;
+          
+          // Transfer rooms
+          const roomsResult = await db.update(rooms)
+            .set({ propertyId: primary.id })
+            .where(eq(rooms.propertyId, duplicateId))
+            .returning();
+          propertyTransferCounts.rooms += roomsResult.length;
+          
+          // Transfer vehicles
+          const vehiclesResult = await db.update(vehicles)
+            .set({ propertyId: primary.id })
+            .where(eq(vehicles.propertyId, duplicateId))
+            .returning();
+          propertyTransferCounts.vehicles += vehiclesResult.length;
+          
+          // Transfer events
+          const eventsResult = await db.update(events)
+            .set({ property_id: primary.id })
+            .where(eq(events.property_id, duplicateId))
+            .returning();
+          propertyTransferCounts.events += eventsResult.length;
+          
+          // Transfer alerts
+          const alertsResult = await db.update(alerts)
+            .set({ entity_id: primary.id })
+            .where(and(
+              eq(alerts.type, 'property'),
+              eq(alerts.entity_id, duplicateId)
+            ))
+            .returning();
+          propertyTransferCounts.alerts += alertsResult.length;
+          
+          // Transfer contacts (if they reference propertyId directly)
+          const contactsResult = await db.update(contacts)
+            .set({ property_id: primary.id })
+            .where(eq(contacts.property_id, duplicateId))
+            .returning();
+          propertyTransferCounts.contacts += contactsResult.length;
+          
+          // Transfer contact-property links (with deduplication)
           const existingLinks = await db.select()
             .from(contactProperties)
             .where(eq(contactProperties.propertyId, primary.id));
@@ -4373,24 +4586,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await db.update(contactProperties)
                 .set({ propertyId: primary.id })
                 .where(eq(contactProperties.id, link.id));
+              propertyTransferCounts.contactProperties++;
             } else {
               // Conflict - just delete the duplicate link
               await db.delete(contactProperties)
                 .where(eq(contactProperties.id, link.id));
             }
           }
-        }
-        
-        // Note: rooms and vehicles have CASCADE DELETE, so they'll be deleted when properties are deleted
-        // We need to update them to point to the primary property instead
-        for (const duplicateId of duplicateIds) {
-          await db.update(rooms)
-            .set({ propertyId: primary.id })
-            .where(eq(rooms.propertyId, duplicateId));
-          
-          await db.update(vehicles)
-            .set({ propertyId: primary.id })
-            .where(eq(vehicles.propertyId, duplicateId));
         }
         
         // Delete duplicate properties
@@ -4409,7 +4611,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             mergedPropertyIds: duplicateIds,
             mergeNotes,
             totalRecords: propertiesToMerge.length,
-            primaryAddress: `${primary.address1}, ${primary.city}, ${primary.state}`
+            primaryAddress: `${primary.address1}, ${primary.city}, ${primary.state}`,
+            transferredRecords: propertyTransferCounts
           })
         });
         
