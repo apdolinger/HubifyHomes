@@ -1253,6 +1253,10 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
     fields: [tasks.roomId],
     references: [rooms.id],
   }),
+  contact: one(contacts, {
+    fields: [tasks.contactId],
+    references: [contacts.id],
+  }),
   assignedTo: one(users, {
     fields: [tasks.assignedToId],
     references: [users.id],
