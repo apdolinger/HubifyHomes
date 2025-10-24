@@ -229,6 +229,57 @@ Hubify Team`,
   }
 }
 
+// Helper function to send broadcast notification email to all team members
+async function sendBroadcastNotification(
+  recipientEmail: string,
+  recipientName: string,
+  authorName: string,
+  messageContent: string
+) {
+  if (!SENDGRID_API_KEY) {
+    console.warn("SendGrid API key not configured. Skipping email notification.");
+    return;
+  }
+
+  try {
+    const msg = {
+      to: recipientEmail,
+      from: process.env.SENDGRID_FROM_EMAIL || "noreply@hubify.com",
+      subject: `${authorName} posted a new team message`,
+      text: `Hello ${recipientName},
+
+${authorName} posted a new message to the team:
+
+"${messageContent}"
+
+Log in to Hubify to view and respond.
+
+Best regards,
+Hubify Team`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #3b82f6;">New Team Message</h2>
+          <p>Hello ${recipientName},</p>
+          <p><strong>${authorName}</strong> posted a new message to the team:</p>
+          
+          <div style="background-color: #f3f4f6; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #3b82f6;">
+            <p style="margin: 0;">"${messageContent}"</p>
+          </div>
+
+          <p>Log in to Hubify to view and respond to this message.</p>
+          
+          <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">Best regards,<br>Hubify Team</p>
+        </div>
+      `,
+    };
+
+    await sgMail.send(msg);
+    console.log(`Broadcast notification sent to ${recipientEmail}`);
+  } catch (error) {
+    console.error("Error sending broadcast notification:", error);
+  }
+}
+
 // Security Middleware
 const isSuperAdmin = async (req: Request, res: Response, next: NextFunction) => {
   try {
