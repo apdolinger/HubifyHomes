@@ -1,4 +1,5 @@
-import { RRule } from 'rrule';
+import rruleLib from 'rrule';
+const { RRule } = rruleLib;
 import type { InsertTask, Task, TaskChecklistItem, InsertTaskChecklistItem } from '@shared/schema';
 import { db } from './db';
 import { tasks, taskChecklistItems } from '@shared/schema';
@@ -31,13 +32,22 @@ export async function generateTaskInstances(
   // Parse the RRULE to get occurrence dates
   const rrule = RRule.fromString(templateTask.recurrenceRule);
   
-  // Calculate how many instances to generate
-  const now = new Date();
-  const lookAheadUntil = new Date(now);
-  lookAheadUntil.setMonth(lookAheadUntil.getMonth() + lookAheadMonths);
+  // Get all occurrences based on the RRULE
+  // If the RRULE has COUNT, it will respect it
+  // If the RRULE has UNTIL, it will respect it
+  // Otherwise, we limit by lookAheadMonths
+  let occurrences: Date[];
   
-  // Get all occurrences within the lookahead period
-  const occurrences = rrule.between(now, lookAheadUntil, true);
+  if (rrule.origOptions.count || rrule.origOptions.until) {
+    // RRULE has explicit end condition, use all()
+    occurrences = rrule.all();
+  } else {
+    // No explicit end, use date range with lookahead
+    const now = new Date();
+    const lookAheadUntil = new Date(now);
+    lookAheadUntil.setMonth(lookAheadUntil.getMonth() + lookAheadMonths);
+    occurrences = rrule.between(now, lookAheadUntil, true);
+  }
 
   const generatedInstances: GeneratedInstance[] = [];
 
