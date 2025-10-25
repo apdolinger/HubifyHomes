@@ -308,6 +308,7 @@ export interface IStorage {
   archiveTask(taskId: number): Promise<Task>;
   deleteTask(taskId: number): Promise<void>;
   checkTaskConflicts(assignedUserId: string, dueDate: string, timeEstimate: string, excludeTaskId?: number): Promise<any[]>;
+  getTaskChecklistItems(taskId: number): Promise<TaskChecklistItem[]>;
   
   // Time tracking operations
   getTimeEntries(orgId: string, filters?: { userId?: string; propertyId?: number; taskId?: number; startDate?: string; endDate?: string }): Promise<TimeEntry[]>;
@@ -1615,6 +1616,13 @@ export class DatabaseStorage implements IStorage {
     });
     
     return updatedTask;
+  }
+
+  async getTaskChecklistItems(taskId: number): Promise<TaskChecklistItem[]> {
+    return await db.select()
+      .from(taskChecklistItems)
+      .where(eq(taskChecklistItems.taskId, taskId))
+      .orderBy(taskChecklistItems.sortOrder);
   }
 
   async deleteTask(taskId: number): Promise<void> {

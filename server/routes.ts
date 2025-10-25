@@ -3106,6 +3106,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignedById: userId,
       });
 
+      // If this is a recurring task, automatically generate instances
+      let generatedInstances: any[] = [];
+      if (task.recurrenceRule) {
+        try {
+          const checklistItems = await storage.getTaskChecklistItems(task.id);
+          const { generateTaskInstances } = await import('./taskInstanceGenerator');
+          const instances = await generateTaskInstances({
+            templateTask: task,
+            checklistItems,
+            lookAheadMonths: 12, // Generate 12 months of instances by default
+          });
+          generatedInstances = instances.map(i => ({
+            taskId: i.task.id,
+            dueDate: i.task.dueDate,
+          }));
+        } catch (genError) {
+          console.error("Error auto-generating task instances:", genError);
+          // Don't fail the whole request if instance generation fails
+        }
+      }
+
       // Send email notification if conflict exists and user has supervisor
       if (conflict.hasConflict && conflict.assignedUser?.supervisorId) {
         const supervisor = await storage.getUser(conflict.assignedUser.supervisorId);
@@ -3124,7 +3145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Return task with conflict information
+      // Return task with conflict information and generated instances
       res.status(201).json({
         ...task,
         oooConflict: conflict.hasConflict ? {
@@ -3135,6 +3156,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           oooEndDate: conflict.activeOOO?.endDate,
           oooReason: conflict.activeOOO?.reason,
         } : null,
+        generatedInstances: generatedInstances.length > 0 ? {
+          count: generatedInstances.length,
+          instances: generatedInstances,
+        } : null,
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -3142,6 +3167,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error creating task:", error);
       res.status(500).json({ message: "Failed to create task" });
+    }
+  });
+
+  // Generate task instances from a recurring task template
+  app.post("/api/tasks/:id/generate-instances", isAuthenticated, async (req: any, res) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      const { lookAheadMonths = 12 } = req.body;
+
+      // Get the template task
+      const templateTask = await storage.getTask(taskId);
+      if (!templateTask) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+
+      if (!templateTask.recurrenceRule) {
+        return res.status(400).json({ message: "Task must have a recurrence rule to generate instances" });
+      }
+
+      // Get checklist items for the template
+      const checklistItems = await storage.getTaskChecklistItems(taskId);
+
+      // Generate instances
+      const { generateTaskInstances } = await import('./taskInstanceGenerator');
+      const instances = await generateTaskInstances({
+        templateTask,
+        checklistItems,
+        lookAheadMonths,
+      });
+
+      res.json({
+        message: `Generated ${instances.length} task instances`,
+        count: instances.length,
+        instances: instances.map(i => ({
+          taskId: i.task.id,
+          dueDate: i.task.dueDate,
+          checklistItemCount: i.checklistItems.length,
+        })),
+      });
+    } catch (error) {
+      console.error("Error generating task instances:", error);
+      res.status(500).json({ message: "Failed to generate task instances" });
+    }
+  });
+
+  // Get all instances for a template task
+  app.get("/api/tasks/:id/instances", isAuthenticated, async (req, res) => {
+    try {
+      const templateId = parseInt(req.params.id);
+      const { getTaskInstances } = await import('./taskInstanceGenerator');
+      const instances = await getTaskInstances(templateId);
+      res.json(instances);
+    } catch (error) {
+      console.error("Error fetching task instances:", error);
+      res.status(500).json({ message: "Failed to fetch task instances" });
+    }
+  });
+
+  // Get the template task for an instance
+  app.get("/api/tasks/:id/template", isAuthenticated, async (req, res) => {
+    try {
+      const instanceId = parseInt(req.params.id);
+      const { getTemplateTask } = await import('./taskInstanceGenerator');
+      const template = await getTemplateTask(instanceId);
+      
+      if (!template) {
+        return res.status(404).json({ message: "Template task not found" });
+      }
+      
+      res.json(template);
+    } catch (error) {
+      console.error("Error fetching template task:", error);
+      res.status(500).json({ message: "Failed to fetch template task" });
     }
   });
 
