@@ -92,6 +92,7 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
     taskBased: false,
   });
   const [invoiceFrequency, setInvoiceFrequency] = useState("monthly");
+  const [billingDay, setBillingDay] = useState<number | null>(null);
   const [billingWorkflow, setBillingWorkflow] = useState("review");
   const [defaultHourlyRate, setDefaultHourlyRate] = useState("");
   const [invoiceDeliveryMethod, setInvoiceDeliveryMethod] = useState("email");
@@ -102,6 +103,7 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
       setBillingEnabled(person.billingEnabled || false);
       setBillingTypes(person.billingTypes || { recurringCharges: false, hourlyTime: false, taskBased: false });
       setInvoiceFrequency(person.invoiceFrequency || "monthly");
+      setBillingDay(person.billingDay || null);
       setBillingWorkflow(person.billingWorkflow || "review");
       setDefaultHourlyRate(person.defaultHourlyRateCents ? (person.defaultHourlyRateCents / 100).toFixed(2) : "");
       setInvoiceDeliveryMethod(person.invoiceDeliveryMethod || "email");
@@ -175,6 +177,7 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
       billingEnabled,
       billingTypes,
       invoiceFrequency,
+      billingDay,
       billingWorkflow,
       defaultHourlyRateCents: hourlyRateCents,
       invoiceDeliveryMethod,
@@ -185,6 +188,7 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
     setBillingEnabled(person?.billingEnabled || false);
     setBillingTypes(person?.billingTypes || { recurringCharges: false, hourlyTime: false, taskBased: false });
     setInvoiceFrequency(person?.invoiceFrequency || "monthly");
+    setBillingDay(person?.billingDay || null);
     setBillingWorkflow(person?.billingWorkflow || "review");
     setDefaultHourlyRate(person?.defaultHourlyRateCents ? (person.defaultHourlyRateCents / 100).toFixed(2) : "");
     setInvoiceDeliveryMethod(person?.invoiceDeliveryMethod || "email");
@@ -308,23 +312,91 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
               {/* Invoice Frequency */}
               <div>
                 <Label htmlFor="invoice-frequency" className="text-base font-semibold mb-2 block">
-                  Invoice Frequency
+                  Invoice Frequency & Schedule
                 </Label>
-                <Select
-                  value={invoiceFrequency}
-                  onValueChange={setInvoiceFrequency}
-                  disabled={!isEditingBilling}
-                >
-                  <SelectTrigger id="invoice-frequency" data-testid="select-invoice-frequency">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="weekly">Weekly</SelectItem>
-                    <SelectItem value="biweekly">Bi-weekly (Every 2 weeks)</SelectItem>
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                    <SelectItem value="on_completion">On Project Completion</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="space-y-3">
+                  <Select
+                    value={invoiceFrequency}
+                    onValueChange={(value) => {
+                      setInvoiceFrequency(value);
+                      if (value === "manual" || value === "on_completion") {
+                        setBillingDay(null);
+                      }
+                    }}
+                    disabled={!isEditingBilling}
+                  >
+                    <SelectTrigger id="invoice-frequency" data-testid="select-invoice-frequency">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weekly">Weekly (Automated Batching)</SelectItem>
+                      <SelectItem value="biweekly">Bi-weekly (Automated Batching)</SelectItem>
+                      <SelectItem value="monthly">Monthly (Automated Batching)</SelectItem>
+                      <SelectItem value="on_completion">On Project Completion</SelectItem>
+                      <SelectItem value="manual">Manual (No Automation)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  {(invoiceFrequency === "weekly" || invoiceFrequency === "biweekly") && (
+                    <div>
+                      <Label className="text-sm text-slate-600 mb-1 block">Day of Week</Label>
+                      <Select
+                        value={billingDay?.toString() || ""}
+                        onValueChange={(value) => setBillingDay(parseInt(value))}
+                        disabled={!isEditingBilling}
+                      >
+                        <SelectTrigger data-testid="select-billing-day-week">
+                          <SelectValue placeholder="Select day" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">Sunday</SelectItem>
+                          <SelectItem value="1">Monday</SelectItem>
+                          <SelectItem value="2">Tuesday</SelectItem>
+                          <SelectItem value="3">Wednesday</SelectItem>
+                          <SelectItem value="4">Thursday</SelectItem>
+                          <SelectItem value="5">Friday</SelectItem>
+                          <SelectItem value="6">Saturday</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Invoices will be automatically generated and sent on this day
+                      </p>
+                    </div>
+                  )}
+                  
+                  {invoiceFrequency === "monthly" && (
+                    <div>
+                      <Label className="text-sm text-slate-600 mb-1 block">Day of Month</Label>
+                      <Select
+                        value={billingDay?.toString() || ""}
+                        onValueChange={(value) => setBillingDay(parseInt(value))}
+                        disabled={!isEditingBilling}
+                      >
+                        <SelectTrigger data-testid="select-billing-day-month">
+                          <SelectValue placeholder="Select day" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 28 }, (_, i) => i + 1).map((day) => (
+                            <SelectItem key={day} value={day.toString()}>
+                              {day}{day === 1 ? 'st' : day === 2 ? 'nd' : day === 3 ? 'rd' : 'th'} of each month
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Invoices will be automatically generated and sent on this day of each month
+                      </p>
+                    </div>
+                  )}
+                  
+                  {(invoiceFrequency === "weekly" || invoiceFrequency === "biweekly" || invoiceFrequency === "monthly") && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <p className="text-sm text-blue-900">
+                        <strong>Automated Batching:</strong> All pending billing submissions will automatically be consolidated into a single invoice on the scheduled day.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Billing Workflow */}
