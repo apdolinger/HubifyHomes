@@ -388,6 +388,7 @@ function InvoicesTab() {
   const [invoiceClientFilter, setInvoiceClientFilter] = useState<string>("all");
   
   const [sendInvoiceDialogOpen, setSendInvoiceDialogOpen] = useState(false);
+  const [viewInvoiceDialogOpen, setViewInvoiceDialogOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [recipientEmail, setRecipientEmail] = useState("");
   const [emailMessage, setEmailMessage] = useState("");
@@ -774,7 +775,15 @@ function InvoicesTab() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" data-testid={`button-view-invoice-${invoice.id}`}>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedInvoice(invoice);
+                        setViewInvoiceDialogOpen(true);
+                      }}
+                      data-testid={`button-view-invoice-${invoice.id}`}
+                    >
                       <Eye className="w-4 h-4 mr-1" />
                       View
                     </Button>
@@ -858,6 +867,166 @@ function InvoicesTab() {
                   Send Invoice
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Invoice Dialog */}
+      <Dialog open={viewInvoiceDialogOpen} onOpenChange={setViewInvoiceDialogOpen}>
+        <DialogContent className="max-w-2xl" data-testid="dialog-view-invoice">
+          <DialogHeader>
+            <DialogTitle>Invoice Details</DialogTitle>
+            <DialogDescription>
+              Complete information for Invoice #{selectedInvoice?.invoiceNumber || selectedInvoice?.id?.slice(0, 8)}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedInvoice && (
+            <div className="space-y-4">
+              {/* Status Badges */}
+              <div className="flex gap-2">
+                <Badge
+                  variant={
+                    selectedInvoice.status === "paid" ? "default" :
+                    selectedInvoice.status === "sent" ? "secondary" :
+                    selectedInvoice.status === "overdue" ? "destructive" :
+                    "outline"
+                  }
+                >
+                  {selectedInvoice.status}
+                </Badge>
+                {selectedInvoice.paymentStatus && (
+                  <Badge
+                    variant={
+                      selectedInvoice.paymentStatus === "succeeded" ? "default" :
+                      selectedInvoice.paymentStatus === "failed" ? "destructive" :
+                      "secondary"
+                    }
+                    className={
+                      selectedInvoice.paymentStatus === "succeeded" ? "bg-green-600" :
+                      selectedInvoice.paymentStatus === "failed" ? "bg-red-600" :
+                      ""
+                    }
+                  >
+                    {selectedInvoice.paymentStatus === "succeeded" ? "Payment Successful" :
+                     selectedInvoice.paymentStatus === "failed" ? "Payment Failed" :
+                     selectedInvoice.paymentStatus === "processing" ? "Processing" :
+                     selectedInvoice.paymentStatus}
+                  </Badge>
+                )}
+              </div>
+
+              {/* Invoice Information */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-slate-500">Invoice Number</label>
+                  <p className="text-base font-semibold">{selectedInvoice.invoiceNumber || selectedInvoice.id.slice(0, 8)}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-slate-500">Amount</label>
+                  <p className="text-base font-semibold text-green-600">
+                    ${(selectedInvoice.amountCents / 100).toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-slate-500">Client</label>
+                  <p className="text-base">{selectedInvoice.client?.firstName} {selectedInvoice.client?.lastName}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-slate-500">Client Email</label>
+                  <p className="text-base">{selectedInvoice.client?.email || 'N/A'}</p>
+                </div>
+                {selectedInvoice.issuedAt && (
+                  <div>
+                    <label className="text-sm font-medium text-slate-500">Issued Date</label>
+                    <p className="text-base">{new Date(selectedInvoice.issuedAt).toLocaleDateString()}</p>
+                  </div>
+                )}
+                {selectedInvoice.dueDate && (
+                  <div>
+                    <label className="text-sm font-medium text-slate-500">Due Date</label>
+                    <p className="text-base">{new Date(selectedInvoice.dueDate).toLocaleDateString()}</p>
+                  </div>
+                )}
+                {selectedInvoice.paymentDate && (
+                  <div>
+                    <label className="text-sm font-medium text-slate-500">Payment Date</label>
+                    <p className="text-base">{new Date(selectedInvoice.paymentDate).toLocaleDateString()}</p>
+                  </div>
+                )}
+                {selectedInvoice.sentAt && (
+                  <div>
+                    <label className="text-sm font-medium text-slate-500">Sent Date</label>
+                    <p className="text-base">{new Date(selectedInvoice.sentAt).toLocaleDateString()}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Description */}
+              {selectedInvoice.description && (
+                <div>
+                  <label className="text-sm font-medium text-slate-500">Description</label>
+                  <p className="text-base mt-1">{selectedInvoice.description}</p>
+                </div>
+              )}
+
+              {/* Payment Error */}
+              {selectedInvoice.paymentError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <label className="text-sm font-medium text-red-900">Payment Error</label>
+                  <p className="text-sm text-red-700 mt-1">{selectedInvoice.paymentError}</p>
+                </div>
+              )}
+
+              {/* Line Items */}
+              {selectedInvoice.lineItems && selectedInvoice.lineItems.length > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-slate-500 mb-2 block">Line Items</label>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-slate-50">
+                        <tr>
+                          <th className="text-left p-3 text-sm font-medium">Description</th>
+                          <th className="text-right p-3 text-sm font-medium">Quantity</th>
+                          <th className="text-right p-3 text-sm font-medium">Rate</th>
+                          <th className="text-right p-3 text-sm font-medium">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {selectedInvoice.lineItems.map((item: any, idx: number) => (
+                          <tr key={idx}>
+                            <td className="p-3 text-sm">{item.description}</td>
+                            <td className="p-3 text-sm text-right">{item.quantity}</td>
+                            <td className="p-3 text-sm text-right">${(item.rateCents / 100).toFixed(2)}</td>
+                            <td className="p-3 text-sm text-right font-medium">
+                              ${((item.quantity * item.rateCents) / 100).toFixed(2)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setViewInvoiceDialogOpen(false)}
+              data-testid="button-close-view"
+            >
+              Close
+            </Button>
+            <Button
+              onClick={() => {
+                setViewInvoiceDialogOpen(false);
+                handleGeneratePDF(selectedInvoice);
+              }}
+              data-testid="button-download-pdf-from-view"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download PDF
             </Button>
           </DialogFooter>
         </DialogContent>
