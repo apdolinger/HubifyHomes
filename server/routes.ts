@@ -7437,6 +7437,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { orgId } = req.params;
       
+      // Debug logging
+      console.log('[DEBUG] Client Invoices Access Check:', {
+        userOrgId: req.user?.orgId,
+        urlOrgId: orgId,
+        userRole: req.user?.role,
+        match: req.user?.orgId === orgId,
+        isAdmin: req.user?.role === "admin"
+      });
+      
       // Verify user belongs to org
       if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
         return res.status(403).json({ message: "Access denied" });
