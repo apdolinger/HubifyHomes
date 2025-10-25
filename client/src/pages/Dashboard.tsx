@@ -197,20 +197,34 @@ function renderMessageWithMentions(content: string) {
 
   // Load saved widget configuration from localStorage or use defaults
   const [dashboardWidgets, setDashboardWidgets] = useState(() => {
+    const defaultWidgets = getDefaultWidgets();
     const saved = localStorage.getItem('dashboardWidgets');
+    
     if (saved) {
       try {
         const savedWidgets = JSON.parse(saved);
-        // Merge saved data with default structure and add icons
-        return savedWidgets.map((savedWidget: any) => ({
-          ...savedWidget,
-          icon: getWidgetIcon(savedWidget.id)
-        }));
+        // Create a map of saved widgets by id for quick lookup
+        const savedMap = new Map(savedWidgets.map((w: any) => [w.id, w]));
+        
+        // Merge: use saved settings for existing widgets, add new default widgets
+        return defaultWidgets.map(defaultWidget => {
+          const savedWidget = savedMap.get(defaultWidget.id);
+          if (savedWidget) {
+            // Use saved settings but keep the icon from default
+            return {
+              ...defaultWidget,
+              ...savedWidget,
+              icon: defaultWidget.icon
+            };
+          }
+          // New widget not in saved config - use default
+          return defaultWidget;
+        });
       } catch (error) {
         console.error('Failed to parse saved dashboard widgets:', error);
       }
     }
-    return getDefaultWidgets();
+    return defaultWidgets;
   });
 
   // Redirect if not authenticated
