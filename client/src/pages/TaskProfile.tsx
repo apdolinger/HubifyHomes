@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation, useRoute } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import EnhancedChecklist from "@/components/EnhancedChecklist";
+import { formatRecurrenceRule } from "@/lib/rruleUtils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -50,7 +51,8 @@ import {
   Target,
   BookOpen,
   Check,
-  ChevronsUpDown
+  ChevronsUpDown,
+  Repeat
 } from "lucide-react";
 
 export default function TaskProfile() {
@@ -930,9 +932,27 @@ export default function TaskProfile() {
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0 mr-4">
-                <h1 className="text-3xl font-bold text-slate-900 mb-2 break-words">
-                  {(task as any).title}
-                </h1>
+                <div className="flex items-center gap-3 mb-2">
+                  <h1 className="text-3xl font-bold text-slate-900 break-words">
+                    {(task as any).title}
+                  </h1>
+                  {(task as any).isTemplate && (
+                    <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-medium shrink-0" title="Recurring task template">
+                      Template
+                    </span>
+                  )}
+                  {(task as any).templateTaskId && !(task as any).isTemplate && (
+                    <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium shrink-0" title="Instance of recurring task">
+                      Instance
+                    </span>
+                  )}
+                </div>
+                {(task as any).isTemplate && (task as any).recurrenceRule && (
+                  <div className="text-sm text-slate-500 mb-2 flex items-center gap-1">
+                    <Repeat className="w-4 h-4" />
+                    {formatRecurrenceRule((task as any).recurrenceRule)}
+                  </div>
+                )}
                 <div className="flex items-center space-x-4 text-sm text-slate-600 mb-4">
                   <div className="flex items-center space-x-1">
                     <Badge variant={getPriorityColor((task as any).priority)} className="capitalize">

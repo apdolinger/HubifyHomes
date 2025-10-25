@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation } from "wouter";
 import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
+import { formatRecurrenceRule } from "@/lib/rruleUtils";
 
 type SortField = 'title' | 'priority' | 'status' | 'dueDate' | 'createdAt' | 'assignedUser' | 'property' | 'client';
 type SortDirection = 'asc' | 'desc';
@@ -315,6 +316,12 @@ export default function Tasks() {
                 <Repeat className="w-4 h-4 text-primary" title="Recurring task" />
               )}
             </div>
+            {task.isTemplate && task.recurrenceRule && (
+              <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                <Repeat className="w-3 h-3" />
+                {formatRecurrenceRule(task.recurrenceRule)}
+              </div>
+            )}
             {task.description && (
               <div className="text-sm text-slate-600 truncate max-w-xs">
                 {task.description}
