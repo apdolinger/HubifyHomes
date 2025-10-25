@@ -301,7 +301,17 @@ export default function Tasks() {
           <div>
             <div className="font-semibold flex items-center gap-2">
               {task.title}
-              {task.recurrenceRule && (
+              {task.isTemplate && (
+                <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-medium" title="Recurring task template">
+                  Template
+                </span>
+              )}
+              {task.templateTaskId && !task.isTemplate && (
+                <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium" title="Instance of recurring task">
+                  Instance
+                </span>
+              )}
+              {task.recurrenceRule && !task.isTemplate && (
                 <Repeat className="w-4 h-4 text-primary" title="Recurring task" />
               )}
             </div>
