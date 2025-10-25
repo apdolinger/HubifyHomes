@@ -233,6 +233,9 @@ export interface IStorage {
   getClientInvoicesByClient(clientId: string): Promise<ClientInvoice[]>;
   getClientInvoice(id: string): Promise<ClientInvoice | undefined>;
   updateClientInvoice(id: string, invoice: Partial<InsertClientInvoice>): Promise<ClientInvoice>;
+  updateInvoicePaymentStatus(invoiceId: string, updates: Partial<InsertClientInvoice>): Promise<ClientInvoice>;
+  getClientInvoiceByStripePaymentIntent(paymentIntentId: string): Promise<ClientInvoice | undefined>;
+  updateInvoicePaymentStatusByStripePaymentIntent(paymentIntentId: string, updates: Partial<InsertClientInvoice>): Promise<void>;
   
   // Portal user operations
   getPortalUserByEmail(orgId: string, email: string): Promise<PortalUser | undefined>;
@@ -961,6 +964,30 @@ export class DatabaseStorage implements IStorage {
       .where(eq(clientInvoices.id, id))
       .returning();
     return invoice;
+  }
+
+  async updateInvoicePaymentStatus(invoiceId: string, updates: Partial<InsertClientInvoice>): Promise<ClientInvoice> {
+    const [invoice] = await db
+      .update(clientInvoices)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(eq(clientInvoices.id, invoiceId))
+      .returning();
+    return invoice;
+  }
+
+  async getClientInvoiceByStripePaymentIntent(paymentIntentId: string): Promise<ClientInvoice | undefined> {
+    const [invoice] = await db
+      .select()
+      .from(clientInvoices)
+      .where(eq(clientInvoices.stripePaymentIntentId, paymentIntentId));
+    return invoice;
+  }
+
+  async updateInvoicePaymentStatusByStripePaymentIntent(paymentIntentId: string, updates: Partial<InsertClientInvoice>): Promise<void> {
+    await db
+      .update(clientInvoices)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(eq(clientInvoices.stripePaymentIntentId, paymentIntentId));
   }
 
   // Portal user operations

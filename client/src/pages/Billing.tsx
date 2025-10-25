@@ -403,8 +403,159 @@ function InvoicesTab() {
     return true;
   });
 
+  // Calculate failed and overdue invoices
+  const failedInvoices = (allInvoices as any[] || []).filter((inv: any) => inv.paymentStatus === 'failed');
+  const overdueInvoices = (allInvoices as any[] || []).filter((inv: any) => {
+    const isDue = inv.dueDate && new Date(inv.dueDate) < new Date();
+    const isNotPaid = inv.status !== 'paid';
+    return isDue && isNotPaid;
+  });
+  
+  const failedAmount = failedInvoices.reduce((sum: number, inv: any) => sum + inv.amountCents, 0);
+  const overdueAmount = overdueInvoices.reduce((sum: number, inv: any) => sum + inv.amountCents, 0);
+  const totalAtRisk = failedAmount + overdueAmount;
+
   return (
     <div className="space-y-4">
+      {/* Failed Payments Alert Widget */}
+      {(failedInvoices.length > 0 || overdueInvoices.length > 0) && (
+        <Card className="border-red-200 bg-red-50" data-testid="card-failed-payments">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+              <CardTitle className="text-red-900">Payment Issues Detected</CardTitle>
+            </div>
+            <CardDescription className="text-red-700">
+              Review and take action on failed payments and overdue invoices
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div className="bg-white p-4 rounded-lg border border-red-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-slate-600">Failed Payments</span>
+                  <Badge variant="destructive" data-testid="badge-failed-count">
+                    {failedInvoices.length}
+                  </Badge>
+                </div>
+                <p className="text-2xl font-bold text-red-600" data-testid="text-failed-amount">
+                  ${(failedAmount / 100).toFixed(2)}
+                </p>
+              </div>
+              <div className="bg-white p-4 rounded-lg border border-orange-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-slate-600">Overdue Invoices</span>
+                  <Badge variant="secondary" className="bg-orange-100 text-orange-800" data-testid="badge-overdue-count">
+                    {overdueInvoices.length}
+                  </Badge>
+                </div>
+                <p className="text-2xl font-bold text-orange-600" data-testid="text-overdue-amount">
+                  ${(overdueAmount / 100).toFixed(2)}
+                </p>
+              </div>
+              <div className="bg-white p-4 rounded-lg border border-slate-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-slate-600">Total at Risk</span>
+                </div>
+                <p className="text-2xl font-bold text-slate-900" data-testid="text-total-at-risk">
+                  ${(totalAtRisk / 100).toFixed(2)}
+                </p>
+              </div>
+            </div>
+
+            {/* Failed Payments List */}
+            {failedInvoices.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold text-red-900 mb-2">Failed Payments</h4>
+                {failedInvoices.map((invoice: any) => (
+                  <div
+                    key={invoice.id}
+                    className="bg-white p-3 rounded-lg border border-red-200"
+                    data-testid={`failed-invoice-${invoice.id}`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-sm">
+                            Invoice #{invoice.invoiceNumber || invoice.id.slice(0, 8)}
+                          </span>
+                          <Badge variant="destructive" className="text-xs">Failed</Badge>
+                        </div>
+                        <div className="text-xs text-slate-600 space-y-1">
+                          <div>Client: {invoice.client?.firstName} {invoice.client?.lastName}</div>
+                          <div className="font-semibold text-red-600">
+                            Amount: ${(invoice.amountCents / 100).toFixed(2)}
+                          </div>
+                          {invoice.paymentError && (
+                            <div className="text-red-700 bg-red-50 p-2 rounded mt-2">
+                              <span className="font-medium">Error:</span> {invoice.paymentError}
+                            </div>
+                          )}
+                          {invoice.paymentDate && (
+                            <div>Last attempt: {new Date(invoice.paymentDate).toLocaleDateString()}</div>
+                          )}
+                        </div>
+                      </div>
+                      <Button size="sm" variant="outline" className="text-xs">
+                        Retry Payment
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Overdue Invoices List */}
+            {overdueInvoices.length > 0 && failedInvoices.length > 0 && (
+              <div className="h-px bg-slate-200 my-4"></div>
+            )}
+            {overdueInvoices.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold text-orange-900 mb-2">Overdue Invoices</h4>
+                {overdueInvoices.slice(0, 3).map((invoice: any) => (
+                  <div
+                    key={invoice.id}
+                    className="bg-white p-3 rounded-lg border border-orange-200"
+                    data-testid={`overdue-invoice-${invoice.id}`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-sm">
+                            Invoice #{invoice.invoiceNumber || invoice.id.slice(0, 8)}
+                          </span>
+                          <Badge variant="secondary" className="bg-orange-100 text-orange-800 text-xs">Overdue</Badge>
+                        </div>
+                        <div className="text-xs text-slate-600 space-y-1">
+                          <div>Client: {invoice.client?.firstName} {invoice.client?.lastName}</div>
+                          <div className="font-semibold text-orange-600">
+                            Amount: ${(invoice.amountCents / 100).toFixed(2)}
+                          </div>
+                          {invoice.dueDate && (
+                            <div className="text-orange-700">
+                              Due: {new Date(invoice.dueDate).toLocaleDateString()} 
+                              ({Math.floor((new Date().getTime() - new Date(invoice.dueDate).getTime()) / (1000 * 60 * 60 * 24))} days overdue)
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <Button size="sm" variant="outline" className="text-xs">
+                        Send Reminder
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {overdueInvoices.length > 3 && (
+                  <p className="text-xs text-slate-500 text-center pt-2">
+                    + {overdueInvoices.length - 3} more overdue invoice{overdueInvoices.length - 3 > 1 ? 's' : ''}
+                  </p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Filters */}
       <Card>
         <CardHeader>
@@ -488,6 +639,31 @@ function InvoicesTab() {
                       >
                         {invoice.status}
                       </Badge>
+                      {invoice.paymentStatus && (
+                        <Badge
+                          variant={
+                            invoice.paymentStatus === "succeeded" ? "default" :
+                            invoice.paymentStatus === "failed" ? "destructive" :
+                            invoice.paymentStatus === "processing" ? "secondary" :
+                            invoice.paymentStatus === "refunded" ? "outline" :
+                            "secondary"
+                          }
+                          className={
+                            invoice.paymentStatus === "succeeded" ? "bg-green-600" :
+                            invoice.paymentStatus === "failed" ? "bg-red-600" :
+                            invoice.paymentStatus === "processing" ? "bg-blue-600" :
+                            invoice.paymentStatus === "refunded" ? "bg-gray-600" :
+                            ""
+                          }
+                          data-testid={`badge-payment-status-${invoice.id}`}
+                        >
+                          {invoice.paymentStatus === "succeeded" ? "Payment Successful" :
+                           invoice.paymentStatus === "failed" ? "Payment Failed" :
+                           invoice.paymentStatus === "processing" ? "Processing" :
+                           invoice.paymentStatus === "refunded" ? "Refunded" :
+                           invoice.paymentStatus}
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-4 text-sm text-slate-500">
                       <span>Client: {invoice.client?.firstName} {invoice.client?.lastName}</span>

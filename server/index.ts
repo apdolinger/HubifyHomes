@@ -4,6 +4,63 @@ import { setupVite, serveStatic, log } from "./vite";
 import { startScheduledTasks } from "./scheduledTasks";
 
 const app = express();
+
+// Webhook routes MUST be registered before express.json() to preserve raw body for signature verification
+app.post("/api/stripe/webhooks/master", express.raw({ type: "application/json" }), async (req, res) => {
+  try {
+    const { getMasterStripe, handleMasterWebhook } = await import("./stripe");
+    const stripe = getMasterStripe();
+    const sig = req.headers["stripe-signature"];
+
+    if (!sig || !process.env.STRIPE_WEBHOOK_SECRET) {
+      return res.status(400).json({ message: "Missing signature or webhook secret" });
+    }
+
+    const event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+
+    await handleMasterWebhook(event);
+    res.json({ received: true });
+  } catch (error) {
+    console.error("Webhook error:", error);
+    res.status(400).json({ message: `Webhook Error: ${(error as Error).message}` });
+  }
+});
+
+app.post("/api/stripe/webhooks/org/:orgId", express.raw({ type: "application/json" }), async (req, res) => {
+  try {
+    const { orgId } = req.params;
+    const { getOrgStripe, handleOrgWebhook } = await import("./stripe");
+    
+    const orgStripeConnection = await getOrgStripe(orgId);
+    if (!orgStripeConnection) {
+      return res.status(404).json({ message: "Organization Stripe connection not found" });
+    }
+
+    const sig = req.headers["stripe-signature"];
+    const webhookSecret = process.env[`STRIPE_ORG_WEBHOOK_SECRET_${orgId}`] || process.env.STRIPE_ORG_WEBHOOK_SECRET;
+
+    if (!sig || !webhookSecret) {
+      return res.status(400).json({ message: "Missing signature or webhook secret" });
+    }
+
+    const event = orgStripeConnection.stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      webhookSecret
+    );
+
+    await handleOrgWebhook(event, orgId);
+    res.json({ received: true });
+  } catch (error) {
+    console.error("Organization webhook error:", error);
+    res.status(400).json({ message: `Webhook Error: ${(error as Error).message}` });
+  }
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 

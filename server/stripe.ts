@@ -262,3 +262,217 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
     status: "past_due",
   });
 }
+
+// Organization-level webhook handler for client invoice payments
+export async function handleOrgWebhook(event: Stripe.Event, orgId: string) {
+  // Record the webhook event
+  await storage.recordWebhookEvent({
+    stripeEventId: event.id,
+    eventSource: "organization",
+    orgId,
+    eventType: event.type,
+    eventData: event.data as any,
+  });
+
+  try {
+    switch (event.type) {
+      case "payment_intent.succeeded":
+        await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent, orgId);
+        break;
+      
+      case "payment_intent.payment_failed":
+        await handlePaymentIntentFailed(event.data.object as Stripe.PaymentIntent, orgId);
+        break;
+      
+      case "charge.refunded":
+        await handleChargeRefunded(event.data.object as Stripe.Charge, orgId);
+        break;
+    }
+
+    await storage.markWebhookProcessed(event.id);
+  } catch (error) {
+    await storage.markWebhookProcessed(event.id, (error as Error).message);
+    throw error;
+  }
+}
+
+async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent, orgId: string) {
+  // Find invoice by stripePaymentIntentId
+  const invoiceId = paymentIntent.metadata.invoiceId;
+  if (!invoiceId) {
+    console.warn(`Payment intent ${paymentIntent.id} has no invoiceId in metadata`);
+    return;
+  }
+
+  await storage.updateInvoicePaymentStatus(invoiceId, {
+    status: "paid",
+    paymentStatus: "succeeded",
+    paymentMethod: paymentIntent.payment_method_types?.[0] || "card",
+    paymentDate: new Date(),
+    stripePaymentIntentId: paymentIntent.id,
+    paymentError: null,
+  });
+
+  console.log(`Invoice ${invoiceId} payment succeeded via ${paymentIntent.id}`);
+}
+
+async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent, orgId: string) {
+  const invoiceId = paymentIntent.metadata.invoiceId;
+  if (!invoiceId) {
+    console.warn(`Payment intent ${paymentIntent.id} has no invoiceId in metadata`);
+    return;
+  }
+
+  const errorMessage = paymentIntent.last_payment_error?.message || "Payment failed";
+
+  await storage.updateInvoicePaymentStatus(invoiceId, {
+    paymentStatus: "failed",
+    paymentError: errorMessage,
+    stripePaymentIntentId: paymentIntent.id,
+  });
+
+  // Send notification email about failed payment
+  await sendPaymentFailureNotification(invoiceId, errorMessage);
+
+  console.log(`Invoice ${invoiceId} payment failed: ${errorMessage}`);
+}
+
+async function handleChargeRefunded(charge: Stripe.Charge, orgId: string) {
+  // Find invoice by stripePaymentIntentId from charge
+  const paymentIntentId = typeof charge.payment_intent === "string" 
+    ? charge.payment_intent 
+    : charge.payment_intent?.id;
+
+  if (!paymentIntentId) {
+    console.warn(`Charge ${charge.id} has no payment intent`);
+    return;
+  }
+
+  await storage.updateInvoicePaymentStatusByStripePaymentIntent(paymentIntentId, {
+    paymentStatus: "refunded",
+    status: "void",
+  });
+
+  console.log(`Charge ${charge.id} refunded for payment intent ${paymentIntentId}`);
+}
+
+async function sendPaymentFailureNotification(invoiceId: string, errorMessage: string) {
+  try {
+    // Get invoice details
+    const invoice = await storage.getClientInvoice(invoiceId);
+    if (!invoice) {
+      console.warn(`Invoice ${invoiceId} not found for payment failure notification`);
+      return;
+    }
+
+    // Get client details
+    const client = await storage.getClient(invoice.clientId);
+    if (!client) {
+      console.warn(`Client not found for invoice ${invoiceId}`);
+      return;
+    }
+
+    // Get organization details
+    const org = await storage.getOrg(invoice.orgId);
+    if (!org) {
+      console.warn(`Organization not found for invoice ${invoiceId}`);
+      return;
+    }
+
+    // Import SendGrid
+    const sgMail = (await import("@sendgrid/mail")).default;
+    const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
+    const supportEmailFrom = process.env.SUPPORT_EMAIL_FROM || "noreply@hubify.app";
+
+    if (!SENDGRID_API_KEY) {
+      console.warn("SENDGRID_API_KEY not configured, skipping email notification");
+      return;
+    }
+
+    sgMail.setApiKey(SENDGRID_API_KEY);
+
+    // Format amount
+    const amountFormatted = `$${(invoice.amountCents / 100).toFixed(2)}`;
+
+    // Build email HTML
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Failed</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+    .header { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); padding: 40px 20px; text-align: center; color: white; }
+    .content { padding: 40px 30px; }
+    .alert-box { background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 15px; margin: 20px 0; }
+    .invoice-details { background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0; }
+    .detail-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
+    .detail-label { font-weight: 600; color: #6b7280; }
+    .detail-value { color: #111827; }
+    .button { display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+    .footer { background-color: #f9fafb; padding: 30px; text-align: center; color: #6b7280; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>⚠️ Payment Failed</h1>
+    </div>
+    <div class="content">
+      <h2>Payment Attempt Unsuccessful</h2>
+      <p>We were unable to process the payment for your recent invoice. Please review the details below and update your payment method.</p>
+      
+      <div class="alert-box">
+        <strong>Error:</strong> ${errorMessage}
+      </div>
+      
+      <div class="invoice-details">
+        <div class="detail-row">
+          <span class="detail-label">Invoice Number:</span>
+          <span class="detail-value">${invoice.invoiceNumber || 'N/A'}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Amount:</span>
+          <span class="detail-value">${amountFormatted}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Due Date:</span>
+          <span class="detail-value">${invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : 'N/A'}</span>
+        </div>
+      </div>
+      
+      <p><strong>What to do next:</strong></p>
+      <ul>
+        <li>Verify your payment method has sufficient funds</li>
+        <li>Update your payment information if needed</li>
+        <li>Contact us if you need assistance</li>
+      </ul>
+      
+      ${invoice.hostedInvoiceUrl ? `<a href="${invoice.hostedInvoiceUrl}" class="button">View Invoice & Retry Payment</a>` : ''}
+    </div>
+    <div class="footer">
+      <p>${org.name}<br/>
+      This is an automated notification. Please do not reply to this email.</p>
+    </div>
+  </div>
+</body>
+</html>
+    `;
+
+    const msg = {
+      to: client.email,
+      from: supportEmailFrom,
+      subject: `Payment Failed - Invoice ${invoice.invoiceNumber || invoiceId}`,
+      html: htmlContent,
+    };
+
+    await sgMail.send(msg);
+    console.log(`Payment failure notification sent to ${client.email} for invoice ${invoiceId}`);
+  } catch (error) {
+    console.error(`Error sending payment failure notification for invoice ${invoiceId}:`, error);
+    // Don't throw - email failure shouldn't break webhook processing
+  }
+}

@@ -180,6 +180,13 @@ export const clientInvoices = pgTable("client_invoices", {
   currency: varchar("currency").notNull().default("usd"),
   status: varchar("status").$type<"draft"|"open"|"paid"|"void"|"uncollectible">().notNull().default("draft"),
   
+  // Payment tracking
+  paymentStatus: varchar("payment_status").$type<"pending"|"processing"|"succeeded"|"failed"|"refunded">(),
+  paymentMethod: varchar("payment_method"), // card, bank_transfer, ach, etc.
+  paymentDate: timestamp("payment_date"),
+  paymentError: text("payment_error"), // Decline reason or error message
+  stripePaymentIntentId: varchar("stripe_payment_intent_id"),
+  
   // Dates
   dueDate: timestamp("due_date"),
   issuedAt: timestamp("issued_at"),

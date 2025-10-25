@@ -7041,29 +7041,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/stripe/webhooks/master", express.raw({ type: "application/json" }), async (req, res) => {
-    try {
-      const { getMasterStripe, handleMasterWebhook } = await import("./stripe");
-      const stripe = getMasterStripe();
-      const sig = req.headers["stripe-signature"];
-
-      if (!sig || !process.env.STRIPE_WEBHOOK_SECRET) {
-        return res.status(400).json({ message: "Missing signature or webhook secret" });
-      }
-
-      const event = stripe.webhooks.constructEvent(
-        req.body,
-        sig,
-        process.env.STRIPE_WEBHOOK_SECRET
-      );
-
-      await handleMasterWebhook(event);
-      res.json({ received: true });
-    } catch (error) {
-      console.error("Webhook error:", error);
-      res.status(400).json({ message: `Webhook Error: ${(error as Error).message}` });
-    }
-  });
+  // NOTE: Stripe webhook endpoints are registered in server/index.ts BEFORE express.json() middleware
+  // to preserve raw request body for signature verification
 
   // Stripe routes - Per-organization connections
   app.get("/api/orgs/:orgId/stripe-connection", isAuthenticated, async (req, res) => {
