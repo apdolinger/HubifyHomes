@@ -36,11 +36,6 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
-  
-  const [sendInvoiceDialogOpen, setSendInvoiceDialogOpen] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
-  const [recipientEmail, setRecipientEmail] = useState("");
-  const [emailMessage, setEmailMessage] = useState("");
 
   // Fetch billing submissions
   const { data: submissions, isLoading: submissionsLoading } = useQuery({
@@ -109,94 +104,6 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
       return;
     }
     rejectMutation.mutate({ submissionId: selectedSubmission.id, reason: rejectionReason });
-  };
-
-  const sendInvoiceMutation = useMutation({
-    mutationFn: async ({ invoiceId, email, message }: { invoiceId: string; email: string; message?: string }) => {
-      const user = await queryClient.fetchQuery({ queryKey: ["/api/auth/user"] }) as any;
-      const orgId = user.orgId;
-      return apiRequest("POST", `/api/orgs/${orgId}/client-invoices/${invoiceId}/send`, {
-        recipientEmail: email,
-        message: message || undefined
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/client-invoices"] });
-      toast({
-        title: "Invoice sent",
-        description: "The invoice has been sent successfully.",
-      });
-      setSendInvoiceDialogOpen(false);
-      setSelectedInvoice(null);
-      setRecipientEmail("");
-      setEmailMessage("");
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Failed to send invoice",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleSendInvoice = (invoice: any) => {
-    setSelectedInvoice(invoice);
-    setRecipientEmail(invoice.client?.email || "");
-    setSendInvoiceDialogOpen(true);
-  };
-
-  const handleConfirmSend = () => {
-    if (!recipientEmail.trim()) {
-      toast({
-        title: "Email required",
-        description: "Please provide a recipient email address.",
-        variant: "destructive",
-      });
-      return;
-    }
-    sendInvoiceMutation.mutate({
-      invoiceId: selectedInvoice.id,
-      email: recipientEmail,
-      message: emailMessage,
-    });
-  };
-
-  const handleGeneratePDF = async (invoice: any) => {
-    try {
-      const user = await queryClient.fetchQuery({ queryKey: ["/api/auth/user"] }) as any;
-      const orgId = user.orgId;
-      
-      const response = await fetch(`/api/orgs/${orgId}/client-invoices/${invoice.id}/generate-pdf`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to generate PDF');
-      }
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `invoice-${invoice.invoiceNumber || invoice.id.slice(0, 8)}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      toast({
-        title: "PDF generated",
-        description: "Invoice PDF downloaded successfully.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Failed to generate PDF",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
   };
 
   const filteredSubmissions = (submissions as any[] || []).filter((submission: any) => {
@@ -477,6 +384,11 @@ function InvoicesTab() {
 
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<string>("all");
   const [invoiceClientFilter, setInvoiceClientFilter] = useState<string>("all");
+  
+  const [sendInvoiceDialogOpen, setSendInvoiceDialogOpen] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [recipientEmail, setRecipientEmail] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
 
   // Fetch all invoices
   const { data: allInvoices, isLoading: invoicesLoading } = useQuery({
@@ -489,6 +401,94 @@ function InvoicesTab() {
     queryKey: ["/api/contacts"],
     enabled: isAuthenticated,
   });
+
+  const sendInvoiceMutation = useMutation({
+    mutationFn: async ({ invoiceId, email, message }: { invoiceId: string; email: string; message?: string }) => {
+      const user = await queryClient.fetchQuery({ queryKey: ["/api/auth/user"] }) as any;
+      const orgId = user.orgId;
+      return apiRequest("POST", `/api/orgs/${orgId}/client-invoices/${invoiceId}/send`, {
+        recipientEmail: email,
+        message: message || undefined
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/billing/invoices"] });
+      toast({
+        title: "Invoice sent",
+        description: "The invoice has been sent successfully.",
+      });
+      setSendInvoiceDialogOpen(false);
+      setSelectedInvoice(null);
+      setRecipientEmail("");
+      setEmailMessage("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to send invoice",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSendInvoice = (invoice: any) => {
+    setSelectedInvoice(invoice);
+    setRecipientEmail(invoice.client?.email || "");
+    setSendInvoiceDialogOpen(true);
+  };
+
+  const handleConfirmSend = () => {
+    if (!recipientEmail.trim()) {
+      toast({
+        title: "Email required",
+        description: "Please provide a recipient email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+    sendInvoiceMutation.mutate({
+      invoiceId: selectedInvoice.id,
+      email: recipientEmail,
+      message: emailMessage,
+    });
+  };
+
+  const handleGeneratePDF = async (invoice: any) => {
+    try {
+      const user = await queryClient.fetchQuery({ queryKey: ["/api/auth/user"] }) as any;
+      const orgId = user.orgId;
+      
+      const response = await fetch(`/api/orgs/${orgId}/client-invoices/${invoice.id}/generate-pdf`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-${invoice.invoiceNumber || invoice.id.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "PDF generated",
+        description: "Invoice PDF downloaded successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Failed to generate PDF",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const filteredInvoices = (allInvoices as any[] || []).filter((invoice: any) => {
     if (invoiceStatusFilter !== "all" && invoice.status !== invoiceStatusFilter) return false;
