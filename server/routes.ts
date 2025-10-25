@@ -53,6 +53,8 @@ import {
   insertConflictResolutionSchema,
   insertPlatformInvoiceSchema,
   insertClientInvoiceSchema,
+  insertRecurringBillingScheduleSchema,
+  insertBillingSubmissionSchema,
   insertSupportRequestSchema,
   insertEmailTemplateSchema,
   type Form,
@@ -8106,6 +8108,283 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error generating user iCal token:", error);
       res.status(500).json({ message: "Failed to generate calendar token" });
+    }
+  });
+
+  // Billing - Recurring Schedule endpoints
+  app.post("/api/clients/:clientId/recurring-schedules", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const { clientId } = req.params;
+      const client = await storage.getClient(clientId);
+      
+      if (!client || client.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      const validatedData = insertRecurringBillingScheduleSchema.parse({
+        ...req.body,
+        orgId: user.orgId,
+        clientId,
+      });
+
+      const schedule = await storage.createRecurringSchedule(validatedData);
+      res.status(201).json(schedule);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating recurring schedule:", error);
+      res.status(500).json({ message: "Failed to create recurring schedule" });
+    }
+  });
+
+  app.get("/api/clients/:clientId/recurring-schedules", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const { clientId } = req.params;
+      const client = await storage.getClient(clientId);
+      
+      if (!client || client.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      const schedules = await storage.getRecurringSchedulesByClient(clientId);
+      res.json(schedules);
+    } catch (error) {
+      console.error("Error fetching recurring schedules:", error);
+      res.status(500).json({ message: "Failed to fetch recurring schedules" });
+    }
+  });
+
+  app.patch("/api/recurring-schedules/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const { id } = req.params;
+      const schedule = await storage.getRecurringSchedule(id);
+      
+      if (!schedule || schedule.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Schedule not found" });
+      }
+
+      const validatedData = insertRecurringBillingScheduleSchema.partial().parse(req.body);
+      const updated = await storage.updateRecurringSchedule(id, validatedData);
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error updating recurring schedule:", error);
+      res.status(500).json({ message: "Failed to update recurring schedule" });
+    }
+  });
+
+  app.delete("/api/recurring-schedules/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const { id } = req.params;
+      const schedule = await storage.getRecurringSchedule(id);
+      
+      if (!schedule || schedule.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Schedule not found" });
+      }
+
+      await storage.deleteRecurringSchedule(id);
+      res.json({ message: "Recurring schedule deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting recurring schedule:", error);
+      res.status(500).json({ message: "Failed to delete recurring schedule" });
+    }
+  });
+
+  // Billing Submissions endpoints
+  app.get("/api/billing-submissions", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const { status, clientId } = req.query;
+      const submissions = await storage.getBillingSubmissions(user.orgId, {
+        status: status as string,
+        clientId: clientId as string,
+      });
+      
+      res.json(submissions);
+    } catch (error) {
+      console.error("Error fetching billing submissions:", error);
+      res.status(500).json({ message: "Failed to fetch billing submissions" });
+    }
+  });
+
+  app.post("/api/billing-submissions/:id/authorize", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const user = await storage.getUser(userId);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const { id } = req.params;
+      const submission = await storage.getBillingSubmission(id);
+      
+      if (!submission || submission.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Billing submission not found" });
+      }
+
+      if (submission.status !== 'pending') {
+        return res.status(400).json({ message: "Only pending submissions can be authorized" });
+      }
+
+      const authorized = await storage.authorizeBillingSubmission(id, userId);
+      res.json(authorized);
+    } catch (error) {
+      console.error("Error authorizing billing submission:", error);
+      res.status(500).json({ message: "Failed to authorize billing submission" });
+    }
+  });
+
+  app.post("/api/billing-submissions/:id/reject", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const { id } = req.params;
+      const { rejectionReason } = req.body;
+
+      if (!rejectionReason) {
+        return res.status(400).json({ message: "Rejection reason is required" });
+      }
+
+      const submission = await storage.getBillingSubmission(id);
+      
+      if (!submission || submission.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Billing submission not found" });
+      }
+
+      if (submission.status !== 'pending') {
+        return res.status(400).json({ message: "Only pending submissions can be rejected" });
+      }
+
+      const rejected = await storage.rejectBillingSubmission(id, rejectionReason);
+      res.json(rejected);
+    } catch (error) {
+      console.error("Error rejecting billing submission:", error);
+      res.status(500).json({ message: "Failed to reject billing submission" });
+    }
+  });
+
+  // Client Invoice endpoints
+  app.post("/api/billing/generate-invoice", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const user = await storage.getUser(userId);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const validatedData = insertClientInvoiceSchema.parse({
+        ...req.body,
+        orgId: user.orgId,
+        createdBy: userId,
+      });
+
+      const invoice = await storage.createClientInvoice(validatedData);
+      res.status(201).json(invoice);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating invoice:", error);
+      res.status(500).json({ message: "Failed to create invoice" });
+    }
+  });
+
+  app.get("/api/clients/:clientId/invoices", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const { clientId } = req.params;
+      const client = await storage.getClient(clientId);
+      
+      if (!client || client.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      const invoices = await storage.getClientInvoicesByClient(clientId);
+      res.json(invoices);
+    } catch (error) {
+      console.error("Error fetching client invoices:", error);
+      res.status(500).json({ message: "Failed to fetch client invoices" });
+    }
+  });
+
+  app.get("/api/invoices/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const { id } = req.params;
+      const invoice = await storage.getClientInvoice(id);
+      
+      if (!invoice || invoice.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      res.json(invoice);
+    } catch (error) {
+      console.error("Error fetching invoice:", error);
+      res.status(500).json({ message: "Failed to fetch invoice" });
+    }
+  });
+
+  app.patch("/api/invoices/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const { id } = req.params;
+      const invoice = await storage.getClientInvoice(id);
+      
+      if (!invoice || invoice.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      const validatedData = insertClientInvoiceSchema.partial().parse(req.body);
+      const updated = await storage.updateClientInvoice(id, validatedData);
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error updating invoice:", error);
+      res.status(500).json({ message: "Failed to update invoice" });
     }
   });
 

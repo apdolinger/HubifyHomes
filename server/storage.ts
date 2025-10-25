@@ -8,6 +8,8 @@ import {
   platformInvoices,
   clientInvoices,
   clients,
+  recurringBillingSchedules,
+  billingSubmissions,
   portalUsers,
   portalUserProperties,
   portalSessions,
@@ -73,6 +75,10 @@ import {
   type InsertClientInvoice,
   type Client,
   type InsertClient,
+  type RecurringBillingSchedule,
+  type InsertRecurringBillingSchedule,
+  type BillingSubmission,
+  type InsertBillingSubmission,
   type PortalUser,
   type InsertPortalUser,
   type PortalUserProperty,
@@ -204,6 +210,29 @@ export interface IStorage {
   getClient(id: string): Promise<Client | undefined>;
   createClient(client: InsertClient): Promise<Client>;
   updateClient(id: string, client: Partial<InsertClient>): Promise<Client>;
+  
+  // Recurring billing schedule operations
+  createRecurringSchedule(schedule: InsertRecurringBillingSchedule): Promise<RecurringBillingSchedule>;
+  getRecurringSchedulesByClient(clientId: string): Promise<RecurringBillingSchedule[]>;
+  getRecurringSchedule(id: string): Promise<RecurringBillingSchedule | undefined>;
+  updateRecurringSchedule(id: string, schedule: Partial<InsertRecurringBillingSchedule>): Promise<RecurringBillingSchedule>;
+  deleteRecurringSchedule(id: string): Promise<void>;
+  getDueRecurringSchedules(beforeDate: Date): Promise<RecurringBillingSchedule[]>;
+  
+  // Billing submission operations
+  createBillingSubmission(submission: InsertBillingSubmission): Promise<BillingSubmission>;
+  getBillingSubmissions(orgId: string, filters?: { status?: string; clientId?: string }): Promise<BillingSubmission[]>;
+  getBillingSubmissionsByClient(clientId: string): Promise<BillingSubmission[]>;
+  getBillingSubmission(id: string): Promise<BillingSubmission | undefined>;
+  authorizeBillingSubmission(id: string, authorizedBy: string): Promise<BillingSubmission>;
+  rejectBillingSubmission(id: string, rejectionReason: string): Promise<BillingSubmission>;
+  
+  // Client invoice operations
+  createClientInvoice(invoice: InsertClientInvoice): Promise<ClientInvoice>;
+  getClientInvoices(orgId: string, filters?: { status?: string; clientId?: string }): Promise<ClientInvoice[]>;
+  getClientInvoicesByClient(clientId: string): Promise<ClientInvoice[]>;
+  getClientInvoice(id: string): Promise<ClientInvoice | undefined>;
+  updateClientInvoice(id: string, invoice: Partial<InsertClientInvoice>): Promise<ClientInvoice>;
   
   // Portal user operations
   getPortalUserByEmail(orgId: string, email: string): Promise<PortalUser | undefined>;
@@ -755,6 +784,183 @@ export class DatabaseStorage implements IStorage {
       .where(eq(clients.id, id))
       .returning();
     return client;
+  }
+
+  // Recurring billing schedule operations
+  async createRecurringSchedule(scheduleData: InsertRecurringBillingSchedule): Promise<RecurringBillingSchedule> {
+    const [schedule] = await db
+      .insert(recurringBillingSchedules)
+      .values(scheduleData)
+      .returning();
+    return schedule;
+  }
+
+  async getRecurringSchedulesByClient(clientId: string): Promise<RecurringBillingSchedule[]> {
+    return await db
+      .select()
+      .from(recurringBillingSchedules)
+      .where(and(
+        eq(recurringBillingSchedules.clientId, clientId),
+        eq(recurringBillingSchedules.isActive, true)
+      ))
+      .orderBy(recurringBillingSchedules.nextBillingDate);
+  }
+
+  async getRecurringSchedule(id: string): Promise<RecurringBillingSchedule | undefined> {
+    const [schedule] = await db
+      .select()
+      .from(recurringBillingSchedules)
+      .where(eq(recurringBillingSchedules.id, id));
+    return schedule;
+  }
+
+  async updateRecurringSchedule(id: string, scheduleData: Partial<InsertRecurringBillingSchedule>): Promise<RecurringBillingSchedule> {
+    const [schedule] = await db
+      .update(recurringBillingSchedules)
+      .set({ ...scheduleData, updatedAt: new Date() } as any)
+      .where(eq(recurringBillingSchedules.id, id))
+      .returning();
+    return schedule;
+  }
+
+  async deleteRecurringSchedule(id: string): Promise<void> {
+    await db
+      .update(recurringBillingSchedules)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(recurringBillingSchedules.id, id));
+  }
+
+  async getDueRecurringSchedules(beforeDate: Date): Promise<RecurringBillingSchedule[]> {
+    return await db
+      .select()
+      .from(recurringBillingSchedules)
+      .where(and(
+        eq(recurringBillingSchedules.isActive, true),
+        sql`${recurringBillingSchedules.nextBillingDate} <= ${beforeDate}`
+      ))
+      .orderBy(recurringBillingSchedules.nextBillingDate);
+  }
+
+  // Billing submission operations
+  async createBillingSubmission(submissionData: InsertBillingSubmission): Promise<BillingSubmission> {
+    const [submission] = await db
+      .insert(billingSubmissions)
+      .values(submissionData)
+      .returning();
+    return submission;
+  }
+
+  async getBillingSubmissions(orgId: string, filters?: { status?: string; clientId?: string }): Promise<BillingSubmission[]> {
+    const conditions = [eq(billingSubmissions.orgId, orgId)];
+    
+    if (filters?.status) {
+      conditions.push(eq(billingSubmissions.status, filters.status as any));
+    }
+    
+    if (filters?.clientId) {
+      conditions.push(eq(billingSubmissions.clientId, filters.clientId));
+    }
+    
+    return await db
+      .select()
+      .from(billingSubmissions)
+      .where(and(...conditions))
+      .orderBy(desc(billingSubmissions.createdAt));
+  }
+
+  async getBillingSubmissionsByClient(clientId: string): Promise<BillingSubmission[]> {
+    return await db
+      .select()
+      .from(billingSubmissions)
+      .where(eq(billingSubmissions.clientId, clientId))
+      .orderBy(desc(billingSubmissions.createdAt));
+  }
+
+  async getBillingSubmission(id: string): Promise<BillingSubmission | undefined> {
+    const [submission] = await db
+      .select()
+      .from(billingSubmissions)
+      .where(eq(billingSubmissions.id, id));
+    return submission;
+  }
+
+  async authorizeBillingSubmission(id: string, authorizedBy: string): Promise<BillingSubmission> {
+    const [submission] = await db
+      .update(billingSubmissions)
+      .set({
+        status: 'authorized',
+        authorizedBy,
+        authorizedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(billingSubmissions.id, id))
+      .returning();
+    return submission;
+  }
+
+  async rejectBillingSubmission(id: string, rejectionReason: string): Promise<BillingSubmission> {
+    const [submission] = await db
+      .update(billingSubmissions)
+      .set({
+        status: 'rejected',
+        rejectionReason,
+        updatedAt: new Date(),
+      })
+      .where(eq(billingSubmissions.id, id))
+      .returning();
+    return submission;
+  }
+
+  // Client invoice operations
+  async createClientInvoice(invoiceData: InsertClientInvoice): Promise<ClientInvoice> {
+    const [invoice] = await db
+      .insert(clientInvoices)
+      .values(invoiceData)
+      .returning();
+    return invoice;
+  }
+
+  async getClientInvoices(orgId: string, filters?: { status?: string; clientId?: string }): Promise<ClientInvoice[]> {
+    const conditions = [eq(clientInvoices.orgId, orgId)];
+    
+    if (filters?.status) {
+      conditions.push(eq(clientInvoices.status, filters.status as any));
+    }
+    
+    if (filters?.clientId) {
+      conditions.push(eq(clientInvoices.clientId, filters.clientId));
+    }
+    
+    return await db
+      .select()
+      .from(clientInvoices)
+      .where(and(...conditions))
+      .orderBy(desc(clientInvoices.createdAt));
+  }
+
+  async getClientInvoicesByClient(clientId: string): Promise<ClientInvoice[]> {
+    return await db
+      .select()
+      .from(clientInvoices)
+      .where(eq(clientInvoices.clientId, clientId))
+      .orderBy(desc(clientInvoices.createdAt));
+  }
+
+  async getClientInvoice(id: string): Promise<ClientInvoice | undefined> {
+    const [invoice] = await db
+      .select()
+      .from(clientInvoices)
+      .where(eq(clientInvoices.id, id));
+    return invoice;
+  }
+
+  async updateClientInvoice(id: string, invoiceData: Partial<InsertClientInvoice>): Promise<ClientInvoice> {
+    const [invoice] = await db
+      .update(clientInvoices)
+      .set({ ...invoiceData, updatedAt: new Date() } as any)
+      .where(eq(clientInvoices.id, id))
+      .returning();
+    return invoice;
   }
 
   // Portal user operations
