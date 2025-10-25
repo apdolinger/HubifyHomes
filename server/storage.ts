@@ -225,6 +225,7 @@ export interface IStorage {
   getBillingSubmissionsByClient(clientId: string): Promise<BillingSubmission[]>;
   getBillingSubmissionsByInvoice(invoiceId: string): Promise<BillingSubmission[]>;
   getBillingSubmission(id: string): Promise<BillingSubmission | undefined>;
+  updateBillingSubmission(id: string, updates: Partial<InsertBillingSubmission>): Promise<BillingSubmission>;
   authorizeBillingSubmission(id: string, authorizedBy: string): Promise<BillingSubmission>;
   rejectBillingSubmission(id: string, rejectionReason: string): Promise<BillingSubmission>;
   
@@ -893,6 +894,18 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(billingSubmissions)
       .where(eq(billingSubmissions.id, id));
+    return submission;
+  }
+
+  async updateBillingSubmission(id: string, updates: Partial<InsertBillingSubmission>): Promise<BillingSubmission> {
+    const [submission] = await db
+      .update(billingSubmissions)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(billingSubmissions.id, id))
+      .returning();
     return submission;
   }
 

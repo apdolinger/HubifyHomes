@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Label } from "@/components/ui/label";
 import { 
   DollarSign, 
   FileText, 
@@ -23,7 +28,10 @@ import {
   AlertCircle,
   Search,
   Filter,
-  Settings
+  Settings,
+  Edit,
+  Plus,
+  Trash2
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -37,6 +45,8 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [editSubmissionId, setEditSubmissionId] = useState<string | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   // Fetch billing submissions
   const { data: submissions, isLoading: submissionsLoading } = useQuery({
@@ -303,6 +313,19 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
                         <div className="flex gap-2">
                           <Button
                             size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditSubmissionId(submission.id);
+                              setEditDialogOpen(true);
+                            }}
+                            data-testid={`button-edit-details-${submission.id}`}
+                          >
+                            <Edit className="w-4 h-4 mr-1" />
+                            Edit Details
+                          </Button>
+                          <Button
+                            size="sm"
                             variant="default"
                             className="bg-blue-600 hover:bg-blue-700"
                             onClick={(e) => {
@@ -520,6 +543,13 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Submission Detail Dialog */}
+      <SubmissionDetailDialog
+        submissionId={editSubmissionId}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+      />
     </div>
   );
 }
@@ -1338,5 +1368,349 @@ function SettingsTab() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// Submission Detail Dialog - Itemized Receipt Editor
+function SubmissionDetailDialog({
+  submissionId,
+  open,
+  onOpenChange
+}: {
+  submissionId: string | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  // Fetch submission details
+  const { data: submission, isLoading } = useQuery({
+    queryKey: [`/api/billing-submissions/${submissionId}`],
+    enabled: !!submissionId && open,
+  });
+
+  // Form schema
+  const lineItemSchema = z.object({
+    id: z.string(),
+    description: z.string().min(1, "Description required"),
+    quantity: z.number().min(0.01, "Quantity must be positive"),
+    rate: z.number().min(0, "Rate must be non-negative"),
+    amount: z.number(),
+    type: z.enum(["task", "time_entry", "material", "other"]),
+  });
+
+  const formSchema = z.object({
+    description: z.string().min(1, "Description required"),
+    notes: z.string().optional(),
+    lineItems: z.array(lineItemSchema),
+  });
+
+  type FormData = z.infer<typeof formSchema>;
+
+  // Initialize form with default values
+  const form = useForm<FormData>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      description: "",
+      notes: "",
+      lineItems: [],
+    },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "lineItems",
+  });
+
+  // Update form when submission loads
+  useMemo(() => {
+    if (submission) {
+      form.reset({
+        description: submission.description || "",
+        notes: submission.notes || "",
+        lineItems: (submission.lineItems || []).map((item: any) => ({
+          ...item,
+          rate: item.rateCents / 100,
+          amount: item.amountCents / 100,
+        })),
+      });
+    }
+  }, [submission, form]);
+
+  // Calculate totals
+  const totals = useMemo(() => {
+    const items = form.watch("lineItems") || [];
+    const subtotal = items.reduce((sum, item) => sum + (item.amount || 0), 0);
+    return {
+      subtotal,
+      tax: 0,
+      total: subtotal,
+    };
+  }, [form.watch("lineItems")]);
+
+  // Update mutation
+  const updateMutation = useMutation({
+    mutationFn: async (data: FormData) => {
+      return apiRequest("PATCH", `/api/billing-submissions/${submissionId}`, {
+        description: data.description,
+        notes: data.notes,
+        lineItems: data.lineItems.map(item => ({
+          ...item,
+          rateCents: Math.round(item.rate * 100),
+          amountCents: Math.round(item.amount * 100),
+        })),
+        amountCents: Math.round(totals.total * 100),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/billing-submissions"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/billing-submissions/${submissionId}`] });
+      toast({
+        title: "Submission updated",
+        description: "Billing submission has been saved successfully.",
+      });
+      onOpenChange(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update failed",
+        description: error.message || "Failed to update submission",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (data: FormData) => {
+    updateMutation.mutate(data);
+  };
+
+  // Calculate line item amount when quantity or rate changes
+  const updateLineItemAmount = (index: number) => {
+    const item = form.getValues(`lineItems.${index}`);
+    const amount = item.quantity * item.rate;
+    form.setValue(`lineItems.${index}.amount`, amount);
+  };
+
+  if (isLoading) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <div className="flex justify-center p-8">Loading...</div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  if (!submission) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Billing Submission</DialogTitle>
+          <DialogDescription>
+            Modify submission details and line items. Total will be recalculated automatically.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Controller
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <Input
+                  {...field}
+                  id="description"
+                  placeholder="Enter description"
+                  data-testid="input-description"
+                />
+              )}
+            />
+            {form.formState.errors.description && (
+              <p className="text-sm text-red-500">{form.formState.errors.description.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes</Label>
+            <Controller
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <Textarea
+                  {...field}
+                  id="notes"
+                  placeholder="Additional notes or details"
+                  rows={3}
+                  data-testid="textarea-notes"
+                />
+              )}
+            />
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-semibold">Line Items</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => append({
+                  id: `new-${Date.now()}`,
+                  description: "",
+                  quantity: 1,
+                  rate: 0,
+                  amount: 0,
+                  type: "other",
+                })}
+                data-testid="button-add-line-item"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add Line Item
+              </Button>
+            </div>
+
+            <div className="border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[40%]">Description</TableHead>
+                    <TableHead className="w-[15%]">Qty</TableHead>
+                    <TableHead className="w-[20%]">Rate</TableHead>
+                    <TableHead className="w-[20%]">Amount</TableHead>
+                    <TableHead className="w-[5%]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {fields.map((field, index) => (
+                    <TableRow key={field.id}>
+                      <TableCell>
+                        <Controller
+                          control={form.control}
+                          name={`lineItems.${index}.description`}
+                          render={({ field }) => (
+                            <Input
+                              {...field}
+                              placeholder="Item description"
+                              className="h-8"
+                              data-testid={`input-line-item-desc-${index}`}
+                            />
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Controller
+                          control={form.control}
+                          name={`lineItems.${index}.quantity`}
+                          render={({ field }) => (
+                            <Input
+                              {...field}
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              className="h-8"
+                              onChange={(e) => {
+                                field.onChange(parseFloat(e.target.value) || 0);
+                                updateLineItemAmount(index);
+                              }}
+                              data-testid={`input-line-item-qty-${index}`}
+                            />
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Controller
+                          control={form.control}
+                          name={`lineItems.${index}.rate`}
+                          render={({ field }) => (
+                            <div className="flex items-center">
+                              <span className="text-slate-500 mr-1">$</span>
+                              <Input
+                                {...field}
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className="h-8"
+                                onChange={(e) => {
+                                  field.onChange(parseFloat(e.target.value) || 0);
+                                  updateLineItemAmount(index);
+                                }}
+                                data-testid={`input-line-item-rate-${index}`}
+                              />
+                            </div>
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium">
+                          ${form.watch(`lineItems.${index}.amount`)?.toFixed(2) || "0.00"}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => remove(index)}
+                          data-testid={`button-remove-line-item-${index}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {fields.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                        No line items. Click "Add Line Item" to add one.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="flex justify-end">
+              <div className="w-64 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Subtotal:</span>
+                  <span className="font-medium">${totals.subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Tax:</span>
+                  <span className="font-medium">${totals.tax.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-base font-bold border-t pt-2">
+                  <span>Total:</span>
+                  <span data-testid="text-total">${totals.total.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              data-testid="button-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={updateMutation.isPending}
+              data-testid="button-save"
+            >
+              {updateMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

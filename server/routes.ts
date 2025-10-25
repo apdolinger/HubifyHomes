@@ -8534,7 +8534,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const submission = await storage.createBillingSubmission(validatedData);
+      // Build enhanced submission data with line items and notes
+      let submissionData: any = { ...validatedData };
+      
+      // If source is a task, aggregate task and time entry data into line items
+      if (validatedData.sourceType === 'task') {
+        const taskId = parseInt(validatedData.sourceId);
+        if (isNaN(taskId)) {
+          console.warn(`Invalid task sourceId: ${validatedData.sourceId}, skipping line item aggregation`);
+        } else {
+          const task = await storage.getTask(taskId);
+          if (task) {
+          const lineItems: Array<{
+            id: string,
+            description: string,
+            quantity: number,
+            rateCents: number,
+            amountCents: number,
+            type: "task" | "time_entry" | "material" | "other"
+          }> = [];
+
+          // Add task itself as a line item if it has a billing amount
+          if (task.billableRateCents || task.billingAmount) {
+            const taskAmountCents = task.billingAmount 
+              ? Math.round(parseFloat(task.billingAmount) * 100)
+              : task.billableRateCents || 0;
+            
+            lineItems.push({
+              id: `task-${task.id}`,
+              description: task.title || 'Task',
+              quantity: 1,
+              rateCents: taskAmountCents,
+              amountCents: taskAmountCents,
+              type: 'task'
+            });
+          }
+
+          // Fetch and add associated time entries
+          const taskTimeEntries = await storage.getTimeEntries(user.orgId, { taskId: task.id });
+
+          for (const entry of taskTimeEntries) {
+            if (entry.clockOut && entry.isBillable) {
+              const hoursWorked = (new Date(entry.clockOut).getTime() - new Date(entry.clockIn).getTime()) / (1000 * 60 * 60);
+              const rateCents = entry.billableRateCents || task.billableRateCents || 0;
+              const amountCents = Math.round(hoursWorked * rateCents);
+
+              lineItems.push({
+                id: `time-${entry.id}`,
+                description: entry.notes || `Time entry - ${hoursWorked.toFixed(2)} hours`,
+                quantity: parseFloat(hoursWorked.toFixed(2)),
+                rateCents,
+                amountCents,
+                type: 'time_entry'
+              });
+            }
+          }
+
+          // Calculate total amount from line items
+          const totalAmountCents = lineItems.reduce((sum, item) => sum + item.amountCents, 0);
+
+          // Update submission data with enhanced fields
+          submissionData = {
+            ...submissionData,
+            notes: task.description || null,
+            lineItems,
+            amountCents: totalAmountCents || validatedData.amountCents,
+          };
+        }
+        }
+      }
+
+      const submission = await storage.createBillingSubmission(submissionData);
       
       // Check organization's billing workflow mode
       const org = await storage.getOrg(user.orgId);
@@ -8555,6 +8625,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error creating billing submission:", error);
       res.status(500).json({ message: "Failed to create billing submission" });
+    }
+  });
+
+  // Get single billing submission with full details
+  app.get("/api/billing-submissions/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const { id } = req.params;
+      const submission = await storage.getBillingSubmission(id);
+      
+      if (!submission || submission.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Billing submission not found" });
+      }
+
+      res.json(submission);
+    } catch (error) {
+      console.error("Error fetching billing submission:", error);
+      res.status(500).json({ message: "Failed to fetch billing submission" });
+    }
+  });
+
+  // Update billing submission (admin/supervisor only)
+  app.patch("/api/billing-submissions/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const user = await storage.getUser(userId);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      // Check permissions: only admin/supervisor can edit submissions
+      if (user.role !== 'admin' && user.role !== 'supervisor') {
+        return res.status(403).json({ message: "Only admin or supervisor users can edit billing submissions" });
+      }
+
+      const { id } = req.params;
+      const submission = await storage.getBillingSubmission(id);
+      
+      if (!submission || submission.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Billing submission not found" });
+      }
+
+      // Only allow editing pending submissions
+      if (submission.status !== 'pending') {
+        return res.status(400).json({ message: "Only pending submissions can be edited" });
+      }
+
+      // Extract allowed update fields
+      const { description, amountCents, notes, attachments, lineItems } = req.body;
+      const updates: any = {};
+      
+      if (description !== undefined) updates.description = description;
+      if (amountCents !== undefined) updates.amountCents = amountCents;
+      if (notes !== undefined) updates.notes = notes;
+      if (attachments !== undefined) updates.attachments = attachments;
+      if (lineItems !== undefined) updates.lineItems = lineItems;
+
+      const updated = await storage.updateBillingSubmission(id, updates);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating billing submission:", error);
+      res.status(500).json({ message: "Failed to update billing submission" });
     }
   });
 
