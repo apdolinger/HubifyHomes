@@ -89,6 +89,9 @@ export default function TaskProfile() {
     sortOrder: number;
   }>>([]);
   const [attachments, setAttachments] = useState<Array<{id: string, name: string, size: string, type: string}>>([]);
+  const [photoAttachments, setPhotoAttachments] = useState<Array<{url: string, filename: string}>>([]);
+  const [isDragOverPhotos, setIsDragOverPhotos] = useState(false);
+  const [isPhotoUploading, setIsPhotoUploading] = useState(false);
   const [quickLinks, setQuickLinks] = useState<Array<{id: string, label: string, url: string}>>([]);
   const [newQuickLink, setNewQuickLink] = useState({label: "", url: ""});
   const [comments, setComments] = useState<Array<{id: string, text: string, author: string, timestamp: string}>>([]);
@@ -487,6 +490,7 @@ export default function TaskProfile() {
         sortOrder: index
       })));
       setAttachments((task as any).attachments || []);
+      setPhotoAttachments((task as any).attachments || []);
       setQuickLinks((task as any).quickLinks || []);
       setComments((task as any).comments || []);
     }
@@ -509,7 +513,7 @@ export default function TaskProfile() {
       roomId: editForm.roomId && editForm.roomId !== "none" ? parseInt(editForm.roomId) : null,
       billedSeparately: editForm.billedSeparately,
       billingAmount: editForm.billingAmount,
-      // Note: checklist, attachments, etc. will be handled later when we implement those features
+      attachments: photoAttachments,
     };
 
     // Check for conflicts before saving
@@ -806,6 +810,117 @@ export default function TaskProfile() {
     setAttachments(prev => prev.filter(file => file.id !== id));
     toast({
       title: "File removed",
+      description: "Attachment has been removed",
+    });
+  };
+
+  // Photo attachment handlers
+  const handlePhotoUpload = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    const validFiles = fileArray.filter(file => {
+      // Allow image files only
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Invalid File Type",
+          description: `${file.name} is not an image file.`,
+          variant: "destructive",
+        });
+        return false;
+      }
+      
+      // Max 10MB per file
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File Too Large",
+          description: `${file.name} is larger than 10MB. Please choose a smaller file.`,
+          variant: "destructive",
+        });
+        return false;
+      }
+      
+      return true;
+    });
+
+    if (validFiles.length === 0) return;
+
+    setIsPhotoUploading(true);
+
+    try {
+      const uploadedPhotos: Array<{url: string, filename: string}> = [];
+
+      for (const file of validFiles) {
+        const formData = new FormData();
+        formData.append('files', file);
+        formData.append('directory', '.private/task-attachments');
+
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+          credentials: 'include',
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error(`Failed to upload ${file.name}`);
+        }
+
+        const uploadData = await uploadResponse.json();
+        if (uploadData.urls && uploadData.urls.length > 0) {
+          uploadedPhotos.push({
+            url: uploadData.urls[0],
+            filename: file.name
+          });
+        }
+      }
+
+      if (uploadedPhotos.length > 0) {
+        setPhotoAttachments(prev => [...prev, ...uploadedPhotos]);
+        toast({
+          title: "Photos Uploaded",
+          description: `${uploadedPhotos.length} photo(s) uploaded successfully.`,
+        });
+      }
+    } catch (error) {
+      console.error('Photo upload error:', error);
+      toast({
+        title: "Upload Failed",
+        description: "Failed to upload photos. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPhotoUploading(false);
+    }
+  };
+
+  const handlePhotoDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOverPhotos(true);
+  };
+
+  const handlePhotoDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOverPhotos(false);
+  };
+
+  const handlePhotoDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOverPhotos(false);
+
+    if (e.dataTransfer.files) {
+      handlePhotoUpload(e.dataTransfer.files);
+    }
+  };
+
+  const handlePhotoInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      handlePhotoUpload(e.target.files);
+      e.target.value = ''; // Clear input
+    }
+  };
+
+  const removePhotoAttachment = (index: number) => {
+    setPhotoAttachments(prev => prev.filter((_, i) => i !== index));
+    toast({
+      title: "Photo Removed",
       description: "Attachment has been removed",
     });
   };
@@ -1718,6 +1833,117 @@ export default function TaskProfile() {
                       No description provided.
                     </p>
                   )}
+                </CardContent>
+              </Card>
+
+              {/* Photos/Attachments */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Paperclip className="w-5 h-5 mr-2" />
+                    Photos & Attachments
+                  </CardTitle>
+                  <CardDescription>
+                    Upload photos and documents related to this task
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Upload Area */}
+                    <div
+                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                        isDragOverPhotos
+                          ? 'border-blue-400 bg-blue-50'
+                          : 'border-slate-300 hover:border-slate-400'
+                      }`}
+                      onDragOver={handlePhotoDragOver}
+                      onDragLeave={handlePhotoDragLeave}
+                      onDrop={handlePhotoDrop}
+                    >
+                      {isPhotoUploading ? (
+                        <div className="flex flex-col items-center py-4">
+                          <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mb-2" />
+                          <p className="text-sm text-slate-600">Uploading photos...</p>
+                        </div>
+                      ) : (
+                        <>
+                          <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                          <p className="text-sm text-slate-600 mb-2">
+                            Drag and drop photos here, or click to browse
+                          </p>
+                          <p className="text-xs text-slate-500 mb-3">
+                            Images only, max 10MB per file
+                          </p>
+                          <label>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              type="button"
+                              disabled={isPhotoUploading}
+                              data-testid="button-upload-photo"
+                              asChild
+                            >
+                              <span className="cursor-pointer">
+                                <Upload className="w-4 h-4 mr-2" />
+                                Choose Photos
+                              </span>
+                            </Button>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              onChange={handlePhotoInputChange}
+                              className="hidden"
+                              disabled={isPhotoUploading}
+                              data-testid="input-photo-upload"
+                            />
+                          </label>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Display Uploaded Photos */}
+                    {photoAttachments.length > 0 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                        {photoAttachments.map((attachment, index) => (
+                          <div
+                            key={index}
+                            className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200 hover:border-slate-300 transition-colors"
+                            data-testid={`photo-attachment-${index}`}
+                          >
+                            <img
+                              src={attachment.url}
+                              alt={attachment.filename}
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center">
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => removePhotoAttachment(index)}
+                                data-testid={`button-remove-photo-${index}`}
+                              >
+                                <Trash2 className="w-4 h-4 mr-1" />
+                                Remove
+                              </Button>
+                            </div>
+                            <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 px-2 py-1">
+                              <p className="text-xs text-white truncate" title={attachment.filename}>
+                                {attachment.filename}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {photoAttachments.length === 0 && !isPhotoUploading && (
+                      <p className="text-sm text-slate-500 text-center py-4">
+                        No photos attached yet
+                      </p>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 

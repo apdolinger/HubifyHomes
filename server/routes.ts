@@ -7753,10 +7753,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         primaryColor: org.branding?.primaryColor,
         secondaryColor: org.branding?.secondaryColor,
+        
+        attachments: (invoice as any).attachments || undefined,
       };
 
       const { generateInvoicePDF } = await import('./invoiceUtils.js');
-      generateInvoicePDF(invoiceData, res);
+      await generateInvoicePDF(invoiceData, res);
 
     } catch (error) {
       console.error("Error generating invoice PDF:", error);
@@ -8599,6 +8601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             notes: task.description || null,
             lineItems,
             amountCents: totalAmountCents || validatedData.amountCents,
+            attachments: (task as any).attachments || [],
           };
         }
         }
@@ -8797,6 +8800,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Step 2: Create invoice from submission
       const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+      
+      // Transform submission lineItems to invoice lineItems format
+      const invoiceLineItems = ((submission as any).lineItems || []).map((item: any) => ({
+        description: item.description,
+        quantity: item.quantity,
+        unitAmountCents: item.rateCents,
+        totalCents: item.amountCents
+      }));
+      
+      // Build description including notes if present
+      let invoiceDescription = submission.description;
+      if ((submission as any).notes) {
+        invoiceDescription += `\n\nNotes: ${(submission as any).notes}`;
+      }
+      
       const invoice = await storage.createClientInvoice({
         orgId: user.orgId,
         clientId: submission.clientId,
@@ -8805,19 +8823,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         amountCents: submission.amountCents,
         currency: 'usd',
         status: 'open',
-        description: submission.description,
+        description: invoiceDescription,
         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
         issuedAt: new Date(),
-        lineItems: [{
-          description: submission.description,
-          quantity: submission.quantity,
-          unitAmountCents: Math.floor(submission.amountCents / submission.quantity),
-          totalCents: submission.amountCents
-        }],
+        lineItems: invoiceLineItems,
+        attachments: (submission as any).attachments || [],
         metadata: {
           submissionId: submission.id,
           authorizedBy: userId,
-          quickSend: true
+          quickSend: true,
+          notes: (submission as any).notes || null
         },
         createdBy: userId
       });

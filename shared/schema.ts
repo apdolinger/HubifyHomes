@@ -206,6 +206,7 @@ export const clientInvoices = pgTable("client_invoices", {
     totalCents: number;
   }>>().default([]),
   metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+  attachments: jsonb("attachments").$type<Array<{url: string, filename: string}>>().default([]),
   
   // Creator tracking
   createdBy: varchar("created_by").references(() => users.id),
@@ -753,6 +754,7 @@ export const tasks = pgTable("tasks", {
   billingAmount: varchar("billing_amount"), // dollar amount as string, e.g., "125.00"
   billableRateCents: integer("billable_rate_cents"), // Hourly billable rate in cents for time tracking
   isArchived: boolean("is_archived").notNull().default(false),
+  attachments: jsonb("attachments").$type<Array<{url: string, filename: string}>>().default([]),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

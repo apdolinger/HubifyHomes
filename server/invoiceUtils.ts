@@ -45,9 +45,12 @@ interface InvoiceData {
   // Branding
   primaryColor?: string;
   secondaryColor?: string;
+  
+  // Attachments
+  attachments?: Array<{url: string, filename: string}>;
 }
 
-export function generateInvoicePDF(invoiceData: InvoiceData, res: Response) {
+export async function generateInvoicePDF(invoiceData: InvoiceData, res: Response) {
   const doc = new PDFDocument({ 
     margin: 50,
     size: 'LETTER'
@@ -300,9 +303,105 @@ export function generateInvoicePDF(invoiceData: InvoiceData, res: Response) {
        });
   }
   
+  // Photos & Attachments section (if provided)
+  if (invoiceData.attachments && invoiceData.attachments.length > 0) {
+    doc.y = totalsY + 40;
+    
+    // Check if we need a new page
+    if (doc.y > 650) {
+      doc.addPage();
+      doc.y = 50;
+    }
+    
+    doc.fontSize(12)
+       .font('Helvetica-Bold')
+       .fillColor('#666666')
+       .text('Photos & Attachments', 50, doc.y, { underline: true });
+    
+    doc.y += 25;
+    
+    const imageWidth = 250;
+    const imageSpacing = 15;
+    const leftImageX = 50;
+    const rightImageX = leftImageX + imageWidth + imageSpacing;
+    let currentImageY = doc.y;
+    let currentColumn = 0; // 0 for left, 1 for right
+    
+    for (let i = 0; i < invoiceData.attachments.length; i++) {
+      const attachment = invoiceData.attachments[i];
+      
+      try {
+        // Fetch image from URL
+        const response = await fetch(attachment.url);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch image: ${response.statusText}`);
+        }
+        
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        
+        // Check if we need a new page (leave room for image + caption)
+        if (currentImageY > 550) {
+          doc.addPage();
+          currentImageY = 50;
+          currentColumn = 0;
+        }
+        
+        // Calculate X position based on column
+        const imageX = currentColumn === 0 ? leftImageX : rightImageX;
+        
+        // Draw image - PDFKit will auto-fit to the specified dimensions
+        doc.image(buffer, imageX, currentImageY, { 
+          fit: [imageWidth, 250],
+          align: 'center'
+        });
+        
+        // Use max height for consistent spacing
+        const imageHeight = 250;
+        
+        // Add filename caption below image
+        doc.fontSize(8)
+           .font('Helvetica')
+           .fillColor('#666666')
+           .text(attachment.filename, imageX, currentImageY + imageHeight + 5, {
+             width: imageWidth,
+             align: 'center'
+           });
+        
+        // Move to next column or next row
+        if (currentColumn === 0) {
+          // Move to right column
+          currentColumn = 1;
+        } else {
+          // Move to next row (left column)
+          currentColumn = 0;
+          currentImageY += imageHeight + 40; // Image height + caption + spacing
+        }
+        
+      } catch (error) {
+        console.error(`Failed to load image ${attachment.filename}:`, error);
+        // Skip this image and continue with the next one
+        continue;
+      }
+    }
+    
+    // Update doc.y for subsequent sections
+    // If we ended on the right column, we need to move down
+    if (currentColumn === 1) {
+      doc.y = currentImageY + 250 + 40; // Assume max height for the last row
+    } else {
+      doc.y = currentImageY;
+    }
+  }
+  
   // Notes section (if provided)
   if (invoiceData.notes) {
-    doc.y = totalsY + 40;
+    // Only add spacing if attachments weren't shown
+    if (!invoiceData.attachments || invoiceData.attachments.length === 0) {
+      doc.y = totalsY + 40;
+    } else {
+      doc.y += 20; // Small spacing after attachments
+    }
     
     // Check if we need a new page
     if (doc.y > 650) {
@@ -325,7 +424,13 @@ export function generateInvoicePDF(invoiceData: InvoiceData, res: Response) {
   
   // Payment terms section (if provided)
   if (invoiceData.paymentTerms) {
-    doc.y += (invoiceData.notes ? 40 : 0);
+    if (invoiceData.notes) {
+      doc.y += 40;
+    } else if (!invoiceData.attachments || invoiceData.attachments.length === 0) {
+      doc.y = totalsY + 40;
+    } else {
+      doc.y += 20; // Small spacing after attachments
+    }
     
     // Check if we need a new page
     if (doc.y > 650) {

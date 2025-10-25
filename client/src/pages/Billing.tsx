@@ -31,7 +31,9 @@ import {
   Settings,
   Edit,
   Plus,
-  Trash2
+  Trash2,
+  Upload,
+  X as XIcon
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -1387,6 +1389,11 @@ function SubmissionDetailDialog({
     enabled: !!submissionId && open,
   });
 
+  // Photo attachments state
+  const [photoAttachments, setPhotoAttachments] = useState<Array<{url: string, filename: string}>>([]);
+  const [isDragOverPhotos, setIsDragOverPhotos] = useState(false);
+  const [isPhotoUploading, setIsPhotoUploading] = useState(false);
+
   // Form schema
   const lineItemSchema = z.object({
     id: z.string(),
@@ -1432,6 +1439,8 @@ function SubmissionDetailDialog({
           amount: item.amountCents / 100,
         })),
       });
+      // Initialize photo attachments from submission
+      setPhotoAttachments(submission.attachments || []);
     }
   }, [submission, form]);
 
@@ -1462,6 +1471,7 @@ function SubmissionDetailDialog({
           amountCents: Math.round(item.amount * 100),
         })),
         amountCents: Math.round(totals.total * 100),
+        attachments: photoAttachments,
       });
     },
     onSuccess: () => {
@@ -1491,6 +1501,117 @@ function SubmissionDetailDialog({
     const item = form.getValues(`lineItems.${index}`);
     const amount = item.quantity * item.rate;
     form.setValue(`lineItems.${index}.amount`, amount);
+  };
+
+  // Photo attachment handlers
+  const handlePhotoUpload = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    const validFiles = fileArray.filter(file => {
+      // Allow image files only
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Invalid File Type",
+          description: `${file.name} is not an image file.`,
+          variant: "destructive",
+        });
+        return false;
+      }
+      
+      // Max 10MB per file
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File Too Large",
+          description: `${file.name} is larger than 10MB. Please choose a smaller file.`,
+          variant: "destructive",
+        });
+        return false;
+      }
+      
+      return true;
+    });
+
+    if (validFiles.length === 0) return;
+
+    setIsPhotoUploading(true);
+
+    try {
+      const uploadedPhotos: Array<{url: string, filename: string}> = [];
+
+      for (const file of validFiles) {
+        const formData = new FormData();
+        formData.append('files', file);
+        formData.append('directory', '.private/submission-attachments');
+
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+          credentials: 'include',
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error(`Failed to upload ${file.name}`);
+        }
+
+        const uploadData = await uploadResponse.json();
+        if (uploadData.urls && uploadData.urls.length > 0) {
+          uploadedPhotos.push({
+            url: uploadData.urls[0],
+            filename: file.name
+          });
+        }
+      }
+
+      if (uploadedPhotos.length > 0) {
+        setPhotoAttachments(prev => [...prev, ...uploadedPhotos]);
+        toast({
+          title: "Photos Uploaded",
+          description: `${uploadedPhotos.length} photo(s) uploaded successfully.`,
+        });
+      }
+    } catch (error) {
+      console.error('Photo upload error:', error);
+      toast({
+        title: "Upload Failed",
+        description: "Failed to upload photos. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPhotoUploading(false);
+    }
+  };
+
+  const handlePhotoDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOverPhotos(true);
+  };
+
+  const handlePhotoDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOverPhotos(false);
+  };
+
+  const handlePhotoDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOverPhotos(false);
+
+    if (e.dataTransfer.files) {
+      handlePhotoUpload(e.dataTransfer.files);
+    }
+  };
+
+  const handlePhotoInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      handlePhotoUpload(e.target.files);
+      e.target.value = ''; // Clear input
+    }
+  };
+
+  const removePhotoAttachment = (index: number) => {
+    setPhotoAttachments(prev => prev.filter((_, i) => i !== index));
+    toast({
+      title: "Photo Removed",
+      description: "Attachment has been removed",
+    });
   };
 
   if (isLoading) {
@@ -1673,7 +1794,110 @@ function SubmissionDetailDialog({
                 </TableBody>
               </Table>
             </div>
+          </div>
 
+          {/* Photos & Attachments Section */}
+          <div className="space-y-4">
+            <Label className="text-base font-semibold">Photos & Attachments</Label>
+            
+            {/* Upload Area */}
+            <div
+              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                isDragOverPhotos
+                  ? 'border-blue-400 bg-blue-50'
+                  : 'border-slate-300 hover:border-slate-400'
+              }`}
+              onDragOver={handlePhotoDragOver}
+              onDragLeave={handlePhotoDragLeave}
+              onDrop={handlePhotoDrop}
+              data-testid="dropzone-photos"
+            >
+              {isPhotoUploading ? (
+                <div className="flex flex-col items-center py-4">
+                  <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mb-2" />
+                  <p className="text-sm text-slate-600">Uploading photos...</p>
+                </div>
+              ) : (
+                <>
+                  <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                  <p className="text-sm text-slate-600 mb-2">
+                    Drag and drop photos here, or click to browse
+                  </p>
+                  <p className="text-xs text-slate-500 mb-4">
+                    Supports JPG, PNG, GIF up to 10MB
+                  </p>
+                  <label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      type="button"
+                      disabled={isPhotoUploading}
+                      data-testid="button-upload-photo"
+                      asChild
+                    >
+                      <span className="cursor-pointer">
+                        <Upload className="w-4 h-4 mr-2" />
+                        Choose Photos
+                      </span>
+                    </Button>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handlePhotoInputChange}
+                      className="hidden"
+                      disabled={isPhotoUploading}
+                      data-testid="input-photo-upload"
+                    />
+                  </label>
+                </>
+              )}
+            </div>
+
+            {/* Display Uploaded Photos */}
+            {photoAttachments.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                {photoAttachments.map((attachment, index) => (
+                  <div
+                    key={index}
+                    className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200 hover:border-slate-300 transition-colors"
+                    data-testid={`photo-attachment-${index}`}
+                  >
+                    <img
+                      src={attachment.url}
+                      alt={attachment.filename}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-opacity flex items-end">
+                      <div className="w-full p-2 bg-gradient-to-t from-black to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                        <p className="text-white text-xs truncate mb-1">{attachment.filename}</p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          className="w-full h-7 text-xs"
+                          onClick={() => removePhotoAttachment(index)}
+                          data-testid={`button-remove-photo-${index}`}
+                        >
+                          <XIcon className="w-3 h-3 mr-1" />
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {photoAttachments.length === 0 && !isPhotoUploading && (
+              <p className="text-sm text-slate-500 text-center py-4">
+                No photos attached yet
+              </p>
+            )}
+          </div>
+
+          {/* Totals Section */}
+          <div className="space-y-4">
             <div className="flex justify-end">
               <div className="w-64 space-y-2">
                 <div className="flex justify-between text-sm">
