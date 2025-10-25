@@ -77,6 +77,427 @@ const propertySchema = z.object({
 type EditContactFormData = z.infer<typeof editContactSchema>;
 type PropertyFormData = z.infer<typeof propertySchema>;
 
+// Billing Settings Component
+function BillingSettingsTab({ person, personId }: { person: any; personId: string }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isEditingBilling, setIsEditingBilling] = useState(false);
+  const [isAddingSchedule, setIsAddingSchedule] = useState(false);
+
+  // Billing configuration state
+  const [billingEnabled, setBillingEnabled] = useState(false);
+  const [billingTypes, setBillingTypes] = useState({
+    recurringCharges: false,
+    hourlyTime: false,
+    taskBased: false,
+  });
+  const [invoiceFrequency, setInvoiceFrequency] = useState("monthly");
+  const [billingWorkflow, setBillingWorkflow] = useState("review");
+  const [defaultHourlyRate, setDefaultHourlyRate] = useState("");
+  const [invoiceDeliveryMethod, setInvoiceDeliveryMethod] = useState("email");
+
+  // Rehydrate state when person or personId changes (critical for preventing wrong data saves)
+  useEffect(() => {
+    if (person) {
+      setBillingEnabled(person.billingEnabled || false);
+      setBillingTypes(person.billingTypes || { recurringCharges: false, hourlyTime: false, taskBased: false });
+      setInvoiceFrequency(person.invoiceFrequency || "monthly");
+      setBillingWorkflow(person.billingWorkflow || "review");
+      setDefaultHourlyRate(person.defaultHourlyRateCents ? (person.defaultHourlyRateCents / 100).toFixed(2) : "");
+      setInvoiceDeliveryMethod(person.invoiceDeliveryMethod || "email");
+      setIsEditingBilling(false);
+    }
+  }, [personId, person]);
+
+  // Fetch recurring schedules
+  const { data: recurringSchedules, isLoading: schedulesLoading } = useQuery({
+    queryKey: [`/api/clients/${personId}/recurring-schedules`],
+    enabled: !!personId && billingEnabled,
+  });
+
+  // Fetch client invoices
+  const { data: clientInvoices, isLoading: invoicesLoading } = useQuery({
+    queryKey: [`/api/clients/${personId}/invoices`],
+    enabled: !!personId && billingEnabled,
+  });
+
+  // Update billing settings mutation
+  const updateBillingMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return apiRequest("PATCH", `/api/contacts/${personId}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/contacts/${personId}`] });
+      setIsEditingBilling(false);
+      toast({
+        title: "Billing settings updated",
+        description: "Billing configuration has been saved successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update billing settings",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveBillingSettings = () => {
+    // Validation: If billing is enabled, at least one billing type must be selected
+    if (billingEnabled) {
+      const hasAtLeastOneType = billingTypes.recurringCharges || billingTypes.hourlyTime || billingTypes.taskBased;
+      if (!hasAtLeastOneType) {
+        toast({
+          title: "Validation Error",
+          description: "Please select at least one billing type when billing is enabled.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validation: If hourly time is enabled, hourly rate must be valid
+      if (billingTypes.hourlyTime && (!defaultHourlyRate || isNaN(parseFloat(defaultHourlyRate)) || parseFloat(defaultHourlyRate) <= 0)) {
+        toast({
+          title: "Validation Error",
+          description: "Please enter a valid hourly rate greater than 0 when hourly time billing is enabled.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    const hourlyRateCents = defaultHourlyRate && !isNaN(parseFloat(defaultHourlyRate)) 
+      ? Math.round(parseFloat(defaultHourlyRate) * 100) 
+      : null;
+    
+    updateBillingMutation.mutate({
+      billingEnabled,
+      billingTypes,
+      invoiceFrequency,
+      billingWorkflow,
+      defaultHourlyRateCents: hourlyRateCents,
+      invoiceDeliveryMethod,
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setBillingEnabled(person?.billingEnabled || false);
+    setBillingTypes(person?.billingTypes || { recurringCharges: false, hourlyTime: false, taskBased: false });
+    setInvoiceFrequency(person?.invoiceFrequency || "monthly");
+    setBillingWorkflow(person?.billingWorkflow || "review");
+    setDefaultHourlyRate(person?.defaultHourlyRateCents ? (person.defaultHourlyRateCents / 100).toFixed(2) : "");
+    setInvoiceDeliveryMethod(person?.invoiceDeliveryMethod || "email");
+    setIsEditingBilling(false);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Billing Configuration Card */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center">
+              <DollarSign className="w-5 h-5 mr-2" />
+              Billing Configuration
+            </CardTitle>
+            {!isEditingBilling ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setIsEditingBilling(true)}
+                data-testid="button-edit-billing"
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Edit Settings
+              </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCancelEdit}
+                  disabled={updateBillingMutation.isPending}
+                  data-testid="button-cancel-billing-edit"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSaveBillingSettings}
+                  disabled={updateBillingMutation.isPending}
+                  data-testid="button-save-billing"
+                >
+                  {updateBillingMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Enable/Disable Billing */}
+          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+            <div>
+              <p className="font-medium">Billing Enabled</p>
+              <p className="text-sm text-slate-500">Enable billing for this client</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={billingEnabled}
+                onChange={(e) => setBillingEnabled(e.target.checked)}
+                disabled={!isEditingBilling}
+                className="sr-only peer"
+                data-testid="input-billing-enabled"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+          </div>
+
+          {billingEnabled && (
+            <>
+              {/* Billing Types */}
+              <div>
+                <Label className="text-base font-semibold mb-3 block">Billing Types</Label>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="recurring-charges"
+                      checked={billingTypes.recurringCharges}
+                      onChange={(e) => setBillingTypes({ ...billingTypes, recurringCharges: e.target.checked })}
+                      disabled={!isEditingBilling}
+                      className="w-4 h-4"
+                      data-testid="checkbox-recurring-charges"
+                    />
+                    <Label htmlFor="recurring-charges" className="font-normal cursor-pointer">
+                      Recurring Charges (weekly/monthly scheduled billing)
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="hourly-time"
+                      checked={billingTypes.hourlyTime}
+                      onChange={(e) => setBillingTypes({ ...billingTypes, hourlyTime: e.target.checked })}
+                      disabled={!isEditingBilling}
+                      className="w-4 h-4"
+                      data-testid="checkbox-hourly-time"
+                    />
+                    <Label htmlFor="hourly-time" className="font-normal cursor-pointer">
+                      Hourly Time Tracking
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="task-based"
+                      checked={billingTypes.taskBased}
+                      onChange={(e) => setBillingTypes({ ...billingTypes, taskBased: e.target.checked })}
+                      disabled={!isEditingBilling}
+                      className="w-4 h-4"
+                      data-testid="checkbox-task-based"
+                    />
+                    <Label htmlFor="task-based" className="font-normal cursor-pointer">
+                      Task-Based Billing
+                    </Label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Invoice Frequency */}
+              <div>
+                <Label htmlFor="invoice-frequency" className="text-base font-semibold mb-2 block">
+                  Invoice Frequency
+                </Label>
+                <Select
+                  value={invoiceFrequency}
+                  onValueChange={setInvoiceFrequency}
+                  disabled={!isEditingBilling}
+                >
+                  <SelectTrigger id="invoice-frequency" data-testid="select-invoice-frequency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="biweekly">Bi-weekly (Every 2 weeks)</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="on_completion">On Project Completion</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Billing Workflow */}
+              <div>
+                <Label className="text-base font-semibold mb-2 block">Billing Workflow</Label>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="workflow-auto"
+                      name="billing-workflow"
+                      value="auto"
+                      checked={billingWorkflow === "auto"}
+                      onChange={(e) => setBillingWorkflow(e.target.value)}
+                      disabled={!isEditingBilling}
+                      className="w-4 h-4"
+                      data-testid="radio-workflow-auto"
+                    />
+                    <Label htmlFor="workflow-auto" className="font-normal cursor-pointer">
+                      Auto-generate invoices (no approval required)
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="workflow-review"
+                      name="billing-workflow"
+                      value="review"
+                      checked={billingWorkflow === "review"}
+                      onChange={(e) => setBillingWorkflow(e.target.value)}
+                      disabled={!isEditingBilling}
+                      className="w-4 h-4"
+                      data-testid="radio-workflow-review"
+                    />
+                    <Label htmlFor="workflow-review" className="font-normal cursor-pointer">
+                      Review & authorize before invoicing
+                    </Label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Hourly Rate */}
+              {billingTypes.hourlyTime && (
+                <div>
+                  <Label htmlFor="hourly-rate" className="text-base font-semibold mb-2 block">
+                    Default Hourly Rate
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                    <Input
+                      id="hourly-rate"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={defaultHourlyRate}
+                      onChange={(e) => setDefaultHourlyRate(e.target.value)}
+                      disabled={!isEditingBilling}
+                      className="pl-7"
+                      placeholder="0.00"
+                      data-testid="input-hourly-rate"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Invoice Delivery Method */}
+              <div>
+                <Label htmlFor="delivery-method" className="text-base font-semibold mb-2 block">
+                  Invoice Delivery Method
+                </Label>
+                <Select
+                  value={invoiceDeliveryMethod}
+                  onValueChange={setInvoiceDeliveryMethod}
+                  disabled={!isEditingBilling}
+                >
+                  <SelectTrigger id="delivery-method" data-testid="select-delivery-method">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="email">Email (full invoice details)</SelectItem>
+                    <SelectItem value="sms">SMS (PDF link only)</SelectItem>
+                    <SelectItem value="both">Both Email & SMS</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Recurring Schedules Card */}
+      {billingEnabled && billingTypes.recurringCharges && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Recurring Billing Schedules</CardTitle>
+              <Button
+                size="sm"
+                onClick={() => setIsAddingSchedule(true)}
+                data-testid="button-add-recurring-schedule"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Schedule
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {schedulesLoading ? (
+              <p className="text-center text-slate-500">Loading schedules...</p>
+            ) : !recurringSchedules || (recurringSchedules as any[]).length === 0 ? (
+              <p className="text-center text-slate-500">No recurring schedules configured</p>
+            ) : (
+              <div className="space-y-2">
+                {(recurringSchedules as any[]).map((schedule: any) => (
+                  <div key={schedule.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg" data-testid={`schedule-${schedule.id}`}>
+                    <div>
+                      <p className="font-medium">{schedule.description}</p>
+                      <p className="text-sm text-slate-500">
+                        ${(schedule.amountCents / 100).toFixed(2)} • {schedule.frequency} • 
+                        Next: {new Date(schedule.nextBillingDate).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <Badge variant={schedule.isActive ? "default" : "secondary"}>
+                      {schedule.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Recent Invoices Card */}
+      {billingEnabled && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Invoices</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {invoicesLoading ? (
+              <p className="text-center text-slate-500">Loading invoices...</p>
+            ) : !clientInvoices || (clientInvoices as any[]).length === 0 ? (
+              <p className="text-center text-slate-500">No invoices generated yet</p>
+            ) : (
+              <div className="space-y-2">
+                {(clientInvoices as any[]).slice(0, 5).map((invoice: any) => (
+                  <div key={invoice.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg" data-testid={`invoice-${invoice.id}`}>
+                    <div>
+                      <p className="font-medium">Invoice #{invoice.invoiceNumber || invoice.id.slice(0, 8)}</p>
+                      <p className="text-sm text-slate-500">
+                        ${(invoice.amountCents / 100).toFixed(2)} • 
+                        {invoice.issuedAt ? new Date(invoice.issuedAt).toLocaleDateString() : 'Draft'}
+                      </p>
+                    </div>
+                    <Badge variant={
+                      invoice.status === 'paid' ? 'default' :
+                      invoice.status === 'sent' ? 'secondary' :
+                      'outline'
+                    }>
+                      {invoice.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 export default function PersonProfile() {
   const { isAuthenticated, isLoading } = useAuth();
   const { openTaskModal } = useTaskModal();
@@ -889,47 +1310,7 @@ export default function PersonProfile() {
         </TabsContent>
         
         <TabsContent value="billing">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <DollarSign className="w-5 h-5 mr-2" />
-                Billing Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between p-3 bg-slate-50 rounded-lg">
-                  <div>
-                    <p className="font-medium">Payment Method</p>
-                    <p className="text-sm text-slate-500">Credit Card ending in 4242</p>
-                  </div>
-                  <Button size="sm" variant="outline">
-                    Update
-                  </Button>
-                </div>
-                
-                <div className="flex justify-between p-3 bg-slate-50 rounded-lg">
-                  <div>
-                    <p className="font-medium">Billing Address</p>
-                    <p className="text-sm text-slate-500">Same as property address</p>
-                  </div>
-                  <Button size="sm" variant="outline">
-                    Edit
-                  </Button>
-                </div>
-                
-                <div className="flex justify-between p-3 bg-slate-50 rounded-lg">
-                  <div>
-                    <p className="font-medium">Monthly Charges</p>
-                    <p className="text-sm text-slate-500">$125.00/month</p>
-                  </div>
-                  <Button size="sm" variant="outline">
-                    View Details
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <BillingSettingsTab person={person as any} personId={personId} />
         </TabsContent>
         
         <TabsContent value="notes">

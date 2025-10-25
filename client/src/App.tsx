@@ -40,6 +40,7 @@ import OrgStripeSettings from "@/pages/OrgStripeSettings";
 import ImportManager from "@/pages/ImportManager";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfService from "@/pages/TermsOfService";
+import Billing from "@/pages/Billing";
 import Navigation from "@/components/Navigation";
 import QuickSearchModal from "@/components/QuickSearchModal";
 import QuickAddTaskModal from "@/components/QuickAddTaskModal";
@@ -155,6 +156,7 @@ function Router() {
           <Route path="/admin/vendors" component={Vendors} />
           
           {/* Billing Routes */}
+          <Route path="/billing" component={Billing} />
           <Route path="/admin/billing" component={AdminBilling} />
           <Route path="/admin/invoices" component={AdminInvoices} />
           <Route path="/billing/invoices" component={OrgBillingInvoices} />

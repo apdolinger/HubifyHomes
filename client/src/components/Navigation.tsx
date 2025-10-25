@@ -29,7 +29,8 @@ import {
   CreditCard,
   Wrench,
   Bell,
-  MessageSquare
+  MessageSquare,
+  DollarSign
 } from "lucide-react";
 
 const getNavigationItems = (user: any) => {
@@ -196,9 +197,9 @@ export default function Navigation() {
                       Hubify Console
                     </DropdownMenuItem>
                     {(user as any)?.role === 'admin' && (
-                      <DropdownMenuItem onClick={() => window.location.href = '/admin/billing'}>
-                        <Wrench className="w-4 h-4 mr-2" />
-                        Billing Management
+                      <DropdownMenuItem onClick={() => window.location.href = '/billing'}>
+                        <DollarSign className="w-4 h-4 mr-2" />
+                        Billing
                       </DropdownMenuItem>
                     )}
                   </>
