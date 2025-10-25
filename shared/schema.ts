@@ -654,6 +654,9 @@ export const tasks = pgTable("tasks", {
   recurrenceFrequency: varchar("recurrence_frequency"), // Legacy field, keep for backward compatibility
   recurrenceRule: text("recurrence_rule"), // RFC5545 RRULE string for recurring tasks
   recurrenceExDates: text("recurrence_ex_dates").array(), // Exception dates for recurring tasks
+  isTemplate: boolean("is_template").notNull().default(false), // True if this is a recurring task template
+  templateTaskId: integer("template_task_id").references((): any => tasks.id, { onDelete: "set null" }), // Links instance to template
+  instanceDate: timestamp("instance_date"), // Specific date this instance is for
   billedSeparately: boolean("billed_separately").notNull().default(false),
   billingAmount: varchar("billing_amount"), // dollar amount as string, e.g., "125.00"
   billableRateCents: integer("billable_rate_cents"), // Hourly billable rate in cents for time tracking
