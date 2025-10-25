@@ -307,7 +307,9 @@ export const clients = pgTable("clients", {
     hourlyTime: boolean;
     taskBased: boolean;
   }>().default({ recurringCharges: false, hourlyTime: false, taskBased: false }),
-  invoiceFrequency: varchar("invoice_frequency").$type<"weekly"|"biweekly"|"monthly"|"on_completion">().default("monthly"),
+  invoiceFrequency: varchar("invoice_frequency").$type<"weekly"|"biweekly"|"monthly"|"on_completion"|"manual">().default("monthly"),
+  billingDay: integer("billing_day"), // Day of week (0-6) for weekly/biweekly, or day of month (1-31) for monthly
+  lastInvoiceDate: timestamp("last_invoice_date"), // Last time an invoice was generated for batching
   billingWorkflow: varchar("billing_workflow").$type<"auto"|"review">().notNull().default("review"),
   defaultHourlyRateCents: integer("default_hourly_rate_cents"),
   invoiceDeliveryMethod: varchar("invoice_delivery_method").$type<"email"|"sms"|"both">().default("email"),
