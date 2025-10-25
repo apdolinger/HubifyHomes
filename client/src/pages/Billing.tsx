@@ -94,6 +94,53 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
     },
   });
 
+  // Authorize & Send mutation (admin/supervisor only)
+  const [authorizeAndSendDialog, setAuthorizeAndSendDialog] = useState(false);
+  const [authorizeAndSendSubmission, setAuthorizeAndSendSubmission] = useState<any>(null);
+  const [quickSendEmail, setQuickSendEmail] = useState("");
+  const [quickSendMessage, setQuickSendMessage] = useState("");
+
+  const authorizeAndSendMutation = useMutation({
+    mutationFn: async ({ submissionId, recipientEmail, message }: { submissionId: string; recipientEmail: string; message?: string }) => {
+      return apiRequest("POST", `/api/billing-submissions/${submissionId}/authorize-and-send`, { recipientEmail, message });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/billing-submissions"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/orgs`] });
+      toast({
+        title: "Success!",
+        description: "Submission authorized, invoice created and sent to client.",
+      });
+      setAuthorizeAndSendDialog(false);
+      setAuthorizeAndSendSubmission(null);
+      setQuickSendEmail("");
+      setQuickSendMessage("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to send",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAuthorizeAndSend = () => {
+    if (!quickSendEmail.trim()) {
+      toast({
+        title: "Email required",
+        description: "Please provide a recipient email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+    authorizeAndSendMutation.mutate({
+      submissionId: authorizeAndSendSubmission.id,
+      recipientEmail: quickSendEmail,
+      message: quickSendMessage
+    });
+  };
+
   const handleReject = () => {
     if (!rejectionReason.trim()) {
       toast({
@@ -249,6 +296,22 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
                       </div>
                       {submission.status === "pending" && (
                         <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="bg-blue-600 hover:bg-blue-700"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAuthorizeAndSendSubmission(submission);
+                              setQuickSendEmail(submission.client?.email || '');
+                              setAuthorizeAndSendDialog(true);
+                            }}
+                            disabled={authorizeAndSendMutation.isPending}
+                            data-testid={`button-authorize-send-${submission.id}`}
+                          >
+                            <Send className="w-4 h-4 mr-1" />
+                            Authorize & Send
+                          </Button>
                           <Button
                             size="sm"
                             variant="outline"

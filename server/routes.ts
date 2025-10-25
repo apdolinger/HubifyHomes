@@ -8546,6 +8546,156 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Authorize & Send - streamlined workflow for admin/supervisor roles
+  app.post("/api/billing-submissions/:id/authorize-and-send", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const user = await storage.getUser(userId);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      // Check permissions: only admin/supervisor can use this feature
+      if (user.role !== 'admin' && user.role !== 'supervisor') {
+        return res.status(403).json({ message: "Only admin or supervisor users can authorize and send" });
+      }
+
+      const { id } = req.params;
+      const { recipientEmail, message: customMessage } = req.body;
+
+      // Validate submission exists and belongs to org
+      const submission = await storage.getBillingSubmission(id);
+      if (!submission || submission.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Billing submission not found" });
+      }
+
+      if (submission.status !== 'pending') {
+        return res.status(400).json({ message: "Only pending submissions can be authorized" });
+      }
+
+      // Get client information
+      const client = await storage.getClient(submission.clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      // Get organization for branding
+      const org = await storage.getOrg(user.orgId);
+      if (!org) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+
+      // Step 1: Authorize the submission
+      const authorizedSubmission = await storage.authorizeBillingSubmission(id, userId);
+
+      // Step 2: Create invoice from submission
+      const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+      const invoice = await storage.createClientInvoice({
+        orgId: user.orgId,
+        clientId: submission.clientId,
+        source: 'manual',
+        invoiceNumber,
+        amountCents: submission.amountCents,
+        currency: 'usd',
+        status: 'open',
+        description: submission.description,
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        issuedAt: new Date(),
+        lineItems: [{
+          description: submission.description,
+          quantity: submission.quantity,
+          unitAmountCents: Math.floor(submission.amountCents / submission.quantity),
+          totalCents: submission.amountCents
+        }],
+        metadata: {
+          submissionId: submission.id,
+          authorizedBy: userId,
+          quickSend: true
+        },
+        createdBy: userId
+      });
+
+      // Link submission to invoice
+      await storage.db
+        .update(storage.billingSubmissions)
+        .set({ 
+          invoiceId: invoice.id,
+          status: 'invoiced',
+          updatedAt: new Date()
+        })
+        .where(storage.eq(storage.billingSubmissions.id, id));
+
+      // Step 3: Generate PDF
+      const pdfBuffer = await generateInvoicePDF(invoice, client, org);
+      
+      // Store PDF in object storage
+      const pdfKey = `invoices/org/${org.id}/clients/${client.id}/${invoice.id}.pdf`;
+      const bucket = storage.getBucket();
+      const file = bucket.file(pdfKey);
+      await file.save(pdfBuffer, {
+        contentType: 'application/pdf',
+        metadata: {
+          invoiceId: invoice.id,
+          clientId: client.id,
+          orgId: org.id
+        }
+      });
+
+      // Update invoice with PDF key
+      await storage.updateClientInvoice(invoice.id, {
+        pdfStorageKey: pdfKey
+      });
+
+      // Step 4: Send email to client
+      const emailTo = recipientEmail || (client as any).email || '';
+      if (!emailTo) {
+        return res.status(400).json({ message: "Client email is required" });
+      }
+
+      const emailSubject = `Invoice ${invoiceNumber} from ${org.name}`;
+      const emailBody = await generateInvoiceEmail(
+        invoice,
+        client,
+        org,
+        customMessage || `Please find attached invoice ${invoiceNumber}.`
+      );
+
+      await sendInvoiceEmail(emailTo, emailSubject, emailBody, pdfBuffer, invoiceNumber);
+
+      // Update invoice as sent
+      await storage.updateClientInvoice(invoice.id, {
+        sentAt: new Date(),
+        status: 'open'
+      });
+
+      // Log activity
+      await storage.logActivity({
+        userId,
+        action: 'authorize_and_send_submission',
+        entityType: 'billing_submission',
+        entityId: String(submission.id),
+        metadata: {
+          invoiceId: invoice.id,
+          invoiceNumber,
+          recipientEmail: emailTo,
+          amountCents: submission.amountCents
+        },
+        severity: 'info',
+        success: true
+      });
+
+      res.json({
+        message: "Submission authorized, invoice created and sent successfully",
+        submission: authorizedSubmission,
+        invoice,
+        emailSent: true
+      });
+    } catch (error) {
+      console.error("Error in authorize-and-send workflow:", error);
+      res.status(500).json({ message: "Failed to complete authorize-and-send workflow" });
+    }
+  });
+
   // Client Invoice endpoints
   app.post("/api/billing/generate-invoice", isAuthenticated, async (req: any, res) => {
     try {
