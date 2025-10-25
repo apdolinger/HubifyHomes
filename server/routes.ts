@@ -8992,6 +8992,170 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Batch authorize and send endpoint (consolidates multiple submissions into one invoice)
+  app.post("/api/billing-submissions/batch-authorize-and-send", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const user = await storage.getUser(userId);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      // Check permissions: only admin/supervisor can use this feature
+      if (user.role !== 'admin' && user.role !== 'supervisor') {
+        return res.status(403).json({ message: "Only admin or supervisor users can authorize and send" });
+      }
+
+      const { submissionIds, recipientEmail, message: customMessage } = req.body;
+
+      if (!Array.isArray(submissionIds) || submissionIds.length === 0) {
+        return res.status(400).json({ message: "submissionIds array is required" });
+      }
+
+      // Fetch all submissions
+      const submissions = await Promise.all(
+        submissionIds.map((id: string) => storage.getBillingSubmission(id))
+      );
+
+      // Validate all submissions exist, belong to org, and are pending
+      for (const submission of submissions) {
+        if (!submission || submission.orgId !== user.orgId) {
+          return res.status(404).json({ message: "One or more billing submissions not found" });
+        }
+        if (submission.status !== 'pending') {
+          return res.status(400).json({ message: "All submissions must be in pending status" });
+        }
+      }
+
+      // Ensure all submissions are for the same client
+      const clientIds = [...new Set(submissions.map(s => s!.clientId))];
+      if (clientIds.length > 1) {
+        return res.status(400).json({ message: "All submissions must be for the same client" });
+      }
+
+      const clientId = submissions[0]!.clientId;
+      const client = await storage.getClient(clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      const org = await storage.getOrg(user.orgId);
+      if (!org) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+
+      // Step 1: Authorize all submissions
+      await Promise.all(
+        submissions.map(s => storage.authorizeBillingSubmission(s!.id, userId))
+      );
+
+      // Step 2: Create consolidated invoice
+      const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+      
+      // Consolidate all line items, notes, and attachments from all submissions
+      const allLineItems: any[] = [];
+      const allNotes: string[] = [];
+      const allAttachments: any[] = [];
+      let totalAmountCents = 0;
+
+      submissions.forEach((submission) => {
+        if (!submission) return;
+        
+        // Add line items with submission description as a header
+        const submissionLineItems = ((submission as any).lineItems || []).map((item: any) => ({
+          description: item.description,
+          quantity: item.quantity,
+          unitAmountCents: item.rateCents,
+          totalCents: item.amountCents
+        }));
+        
+        allLineItems.push(...submissionLineItems);
+        
+        // Collect notes
+        if ((submission as any).notes) {
+          allNotes.push(`[${submission.description}]: ${(submission as any).notes}`);
+        }
+        
+        // Collect attachments
+        if ((submission as any).attachments && Array.isArray((submission as any).attachments)) {
+          allAttachments.push(...(submission as any).attachments);
+        }
+        
+        totalAmountCents += submission.amountCents;
+      });
+
+      // Build consolidated description
+      const consolidatedDescription = `Consolidated invoice for ${submissions.length} submission(s):\n` + 
+        submissions.map((s, i) => `${i + 1}. ${s!.description}`).join('\n');
+
+      const consolidatedNotes = allNotes.length > 0 ? allNotes.join('\n\n') : undefined;
+
+      const invoice = await storage.createClientInvoice({
+        orgId: user.orgId,
+        clientId: clientId,
+        source: 'manual',
+        invoiceNumber,
+        amountCents: totalAmountCents,
+        currency: 'usd',
+        status: 'open',
+        description: consolidatedDescription,
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        issuedAt: new Date(),
+        lineItems: allLineItems,
+        attachments: allAttachments,
+        metadata: {
+          submissionIds: submissionIds,
+          authorizedBy: userId,
+          consolidatedInvoice: true,
+          submissionCount: submissions.length,
+          notes: consolidatedNotes || null
+        },
+        createdBy: userId
+      });
+
+      // Link all submissions to invoice and mark as invoiced
+      await Promise.all(
+        submissions.map(s => 
+          storage.updateBillingSubmission(s!.id, { 
+            status: 'invoiced',
+            invoiceId: invoice.id
+          })
+        )
+      );
+
+      // Update client's last invoice date
+      await storage.updateClient(clientId, {
+        lastInvoiceDate: new Date()
+      });
+
+      // Step 3: Generate PDF
+      const pdfBuffer = await generateInvoicePDF(invoice, client, org);
+
+      // Step 4: Send email with PDF attachment
+      const mailService = new MailService();
+      await mailService.sendInvoiceEmail({
+        to: recipientEmail,
+        subject: `Invoice ${invoice.invoiceNumber} from ${org.name}`,
+        invoiceNumber: invoice.invoiceNumber,
+        amountCents: invoice.amountCents,
+        dueDate: invoice.dueDate!,
+        customMessage,
+        pdfBuffer,
+        organizationName: org.name,
+      });
+
+      res.json({
+        success: true,
+        invoice,
+        submissionsConsolidated: submissions.length,
+        message: `Successfully created consolidated invoice for ${submissions.length} submission(s)`
+      });
+    } catch (error) {
+      console.error("Error in batch authorize-and-send workflow:", error);
+      res.status(500).json({ message: "Failed to complete batch authorize-and-send workflow" });
+    }
+  });
+
   // Client Invoice endpoints
   app.post("/api/billing/generate-invoice", isAuthenticated, async (req: any, res) => {
     try {
