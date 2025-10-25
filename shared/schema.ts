@@ -289,11 +289,79 @@ export const clients = pgTable("clients", {
   lastName: varchar("last_name"),
   phone: varchar("phone"),
   isActive: boolean("is_active").notNull().default(true),
+  
+  // Billing configuration
+  billingEnabled: boolean("billing_enabled").notNull().default(false),
+  billingTypes: jsonb("billing_types").$type<{
+    recurringCharges: boolean;
+    hourlyTime: boolean;
+    taskBased: boolean;
+  }>().default({ recurringCharges: false, hourlyTime: false, taskBased: false }),
+  invoiceFrequency: varchar("invoice_frequency").$type<"weekly"|"biweekly"|"monthly"|"on_completion">().default("monthly"),
+  billingWorkflow: varchar("billing_workflow").$type<"auto"|"review">().notNull().default("review"),
+  defaultHourlyRateCents: integer("default_hourly_rate_cents"),
+  invoiceDeliveryMethod: varchar("invoice_delivery_method").$type<"email"|"sms"|"both">().default("email"),
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
   uniqueOrgEmail: unique().on(table.orgId, table.email),
 }));
+
+// Recurring billing schedules - for scheduled recurring charges
+export const recurringBillingSchedules = pgTable("recurring_billing_schedules", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  clientId: uuid("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
+  
+  description: text("description").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  frequency: varchar("frequency").$type<"weekly"|"biweekly"|"monthly">().notNull(),
+  
+  // Schedule tracking
+  nextBillingDate: timestamp("next_billing_date").notNull(),
+  lastBilledAt: timestamp("last_billed_at"),
+  isActive: boolean("is_active").notNull().default(true),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("recurring_billing_org_client_idx").on(table.orgId, table.clientId),
+  index("recurring_billing_next_date_idx").on(table.nextBillingDate),
+]);
+
+// Billing submissions - tracks completed work awaiting authorization
+export const billingSubmissions = pgTable("billing_submissions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  clientId: uuid("client_id").references(() => clients.id).notNull(),
+  
+  // Source tracking
+  sourceType: varchar("source_type").$type<"task"|"time_entry"|"recurring_charge">().notNull(),
+  sourceId: varchar("source_id").notNull(), // References the task ID, time entry ID, or recurring schedule ID
+  
+  // Billing details
+  description: text("description").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  
+  // Workflow status
+  status: varchar("status").$type<"pending"|"authorized"|"rejected"|"invoiced">().notNull().default("pending"),
+  authorizedBy: varchar("authorized_by").references(() => users.id),
+  authorizedAt: timestamp("authorized_at"),
+  rejectionReason: text("rejection_reason"),
+  invoiceId: uuid("invoice_id").references(() => clientInvoices.id),
+  
+  // Metadata
+  metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("billing_submissions_org_client_idx").on(table.orgId, table.clientId),
+  index("billing_submissions_status_idx").on(table.status),
+  index("billing_submissions_invoice_idx").on(table.invoiceId),
+]);
 
 // Portal users table - for Hubify Portal (Staff, Vendors)
 export const portalUsers = pgTable("portal_users", {
@@ -1723,6 +1791,18 @@ export const insertClientSchema = createInsertSchema(clients).omit({
   updatedAt: true,
 });
 
+export const insertRecurringBillingScheduleSchema = createInsertSchema(recurringBillingSchedules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertBillingSubmissionSchema = createInsertSchema(billingSubmissions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertPortalUserSchema = createInsertSchema(portalUsers).omit({
   id: true,
   createdAt: true,
@@ -1884,6 +1964,10 @@ export type InsertQuickbooksSyncLog = z.infer<typeof insertQuickbooksSyncLogSche
 export type QuickbooksSyncLog = typeof quickbooksSyncLogs.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
+export type InsertRecurringBillingSchedule = z.infer<typeof insertRecurringBillingScheduleSchema>;
+export type RecurringBillingSchedule = typeof recurringBillingSchedules.$inferSelect;
+export type InsertBillingSubmission = z.infer<typeof insertBillingSubmissionSchema>;
+export type BillingSubmission = typeof billingSubmissions.$inferSelect;
 export type InsertPortalUser = z.infer<typeof insertPortalUserSchema>;
 export type PortalUser = typeof portalUsers.$inferSelect;
 export type InsertPortalUserProperty = z.infer<typeof insertPortalUserPropertySchema>;
