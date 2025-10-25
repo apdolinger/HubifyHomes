@@ -7831,8 +7831,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         attachments: (invoice as any).attachments || undefined,
       };
 
-      const { generateInvoicePDF } = await import('./invoiceUtils.js');
-      await generateInvoicePDF(invoiceData, res);
+      const { generateInvoicePDFToResponse } = await import('./invoiceUtils.js');
+      await generateInvoicePDFToResponse(invoiceData, res);
 
     } catch (error) {
       console.error("Error generating invoice PDF:", error);
