@@ -454,3 +454,123 @@ export function DuplicatesWidget({ className }: DuplicatesWidgetProps) {
     </Card>
   );
 }
+
+interface BillingWidgetProps {
+  className?: string;
+}
+
+export function BillingWidget({ className }: BillingWidgetProps) {
+  const [, setLocation] = useLocation();
+
+  // Fetch pending billing submissions
+  const { data: submissions, isLoading } = useQuery<any[]>({
+    queryKey: ["/api/billing-submissions", { status: "pending" }],
+  });
+
+  const handleViewAllSubmissions = () => {
+    setLocation("/admin?tab=billing");
+  };
+
+  const handleViewSubmission = (id: string) => {
+    setLocation("/admin?tab=billing");
+  };
+
+  const pendingSubmissions = submissions || [];
+  const pendingCount = pendingSubmissions.length;
+  const recentSubmissions = pendingSubmissions.slice(0, 3);
+
+  return (
+    <Card className={className}>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center">
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Billing Queue
+          </div>
+          {isLoading ? (
+            <Badge variant="secondary" data-testid="badge-billing-loading">Loading...</Badge>
+          ) : (
+            <Badge 
+              variant="secondary" 
+              className={pendingCount > 0 ? "bg-orange-100 text-orange-800" : ""}
+              data-testid="badge-billing-count"
+            >
+              {pendingCount} pending
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="text-center py-4 text-muted-foreground" data-testid="billing-loading">
+            <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" />
+            Loading billing submissions...
+          </div>
+        ) : pendingCount === 0 ? (
+          <div className="text-center py-6" data-testid="billing-empty">
+            <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+            <p className="text-sm font-medium text-gray-700 mb-1">All Caught Up!</p>
+            <p className="text-xs text-gray-500">No pending billing submissions</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {recentSubmissions.map((submission, idx) => (
+              <div 
+                key={submission.id || idx}
+                className="flex items-center justify-between p-3 rounded-lg border hover:bg-slate-50 cursor-pointer transition-colors"
+                onClick={() => handleViewSubmission(submission.id)}
+                data-testid={`billing-item-${idx}`}
+              >
+                <div className="flex-1">
+                  <p className="font-medium text-sm">{submission.description}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-xs text-slate-500">
+                      {submission.sourceType === 'task' ? 'Task' : 
+                       submission.sourceType === 'time_entry' ? 'Time Entry' : 
+                       'Recurring Charge'}
+                    </p>
+                    <span className="text-xs text-slate-400">•</span>
+                    <p className="text-xs font-semibold text-slate-700">
+                      ${(submission.amountCents / 100).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewSubmission(submission.id);
+                  }}
+                  className="hover:bg-orange-50"
+                  data-testid={`button-review-billing-${idx}`}
+                >
+                  <Eye className="w-3 h-3 mr-1" />
+                  Review
+                </Button>
+              </div>
+            ))}
+            
+            {pendingCount > 3 && (
+              <div className="text-center text-sm text-muted-foreground pt-2">
+                +{pendingCount - 3} more submission{pendingCount - 3 !== 1 ? 's' : ''}
+              </div>
+            )}
+            
+            <Button 
+              variant="outline" 
+              className="w-full hover:bg-slate-50 mt-2" 
+              onClick={handleViewAllSubmissions}
+              data-testid="button-view-all-billing"
+            >
+              <ArrowRight className="w-4 h-4 mr-2" />
+              Review All Submissions
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

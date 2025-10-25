@@ -43,7 +43,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useLocation } from "wouter";
 import DashboardCustomizationModal from "@/components/DashboardCustomizationModal";
-import { CalendarWidget, SupportWidget, DuplicatesWidget } from "@/components/DashboardWidgets";
+import { CalendarWidget, SupportWidget, DuplicatesWidget, BillingWidget } from "@/components/DashboardWidgets";
 
 export default function Dashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -76,7 +76,10 @@ export default function Dashboard() {
       "recent-activity": <Clock className="w-4 h-4" />,
       "calendar": <Calendar className="w-4 h-4" />,
       "support": <HelpCircle className="w-4 h-4" />,
-      "duplicates": <Copy className="w-4 h-4" />
+      "duplicates": <Copy className="w-4 h-4" />,
+      "billing": <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
     };
     return iconMap[id] || <Building className="w-4 h-4" />;
   };
@@ -143,6 +146,15 @@ export default function Dashboard() {
       icon: getWidgetIcon("duplicates"),
       enabled: false,
       order: 7,
+      category: "content" as const
+    },
+    {
+      id: "billing",
+      name: "Billing Queue",
+      description: "Pending billing submissions for review",
+      icon: getWidgetIcon("billing"),
+      enabled: false,
+      order: 8,
       category: "content" as const
     }];
 
@@ -1079,6 +1091,9 @@ function renderMessageWithMentions(content: string) {
 
             case "duplicates":
               return <DuplicatesWidget key={widget.id} className="lg:col-span-6" />;
+
+            case "billing":
+              return <BillingWidget key={widget.id} className="lg:col-span-6" />;
 
             default:
               return null;
