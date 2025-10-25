@@ -197,7 +197,7 @@ export default function Navigation() {
                       Hubify Console
                     </DropdownMenuItem>
                     {(user as any)?.role === 'admin' && (
-                      <DropdownMenuItem onClick={() => window.location.href = '/billing'}>
+                      <DropdownMenuItem onClick={() => window.location.href = '/admin?tab=billing'}>
                         <DollarSign className="w-4 h-4 mr-2" />
                         Billing
                       </DropdownMenuItem>

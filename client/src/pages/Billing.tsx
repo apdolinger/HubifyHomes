@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
-export default function Billing() {
+export default function Billing({ embedded = false }: { embedded?: boolean }) {
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -118,11 +118,13 @@ export default function Billing() {
   const pendingCount = (submissions as any[] || []).filter((s: any) => s.status === "pending").length;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Billing Management</h1>
-        <p className="text-slate-500">Review and authorize billing submissions, manage invoices</p>
-      </div>
+    <div className={embedded ? "" : "p-6 max-w-7xl mx-auto"}>
+      {!embedded && (
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2">Billing Management</h1>
+          <p className="text-slate-500">Review and authorize billing submissions, manage invoices</p>
+        </div>
+      )}
 
       <Tabs defaultValue="submissions" className="space-y-4">
         <TabsList>

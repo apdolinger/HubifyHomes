@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import AdminForms from "./AdminForms";
 import SupportModal from "@/components/SupportModal";
+import Billing from "./Billing";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { z } from "zod";
@@ -45,13 +46,23 @@ import {
   MapPin,
   User,
   Phone,
-  Eye
+  Eye,
+  DollarSign,
+  XCircle,
+  AlertCircle,
+  Search,
+  Filter
 } from "lucide-react";
 
 export default function Admin() {
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState("forms");
+  
+  // Check URL query parameters for initial tab
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialTab = urlParams.get('tab') || 'forms';
+  
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [isNewTemplateDialogOpen, setIsNewTemplateDialogOpen] = useState(false);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isNewCommunityDialogOpen, setIsNewCommunityDialogOpen] = useState(false);
@@ -646,7 +657,7 @@ export default function Admin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-9">
+        <TabsList className="grid w-full grid-cols-10">
           <TabsTrigger value="forms" className="flex items-center gap-2">
             <FileText className="w-4 h-4" />
             Forms
@@ -658,6 +669,10 @@ export default function Admin() {
           <TabsTrigger value="reports" className="flex items-center gap-2">
             <Download className="w-4 h-4" />
             Reports
+          </TabsTrigger>
+          <TabsTrigger value="billing" className="flex items-center gap-2">
+            <DollarSign className="w-4 h-4" />
+            Billing
           </TabsTrigger>
           <TabsTrigger value="communities" className="flex items-center gap-2">
             <Building className="w-4 h-4" />
@@ -1191,6 +1206,11 @@ export default function Admin() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Billing Tab */}
+        <TabsContent value="billing" className="space-y-6">
+          <Billing embedded={true} />
         </TabsContent>
 
         {/* Communities Tab */}
