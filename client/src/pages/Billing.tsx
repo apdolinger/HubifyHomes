@@ -141,6 +141,64 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
     },
   });
 
+  // Batch authorize and send mutation (for consolidated invoices)
+  const [batchAuthorizeDialog, setBatchAuthorizeDialog] = useState(false);
+  const [batchClient, setBatchClient] = useState<any>(null);
+  const [batchSubmissions, setBatchSubmissions] = useState<any[]>([]);
+  const [batchEmail, setBatchEmail] = useState("");
+  const [batchMessage, setBatchMessage] = useState("");
+
+  const batchAuthorizeAndSendMutation = useMutation({
+    mutationFn: async ({ submissionIds, recipientEmail, message }: { submissionIds: string[]; recipientEmail: string; message?: string }) => {
+      return apiRequest("POST", `/api/billing-submissions/batch-authorize-and-send`, { submissionIds, recipientEmail, message });
+    },
+    onSuccess: (response: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/billing-submissions"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/orgs`] });
+      const count = batchSubmissions.length;
+      toast({
+        title: "Consolidated Invoice Created!",
+        description: `${count} submission${count > 1 ? 's' : ''} consolidated into one invoice and sent to ${batchEmail}.`,
+      });
+      setBatchAuthorizeDialog(false);
+      setBatchClient(null);
+      setBatchSubmissions([]);
+      setBatchEmail("");
+      setBatchMessage("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to create invoice",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleBatchAuthorizeAndSend = () => {
+    if (!batchEmail.trim()) {
+      toast({
+        title: "Email required",
+        description: "Please provide a recipient email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (batchSubmissions.length === 0) {
+      toast({
+        title: "No submissions",
+        description: "No submissions selected for batching.",
+        variant: "destructive",
+      });
+      return;
+    }
+    batchAuthorizeAndSendMutation.mutate({
+      submissionIds: batchSubmissions.map(s => s.id),
+      recipientEmail: batchEmail,
+      message: batchMessage
+    });
+  };
+
   const handleAuthorizeAndSend = () => {
     if (!quickSendEmail.trim()) {
       toast({
@@ -178,6 +236,30 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
       submission.sourceType?.toLowerCase().includes(searchLower)
     );
   });
+
+  // Group pending submissions by client for batch invoicing
+  const pendingGroupedByClient = useMemo(() => {
+    const pending = filteredSubmissions.filter((s: any) => s.status === "pending");
+    const grouped = new Map<string, { client: any; submissions: any[]; totalCents: number }>();
+    
+    pending.forEach((submission: any) => {
+      const clientId = submission.clientId;
+      if (!grouped.has(clientId)) {
+        grouped.set(clientId, {
+          client: submission.client,
+          submissions: [],
+          totalCents: 0,
+        });
+      }
+      const group = grouped.get(clientId)!;
+      group.submissions.push(submission);
+      group.totalCents += submission.amountCents;
+    });
+    
+    return Array.from(grouped.values()).sort((a, b) => 
+      `${a.client?.firstName} ${a.client?.lastName}`.localeCompare(`${b.client?.firstName} ${b.client?.lastName}`)
+    );
+  }, [filteredSubmissions]);
 
   const pendingCount = (submissions as any[] || []).filter((s: any) => s.status === "pending").length;
 
@@ -265,126 +347,165 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
             </CardContent>
           </Card>
 
-          {/* Submissions Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Billing Submissions</CardTitle>
-              <CardDescription>
-                Review and authorize billable work before it's included in invoices
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {submissionsLoading ? (
-                <p className="text-center text-slate-500 py-8">Loading submissions...</p>
-              ) : filteredSubmissions.length === 0 ? (
-                <div className="text-center py-12">
-                  <AlertCircle className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-                  <h3 className="text-lg font-medium mb-2">No submissions found</h3>
-                  <p className="text-slate-500">No billing submissions match your filters.</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {filteredSubmissions.map((submission: any) => (
-                    <div
-                      key={submission.id}
-                      className="flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                      onClick={() => {
-                        setEditSubmissionId(submission.id);
-                        setEditDialogOpen(true);
-                      }}
-                      data-testid={`submission-${submission.id}`}
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h4 className="font-medium">{submission.description}</h4>
-                          <Badge variant="outline" className="text-xs">
-                            {submission.sourceType}
-                          </Badge>
-                          <Badge
-                            variant={
-                              submission.status === "pending" ? "secondary" :
-                              submission.status === "authorized" ? "default" :
-                              submission.status === "rejected" ? "destructive" :
-                              "outline"
-                            }
-                          >
-                            {submission.status}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-slate-500">
-                          <span>Client: {submission.client?.firstName} {submission.client?.lastName}</span>
-                          <span>Amount: ${(submission.amountCents / 100).toFixed(2)}</span>
-                          {submission.quantity > 1 && <span>Qty: {submission.quantity}</span>}
-                          <span>{new Date(submission.createdAt).toLocaleDateString()}</span>
-                        </div>
-                      </div>
-                      {submission.status === "pending" && (
-                        <div className="flex gap-2">
+          {/* Pending Submissions Grouped by Client */}
+          {statusFilter === "pending" ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Pending Billing Submissions - Grouped by Client</CardTitle>
+                <CardDescription>
+                  Review submissions by client. Create consolidated invoices for multiple submissions at once.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {submissionsLoading ? (
+                  <p className="text-center text-slate-500 py-8">Loading submissions...</p>
+                ) : pendingGroupedByClient.length === 0 ? (
+                  <div className="text-center py-12">
+                    <AlertCircle className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+                    <h3 className="text-lg font-medium mb-2">No pending submissions</h3>
+                    <p className="text-slate-500">No pending billing submissions found.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {pendingGroupedByClient.map((group, idx) => (
+                      <div key={group.client?.id || idx} className="border rounded-lg p-4 bg-slate-50">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold">
+                              {group.client?.firstName?.[0]}{group.client?.lastName?.[0]}
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-lg">
+                                {group.client?.firstName} {group.client?.lastName}
+                              </h3>
+                              <p className="text-sm text-slate-500">
+                                {group.submissions.length} submission{group.submissions.length > 1 ? 's' : ''} • 
+                                Total: <span className="font-medium text-slate-700">${(group.totalCents / 100).toFixed(2)}</span>
+                              </p>
+                            </div>
+                          </div>
                           <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditSubmissionId(submission.id);
-                              setEditDialogOpen(true);
-                            }}
-                            data-testid={`button-edit-details-${submission.id}`}
-                          >
-                            <Edit className="w-4 h-4 mr-1" />
-                            Edit Details
-                          </Button>
-                          <Button
-                            size="sm"
                             variant="default"
                             className="bg-blue-600 hover:bg-blue-700"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setAuthorizeAndSendSubmission(submission);
-                              setQuickSendEmail(submission.client?.email || '');
-                              setAuthorizeAndSendDialog(true);
+                            onClick={() => {
+                              setBatchClient(group.client);
+                              setBatchSubmissions(group.submissions);
+                              setBatchEmail(group.client?.email || '');
+                              setBatchAuthorizeDialog(true);
                             }}
-                            disabled={authorizeAndSendMutation.isPending}
-                            data-testid={`button-authorize-send-${submission.id}`}
+                            data-testid={`button-create-invoice-${group.client?.id}`}
                           >
-                            <Send className="w-4 h-4 mr-1" />
-                            Authorize & Send
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              authorizeMutation.mutate(submission.id);
-                            }}
-                            disabled={authorizeMutation.isPending}
-                            data-testid={`button-authorize-${submission.id}`}
-                          >
-                            <CheckCircle className="w-4 h-4 mr-1" />
-                            Authorize
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSubmissionToReject(submission);
-                              setRejectDialogOpen(true);
-                            }}
-                            data-testid={`button-reject-${submission.id}`}
-                          >
-                            <XCircle className="w-4 h-4 mr-1" />
-                            Reject
+                            <Send className="w-4 h-4 mr-2" />
+                            Create Invoice Now
                           </Button>
                         </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                        
+                        <div className="space-y-2">
+                          {group.submissions.map((submission: any) => (
+                            <div
+                              key={submission.id}
+                              className="flex items-center justify-between p-3 bg-white rounded border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer"
+                              onClick={() => {
+                                setEditSubmissionId(submission.id);
+                                setEditDialogOpen(true);
+                              }}
+                              data-testid={`submission-${submission.id}`}
+                            >
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h4 className="font-medium text-sm">{submission.description}</h4>
+                                  <Badge variant="outline" className="text-xs">
+                                    {submission.sourceType}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-3 text-xs text-slate-500">
+                                  <span>${(submission.amountCents / 100).toFixed(2)}</span>
+                                  {submission.quantity > 1 && <span>Qty: {submission.quantity}</span>}
+                                  <span>{new Date(submission.createdAt).toLocaleDateString()}</span>
+                                </div>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditSubmissionId(submission.id);
+                                  setEditDialogOpen(true);
+                                }}
+                                data-testid={`button-edit-details-${submission.id}`}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            // Original table view for non-pending statuses
+            <Card>
+              <CardHeader>
+                <CardTitle>Billing Submissions</CardTitle>
+                <CardDescription>
+                  Review and authorize billable work before it's included in invoices
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {submissionsLoading ? (
+                  <p className="text-center text-slate-500 py-8">Loading submissions...</p>
+                ) : filteredSubmissions.length === 0 ? (
+                  <div className="text-center py-12">
+                    <AlertCircle className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+                    <h3 className="text-lg font-medium mb-2">No submissions found</h3>
+                    <p className="text-slate-500">No billing submissions match your filters.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredSubmissions.map((submission: any) => (
+                      <div
+                        key={submission.id}
+                        className="flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                        onClick={() => {
+                          setEditSubmissionId(submission.id);
+                          setEditDialogOpen(true);
+                        }}
+                        data-testid={`submission-${submission.id}`}
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h4 className="font-medium">{submission.description}</h4>
+                            <Badge variant="outline" className="text-xs">
+                              {submission.sourceType}
+                            </Badge>
+                            <Badge
+                              variant={
+                                submission.status === "pending" ? "secondary" :
+                                submission.status === "authorized" ? "default" :
+                                submission.status === "rejected" ? "destructive" :
+                                "outline"
+                              }
+                            >
+                              {submission.status}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-slate-500">
+                            <span>Client: {submission.client?.firstName} {submission.client?.lastName}</span>
+                            <span>Amount: ${(submission.amountCents / 100).toFixed(2)}</span>
+                            {submission.quantity > 1 && <span>Qty: {submission.quantity}</span>}
+                            <span>{new Date(submission.createdAt).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="invoices" className="space-y-4">
@@ -535,6 +656,86 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
                 <>
                   <Send className="w-4 h-4 mr-2" />
                   Authorize & Send
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Batch Authorize & Send Dialog */}
+      <Dialog open={batchAuthorizeDialog} onOpenChange={setBatchAuthorizeDialog}>
+        <DialogContent className="max-w-2xl" data-testid="dialog-batch-authorize-send">
+          <DialogHeader>
+            <DialogTitle>Create Consolidated Invoice</DialogTitle>
+            <DialogDescription>
+              This will combine all {batchSubmissions.length} submissions into a single invoice and send it to the client.
+            </DialogDescription>
+          </DialogHeader>
+          {batchClient && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-semibold mb-2">Client: {batchClient.firstName} {batchClient.lastName}</h4>
+                <p className="text-sm text-slate-600 mb-3">
+                  {batchSubmissions.length} submission{batchSubmissions.length > 1 ? 's' : ''} will be consolidated into one invoice
+                </p>
+                <div className="space-y-1">
+                  {batchSubmissions.map((sub: any) => (
+                    <div key={sub.id} className="flex justify-between text-sm">
+                      <span className="text-slate-700">{sub.description}</span>
+                      <span className="font-medium">${(sub.amountCents / 100).toFixed(2)}</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between text-base font-semibold pt-2 border-t border-blue-300">
+                    <span>Total:</span>
+                    <span>${(batchSubmissions.reduce((sum: number, s: any) => sum + s.amountCents, 0) / 100).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">Recipient Email *</label>
+                <Input
+                  type="email"
+                  placeholder="client@example.com"
+                  value={batchEmail}
+                  onChange={(e) => setBatchEmail(e.target.value)}
+                  data-testid="input-batch-email"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">Message (optional)</label>
+                <Textarea
+                  placeholder="Add a custom message to include in the email..."
+                  value={batchMessage}
+                  onChange={(e) => setBatchMessage(e.target.value)}
+                  rows={3}
+                  data-testid="textarea-batch-message"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBatchAuthorizeDialog(false)}
+              data-testid="button-cancel-batch-authorize"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBatchAuthorizeAndSend}
+              disabled={batchAuthorizeAndSendMutation.isPending}
+              data-testid="button-confirm-batch-authorize"
+            >
+              {batchAuthorizeAndSendMutation.isPending ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Creating Invoice...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 mr-2" />
+                  Create & Send Invoice
                 </>
               )}
             </Button>
