@@ -5307,6 +5307,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Organization and Branding routes
+  app.get("/api/orgs/:orgId", isAuthenticated, async (req, res) => {
+    try {
+      const orgId = req.params.orgId;
+      const userOrgId = req.user?.claims?.orgId;
+      
+      // Ensure user belongs to the organization
+      if (userOrgId !== orgId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const org = await storage.getOrg(orgId);
+      
+      if (!org) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+
+      res.json(org);
+    } catch (error) {
+      console.error("Error fetching organization:", error);
+      res.status(500).json({ message: "Failed to fetch organization" });
+    }
+  });
+
+  app.patch("/api/orgs/:orgId", isAuthenticated, async (req, res) => {
+    try {
+      const orgId = req.params.orgId;
+      const userOrgId = req.user?.claims?.orgId;
+      const userRole = req.user?.claims?.role;
+      
+      // Ensure user belongs to the organization and has admin privileges
+      if (userOrgId !== orgId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      if (userRole !== "admin" && userRole !== "supervisor") {
+        return res.status(403).json({ message: "Only admins and supervisors can update organization settings" });
+      }
+      
+      const updates: any = {};
+      
+      // Allow updating billing workflow mode
+      if (req.body.hasOwnProperty('billingWorkflowMode')) {
+        const validModes = ["automatic", "require_authorization", "manual"];
+        if (!validModes.includes(req.body.billingWorkflowMode)) {
+          return res.status(400).json({ message: "Invalid billing workflow mode" });
+        }
+        updates.billingWorkflowMode = req.body.billingWorkflowMode;
+      }
+      
+      const updatedOrg = await storage.updateOrg(orgId, updates);
+
+      res.json(updatedOrg);
+    } catch (error) {
+      console.error("Error updating organization:", error);
+      res.status(500).json({ message: "Failed to update organization" });
+    }
+  });
+
   app.get("/api/orgs/:orgId/branding", isAuthenticated, async (req, res) => {
     try {
       const orgId = req.params.orgId;
@@ -8477,7 +8535,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const submission = await storage.createBillingSubmission(validatedData);
-      res.status(201).json(submission);
+      
+      // Check organization's billing workflow mode
+      const org = await storage.getOrg(user.orgId);
+      const workflowMode = org?.billingWorkflowMode || "manual";
+      
+      // If workflow mode is automatic, immediately authorize the submission
+      if (workflowMode === "automatic") {
+        const userId = req.user?.claims?.sub || req.user?.id;
+        const authorizedSubmission = await storage.authorizeBillingSubmission(submission.id, userId);
+        res.status(201).json(authorizedSubmission);
+      } else {
+        // For manual or require_authorization modes, return the pending submission
+        res.status(201).json(submission);
+      }
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid data", errors: error.errors });

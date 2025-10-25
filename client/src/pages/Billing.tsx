@@ -22,7 +22,8 @@ import {
   RefreshCw,
   AlertCircle,
   Search,
-  Filter
+  Filter,
+  Settings
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -185,6 +186,10 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
           </TabsTrigger>
           <TabsTrigger value="invoices" data-testid="tab-invoices">
             Invoices
+          </TabsTrigger>
+          <TabsTrigger value="settings" data-testid="tab-settings">
+            <Settings className="w-4 h-4 mr-2" />
+            Settings
           </TabsTrigger>
         </TabsList>
 
@@ -352,6 +357,10 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
         <TabsContent value="invoices" className="space-y-4">
           <InvoicesTab />
         </TabsContent>
+
+        <TabsContent value="settings" className="space-y-4">
+          <SettingsTab />
+        </TabsContent>
       </Tabs>
 
       {/* Submission Details/Reject Modal */}
@@ -433,6 +442,82 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Authorize & Send Dialog */}
+      <Dialog open={authorizeAndSendDialog} onOpenChange={setAuthorizeAndSendDialog}>
+        <DialogContent data-testid="dialog-authorize-send">
+          <DialogHeader>
+            <DialogTitle>Authorize & Send Invoice</DialogTitle>
+            <DialogDescription>
+              This will authorize the submission, create an invoice, generate a PDF, and send it to the client in one action.
+            </DialogDescription>
+          </DialogHeader>
+          {authorizeAndSendSubmission && (
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Submission</label>
+                <p className="text-sm text-slate-700">{authorizeAndSendSubmission.description}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Amount</label>
+                  <p className="text-sm text-slate-700">${(authorizeAndSendSubmission.amountCents / 100).toFixed(2)}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Client</label>
+                  <p className="text-sm text-slate-700">{authorizeAndSendSubmission.client?.name || "Unknown"}</p>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">Recipient Email *</label>
+                <Input
+                  type="email"
+                  placeholder="client@example.com"
+                  value={quickSendEmail}
+                  onChange={(e) => setQuickSendEmail(e.target.value)}
+                  data-testid="input-quick-send-email"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">Message (optional)</label>
+                <Textarea
+                  placeholder="Add a custom message to include in the email..."
+                  value={quickSendMessage}
+                  onChange={(e) => setQuickSendMessage(e.target.value)}
+                  rows={3}
+                  data-testid="textarea-quick-send-message"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAuthorizeAndSendDialog(false)}
+              data-testid="button-cancel-authorize-send"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAuthorizeAndSend}
+              disabled={authorizeAndSendMutation.isPending}
+              data-testid="button-confirm-authorize-send"
+            >
+              {authorizeAndSendMutation.isPending ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 mr-2" />
+                  Authorize & Send
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
@@ -1094,6 +1179,164 @@ function InvoicesTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// Settings Tab Component
+function SettingsTab() {
+  const { user, isAuthenticated, isLoading: userLoading } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  const orgId = (user as any)?.orgId;
+
+  // Fetch organization settings
+  const { data: org, isLoading: orgLoading } = useQuery({
+    queryKey: [`/api/orgs/${orgId}`],
+    enabled: isAuthenticated && !!orgId,
+  });
+
+  const updateWorkflowMutation = useMutation({
+    mutationFn: async (mode: "automatic" | "require_authorization" | "manual") => {
+      return apiRequest("PATCH", `/api/orgs/${orgId}`, { billingWorkflowMode: mode });
+    },
+    onMutate: async (mode) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: [`/api/orgs/${orgId}`] });
+      
+      // Snapshot the previous value
+      const previousOrg = queryClient.getQueryData([`/api/orgs/${orgId}`]);
+      
+      // Optimistically update to the new value
+      queryClient.setQueryData([`/api/orgs/${orgId}`], (old: any) => ({
+        ...old,
+        billingWorkflowMode: mode
+      }));
+      
+      // Return context with the previous value
+      return { previousOrg };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}`] });
+      toast({
+        title: "Settings updated",
+        description: "Billing workflow mode has been updated successfully.",
+      });
+    },
+    onError: (error: any, _mode, context) => {
+      // Rollback to previous value on error
+      if (context?.previousOrg) {
+        queryClient.setQueryData([`/api/orgs/${orgId}`], context.previousOrg);
+      }
+      toast({
+        title: "Failed to update settings",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleWorkflowChange = (mode: string) => {
+    updateWorkflowMutation.mutate(mode as "automatic" | "require_authorization" | "manual");
+  };
+
+  if (userLoading || orgLoading) {
+    return <div className="flex justify-center p-8">Loading settings...</div>;
+  }
+
+  if (!orgId) {
+    return <div className="flex justify-center p-8">No organization found.</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Billing Workflow Mode</CardTitle>
+          <CardDescription>
+            Configure how billing submissions are processed in your organization
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            <div className="flex items-start space-x-3">
+              <input
+                type="radio"
+                id="automatic"
+                name="workflow"
+                value="automatic"
+                checked={org?.billingWorkflowMode === "automatic"}
+                onChange={(e) => handleWorkflowChange(e.target.value)}
+                className="mt-1"
+                data-testid="radio-automatic"
+              />
+              <div>
+                <label htmlFor="automatic" className="font-medium cursor-pointer">
+                  Automatic
+                </label>
+                <p className="text-sm text-slate-500">
+                  Billing submissions are automatically converted to invoices without requiring authorization. 
+                  Ideal for streamlined workflows with high trust.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start space-x-3">
+              <input
+                type="radio"
+                id="require_authorization"
+                name="workflow"
+                value="require_authorization"
+                checked={org?.billingWorkflowMode === "require_authorization"}
+                onChange={(e) => handleWorkflowChange(e.target.value)}
+                className="mt-1"
+                data-testid="radio-require-authorization"
+              />
+              <div>
+                <label htmlFor="require_authorization" className="font-medium cursor-pointer">
+                  Require Authorization
+                </label>
+                <p className="text-sm text-slate-500">
+                  Billing submissions require supervisor/admin approval before being converted to invoices. 
+                  Provides oversight while maintaining efficiency.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start space-x-3">
+              <input
+                type="radio"
+                id="manual"
+                name="workflow"
+                value="manual"
+                checked={org?.billingWorkflowMode === "manual"}
+                onChange={(e) => handleWorkflowChange(e.target.value)}
+                className="mt-1"
+                data-testid="radio-manual"
+              />
+              <div>
+                <label htmlFor="manual" className="font-medium cursor-pointer">
+                  Manual
+                </label>
+                <p className="text-sm text-slate-500">
+                  Billing submissions remain as submissions only. Invoices must be created manually. 
+                  Maximum control for complex billing scenarios.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t">
+            <h4 className="font-medium mb-2">Current Mode</h4>
+            <Badge variant="outline" className="text-base px-3 py-1">
+              {org?.billingWorkflowMode === "automatic" ? "Automatic" :
+               org?.billingWorkflowMode === "require_authorization" ? "Require Authorization" :
+               "Manual"}
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
