@@ -378,9 +378,11 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
 
 // Invoices Tab Component
 function InvoicesTab() {
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  const orgId = (user as any)?.orgId;
 
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<string>("all");
   const [invoiceClientFilter, setInvoiceClientFilter] = useState<string>("all");
@@ -392,8 +394,8 @@ function InvoicesTab() {
 
   // Fetch all invoices
   const { data: allInvoices, isLoading: invoicesLoading } = useQuery({
-    queryKey: ["/api/client-invoices"],
-    enabled: isAuthenticated,
+    queryKey: [`/api/orgs/${orgId}/client-invoices`],
+    enabled: isAuthenticated && !!orgId,
   });
 
   // Fetch clients for filtering
@@ -412,7 +414,7 @@ function InvoicesTab() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/client-invoices"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}/client-invoices`] });
       toast({
         title: "Invoice sent",
         description: "The invoice has been sent successfully.",
