@@ -34,12 +34,12 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
   const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("pending");
-  const [clientFilter, setClientFilter] = useState<string>("");
+  const [clientFilter, setClientFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
 
   // Fetch billing submissions
   const { data: submissions, isLoading: submissionsLoading } = useQuery({
-    queryKey: ["/api/billing-submissions", { status: statusFilter, clientId: clientFilter || undefined }],
+    queryKey: ["/api/billing-submissions", { status: statusFilter, clientId: clientFilter !== "all" ? clientFilter : undefined }],
     enabled: isAuthenticated,
   });
 
@@ -184,7 +184,7 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
                       <SelectValue placeholder="All Clients" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Clients</SelectItem>
+                      <SelectItem value="all">All Clients</SelectItem>
                       {(clients as any[] || []).map((client: any) => (
                         <SelectItem key={client.id} value={client.id}>
                           {client.firstName} {client.lastName}
@@ -383,7 +383,7 @@ function InvoicesTab() {
   const queryClient = useQueryClient();
 
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<string>("all");
-  const [invoiceClientFilter, setInvoiceClientFilter] = useState<string>("");
+  const [invoiceClientFilter, setInvoiceClientFilter] = useState<string>("all");
 
   // Fetch all invoices
   const { data: allInvoices, isLoading: invoicesLoading } = useQuery({
@@ -399,7 +399,7 @@ function InvoicesTab() {
 
   const filteredInvoices = (allInvoices as any[] || []).filter((invoice: any) => {
     if (invoiceStatusFilter !== "all" && invoice.status !== invoiceStatusFilter) return false;
-    if (invoiceClientFilter && invoice.clientId !== invoiceClientFilter) return false;
+    if (invoiceClientFilter !== "all" && invoice.clientId !== invoiceClientFilter) return false;
     return true;
   });
 
@@ -435,7 +435,7 @@ function InvoicesTab() {
                   <SelectValue placeholder="All Clients" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Clients</SelectItem>
+                  <SelectItem value="all">All Clients</SelectItem>
                   {(clients as any[] || []).map((client: any) => (
                     <SelectItem key={client.id} value={client.id}>
                       {client.firstName} {client.lastName}
