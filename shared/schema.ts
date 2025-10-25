@@ -354,6 +354,20 @@ export const billingSubmissions = pgTable("billing_submissions", {
   amountCents: integer("amount_cents").notNull(),
   quantity: integer("quantity").notNull().default(1),
   
+  // Rich content from source task/work
+  notes: text("notes"),
+  attachments: jsonb("attachments").$type<Array<{url: string, filename: string}>>().default([]),
+  
+  // Itemized line items for receipt-style billing
+  lineItems: jsonb("line_items").$type<Array<{
+    id: string,
+    description: string,
+    quantity: number,
+    rateCents: number,
+    amountCents: number,
+    type: "task" | "time_entry" | "material" | "other"
+  }>>().default([]),
+  
   // Workflow status
   status: varchar("status").$type<"pending"|"authorized"|"rejected"|"invoiced">().notNull().default("pending"),
   authorizedBy: varchar("authorized_by").references(() => users.id),
