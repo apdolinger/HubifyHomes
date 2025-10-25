@@ -8111,6 +8111,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get client by ID
+  app.get("/api/clients/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const { id } = req.params;
+      const client = await storage.getClient(id);
+      
+      if (!client || client.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      res.json(client);
+    } catch (error) {
+      console.error("Error fetching client:", error);
+      res.status(500).json({ message: "Failed to fetch client" });
+    }
+  });
+
   // Billing - Recurring Schedule endpoints
   app.post("/api/clients/:clientId/recurring-schedules", isAuthenticated, async (req: any, res) => {
     try {
