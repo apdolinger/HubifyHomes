@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { useForm, useFieldArray, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -1435,16 +1435,20 @@ function SubmissionDetailDialog({
     }
   }, [submission, form]);
 
-  // Calculate totals
-  const totals = useMemo(() => {
-    const items = form.watch("lineItems") || [];
-    const subtotal = items.reduce((sum, item) => sum + (item.amount || 0), 0);
-    return {
-      subtotal,
-      tax: 0,
-      total: subtotal,
-    };
-  }, [form.watch("lineItems")]);
+  // Watch line items using useWatch for proper subscription
+  const lineItems = useWatch({
+    control: form.control,
+    name: "lineItems",
+    defaultValue: [],
+  }) || [];
+  
+  // Calculate totals (recalculates when lineItems changes)
+  const subtotal = lineItems.reduce((sum, item) => sum + (item.amount || 0), 0);
+  const totals = {
+    subtotal,
+    tax: 0,
+    total: subtotal,
+  };
 
   // Update mutation
   const updateMutation = useMutation({
