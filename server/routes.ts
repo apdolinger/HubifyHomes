@@ -816,10 +816,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         });
 
-        // Make the file publicly accessible
-        await gcsFile.makePublic();
-
-        // Get the public URL
+        // Get the public URL (note: bucket should allow public read access)
+        // If bucket has public access prevention, use signed URLs instead
         const publicUrl = `https://storage.googleapis.com/${bucket.name}/${objectPath}`;
         uploadedUrls.push(publicUrl);
       }
