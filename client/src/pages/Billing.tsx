@@ -392,7 +392,7 @@ function InvoicesTab() {
 
   // Fetch all invoices
   const { data: allInvoices, isLoading: invoicesLoading } = useQuery({
-    queryKey: ["/api/billing/invoices"],
+    queryKey: ["/api/client-invoices"],
     enabled: isAuthenticated,
   });
 
@@ -412,7 +412,7 @@ function InvoicesTab() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/billing/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/client-invoices"] });
       toast({
         title: "Invoice sent",
         description: "The invoice has been sent successfully.",
