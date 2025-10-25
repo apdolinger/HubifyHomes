@@ -9044,10 +9044,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Organization not found" });
       }
 
-      // Step 1: Authorize all submissions
-      await Promise.all(
-        submissions.map(s => storage.authorizeBillingSubmission(s!.id, userId))
-      );
+      // Step 1: Authorize all submissions and create invoice in try-catch for error handling
+      try {
+        // Authorize all submissions
+        await Promise.all(
+          submissions.map(s => storage.authorizeBillingSubmission(s!.id, userId))
+        );
+      } catch (authError) {
+        return res.status(500).json({ message: "Failed to authorize submissions" });
+      }
 
       // Step 2: Create consolidated invoice
       const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
@@ -9061,8 +9066,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       submissions.forEach((submission) => {
         if (!submission) return;
         
-        // Add line items with submission description as a header
-        const submissionLineItems = ((submission as any).lineItems || []).map((item: any) => ({
+        // Safely handle line items (default to empty array if null/undefined)
+        const submissionLineItems = (Array.isArray((submission as any).lineItems) ? (submission as any).lineItems : []).map((item: any) => ({
           description: item.description,
           quantity: item.quantity,
           unitAmountCents: item.rateCents,
@@ -9071,14 +9076,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         allLineItems.push(...submissionLineItems);
         
-        // Collect notes
-        if ((submission as any).notes) {
+        // Safely collect notes
+        if ((submission as any).notes && typeof (submission as any).notes === 'string') {
           allNotes.push(`[${submission.description}]: ${(submission as any).notes}`);
         }
         
-        // Collect attachments
-        if ((submission as any).attachments && Array.isArray((submission as any).attachments)) {
-          allAttachments.push(...(submission as any).attachments);
+        // Safely collect attachments (deduplicate by URL)
+        if (Array.isArray((submission as any).attachments)) {
+          (submission as any).attachments.forEach((att: any) => {
+            if (att && att.url && !allAttachments.find((a: any) => a.url === att.url)) {
+              allAttachments.push(att);
+            }
+          });
         }
         
         totalAmountCents += submission.amountCents;
@@ -9128,28 +9137,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastInvoiceDate: new Date()
       });
 
-      // Step 3: Generate PDF
-      const pdfBuffer = await generateInvoicePDF(invoice, client, org);
+      // Step 3: Generate PDF and send email
+      try {
+        const pdfBuffer = await generateInvoicePDF(invoice, client, org);
 
-      // Step 4: Send email with PDF attachment
-      const mailService = new MailService();
-      await mailService.sendInvoiceEmail({
-        to: recipientEmail,
-        subject: `Invoice ${invoice.invoiceNumber} from ${org.name}`,
-        invoiceNumber: invoice.invoiceNumber,
-        amountCents: invoice.amountCents,
-        dueDate: invoice.dueDate!,
-        customMessage,
-        pdfBuffer,
-        organizationName: org.name,
-      });
+        // Store PDF in object storage
+        const pdfKey = `invoices/org/${org.id}/clients/${client.id}/${invoice.id}.pdf`;
+        const bucket = storage.getBucket();
+        const file = bucket.file(pdfKey);
+        await file.save(pdfBuffer, {
+          contentType: 'application/pdf',
+          metadata: {
+            invoiceId: invoice.id,
+            clientId: client.id,
+            orgId: org.id,
+            consolidated: 'true'
+          }
+        });
 
-      res.json({
-        success: true,
-        invoice,
-        submissionsConsolidated: submissions.length,
-        message: `Successfully created consolidated invoice for ${submissions.length} submission(s)`
-      });
+        // Update invoice with PDF key
+        await storage.updateClientInvoice(invoice.id, {
+          pdfStorageKey: pdfKey
+        });
+
+        // Send email with PDF attachment
+        const { generateInvoiceEmail, sendInvoiceEmail } = await import('./emailUtils.js');
+        const emailSubject = `Invoice ${invoice.invoiceNumber} from ${org.name}`;
+        const emailBody = await generateInvoiceEmail(
+          invoice,
+          client,
+          org,
+          customMessage || `Please find attached your consolidated invoice.`
+        );
+
+        await sendInvoiceEmail(recipientEmail, emailSubject, emailBody, pdfBuffer, invoice.invoiceNumber);
+
+        // Update invoice as sent
+        await storage.updateClientInvoice(invoice.id, {
+          sentAt: new Date()
+        });
+
+        res.json({
+          success: true,
+          invoice,
+          submissionsConsolidated: submissions.length,
+          message: `Successfully created consolidated invoice for ${submissions.length} submission(s)`
+        });
+      } catch (pdfError) {
+        console.error("Error generating/sending PDF:", pdfError);
+        // Invoice was created but PDF/email failed
+        return res.status(500).json({ 
+          message: "Invoice created but failed to generate PDF or send email",
+          invoice
+        });
+      }
     } catch (error) {
       console.error("Error in batch authorize-and-send workflow:", error);
       res.status(500).json({ message: "Failed to complete batch authorize-and-send workflow" });

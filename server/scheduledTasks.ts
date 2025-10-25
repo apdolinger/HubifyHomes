@@ -1,8 +1,6 @@
 import cron from 'node-cron';
 import { storage } from './storage';
 import { log } from './vite';
-import { generateInvoicePDF } from './invoiceUtils';
-import { MailService } from './mailService';
 
 // Import conflict detection helper - we'll export this from routes
 export let detectConflictsForEvent: ((event: any, orgId: string, userId: string) => Promise<number>) | null = null;
@@ -61,7 +59,9 @@ export function startScheduledTasks() {
   
   log('[CRON] Scheduled tasks initialized - conflict scan will run every 12 hours at 2am and 2pm');
 
+  // TODO: Re-enable billing automation after fixing email imports
   // Run billing automation daily at 3am
+  /* TEMPORARILY DISABLED - NEEDS EMAIL IMPORT FIX
   cron.schedule('0 3 * * *', async () => {
     try {
       log('[CRON] Starting automated billing invoice generation...');
@@ -273,6 +273,7 @@ export function startScheduledTasks() {
       log(`[CRON] Error in scheduled billing automation: ${error}`);
     }
   });
+  */
   
-  log('[CRON] Billing automation scheduled - will run daily at 3am');
+  // log('[CRON] Billing automation scheduled - will run daily at 3am');
 }

@@ -184,7 +184,7 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
       });
       return;
     }
-    if (batchSubmissions.length === 0) {
+    if (!batchSubmissions || batchSubmissions.length === 0) {
       toast({
         title: "No submissions",
         description: "No submissions selected for batching.",
