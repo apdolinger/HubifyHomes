@@ -302,11 +302,11 @@ export default function TaskProfile() {
     enabled: isAuthenticated && !!(task as any)?.propertyId,
   });
 
-  // Fetch client details for billing check (if task has a linked contact)
-  const linkedContactId = (task as any)?.linkedContactId;
+  // Fetch client details for billing check (if task has a linked client)
+  const linkedClientId = (task as any)?.clientId;
   const { data: linkedClient } = useQuery({
-    queryKey: [`/api/contacts/${linkedContactId}`],
-    enabled: isAuthenticated && !!linkedContactId,
+    queryKey: [`/api/clients/${linkedClientId}`],
+    enabled: isAuthenticated && !!linkedClientId,
   });
 
   // Update task mutation
@@ -521,11 +521,25 @@ export default function TaskProfile() {
     const isBeingCompleted = oldStatus !== 'completed' && newStatus === 'completed';
     const client = linkedClient as any;
     const hasBillingEnabled = client?.billingEnabled;
-    const hasTaskBilling = client?.billingTypes?.includes('task');
+    const hasTaskBilling = client?.billingTypes?.taskBased; // billingTypes is an object with boolean properties
     const isBillable = editForm.billedSeparately || (hasBillingEnabled && hasTaskBilling);
 
+    console.log('[Billing Dialog Debug]', {
+      oldStatus,
+      newStatus,
+      isBeingCompleted,
+      linkedClientId,
+      clientData: client,
+      hasBillingEnabled,
+      hasTaskBilling,
+      billedSeparately: editForm.billedSeparately,
+      isBillable,
+      shouldShowDialog: isBeingCompleted && linkedClientId && isBillable
+    });
+
     // If task is being completed and is billable, show billing dialog
-    if (isBeingCompleted && linkedContactId && isBillable) {
+    if (isBeingCompleted && linkedClientId && isBillable) {
+      console.log('[Billing Dialog] Showing billing dialog');
       setPendingTaskUpdate(updateData);
       setIsBillingDialogOpen(true);
       // Pre-fill amount if task has a billingAmount
@@ -585,7 +599,7 @@ export default function TaskProfile() {
 
     // Create billing submission
     createBillingSubmissionMutation.mutate({
-      clientId: linkedContactId,
+      clientId: linkedClientId,
       amountCents: Math.round(amount * 100),
       description: `Completed Task: ${editForm.title}`,
     });
