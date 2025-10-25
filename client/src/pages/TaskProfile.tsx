@@ -122,6 +122,9 @@ export default function TaskProfile() {
     phone: "",
     type: "owner",
   });
+  const [isBillingDialogOpen, setIsBillingDialogOpen] = useState(false);
+  const [pendingTaskUpdate, setPendingTaskUpdate] = useState<any>(null);
+  const [billingSubmissionAmount, setBillingSubmissionAmount] = useState("");
 
   // Task templates
   const taskTemplates = {
@@ -299,6 +302,13 @@ export default function TaskProfile() {
     enabled: isAuthenticated && !!(task as any)?.propertyId,
   });
 
+  // Fetch client details for billing check (if task has a linked contact)
+  const linkedContactId = (task as any)?.linkedContactId;
+  const { data: linkedClient } = useQuery({
+    queryKey: [`/api/contacts/${linkedContactId}`],
+    enabled: isAuthenticated && !!linkedContactId,
+  });
+
   // Update task mutation
   const updateTaskMutation = useMutation({
     mutationFn: async (updatedTask: any) => {
@@ -355,6 +365,37 @@ export default function TaskProfile() {
       toast({
         title: "Error",
         description: "Failed to delete task",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Billing submission mutation
+  const createBillingSubmissionMutation = useMutation({
+    mutationFn: async (data: { clientId: string; amountCents: number; description: string }) => {
+      return await apiRequest("POST", "/api/billing-submissions", {
+        clientId: data.clientId,
+        sourceType: "task",
+        sourceId: taskId,
+        amountCents: data.amountCents,
+        description: data.description,
+        status: "pending",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/billing-submissions"] });
+      toast({
+        title: "Success",
+        description: "Task submitted for billing review",
+      });
+      setIsBillingDialogOpen(false);
+      setBillingSubmissionAmount("");
+    },
+    onError: (error: any) => {
+      console.error("Billing submission error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to submit for billing",
         variant: "destructive",
       });
     },
@@ -474,6 +515,26 @@ export default function TaskProfile() {
       }
     }
 
+    // Check if status is changing to "completed" and task is billable
+    const oldStatus = (task as any)?.status;
+    const newStatus = editForm.status;
+    const isBeingCompleted = oldStatus !== 'completed' && newStatus === 'completed';
+    const client = linkedClient as any;
+    const hasBillingEnabled = client?.billingEnabled;
+    const hasTaskBilling = client?.billingTypes?.includes('task');
+    const isBillable = editForm.billedSeparately || (hasBillingEnabled && hasTaskBilling);
+
+    // If task is being completed and is billable, show billing dialog
+    if (isBeingCompleted && linkedContactId && isBillable) {
+      setPendingTaskUpdate(updateData);
+      setIsBillingDialogOpen(true);
+      // Pre-fill amount if task has a billingAmount
+      if (editForm.billingAmount) {
+        setBillingSubmissionAmount(editForm.billingAmount);
+      }
+      return; // Don't save yet - let user decide on billing
+    }
+
     console.log("Sending update data:", updateData);
     updateTaskMutation.mutate(updateData);
   };
@@ -509,6 +570,41 @@ export default function TaskProfile() {
   const handleCancel = () => {
     setIsEditModalOpen(false);
     // Form will be reset by useEffect when modal reopens
+  };
+
+  const handleSubmitForBilling = () => {
+    const amount = parseFloat(billingSubmissionAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a valid billing amount greater than 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Create billing submission
+    createBillingSubmissionMutation.mutate({
+      clientId: linkedContactId,
+      amountCents: Math.round(amount * 100),
+      description: `Completed Task: ${editForm.title}`,
+    });
+
+    // Also update the task status to completed
+    if (pendingTaskUpdate) {
+      updateTaskMutation.mutate(pendingTaskUpdate);
+      setPendingTaskUpdate(null);
+    }
+  };
+
+  const handleCompleteWithoutBilling = () => {
+    // Just update the task without creating billing submission
+    if (pendingTaskUpdate) {
+      updateTaskMutation.mutate(pendingTaskUpdate);
+      setPendingTaskUpdate(null);
+    }
+    setIsBillingDialogOpen(false);
+    setBillingSubmissionAmount("");
   };
 
   const handleTemplateSelect = (templateId: string) => {
@@ -2100,6 +2196,79 @@ export default function TaskProfile() {
               data-testid="button-confirm-delete"
             >
               {deleteTaskMutation.isPending ? "Deleting..." : "Delete Task"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Billing Submission Dialog */}
+      <Dialog open={isBillingDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setIsBillingDialogOpen(false);
+          setBillingSubmissionAmount("");
+          setPendingTaskUpdate(null);
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2 text-green-600">
+              <CheckSquare className="w-5 h-5" />
+              <span>Task Completed - Submit for Billing?</span>
+            </DialogTitle>
+            <DialogDescription>
+              This task is marked as billable. Would you like to submit it for billing review?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-900">
+                <strong>Task:</strong> {editForm.title}
+              </p>
+              {linkedClient && (
+                <p className="text-sm text-blue-900 mt-1">
+                  <strong>Client:</strong> {(linkedClient as any).firstName} {(linkedClient as any).lastName}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="billing-amount" className="text-sm font-medium">
+                Billing Amount (USD) *
+              </Label>
+              <div className="flex items-center space-x-2 mt-2">
+                <span className="text-lg text-slate-600">$</span>
+                <Input
+                  id="billing-amount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={billingSubmissionAmount}
+                  onChange={(e) => setBillingSubmissionAmount(e.target.value)}
+                  placeholder="0.00"
+                  data-testid="input-billing-amount"
+                />
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Enter the amount to bill for this completed task
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={handleCompleteWithoutBilling}
+              data-testid="button-complete-without-billing"
+            >
+              Complete Without Billing
+            </Button>
+            <Button
+              onClick={handleSubmitForBilling}
+              disabled={createBillingSubmissionMutation.isPending || !billingSubmissionAmount}
+              data-testid="button-submit-for-billing"
+            >
+              {createBillingSubmissionMutation.isPending ? "Submitting..." : "Submit for Billing"}
             </Button>
           </DialogFooter>
         </DialogContent>
