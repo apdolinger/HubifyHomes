@@ -584,6 +584,21 @@ const uploadInvoice = multer({
   }
 });
 
+// Memory storage for object storage uploads
+const uploadToMemory = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
+
 // Context-based form submission handler
 async function onFormSubmit(formData: any, formSchema: any, storage: any) {
   const contexts = formSchema.contexts || ['people'];
@@ -754,6 +769,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   });
   app.use('/uploads', express.static('uploads'));
+
+  // Generic file upload endpoint for object storage
+  app.post('/api/upload', isAuthenticated, uploadToMemory.array('files', 10), async (req: any, res) => {
+    try {
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ message: 'No files provided' });
+      }
+
+      const directory = req.body.directory || 'public';
+      
+      // Parse bucket name from directory path (format: /bucket-name/path/to/file or bucket-name/path)
+      const dirPath = directory.startsWith('/') ? directory : `/${directory}`;
+      const pathParts = dirPath.split('/').filter(p => p);
+      
+      if (pathParts.length === 0) {
+        return res.status(400).json({ message: 'Invalid directory path' });
+      }
+
+      // Use the private object dir to get the bucket name
+      const privateDir = process.env.PRIVATE_OBJECT_DIR || '';
+      const privateDirParts = privateDir.split('/').filter(p => p);
+      const bucketName = privateDirParts[0] || 'repl-default-bucket';
+      
+      const { objectStorageClient } = await import("./objectStorage");
+      const bucket = objectStorageClient.bucket(bucketName);
+      const uploadedUrls: string[] = [];
+
+      for (const file of req.files) {
+        // Generate unique filename
+        const timestamp = Date.now();
+        const randomStr = Math.random().toString(36).substring(7);
+        const ext = path.extname(file.originalname);
+        const filename = `${timestamp}-${randomStr}${ext}`;
+        
+        // Build the full object path (without leading bucket name)
+        const objectPath = `${directory.replace(/^\//, '')}/${filename}`;
+
+        // Upload to object storage
+        const gcsFile = bucket.file(objectPath);
+        await gcsFile.save(file.buffer, {
+          contentType: file.mimetype,
+          metadata: {
+            originalName: file.originalname,
+            uploadedAt: new Date().toISOString(),
+          }
+        });
+
+        // Make the file publicly accessible
+        await gcsFile.makePublic();
+
+        // Get the public URL
+        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${objectPath}`;
+        uploadedUrls.push(publicUrl);
+      }
+
+      res.json({ urls: uploadedUrls });
+    } catch (error) {
+      console.error('Upload error:', error);
+      res.status(500).json({ message: 'Failed to upload files' });
+    }
+  });
 
   // Development route to create a test user
   app.post('/api/dev/login', async (req, res) => {
