@@ -65,12 +65,10 @@ export function generateInvoicePDF(invoiceData: InvoiceData, res: Response) {
   
   // Header section with gradient background
   const headerHeight = 120;
-  doc.rect(0, 0, doc.page.width, headerHeight)
-     .linearGradient(0, 0, doc.page.width, 0, {
-       '0': primaryColor,
-       '1': secondaryColor
-     })
-     .fill();
+  const gradient = doc.linearGradient(0, 0, doc.page.width, 0);
+  gradient.stop(0, primaryColor);
+  gradient.stop(1, secondaryColor);
+  doc.rect(0, 0, doc.page.width, headerHeight).fill(gradient);
   
   // Organization logo (if available)
   if (invoiceData.organizationLogo) {
