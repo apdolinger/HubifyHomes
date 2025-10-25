@@ -47,6 +47,8 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [editSubmissionId, setEditSubmissionId] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [submissionToReject, setSubmissionToReject] = useState<any>(null);
 
   // Fetch billing submissions
   const { data: submissions, isLoading: submissionsLoading } = useQuery({
@@ -93,7 +95,8 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
         title: "Submission rejected",
         description: "The billing submission has been rejected.",
       });
-      setSelectedSubmission(null);
+      setSubmissionToReject(null);
+      setRejectDialogOpen(false);
       setRejectionReason("");
     },
     onError: (error: any) => {
@@ -161,7 +164,8 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
       });
       return;
     }
-    rejectMutation.mutate({ submissionId: selectedSubmission.id, reason: rejectionReason });
+    if (!submissionToReject) return;
+    rejectMutation.mutate({ submissionId: submissionToReject.id, reason: rejectionReason });
   };
 
   const filteredSubmissions = (submissions as any[] || []).filter((submission: any) => {
@@ -282,7 +286,10 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
                     <div
                       key={submission.id}
                       className="flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                      onClick={() => setSelectedSubmission(submission)}
+                      onClick={() => {
+                        setEditSubmissionId(submission.id);
+                        setEditDialogOpen(true);
+                      }}
                       data-testid={`submission-${submission.id}`}
                     >
                       <div className="flex-1">
@@ -360,7 +367,8 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
                             className="text-red-600 hover:text-red-700 hover:bg-red-50"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedSubmission(submission);
+                              setSubmissionToReject(submission);
+                              setRejectDialogOpen(true);
                             }}
                             data-testid={`button-reject-${submission.id}`}
                           >
@@ -386,83 +394,71 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
         </TabsContent>
       </Tabs>
 
-      {/* Submission Details/Reject Modal */}
-      <Dialog open={!!selectedSubmission} onOpenChange={(open) => !open && setSelectedSubmission(null)}>
-        <DialogContent data-testid="dialog-submission-details">
+      {/* Reject Submission Dialog */}
+      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <DialogContent data-testid="dialog-reject-submission">
           <DialogHeader>
-            <DialogTitle>Billing Submission Details</DialogTitle>
+            <DialogTitle>Reject Billing Submission</DialogTitle>
             <DialogDescription>
-              Review submission details and take action
+              Provide a reason for rejecting this billing submission
             </DialogDescription>
           </DialogHeader>
-          {selectedSubmission && (
+          {submissionToReject && (
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium">Description</label>
-                <p className="text-sm text-slate-700">{selectedSubmission.description}</p>
+                <label className="text-sm font-medium">Submission</label>
+                <p className="text-sm text-slate-700">{submissionToReject.description}</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium">Amount</label>
-                  <p className="text-sm text-slate-700">${(selectedSubmission.amountCents / 100).toFixed(2)}</p>
+                  <p className="text-sm text-slate-700">${(submissionToReject.amountCents / 100).toFixed(2)}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Quantity</label>
-                  <p className="text-sm text-slate-700">{selectedSubmission.quantity}</p>
+                  <label className="text-sm font-medium">Client</label>
+                  <p className="text-sm text-slate-700">{submissionToReject.client?.firstName} {submissionToReject.client?.lastName}</p>
                 </div>
               </div>
               <div>
-                <label className="text-sm font-medium">Source Type</label>
-                <p className="text-sm text-slate-700">{selectedSubmission.sourceType}</p>
+                <label className="text-sm font-medium mb-2 block">Rejection Reason</label>
+                <Textarea
+                  placeholder="Enter reason for rejection..."
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  rows={3}
+                  data-testid="textarea-rejection-reason"
+                />
               </div>
-              <div>
-                <label className="text-sm font-medium">Status</label>
-                <Badge variant={
-                  selectedSubmission.status === "pending" ? "secondary" :
-                  selectedSubmission.status === "authorized" ? "default" :
-                  "destructive"
-                }>
-                  {selectedSubmission.status}
-                </Badge>
-              </div>
-              {selectedSubmission.status === "pending" && (
-                <>
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Rejection Reason (optional)</label>
-                    <Textarea
-                      placeholder="Enter reason for rejection..."
-                      value={rejectionReason}
-                      onChange={(e) => setRejectionReason(e.target.value)}
-                      rows={3}
-                      data-testid="textarea-rejection-reason"
-                    />
-                  </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setSelectedSubmission(null)}>
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="text-green-600 hover:text-green-700"
-                      onClick={() => authorizeMutation.mutate(selectedSubmission.id)}
-                      disabled={authorizeMutation.isPending}
-                      data-testid="button-authorize-submission"
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Authorize
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={handleReject}
-                      disabled={rejectMutation.isPending}
-                      data-testid="button-reject-submission"
-                    >
+              <DialogFooter>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setRejectDialogOpen(false);
+                    setRejectionReason("");
+                  }}
+                  data-testid="button-cancel-reject"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleReject}
+                  disabled={rejectMutation.isPending}
+                  data-testid="button-confirm-reject"
+                >
+                  {rejectMutation.isPending ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      Rejecting...
+                    </>
+                  ) : (
+                    <>
                       <XCircle className="w-4 h-4 mr-2" />
-                      Reject
-                    </Button>
-                  </DialogFooter>
-                </>
-              )}
+                      Reject Submission
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
             </div>
           )}
         </DialogContent>
