@@ -36,6 +36,11 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  
+  const [sendInvoiceDialogOpen, setSendInvoiceDialogOpen] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [recipientEmail, setRecipientEmail] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
 
   // Fetch billing submissions
   const { data: submissions, isLoading: submissionsLoading } = useQuery({
@@ -104,6 +109,94 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
       return;
     }
     rejectMutation.mutate({ submissionId: selectedSubmission.id, reason: rejectionReason });
+  };
+
+  const sendInvoiceMutation = useMutation({
+    mutationFn: async ({ invoiceId, email, message }: { invoiceId: string; email: string; message?: string }) => {
+      const user = await queryClient.fetchQuery({ queryKey: ["/api/auth/user"] }) as any;
+      const orgId = user.orgId;
+      return apiRequest("POST", `/api/orgs/${orgId}/client-invoices/${invoiceId}/send`, {
+        recipientEmail: email,
+        message: message || undefined
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/client-invoices"] });
+      toast({
+        title: "Invoice sent",
+        description: "The invoice has been sent successfully.",
+      });
+      setSendInvoiceDialogOpen(false);
+      setSelectedInvoice(null);
+      setRecipientEmail("");
+      setEmailMessage("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to send invoice",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSendInvoice = (invoice: any) => {
+    setSelectedInvoice(invoice);
+    setRecipientEmail(invoice.client?.email || "");
+    setSendInvoiceDialogOpen(true);
+  };
+
+  const handleConfirmSend = () => {
+    if (!recipientEmail.trim()) {
+      toast({
+        title: "Email required",
+        description: "Please provide a recipient email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+    sendInvoiceMutation.mutate({
+      invoiceId: selectedInvoice.id,
+      email: recipientEmail,
+      message: emailMessage,
+    });
+  };
+
+  const handleGeneratePDF = async (invoice: any) => {
+    try {
+      const user = await queryClient.fetchQuery({ queryKey: ["/api/auth/user"] }) as any;
+      const orgId = user.orgId;
+      
+      const response = await fetch(`/api/orgs/${orgId}/client-invoices/${invoice.id}/generate-pdf`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-${invoice.invoiceNumber || invoice.id.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "PDF generated",
+        description: "Invoice PDF downloaded successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Failed to generate PDF",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const filteredSubmissions = (submissions as any[] || []).filter((submission: any) => {
@@ -683,12 +776,24 @@ function InvoicesTab() {
                       <Eye className="w-4 h-4 mr-1" />
                       View
                     </Button>
-                    {invoice.pdfStorageKey && (
-                      <Button size="sm" variant="outline" data-testid={`button-download-invoice-${invoice.id}`}>
-                        <Download className="w-4 h-4 mr-1" />
-                        Download
-                      </Button>
-                    )}
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => handleGeneratePDF(invoice)}
+                      data-testid={`button-generate-pdf-${invoice.id}`}
+                    >
+                      <Download className="w-4 h-4 mr-1" />
+                      PDF
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="default"
+                      onClick={() => handleSendInvoice(invoice)}
+                      data-testid={`button-send-invoice-${invoice.id}`}
+                    >
+                      <Send className="w-4 h-4 mr-1" />
+                      Send
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -696,6 +801,65 @@ function InvoicesTab() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={sendInvoiceDialogOpen} onOpenChange={setSendInvoiceDialogOpen}>
+        <DialogContent data-testid="dialog-send-invoice">
+          <DialogHeader>
+            <DialogTitle>Send Invoice</DialogTitle>
+            <DialogDescription>
+              Send invoice #{selectedInvoice?.invoiceNumber || selectedInvoice?.id?.slice(0, 8)} to the client via email.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Recipient Email</label>
+              <Input
+                type="email"
+                placeholder="client@example.com"
+                value={recipientEmail}
+                onChange={(e) => setRecipientEmail(e.target.value)}
+                data-testid="input-recipient-email"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Message (Optional)</label>
+              <Textarea
+                placeholder="Add a personal message to include in the email..."
+                value={emailMessage}
+                onChange={(e) => setEmailMessage(e.target.value)}
+                rows={4}
+                data-testid="textarea-email-message"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSendInvoiceDialogOpen(false)}
+              data-testid="button-cancel-send"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmSend}
+              disabled={sendInvoiceMutation.isPending}
+              data-testid="button-confirm-send"
+            >
+              {sendInvoiceMutation.isPending ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 mr-2" />
+                  Send Invoice
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
