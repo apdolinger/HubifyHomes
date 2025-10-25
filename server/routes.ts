@@ -7627,6 +7627,182 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/orgs/:orgId/client-invoices/:id/generate-pdf", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, id } = req.params;
+      
+      // Verify user belongs to org
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const invoice = await storage.getClientInvoice(orgId, id);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      const client = await storage.getClient(invoice.clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      const org = await storage.getOrg(orgId);
+      if (!org) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+
+      const submissions = await storage.getBillingSubmissionsByInvoice(invoice.id);
+      
+      const lineItems = submissions.map((submission: any) => ({
+        description: submission.description || `${submission.sourceType} - ${submission.sourceId}`,
+        quantity: 1,
+        unitPrice: submission.amountCents,
+        total: submission.amountCents
+      }));
+
+      const invoiceData = {
+        invoiceNumber: invoice.invoiceNumber || `INV-${invoice.id.slice(0, 8)}`,
+        invoiceDate: invoice.invoiceDate || invoice.createdAt || new Date(),
+        dueDate: invoice.dueDate,
+        
+        organizationName: org.name,
+        organizationAddress: org.address,
+        organizationPhone: org.phone,
+        organizationEmail: org.email,
+        organizationLogo: org.branding?.logo,
+        
+        clientName: `${client.firstName} ${client.lastName}`,
+        clientEmail: client.email || undefined,
+        clientAddress: client.address || undefined,
+        clientPhone: client.phone || undefined,
+        
+        lineItems,
+        
+        subtotal: invoice.subtotalCents,
+        taxRate: invoice.taxRate || undefined,
+        taxAmount: invoice.taxCents || undefined,
+        total: invoice.totalCents,
+        amountPaid: invoice.paidCents || 0,
+        amountDue: invoice.totalCents - (invoice.paidCents || 0),
+        
+        notes: invoice.notes || undefined,
+        paymentTerms: invoice.paymentTerms || undefined,
+        currency: invoice.currency || 'usd',
+        
+        primaryColor: org.branding?.primaryColor,
+        secondaryColor: org.branding?.secondaryColor,
+      };
+
+      const { generateInvoicePDF } = await import('./invoiceUtils.js');
+      generateInvoicePDF(invoiceData, res);
+
+    } catch (error) {
+      console.error("Error generating invoice PDF:", error);
+      res.status(500).json({ message: "Failed to generate PDF" });
+    }
+  });
+
+  app.post("/api/orgs/:orgId/client-invoices/:id/send", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId, id } = req.params;
+      const { recipientEmail, recipientName, message } = req.body;
+      
+      // Verify user belongs to org
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      if (!SENDGRID_API_KEY) {
+        return res.status(500).json({ message: "Email service not configured. Please set SENDGRID_API_KEY." });
+      }
+
+      const invoice = await storage.getClientInvoice(orgId, id);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      const client = await storage.getClient(invoice.clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      const org = await storage.getOrg(orgId);
+      if (!org) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+
+      const emailTo = recipientEmail || client.email;
+      if (!emailTo) {
+        return res.status(400).json({ message: "No email address provided or found for client" });
+      }
+
+      const clientName = recipientName || `${client.firstName} ${client.lastName}`;
+      
+      const invoiceEmailData = {
+        invoiceNumber: invoice.invoiceNumber || `INV-${invoice.id.slice(0, 8)}`,
+        invoiceDate: invoice.invoiceDate || invoice.createdAt || new Date(),
+        dueDate: invoice.dueDate,
+        total: invoice.totalCents,
+        amountDue: invoice.totalCents - (invoice.paidCents || 0),
+        currency: invoice.currency || 'usd',
+        clientName,
+        organizationName: org.name,
+        organizationBranding: org.branding,
+        paymentUrl: invoice.paymentUrl || undefined,
+        notes: message || invoice.notes || undefined,
+      };
+
+      const { generateInvoiceEmailHTML } = await import('./emailUtils.js');
+      const htmlContent = generateInvoiceEmailHTML(invoiceEmailData);
+
+      let pdfBuffer: Buffer | undefined;
+      if (invoice.pdfStorageKey) {
+        const objectStorage = new ObjectStorageService();
+        const signedUrl = await objectStorage.getSignedUrl(invoice.pdfStorageKey, 60);
+        
+        const response = await fetch(signedUrl);
+        if (response.ok) {
+          const arrayBuffer = await response.arrayBuffer();
+          pdfBuffer = Buffer.from(arrayBuffer);
+        }
+      }
+
+      const mailData: any = {
+        to: emailTo,
+        from: process.env.SENDGRID_FROM_EMAIL || "noreply@hubify.com",
+        subject: `Invoice ${invoiceEmailData.invoiceNumber} from ${org.name}`,
+        html: htmlContent,
+      };
+
+      if (pdfBuffer) {
+        mailData.attachments = [
+          {
+            content: pdfBuffer.toString('base64'),
+            filename: `invoice-${invoiceEmailData.invoiceNumber}.pdf`,
+            type: 'application/pdf',
+            disposition: 'attachment',
+          },
+        ];
+      }
+
+      await sgMail.send(mailData);
+      
+      await storage.updateClientInvoice(orgId, id, { 
+        status: invoice.status === 'draft' ? 'open' : invoice.status,
+        sentAt: new Date(),
+      });
+
+      res.json({ 
+        message: "Invoice sent successfully",
+        sentTo: emailTo
+      });
+
+    } catch (error) {
+      console.error("Error sending invoice:", error);
+      res.status(500).json({ message: "Failed to send invoice" });
+    }
+  });
+
   // CSV Import history endpoint
   app.get("/api/admin/import/history", isAuthenticated, async (req, res) => {
     try {

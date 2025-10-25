@@ -410,3 +410,289 @@ export async function sendEventInvitationEmail(
     throw error;
   }
 }
+
+interface InvoiceEmailData {
+  invoiceNumber: string;
+  invoiceDate: Date;
+  dueDate: Date | null;
+  total: number;
+  amountDue: number;
+  currency: string;
+  clientName: string;
+  organizationName: string;
+  organizationBranding?: OrgBranding;
+  paymentUrl?: string;
+  notes?: string;
+}
+
+export function generateInvoiceEmailHTML(data: InvoiceEmailData): string {
+  const {
+    invoiceNumber,
+    invoiceDate,
+    dueDate,
+    total,
+    amountDue,
+    currency,
+    clientName,
+    organizationName,
+    organizationBranding = {},
+    paymentUrl,
+    notes,
+  } = data;
+
+  const primaryColor = organizationBranding.primaryColor || '#667eea';
+  const secondaryColor = organizationBranding.secondaryColor || '#764ba2';
+  const logo = organizationBranding.logo;
+
+  const formatCurrency = (amount: number, curr: string): string => {
+    const formatter = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: curr.toUpperCase(),
+    });
+    return formatter.format(amount / 100);
+  };
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoice ${invoiceNumber}</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background-color: #f5f5f5;
+      color: #333333;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+    }
+    .header {
+      background: linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%);
+      padding: 40px 20px;
+      text-align: center;
+    }
+    .logo {
+      max-width: 200px;
+      max-height: 80px;
+      margin-bottom: 20px;
+    }
+    .header-text {
+      color: #ffffff;
+      font-size: 28px;
+      font-weight: 600;
+      margin: 0;
+    }
+    .invoice-number {
+      color: #ffffff;
+      font-size: 16px;
+      margin: 10px 0 0 0;
+      opacity: 0.9;
+    }
+    .content {
+      padding: 40px 30px;
+    }
+    .greeting {
+      font-size: 16px;
+      color: #333333;
+      margin-bottom: 20px;
+    }
+    .invoice-details {
+      background-color: #f8f9fa;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 25px 0;
+    }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+    .detail-label {
+      color: #666666;
+      font-weight: 500;
+    }
+    .detail-value {
+      color: #000000;
+      font-weight: 600;
+    }
+    .total-row {
+      border-top: 2px solid #e0e0e0;
+      padding-top: 12px;
+      margin-top: 12px;
+      font-size: 18px;
+    }
+    .total-row .detail-value {
+      color: ${primaryColor};
+      font-size: 20px;
+    }
+    .amount-due {
+      background: linear-gradient(135deg, ${primaryColor}15 0%, ${secondaryColor}15 100%);
+      border-left: 4px solid ${primaryColor};
+      border-radius: 6px;
+      padding: 15px 20px;
+      margin: 25px 0;
+      text-align: center;
+    }
+    .amount-due-label {
+      font-size: 14px;
+      color: #666666;
+      margin-bottom: 5px;
+    }
+    .amount-due-value {
+      font-size: 32px;
+      font-weight: bold;
+      color: ${primaryColor};
+      margin: 0;
+    }
+    .due-date-notice {
+      background-color: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 6px;
+      padding: 15px;
+      margin: 20px 0;
+      font-size: 14px;
+      color: #856404;
+    }
+    .cta-button {
+      display: inline-block;
+      background: linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%);
+      color: #ffffff !important;
+      text-decoration: none;
+      padding: 14px 32px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 16px;
+      margin: 20px 0;
+      text-align: center;
+    }
+    .notes {
+      background-color: #f8f9fa;
+      border-radius: 6px;
+      padding: 15px;
+      margin: 25px 0;
+      font-size: 14px;
+      color: #666666;
+    }
+    .notes-title {
+      font-weight: 600;
+      color: #333333;
+      margin-bottom: 8px;
+    }
+    .footer {
+      background-color: #f8f9fa;
+      padding: 30px;
+      text-align: center;
+      color: #999999;
+      font-size: 13px;
+    }
+    .divider {
+      height: 2px;
+      background: linear-gradient(to right, transparent, ${primaryColor}30, transparent);
+      margin: 30px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      ${logo ? `<img src="${logo}" alt="${organizationName}" class="logo">` : ''}
+      <h1 class="header-text">Invoice</h1>
+      <p class="invoice-number">#${invoiceNumber}</p>
+    </div>
+    
+    <!-- Content -->
+    <div class="content">
+      <p class="greeting">Dear ${clientName},</p>
+      
+      <p style="font-size: 15px; color: #666666; line-height: 1.6;">
+        Thank you for your business! Please find your invoice details below. 
+        ${dueDate ? `Payment is due by <strong>${dueDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</strong>.` : ''}
+      </p>
+      
+      <!-- Invoice Details -->
+      <div class="invoice-details">
+        <div class="detail-row">
+          <span class="detail-label">Invoice Number:</span>
+          <span class="detail-value">${invoiceNumber}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Invoice Date:</span>
+          <span class="detail-value">${invoiceDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+        </div>
+        ${dueDate ? `
+        <div class="detail-row">
+          <span class="detail-label">Due Date:</span>
+          <span class="detail-value">${dueDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+        </div>
+        ` : ''}
+        <div class="detail-row total-row">
+          <span class="detail-label">Total Amount:</span>
+          <span class="detail-value">${formatCurrency(total, currency)}</span>
+        </div>
+      </div>
+      
+      <!-- Amount Due -->
+      ${amountDue > 0 ? `
+      <div class="amount-due">
+        <div class="amount-due-label">Amount Due</div>
+        <div class="amount-due-value">${formatCurrency(amountDue, currency)}</div>
+      </div>
+      ` : `
+      <div style="text-align: center; padding: 20px; color: #22c55e; font-size: 16px; font-weight: 600;">
+        ✓ This invoice has been paid in full
+      </div>
+      `}
+      
+      <!-- Due Date Notice -->
+      ${dueDate && amountDue > 0 ? `
+      <div class="due-date-notice">
+        <strong>⏰ Payment Reminder:</strong> Please ensure payment is received by ${dueDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} to avoid late fees.
+      </div>
+      ` : ''}
+      
+      <!-- Payment Button -->
+      ${paymentUrl && amountDue > 0 ? `
+      <div style="text-align: center;">
+        <a href="${paymentUrl}" class="cta-button">Pay Now</a>
+      </div>
+      ` : ''}
+      
+      <div class="divider"></div>
+      
+      <!-- Notes -->
+      ${notes ? `
+      <div class="notes">
+        <div class="notes-title">Additional Notes:</div>
+        <div>${notes}</div>
+      </div>
+      ` : ''}
+      
+      <p style="font-size: 14px; color: #666666; margin-top: 30px;">
+        The attached PDF contains the complete invoice details including itemized charges.
+        If you have any questions about this invoice, please contact us.
+      </p>
+      
+      <p style="font-size: 14px; color: #666666; margin-top: 20px;">
+        Thank you for your business!<br>
+        <strong>${organizationName}</strong>
+      </p>
+    </div>
+    
+    <!-- Footer -->
+    <div class="footer">
+      <p style="margin: 0 0 10px 0;">This is an automated invoice notification from ${organizationName}</p>
+      <p style="margin: 0;">Please do not reply directly to this email.</p>
+    </div>
+  </div>
+</body>
+</html>
+`;
+}

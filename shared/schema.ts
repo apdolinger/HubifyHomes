@@ -190,6 +190,7 @@ export const clientInvoices = pgTable("client_invoices", {
   // Dates
   dueDate: timestamp("due_date"),
   issuedAt: timestamp("issued_at"),
+  sentAt: timestamp("sent_at"), // When invoice was sent to client
   
   // Links and storage
   hostedInvoiceUrl: text("hosted_invoice_url"),

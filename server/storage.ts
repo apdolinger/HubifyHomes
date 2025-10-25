@@ -223,6 +223,7 @@ export interface IStorage {
   createBillingSubmission(submission: InsertBillingSubmission): Promise<BillingSubmission>;
   getBillingSubmissions(orgId: string, filters?: { status?: string; clientId?: string }): Promise<BillingSubmission[]>;
   getBillingSubmissionsByClient(clientId: string): Promise<BillingSubmission[]>;
+  getBillingSubmissionsByInvoice(invoiceId: string): Promise<BillingSubmission[]>;
   getBillingSubmission(id: string): Promise<BillingSubmission | undefined>;
   authorizeBillingSubmission(id: string, authorizedBy: string): Promise<BillingSubmission>;
   rejectBillingSubmission(id: string, rejectionReason: string): Promise<BillingSubmission>;
@@ -876,6 +877,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(billingSubmissions)
       .where(eq(billingSubmissions.clientId, clientId))
+      .orderBy(desc(billingSubmissions.createdAt));
+  }
+
+  async getBillingSubmissionsByInvoice(invoiceId: string): Promise<BillingSubmission[]> {
+    return await db
+      .select()
+      .from(billingSubmissions)
+      .where(eq(billingSubmissions.invoiceId, invoiceId))
       .orderBy(desc(billingSubmissions.createdAt));
   }
 
