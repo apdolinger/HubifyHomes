@@ -8256,6 +8256,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/billing-submissions", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      // Validate the request data first
+      const validatedData = insertBillingSubmissionSchema.parse({
+        ...req.body,
+        orgId: user.orgId,
+      });
+
+      // CRITICAL: Verify that the client belongs to the user's organization
+      const client = await storage.getClient(validatedData.clientId);
+      if (!client || client.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      // If source is a task, verify the task belongs to the same org via property or contact
+      if (validatedData.sourceType === 'task') {
+        const task = await storage.getTask(parseInt(validatedData.sourceId));
+        if (!task) {
+          return res.status(404).json({ message: "Task not found" });
+        }
+
+        // Verify task belongs to user's org through property, contact, or direct client relationship
+        let taskBelongsToOrg = false;
+
+        // Path 1: Verify via direct clientId if task has it
+        if ((task as any).clientId) {
+          const taskClient = await storage.getClient((task as any).clientId);
+          if (taskClient && taskClient.orgId === user.orgId) {
+            taskBelongsToOrg = true;
+          }
+        }
+
+        // Path 2: Verify via property if task has propertyId
+        if (!taskBelongsToOrg && task.propertyId) {
+          const property = await storage.getProperty(task.propertyId);
+          if (property && (property as any).orgId === user.orgId) {
+            taskBelongsToOrg = true;
+          }
+        }
+
+        // Path 3: Verify via contact → client if task has contactId
+        if (!taskBelongsToOrg && task.contactId) {
+          const contact = await storage.getContact(task.contactId);
+          if (contact && (contact as any).accountId) {
+            const contactClient = await storage.getClient((contact as any).accountId);
+            if (contactClient && contactClient.orgId === user.orgId) {
+              taskBelongsToOrg = true;
+            }
+          }
+        }
+
+        if (!taskBelongsToOrg) {
+          return res.status(404).json({ message: "Task not found" });
+        }
+      }
+
+      const submission = await storage.createBillingSubmission(validatedData);
+      res.status(201).json(submission);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating billing submission:", error);
+      res.status(500).json({ message: "Failed to create billing submission" });
+    }
+  });
+
   app.post("/api/billing-submissions/:id/authorize", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub || req.user?.id;

@@ -302,8 +302,19 @@ export default function TaskProfile() {
     enabled: isAuthenticated && !!(task as any)?.propertyId,
   });
 
+  // Fetch contact details if task has contactId (to get accountId)
+  const taskContactId = (task as any)?.contactId;
+  const { data: taskContact } = useQuery({
+    queryKey: [`/api/contacts/${taskContactId}`],
+    enabled: isAuthenticated && !!taskContactId,
+  });
+
+  // Get linkedClientId from either task.clientId (direct) or contact.accountId (via contact)
+  const directClientId = (task as any)?.clientId;
+  const contactAccountId = (taskContact as any)?.accountId;
+  const linkedClientId = directClientId || contactAccountId;
+  
   // Fetch client details for billing check (if task has a linked client)
-  const linkedClientId = (task as any)?.clientId;
   const { data: linkedClient } = useQuery({
     queryKey: [`/api/clients/${linkedClientId}`],
     enabled: isAuthenticated && !!linkedClientId,
