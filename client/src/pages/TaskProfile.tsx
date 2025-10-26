@@ -89,9 +89,10 @@ export default function TaskProfile() {
     sortOrder: number;
   }>>([]);
   const [attachments, setAttachments] = useState<Array<{id: string, name: string, size: string, type: string}>>([]);
-  const [photoAttachments, setPhotoAttachments] = useState<Array<{url: string, filename: string}>>([]);
+  const [photoAttachments, setPhotoAttachments] = useState<Array<{url: string, filename: string, category?: 'before' | 'after' | null}>>([]);
   const [isDragOverPhotos, setIsDragOverPhotos] = useState(false);
   const [isPhotoUploading, setIsPhotoUploading] = useState(false);
+  const [beforeAfterMode, setBeforeAfterMode] = useState(false);
   const [quickLinks, setQuickLinks] = useState<Array<{id: string, label: string, url: string}>>([]);
   const [newQuickLink, setNewQuickLink] = useState({label: "", url: ""});
   const [comments, setComments] = useState<Array<{id: string, text: string, author: string, timestamp: string}>>([]);
@@ -846,7 +847,7 @@ export default function TaskProfile() {
     setIsPhotoUploading(true);
 
     try {
-      const uploadedPhotos: Array<{url: string, filename: string}> = [];
+      const uploadedPhotos: Array<{url: string, filename: string, category?: 'before' | 'after' | null}> = [];
 
       for (const file of validFiles) {
         const formData = new FormData();
@@ -867,7 +868,8 @@ export default function TaskProfile() {
         if (uploadData.urls && uploadData.urls.length > 0) {
           uploadedPhotos.push({
             url: uploadData.urls[0],
-            filename: file.name
+            filename: file.name,
+            category: null
           });
         }
       }
@@ -923,6 +925,12 @@ export default function TaskProfile() {
       title: "Photo Removed",
       description: "Attachment has been removed",
     });
+  };
+
+  const updatePhotoCategory = (index: number, category: 'before' | 'after' | null) => {
+    setPhotoAttachments(prev => prev.map((photo, i) => 
+      i === index ? { ...photo, category } : photo
+    ));
   };
 
   // Create property mutation
@@ -1592,6 +1600,24 @@ export default function TaskProfile() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
+                    {/* Before/After Mode Toggle */}
+                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <div className="flex items-center space-x-2">
+                        <Label htmlFor="before-after-mode" className="text-sm font-medium cursor-pointer">
+                          Before/After Photo Mode
+                        </Label>
+                        <p className="text-xs text-slate-500">
+                          Categorize photos for side-by-side comparison
+                        </p>
+                      </div>
+                      <Switch
+                        id="before-after-mode"
+                        checked={beforeAfterMode}
+                        onCheckedChange={setBeforeAfterMode}
+                        data-testid="switch-before-after-mode"
+                      />
+                    </div>
+
                     {/* Upload Area */}
                     <div
                       className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
@@ -1647,38 +1673,173 @@ export default function TaskProfile() {
 
                     {/* Display Uploaded Photos */}
                     {photoAttachments.length > 0 && (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        {photoAttachments.map((attachment, index) => (
-                          <div
-                            key={index}
-                            className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200 hover:border-slate-300 transition-colors"
-                            data-testid={`photo-attachment-${index}`}
-                          >
-                            <img
-                              src={attachment.url}
-                              alt={attachment.filename}
-                              className="w-full h-full object-cover"
-                            />
-                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center">
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                className="opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={() => removePhotoAttachment(index)}
-                                data-testid={`button-remove-photo-${index}`}
-                              >
-                                <Trash2 className="w-4 h-4 mr-1" />
-                                Remove
-                              </Button>
+                      <>
+                        {beforeAfterMode ? (
+                          /* Before/After Comparison View */
+                          <div className="space-y-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                              {/* Before Photos Column */}
+                              <div>
+                                <h3 className="font-medium text-sm text-slate-700 mb-3 flex items-center">
+                                  <span className="inline-block w-3 h-3 bg-amber-500 rounded-full mr-2"></span>
+                                  Before Photos ({photoAttachments.filter(p => p.category === 'before').length})
+                                </h3>
+                                <div className="grid grid-cols-2 gap-3">
+                                  {photoAttachments.filter(p => p.category === 'before').map((attachment, index) => (
+                                    <div
+                                      key={index}
+                                      className="relative group aspect-square rounded-lg overflow-hidden border-2 border-amber-200"
+                                      data-testid={`photo-before-${index}`}
+                                    >
+                                      <img
+                                        src={attachment.url}
+                                        alt={attachment.filename}
+                                        className="w-full h-full object-cover"
+                                      />
+                                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center">
+                                        <Button
+                                          variant="destructive"
+                                          size="sm"
+                                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                          onClick={() => removePhotoAttachment(photoAttachments.indexOf(attachment))}
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* After Photos Column */}
+                              <div>
+                                <h3 className="font-medium text-sm text-slate-700 mb-3 flex items-center">
+                                  <span className="inline-block w-3 h-3 bg-green-500 rounded-full mr-2"></span>
+                                  After Photos ({photoAttachments.filter(p => p.category === 'after').length})
+                                </h3>
+                                <div className="grid grid-cols-2 gap-3">
+                                  {photoAttachments.filter(p => p.category === 'after').map((attachment, index) => (
+                                    <div
+                                      key={index}
+                                      className="relative group aspect-square rounded-lg overflow-hidden border-2 border-green-200"
+                                      data-testid={`photo-after-${index}`}
+                                    >
+                                      <img
+                                        src={attachment.url}
+                                        alt={attachment.filename}
+                                        className="w-full h-full object-cover"
+                                      />
+                                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center">
+                                        <Button
+                                          variant="destructive"
+                                          size="sm"
+                                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                          onClick={() => removePhotoAttachment(photoAttachments.indexOf(attachment))}
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
                             </div>
-                            <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 px-2 py-1">
-                              <p className="text-xs text-white truncate" title={attachment.filename}>
-                                {attachment.filename}
-                              </p>
-                            </div>
+
+                            {/* Uncategorized Photos */}
+                            {photoAttachments.filter(p => !p.category || p.category === null).length > 0 && (
+                              <div>
+                                <h3 className="font-medium text-sm text-slate-700 mb-3">
+                                  Uncategorized ({photoAttachments.filter(p => !p.category || p.category === null).length}) - Assign as Before or After
+                                </h3>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                  {photoAttachments.map((attachment, index) => (
+                                    (!attachment.category || attachment.category === null) && (
+                                      <div
+                                        key={index}
+                                        className="relative rounded-lg overflow-hidden border border-slate-300"
+                                        data-testid={`photo-uncategorized-${index}`}
+                                      >
+                                        <div className="aspect-square">
+                                          <img
+                                            src={attachment.url}
+                                            alt={attachment.filename}
+                                            className="w-full h-full object-cover"
+                                          />
+                                        </div>
+                                        <div className="p-2 bg-white border-t border-slate-200">
+                                          <div className="flex gap-1">
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              className="flex-1 text-xs border-amber-300 hover:bg-amber-50"
+                                              onClick={() => updatePhotoCategory(index, 'before')}
+                                              data-testid={`button-mark-before-${index}`}
+                                            >
+                                              Before
+                                            </Button>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              className="flex-1 text-xs border-green-300 hover:bg-green-50"
+                                              onClick={() => updatePhotoCategory(index, 'after')}
+                                              data-testid={`button-mark-after-${index}`}
+                                            >
+                                              After
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="px-2"
+                                              onClick={() => removePhotoAttachment(index)}
+                                              data-testid={`button-remove-uncategorized-${index}`}
+                                            >
+                                              <Trash2 className="w-3 h-3 text-red-500" />
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        ))}
-                      </div>
+                        ) : (
+                          /* Standard Grid View */
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                            {photoAttachments.map((attachment, index) => (
+                              <div
+                                key={index}
+                                className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200 hover:border-slate-300 transition-colors"
+                                data-testid={`photo-attachment-${index}`}
+                              >
+                                <img
+                                  src={attachment.url}
+                                  alt={attachment.filename}
+                                  className="w-full h-full object-cover"
+                                />
+                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center">
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={() => removePhotoAttachment(index)}
+                                    data-testid={`button-remove-photo-${index}`}
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-1" />
+                                    Remove
+                                  </Button>
+                                </div>
+                                <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 px-2 py-1">
+                                  <p className="text-xs text-white truncate" title={attachment.filename}>
+                                    {attachment.filename}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
                     )}
 
                     {photoAttachments.length === 0 && !isPhotoUploading && (

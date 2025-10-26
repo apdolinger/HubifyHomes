@@ -47,7 +47,7 @@ interface InvoiceData {
   secondaryColor?: string;
   
   // Attachments
-  attachments?: Array<{url: string, filename: string}>;
+  attachments?: Array<{url: string, filename: string, category?: 'before' | 'after' | null}>;
 }
 
 export async function generateInvoicePDFToResponse(invoiceData: InvoiceData, res: Response) {
@@ -307,6 +307,13 @@ export async function generateInvoicePDFToResponse(invoiceData: InvoiceData, res
   if (invoiceData.attachments && invoiceData.attachments.length > 0) {
     doc.y = totalsY + 40;
     
+    // Categorize photos
+    const beforePhotos = invoiceData.attachments.filter(a => a.category === 'before');
+    const afterPhotos = invoiceData.attachments.filter(a => a.category === 'after');
+    const uncategorizedPhotos = invoiceData.attachments.filter(a => !a.category || a.category === null);
+    
+    const hasCategories = beforePhotos.length > 0 || afterPhotos.length > 0;
+    
     // Check if we need a new page
     if (doc.y > 650) {
       doc.addPage();
@@ -324,73 +331,163 @@ export async function generateInvoicePDFToResponse(invoiceData: InvoiceData, res
     const imageSpacing = 15;
     const leftImageX = 50;
     const rightImageX = leftImageX + imageWidth + imageSpacing;
-    let currentImageY = doc.y;
-    let currentColumn = 0; // 0 for left, 1 for right
     
-    for (let i = 0; i < invoiceData.attachments.length; i++) {
-      const attachment = invoiceData.attachments[i];
+    // Render before/after photos side by side
+    if (hasCategories) {
+      let currentY = doc.y;
+      const maxPhotos = Math.max(beforePhotos.length, afterPhotos.length);
       
-      try {
-        // Fetch image from URL
-        const response = await fetch(attachment.url);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch image: ${response.statusText}`);
-        }
+      for (let i = 0; i < maxPhotos; i++) {
+        const beforePhoto = beforePhotos[i];
+        const afterPhoto = afterPhotos[i];
         
-        const arrayBuffer = await response.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        
-        // Check if we need a new page (leave room for image + caption)
-        if (currentImageY > 550) {
+        // Check if we need a new page
+        if (currentY > 550) {
           doc.addPage();
-          currentImageY = 50;
-          currentColumn = 0;
+          currentY = 50;
         }
         
-        // Calculate X position based on column
-        const imageX = currentColumn === 0 ? leftImageX : rightImageX;
-        
-        // Draw image - PDFKit will auto-fit to the specified dimensions
-        doc.image(buffer, imageX, currentImageY, { 
-          fit: [imageWidth, 250],
-          align: 'center'
-        });
-        
-        // Use max height for consistent spacing
-        const imageHeight = 250;
-        
-        // Add filename caption below image
-        doc.fontSize(8)
-           .font('Helvetica')
-           .fillColor('#666666')
-           .text(attachment.filename, imageX, currentImageY + imageHeight + 5, {
-             width: imageWidth,
-             align: 'center'
-           });
-        
-        // Move to next column or next row
-        if (currentColumn === 0) {
-          // Move to right column
-          currentColumn = 1;
-        } else {
-          // Move to next row (left column)
-          currentColumn = 0;
-          currentImageY += imageHeight + 40; // Image height + caption + spacing
+        // Render Before photo (left column)
+        if (beforePhoto) {
+          try {
+            const response = await fetch(beforePhoto.url);
+            if (response.ok) {
+              const arrayBuffer = await response.arrayBuffer();
+              const buffer = Buffer.from(arrayBuffer);
+              
+              // Add "BEFORE" label with amber color
+              doc.fontSize(10)
+                 .font('Helvetica-Bold')
+                 .fillColor('#f59e0b')
+                 .text('BEFORE', leftImageX, currentY, { width: imageWidth, align: 'center' });
+              
+              // Draw image
+              doc.image(buffer, leftImageX, currentY + 15, { 
+                fit: [imageWidth, 200],
+                align: 'center'
+              });
+              
+              // Add filename caption
+              doc.fontSize(8)
+                 .font('Helvetica')
+                 .fillColor('#666666')
+                 .text(beforePhoto.filename, leftImageX, currentY + 220, {
+                   width: imageWidth,
+                   align: 'center'
+                 });
+            }
+          } catch (error) {
+            console.error(`Failed to load before image ${beforePhoto.filename}:`, error);
+          }
         }
         
-      } catch (error) {
-        console.error(`Failed to load image ${attachment.filename}:`, error);
-        // Skip this image and continue with the next one
-        continue;
+        // Render After photo (right column)
+        if (afterPhoto) {
+          try {
+            const response = await fetch(afterPhoto.url);
+            if (response.ok) {
+              const arrayBuffer = await response.arrayBuffer();
+              const buffer = Buffer.from(arrayBuffer);
+              
+              // Add "AFTER" label with green color
+              doc.fontSize(10)
+                 .font('Helvetica-Bold')
+                 .fillColor('#22c55e')
+                 .text('AFTER', rightImageX, currentY, { width: imageWidth, align: 'center' });
+              
+              // Draw image
+              doc.image(buffer, rightImageX, currentY + 15, { 
+                fit: [imageWidth, 200],
+                align: 'center'
+              });
+              
+              // Add filename caption
+              doc.fontSize(8)
+                 .font('Helvetica')
+                 .fillColor('#666666')
+                 .text(afterPhoto.filename, rightImageX, currentY + 220, {
+                   width: imageWidth,
+                   align: 'center'
+                 });
+            }
+          } catch (error) {
+            console.error(`Failed to load after image ${afterPhoto.filename}:`, error);
+          }
+        }
+        
+        currentY += 240; // Label + image + caption + spacing
       }
+      
+      doc.y = currentY + 20;
     }
     
-    // Update doc.y for subsequent sections
-    // If we ended on the right column, we need to move down
-    if (currentColumn === 1) {
-      doc.y = currentImageY + 250 + 40; // Assume max height for the last row
-    } else {
-      doc.y = currentImageY;
+    // Render uncategorized photos in standard grid
+    if (uncategorizedPhotos.length > 0) {
+      if (hasCategories) {
+        doc.y += 20;
+        doc.fontSize(10)
+           .font('Helvetica-Bold')
+           .fillColor('#666666')
+           .text('Additional Photos', 50, doc.y);
+        doc.y += 20;
+      }
+      
+      let currentImageY = doc.y;
+      let currentColumn = 0;
+      
+      for (let i = 0; i < uncategorizedPhotos.length; i++) {
+        const attachment = uncategorizedPhotos[i];
+        
+        try {
+          const response = await fetch(attachment.url);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch image: ${response.statusText}`);
+          }
+          
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          
+          if (currentImageY > 550) {
+            doc.addPage();
+            currentImageY = 50;
+            currentColumn = 0;
+          }
+          
+          const imageX = currentColumn === 0 ? leftImageX : rightImageX;
+          
+          doc.image(buffer, imageX, currentImageY, { 
+            fit: [imageWidth, 250],
+            align: 'center'
+          });
+          
+          const imageHeight = 250;
+          
+          doc.fontSize(8)
+             .font('Helvetica')
+             .fillColor('#666666')
+             .text(attachment.filename, imageX, currentImageY + imageHeight + 5, {
+               width: imageWidth,
+               align: 'center'
+             });
+          
+          if (currentColumn === 0) {
+            currentColumn = 1;
+          } else {
+            currentColumn = 0;
+            currentImageY += imageHeight + 40;
+          }
+          
+        } catch (error) {
+          console.error(`Failed to load image ${attachment.filename}:`, error);
+          continue;
+        }
+      }
+      
+      if (currentColumn === 1) {
+        doc.y = currentImageY + 250 + 40;
+      } else {
+        doc.y = currentImageY;
+      }
     }
   }
   
@@ -726,6 +823,13 @@ export async function generateInvoicePDF(invoice: any, client: any, org: any): P
       if (invoice.attachments && invoice.attachments.length > 0) {
         doc.y = totalsY + 40;
         
+        // Categorize photos
+        const beforePhotos = invoice.attachments.filter((a: any) => a.category === 'before');
+        const afterPhotos = invoice.attachments.filter((a: any) => a.category === 'after');
+        const uncategorizedPhotos = invoice.attachments.filter((a: any) => !a.category || a.category === null);
+        
+        const hasCategories = beforePhotos.length > 0 || afterPhotos.length > 0;
+        
         // Check if we need a new page
         if (doc.y > 650) {
           doc.addPage();
@@ -743,69 +847,162 @@ export async function generateInvoicePDF(invoice: any, client: any, org: any): P
         const imageSpacing = 15;
         const leftImageX = 50;
         const rightImageX = leftImageX + imageWidth + imageSpacing;
-        let currentImageY = doc.y;
-        let currentColumn = 0; // 0 for left, 1 for right
         
-        for (let i = 0; i < invoice.attachments.length; i++) {
-          const attachment = invoice.attachments[i];
+        // Render before/after photos side by side
+        if (hasCategories) {
+          let currentY = doc.y;
+          const maxPhotos = Math.max(beforePhotos.length, afterPhotos.length);
           
-          try {
-            // Fetch image from URL
-            const response = await fetch(attachment.url);
-            if (!response.ok) {
-              throw new Error(`Failed to fetch image: ${response.statusText}`);
-            }
+          for (let i = 0; i < maxPhotos; i++) {
+            const beforePhoto = beforePhotos[i];
+            const afterPhoto = afterPhotos[i];
             
-            const arrayBuffer = await response.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
-            
-            // Check if we need a new page (leave room for image + caption)
-            if (currentImageY > 550) {
+            // Check if we need a new page
+            if (currentY > 550) {
               doc.addPage();
-              currentImageY = 50;
-              currentColumn = 0;
+              currentY = 50;
             }
             
-            // Calculate X position based on column
-            const imageX = currentColumn === 0 ? leftImageX : rightImageX;
-            
-            // Draw image - PDFKit will auto-fit to the specified dimensions
-            doc.image(buffer, imageX, currentImageY, { 
-              fit: [imageWidth, 250],
-              align: 'center'
-            });
-            
-            // Use max height for consistent spacing
-            const imageHeight = 250;
-            
-            // Add filename caption below image
-            doc.fontSize(8)
-               .font('Helvetica')
-               .fillColor('#666666')
-               .text(attachment.filename, imageX, currentImageY + imageHeight + 5, {
-                 width: imageWidth,
-                 align: 'center'
-               });
-            
-            // Move to next column or next row
-            if (currentColumn === 0) {
-              // Move to right column
-              currentColumn = 1;
-            } else {
-              // Move to next row
-              currentColumn = 0;
-              currentImageY += imageHeight + 35; // Image height + caption + spacing
+            // Render Before photo (left column)
+            if (beforePhoto) {
+              try {
+                const response = await fetch(beforePhoto.url);
+                if (response.ok) {
+                  const arrayBuffer = await response.arrayBuffer();
+                  const buffer = Buffer.from(arrayBuffer);
+                  
+                  // Add "BEFORE" label with amber color
+                  doc.fontSize(10)
+                     .font('Helvetica-Bold')
+                     .fillColor('#f59e0b')
+                     .text('BEFORE', leftImageX, currentY, { width: imageWidth, align: 'center' });
+                  
+                  // Draw image
+                  doc.image(buffer, leftImageX, currentY + 15, { 
+                    fit: [imageWidth, 200],
+                    align: 'center'
+                  });
+                  
+                  // Add filename caption
+                  doc.fontSize(8)
+                     .font('Helvetica')
+                     .fillColor('#666666')
+                     .text(beforePhoto.filename, leftImageX, currentY + 220, {
+                       width: imageWidth,
+                       align: 'center'
+                     });
+                }
+              } catch (error) {
+                console.error(`Failed to load before image ${beforePhoto.filename}:`, error);
+              }
             }
-          } catch (error) {
-            console.error(`Error adding attachment ${attachment.filename}:`, error);
+            
+            // Render After photo (right column)
+            if (afterPhoto) {
+              try {
+                const response = await fetch(afterPhoto.url);
+                if (response.ok) {
+                  const arrayBuffer = await response.arrayBuffer();
+                  const buffer = Buffer.from(arrayBuffer);
+                  
+                  // Add "AFTER" label with green color
+                  doc.fontSize(10)
+                     .font('Helvetica-Bold')
+                     .fillColor('#22c55e')
+                     .text('AFTER', rightImageX, currentY, { width: imageWidth, align: 'center' });
+                  
+                  // Draw image
+                  doc.image(buffer, rightImageX, currentY + 15, { 
+                    fit: [imageWidth, 200],
+                    align: 'center'
+                  });
+                  
+                  // Add filename caption
+                  doc.fontSize(8)
+                     .font('Helvetica')
+                     .fillColor('#666666')
+                     .text(afterPhoto.filename, rightImageX, currentY + 220, {
+                       width: imageWidth,
+                       align: 'center'
+                     });
+                }
+              } catch (error) {
+                console.error(`Failed to load after image ${afterPhoto.filename}:`, error);
+              }
+            }
+            
+            currentY += 240; // Label + image + caption + spacing
           }
+          
+          doc.y = currentY + 20;
         }
         
-        // Update doc.y to be after the last row of images
-        if (currentColumn === 1) {
-          doc.y = currentImageY + 250 + 35; // Last image height + caption
-        } else {
-          doc.y = currentImageY;
+        // Render uncategorized photos in standard grid
+        if (uncategorizedPhotos.length > 0) {
+          if (hasCategories) {
+            doc.y += 20;
+            doc.fontSize(10)
+               .font('Helvetica-Bold')
+               .fillColor('#666666')
+               .text('Additional Photos', 50, doc.y);
+            doc.y += 20;
+          }
+          
+          let currentImageY = doc.y;
+          let currentColumn = 0;
+          
+          for (let i = 0; i < uncategorizedPhotos.length; i++) {
+            const attachment = uncategorizedPhotos[i];
+            
+            try {
+              const response = await fetch(attachment.url);
+              if (!response.ok) {
+                throw new Error(`Failed to fetch image: ${response.statusText}`);
+              }
+              
+              const arrayBuffer = await response.arrayBuffer();
+              const buffer = Buffer.from(arrayBuffer);
+              
+              if (currentImageY > 550) {
+                doc.addPage();
+                currentImageY = 50;
+                currentColumn = 0;
+              }
+              
+              const imageX = currentColumn === 0 ? leftImageX : rightImageX;
+              
+              doc.image(buffer, imageX, currentImageY, { 
+                fit: [imageWidth, 250],
+                align: 'center'
+              });
+              
+              const imageHeight = 250;
+              
+              doc.fontSize(8)
+                 .font('Helvetica')
+                 .fillColor('#666666')
+                 .text(attachment.filename, imageX, currentImageY + imageHeight + 5, {
+                   width: imageWidth,
+                   align: 'center'
+                 });
+              
+              if (currentColumn === 0) {
+                currentColumn = 1;
+              } else {
+                currentColumn = 0;
+                currentImageY += imageHeight + 35;
+              }
+              
+            } catch (error) {
+              console.error(`Error adding attachment ${attachment.filename}:`, error);
+            }
+          }
+          
+          if (currentColumn === 1) {
+            doc.y = currentImageY + 250 + 35;
+          } else {
+            doc.y = currentImageY;
+          }
         }
       }
       
