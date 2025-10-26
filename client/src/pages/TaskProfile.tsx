@@ -1538,7 +1538,7 @@ export default function TaskProfile() {
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-[400px] p-0">
-                          <Command>
+                          <Command shouldFilter={false}>
                             <CommandInput
                               placeholder="Search properties..."
                               value={propertySearchValue}
@@ -1548,6 +1548,7 @@ export default function TaskProfile() {
                             <CommandGroup className="max-h-[300px] overflow-auto">
                               {Array.isArray(properties) && properties
                                 .filter((property: any) => 
+                                  !propertySearchValue || 
                                   property.name.toLowerCase().includes(propertySearchValue.toLowerCase()) ||
                                   (property.address1 && property.address1.toLowerCase().includes(propertySearchValue.toLowerCase())) ||
                                   (property.city && property.city.toLowerCase().includes(propertySearchValue.toLowerCase()))
