@@ -48,6 +48,7 @@ export const orgs = pgTable("orgs", {
   isActive: boolean("is_active").notNull().default(true),
   iCalFeedToken: varchar("ical_feed_token"), // Secret token for organization-wide iCal feed subscription
   billingWorkflowMode: varchar("billing_workflow_mode").$type<"automatic"|"require_authorization"|"manual">().default("manual"), // Billing submission workflow
+  invoiceGroupingStrategy: varchar("invoice_grouping_strategy").$type<"client"|"property">().default("client"), // How to group submissions for consolidated invoicing
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

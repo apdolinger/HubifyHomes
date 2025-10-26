@@ -64,6 +64,12 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
     enabled: isAuthenticated,
   });
 
+  // Fetch organization settings
+  const { data: orgSettings } = useQuery({
+    queryKey: ["/api/orgs/current"],
+    enabled: isAuthenticated,
+  });
+
   // Authorize submission mutation
   const authorizeMutation = useMutation({
     mutationFn: async (submissionId: string) => {
@@ -237,29 +243,46 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
     );
   });
 
-  // Group pending submissions by client for batch invoicing
+  // Group pending submissions by client OR property based on org settings
   const pendingGroupedByClient = useMemo(() => {
     const pending = filteredSubmissions.filter((s: any) => s.status === "pending");
-    const grouped = new Map<string, { client: any; submissions: any[]; totalCents: number }>();
+    const groupingStrategy = (orgSettings as any)?.invoiceGroupingStrategy || "client";
+    
+    const grouped = new Map<string, { 
+      client: any; 
+      property?: any;
+      submissions: any[]; 
+      totalCents: number;
+      groupKey: string;
+    }>();
     
     pending.forEach((submission: any) => {
-      const clientId = submission.clientId;
-      if (!grouped.has(clientId)) {
-        grouped.set(clientId, {
+      // Group by client or property based on org settings
+      const groupKey = groupingStrategy === "property" 
+        ? submission.propertyId 
+        : submission.clientId;
+      
+      if (!grouped.has(groupKey)) {
+        grouped.set(groupKey, {
           client: submission.client,
+          property: submission.property,
           submissions: [],
           totalCents: 0,
+          groupKey,
         });
       }
-      const group = grouped.get(clientId)!;
+      const group = grouped.get(groupKey)!;
       group.submissions.push(submission);
       group.totalCents += submission.amountCents;
     });
     
-    return Array.from(grouped.values()).sort((a, b) => 
-      `${a.client?.firstName} ${a.client?.lastName}`.localeCompare(`${b.client?.firstName} ${b.client?.lastName}`)
-    );
-  }, [filteredSubmissions]);
+    return Array.from(grouped.values()).sort((a, b) => {
+      if (groupingStrategy === "property") {
+        return (a.property?.name || "").localeCompare(b.property?.name || "");
+      }
+      return `${a.client?.firstName} ${a.client?.lastName}`.localeCompare(`${b.client?.firstName} ${b.client?.lastName}`);
+    });
+  }, [filteredSubmissions, orgSettings]);
 
   const pendingCount = (submissions as any[] || []).filter((s: any) => s.status === "pending").length;
 
@@ -347,13 +370,15 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
             </CardContent>
           </Card>
 
-          {/* Pending Submissions Grouped by Client */}
+          {/* Pending Submissions Grouped by Client or Property */}
           {statusFilter === "pending" ? (
             <Card>
               <CardHeader>
-                <CardTitle>Pending Billing Submissions - Grouped by Client</CardTitle>
+                <CardTitle>
+                  Pending Billing Submissions - Grouped by {(orgSettings as any)?.invoiceGroupingStrategy === "property" ? "Property" : "Client"}
+                </CardTitle>
                 <CardDescription>
-                  Review submissions by client. Create consolidated invoices for multiple submissions at once.
+                  Review submissions grouped by {(orgSettings as any)?.invoiceGroupingStrategy === "property" ? "property" : "client"}. Create consolidated invoices for multiple submissions at once.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -367,38 +392,52 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {pendingGroupedByClient.map((group, idx) => (
-                      <div key={group.client?.id || idx} className="border rounded-lg p-4 bg-slate-50">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold">
-                              {group.client?.firstName?.[0]}{group.client?.lastName?.[0]}
+                    {pendingGroupedByClient.map((group, idx) => {
+                      const isPropertyGrouping = (orgSettings as any)?.invoiceGroupingStrategy === "property";
+                      const displayName = isPropertyGrouping 
+                        ? group.property?.name 
+                        : `${group.client?.firstName} ${group.client?.lastName}`;
+                      const initials = isPropertyGrouping
+                        ? group.property?.name?.substring(0, 2)?.toUpperCase()
+                        : `${group.client?.firstName?.[0]}${group.client?.lastName?.[0]}`;
+                      
+                      return (
+                        <div key={group.groupKey || idx} className="border rounded-lg p-4 bg-slate-50">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold">
+                                {initials}
+                              </div>
+                              <div>
+                                <h3 className="font-semibold text-lg">
+                                  {displayName}
+                                </h3>
+                                {isPropertyGrouping && group.client && (
+                                  <p className="text-xs text-slate-400">
+                                    Client: {group.client.firstName} {group.client.lastName}
+                                  </p>
+                                )}
+                                <p className="text-sm text-slate-500">
+                                  {group.submissions.length} submission{group.submissions.length > 1 ? 's' : ''} • 
+                                  Total: <span className="font-medium text-slate-700">${(group.totalCents / 100).toFixed(2)}</span>
+                                </p>
+                              </div>
                             </div>
-                            <div>
-                              <h3 className="font-semibold text-lg">
-                                {group.client?.firstName} {group.client?.lastName}
-                              </h3>
-                              <p className="text-sm text-slate-500">
-                                {group.submissions.length} submission{group.submissions.length > 1 ? 's' : ''} • 
-                                Total: <span className="font-medium text-slate-700">${(group.totalCents / 100).toFixed(2)}</span>
-                              </p>
-                            </div>
+                            <Button
+                              variant="default"
+                              className="bg-blue-600 hover:bg-blue-700"
+                              onClick={() => {
+                                setBatchClient(group.client);
+                                setBatchSubmissions(group.submissions);
+                                setBatchEmail(group.client?.email || '');
+                                setBatchAuthorizeDialog(true);
+                              }}
+                              data-testid={`button-create-invoice-${group.groupKey}`}
+                            >
+                              <Send className="w-4 h-4 mr-2" />
+                              Create Invoice Now
+                            </Button>
                           </div>
-                          <Button
-                            variant="default"
-                            className="bg-blue-600 hover:bg-blue-700"
-                            onClick={() => {
-                              setBatchClient(group.client);
-                              setBatchSubmissions(group.submissions);
-                              setBatchEmail(group.client?.email || '');
-                              setBatchAuthorizeDialog(true);
-                            }}
-                            data-testid={`button-create-invoice-${group.client?.id}`}
-                          >
-                            <Send className="w-4 h-4 mr-2" />
-                            Create Invoice Now
-                          </Button>
-                        </div>
                         
                         <div className="space-y-2">
                           {group.submissions.map((submission: any) => (
@@ -439,8 +478,9 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
                             </div>
                           ))}
                         </div>
-                      </div>
-                    ))}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
@@ -1470,6 +1510,31 @@ function SettingsTab() {
     updateWorkflowMutation.mutate(mode as "automatic" | "require_authorization" | "manual");
   };
 
+  const updateGroupingStrategyMutation = useMutation({
+    mutationFn: async (strategy: "client" | "property") => {
+      return apiRequest("PATCH", `/api/orgs/${orgId}`, { invoiceGroupingStrategy: strategy });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orgs/current"] });
+      toast({
+        title: "Settings updated",
+        description: "Invoice grouping strategy has been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update settings",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleGroupingStrategyChange = (strategy: string) => {
+    updateGroupingStrategyMutation.mutate(strategy as "client" | "property");
+  };
+
   if (userLoading || orgLoading) {
     return <div className="flex justify-center p-8">Loading settings...</div>;
   }
@@ -1562,6 +1627,69 @@ function SettingsTab() {
               {org?.billingWorkflowMode === "automatic" ? "Automatic" :
                org?.billingWorkflowMode === "require_authorization" ? "Require Authorization" :
                "Manual"}
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Invoice Grouping Strategy</CardTitle>
+          <CardDescription>
+            Choose how to group pending billing submissions for consolidated invoicing
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            <div className="flex items-start space-x-3">
+              <input
+                type="radio"
+                id="groupByClient"
+                name="grouping"
+                value="client"
+                checked={org?.invoiceGroupingStrategy === "client"}
+                onChange={(e) => handleGroupingStrategyChange(e.target.value)}
+                className="mt-1"
+                data-testid="radio-group-by-client"
+              />
+              <div>
+                <label htmlFor="groupByClient" className="font-medium cursor-pointer">
+                  Group by Client
+                </label>
+                <p className="text-sm text-slate-500">
+                  All pending submissions for a client are grouped together into one consolidated invoice, 
+                  regardless of which property they're for. Best for clients with multiple properties.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start space-x-3">
+              <input
+                type="radio"
+                id="groupByProperty"
+                name="grouping"
+                value="property"
+                checked={org?.invoiceGroupingStrategy === "property"}
+                onChange={(e) => handleGroupingStrategyChange(e.target.value)}
+                className="mt-1"
+                data-testid="radio-group-by-property"
+              />
+              <div>
+                <label htmlFor="groupByProperty" className="font-medium cursor-pointer">
+                  Group by Property
+                </label>
+                <p className="text-sm text-slate-500">
+                  Submissions are grouped by property, creating separate invoices for each property. 
+                  Best for billing each property individually.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t">
+            <h4 className="font-medium mb-2">Current Strategy</h4>
+            <Badge variant="outline" className="text-base px-3 py-1">
+              {org?.invoiceGroupingStrategy === "property" ? "Group by Property" : "Group by Client"}
             </Badge>
           </div>
         </CardContent>
