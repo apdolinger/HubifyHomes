@@ -140,7 +140,7 @@ export default function TaskProfile() {
       category: "inspection",
       priority: "normal",
       description: "Prepare a property for owner arrival or occupancy",
-      timeEstimate: "2 hours",
+      timeEstimate: "0 days 2 hours 0 minutes",
       checklist: [
         { id: "1", text: "Unlock gates and entry doors", completed: false },
         { id: "2", text: "Remove security devices (covers, locks, barriers)", completed: false },
@@ -167,7 +167,7 @@ export default function TaskProfile() {
       category: "inspection",
       priority: "normal",
       description: "Secure and prepare property for vacancy",
-      timeEstimate: "2 hours",
+      timeEstimate: "0 days 2 hours 0 minutes",
       checklist: [
         { id: "1", text: "Turn off main water supply", completed: false },
         { id: "2", text: "Drain water lines if required", completed: false },
@@ -194,7 +194,7 @@ export default function TaskProfile() {
       category: "inspection",
       priority: "normal",
       description: "Routine check for maintenance, security, and system health",
-      timeEstimate: "1.5 hours",
+      timeEstimate: "0 days 1 hours 30 minutes",
       checklist: [
         { id: "1", text: "Inspect roof, gutters, and downspouts", completed: false },
         { id: "2", text: "Check for storm damage or debris", completed: false },
@@ -219,7 +219,7 @@ export default function TaskProfile() {
       category: "maintenance",
       priority: "urgent",
       description: "Ready the property for hurricanes or severe weather",
-      timeEstimate: "3 hours",
+      timeEstimate: "0 days 3 hours 0 minutes",
       checklist: [
         { id: "1", text: "Bring in outdoor furniture, planters, décor", completed: false },
         { id: "2", text: "Secure loose items (grill, hoses, etc.)", completed: false },
@@ -240,7 +240,7 @@ export default function TaskProfile() {
       category: "inspection",
       priority: "high",
       description: "Evaluate and document condition after severe weather",
-      timeEstimate: "2 hours",
+      timeEstimate: "0 days 2 hours 0 minutes",
       checklist: [
         { id: "1", text: "Inspect roof, siding, and gutters for damage", completed: false },
         { id: "2", text: "Check pool and yard for debris", completed: false },
@@ -259,7 +259,7 @@ export default function TaskProfile() {
       category: "maintenance",
       priority: "normal",
       description: "Manage ongoing or recurring service tasks",
-      timeEstimate: "1 hour",
+      timeEstimate: "0 days 1 hours 0 minutes",
       checklist: [
         { id: "1", text: "Confirm date/time with vendor", completed: false },
         { id: "2", text: "Verify access details and lockbox codes", completed: false },
