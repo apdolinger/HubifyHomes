@@ -1108,357 +1108,100 @@ export default function TaskProfile() {
   }
 
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="mb-4">
-        {/* Back to Tasks Button */}
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      {/* Simplified Header */}
+      <div className="mb-8">
+        {/* Back Button */}
         <div className="mb-6">
           <Button
             variant="ghost"
             onClick={() => navigate("/tasks")}
-            className="flex items-center text-slate-600 hover:text-slate-900"
+            className="text-slate-600 hover:text-slate-900 -ml-2"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Tasks
           </Button>
         </div>
 
-        {/* Task Image, Name, and Associations */}
-        <div className="flex items-start space-x-6 mb-6">
-          {/* Task Image Upload Area */}
+        {/* Task Header */}
+        <div className="flex items-start gap-6">
+          {/* Task Image */}
           <div className="flex-shrink-0">
-            <div className="relative">
-              {taskImage ? (
-                <div className="relative group">
-                  <img
-                    src={taskImage}
-                    alt="Task image"
-                    className="w-24 h-24 object-cover rounded-lg border-2 border-slate-200"
-                  />
-                  {isImageUploading && (
-                    <div className="absolute inset-0 bg-black bg-opacity-50 rounded-lg flex items-center justify-center">
-                      <RefreshCw className="w-6 h-6 text-white animate-spin" />
-                    </div>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    className="absolute -top-2 -right-2 w-6 h-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={removeTaskImage}
-                  >
-                    <X className="w-3 h-3" />
-                  </Button>
-                </div>
-              ) : (
-                <label className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-slate-400 hover:bg-slate-50 transition-colors">
-                  <Upload className="w-6 h-6 text-slate-400 mb-1" />
-                  <span className="text-xs text-slate-500 text-center px-1">Upload Image</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                </label>
-              )}
-            </div>
+            {taskImage ? (
+              <div className="relative group">
+                <img
+                  src={taskImage}
+                  alt="Task image"
+                  className="w-20 h-20 object-cover rounded-xl border-2 border-slate-200 shadow-sm"
+                />
+                {isImageUploading && (
+                  <div className="absolute inset-0 bg-black bg-opacity-50 rounded-xl flex items-center justify-center">
+                    <RefreshCw className="w-5 h-5 text-white animate-spin" />
+                  </div>
+                )}
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="absolute -top-2 -right-2 w-6 h-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                  onClick={removeTaskImage}
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+            ) : (
+              <label className="w-20 h-20 border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-slate-400 hover:bg-slate-50 transition-all shadow-sm">
+                <Upload className="w-5 h-5 text-slate-400 mb-1" />
+                <span className="text-xs text-slate-500 text-center px-1">Add Photo</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+              </label>
+            )}
           </div>
 
-          {/* Task Name and Details */}
+          {/* Task Title and Badges */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between">
-              <div className="flex-1 min-w-0 mr-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-3xl font-bold text-slate-900 break-words">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 mb-3">
+                  <h1 className="text-3xl font-bold text-slate-900 truncate">
                     {(task as any).title}
                   </h1>
                   {(task as any).isTemplate && (
-                    <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-medium shrink-0" title="Recurring task template">
+                    <Badge variant="secondary" className="shrink-0 bg-indigo-100 text-indigo-700 hover:bg-indigo-100">
                       Template
-                    </span>
+                    </Badge>
                   )}
                   {(task as any).templateTaskId && !(task as any).isTemplate && (
-                    <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium shrink-0" title="Instance of recurring task">
+                    <Badge variant="secondary" className="shrink-0 bg-blue-100 text-blue-700 hover:bg-blue-100">
                       Instance
-                    </span>
+                    </Badge>
                   )}
                 </div>
+                
                 {(task as any).isTemplate && (task as any).recurrenceRule && (
-                  <div className="text-sm text-slate-500 mb-2 flex items-center gap-1">
+                  <div className="text-sm text-slate-600 mb-3 flex items-center gap-2">
                     <Repeat className="w-4 h-4" />
-                    {formatRecurrenceRule((task as any).recurrenceRule)}
+                    <span>{formatRecurrenceRule((task as any).recurrenceRule)}</span>
                   </div>
                 )}
-                <div className="flex items-center space-x-4 text-sm text-slate-600 mb-4">
-                  <div className="flex items-center space-x-1">
-                    <Badge variant={getPriorityColor((task as any).priority)} className="capitalize">
-                      {(task as any).priority}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <Badge variant={getStatusColor((task as any).status)} className="capitalize">
-                      {(task as any).status?.replace('_', ' ')}
-                    </Badge>
-                  </div>
+                
+                <div className="flex flex-wrap items-center gap-3">
+                  <Badge variant={getPriorityColor((task as any).priority)} className="capitalize">
+                    {(task as any).priority}
+                  </Badge>
+                  <Badge variant={getStatusColor((task as any).status)} className="capitalize">
+                    {(task as any).status?.replace('_', ' ')}
+                  </Badge>
                   {(task as any).dueDate && (
-                    <div className="flex items-center space-x-1">
+                    <div className="flex items-center gap-1.5 text-sm text-slate-600">
                       <Calendar className="w-4 h-4" />
                       <span>Due {formatDate((task as any).dueDate)}</span>
                     </div>
                   )}
-                </div>
-
-                {/* Property and Contact Associations */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  {/* Property Association */}
-                  <div>
-                    <Label className="text-sm font-medium text-slate-700 mb-2 block">
-                      Associated Property
-                    </Label>
-                    <Popover open={propertySearchOpen} onOpenChange={setPropertySearchOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          aria-expanded={propertySearchOpen}
-                          className="w-full justify-between"
-                        >
-                          {(task as any).property?.id ? (
-                            <div className="flex items-center space-x-2">
-                              <Building className="w-4 h-4 text-slate-500" />
-                              <span>{(task as any).property.name}</span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-500">Search property...</span>
-                          )}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[400px] p-0">
-                        <Command>
-                          <CommandInput 
-                            placeholder="Search properties..." 
-                            value={propertySearchValue}
-                            onValueChange={setPropertySearchValue}
-                          />
-                          <CommandEmpty>
-                            <div className="p-4 text-center">
-                              <p className="text-sm text-slate-500 mb-3">No properties found</p>
-                              <Button 
-                                size="sm" 
-                                onClick={() => {
-                                  setPropertySearchOpen(false);
-                                  setIsNewPropertyModalOpen(true);
-                                  setNewPropertyForm(prev => ({ ...prev, name: propertySearchValue }));
-                                }}
-                                className="w-full"
-                              >
-                                <Plus className="w-4 h-4 mr-2" />
-                                Create new property
-                              </Button>
-                            </div>
-                          </CommandEmpty>
-                          <CommandGroup>
-                            <CommandItem
-                              onSelect={() => {
-                                handlePropertyAssociation("none");
-                                setPropertySearchOpen(false);
-                                setPropertySearchValue("");
-                              }}
-                            >
-                              <X className="mr-2 h-4 w-4 text-slate-400" />
-                              No property
-                            </CommandItem>
-                            {Array.isArray(properties) && properties.map((property: any) => (
-                              <CommandItem
-                                key={property.id}
-                                value={`${property.name} ${property.address1} ${property.city}`}
-                                onSelect={() => {
-                                  handlePropertyAssociation(property.id.toString());
-                                  setPropertySearchOpen(false);
-                                  setPropertySearchValue("");
-                                }}
-                              >
-                                <Check
-                                  className={`mr-2 h-4 w-4 ${
-                                    (task as any).propertyId === property.id ? "opacity-100" : "opacity-0"
-                                  }`}
-                                />
-                                <Building className="mr-2 h-4 w-4 text-slate-500" />
-                                <div className="flex flex-col">
-                                  <span className="font-medium">{property.name}</span>
-                                  <span className="text-xs text-slate-500">{property.address1}, {property.city}</span>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  {/* Room/Space Association */}
-                  {(task as any).room && (
-                    <div>
-                      <Label className="text-sm font-medium text-slate-700 mb-2 block">
-                        Room/Space
-                      </Label>
-                      <div className="flex items-center space-x-2 p-2 bg-slate-50 rounded-lg">
-                        <span className="text-lg">
-                          {(task as any).room.type === "bedroom" ? "🛏️" : 
-                           (task as any).room.type === "bathroom" ? "🚿" : 
-                           (task as any).room.type === "kitchen" ? "🍳" : 
-                           (task as any).room.type === "living_room" ? "🛋️" : 
-                           (task as any).room.type === "office" ? "💼" : 
-                           (task as any).room.type === "storage" ? "📦" : 
-                           (task as any).room.type === "outdoor" ? "🌿" : "🏠"}
-                        </span>
-                        <div>
-                          <p className="font-medium text-slate-800">{(task as any).room.name}</p>
-                          <p className="text-xs text-slate-500 capitalize">
-                            {(task as any).room.type.replace('_', ' ')}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Client Association */}
-                  <div>
-                    <Label className="text-sm font-medium text-slate-700 mb-2 block">
-                      Related Client
-                    </Label>
-                    <Popover open={contactSearchOpen} onOpenChange={setContactSearchOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          aria-expanded={contactSearchOpen}
-                          className="w-full justify-between"
-                        >
-                          {(task as any).contact?.id ? (
-                            <div className="flex items-center space-x-2">
-                              <User className="w-4 h-4 text-slate-500" />
-                              <span>{(task as any).contact.firstName} {(task as any).contact.lastName}</span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-500">Search client...</span>
-                          )}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[400px] p-0">
-                        <Command>
-                          <CommandInput 
-                            placeholder="Search clients..." 
-                            value={contactSearchValue}
-                            onValueChange={setContactSearchValue}
-                          />
-                          <CommandEmpty>
-                            <div className="p-4 text-center">
-                              <p className="text-sm text-slate-500 mb-3">No clients found</p>
-                              <Button 
-                                size="sm" 
-                                onClick={() => {
-                                  setContactSearchOpen(false);
-                                  setIsNewContactModalOpen(true);
-                                  // Pre-fill with search value if it looks like a name
-                                  const nameParts = contactSearchValue.trim().split(' ');
-                                  if (nameParts.length >= 2) {
-                                    setNewContactForm(prev => ({ 
-                                      ...prev, 
-                                      firstName: nameParts[0], 
-                                      lastName: nameParts.slice(1).join(' ')
-                                    }));
-                                  } else if (nameParts.length === 1) {
-                                    setNewContactForm(prev => ({ ...prev, firstName: nameParts[0] }));
-                                  }
-                                }}
-                                className="w-full"
-                              >
-                                <Plus className="w-4 h-4 mr-2" />
-                                Create new client
-                              </Button>
-                            </div>
-                          </CommandEmpty>
-                          <CommandGroup>
-                            <CommandItem
-                              onSelect={() => {
-                                handleContactAssociation("none");
-                                setContactSearchOpen(false);
-                                setContactSearchValue("");
-                              }}
-                            >
-                              <X className="mr-2 h-4 w-4 text-slate-400" />
-                              No client
-                            </CommandItem>
-                            {Array.isArray(contacts) && contacts.map((contact: any) => (
-                              <CommandItem
-                                key={contact.id}
-                                value={`${contact.firstName} ${contact.lastName} ${contact.email || ''}`}
-                                onSelect={() => {
-                                  handleContactAssociation(contact.id.toString());
-                                  setContactSearchOpen(false);
-                                  setContactSearchValue("");
-                                }}
-                              >
-                                <Check
-                                  className={`mr-2 h-4 w-4 ${
-                                    (task as any).contactId === contact.id ? "opacity-100" : "opacity-0"
-                                  }`}
-                                />
-                                <User className="mr-2 h-4 w-4 text-slate-500" />
-                                <div className="flex flex-col">
-                                  <span className="font-medium">{contact.firstName} {contact.lastName}</span>
-                                  <span className="text-xs text-slate-500 capitalize">{contact.type}{contact.email ? ` • ${contact.email}` : ''}</span>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  {/* Team Assignment */}
-                  <div>
-                    <Label className="text-sm font-medium text-slate-700 mb-2 block">
-                      Assigned To
-                    </Label>
-                    <Select
-                      value={(task as any).assignedToId?.toString() || "none"}
-                      onValueChange={handleUserAssignment}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select team member">
-                          {(task as any).assignedUser ? (
-                            <div className="flex items-center space-x-2">
-                              <User className="w-4 h-4 text-slate-500" />
-                              <span>{(task as any).assignedUser.firstName} {(task as any).assignedUser.lastName}</span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-500">Unassigned</span>
-                          )}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">
-                          <div className="flex items-center space-x-2">
-                            <X className="w-4 h-4 text-slate-400" />
-                            <span>Unassigned</span>
-                          </div>
-                        </SelectItem>
-                        {Array.isArray(users) && users.map((user: any) => (
-                          <SelectItem key={user.id} value={user.id.toString()}>
-                            <div className="flex items-center space-x-2">
-                              <User className="w-4 h-4 text-slate-500" />
-                              <span>{user.firstName} {user.lastName}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
               </div>
               
@@ -2193,9 +1936,242 @@ export default function TaskProfile() {
 
             {/* Sidebar */}
             <div className="space-y-6">
+              {/* Task Associations Card */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Team Details</CardTitle>
+                  <CardTitle className="text-base">Associations</CardTitle>
+                  <CardDescription>Link this task to property, client, and team member</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Property Association */}
+                  <div>
+                    <Label className="text-sm font-medium text-slate-700 mb-2 block">
+                      Property
+                    </Label>
+                    <Popover open={propertySearchOpen} onOpenChange={setPropertySearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={propertySearchOpen}
+                          className="w-full justify-between h-auto min-h-[40px]"
+                        >
+                          {(task as any).property?.id ? (
+                            <div className="flex items-center gap-2 text-left">
+                              <Building className="w-4 h-4 text-slate-500 shrink-0" />
+                              <span className="truncate">{(task as any).property.name}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-500">Select property...</span>
+                          )}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[320px] p-0">
+                        <Command>
+                          <CommandInput 
+                            placeholder="Search properties..." 
+                            value={propertySearchValue}
+                            onValueChange={setPropertySearchValue}
+                          />
+                          <CommandEmpty>
+                            <div className="p-4 text-center">
+                              <p className="text-sm text-slate-500 mb-3">No properties found</p>
+                              <Button 
+                                size="sm" 
+                                onClick={() => {
+                                  setPropertySearchOpen(false);
+                                  setIsNewPropertyModalOpen(true);
+                                  setNewPropertyForm(prev => ({ ...prev, name: propertySearchValue }));
+                                }}
+                                className="w-full"
+                              >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Create new property
+                              </Button>
+                            </div>
+                          </CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              onSelect={() => {
+                                handlePropertyAssociation("none");
+                                setPropertySearchOpen(false);
+                                setPropertySearchValue("");
+                              }}
+                            >
+                              <X className="mr-2 h-4 w-4 text-slate-400" />
+                              No property
+                            </CommandItem>
+                            {Array.isArray(properties) && properties.map((property: any) => (
+                              <CommandItem
+                                key={property.id}
+                                value={`${property.name} ${property.address1} ${property.city}`}
+                                onSelect={() => {
+                                  handlePropertyAssociation(property.id.toString());
+                                  setPropertySearchOpen(false);
+                                  setPropertySearchValue("");
+                                }}
+                              >
+                                <Check
+                                  className={`mr-2 h-4 w-4 ${
+                                    (task as any).propertyId === property.id ? "opacity-100" : "opacity-0"
+                                  }`}
+                                />
+                                <Building className="mr-2 h-4 w-4 text-slate-500" />
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{property.name}</span>
+                                  <span className="text-xs text-slate-500">{property.address1}, {property.city}</span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {/* Client Association */}
+                  <div>
+                    <Label className="text-sm font-medium text-slate-700 mb-2 block">
+                      Client
+                    </Label>
+                    <Popover open={contactSearchOpen} onOpenChange={setContactSearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={contactSearchOpen}
+                          className="w-full justify-between h-auto min-h-[40px]"
+                        >
+                          {(task as any).contact?.id ? (
+                            <div className="flex items-center gap-2 text-left">
+                              <User className="w-4 h-4 text-slate-500 shrink-0" />
+                              <span className="truncate">{(task as any).contact.firstName} {(task as any).contact.lastName}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-500">Select client...</span>
+                          )}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[320px] p-0">
+                        <Command>
+                          <CommandInput 
+                            placeholder="Search clients..." 
+                            value={contactSearchValue}
+                            onValueChange={setContactSearchValue}
+                          />
+                          <CommandEmpty>
+                            <div className="p-4 text-center">
+                              <p className="text-sm text-slate-500 mb-3">No clients found</p>
+                              <Button 
+                                size="sm" 
+                                onClick={() => {
+                                  setContactSearchOpen(false);
+                                  setIsNewContactModalOpen(true);
+                                  const nameParts = contactSearchValue.trim().split(' ');
+                                  if (nameParts.length >= 2) {
+                                    setNewContactForm(prev => ({ 
+                                      ...prev, 
+                                      firstName: nameParts[0], 
+                                      lastName: nameParts.slice(1).join(' ')
+                                    }));
+                                  } else if (nameParts.length === 1) {
+                                    setNewContactForm(prev => ({ ...prev, firstName: nameParts[0] }));
+                                  }
+                                }}
+                                className="w-full"
+                              >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Create new client
+                              </Button>
+                            </div>
+                          </CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              onSelect={() => {
+                                handleContactAssociation("none");
+                                setContactSearchOpen(false);
+                                setContactSearchValue("");
+                              }}
+                            >
+                              <X className="mr-2 h-4 w-4 text-slate-400" />
+                              No client
+                            </CommandItem>
+                            {Array.isArray(contacts) && contacts.map((contact: any) => (
+                              <CommandItem
+                                key={contact.id}
+                                value={`${contact.firstName} ${contact.lastName} ${contact.email || ''}`}
+                                onSelect={() => {
+                                  handleContactAssociation(contact.id.toString());
+                                  setContactSearchOpen(false);
+                                  setContactSearchValue("");
+                                }}
+                              >
+                                <Check
+                                  className={`mr-2 h-4 w-4 ${
+                                    (task as any).contactId === contact.id ? "opacity-100" : "opacity-0"
+                                  }`}
+                                />
+                                <User className="mr-2 h-4 w-4 text-slate-500" />
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{contact.firstName} {contact.lastName}</span>
+                                  <span className="text-xs text-slate-500 capitalize">{contact.type}{contact.email ? ` • ${contact.email}` : ''}</span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {/* Team Assignment */}
+                  <div>
+                    <Label className="text-sm font-medium text-slate-700 mb-2 block">
+                      Assigned To
+                    </Label>
+                    <Select
+                      value={(task as any).assignedToId?.toString() || "none"}
+                      onValueChange={handleUserAssignment}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select team member">
+                          {(task as any).assignedUser ? (
+                            <div className="flex items-center gap-2">
+                              <User className="w-4 h-4 text-slate-500" />
+                              <span>{(task as any).assignedUser.firstName} {(task as any).assignedUser.lastName}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-500">Unassigned</span>
+                          )}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">
+                          <div className="flex items-center gap-2">
+                            <X className="w-4 h-4 text-slate-400" />
+                            <span>Unassigned</span>
+                          </div>
+                        </SelectItem>
+                        {Array.isArray(users) && users.map((user: any) => (
+                          <SelectItem key={user.id} value={user.id.toString()}>
+                            <div className="flex items-center gap-2">
+                              <User className="w-4 h-4 text-slate-500" />
+                              <span>{user.firstName} {user.lastName}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Task Details Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Task Details</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
@@ -2240,29 +2216,6 @@ export default function TaskProfile() {
                           'No'
                         }
                       </span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label className="text-sm font-medium text-slate-500">Assigned To</Label>
-                    <div className="flex items-center mt-1">
-                      <Avatar className="w-8 h-8 mr-3">
-                        <AvatarImage src={(task as any).assignedUser?.profileImageUrl} />
-                        <AvatarFallback>
-                          {(task as any).assignedUser?.firstName?.[0]}{(task as any).assignedUser?.lastName?.[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">
-                          {(task as any).assignedUser ? 
-                            `${(task as any).assignedUser.firstName} ${(task as any).assignedUser.lastName}` : 
-                            "Unassigned"
-                          }
-                        </p>
-                        {(task as any).assignedUser?.email && (
-                          <p className="text-sm text-slate-500">{(task as any).assignedUser.email}</p>
-                        )}
-                      </div>
                     </div>
                   </div>
 
