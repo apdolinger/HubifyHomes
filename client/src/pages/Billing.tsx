@@ -77,18 +77,10 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
     const searchParams = new URLSearchParams(window.location.search);
     const submissionId = searchParams.get('submissionId');
     
-    console.log('[Billing] Full URL:', window.location.href);
-    console.log('[Billing] URL search:', window.location.search);
-    console.log('[Billing] URL submissionId:', submissionId);
-    console.log('[Billing] Submissions loaded:', !!submissions);
-    console.log('[Billing] Submissions count:', submissions?.length);
-    
     if (submissionId && submissions && submissions.length > 0) {
       const submission = (submissions as any[]).find((s: any) => s.id === submissionId);
-      console.log('[Billing] Found submission:', !!submission);
       
       if (submission) {
-        console.log('[Billing] Opening dialog for submission:', submissionId);
         setEditSubmissionId(submissionId);
         setEditDialogOpen(true);
         
@@ -96,9 +88,6 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
         const newUrl = new URL(window.location.href);
         newUrl.searchParams.delete('submissionId');
         window.history.replaceState({}, '', newUrl.toString());
-      } else {
-        console.warn('[Billing] Submission not found in current filter. Available IDs:', 
-          (submissions as any[]).map((s: any) => s.id).join(', '));
       }
     }
   }, [submissions]);
