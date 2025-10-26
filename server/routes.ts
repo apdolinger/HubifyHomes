@@ -3132,9 +3132,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { assignedTo, limit, showArchived } = req.query;
       let tasks = await storage.getTasks();
       
+      console.log(`[TASKS DEBUG] Total tasks: ${tasks.length}, showArchived: ${showArchived}, archived count: ${tasks.filter(t => t.isArchived).length}`);
+      
       // Exclude archived tasks by default
       if (showArchived !== 'true') {
         tasks = tasks.filter(task => !task.isArchived);
+        console.log(`[TASKS DEBUG] After filtering archived: ${tasks.length} tasks`);
+      } else {
+        console.log(`[TASKS DEBUG] Including archived tasks: ${tasks.length} total`);
       }
       
       // Filter by assignedTo if provided
@@ -3150,6 +3155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      console.log(`[TASKS DEBUG] Final task count: ${tasks.length}`);
       res.json(tasks);
     } catch (error) {
       console.error("Error fetching tasks:", error);
@@ -3459,7 +3465,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/tasks/:id/archive", isAuthenticated, async (req, res) => {
     try {
       const taskId = parseInt(req.params.id);
-      const task = await storage.archiveTask(taskId);
+      const userId = req.user!.sub;
+      const task = await storage.archiveTask(taskId, userId);
       res.json(task);
     } catch (error) {
       console.error("Error archiving task:", error);
@@ -3470,7 +3477,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/tasks/:id/unarchive", isAuthenticated, async (req, res) => {
     try {
       const taskId = parseInt(req.params.id);
-      const task = await storage.unarchiveTask(taskId);
+      const userId = req.user!.sub;
+      const task = await storage.unarchiveTask(taskId, userId);
       res.json(task);
     } catch (error) {
       console.error("Error unarchiving task:", error);

@@ -1301,7 +1301,7 @@ export default function TaskProfile() {
                     {(task as any).priority}
                   </Badge>
                   <Badge variant={getStatusColor((task as any).status)} className="capitalize">
-                    {(task as any).status?.replace('_', ' ')}
+                    {(task as any).status ? String((task as any).status).replace('_', ' ') : 'pending'}
                   </Badge>
                   {(task as any).dueDate && (
                     <div className="flex items-center gap-1.5 text-sm text-slate-600">
@@ -2542,7 +2542,7 @@ export default function TaskProfile() {
 
                   <div>
                     <Label className="text-sm font-medium text-slate-500">Status</Label>
-                    <p className="font-medium capitalize">{(task as any).status ? (task as any).status.replace('_', ' ') : 'pending'}</p>
+                    <p className="font-medium capitalize">{(task as any).status ? String((task as any).status).replace('_', ' ') : 'pending'}</p>
                   </div>
 
                   <div>

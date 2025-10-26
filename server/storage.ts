@@ -342,8 +342,8 @@ export interface IStorage {
   updateTask(id: number, task: Partial<InsertTask>): Promise<Task>;
   assignTask(taskId: number, userId: string, assignedById: string): Promise<Task>;
   completeTask(taskId: number): Promise<Task>;
-  archiveTask(taskId: number): Promise<Task>;
-  unarchiveTask(taskId: number): Promise<Task>;
+  archiveTask(taskId: number, userId: string): Promise<Task>;
+  unarchiveTask(taskId: number, userId: string): Promise<Task>;
   deleteTask(taskId: number): Promise<void>;
   checkTaskConflicts(assignedUserId: string, dueDate: string, timeEstimate: string, excludeTaskId?: number): Promise<any[]>;
   getTaskChecklistItems(taskId: number): Promise<TaskChecklistItem[]>;
@@ -1884,7 +1884,7 @@ export class DatabaseStorage implements IStorage {
     return updatedTask;
   }
 
-  async archiveTask(taskId: number): Promise<Task> {
+  async archiveTask(taskId: number, userId: string): Promise<Task> {
     const [updatedTask] = await db
       .update(tasks)
       .set({ 
@@ -1896,7 +1896,7 @@ export class DatabaseStorage implements IStorage {
     
     // Log activity
     await this.logActivity({
-      userId: updatedTask.assignedToId || "system",
+      userId: userId,
       action: "task_archived",
       entityType: "task",
       entityId: taskId.toString(),
@@ -1906,7 +1906,7 @@ export class DatabaseStorage implements IStorage {
     return updatedTask;
   }
 
-  async unarchiveTask(taskId: number): Promise<Task> {
+  async unarchiveTask(taskId: number, userId: string): Promise<Task> {
     const [updatedTask] = await db
       .update(tasks)
       .set({ 
@@ -1918,7 +1918,7 @@ export class DatabaseStorage implements IStorage {
     
     // Log activity
     await this.logActivity({
-      userId: updatedTask.assignedToId || "system",
+      userId: userId,
       action: "task_unarchived",
       entityType: "task",
       entityId: taskId.toString(),
