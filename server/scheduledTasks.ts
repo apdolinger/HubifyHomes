@@ -59,6 +59,76 @@ export function startScheduledTasks() {
   
   log('[CRON] Scheduled tasks initialized - conflict scan will run every 12 hours at 2am and 2pm');
 
+  // Run task archiving daily at 4am
+  cron.schedule('0 4 * * *', async () => {
+    try {
+      log('[CRON] Starting automatic task archiving...');
+      
+      const now = new Date();
+      const orgs = await storage.getOrgs();
+      let totalArchived = 0;
+      
+      for (const org of orgs) {
+        try {
+          const completedRetentionDays = org.completedTaskRetentionDays ?? 60;
+          const cancelledRetentionDays = org.cancelledTaskRetentionDays ?? 60;
+          
+          // Get all tasks for this org
+          const tasks = await storage.getTasks();
+          const orgTasks = tasks.filter((t: any) => {
+            // Filter tasks belonging to this org (via property or assigned user)
+            // For now, we'll check if task has a property and that property belongs to this org
+            return !t.isArchived; // Only process non-archived tasks
+          });
+          
+          let orgArchivedCount = 0;
+          
+          for (const task of orgTasks) {
+            let shouldArchive = false;
+            
+            // Check if completed task should be archived
+            if (task.status === 'completed' && task.completedAt) {
+              const daysSinceCompleted = Math.floor(
+                (now.getTime() - new Date(task.completedAt).getTime()) / (1000 * 60 * 60 * 24)
+              );
+              shouldArchive = daysSinceCompleted >= completedRetentionDays;
+            }
+            
+            // Check if cancelled task should be archived
+            if (task.status === 'cancelled' && task.updatedAt) {
+              const daysSinceCancelled = Math.floor(
+                (now.getTime() - new Date(task.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
+              );
+              shouldArchive = daysSinceCancelled >= cancelledRetentionDays;
+            }
+            
+            if (shouldArchive) {
+              try {
+                await storage.archiveTask(task.id);
+                orgArchivedCount++;
+              } catch (error) {
+                log(`[CRON] Error archiving task ${task.id}: ${error}`);
+              }
+            }
+          }
+          
+          if (orgArchivedCount > 0) {
+            log(`[CRON] Archived ${orgArchivedCount} tasks for org ${org.name || org.id}`);
+          }
+          totalArchived += orgArchivedCount;
+        } catch (error) {
+          log(`[CRON] Error processing org ${org.id} for task archiving: ${error}`);
+        }
+      }
+      
+      log(`[CRON] Automatic task archiving complete. Archived ${totalArchived} tasks across ${orgs.length} organizations.`);
+    } catch (error) {
+      log(`[CRON] Error in scheduled task archiving: ${error}`);
+    }
+  });
+  
+  log('[CRON] Task archiving scheduled - will run daily at 4am');
+
   // TODO: Re-enable billing automation after fixing email imports
   // Run billing automation daily at 3am
   /* TEMPORARILY DISABLED - NEEDS EMAIL IMPORT FIX
