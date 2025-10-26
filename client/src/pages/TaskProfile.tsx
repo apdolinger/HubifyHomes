@@ -2494,8 +2494,7 @@ export default function TaskProfile() {
       <div className="mt-8 pt-8 border-t">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-slate-900">Danger Zone</h3>
-            <p className="text-sm text-slate-600 mt-1">
+            <p className="text-sm text-slate-600">
               Permanently delete this task and all associated data
             </p>
           </div>
