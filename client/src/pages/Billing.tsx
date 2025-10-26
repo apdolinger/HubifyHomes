@@ -395,11 +395,13 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
                     {pendingGroupedByClient.map((group, idx) => {
                       const isPropertyGrouping = (orgSettings as any)?.invoiceGroupingStrategy === "property";
                       const displayName = isPropertyGrouping 
-                        ? group.property?.name 
-                        : `${group.client?.firstName} ${group.client?.lastName}`;
+                        ? (group.property?.name || "Unknown Property")
+                        : (group.client?.firstName && group.client?.lastName 
+                            ? `${group.client.firstName} ${group.client.lastName}` 
+                            : "Unknown Client");
                       const initials = isPropertyGrouping
-                        ? group.property?.name?.substring(0, 2)?.toUpperCase()
-                        : `${group.client?.firstName?.[0]}${group.client?.lastName?.[0]}`;
+                        ? (group.property?.name?.substring(0, 2)?.toUpperCase() || "??")
+                        : ((group.client?.firstName?.[0] || "?") + (group.client?.lastName?.[0] || "?"));
                       
                       return (
                         <div key={group.groupKey || idx} className="border rounded-lg p-4 bg-slate-50">
@@ -412,7 +414,7 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
                                 <h3 className="font-semibold text-lg">
                                   {displayName}
                                 </h3>
-                                {isPropertyGrouping && group.client && (
+                                {isPropertyGrouping && group.client && group.client.firstName && group.client.lastName && (
                                   <p className="text-xs text-slate-400">
                                     Client: {group.client.firstName} {group.client.lastName}
                                   </p>
