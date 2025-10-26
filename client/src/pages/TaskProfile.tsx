@@ -132,6 +132,7 @@ export default function TaskProfile() {
   const [billingSubmissionAmount, setBillingSubmissionAmount] = useState("");
   const [isTemplateConfirmOpen, setIsTemplateConfirmOpen] = useState(false);
   const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
+  const [propertyComboboxOpen, setPropertyComboboxOpen] = useState(false);
 
   // Task templates
   const taskTemplates = {
@@ -1521,23 +1522,67 @@ export default function TaskProfile() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="edit-property">Property</Label>
-                      <Select 
-                        value={editForm.propertyId}
-                        onValueChange={(value) => {
-                          setEditForm({ ...editForm, propertyId: value, roomId: "none" });
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select property" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.isArray(properties) && properties.map((property: any) => (
-                            <SelectItem key={property.id} value={property.id.toString()}>
-                              {property.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Popover open={propertyComboboxOpen} onOpenChange={setPropertyComboboxOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={propertyComboboxOpen}
+                            className="w-full justify-between"
+                            data-testid="button-select-property"
+                          >
+                            {editForm.propertyId && Array.isArray(properties)
+                              ? properties.find((p: any) => p.id.toString() === editForm.propertyId)?.name
+                              : "Select property..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px] p-0">
+                          <Command>
+                            <CommandInput
+                              placeholder="Search properties..."
+                              value={propertySearchValue}
+                              onValueChange={setPropertySearchValue}
+                            />
+                            <CommandEmpty>No property found.</CommandEmpty>
+                            <CommandGroup className="max-h-[300px] overflow-auto">
+                              {Array.isArray(properties) && properties
+                                .filter((property: any) => 
+                                  property.name.toLowerCase().includes(propertySearchValue.toLowerCase()) ||
+                                  (property.address1 && property.address1.toLowerCase().includes(propertySearchValue.toLowerCase())) ||
+                                  (property.city && property.city.toLowerCase().includes(propertySearchValue.toLowerCase()))
+                                )
+                                .map((property: any) => (
+                                  <CommandItem
+                                    key={property.id}
+                                    value={property.id.toString()}
+                                    onSelect={() => {
+                                      setEditForm({ ...editForm, propertyId: property.id.toString(), roomId: "none" });
+                                      setPropertyComboboxOpen(false);
+                                      setPropertySearchValue("");
+                                    }}
+                                  >
+                                    <Check
+                                      className={`mr-2 h-4 w-4 ${
+                                        editForm.propertyId === property.id.toString()
+                                          ? "opacity-100"
+                                          : "opacity-0"
+                                      }`}
+                                    />
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">{property.name}</span>
+                                      {property.address1 && (
+                                        <span className="text-xs text-muted-foreground">
+                                          {property.address1}{property.city ? `, ${property.city}` : ''}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                            </CommandGroup>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                     <div>
                       <Label htmlFor="edit-room">Room/Space</Label>
