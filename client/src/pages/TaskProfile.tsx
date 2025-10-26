@@ -643,7 +643,15 @@ export default function TaskProfile() {
   const handleTemplateSelect = (templateId: string) => {
     if (templateId === "none") return;
     
-    const template = taskTemplates[templateId as keyof typeof taskTemplates];
+    // Show confirmation dialog before applying template
+    setPendingTemplateId(templateId);
+    setIsTemplateConfirmOpen(true);
+  };
+
+  const applyTemplate = () => {
+    if (!pendingTemplateId) return;
+    
+    const template = taskTemplates[pendingTemplateId as keyof typeof taskTemplates];
     if (template) {
       setEditForm({
         ...editForm,
@@ -665,6 +673,15 @@ export default function TaskProfile() {
         description: `${template.title} template has been applied to the task.`,
       });
     }
+    
+    // Close dialog and reset
+    setIsTemplateConfirmOpen(false);
+    setPendingTemplateId(null);
+  };
+
+  const cancelTemplateApplication = () => {
+    setIsTemplateConfirmOpen(false);
+    setPendingTemplateId(null);
   };
 
   const handleStatusChange = (newStatus: string) => {
