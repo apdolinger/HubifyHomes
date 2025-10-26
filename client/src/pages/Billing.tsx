@@ -74,9 +74,11 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
 
   // Parse URL query parameters to auto-open submission detail
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.split('?')[1]);
+    const searchParams = new URLSearchParams(window.location.search);
     const submissionId = searchParams.get('submissionId');
     
+    console.log('[Billing] Full URL:', window.location.href);
+    console.log('[Billing] URL search:', window.location.search);
     console.log('[Billing] URL submissionId:', submissionId);
     console.log('[Billing] Submissions loaded:', !!submissions);
     console.log('[Billing] Submissions count:', submissions?.length);
@@ -89,12 +91,17 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
         console.log('[Billing] Opening dialog for submission:', submissionId);
         setEditSubmissionId(submissionId);
         setEditDialogOpen(true);
+        
+        // Clear the submissionId from URL after opening
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('submissionId');
+        window.history.replaceState({}, '', newUrl.toString());
       } else {
         console.warn('[Billing] Submission not found in current filter. Available IDs:', 
           (submissions as any[]).map((s: any) => s.id).join(', '));
       }
     }
-  }, [location, submissions]);
+  }, [submissions]);
 
   // Authorize submission mutation
   const authorizeMutation = useMutation({
