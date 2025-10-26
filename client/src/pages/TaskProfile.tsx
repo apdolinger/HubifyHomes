@@ -1620,7 +1620,7 @@ export default function TaskProfile() {
 
                     {/* Upload Area */}
                     <div
-                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                      className={`border-2 border-dashed rounded-lg p-3 text-center transition-colors ${
                         isDragOverPhotos
                           ? 'border-blue-400 bg-blue-50'
                           : 'border-slate-300 hover:border-slate-400'
@@ -1630,17 +1630,17 @@ export default function TaskProfile() {
                       onDrop={handlePhotoDrop}
                     >
                       {isPhotoUploading ? (
-                        <div className="flex flex-col items-center py-4">
-                          <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mb-2" />
+                        <div className="flex flex-col items-center py-2">
+                          <RefreshCw className="w-6 h-6 text-blue-500 animate-spin mb-1" />
                           <p className="text-sm text-slate-600">Uploading photos...</p>
                         </div>
                       ) : (
                         <>
-                          <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                          <p className="text-sm text-slate-600 mb-2">
+                          <Upload className="w-6 h-6 text-slate-400 mx-auto mb-1" />
+                          <p className="text-sm text-slate-600 mb-1">
                             Drag and drop photos here, or click to browse
                           </p>
-                          <p className="text-xs text-slate-500 mb-3">
+                          <p className="text-xs text-slate-500 mb-2">
                             Images only, max 10MB per file
                           </p>
                           <label>
@@ -1843,7 +1843,7 @@ export default function TaskProfile() {
                     )}
 
                     {photoAttachments.length === 0 && !isPhotoUploading && (
-                      <p className="text-sm text-slate-500 text-center py-4">
+                      <p className="text-sm text-slate-500 text-center py-2">
                         No photos attached yet
                       </p>
                     )}
@@ -2003,10 +2003,10 @@ export default function TaskProfile() {
                         </div>
                       ))
                     ) : (
-                      <div className="text-center py-8 text-slate-500">
-                        <Upload className="w-8 h-8 mx-auto mb-2 text-slate-400" />
-                        <p>No attachments yet</p>
-                        <p className="text-sm">Upload files to share documents, photos, or other materials</p>
+                      <div className="text-center py-3 text-slate-500">
+                        <Upload className="w-6 h-6 mx-auto mb-1 text-slate-400" />
+                        <p className="text-sm">No attachments yet</p>
+                        <p className="text-xs text-slate-400">Upload files to share documents, photos, or other materials</p>
                       </div>
                     )}
                     
