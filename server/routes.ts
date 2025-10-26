@@ -3129,8 +3129,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Task routes
   app.get("/api/tasks", isAuthenticated, async (req, res) => {
     try {
-      const { assignedTo, limit } = req.query;
+      const { assignedTo, limit, showArchived } = req.query;
       let tasks = await storage.getTasks();
+      
+      // Exclude archived tasks by default
+      if (showArchived !== 'true') {
+        tasks = tasks.filter(task => !task.isArchived);
+      }
       
       // Filter by assignedTo if provided
       if (assignedTo) {
@@ -3459,6 +3464,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error archiving task:", error);
       res.status(500).json({ message: "Failed to archive task" });
+    }
+  });
+
+  app.patch("/api/tasks/:id/unarchive", isAuthenticated, async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      const task = await storage.unarchiveTask(taskId);
+      res.json(task);
+    } catch (error) {
+      console.error("Error unarchiving task:", error);
+      res.status(500).json({ message: "Failed to unarchive task" });
     }
   });
 
@@ -5428,6 +5444,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Invalid billing workflow mode" });
         }
         updates.billingWorkflowMode = req.body.billingWorkflowMode;
+      }
+      
+      // Allow updating task retention periods
+      if (req.body.hasOwnProperty('completedTaskRetentionDays')) {
+        const days = parseInt(req.body.completedTaskRetentionDays);
+        if (isNaN(days) || days < 0) {
+          return res.status(400).json({ message: "Invalid completed task retention days" });
+        }
+        updates.completedTaskRetentionDays = days;
+      }
+      
+      if (req.body.hasOwnProperty('cancelledTaskRetentionDays')) {
+        const days = parseInt(req.body.cancelledTaskRetentionDays);
+        if (isNaN(days) || days < 0) {
+          return res.status(400).json({ message: "Invalid cancelled task retention days" });
+        }
+        updates.cancelledTaskRetentionDays = days;
       }
       
       const updatedOrg = await storage.updateOrg(orgId, updates);

@@ -343,6 +343,7 @@ export interface IStorage {
   assignTask(taskId: number, userId: string, assignedById: string): Promise<Task>;
   completeTask(taskId: number): Promise<Task>;
   archiveTask(taskId: number): Promise<Task>;
+  unarchiveTask(taskId: number): Promise<Task>;
   deleteTask(taskId: number): Promise<void>;
   checkTaskConflicts(assignedUserId: string, dueDate: string, timeEstimate: string, excludeTaskId?: number): Promise<any[]>;
   getTaskChecklistItems(taskId: number): Promise<TaskChecklistItem[]>;
@@ -1900,6 +1901,28 @@ export class DatabaseStorage implements IStorage {
       entityType: "task",
       entityId: taskId.toString(),
       description: `Archived task "${updatedTask.title}"`,
+    });
+    
+    return updatedTask;
+  }
+
+  async unarchiveTask(taskId: number): Promise<Task> {
+    const [updatedTask] = await db
+      .update(tasks)
+      .set({ 
+        isArchived: false,
+        updatedAt: new Date() 
+      })
+      .where(eq(tasks.id, taskId))
+      .returning();
+    
+    // Log activity
+    await this.logActivity({
+      userId: updatedTask.assignedToId || "system",
+      action: "task_unarchived",
+      entityType: "task",
+      entityId: taskId.toString(),
+      description: `Unarchived task "${updatedTask.title}"`,
     });
     
     return updatedTask;
