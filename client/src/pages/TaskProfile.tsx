@@ -1852,7 +1852,7 @@ export default function TaskProfile() {
               </Card>
 
               {/* Property and Owner Information - moved up below description */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className={`grid gap-6 ${(task as any).property && (task as any).contact ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
                 {(task as any).property && (
                   <Card>
                     <CardHeader>
@@ -1966,131 +1966,136 @@ export default function TaskProfile() {
                 </CardContent>
               </Card>
 
-              {/* Attachments */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Paperclip className="w-5 h-5 mr-2" />
-                    Attachments
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {attachments.length > 0 ? (
-                      attachments.map((file) => (
-                        <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div className="flex items-center space-x-3">
-                            <FileText className="w-5 h-5 text-slate-500" />
-                            <div>
-                              <p className="font-medium">{file.name}</p>
-                              <p className="text-sm text-slate-500">{file.size}</p>
+              {/* Attachments and Quick Links side by side */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Attachments */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center text-base">
+                      <Paperclip className="w-5 h-5 mr-2" />
+                      Attachments
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {attachments.length > 0 ? (
+                        attachments.map((file) => (
+                          <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg">
+                            <div className="flex items-center space-x-3">
+                              <FileText className="w-5 h-5 text-slate-500" />
+                              <div>
+                                <p className="font-medium text-sm">{file.name}</p>
+                                <p className="text-xs text-slate-500">{file.size}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Button variant="ghost" size="sm">
+                                <Download className="w-4 h-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-red-500 hover:text-red-700"
+                                onClick={() => removeAttachment(file.id)}
+                                data-testid={`button-remove-attachment-${file.id}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
                             </div>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <Button variant="ghost" size="sm">
-                              <Download className="w-4 h-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="text-red-500 hover:text-red-700"
-                              onClick={() => removeAttachment(file.id)}
-                              data-testid={`button-remove-attachment-${file.id}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-3 text-slate-500">
+                          <Upload className="w-6 h-6 mx-auto mb-1 text-slate-400" />
+                          <p className="text-sm">No attachments yet</p>
+                          <p className="text-xs text-slate-400">Upload files to share documents</p>
                         </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-3 text-slate-500">
-                        <Upload className="w-6 h-6 mx-auto mb-1 text-slate-400" />
-                        <p className="text-sm">No attachments yet</p>
-                        <p className="text-xs text-slate-400">Upload files to share documents, photos, or other materials</p>
-                      </div>
-                    )}
-                    
-                    <label className="w-full">
-                      <Button 
-                        variant="outline" 
-                        className="w-full cursor-pointer"
-                        disabled={isFileUploading}
-                        asChild
-                      >
-                        <span>
-                          <Upload className="w-4 h-4 mr-2" />
-                          {isFileUploading ? "Uploading..." : "Upload Files"}
-                        </span>
-                      </Button>
-                      <input
-                        type="file"
-                        multiple
-                        onChange={handleFileUpload}
-                        className="hidden"
-                        accept="*/*"
-                        data-testid="input-file-upload"
-                      />
-                    </label>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Quick Links */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Link className="w-5 h-5 mr-2" />
-                    Quick Links
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {quickLinks.map((link) => (
-                      <div key={link.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          <Link className="w-4 h-4 text-blue-500" />
-                          <div>
-                            <p className="font-medium">{link.label}</p>
-                            <a href={link.url} target="_blank" rel="noopener noreferrer" 
-                               className="text-sm text-blue-500 hover:text-blue-700 underline">
-                              {link.url}
-                            </a>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeQuickLink(link.id)}
-                          className="text-red-500 hover:text-red-700"
+                      )}
+                      
+                      <label className="w-full">
+                        <Button 
+                          variant="outline" 
+                          className="w-full cursor-pointer"
+                          disabled={isFileUploading}
+                          asChild
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <span>
+                            <Upload className="w-4 h-4 mr-2" />
+                            {isFileUploading ? "Uploading..." : "Upload Files"}
+                          </span>
                         </Button>
-                      </div>
-                    ))}
-                    
-                    <div className="grid grid-cols-2 gap-2 mt-4">
-                      <Input
-                        value={newQuickLink.label}
-                        onChange={(e) => setNewQuickLink({ ...newQuickLink, label: e.target.value })}
-                        placeholder="Link label..."
-                      />
-                      <Input
-                        value={newQuickLink.url}
-                        onChange={(e) => setNewQuickLink({ ...newQuickLink, url: e.target.value })}
-                        placeholder="URL..."
-                      />
+                        <input
+                          type="file"
+                          multiple
+                          onChange={handleFileUpload}
+                          className="hidden"
+                          accept="*/*"
+                          data-testid="input-file-upload"
+                        />
+                      </label>
                     </div>
-                    <Button 
-                      onClick={addQuickLink} 
-                      disabled={!newQuickLink.label.trim() || !newQuickLink.url.trim()}
-                      className="w-full"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Quick Link
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+
+                {/* Quick Links */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center text-base">
+                      <Link className="w-5 h-5 mr-2" />
+                      Quick Links
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {quickLinks.map((link) => (
+                        <div key={link.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <Link className="w-4 h-4 text-blue-500" />
+                            <div>
+                              <p className="font-medium text-sm">{link.label}</p>
+                              <a href={link.url} target="_blank" rel="noopener noreferrer" 
+                                 className="text-xs text-blue-500 hover:text-blue-700 underline">
+                                {link.url}
+                              </a>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeQuickLink(link.id)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      
+                      <div className="grid grid-cols-1 gap-2 mt-4">
+                        <Input
+                          value={newQuickLink.label}
+                          onChange={(e) => setNewQuickLink({ ...newQuickLink, label: e.target.value })}
+                          placeholder="Link label..."
+                          className="text-sm"
+                        />
+                        <Input
+                          value={newQuickLink.url}
+                          onChange={(e) => setNewQuickLink({ ...newQuickLink, url: e.target.value })}
+                          placeholder="URL..."
+                          className="text-sm"
+                        />
+                      </div>
+                      <Button 
+                        onClick={addQuickLink} 
+                        disabled={!newQuickLink.label.trim() || !newQuickLink.url.trim()}
+                        className="w-full"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Link
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
 
             </div>
