@@ -135,116 +135,141 @@ export default function TaskProfile() {
 
   // Task templates
   const taskTemplates = {
-    "weekly-inspection": {
-      title: "Weekly Property Inspection",
+    "open-property": {
+      title: "Open Property Checklist",
       category: "inspection",
       priority: "normal",
-      description: "Conduct thorough weekly inspection of property including:\n• Check exterior condition\n• Inspect HVAC systems\n• Test smoke and carbon monoxide detectors\n• Review security systems\n• Document any maintenance needs",
+      description: "Prepare a property for owner arrival or occupancy",
       timeEstimate: "2 hours",
       checklist: [
-        { id: "1", text: "Inspect exterior walls and roof", completed: false },
-        { id: "2", text: "Check HVAC filter and operation", completed: false },
-        { id: "3", text: "Test smoke detectors", completed: false },
-        { id: "4", text: "Check security system functionality", completed: false },
-        { id: "5", text: "Document findings in report", completed: false }
+        { id: "1", text: "Unlock gates and entry doors", completed: false },
+        { id: "2", text: "Remove security devices (covers, locks, barriers)", completed: false },
+        { id: "3", text: "Turn on exterior lighting and landscape systems", completed: false },
+        { id: "4", text: "Inspect driveway, paths, and pool area for debris", completed: false },
+        { id: "5", text: "Turn on main water supply", completed: false },
+        { id: "6", text: "Turn on water heater and confirm power source", completed: false },
+        { id: "7", text: "Turn on electricity breakers (note any tripped circuits)", completed: false },
+        { id: "8", text: "Turn on HVAC and set thermostat to owner preference", completed: false },
+        { id: "9", text: "Open blinds/curtains for natural light", completed: false },
+        { id: "10", text: "Test all lights, ceiling fans, and switches", completed: false },
+        { id: "11", text: "Check refrigerator, freezer, and appliances", completed: false },
+        { id: "12", text: "Run faucets/toilets briefly to flush standing water", completed: false },
+        { id: "13", text: "Test smoke and CO detectors", completed: false },
+        { id: "14", text: "Inspect fire extinguishers and expiration dates", completed: false },
+        { id: "15", text: "Ensure security alarm system is functional", completed: false },
+        { id: "16", text: "Place welcome note or owner supplies", completed: false },
+        { id: "17", text: "Report any issues or needed repairs", completed: false },
+        { id: "18", text: "Lock up and confirm alarm re-armed upon exit", completed: false }
       ]
     },
-    "monthly-maintenance": {
-      title: "Monthly Maintenance Review",
-      category: "maintenance",
-      priority: "high",
-      description: "Comprehensive monthly maintenance tasks:\n• Deep clean common areas\n• Service mechanical equipment\n• Update maintenance logs\n• Plan upcoming repairs\n• Review vendor contracts",
-      timeEstimate: "4 hours",
-      checklist: [
-        { id: "1", text: "Deep clean all common areas", completed: false },
-        { id: "2", text: "Service HVAC equipment", completed: false },
-        { id: "3", text: "Update maintenance logs", completed: false },
-        { id: "4", text: "Review and plan repairs", completed: false },
-        { id: "5", text: "Check vendor contract status", completed: false }
-      ]
-    },
-    "quarterly-review": {
-      title: "Quarterly Property Review",
-      category: "administrative",
-      priority: "high", 
-      description: "Comprehensive quarterly assessment:\n• Financial review and budgeting\n• Tenant satisfaction survey\n• Maintenance planning for next quarter\n• Insurance and compliance review\n• Strategic planning updates",
-      timeEstimate: "6 hours",
-      checklist: [
-        { id: "1", text: "Review quarterly financials", completed: false },
-        { id: "2", text: "Conduct tenant satisfaction survey", completed: false },
-        { id: "3", text: "Plan maintenance for next quarter", completed: false },
-        { id: "4", text: "Review insurance compliance", completed: false },
-        { id: "5", text: "Update strategic plans", completed: false }
-      ]
-    },
-    "emergency-repair": {
-      title: "Emergency Repair Response",
-      category: "repair",
-      priority: "urgent",
-      description: "Immediate response to emergency repair situation:\n• Assess damage and safety risks\n• Contact emergency services if needed\n• Implement temporary solutions\n• Coordinate with vendors\n• Document incident thoroughly",
-      timeEstimate: "Varies",
-      checklist: [
-        { id: "1", text: "Assess safety and damage", completed: false },
-        { id: "2", text: "Contact emergency services if needed", completed: false },
-        { id: "3", text: "Implement temporary fixes", completed: false },
-        { id: "4", text: "Contact repair vendors", completed: false },
-        { id: "5", text: "Document incident and costs", completed: false }
-      ]
-    },
-    "cleaning-checklist": {
-      title: "Deep Cleaning Service",
-      category: "cleaning",
-      priority: "normal",
-      description: "Comprehensive cleaning service including:\n• All interior surfaces and fixtures\n• Window cleaning inside and out\n• Floor deep cleaning and maintenance\n• Sanitization of high-touch areas\n• Restocking of supplies",
-      timeEstimate: "3 hours",
-      checklist: [
-        { id: "1", text: "Clean all interior surfaces", completed: false },
-        { id: "2", text: "Clean windows inside and out", completed: false },
-        { id: "3", text: "Deep clean and maintain floors", completed: false },
-        { id: "4", text: "Sanitize high-touch areas", completed: false },
-        { id: "5", text: "Restock cleaning supplies", completed: false }
-      ]
-    },
-    "hvac-maintenance": {
-      title: "HVAC System Maintenance",
-      category: "maintenance",
-      priority: "high",
-      description: "Regular HVAC system maintenance:\n• Replace air filters\n• Clean and inspect ductwork\n• Check thermostat calibration\n• Inspect and clean outdoor units\n• Test system efficiency",
-      timeEstimate: "2.5 hours",
-      checklist: [
-        { id: "1", text: "Replace all air filters", completed: false },
-        { id: "2", text: "Clean and inspect ductwork", completed: false },
-        { id: "3", text: "Calibrate thermostats", completed: false },
-        { id: "4", text: "Clean outdoor units", completed: false },
-        { id: "5", text: "Test system efficiency", completed: false }
-      ]
-    },
-    "landscaping": {
-      title: "Landscaping Maintenance",
-      category: "maintenance",
-      priority: "normal",
-      description: "Seasonal landscaping maintenance:\n• Lawn mowing and edging\n• Pruning shrubs and trees\n• Weed control and fertilization\n• Irrigation system check\n• Seasonal plantings",
-      timeEstimate: "4 hours",
-      checklist: [
-        { id: "1", text: "Mow and edge all lawn areas", completed: false },
-        { id: "2", text: "Prune shrubs and trees", completed: false },
-        { id: "3", text: "Apply weed control and fertilizer", completed: false },
-        { id: "4", text: "Check irrigation system", completed: false },
-        { id: "5", text: "Install seasonal plantings", completed: false }
-      ]
-    },
-    "security-check": {
-      title: "Security System Check",
+    "close-property": {
+      title: "Close Property Checklist",
       category: "inspection",
-      priority: "high",
-      description: "Comprehensive security system review:\n• Test all security cameras\n• Check door and window sensors\n• Verify alarm system functionality\n• Update access codes if needed\n• Review security logs",
+      priority: "normal",
+      description: "Secure and prepare property for vacancy",
+      timeEstimate: "2 hours",
+      checklist: [
+        { id: "1", text: "Turn off main water supply", completed: false },
+        { id: "2", text: "Drain water lines if required", completed: false },
+        { id: "3", text: "Set water heater to vacation/off mode", completed: false },
+        { id: "4", text: "Adjust HVAC to energy-efficient temperature", completed: false },
+        { id: "5", text: "Unplug non-essential appliances", completed: false },
+        { id: "6", text: "Close blinds/curtains as directed", completed: false },
+        { id: "7", text: "Empty refrigerator/freezer if long-term vacancy", completed: false },
+        { id: "8", text: "Confirm all doors/windows locked", completed: false },
+        { id: "9", text: "Remove perishable items and trash", completed: false },
+        { id: "10", text: "Store outdoor furniture, cushions, umbrellas", completed: false },
+        { id: "11", text: "Turn off irrigation if instructed", completed: false },
+        { id: "12", text: "Secure gates and garage doors", completed: false },
+        { id: "13", text: "Cover or secure pool and spa", completed: false },
+        { id: "14", text: "Arm alarm and confirm monitoring status", completed: false },
+        { id: "15", text: "Leave key and access instructions securely stored", completed: false },
+        { id: "16", text: "Take final photos of each room and exterior", completed: false },
+        { id: "17", text: "Log readings for electricity, water, or gas", completed: false },
+        { id: "18", text: "Submit closing report", completed: false }
+      ]
+    },
+    "property-inspection": {
+      title: "Property Inspection Checklist",
+      category: "inspection",
+      priority: "normal",
+      description: "Routine check for maintenance, security, and system health",
       timeEstimate: "1.5 hours",
       checklist: [
-        { id: "1", text: "Test all security cameras", completed: false },
-        { id: "2", text: "Check door and window sensors", completed: false },
-        { id: "3", text: "Test alarm system", completed: false },
-        { id: "4", text: "Update access codes", completed: false },
-        { id: "5", text: "Review security logs", completed: false }
+        { id: "1", text: "Inspect roof, gutters, and downspouts", completed: false },
+        { id: "2", text: "Check for storm damage or debris", completed: false },
+        { id: "3", text: "Examine pool/spa condition", completed: false },
+        { id: "4", text: "Look for pests, rodents, or animal activity", completed: false },
+        { id: "5", text: "Check for leaks, mold, or water stains", completed: false },
+        { id: "6", text: "Test all lights and ceiling fans", completed: false },
+        { id: "7", text: "Ensure HVAC functioning properly", completed: false },
+        { id: "8", text: "Flush toilets and run faucets to prevent stagnation", completed: false },
+        { id: "9", text: "Verify windows/doors are locked and sealed", completed: false },
+        { id: "10", text: "Run dishwasher, washing machine (short cycle) monthly", completed: false },
+        { id: "11", text: "Confirm refrigerator/freezer temperature", completed: false },
+        { id: "12", text: "Check smoke/CO detectors and batteries", completed: false },
+        { id: "13", text: "Test security system or cameras", completed: false },
+        { id: "14", text: "Take time-stamped photos of key areas", completed: false },
+        { id: "15", text: "Note maintenance needs or issues", completed: false },
+        { id: "16", text: "Send report to client with recommendations", completed: false }
+      ]
+    },
+    "storm-preparation": {
+      title: "Storm Preparation Checklist",
+      category: "maintenance",
+      priority: "urgent",
+      description: "Ready the property for hurricanes or severe weather",
+      timeEstimate: "3 hours",
+      checklist: [
+        { id: "1", text: "Bring in outdoor furniture, planters, décor", completed: false },
+        { id: "2", text: "Secure loose items (grill, hoses, etc.)", completed: false },
+        { id: "3", text: "Lower or secure hurricane shutters", completed: false },
+        { id: "4", text: "Check generator fuel and operation", completed: false },
+        { id: "5", text: "Unplug electronics and sensitive devices", completed: false },
+        { id: "6", text: "Move valuables and paperwork to safe location", completed: false },
+        { id: "7", text: "Close interior doors to reduce pressure shifts", completed: false },
+        { id: "8", text: "Turn off main water supply if necessary", completed: false },
+        { id: "9", text: "Set HVAC to safe level", completed: false },
+        { id: "10", text: "Backup alarm system power (if available)", completed: false },
+        { id: "11", text: "Document pre-storm condition with photos", completed: false },
+        { id: "12", text: "Notify client when prep is complete", completed: false }
+      ]
+    },
+    "post-storm-inspection": {
+      title: "Post-Storm Inspection Checklist",
+      category: "inspection",
+      priority: "high",
+      description: "Evaluate and document condition after severe weather",
+      timeEstimate: "2 hours",
+      checklist: [
+        { id: "1", text: "Inspect roof, siding, and gutters for damage", completed: false },
+        { id: "2", text: "Check pool and yard for debris", completed: false },
+        { id: "3", text: "Verify windows, shutters, and doors for impact damage", completed: false },
+        { id: "4", text: "Confirm fencing and gates intact", completed: false },
+        { id: "5", text: "Check for leaks, water intrusion, or dampness", completed: false },
+        { id: "6", text: "Inspect ceilings and floors for stains or swelling", completed: false },
+        { id: "7", text: "Confirm power restored and systems operational", completed: false },
+        { id: "8", text: "Take photos before cleanup", completed: false },
+        { id: "9", text: "Record any damage or insurance-related details", completed: false },
+        { id: "10", text: "Send client report with next steps", completed: false }
+      ]
+    },
+    "maintenance-followup": {
+      title: "Maintenance Follow-Up Checklist",
+      category: "maintenance",
+      priority: "normal",
+      description: "Manage ongoing or recurring service tasks",
+      timeEstimate: "1 hour",
+      checklist: [
+        { id: "1", text: "Confirm date/time with vendor", completed: false },
+        { id: "2", text: "Verify access details and lockbox codes", completed: false },
+        { id: "3", text: "Notify client if they requested updates", completed: false },
+        { id: "4", text: "Meet vendor if required", completed: false },
+        { id: "5", text: "Observe completion of work", completed: false },
+        { id: "6", text: "Confirm cleanup and restore access", completed: false },
+        { id: "7", text: "Take photos of completed work", completed: false },
+        { id: "8", text: "Collect and file invoices", completed: false },
+        { id: "9", text: "Mark maintenance log as complete", completed: false }
       ]
     }
   };
@@ -1294,14 +1319,12 @@ export default function TaskProfile() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="none">No Template</SelectItem>
-                              <SelectItem value="weekly-inspection">Weekly Inspection</SelectItem>
-                              <SelectItem value="monthly-maintenance">Monthly Maintenance</SelectItem>
-                              <SelectItem value="quarterly-review">Quarterly Review</SelectItem>
-                              <SelectItem value="emergency-repair">Emergency Repair</SelectItem>
-                              <SelectItem value="cleaning-checklist">Cleaning Checklist</SelectItem>
-                              <SelectItem value="hvac-maintenance">HVAC Maintenance</SelectItem>
-                              <SelectItem value="landscaping">Landscaping Tasks</SelectItem>
-                              <SelectItem value="security-check">Security Check</SelectItem>
+                              <SelectItem value="open-property">Open Property Checklist</SelectItem>
+                              <SelectItem value="close-property">Close Property Checklist</SelectItem>
+                              <SelectItem value="property-inspection">Property Inspection Checklist</SelectItem>
+                              <SelectItem value="storm-preparation">Storm Preparation Checklist</SelectItem>
+                              <SelectItem value="post-storm-inspection">Post-Storm Inspection Checklist</SelectItem>
+                              <SelectItem value="maintenance-followup">Maintenance Follow-Up Checklist</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
