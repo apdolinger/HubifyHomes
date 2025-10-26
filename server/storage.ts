@@ -872,25 +872,25 @@ export class DatabaseStorage implements IStorage {
       .where(and(...conditions))
       .orderBy(desc(billingSubmissions.createdAt));
     
-    // Fetch related clients and properties
-    const clientIds = [...new Set(submissions.map(s => s.clientId).filter(Boolean))] as string[];
-    const propertyIds = [...new Set(submissions.map(s => s.propertyId).filter(Boolean))] as string[];
+    // Fetch related clients and properties individually for each submission
+    const results = await Promise.all(
+      submissions.map(async (submission) => {
+        const client = submission.clientId
+          ? (await db.select().from(contacts).where(eq(contacts.id, submission.clientId)))[0]
+          : null;
+        const property = submission.propertyId
+          ? (await db.select().from(properties).where(eq(properties.id, submission.propertyId)))[0]
+          : null;
+        
+        return {
+          ...submission,
+          client,
+          property,
+        };
+      })
+    );
     
-    const clientsData = clientIds.length > 0 
-      ? await db.select().from(contacts).where(inArray(contacts.id, clientIds))
-      : [];
-    const propertiesData = propertyIds.length > 0 
-      ? await db.select().from(properties).where(inArray(properties.id, propertyIds))
-      : [];
-    
-    const clientsMap = new Map(clientsData.map(c => [c.id, c]));
-    const propertiesMap = new Map(propertiesData.map(p => [p.id, p]));
-    
-    return submissions.map(s => ({
-      ...s,
-      client: s.clientId ? clientsMap.get(s.clientId) : null,
-      property: s.propertyId ? propertiesMap.get(s.propertyId) : null,
-    }));
+    return results;
   }
 
   async getBillingSubmissionsByClient(clientId: string): Promise<BillingSubmission[]> {
