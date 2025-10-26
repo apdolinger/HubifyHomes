@@ -6,6 +6,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +24,11 @@ interface TableCustomizationModalProps {
   columns: ColumnConfig[];
   defaultColumns: ColumnConfig[];
   onSave: (columns: ColumnConfig[]) => void;
+  // Archive settings props
+  completedRetentionDays?: number;
+  cancelledRetentionDays?: number;
+  onSaveArchiveSettings?: (completed: number, cancelled: number) => void;
+  isSavingArchiveSettings?: boolean;
 }
 
 function SortableColumn({ column, onToggle }: { column: ColumnConfig; onToggle: (id: string) => void }) {
@@ -78,8 +85,14 @@ export default function TableCustomizationModal({
   columns,
   defaultColumns,
   onSave,
+  completedRetentionDays = 60,
+  cancelledRetentionDays = 60,
+  onSaveArchiveSettings,
+  isSavingArchiveSettings = false,
 }: TableCustomizationModalProps) {
   const [localColumns, setLocalColumns] = useState<ColumnConfig[]>(columns);
+  const [localCompletedRetention, setLocalCompletedRetention] = useState(completedRetentionDays);
+  const [localCancelledRetention, setLocalCancelledRetention] = useState(cancelledRetentionDays);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -91,8 +104,10 @@ export default function TableCustomizationModal({
   useEffect(() => {
     if (isOpen) {
       setLocalColumns(columns);
+      setLocalCompletedRetention(completedRetentionDays);
+      setLocalCancelledRetention(cancelledRetentionDays);
     }
-  }, [isOpen, columns]);
+  }, [isOpen, columns, completedRetentionDays, cancelledRetentionDays]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -128,50 +143,109 @@ export default function TableCustomizationModal({
     setLocalColumns(resetColumns);
   };
 
+  const handleSaveArchiveSettings = () => {
+    if (onSaveArchiveSettings) {
+      onSaveArchiveSettings(localCompletedRetention, localCancelledRetention);
+    }
+    onClose();
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Customize Table</DialogTitle>
+          <DialogTitle>Table Settings</DialogTitle>
           <DialogDescription>
-            Toggle column visibility and drag to reorder columns
+            Customize table columns and archive settings
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-2 max-h-96 overflow-y-auto py-4">
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={localColumns.map((col) => col.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              {localColumns.map((column) => (
-                <SortableColumn
-                  key={column.id}
-                  column={column}
-                  onToggle={handleToggle}
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
-        </div>
+        <Tabs defaultValue="columns" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="columns">Columns</TabsTrigger>
+            <TabsTrigger value="archive">Archive Settings</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="columns" className="space-y-4">
+            <div className="space-y-2 max-h-96 overflow-y-auto py-4">
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={localColumns.map((col) => col.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {localColumns.map((column) => (
+                    <SortableColumn
+                      key={column.id}
+                      column={column}
+                      onToggle={handleToggle}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
+            </div>
 
-        <DialogFooter className="flex justify-between sm:justify-between">
-          <Button variant="outline" onClick={handleReset} data-testid="reset-columns-btn">
-            Reset to Default
-          </Button>
-          <div className="flex space-x-2">
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} data-testid="save-columns-btn">
-              Save Changes
-            </Button>
-          </div>
-        </DialogFooter>
+            <DialogFooter className="flex justify-between sm:justify-between">
+              <Button variant="outline" onClick={handleReset} data-testid="reset-columns-btn">
+                Reset to Default
+              </Button>
+              <div className="flex space-x-2">
+                <Button variant="outline" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSave} data-testid="save-columns-btn">
+                  Save Changes
+                </Button>
+              </div>
+            </DialogFooter>
+          </TabsContent>
+
+          <TabsContent value="archive" className="space-y-4">
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="completed-retention">Archive completed tasks after (days)</Label>
+                <Input
+                  id="completed-retention"
+                  type="number"
+                  min="0"
+                  value={localCompletedRetention}
+                  onChange={(e) => setLocalCompletedRetention(parseInt(e.target.value) || 0)}
+                  data-testid="input-completed-retention"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cancelled-retention">Archive cancelled tasks after (days)</Label>
+                <Input
+                  id="cancelled-retention"
+                  type="number"
+                  min="0"
+                  value={localCancelledRetention}
+                  onChange={(e) => setLocalCancelledRetention(parseInt(e.target.value) || 0)}
+                  data-testid="input-cancelled-retention"
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Archived tasks are hidden by default but can be viewed by toggling "Show Archived Tasks".
+              </p>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={onClose} disabled={isSavingArchiveSettings}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveArchiveSettings} 
+                data-testid="button-save-retention"
+                disabled={isSavingArchiveSettings}
+              >
+                {isSavingArchiveSettings ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

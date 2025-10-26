@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useTaskModal } from "@/contexts/TaskModalContext";
 import { useToast } from "@/hooks/use-toast";
@@ -25,7 +25,7 @@ type SortField = 'title' | 'priority' | 'status' | 'dueDate' | 'createdAt' | 'as
 type SortDirection = 'asc' | 'desc';
 
 export default function Tasks() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const { openTaskModal } = useTaskModal();
   const { toast } = useToast();
   const [location, navigate] = useLocation();
@@ -64,10 +64,52 @@ export default function Tasks() {
   // Table customization state
   const [isCustomizeModalOpen, setIsCustomizeModalOpen] = useState(false);
   
-  // Retention settings state
-  const [isRetentionSettingsOpen, setIsRetentionSettingsOpen] = useState(false);
+  // Fetch organization settings to get retention periods
+  const { data: orgSettings } = useQuery({
+    queryKey: ["/api/orgs/current"],
+    enabled: isAuthenticated,
+  });
+  
+  // Retention settings state - initialize from org settings
   const [completedRetentionDays, setCompletedRetentionDays] = useState(60);
   const [cancelledRetentionDays, setCancelledRetentionDays] = useState(60);
+  
+  // Update retention state when org settings load
+  useEffect(() => {
+    if (orgSettings) {
+      setCompletedRetentionDays(orgSettings.completedTaskRetentionDays ?? 60);
+      setCancelledRetentionDays(orgSettings.cancelledTaskRetentionDays ?? 60);
+    }
+  }, [orgSettings]);
+  
+  // Mutation to update retention settings
+  const updateRetentionMutation = useMutation({
+    mutationFn: async ({ completed, cancelled }: { completed: number; cancelled: number }) => {
+      const orgId = user?.claims?.orgId;
+      if (!orgId) throw new Error("Organization ID not found");
+      
+      return await apiRequest("PATCH", `/api/orgs/${orgId}`, {
+        completedTaskRetentionDays: completed,
+        cancelledTaskRetentionDays: cancelled,
+      });
+    },
+    onSuccess: (_, variables) => {
+      setCompletedRetentionDays(variables.completed);
+      setCancelledRetentionDays(variables.cancelled);
+      queryClient.invalidateQueries({ queryKey: ["/api/orgs/current"] });
+      toast({ 
+        title: "Settings saved", 
+        description: "Archive settings updated successfully" 
+      });
+    },
+    onError: () => {
+      toast({ 
+        title: "Error", 
+        description: "Failed to save archive settings. Please try again.", 
+        variant: "destructive" 
+      });
+    },
+  });
   
   // Default column configuration
   const defaultColumns: ColumnConfig[] = [
@@ -585,78 +627,15 @@ export default function Tasks() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Tasks List</CardTitle>
-          <div className="flex items-center space-x-2">
-            <Dialog open={isRetentionSettingsOpen} onOpenChange={setIsRetentionSettingsOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  data-testid="button-retention-settings"
-                >
-                  <Archive className="w-4 h-4 mr-2" />
-                  Archive Settings
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Task Archive Settings</DialogTitle>
-                  <DialogDescription>
-                    Configure how long completed and cancelled tasks are retained before automatic archiving.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="completed-retention">Archive completed tasks after (days)</Label>
-                    <Input
-                      id="completed-retention"
-                      type="number"
-                      min="0"
-                      value={completedRetentionDays}
-                      onChange={(e) => setCompletedRetentionDays(parseInt(e.target.value) || 0)}
-                      data-testid="input-completed-retention"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cancelled-retention">Archive cancelled tasks after (days)</Label>
-                    <Input
-                      id="cancelled-retention"
-                      type="number"
-                      min="0"
-                      value={cancelledRetentionDays}
-                      onChange={(e) => setCancelledRetentionDays(parseInt(e.target.value) || 0)}
-                      data-testid="input-cancelled-retention"
-                    />
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Archived tasks are hidden by default but can be viewed by toggling "Show Archived Tasks".
-                  </p>
-                </div>
-                <DialogFooter>
-                  <Button
-                    onClick={async () => {
-                      try {
-                        toast({ title: "Settings saved", description: "Archive settings updated successfully" });
-                        setIsRetentionSettingsOpen(false);
-                      } catch (error) {
-                        toast({ title: "Error", description: "Failed to save settings", variant: "destructive" });
-                      }
-                    }}
-                    data-testid="button-save-retention"
-                  >
-                    Save Changes
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsCustomizeModalOpen(true)}
-              data-testid="customize-table-btn"
-            >
-              <Settings className="w-4 h-4" />
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsCustomizeModalOpen(true)}
+            data-testid="customize-table-btn"
+          >
+            <Settings className="w-4 h-4 mr-2" />
+            Settings
+          </Button>
         </CardHeader>
         <CardContent>
           {tasksLoading ? (
@@ -774,6 +753,12 @@ export default function Tasks() {
         columns={columns}
         defaultColumns={defaultColumns}
         onSave={handleSaveColumns}
+        completedRetentionDays={completedRetentionDays}
+        cancelledRetentionDays={cancelledRetentionDays}
+        onSaveArchiveSettings={(completed, cancelled) => {
+          updateRetentionMutation.mutate({ completed, cancelled });
+        }}
+        isSavingArchiveSettings={updateRetentionMutation.isPending}
       />
     </main>
   );
