@@ -2956,6 +2956,66 @@ export default function TaskProfile() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Template Confirmation Dialog */}
+      <Dialog open={isTemplateConfirmOpen} onOpenChange={setIsTemplateConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2 text-amber-600">
+              <AlertCircle className="w-5 h-5" />
+              <span>Apply Template?</span>
+            </DialogTitle>
+            <DialogDescription>
+              Applying this template will replace existing data in some fields.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <h4 className="font-medium text-sm text-amber-900 mb-2">
+                The following fields will be overridden:
+              </h4>
+              <ul className="text-sm text-amber-800 space-y-1 list-disc list-inside">
+                <li>Task title</li>
+                <li>Description</li>
+                <li>Category</li>
+                <li>Priority</li>
+                <li>Time estimate</li>
+                <li>Checklist items (completely replaced)</li>
+              </ul>
+            </div>
+
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h4 className="font-medium text-sm text-blue-900 mb-2">
+                The following fields will be preserved:
+              </h4>
+              <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+                <li>Status</li>
+                <li>Due date</li>
+                <li>Team/Staff assignment</li>
+                <li>Property and Client</li>
+                <li>Tags and other fields</li>
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={cancelTemplateApplication}
+              data-testid="button-cancel-template"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={applyTemplate}
+              data-testid="button-apply-template"
+            >
+              Apply Template
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
