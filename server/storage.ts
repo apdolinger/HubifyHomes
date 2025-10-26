@@ -876,7 +876,7 @@ export class DatabaseStorage implements IStorage {
     const results = await Promise.all(
       submissions.map(async (submission) => {
         const client = submission.clientId
-          ? (await db.select().from(contacts).where(eq(contacts.id, submission.clientId)))[0]
+          ? (await db.select().from(contacts).where(eq(contacts.accountId, submission.clientId)))[0]
           : null;
         const property = submission.propertyId
           ? (await db.select().from(properties).where(eq(properties.id, submission.propertyId)))[0]
