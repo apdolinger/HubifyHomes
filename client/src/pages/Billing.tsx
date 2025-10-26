@@ -1,7 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import { useForm, useFieldArray, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -41,6 +42,7 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [location] = useLocation();
 
   const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
   const [rejectionReason, setRejectionReason] = useState("");
@@ -51,6 +53,20 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [submissionToReject, setSubmissionToReject] = useState<any>(null);
+
+  // Parse URL query parameters to auto-open submission detail
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.split('?')[1]);
+    const submissionId = searchParams.get('submissionId');
+    
+    if (submissionId && submissions) {
+      const submission = (submissions as any[]).find((s: any) => s.id === submissionId);
+      if (submission) {
+        setEditSubmissionId(submissionId);
+        setEditDialogOpen(true);
+      }
+    }
+  }, [location, submissions]);
 
   // Fetch billing submissions
   const { data: submissions, isLoading: submissionsLoading } = useQuery({

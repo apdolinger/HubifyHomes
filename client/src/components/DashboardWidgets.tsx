@@ -474,7 +474,7 @@ export function BillingWidget({ className }: BillingWidgetProps) {
   };
 
   const handleViewSubmission = (id: string) => {
-    setLocation("/admin?tab=billing");
+    setLocation(`/admin?tab=billing&submissionId=${id}`);
   };
 
   const pendingSubmissions = submissions || [];
