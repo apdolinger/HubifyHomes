@@ -855,7 +855,7 @@ export class DatabaseStorage implements IStorage {
     return submission;
   }
 
-  async getBillingSubmissions(orgId: string, filters?: { status?: string; clientId?: string }): Promise<BillingSubmission[]> {
+  async getBillingSubmissions(orgId: string, filters?: { status?: string; clientId?: string }): Promise<any[]> {
     const conditions = [eq(billingSubmissions.orgId, orgId)];
     
     if (filters?.status) {
@@ -866,11 +866,23 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(billingSubmissions.clientId, filters.clientId));
     }
     
-    return await db
-      .select()
+    const results = await db
+      .select({
+        submission: billingSubmissions,
+        client: contacts,
+        property: properties,
+      })
       .from(billingSubmissions)
+      .leftJoin(contacts, eq(billingSubmissions.clientId, contacts.id))
+      .leftJoin(properties, eq(billingSubmissions.propertyId, properties.id))
       .where(and(...conditions))
       .orderBy(desc(billingSubmissions.createdAt));
+    
+    return results.map(r => ({
+      ...r.submission,
+      client: r.client,
+      property: r.property,
+    }));
   }
 
   async getBillingSubmissionsByClient(clientId: string): Promise<BillingSubmission[]> {
