@@ -77,11 +77,21 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
     const searchParams = new URLSearchParams(location.split('?')[1]);
     const submissionId = searchParams.get('submissionId');
     
-    if (submissionId && submissions) {
+    console.log('[Billing] URL submissionId:', submissionId);
+    console.log('[Billing] Submissions loaded:', !!submissions);
+    console.log('[Billing] Submissions count:', submissions?.length);
+    
+    if (submissionId && submissions && submissions.length > 0) {
       const submission = (submissions as any[]).find((s: any) => s.id === submissionId);
+      console.log('[Billing] Found submission:', !!submission);
+      
       if (submission) {
+        console.log('[Billing] Opening dialog for submission:', submissionId);
         setEditSubmissionId(submissionId);
         setEditDialogOpen(true);
+      } else {
+        console.warn('[Billing] Submission not found in current filter. Available IDs:', 
+          (submissions as any[]).map((s: any) => s.id).join(', '));
       }
     }
   }, [location, submissions]);
