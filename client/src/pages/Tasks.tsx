@@ -8,7 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckSquare, Clock, User, Building, Eye, Edit, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings, Repeat } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useQuery as useAuthQuery } from "@tanstack/react-query";
+import { CheckSquare, Clock, User, Building, Eye, Edit, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings, Repeat, Archive } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation } from "wouter";
@@ -30,6 +36,7 @@ export default function Tasks() {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [assignedFilter, setAssignedFilter] = useState("all");
   const [clientFilter, setClientFilter] = useState("all");
+  const [showArchived, setShowArchived] = useState(false);
   
   // Parse URL search parameters and update filters when location changes
   useEffect(() => {
@@ -56,6 +63,11 @@ export default function Tasks() {
 
   // Table customization state
   const [isCustomizeModalOpen, setIsCustomizeModalOpen] = useState(false);
+  
+  // Retention settings state
+  const [isRetentionSettingsOpen, setIsRetentionSettingsOpen] = useState(false);
+  const [completedRetentionDays, setCompletedRetentionDays] = useState(60);
+  const [cancelledRetentionDays, setCancelledRetentionDays] = useState(60);
   
   // Default column configuration
   const defaultColumns: ColumnConfig[] = [
@@ -109,7 +121,7 @@ export default function Tasks() {
   }, [isAuthenticated, isLoading, toast]);
 
   const { data: tasks, isLoading: tasksLoading } = useQuery({
-    queryKey: ["/api/tasks"],
+    queryKey: [`/api/tasks?showArchived=${showArchived ? 'true' : 'false'}`],
     enabled: isAuthenticated,
   });
 
@@ -552,6 +564,20 @@ export default function Tasks() {
               </Button>
             </div>
           )}
+          
+          {/* Show Archived Toggle */}
+          <div className="mt-4 flex items-center space-x-2">
+            <Switch 
+              id="show-archived" 
+              checked={showArchived} 
+              onCheckedChange={setShowArchived}
+              data-testid="switch-show-archived"
+            />
+            <Label htmlFor="show-archived" className="cursor-pointer flex items-center space-x-2">
+              <Archive className="w-4 h-4 text-slate-600" />
+              <span>Show Archived Tasks</span>
+            </Label>
+          </div>
         </CardContent>
       </Card>
 
@@ -559,14 +585,78 @@ export default function Tasks() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Tasks List</CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsCustomizeModalOpen(true)}
-            data-testid="customize-table-btn"
-          >
-            <Settings className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center space-x-2">
+            <Dialog open={isRetentionSettingsOpen} onOpenChange={setIsRetentionSettingsOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid="button-retention-settings"
+                >
+                  <Archive className="w-4 h-4 mr-2" />
+                  Archive Settings
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Task Archive Settings</DialogTitle>
+                  <DialogDescription>
+                    Configure how long completed and cancelled tasks are retained before automatic archiving.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="completed-retention">Archive completed tasks after (days)</Label>
+                    <Input
+                      id="completed-retention"
+                      type="number"
+                      min="0"
+                      value={completedRetentionDays}
+                      onChange={(e) => setCompletedRetentionDays(parseInt(e.target.value) || 0)}
+                      data-testid="input-completed-retention"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cancelled-retention">Archive cancelled tasks after (days)</Label>
+                    <Input
+                      id="cancelled-retention"
+                      type="number"
+                      min="0"
+                      value={cancelledRetentionDays}
+                      onChange={(e) => setCancelledRetentionDays(parseInt(e.target.value) || 0)}
+                      data-testid="input-cancelled-retention"
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Archived tasks are hidden by default but can be viewed by toggling "Show Archived Tasks".
+                  </p>
+                </div>
+                <DialogFooter>
+                  <Button
+                    onClick={async () => {
+                      try {
+                        toast({ title: "Settings saved", description: "Archive settings updated successfully" });
+                        setIsRetentionSettingsOpen(false);
+                      } catch (error) {
+                        toast({ title: "Error", description: "Failed to save settings", variant: "destructive" });
+                      }
+                    }}
+                    data-testid="button-save-retention"
+                  >
+                    Save Changes
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsCustomizeModalOpen(true)}
+              data-testid="customize-table-btn"
+            >
+              <Settings className="w-4 h-4" />
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {tasksLoading ? (

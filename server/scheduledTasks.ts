@@ -73,12 +73,16 @@ export function startScheduledTasks() {
           const completedRetentionDays = org.completedTaskRetentionDays ?? 60;
           const cancelledRetentionDays = org.cancelledTaskRetentionDays ?? 60;
           
-          // Get all tasks for this org
-          const tasks = await storage.getTasks();
-          const orgTasks = tasks.filter((t: any) => {
-            // Filter tasks belonging to this org (via property or assigned user)
-            // For now, we'll check if task has a property and that property belongs to this org
-            return !t.isArchived; // Only process non-archived tasks
+          // Get all non-archived tasks
+          const allTasks = await storage.getTasks();
+          
+          // Get all properties for this org to identify org's tasks
+          const orgProperties = await storage.getProperties(org.id);
+          const orgPropertyIds = new Set(orgProperties.map((p: any) => p.id));
+          
+          // Filter to only this org's tasks (tasks assigned to org properties) and not archived
+          const orgTasks = allTasks.filter((t: any) => {
+            return !t.isArchived && t.propertyId && orgPropertyIds.has(t.propertyId);
           });
           
           let orgArchivedCount = 0;

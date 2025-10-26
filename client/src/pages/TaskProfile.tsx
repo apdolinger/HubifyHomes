@@ -53,7 +53,8 @@ import {
   BookOpen,
   Check,
   ChevronsUpDown,
-  Repeat
+  Repeat,
+  Archive
 } from "lucide-react";
 
 export default function TaskProfile() {
@@ -351,6 +352,58 @@ export default function TaskProfile() {
   const { data: linkedClient } = useQuery({
     queryKey: [`/api/clients/${linkedClientId}`],
     enabled: isAuthenticated && !!linkedClientId,
+  });
+
+  // Archive/Unarchive task mutation
+  const archiveTaskMutation = useMutation({
+    mutationFn: async (action: 'archive' | 'unarchive') => {
+      const endpoint = action === 'unarchive' 
+        ? `/api/tasks/${taskId}/unarchive` 
+        : `/api/tasks/${taskId}/archive`;
+      return await apiRequest("PATCH", endpoint);
+    },
+    onMutate: async (action) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: [`/api/tasks/${taskId}`] });
+      
+      // Snapshot the previous value
+      const previousTask = queryClient.getQueryData([`/api/tasks/${taskId}`]);
+      
+      // Optimistically update the cache
+      queryClient.setQueryData([`/api/tasks/${taskId}`], (old: any) => ({
+        ...old,
+        isArchived: action === 'archive'
+      }));
+      
+      return { previousTask };
+    },
+    onError: (err, action, context) => {
+      // Rollback on error
+      if (context?.previousTask) {
+        queryClient.setQueryData([`/api/tasks/${taskId}`], context.previousTask);
+      }
+      toast({
+        title: "Error",
+        description: `Failed to ${action} task`,
+        variant: "destructive",
+      });
+    },
+    onSuccess: (data, action) => {
+      // Update cache with server response
+      queryClient.setQueryData([`/api/tasks/${taskId}`], data);
+      
+      // Invalidate all task list queries
+      queryClient.invalidateQueries({ 
+        predicate: ({ queryKey }) => queryKey.some((segment) => 
+          typeof segment === 'string' && segment.startsWith('/api/tasks')
+        )
+      });
+      
+      toast({
+        title: `Task ${action === 'archive' ? 'Archived' : 'Unarchived'}`,
+        description: `Task has been ${action}d successfully`,
+      });
+    }
   });
 
   // Update task mutation
@@ -1296,9 +1349,27 @@ export default function TaskProfile() {
                   </Button>
                 )}
                 
+                {/* Archive/Unarchive Button */}
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const action = (task as any).isArchived ? 'unarchive' : 'archive';
+                    archiveTaskMutation.mutate(action);
+                  }}
+                  disabled={archiveTaskMutation.isPending}
+                  data-testid={(task as any).isArchived ? "button-unarchive-task" : "button-archive-task"}
+                >
+                  {archiveTaskMutation.isPending ? (
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Archive className="w-4 h-4 mr-2" />
+                  )}
+                  {(task as any).isArchived ? "Unarchive Task" : "Archive Task"}
+                </Button>
+                
                 <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
                   <DialogTrigger asChild>
-                    <Button>
+                    <Button data-testid="button-edit-task">
                       <Edit className="w-4 h-4 mr-2" />
                       Edit Task
                     </Button>
