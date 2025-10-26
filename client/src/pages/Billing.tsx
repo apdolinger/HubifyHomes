@@ -54,20 +54,6 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [submissionToReject, setSubmissionToReject] = useState<any>(null);
 
-  // Parse URL query parameters to auto-open submission detail
-  useEffect(() => {
-    const searchParams = new URLSearchParams(location.split('?')[1]);
-    const submissionId = searchParams.get('submissionId');
-    
-    if (submissionId && submissions) {
-      const submission = (submissions as any[]).find((s: any) => s.id === submissionId);
-      if (submission) {
-        setEditSubmissionId(submissionId);
-        setEditDialogOpen(true);
-      }
-    }
-  }, [location, submissions]);
-
   // Fetch billing submissions
   const { data: submissions, isLoading: submissionsLoading } = useQuery({
     queryKey: ["/api/billing-submissions", { status: statusFilter, clientId: clientFilter !== "all" ? clientFilter : undefined }],
@@ -85,6 +71,20 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
     queryKey: ["/api/orgs/current"],
     enabled: isAuthenticated,
   });
+
+  // Parse URL query parameters to auto-open submission detail
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.split('?')[1]);
+    const submissionId = searchParams.get('submissionId');
+    
+    if (submissionId && submissions) {
+      const submission = (submissions as any[]).find((s: any) => s.id === submissionId);
+      if (submission) {
+        setEditSubmissionId(submissionId);
+        setEditDialogOpen(true);
+      }
+    }
+  }, [location, submissions]);
 
   // Authorize submission mutation
   const authorizeMutation = useMutation({
