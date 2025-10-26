@@ -173,7 +173,7 @@ import {
   type InsertEmailTemplate,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, or, like, count, sql } from "drizzle-orm";
+import { eq, desc, and, or, like, count, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations - required for Replit Auth
@@ -866,22 +866,30 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(billingSubmissions.clientId, filters.clientId));
     }
     
-    const results = await db
-      .select({
-        submission: billingSubmissions,
-        client: contacts,
-        property: properties,
-      })
+    const submissions = await db
+      .select()
       .from(billingSubmissions)
-      .leftJoin(contacts, eq(billingSubmissions.clientId, contacts.id))
-      .leftJoin(properties, eq(billingSubmissions.propertyId, properties.id))
       .where(and(...conditions))
       .orderBy(desc(billingSubmissions.createdAt));
     
-    return results.map(r => ({
-      ...r.submission,
-      client: r.client,
-      property: r.property,
+    // Fetch related clients and properties
+    const clientIds = [...new Set(submissions.map(s => s.clientId).filter(Boolean))] as string[];
+    const propertyIds = [...new Set(submissions.map(s => s.propertyId).filter(Boolean))] as string[];
+    
+    const clientsData = clientIds.length > 0 
+      ? await db.select().from(contacts).where(inArray(contacts.id, clientIds))
+      : [];
+    const propertiesData = propertyIds.length > 0 
+      ? await db.select().from(properties).where(inArray(properties.id, propertyIds))
+      : [];
+    
+    const clientsMap = new Map(clientsData.map(c => [c.id, c]));
+    const propertiesMap = new Map(propertiesData.map(p => [p.id, p]));
+    
+    return submissions.map(s => ({
+      ...s,
+      client: s.clientId ? clientsMap.get(s.clientId) : null,
+      property: s.propertyId ? propertiesMap.get(s.propertyId) : null,
     }));
   }
 
