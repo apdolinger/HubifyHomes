@@ -130,6 +130,8 @@ export default function TaskProfile() {
   const [isBillingDialogOpen, setIsBillingDialogOpen] = useState(false);
   const [pendingTaskUpdate, setPendingTaskUpdate] = useState<any>(null);
   const [billingSubmissionAmount, setBillingSubmissionAmount] = useState("");
+  const [isTemplateConfirmOpen, setIsTemplateConfirmOpen] = useState(false);
+  const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
 
   // Task templates
   const taskTemplates = {
