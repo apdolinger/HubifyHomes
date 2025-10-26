@@ -462,9 +462,11 @@ interface BillingWidgetProps {
 export function BillingWidget({ className }: BillingWidgetProps) {
   const [, setLocation] = useLocation();
 
-  // Fetch pending billing submissions
+  // Fetch pending billing submissions with automatic polling every 30 seconds
   const { data: submissions, isLoading } = useQuery<any[]>({
     queryKey: ["/api/billing-submissions", { status: "pending" }],
+    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch when user returns to the window
   });
 
   const handleViewAllSubmissions = () => {
