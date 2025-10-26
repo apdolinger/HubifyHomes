@@ -28,6 +28,7 @@ import {
   User,
   Building,
   CheckSquare,
+  CheckCircle,
   AlertCircle,
   FileText,
   MessageSquare,
@@ -1213,8 +1214,43 @@ export default function TaskProfile() {
                 </div>
               </div>
               
-              {/* Edit Task Button */}
-              <div className="flex-shrink-0">
+              {/* Action Buttons */}
+              <div className="flex-shrink-0 flex gap-2">
+                {/* Complete Task Button */}
+                {(task as any).status !== 'completed' && (
+                  <Button
+                    variant="default"
+                    onClick={async () => {
+                      // Mark task as completed
+                      const updateData = {
+                        status: 'completed',
+                        completedAt: new Date().toISOString()
+                      };
+                      
+                      // Check if task is billable (has contact and property)
+                      const isBillable = !!(task as any).contactId && !!(task as any).propertyId;
+                      
+                      if (isBillable) {
+                        // Store update for later and navigate to billing submission
+                        setPendingTaskUpdate(updateData);
+                        setIsSubmissionModalOpen(true);
+                      } else {
+                        // Just update the task
+                        updateTaskMutation.mutate(updateData);
+                        toast({
+                          title: "Task Completed",
+                          description: "Task has been marked as completed",
+                        });
+                      }
+                    }}
+                    data-testid="button-complete-task"
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Complete Task
+                  </Button>
+                )}
+                
                 <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
                   <DialogTrigger asChild>
                     <Button>
