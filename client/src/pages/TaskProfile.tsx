@@ -1369,7 +1369,7 @@ export default function TaskProfile() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="edit-assigned-to">Assigned To</Label>
+                      <Label htmlFor="edit-assigned-to">Team/Staff</Label>
                       <Select 
                         value={editForm.assignedTo}
                         onValueChange={(value) => setEditForm({ ...editForm, assignedTo: value })}
@@ -2331,7 +2331,7 @@ export default function TaskProfile() {
                   {/* Team Assignment */}
                   <div>
                     <Label className="text-sm font-medium text-slate-700 mb-2 block">
-                      Assigned To
+                      Team/Staff
                     </Label>
                     <Select
                       value={(task as any).assignedToId?.toString() || "none"}
