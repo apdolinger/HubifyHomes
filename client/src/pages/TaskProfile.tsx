@@ -980,7 +980,7 @@ export default function TaskProfile() {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       toast({
         title: "Success",
-        description: "Contact created and assigned successfully",
+        description: "Client created and assigned successfully",
       });
       setIsNewContactModalOpen(false);
       setContactSearchOpen(false);
@@ -996,7 +996,7 @@ export default function TaskProfile() {
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: "Failed to create contact",
+        description: "Failed to create client",
         variant: "destructive",
       });
     },
@@ -1323,10 +1323,10 @@ export default function TaskProfile() {
                     </div>
                   )}
 
-                  {/* Contact Association */}
+                  {/* Client Association */}
                   <div>
                     <Label className="text-sm font-medium text-slate-700 mb-2 block">
-                      Related Contact
+                      Related Client
                     </Label>
                     <Popover open={contactSearchOpen} onOpenChange={setContactSearchOpen}>
                       <PopoverTrigger asChild>
@@ -1342,7 +1342,7 @@ export default function TaskProfile() {
                               <span>{(task as any).contact.firstName} {(task as any).contact.lastName}</span>
                             </div>
                           ) : (
-                            <span className="text-slate-500">Search contact...</span>
+                            <span className="text-slate-500">Search client...</span>
                           )}
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
@@ -1350,13 +1350,13 @@ export default function TaskProfile() {
                       <PopoverContent className="w-[400px] p-0">
                         <Command>
                           <CommandInput 
-                            placeholder="Search contacts..." 
+                            placeholder="Search clients..." 
                             value={contactSearchValue}
                             onValueChange={setContactSearchValue}
                           />
                           <CommandEmpty>
                             <div className="p-4 text-center">
-                              <p className="text-sm text-slate-500 mb-3">No contacts found</p>
+                              <p className="text-sm text-slate-500 mb-3">No clients found</p>
                               <Button 
                                 size="sm" 
                                 onClick={() => {
@@ -1377,7 +1377,7 @@ export default function TaskProfile() {
                                 className="w-full"
                               >
                                 <Plus className="w-4 h-4 mr-2" />
-                                Create new contact
+                                Create new client
                               </Button>
                             </div>
                           </CommandEmpty>
@@ -1390,7 +1390,7 @@ export default function TaskProfile() {
                               }}
                             >
                               <X className="mr-2 h-4 w-4 text-slate-400" />
-                              No contact
+                              No client
                             </CommandItem>
                             {Array.isArray(contacts) && contacts.map((contact: any) => (
                               <CommandItem
@@ -2639,13 +2639,13 @@ export default function TaskProfile() {
         </DialogContent>
       </Dialog>
 
-      {/* New Contact Modal */}
+      {/* New Client Modal */}
       <Dialog open={isNewContactModalOpen} onOpenChange={setIsNewContactModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Create New Contact</DialogTitle>
+            <DialogTitle>Create New Client</DialogTitle>
             <DialogDescription>
-              Add a new contact and assign it to this task
+              Add a new client and assign it to this task
             </DialogDescription>
           </DialogHeader>
 
@@ -2698,7 +2698,7 @@ export default function TaskProfile() {
             </div>
 
             <div>
-              <Label htmlFor="contact-type">Contact Type</Label>
+              <Label htmlFor="contact-type">Client Type</Label>
               <Select 
                 value={newContactForm.type}
                 onValueChange={(value) => setNewContactForm({ ...newContactForm, type: value })}
@@ -2737,7 +2737,7 @@ export default function TaskProfile() {
               disabled={createContactMutation.isPending}
               data-testid="button-create-contact"
             >
-              {createContactMutation.isPending ? "Creating..." : "Create Contact"}
+              {createContactMutation.isPending ? "Creating..." : "Create Client"}
             </Button>
           </DialogFooter>
         </DialogContent>
