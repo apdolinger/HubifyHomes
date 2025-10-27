@@ -54,7 +54,8 @@ import {
   Check,
   ChevronsUpDown,
   Repeat,
-  Archive
+  Archive,
+  Settings
 } from "lucide-react";
 
 export default function TaskProfile() {
@@ -97,8 +98,9 @@ export default function TaskProfile() {
   const [beforeAfterMode, setBeforeAfterMode] = useState(false);
   const [quickLinks, setQuickLinks] = useState<Array<{id: string, label: string, url: string}>>([]);
   const [newQuickLink, setNewQuickLink] = useState({label: "", url: ""});
-  const [comments, setComments] = useState<Array<{id: string, text: string, author: string, timestamp: string}>>([]);
   const [newComment, setNewComment] = useState("");
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState("");
   const [taskImage, setTaskImage] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isImageUploading, setIsImageUploading] = useState(false);
@@ -467,6 +469,70 @@ export default function TaskProfile() {
     },
   });
 
+  // Comment mutations
+  const createCommentMutation = useMutation({
+    mutationFn: async (text: string) => {
+      return await apiRequest("POST", `/api/tasks/${taskId}/comments`, { text });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/tasks/${taskId}/comments`] });
+      setNewComment("");
+      toast({
+        title: "Comment added",
+        description: "Your comment has been posted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to add comment",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateCommentMutation = useMutation({
+    mutationFn: async ({ commentId, text }: { commentId: number; text: string }) => {
+      return await apiRequest("PATCH", `/api/tasks/${taskId}/comments/${commentId}`, { text });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/tasks/${taskId}/comments`] });
+      setEditingCommentId(null);
+      setEditingCommentText("");
+      toast({
+        title: "Comment updated",
+        description: "Your comment has been updated successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update comment",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: async (commentId: number) => {
+      return await apiRequest("DELETE", `/api/tasks/${taskId}/comments/${commentId}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/tasks/${taskId}/comments`] });
+      toast({
+        title: "Comment deleted",
+        description: "Your comment has been deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete comment",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Billing submission mutation
   const createBillingSubmissionMutation = useMutation({
     mutationFn: async (data: { clientId: string; amountCents: number; description: string }) => {
@@ -792,15 +858,27 @@ export default function TaskProfile() {
 
   const addComment = () => {
     if (newComment.trim()) {
-      const comment = {
-        id: Date.now().toString(),
-        text: newComment.trim(),
-        author: "Current User", // TODO: Use actual user data when available
-        timestamp: new Date().toISOString()
-      };
-      setComments([...comments, comment]);
-      setNewComment("");
+      createCommentMutation.mutate(newComment.trim());
     }
+  };
+
+  const startEditComment = (comment: any) => {
+    setEditingCommentId(comment.id);
+    setEditingCommentText(comment.text);
+  };
+
+  const saveEditComment = () => {
+    if (editingCommentId && editingCommentText.trim()) {
+      updateCommentMutation.mutate({ 
+        commentId: editingCommentId, 
+        text: editingCommentText.trim() 
+      });
+    }
+  };
+
+  const cancelEditComment = () => {
+    setEditingCommentId(null);
+    setEditingCommentText("");
   };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -2628,23 +2706,79 @@ export default function TaskProfile() {
 
                 {/* Comments List */}
                 <div className="space-y-4">
-                  {comments.length > 0 ? (
-                    comments.map((comment) => (
+                  {fetchedComments && fetchedComments.length > 0 ? (
+                    fetchedComments.map((comment: any) => (
                       <div key={comment.id} className="border rounded-lg p-4">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center space-x-2">
                             <Avatar className="w-6 h-6">
                               <AvatarFallback className="text-xs">
-                                {comment.author ? comment.author.split(' ').map(n => n[0]).join('') : 'U'}
+                                {comment.userName ? comment.userName.split(' ').map((n: string) => n[0]).join('') : comment.userFirstName?.[0] || 'U'}
                               </AvatarFallback>
                             </Avatar>
-                            <span className="font-medium text-sm">{comment.author || 'Unknown User'}</span>
+                            <span className="font-medium text-sm">
+                              {comment.userName || `${comment.userFirstName || ''} ${comment.userLastName || ''}`.trim() || 'Unknown User'}
+                            </span>
                           </div>
-                          <span className="text-xs text-slate-500">
-                            {new Date(comment.timestamp).toLocaleDateString()} at {new Date(comment.timestamp).toLocaleTimeString()}
-                          </span>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs text-slate-500">
+                              {new Date(comment.createdAt).toLocaleDateString()} at {new Date(comment.createdAt).toLocaleTimeString()}
+                              {comment.updatedAt && comment.updatedAt !== comment.createdAt && " (edited)"}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => startEditComment(comment)}
+                              data-testid={`button-edit-comment-${comment.id}`}
+                              className="h-6 w-6 p-0"
+                            >
+                              <Settings className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => deleteCommentMutation.mutate(comment.id)}
+                              data-testid={`button-delete-comment-${comment.id}`}
+                              className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
                         </div>
-                        <p className="text-slate-700 whitespace-pre-wrap">{comment.text}</p>
+                        {editingCommentId === comment.id ? (
+                          <div className="space-y-2 mt-2">
+                            <Textarea
+                              value={editingCommentText}
+                              onChange={(e) => setEditingCommentText(e.target.value)}
+                              placeholder="Edit your comment..."
+                              className="min-h-[80px]"
+                              data-testid={`textarea-edit-comment-${comment.id}`}
+                            />
+                            <div className="flex space-x-2">
+                              <Button
+                                size="sm"
+                                onClick={saveEditComment}
+                                disabled={!editingCommentText.trim() || updateCommentMutation.isPending}
+                                data-testid={`button-save-edit-comment-${comment.id}`}
+                              >
+                                <Save className="w-3 h-3 mr-1" />
+                                {updateCommentMutation.isPending ? "Saving..." : "Save"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={cancelEditComment}
+                                disabled={updateCommentMutation.isPending}
+                                data-testid={`button-cancel-edit-comment-${comment.id}`}
+                              >
+                                <X className="w-3 h-3 mr-1" />
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-slate-700 whitespace-pre-wrap">{comment.text}</p>
+                        )}
                       </div>
                     ))
                   ) : (
