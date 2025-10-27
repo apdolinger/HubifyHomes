@@ -5,6 +5,7 @@ import { Link } from "wouter";
 import AdminForms from "./AdminForms";
 import SupportModal from "@/components/SupportModal";
 import Billing from "./Billing";
+import { CustomFieldsSettings } from "./Account";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { z } from "zod";
@@ -1320,123 +1321,7 @@ export default function Admin() {
 
         {/* Custom Fields Tab */}
         <TabsContent value="fields" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xl font-semibold">Custom Field Manager</h3>
-              <p className="text-slate-600">Add custom fields across People, Properties, and Tasks</p>
-            </div>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Custom Field
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>People Fields</CardTitle>
-                <CardDescription>Custom fields for contacts and team members</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="p-3 border rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Gate Code</p>
-                      <p className="text-sm text-slate-500">Text field • Required</p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      <Edit className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="p-3 border rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Preferred Language</p>
-                      <p className="text-sm text-slate-500">Dropdown • Optional</p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      <Edit className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </div>
-                <Button variant="outline" className="w-full">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add People Field
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Property Fields</CardTitle>
-                <CardDescription>Custom fields for properties</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="p-3 border rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Garage Code</p>
-                      <p className="text-sm text-slate-500">Text field • Optional</p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      <Edit className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="p-3 border rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Trash Day</p>
-                      <p className="text-sm text-slate-500">Dropdown • Required</p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      <Edit className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </div>
-                <Button variant="outline" className="w-full">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Property Field
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Task Fields</CardTitle>
-                <CardDescription>Custom fields for tasks</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="p-3 border rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Estimated Time</p>
-                      <p className="text-sm text-slate-500">Number field • Optional</p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      <Edit className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="p-3 border rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Service Type</p>
-                      <p className="text-sm text-slate-500">Dropdown • Required</p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      <Edit className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </div>
-                <Button variant="outline" className="w-full">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Task Field
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+          <CustomFieldsSettings />
         </TabsContent>
 
         {/* Roles & Permissions Tab */}

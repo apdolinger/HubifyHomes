@@ -839,7 +839,7 @@ export default function Account() {
 }
 
 // Custom Fields Settings Component
-function CustomFieldsSettings() {
+export function CustomFieldsSettings() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
