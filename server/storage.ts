@@ -117,6 +117,8 @@ import {
   type InsertTask,
   type TaskChecklistItem,
   type InsertTaskChecklistItem,
+  type TaskComment,
+  type InsertTaskComment,
   type TimeEntry,
   type InsertTimeEntry,
   type Contact,
@@ -347,6 +349,12 @@ export interface IStorage {
   deleteTask(taskId: number): Promise<void>;
   checkTaskConflicts(assignedUserId: string, dueDate: string, timeEstimate: string, excludeTaskId?: number): Promise<any[]>;
   getTaskChecklistItems(taskId: number): Promise<TaskChecklistItem[]>;
+  
+  // Task comment operations
+  getTaskComments(taskId: number): Promise<any[]>;
+  createTaskComment(comment: InsertTaskComment): Promise<TaskComment>;
+  updateTaskComment(id: number, userId: string, text: string): Promise<TaskComment>;
+  deleteTaskComment(id: number, userId: string): Promise<void>;
   
   // Time tracking operations
   getTimeEntries(orgId: string, filters?: { userId?: string; propertyId?: number; taskId?: number; startDate?: string; endDate?: string }): Promise<TimeEntry[]>;
@@ -1933,6 +1941,54 @@ export class DatabaseStorage implements IStorage {
       .from(taskChecklistItems)
       .where(eq(taskChecklistItems.taskId, taskId))
       .orderBy(taskChecklistItems.sortOrder);
+  }
+
+  async getTaskComments(taskId: number): Promise<any[]> {
+    const { taskComments, users } = await import("@shared/schema");
+    
+    const comments = await db.select({
+      id: taskComments.id,
+      taskId: taskComments.taskId,
+      userId: taskComments.userId,
+      text: taskComments.text,
+      createdAt: taskComments.createdAt,
+      updatedAt: taskComments.updatedAt,
+      userName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
+      userFirstName: users.firstName,
+      userLastName: users.lastName,
+    })
+      .from(taskComments)
+      .leftJoin(users, eq(taskComments.userId, users.id))
+      .where(eq(taskComments.taskId, taskId))
+      .orderBy(taskComments.createdAt);
+    
+    return comments;
+  }
+
+  async createTaskComment(comment: InsertTaskComment): Promise<TaskComment> {
+    const { taskComments } = await import("@shared/schema");
+    const [newComment] = await db.insert(taskComments).values(comment).returning();
+    return newComment;
+  }
+
+  async updateTaskComment(id: number, userId: string, text: string): Promise<TaskComment> {
+    const { taskComments } = await import("@shared/schema");
+    const [updatedComment] = await db.update(taskComments)
+      .set({ text, updatedAt: new Date() })
+      .where(and(eq(taskComments.id, id), eq(taskComments.userId, userId)))
+      .returning();
+    
+    if (!updatedComment) {
+      throw new Error("Comment not found or you don't have permission to edit it");
+    }
+    
+    return updatedComment;
+  }
+
+  async deleteTaskComment(id: number, userId: string): Promise<void> {
+    const { taskComments } = await import("@shared/schema");
+    await db.delete(taskComments)
+      .where(and(eq(taskComments.id, id), eq(taskComments.userId, userId)));
   }
 
   async deleteTask(taskId: number): Promise<void> {
