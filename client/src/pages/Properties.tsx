@@ -25,6 +25,7 @@ import { useLocation } from "wouter";
 import { format } from "date-fns";
 import type { Task } from "@shared/schema";
 import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
+import CustomFieldsRenderer from "@/components/CustomFieldsRenderer";
 
 const propertySchema = z.object({
   accountId: z.string().nullable().optional(),
@@ -401,6 +402,7 @@ export default function Properties() {
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [bulkTaskModalOpen, setBulkTaskModalOpen] = useState(false);
   const [isCustomizeModalOpen, setIsCustomizeModalOpen] = useState(false);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
 
   // Default column configuration for properties table
   const defaultColumns: ColumnConfig[] = [
@@ -470,6 +472,16 @@ export default function Properties() {
   const { data: users = [] } = useQuery({
     queryKey: ["/api/users"],
     enabled: isAuthenticated,
+  });
+
+  // Fetch custom fields for properties
+  const { data: customFields = [] } = useQuery<any[]>({
+    queryKey: ["/api/custom-fields"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/custom-fields?entityType=property");
+      return response.json();
+    },
+    enabled: isAuthenticated && isAddModalOpen,
   });
 
   // Fetch subscription tier to determine if premium property types are available
@@ -578,10 +590,30 @@ export default function Properties() {
   });
 
   const handleAddProperty = (data: PropertyFormData) => {
+    // Validate required custom fields
+    const requiredFields = customFields.filter(f => f.required);
+    const missingFields = requiredFields.filter(f => {
+      const value = customFieldValues[f.fieldKey];
+      if (Array.isArray(value)) {
+        return value.length === 0;
+      }
+      return !value && value !== false && value !== 0;
+    });
+    
+    if (missingFields.length > 0) {
+      toast({
+        title: "Validation Error",
+        description: `Please fill in required custom fields: ${missingFields.map(f => f.fieldName).join(', ')}`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Convert empty accountId to undefined for creates
     const cleanedData = {
       ...data,
       accountId: data.accountId?.trim() || undefined,
+      customFieldValues: Object.keys(customFieldValues).length > 0 ? customFieldValues : undefined,
     };
     createPropertyMutation.mutate(cleanedData);
   };
@@ -745,6 +777,13 @@ export default function Properties() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, filterType, filterStatus, showInactive, itemsPerPage]);
+
+  // Reset custom field values when modal opens
+  useEffect(() => {
+    if (isAddModalOpen) {
+      setCustomFieldValues({});
+    }
+  }, [isAddModalOpen]);
 
   // Bulk actions
   const handleGenerateReport = () => {
@@ -1219,6 +1258,16 @@ export default function Properties() {
                         )}
                       />
                     </div>
+                    
+                    {/* Custom Fields */}
+                    {customFields.length > 0 && (
+                      <CustomFieldsRenderer
+                        fields={customFields}
+                        values={customFieldValues}
+                        onChange={setCustomFieldValues}
+                        mode="edit"
+                      />
+                    )}
                     
                     <div className="flex justify-end space-x-2 pt-4">
                       <Button
