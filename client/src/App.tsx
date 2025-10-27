@@ -143,6 +143,7 @@ function Router() {
           <Route path="/duplicates" component={DuplicatesManagement} />
           <Route path="/messages" component={TeamMessages} />
           <Route path="/admin" component={Admin} />
+          <Route path="/account" component={Account} />
           
           {/* Hubify Console (Admin Back-End) */}
           <Route path="/hubify-console" component={AdminClientPortal} />
