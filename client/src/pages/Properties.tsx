@@ -414,7 +414,7 @@ export default function Properties() {
       const searchLower = searchTerm.toLowerCase();
       const primaryContact = getPrimaryContact(property.id);
       const clientName = primaryContact 
-        ? `${primaryContact.firstName} ${primaryContact.lastName}`.toLowerCase()
+        ? [primaryContact.firstName, primaryContact.lastName].filter(Boolean).join(' ').toLowerCase()
         : '';
       
       const matchesSearch = 
@@ -794,7 +794,7 @@ export default function Properties() {
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
             <Input
-              placeholder="Search properties by name, address, client..."
+              placeholder="Search by name, address, client, type, or status..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
