@@ -18,6 +18,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Building, MapPin, Users, Plus, Home, Square, DollarSign, Activity, Eye, Edit, ToggleLeft, ToggleRight, Trash2, FileText, Mail, MessageCircle, ChevronUp, ChevronDown, Search, Filter, Crown, Anchor, Package } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useLocation } from "wouter";
@@ -58,6 +59,8 @@ export default function Properties() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -308,6 +311,11 @@ export default function Properties() {
     setSelectAll(false);
   }, [properties, searchTerm, filterType, filterStatus]);
 
+  // Reset to page 1 when filters or items per page change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterType, filterStatus, showInactive, itemsPerPage]);
+
   // Bulk actions
   const handleGenerateReport = () => {
     const selectedPropertyList = properties?.filter((p: any) => selectedProperties.has(p.id));
@@ -457,6 +465,22 @@ export default function Properties() {
     if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
     return 0;
   });
+
+  // Paginate the filtered and sorted properties
+  const totalItems = filteredAndSortedProperties?.length || 0;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const effectivePage = totalPages > 0 ? Math.min(currentPage, totalPages) : 1;
+
+  // Update currentPage state if it exceeds valid range
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalItems, itemsPerPage, currentPage, totalPages]);
+
+  const startIndex = (effectivePage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedProperties = filteredAndSortedProperties?.slice(startIndex, endIndex);
 
   const getSortIcon = (field: string) => {
     if (sortField !== field) return null;
@@ -999,7 +1023,7 @@ export default function Properties() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredAndSortedProperties?.map((property: any) => {
+                {paginatedProperties?.map((property: any) => {
                   const primaryContact = getPrimaryContact(property.id);
                   return (
                     <TableRow 
@@ -1165,6 +1189,17 @@ export default function Properties() {
                 Add Property
               </Button>
             </div>
+          )}
+          
+          {/* Pagination */}
+          {totalItems > 0 && (
+            <TablePagination
+              currentPage={effectivePage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              onItemsPerPageChange={setItemsPerPage}
+            />
           )}
         </CardContent>
       </Card>

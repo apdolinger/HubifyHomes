@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,8 @@ export default function Team() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -136,6 +139,27 @@ export default function Team() {
   const getUserInitials = (firstName: string, lastName: string) => {
     return `${firstName[0]}${lastName[0]}`.toUpperCase();
   };
+
+  // Reset to page 1 when items per page changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage]);
+
+  // Paginate the team members
+  const totalItems = teamMembers.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const effectivePage = totalPages > 0 ? Math.min(currentPage, totalPages) : 1;
+
+  // Update currentPage state if it exceeds valid range
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalItems, itemsPerPage, currentPage, totalPages]);
+
+  const startIndex = (effectivePage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedTeamMembers = teamMembers.slice(startIndex, endIndex);
 
   if (isLoading) {
     return (
@@ -310,7 +334,7 @@ export default function Team() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {teamMembers.map((member: any) => (
+                {paginatedTeamMembers.map((member: any) => (
                   <TableRow 
                     key={member.id} 
                     className="hover:bg-slate-50 cursor-pointer" 
@@ -360,6 +384,17 @@ export default function Team() {
                 ))}
               </TableBody>
             </Table>
+          )}
+          
+          {/* Pagination */}
+          {totalItems > 0 && (
+            <TablePagination
+              currentPage={effectivePage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              onItemsPerPageChange={setItemsPerPage}
+            />
           )}
         </CardContent>
       </Card>

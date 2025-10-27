@@ -17,6 +17,7 @@ import { useQuery as useAuthQuery } from "@tanstack/react-query";
 import { CheckSquare, Clock, User, Building, Eye, Edit, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings, Repeat, Archive } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { useLocation } from "wouter";
 import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
 import { formatRecurrenceRule } from "@/lib/rruleUtils";
@@ -60,6 +61,10 @@ export default function Tasks() {
   // Sort state
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
 
   // Table customization state
   const [isCustomizeModalOpen, setIsCustomizeModalOpen] = useState(false);
@@ -290,6 +295,27 @@ export default function Tasks() {
     
     return filtered;
   }, [tasks, searchQuery, statusFilter, priorityFilter, assignedFilter, clientFilter, sortField, sortDirection]);
+
+  // Reset to page 1 when filters or items per page change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, priorityFilter, assignedFilter, clientFilter, showArchived, itemsPerPage]);
+
+  // Paginate the filtered and sorted tasks
+  const totalItems = filteredAndSortedTasks.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const effectivePage = totalPages > 0 ? Math.min(currentPage, totalPages) : 1;
+
+  // Update currentPage state if it exceeds valid range
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalItems, itemsPerPage, currentPage, totalPages]);
+
+  const startIndex = (effectivePage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedTasks = filteredAndSortedTasks.slice(startIndex, endIndex);
 
   // Get all team members for the filter dropdown
   const teamMembers = useMemo(() => {
@@ -662,7 +688,7 @@ export default function Tasks() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredAndSortedTasks.map((task: any) => (
+                {paginatedTasks.map((task: any) => (
                   <TableRow 
                     key={task.id}
                     className="cursor-pointer hover:bg-slate-50"
@@ -742,6 +768,17 @@ export default function Tasks() {
                 </>
               )}
             </div>
+          )}
+          
+          {/* Pagination */}
+          {totalItems > 0 && (
+            <TablePagination
+              currentPage={effectivePage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              onItemsPerPageChange={setItemsPerPage}
+            />
           )}
         </CardContent>
       </Card>

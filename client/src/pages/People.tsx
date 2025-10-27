@@ -15,6 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { Checkbox } from "@/components/ui/checkbox";
 import { 
   UserCheck, 
@@ -69,6 +70,8 @@ export default function People() {
   const [propertyFilter, setPropertyFilter] = useState<string>("all");
   const [selectedContacts, setSelectedContacts] = useState<Set<number>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -540,6 +543,28 @@ export default function People() {
     return groupsArray;
   }, [filteredAndSortedContacts]);
 
+  // Reset to page 1 when filters or items per page change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, typeFilter, propertyFilter, showInactive, itemsPerPage]);
+
+  // Paginate the grouped contacts (each group is one person)
+  const totalItems = groupedContacts.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const effectivePage = totalPages > 0 ? Math.min(currentPage, totalPages) : 1;
+
+  // Update currentPage state if it exceeds valid range
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalItems, itemsPerPage, currentPage, totalPages]);
+  
+  // Slice the grouped contacts for pagination using effectivePage
+  const startIndex = (effectivePage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedGroups = groupedContacts.slice(startIndex, endIndex);
+
   const getContactStats = () => {
     if (!contacts) return { total: 0, tenants: 0, owners: 0, emergencyContacts: 0 };
     
@@ -884,7 +909,7 @@ export default function People() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {groupedContacts.map((group: any) => (
+                  {paginatedGroups.map((group: any) => (
                     <TableRow 
                       key={group.id}
                       className={`hover:bg-slate-50 ${selectedContacts.has(group.id) ? 'bg-blue-50' : ''}`}
@@ -1027,6 +1052,17 @@ export default function People() {
                 </Button>
               )}
             </div>
+          )}
+          
+          {/* Pagination */}
+          {totalItems > 0 && (
+            <TablePagination
+              currentPage={effectivePage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              onItemsPerPageChange={setItemsPerPage}
+            />
           )}
         </CardContent>
       </Card>
