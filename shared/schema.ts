@@ -2359,9 +2359,10 @@ export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit
 export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
 export type EmailTemplate = typeof emailTemplates.$inferSelect;
 
-// Custom Fields insert schema
+// Custom Fields insert schema - fieldKey is auto-generated server-side
 export const insertCustomFieldSchema = createInsertSchema(customFields).omit({
   id: true,
+  fieldKey: true, // Auto-generated from fieldName
   createdAt: true,
   updatedAt: true,
 });
