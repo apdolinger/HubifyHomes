@@ -79,7 +79,10 @@ export default function TaskProfile() {
     recurrenceFrequency: "",
     propertyId: "",
     billedSeparately: false,
-    billingAmount: ""
+    billingAmount: "",
+    roomId: "none",
+    clientId: "",
+    tags: ""
   });
   const [checklistItems, setChecklistItems] = useState<Array<{
     id: string;
@@ -113,6 +116,8 @@ export default function TaskProfile() {
   const [propertySearchValue, setPropertySearchValue] = useState("");
   const [contactSearchOpen, setContactSearchOpen] = useState(false);
   const [contactSearchValue, setContactSearchValue] = useState("");
+  const [clientSearchOpenEditModal, setClientSearchOpenEditModal] = useState(false);
+  const [clientSearchValueEditModal, setClientSearchValueEditModal] = useState("");
   const [isNewPropertyModalOpen, setIsNewPropertyModalOpen] = useState(false);
   const [isNewContactModalOpen, setIsNewContactModalOpen] = useState(false);
   const [newPropertyForm, setNewPropertyForm] = useState({
@@ -623,7 +628,9 @@ export default function TaskProfile() {
         propertyId: (task as any).propertyId?.toString() || "",
         billedSeparately: (task as any).billedSeparately || false,
         billingAmount: (task as any).billingAmount || "",
-        roomId: (task as any).roomId?.toString() || "none"
+        roomId: (task as any).roomId?.toString() || "none",
+        clientId: (task as any).clientId?.toString() || "",
+        tags: (task as any).tags || ""
       });
       
       // Initialize checklist items from task data
@@ -659,9 +666,11 @@ export default function TaskProfile() {
       recurrenceFrequency: editForm.recurrenceFrequency,
       propertyId: editForm.propertyId ? parseInt(editForm.propertyId) : null,
       roomId: editForm.roomId && editForm.roomId !== "none" ? parseInt(editForm.roomId) : null,
+      clientId: editForm.clientId ? parseInt(editForm.clientId) : null,
       billedSeparately: editForm.billedSeparately,
       billingAmount: editForm.billingAmount,
       attachments: photoAttachments,
+      tags: editForm.tags,
     };
 
     // Check for conflicts before saving
@@ -1763,11 +1772,108 @@ export default function TaskProfile() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-client">Client</Label>
+                      <Popover open={clientSearchOpenEditModal} onOpenChange={setClientSearchOpenEditModal}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={clientSearchOpenEditModal}
+                            className="w-full justify-between h-auto min-h-[40px]"
+                            data-testid="button-select-client-edit"
+                          >
+                            {editForm.clientId && contacts ? (
+                              <div className="flex items-center gap-2 text-left">
+                                <User className="w-4 h-4 text-slate-500 shrink-0" />
+                                <span className="truncate">
+                                  {(() => {
+                                    const selectedContact = (contacts as any[]).find((c: any) => c.id.toString() === editForm.clientId);
+                                    return selectedContact ? `${selectedContact.firstName} ${selectedContact.lastName}` : "Select client...";
+                                  })()}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-500">Select client...</span>
+                            )}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[320px] p-0">
+                          <Command>
+                            <CommandInput 
+                              placeholder="Search clients..." 
+                              value={clientSearchValueEditModal}
+                              onValueChange={setClientSearchValueEditModal}
+                            />
+                            <CommandEmpty>
+                              <div className="p-4 text-center">
+                                <p className="text-sm text-slate-500 mb-3">No clients found</p>
+                                <Button 
+                                  size="sm" 
+                                  onClick={() => {
+                                    setClientSearchOpenEditModal(false);
+                                    setIsNewContactModalOpen(true);
+                                    const nameParts = clientSearchValueEditModal.trim().split(' ');
+                                    if (nameParts.length >= 2) {
+                                      setNewContactForm(prev => ({ 
+                                        ...prev, 
+                                        firstName: nameParts[0], 
+                                        lastName: nameParts.slice(1).join(' ')
+                                      }));
+                                    }
+                                  }}
+                                >
+                                  <Plus className="w-4 h-4 mr-2" />
+                                  Add "{clientSearchValueEditModal}"
+                                </Button>
+                              </div>
+                            </CommandEmpty>
+                            <CommandGroup className="max-h-[200px] overflow-y-auto">
+                              <CommandItem
+                                value="none"
+                                onSelect={() => {
+                                  setEditForm({ ...editForm, clientId: "" });
+                                  setClientSearchOpenEditModal(false);
+                                }}
+                              >
+                                <X className="w-4 h-4 mr-2 text-slate-400" />
+                                <span className="text-slate-600">No client</span>
+                              </CommandItem>
+                              {contacts && Array.isArray(contacts) && (contacts as any[]).map((contact: any) => (
+                                <CommandItem
+                                  key={contact.id}
+                                  value={`${contact.firstName} ${contact.lastName} ${contact.email}`}
+                                  onSelect={() => {
+                                    setEditForm({ ...editForm, clientId: contact.id.toString() });
+                                    setClientSearchOpenEditModal(false);
+                                  }}
+                                >
+                                  <div className="flex items-center justify-between w-full">
+                                    <div className="flex items-center gap-2">
+                                      <User className="w-4 h-4 text-slate-500" />
+                                      <div>
+                                        <div className="font-medium">{contact.firstName} {contact.lastName}</div>
+                                        {contact.email && <div className="text-xs text-slate-500">{contact.email}</div>}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    
                     <div>
                       <Label htmlFor="edit-tags">Tags (Optional)</Label>
                       <Input
                         id="edit-tags"
+                        data-testid="input-tags"
+                        value={editForm.tags}
+                        onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })}
                         placeholder="maintenance, urgent, inspection"
                       />
                     </div>
@@ -1855,6 +1961,29 @@ export default function TaskProfile() {
                     <p className="text-slate-500 italic">
                       No description provided.
                     </p>
+                  )}
+                  
+                  {/* Tags Display */}
+                  {(task as any).tags && (
+                    <div className="mt-4 pt-4 border-t border-slate-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Tag className="w-4 h-4 text-slate-500" />
+                        <span className="text-sm font-medium text-slate-700">Tags</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2" data-testid="tags-display">
+                        {(task as any).tags.split(',').map((tag: string, index: number) => (
+                          tag.trim() && (
+                            <span 
+                              key={index} 
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                              data-testid={`tag-${tag.trim()}`}
+                            >
+                              {tag.trim()}
+                            </span>
+                          )
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </CardContent>
               </Card>
