@@ -641,7 +641,6 @@ export default function TaskProfile() {
       setAttachments((task as any).attachments || []);
       setPhotoAttachments((task as any).attachments || []);
       setQuickLinks((task as any).quickLinks || []);
-      setComments((task as any).comments || []);
     }
   }, [task]);
 
