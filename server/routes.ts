@@ -9594,7 +9594,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Organization ID not found" });
       }
       
-      const validatedData = insertCustomFieldSchema.parse({ ...req.body, orgId });
+      // Generate a temporary fieldKey from fieldName for validation
+      const tempFieldKey = req.body.fieldName?.toLowerCase().replace(/[^a-z0-9]+/g, '_') || 'field';
+      
+      const validatedData = insertCustomFieldSchema.parse({ 
+        ...req.body, 
+        orgId,
+        fieldKey: tempFieldKey // Temporary key, will be regenerated with collision handling in createCustomField
+      });
       const field = await storage.createCustomField(validatedData);
       res.status(201).json(field);
     } catch (error) {
