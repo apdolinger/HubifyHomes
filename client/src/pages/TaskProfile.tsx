@@ -83,7 +83,8 @@ export default function TaskProfile() {
     billingAmount: "",
     roomId: "none",
     clientId: "",
-    tags: ""
+    tags: "",
+    customFieldValues: {} as Record<string, any>
   });
   const [checklistItems, setChecklistItems] = useState<Array<{
     id: string;
@@ -641,7 +642,8 @@ export default function TaskProfile() {
         billingAmount: (task as any).billingAmount || "",
         roomId: (task as any).roomId?.toString() || "none",
         clientId: (task as any).contactId?.toString() || "",
-        tags: (task as any).tags || ""
+        tags: (task as any).tags || "",
+        customFieldValues: (task as any).customFieldValues || {}
       });
       
       // Initialize checklist items from task data
@@ -682,6 +684,7 @@ export default function TaskProfile() {
       billingAmount: editForm.billingAmount,
       attachments: photoAttachments,
       tags: editForm.tags,
+      customFieldValues: Object.keys(editForm.customFieldValues).length > 0 ? editForm.customFieldValues : undefined,
     };
 
     // Check for conflicts before saving
@@ -1927,6 +1930,15 @@ export default function TaskProfile() {
                     )}
                   </div>
 
+                  {/* Custom Fields */}
+                  {customFields.length > 0 && (
+                    <CustomFieldsRenderer
+                      fields={customFields}
+                      values={editForm.customFieldValues}
+                      onChange={(values) => setEditForm({ ...editForm, customFieldValues: values })}
+                      mode="edit"
+                    />
+                  )}
 
                     </div>
 

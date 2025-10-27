@@ -56,6 +56,7 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { AlertBanner } from "@/components/AlertBanner";
+import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
 
 export default function PropertyProfile() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -83,7 +84,8 @@ export default function PropertyProfile() {
     bathrooms: "",
     billingRate: "",
     description: "",
-    communityId: ""
+    communityId: "",
+    customFieldValues: {} as Record<string, any>
   });
   const [communitySearch, setCommunitySearch] = useState("");
   const [selectedCommunity, setSelectedCommunity] = useState<any>(null);
@@ -224,6 +226,16 @@ export default function PropertyProfile() {
     enabled: isAuthenticated && !!propertyId,
   });
 
+  // Fetch custom fields for properties
+  const { data: customFields = [] } = useQuery<any[]>({
+    queryKey: ["/api/custom-fields", "property"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/custom-fields?entityType=property");
+      return response.json();
+    },
+    enabled: isAuthenticated,
+  });
+
   const { data: contacts } = useQuery({
     queryKey: ["/api/contacts"],
     enabled: isAuthenticated,
@@ -275,6 +287,37 @@ export default function PropertyProfile() {
     queryKey: ["/api/communities"],
     enabled: isAuthenticated,
   });
+
+  // Populate editForm when property data is available and modal opens
+  useEffect(() => {
+    if (property && isEditModalOpen) {
+      setEditForm({
+        name: (property as any).name || "",
+        address1: (property as any).address1 || "",
+        address2: (property as any).address2 || "",
+        city: (property as any).city || "",
+        state: (property as any).state || "",
+        zip: (property as any).zip || "",
+        type: (property as any).type || "",
+        status: (property as any).status || "",
+        squareFootage: (property as any).squareFootage?.toString() || "",
+        bedrooms: (property as any).bedrooms?.toString() || "",
+        bathrooms: (property as any).bathrooms?.toString() || "",
+        billingRate: (property as any).billingRate?.toString() || "",
+        description: (property as any).description || "",
+        communityId: (property as any).communityId?.toString() || "",
+        customFieldValues: (property as any).customFieldValues || {}
+      });
+      
+      if ((property as any).communityId) {
+        const community = communities.find((c: any) => c.id === (property as any).communityId);
+        if (community) {
+          setCommunitySearch(community.name);
+          setSelectedCommunity(community);
+        }
+      }
+    }
+  }, [property, isEditModalOpen, communities]);
 
   // Room mutations
   const createRoomMutation = useMutation({
@@ -4345,6 +4388,18 @@ export default function PropertyProfile() {
                     rows={3}
                   />
                 </div>
+
+                {/* Custom Fields */}
+                {customFields.length > 0 && (
+                  <div className="col-span-2">
+                    <CustomFieldsRenderer
+                      fields={customFields}
+                      values={editForm.customFieldValues}
+                      onChange={(values) => setEditForm({ ...editForm, customFieldValues: values })}
+                      mode="edit"
+                    />
+                  </div>
+                )}
               </div>
             </div>
             </div>
