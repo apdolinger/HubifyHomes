@@ -3163,6 +3163,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get task templates (tasks marked as templates)
+  app.get("/api/tasks/templates", isAuthenticated, async (req, res) => {
+    try {
+      const tasks = await storage.getTasks();
+      const templates = tasks.filter(task => task.isTemplate && !task.isArchived);
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching task templates:", error);
+      res.status(500).json({ message: "Failed to fetch task templates" });
+    }
+  });
+
   app.get("/api/tasks/:id", isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);

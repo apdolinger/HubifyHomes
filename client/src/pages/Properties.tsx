@@ -23,6 +23,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
+import type { Task } from "@shared/schema";
 
 const propertySchema = z.object({
   accountId: z.string().nullable().optional(),
@@ -66,6 +67,7 @@ interface BulkTaskFormProps {
 function BulkTaskForm({ selectedPropertyIds, properties, users, onSuccess, onCancel }: BulkTaskFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
 
   const form = useForm<BulkTaskFormData>({
     resolver: zodResolver(bulkTaskSchema),
@@ -80,6 +82,31 @@ function BulkTaskForm({ selectedPropertyIds, properties, users, onSuccess, onCan
     },
   });
 
+  const { data: templates = [] } = useQuery<Task[]>({
+    queryKey: ["/api/tasks/templates"],
+  });
+
+  const handleTemplateSelect = (templateId: string) => {
+    setSelectedTemplateId(templateId);
+    
+    if (templateId === "none") {
+      form.reset();
+      return;
+    }
+
+    const template = templates.find((t) => t.id.toString() === templateId);
+    if (template) {
+      form.setValue("title", template.title || "");
+      form.setValue("description", template.description || "");
+      form.setValue("priority", template.priority || "normal");
+      form.setValue("status", template.status || "pending");
+      form.setValue("category", template.category || "");
+      if (template.assignedToId) {
+        form.setValue("assignedToId", template.assignedToId);
+      }
+    }
+  };
+
   const createBulkTasksMutation = useMutation({
     mutationFn: async (data: BulkTaskFormData) => {
       return apiRequest("POST", "/api/tasks/bulk", {
@@ -89,12 +116,20 @@ function BulkTaskForm({ selectedPropertyIds, properties, users, onSuccess, onCan
       });
     },
     onSuccess: () => {
+      // Call parent's onSuccess first to close modal and clear selections
+      onSuccess();
+      
+      // Then show toast and reset local form state
       toast({
         title: "Tasks Created",
         description: `Successfully created ${selectedPropertyIds.length} task${selectedPropertyIds.length > 1 ? 's' : ''}`,
       });
-      form.reset();
-      onSuccess();
+      
+      // Reset form and template selection after a brief delay to avoid state conflicts
+      setTimeout(() => {
+        form.reset();
+        setSelectedTemplateId("");
+      }, 0);
     },
     onError: (error: any) => {
       toast({
@@ -116,6 +151,36 @@ function BulkTaskForm({ selectedPropertyIds, properties, users, onSuccess, onCan
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {/* Template Selector */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Task Template</label>
+          <Select 
+            value={selectedTemplateId} 
+            onValueChange={handleTemplateSelect}
+          >
+            <SelectTrigger data-testid="select-task-template">
+              <SelectValue placeholder="Select a template (optional)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No template (blank form)</SelectItem>
+              {templates && templates.length > 0 ? (
+                templates.map((template) => (
+                  <SelectItem key={template.id} value={template.id.toString()}>
+                    {template.title}
+                  </SelectItem>
+                ))
+              ) : (
+                <SelectItem value="empty" disabled>
+                  No templates available
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-slate-500">
+            Select a template to pre-fill form fields, or start with a blank form
+          </p>
+        </div>
+
         <FormField
           control={form.control}
           name="title"
