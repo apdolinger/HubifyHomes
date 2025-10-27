@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -15,13 +15,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Building, MapPin, Users, Plus, Home, Square, DollarSign, Activity, Eye, Edit, ToggleLeft, ToggleRight, Trash2, FileText, Mail, MessageCircle, ChevronUp, ChevronDown, Search, Filter, Crown, Anchor, Package } from "lucide-react";
+import { Building, MapPin, Users, Plus, Home, Square, DollarSign, Activity, Eye, Edit, ToggleLeft, ToggleRight, Trash2, FileText, Mail, MessageCircle, ChevronUp, ChevronDown, Search, Filter, Crown, Anchor, Package, Calendar } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useLocation } from "wouter";
+import { format } from "date-fns";
 
 const propertySchema = z.object({
   accountId: z.string().nullable().optional(),
@@ -42,6 +43,271 @@ const propertySchema = z.object({
 
 type PropertyFormData = z.infer<typeof propertySchema>;
 
+const bulkTaskSchema = z.object({
+  title: z.string().min(1, "Task title is required"),
+  description: z.string().optional(),
+  priority: z.enum(["urgent", "high", "normal", "low"]).default("normal"),
+  status: z.enum(["pending", "in_progress"]).default("pending"),
+  assignedToId: z.string().optional(),
+  dueDate: z.string().optional(),
+  category: z.string().optional(),
+});
+
+type BulkTaskFormData = z.infer<typeof bulkTaskSchema>;
+
+interface BulkTaskFormProps {
+  selectedPropertyIds: number[];
+  properties: any[];
+  users: any[];
+  onSuccess: () => void;
+  onCancel: () => void;
+}
+
+function BulkTaskForm({ selectedPropertyIds, properties, users, onSuccess, onCancel }: BulkTaskFormProps) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const form = useForm<BulkTaskFormData>({
+    resolver: zodResolver(bulkTaskSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      priority: "normal",
+      status: "pending",
+      assignedToId: "",
+      dueDate: "",
+      category: "",
+    },
+  });
+
+  const createBulkTasksMutation = useMutation({
+    mutationFn: async (data: BulkTaskFormData) => {
+      return apiRequest("POST", "/api/tasks/bulk", {
+        ...data,
+        propertyIds: selectedPropertyIds,
+        dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : null,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Tasks Created",
+        description: `Successfully created ${selectedPropertyIds.length} task${selectedPropertyIds.length > 1 ? 's' : ''}`,
+      });
+      form.reset();
+      onSuccess();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create tasks",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (data: BulkTaskFormData) => {
+    createBulkTasksMutation.mutate(data);
+  };
+
+  const selectedPropertiesList = useMemo(() => {
+    return properties?.filter((p: any) => selectedPropertyIds.includes(p.id)) || [];
+  }, [properties, selectedPropertyIds]);
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="title"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Task Title *</FormLabel>
+              <FormControl>
+                <Input 
+                  {...field} 
+                  placeholder="e.g., Inspect for hurricane damage"
+                  data-testid="input-bulk-task-title"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Description</FormLabel>
+              <FormControl>
+                <Textarea 
+                  {...field} 
+                  placeholder="Enter task description..."
+                  rows={3}
+                  data-testid="textarea-bulk-task-description"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="priority"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Priority</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger data-testid="select-bulk-task-priority">
+                      <SelectValue placeholder="Select priority" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="status"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Status</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger data-testid="select-bulk-task-status">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="assignedToId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Assign To</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger data-testid="select-bulk-task-assigned">
+                      <SelectValue placeholder="Select team member" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="">Unassigned</SelectItem>
+                    {users?.map((user: any) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.firstName} {user.lastName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="dueDate"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Due Date</FormLabel>
+                <FormControl>
+                  <Input 
+                    type="date" 
+                    {...field}
+                    data-testid="input-bulk-task-due-date"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <FormField
+          control={form.control}
+          name="category"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Category</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl>
+                  <SelectTrigger data-testid="select-bulk-task-category">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="">No category</SelectItem>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                  <SelectItem value="inspection">Inspection</SelectItem>
+                  <SelectItem value="cleaning">Cleaning</SelectItem>
+                  <SelectItem value="repair">Repair</SelectItem>
+                  <SelectItem value="administrative">Administrative</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+          <h4 className="text-sm font-medium text-slate-900 mb-2">
+            Selected Properties ({selectedPropertiesList.length})
+          </h4>
+          <div className="max-h-32 overflow-y-auto space-y-1">
+            {selectedPropertiesList.map((property: any) => (
+              <div key={property.id} className="text-sm text-slate-600">
+                • {property.name}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex justify-end space-x-2 pt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            data-testid="button-cancel-bulk-task"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={createBulkTasksMutation.isPending}
+            data-testid="button-submit-bulk-task"
+          >
+            {createBulkTasksMutation.isPending ? "Creating..." : `Create ${selectedPropertyIds.length} Task${selectedPropertyIds.length > 1 ? 's' : ''}`}
+          </Button>
+        </div>
+      </form>
+    </Form>
+  );
+}
+
 export default function Properties() {
   const { isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
@@ -61,6 +327,7 @@ export default function Properties() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [bulkTaskModalOpen, setBulkTaskModalOpen] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -904,9 +1171,10 @@ export default function Properties() {
                         size="sm"
                         variant="outline"
                         className="bg-white hover:bg-blue-50"
+                        data-testid="button-more-actions"
                       >
-                        <MessageCircle className="w-4 h-4 mr-2" />
                         More Actions
+                        <ChevronDown className="w-4 h-4 ml-2" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
@@ -914,12 +1182,10 @@ export default function Properties() {
                         <MessageCircle className="w-4 h-4 mr-2" />
                         Send Messages
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => {
-                        toast({
-                          title: "Bulk Tasks Feature",
-                          description: "Create tasks for selected properties - coming soon!",
-                        });
-                      }}>
+                      <DropdownMenuItem 
+                        onClick={() => setBulkTaskModalOpen(true)}
+                        data-testid="menu-item-create-tasks"
+                      >
                         <Activity className="w-4 h-4 mr-2" />
                         Create Tasks
                       </DropdownMenuItem>
@@ -1203,6 +1469,30 @@ export default function Properties() {
           )}
         </CardContent>
       </Card>
+
+      {/* Bulk Task Creation Modal */}
+      <Dialog open={bulkTaskModalOpen} onOpenChange={setBulkTaskModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create Tasks for Selected Properties</DialogTitle>
+            <p className="text-sm text-slate-600 mt-2">
+              Creating tasks for {selectedProperties.size} selected {selectedProperties.size === 1 ? 'property' : 'properties'}
+            </p>
+          </DialogHeader>
+          <BulkTaskForm
+            selectedPropertyIds={Array.from(selectedProperties)}
+            properties={properties}
+            users={users}
+            onSuccess={() => {
+              setBulkTaskModalOpen(false);
+              setSelectedProperties(new Set());
+              setSelectAll(false);
+              queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+            }}
+            onCancel={() => setBulkTaskModalOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Property Confirmation Modal */}
       <Dialog open={deleteModalOpen} onOpenChange={(open) => {
