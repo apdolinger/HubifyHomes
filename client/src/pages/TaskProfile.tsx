@@ -309,6 +309,31 @@ export default function TaskProfile() {
     enabled: isAuthenticated && !!taskId,
   });
 
+  // Populate editForm when task data is available and modal opens
+  useEffect(() => {
+    if (task && isEditModalOpen) {
+      setEditForm({
+        title: (task as any).title || "",
+        description: (task as any).description || "",
+        priority: (task as any).priority || "",
+        status: (task as any).status || "",
+        dueDate: (task as any).dueDate || "",
+        assignedTo: (task as any).assignedTo?.toString() || "",
+        timeEstimate: (task as any).timeEstimate || "",
+        category: (task as any).category || "",
+        isRecurring: (task as any).isRecurring || false,
+        recurrenceFrequency: (task as any).recurrenceFrequency || "",
+        propertyId: (task as any).propertyId?.toString() || "",
+        billedSeparately: (task as any).billedSeparately || false,
+        billingAmount: (task as any).billingAmount?.toString() || "",
+        roomId: (task as any).roomId?.toString() || "none",
+        clientId: (task as any).clientId || "",
+        tags: (task as any).tags || "",
+        customFieldValues: (task as any).customFieldValues || {}
+      });
+    }
+  }, [task, isEditModalOpen]);
+
   // Fetch task comments/notes
   const { data: fetchedComments } = useQuery({
     queryKey: [`/api/tasks/${taskId}/comments`],
