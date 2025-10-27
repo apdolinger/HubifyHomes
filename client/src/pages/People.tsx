@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import CustomFieldsRenderer from "@/components/CustomFieldsRenderer";
 
 const contactSchema = z.object({
   accountId: z.string().nullable().optional(),
@@ -72,6 +73,7 @@ export default function People() {
   const [selectAll, setSelectAll] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -88,6 +90,13 @@ export default function People() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
+  // Reset custom field values when modal opens
+  useEffect(() => {
+    if (isAddModalOpen) {
+      setCustomFieldValues({});
+    }
+  }, [isAddModalOpen]);
+
   // Fetch contacts
   const { data: contacts, isLoading: contactsLoading } = useQuery({
     queryKey: ["/api/contacts", showInactive],
@@ -102,6 +111,16 @@ export default function People() {
   const { data: properties } = useQuery({
     queryKey: ["/api/properties"],
     enabled: isAuthenticated,
+  });
+
+  // Fetch custom fields for contacts
+  const { data: customFields = [] } = useQuery<any[]>({
+    queryKey: ["/api/custom-fields", "contact"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/custom-fields?entityType=contact");
+      return response.json();
+    },
+    enabled: isAuthenticated && isAddModalOpen,
   });
 
   // Add contact form
@@ -241,10 +260,30 @@ export default function People() {
   });
 
   const handleAddContact = (data: ContactFormData) => {
+    // Validate required custom fields
+    const requiredFields = customFields.filter(f => f.required);
+    const missingFields = requiredFields.filter(f => {
+      const value = customFieldValues[f.fieldKey];
+      if (Array.isArray(value)) {
+        return value.length === 0;
+      }
+      return !value && value !== false && value !== 0;
+    });
+    
+    if (missingFields.length > 0) {
+      toast({
+        title: "Validation Error",
+        description: `Please fill in required custom fields: ${missingFields.map(f => f.fieldName).join(', ')}`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Convert empty accountId to undefined to avoid storing empty strings
     const cleanedData = {
       ...data,
       accountId: data.accountId?.trim() || undefined,
+      customFieldValues: Object.keys(customFieldValues).length > 0 ? customFieldValues : undefined,
     };
     createContactMutation.mutate(cleanedData);
   };
@@ -1215,6 +1254,16 @@ export default function People() {
                   </FormItem>
                 )}
               />
+              
+              {/* Custom Fields */}
+              {customFields.length > 0 && (
+                <CustomFieldsRenderer
+                  fields={customFields}
+                  values={customFieldValues}
+                  onChange={setCustomFieldValues}
+                  mode="edit"
+                />
+              )}
               
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>

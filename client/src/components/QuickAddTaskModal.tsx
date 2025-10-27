@@ -77,7 +77,7 @@ export default function QuickAddTaskModal({ isOpen, onClose }: QuickAddTaskModal
   
   // Fetch custom fields for tasks
   const { data: customFields = [] } = useQuery<any[]>({
-    queryKey: ["/api/custom-fields"],
+    queryKey: ["/api/custom-fields", "task"],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/custom-fields?entityType=task");
       return response.json();

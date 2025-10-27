@@ -476,7 +476,7 @@ export default function Properties() {
 
   // Fetch custom fields for properties
   const { data: customFields = [] } = useQuery<any[]>({
-    queryKey: ["/api/custom-fields"],
+    queryKey: ["/api/custom-fields", "property"],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/custom-fields?entityType=property");
       return response.json();
