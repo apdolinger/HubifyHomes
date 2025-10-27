@@ -544,12 +544,15 @@ export const properties = pgTable("properties", {
   type: varchar("type").notNull(), // single-family, condo, apartment, house, commercial, storage_unit (premium), boat (premium)
   units: integer("units").default(1),
   managerId: varchar("manager_id").references(() => users.id),
+  primaryContactId: integer("primary_contact_id").references(() => contacts.id), // Primary contact/client for this property
+  description: text("description"), // Property description/notes
   isActive: boolean("is_active").notNull().default(true),
   imageUrl: varchar("image_url"),
   squareFootage: integer("square_footage"),
   billingType: varchar("billing_type"), // sqft, flat_fee
   status: varchar("status").notNull().default("occupied"), // occupied, vacant, under_repair
   communityId: integer("community_id").references(() => communities.id),
+  customFieldValues: jsonb("custom_field_values").$type<Record<string, any>>().default({}), // Custom field data
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -770,6 +773,7 @@ export const tasks = pgTable("tasks", {
   isArchived: boolean("is_archived").notNull().default(false),
   attachments: jsonb("attachments").$type<PhotoAttachment[]>().default([]),
   tags: text("tags"), // Comma-separated tags, e.g., "urgent, maintenance, inspection"
+  customFieldValues: jsonb("custom_field_values").$type<Record<string, any>>().default({}), // Custom field data
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -806,6 +810,7 @@ export const contacts = pgTable("contacts", {
   propertyId: integer("property_id").references(() => properties.id),
   isActive: boolean("is_active").notNull().default(true),
   notes: text("notes"),
+  customFieldValues: jsonb("custom_field_values").$type<Record<string, any>>().default({}), // Custom field data
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -823,6 +828,28 @@ export const contactProperties = pgTable("contact_properties", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Custom Fields table - user-defined fields for tasks, properties, and contacts
+export const customFields = pgTable("custom_fields", {
+  id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  entityType: varchar("entity_type").$type<"task"|"property"|"contact">().notNull(), // Which entity this field applies to
+  fieldName: varchar("field_name").notNull(), // Display label for the field
+  fieldKey: varchar("field_key").notNull(), // Unique key for storing values (auto-generated from fieldName)
+  fieldType: varchar("field_type").$type<"text"|"textarea"|"number"|"date"|"select"|"multiselect"|"checkbox">().notNull(),
+  required: boolean("required").notNull().default(false),
+  options: jsonb("options").$type<string[]>(), // For select/multiselect field types
+  placeholder: varchar("placeholder"), // Placeholder text for input fields
+  helpText: text("help_text"), // Help text displayed below the field
+  displayOrder: integer("display_order").notNull().default(0), // Order in which fields appear
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("custom_fields_org_entity_idx").on(table.orgId, table.entityType),
+  index("custom_fields_key_idx").on(table.fieldKey),
+  unique("custom_fields_org_entity_key_unique").on(table.orgId, table.entityType, table.fieldKey),
+]);
 
 // Alerts table - contextual alerts for clients, properties, and tasks
 export const alerts = pgTable("alerts", {
@@ -2331,3 +2358,18 @@ export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit
 });
 export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
 export type EmailTemplate = typeof emailTemplates.$inferSelect;
+
+// Custom Fields insert schema
+export const insertCustomFieldSchema = createInsertSchema(customFields).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCustomField = z.infer<typeof insertCustomFieldSchema>;
+export type CustomField = typeof customFields.$inferSelect;
+
+// Custom Fields update schema - excludes orgId and fieldKey to prevent tampering
+export const updateCustomFieldSchema = insertCustomFieldSchema.omit({
+  orgId: true,
+  fieldKey: true,
+}).partial();

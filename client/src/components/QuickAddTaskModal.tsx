@@ -16,6 +16,7 @@ import { useLocation } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Repeat } from "lucide-react";
 import { RRule, Frequency } from "rrule";
+import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
 
 const taskSchema = z.object({
   title: z.string().min(1, "Task title is required"),
@@ -49,6 +50,9 @@ export default function QuickAddTaskModal({ isOpen, onClose }: QuickAddTaskModal
   const [recurrenceEndType, setRecurrenceEndType] = useState<'never' | 'after' | 'on'>('never');
   const [recurrenceCount, setRecurrenceCount] = useState(10);
   const [recurrenceUntil, setRecurrenceUntil] = useState('');
+  
+  // Custom fields state
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
 
   const form = useForm<TaskFormData>({
     resolver: zodResolver(taskSchema),
@@ -70,10 +74,20 @@ export default function QuickAddTaskModal({ isOpen, onClose }: QuickAddTaskModal
     queryKey: ["/api/contacts"],
     enabled: isOpen,
   });
+  
+  // Fetch custom fields for tasks
+  const { data: customFields = [] } = useQuery<any[]>({
+    queryKey: ["/api/custom-fields"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/custom-fields?entityType=task");
+      return response.json();
+    },
+    enabled: isOpen,
+  });
 
   // Create task mutation
   const createTaskMutation = useMutation({
-    mutationFn: async (data: TaskFormData & { recurrenceRule?: string | null }) => {
+    mutationFn: async (data: TaskFormData & { recurrenceRule?: string | null; customFieldValues?: Record<string, any> }) => {
       const response = await apiRequest("POST", "/api/tasks", data);
       return response.json();
     },
@@ -89,6 +103,7 @@ export default function QuickAddTaskModal({ isOpen, onClose }: QuickAddTaskModal
       onClose();
       form.reset();
       resetRecurrenceState();
+      setCustomFieldValues({});
       
       // Redirect to task detail page
       setLocation(`/task-profile/${newTask.id}`);
@@ -126,6 +141,7 @@ export default function QuickAddTaskModal({ isOpen, onClose }: QuickAddTaskModal
     setRecurrenceEndType('never');
     setRecurrenceCount(10);
     setRecurrenceUntil('');
+    setCustomFieldValues({});
   };
 
   // Focus title input when modal opens
@@ -197,10 +213,30 @@ export default function QuickAddTaskModal({ isOpen, onClose }: QuickAddTaskModal
   };
 
   const onSubmit = (data: TaskFormData) => {
+    // Validate required custom fields
+    const requiredFields = customFields.filter(f => f.required);
+    const missingFields = requiredFields.filter(f => {
+      const value = customFieldValues[f.fieldKey];
+      if (Array.isArray(value)) {
+        return value.length === 0;
+      }
+      return !value && value !== false && value !== 0;
+    });
+    
+    if (missingFields.length > 0) {
+      toast({
+        title: "Validation Error",
+        description: `Please fill in required custom fields: ${missingFields.map(f => f.fieldName).join(', ')}`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     const recurrenceRule = buildRRule();
     createTaskMutation.mutate({
       ...data,
       recurrenceRule,
+      customFieldValues: Object.keys(customFieldValues).length > 0 ? customFieldValues : undefined,
     });
   };
 
@@ -581,6 +617,16 @@ export default function QuickAddTaskModal({ isOpen, onClose }: QuickAddTaskModal
                 </FormItem>
               )}
             />
+            
+            {/* Custom Fields */}
+            {customFields.length > 0 && (
+              <CustomFieldsRenderer
+                fields={customFields}
+                values={customFieldValues}
+                onChange={setCustomFieldValues}
+                mode="edit"
+              />
+            )}
             
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose} data-testid="button-cancel">

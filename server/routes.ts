@@ -57,6 +57,8 @@ import {
   insertBillingSubmissionSchema,
   insertSupportRequestSchema,
   insertEmailTemplateSchema,
+  insertCustomFieldSchema,
+  updateCustomFieldSchema,
   type Form,
   contacts,
   properties,
@@ -69,6 +71,7 @@ import {
   alerts,
   ignoredDuplicates,
   duplicateHistory,
+  customFields,
   isPremiumPropertyType,
   tierAllowsPremiumProperties
 } from "@shared/schema";
@@ -9564,6 +9567,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting email template:", error);
       res.status(500).json({ message: "Failed to delete email template" });
+    }
+  });
+
+  // Custom Fields endpoints
+  app.get("/api/custom-fields", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+      
+      const entityType = req.query.entityType as "task"|"property"|"contact"|undefined;
+      const fields = await storage.getCustomFields(orgId, entityType);
+      res.json(fields);
+    } catch (error) {
+      console.error("Error fetching custom fields:", error);
+      res.status(500).json({ message: "Failed to fetch custom fields" });
+    }
+  });
+
+  app.post("/api/custom-fields", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+      
+      const validatedData = insertCustomFieldSchema.parse({ ...req.body, orgId });
+      const field = await storage.createCustomField(validatedData);
+      res.status(201).json(field);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      // Handle unique constraint violations
+      if (error instanceof Error && error.message.includes("unique constraint")) {
+        return res.status(409).json({ 
+          message: "A custom field with this name already exists for this entity type. Please try a different name." 
+        });
+      }
+      console.error("Error creating custom field:", error);
+      res.status(500).json({ message: "Failed to create custom field" });
+    }
+  });
+
+  app.patch("/api/custom-fields/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+      
+      const id = parseInt(req.params.id);
+      const validatedData = updateCustomFieldSchema.parse(req.body);
+      const updated = await storage.updateCustomField(id, orgId, validatedData);
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      if (error instanceof Error && error.message.includes("not found or access denied")) {
+        return res.status(404).json({ message: error.message });
+      }
+      console.error("Error updating custom field:", error);
+      res.status(500).json({ message: "Failed to update custom field" });
+    }
+  });
+
+  app.delete("/api/custom-fields/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+      
+      const id = parseInt(req.params.id);
+      await storage.deleteCustomField(id, orgId);
+      res.json({ message: "Custom field deleted successfully" });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("not found or access denied")) {
+        return res.status(404).json({ message: error.message });
+      }
+      console.error("Error deleting custom field:", error);
+      res.status(500).json({ message: "Failed to delete custom field" });
+    }
+  });
+
+  app.post("/api/custom-fields/reorder", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+      
+      const { fieldIds } = req.body;
+      if (!Array.isArray(fieldIds)) {
+        return res.status(400).json({ message: "fieldIds must be an array" });
+      }
+      
+      await storage.reorderCustomFields(orgId, fieldIds);
+      res.json({ message: "Custom fields reordered successfully" });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("not found or access denied")) {
+        return res.status(404).json({ message: error.message });
+      }
+      console.error("Error reordering custom fields:", error);
+      res.status(500).json({ message: "Failed to reorder custom fields" });
     }
   });
 

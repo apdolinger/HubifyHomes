@@ -59,6 +59,7 @@ import {
   calendarReportTemplates,
   supportRequests,
   emailTemplates,
+  customFields,
   type User,
   type UpsertUser,
   type Org,
@@ -173,6 +174,8 @@ import {
   type InsertSupportRequest,
   type EmailTemplate,
   type InsertEmailTemplate,
+  type CustomField,
+  type InsertCustomField,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, like, count, sql, inArray } from "drizzle-orm";
@@ -575,6 +578,14 @@ export interface IStorage {
   getEmailTemplateByType(type: "ticket_receipt"|"ticket_notification"|"status_update"): Promise<EmailTemplate | undefined>;
   updateEmailTemplate(id: number, template: Partial<InsertEmailTemplate>): Promise<EmailTemplate>;
   deleteEmailTemplate(id: number): Promise<void>;
+  
+  // Custom field operations
+  getCustomFields(orgId: string, entityType?: "task"|"property"|"contact"): Promise<CustomField[]>;
+  getCustomField(id: number, orgId: string): Promise<CustomField | undefined>;
+  createCustomField(field: InsertCustomField): Promise<CustomField>;
+  updateCustomField(id: number, orgId: string, field: Partial<Omit<InsertCustomField, "orgId"|"fieldKey">>): Promise<CustomField>;
+  deleteCustomField(id: number, orgId: string): Promise<void>;
+  reorderCustomFields(orgId: string, fieldIds: number[]): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4520,6 +4531,115 @@ export class DatabaseStorage implements IStorage {
   
   async deleteEmailTemplate(id: number): Promise<void> {
     await db.delete(emailTemplates).where(eq(emailTemplates.id, id));
+  }
+  
+  // Custom field operations
+  async getCustomFields(orgId: string, entityType?: "task"|"property"|"contact"): Promise<CustomField[]> {
+    const conditions = [eq(customFields.orgId, orgId), eq(customFields.isActive, true)];
+    if (entityType) {
+      conditions.push(eq(customFields.entityType, entityType));
+    }
+    
+    return await db
+      .select()
+      .from(customFields)
+      .where(and(...conditions))
+      .orderBy(customFields.displayOrder, customFields.id);
+  }
+  
+  async getCustomField(id: number, orgId: string): Promise<CustomField | undefined> {
+    const [field] = await db
+      .select()
+      .from(customFields)
+      .where(and(eq(customFields.id, id), eq(customFields.orgId, orgId)));
+    return field;
+  }
+  
+  async createCustomField(field: InsertCustomField): Promise<CustomField> {
+    // Auto-generate fieldKey from fieldName if not provided
+    let baseKey = field.fieldKey || field.fieldName.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    let fieldKey = baseKey;
+    let suffix = 1;
+    
+    // Check for existing keys and append suffix if needed to avoid collisions
+    while (true) {
+      const existing = await db
+        .select()
+        .from(customFields)
+        .where(and(
+          eq(customFields.orgId, field.orgId),
+          eq(customFields.entityType, field.entityType),
+          eq(customFields.fieldKey, fieldKey)
+        ))
+        .limit(1);
+      
+      if (existing.length === 0) {
+        // Key is available
+        break;
+      }
+      
+      // Key exists, try with suffix
+      fieldKey = `${baseKey}_${suffix}`;
+      suffix++;
+    }
+    
+    const [newField] = await db
+      .insert(customFields)
+      .values({ ...field, fieldKey })
+      .returning();
+    return newField;
+  }
+  
+  async updateCustomField(id: number, orgId: string, field: Partial<Omit<InsertCustomField, "orgId"|"fieldKey">>): Promise<CustomField> {
+    // Verify org ownership before updating
+    const existing = await this.getCustomField(id, orgId);
+    if (!existing) {
+      throw new Error("Custom field not found or access denied");
+    }
+    
+    const [updated] = await db
+      .update(customFields)
+      .set({ ...field, updatedAt: new Date() })
+      .where(and(eq(customFields.id, id), eq(customFields.orgId, orgId)))
+      .returning();
+    return updated;
+  }
+  
+  async deleteCustomField(id: number, orgId: string): Promise<void> {
+    // Verify org ownership before deleting
+    const existing = await this.getCustomField(id, orgId);
+    if (!existing) {
+      throw new Error("Custom field not found or access denied");
+    }
+    
+    // Soft delete by setting isActive to false
+    await db
+      .update(customFields)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(and(eq(customFields.id, id), eq(customFields.orgId, orgId)));
+  }
+  
+  async reorderCustomFields(orgId: string, fieldIds: number[]): Promise<void> {
+    // Verify all fields belong to this org before reordering
+    const fields = await db
+      .select()
+      .from(customFields)
+      .where(and(
+        eq(customFields.orgId, orgId),
+        inArray(customFields.id, fieldIds)
+      ));
+    
+    if (fields.length !== fieldIds.length) {
+      throw new Error("Some fields not found or access denied");
+    }
+    
+    // Update display order for each field
+    for (let i = 0; i < fieldIds.length; i++) {
+      await db
+        .update(customFields)
+        .set({ displayOrder: i, updatedAt: new Date() })
+        .where(and(eq(customFields.id, fieldIds[i]), eq(customFields.orgId, orgId)));
+    }
   }
 }
 

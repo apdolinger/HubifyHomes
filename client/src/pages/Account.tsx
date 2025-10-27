@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -541,76 +543,7 @@ export default function Account() {
 
         {/* Custom Fields Tab */}
         <TabsContent value="custom-fields">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center">
-                  <Database className="w-5 h-5 mr-2" />
-                  Custom Fields Configuration
-                </CardTitle>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Field
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="text-sm text-slate-600 mb-4">
-                  Create custom fields that can be used across properties, people, and tasks.
-                </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Field Name</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Used In</TableHead>
-                      <TableHead>Required</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell className="font-medium">Property Manager</TableCell>
-                      <TableCell>Text</TableCell>
-                      <TableCell>Properties</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">Optional</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button size="sm" variant="ghost">
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button size="sm" variant="ghost">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Emergency Contact</TableCell>
-                      <TableCell>Text</TableCell>
-                      <TableCell>People</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">Required</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button size="sm" variant="ghost">
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button size="sm" variant="ghost">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+          <CustomFieldsSettings />
         </TabsContent>
 
         {/* Email Templates Tab */}
@@ -902,5 +835,429 @@ export default function Account() {
         </TabsContent>
       </Tabs>
     </main>
+  );
+}
+
+// Custom Fields Settings Component
+function CustomFieldsSettings() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  const [activeEntity, setActiveEntity] = useState<"task"|"property"|"contact">("task");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingField, setEditingField] = useState<any | null>(null);
+  const [formData, setFormData] = useState({
+    fieldName: "",
+    fieldType: "text" as "text"|"textarea"|"number"|"date"|"select"|"multiselect"|"checkbox",
+    required: false,
+    placeholder: "",
+    helpText: "",
+    options: [] as string[],
+    optionInput: "",
+  });
+  
+  const orgId = (user as any)?.orgId;
+  
+  // Fetch custom fields for the current entity type
+  const { data: customFields = [], isLoading, refetch } = useQuery<any[]>({
+    queryKey: ["/api/custom-fields", activeEntity],
+    enabled: !!orgId,
+  });
+  
+  // Create mutation
+  const createFieldMutation = useMutation({
+    mutationFn: async (fieldData: any) => {
+      const response = await apiRequest("POST", "/api/custom-fields", fieldData);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-fields"] });
+      toast({
+        title: "Success",
+        description: "Custom field created successfully",
+      });
+      setIsCreateDialogOpen(false);
+      resetForm();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create custom field",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Update mutation
+  const updateFieldMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      const response = await apiRequest("PATCH", `/api/custom-fields/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-fields"] });
+      toast({
+        title: "Success",
+        description: "Custom field updated successfully",
+      });
+      setEditingField(null);
+      resetForm();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update custom field",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Delete mutation
+  const deleteFieldMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/custom-fields/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-fields"] });
+      toast({
+        title: "Success",
+        description: "Custom field deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete custom field",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  const resetForm = () => {
+    setFormData({
+      fieldName: "",
+      fieldType: "text",
+      required: false,
+      placeholder: "",
+      helpText: "",
+      options: [],
+      optionInput: "",
+    });
+  };
+  
+  const handleSubmit = () => {
+    if (!formData.fieldName) {
+      toast({
+        title: "Validation Error",
+        description: "Field name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const fieldData = {
+      entityType: activeEntity,
+      fieldName: formData.fieldName,
+      fieldType: formData.fieldType,
+      required: formData.required,
+      placeholder: formData.placeholder || null,
+      helpText: formData.helpText || null,
+      options: ["select", "multiselect"].includes(formData.fieldType) ? formData.options : null,
+    };
+    
+    if (editingField) {
+      updateFieldMutation.mutate({ id: editingField.id, data: fieldData });
+    } else {
+      createFieldMutation.mutate(fieldData);
+    }
+  };
+  
+  const handleEdit = (field: any) => {
+    setEditingField(field);
+    setFormData({
+      fieldName: field.fieldName,
+      fieldType: field.fieldType,
+      required: field.required,
+      placeholder: field.placeholder || "",
+      helpText: field.helpText || "",
+      options: field.options || [],
+      optionInput: "",
+    });
+    setIsCreateDialogOpen(true);
+  };
+  
+  const handleDelete = (id: number) => {
+    if (confirm("Are you sure you want to delete this custom field? This cannot be undone.")) {
+      deleteFieldMutation.mutate(id);
+    }
+  };
+  
+  const addOption = () => {
+    if (formData.optionInput.trim()) {
+      setFormData({
+        ...formData,
+        options: [...formData.options, formData.optionInput.trim()],
+        optionInput: "",
+      });
+    }
+  };
+  
+  const removeOption = (index: number) => {
+    setFormData({
+      ...formData,
+      options: formData.options.filter((_, i) => i !== index),
+    });
+  };
+  
+  const getFieldTypeLabel = (type: string) => {
+    const types: Record<string, string> = {
+      text: "Text",
+      textarea: "Text Area",
+      number: "Number",
+      date: "Date",
+      select: "Dropdown",
+      multiselect: "Multi-Select",
+      checkbox: "Checkbox",
+    };
+    return types[type] || type;
+  };
+  
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center">
+              <Database className="w-5 h-5 mr-2" />
+              Custom Fields Configuration
+            </CardTitle>
+            <p className="text-sm text-slate-600 mt-1">
+              Create custom fields that can be used across properties, contacts, and tasks
+            </p>
+          </div>
+          <Button onClick={() => { resetForm(); setIsCreateDialogOpen(true); }}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Field
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {/* Entity Type Tabs */}
+        <Tabs value={activeEntity} onValueChange={(v) => setActiveEntity(v as any)} className="space-y-4">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="task">Tasks</TabsTrigger>
+            <TabsTrigger value="property">Properties</TabsTrigger>
+            <TabsTrigger value="contact">Contacts</TabsTrigger>
+          </TabsList>
+          
+          {/* Fields Table */}
+          <div>
+            {isLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+              </div>
+            ) : customFields.length === 0 ? (
+              <div className="text-center py-12 text-slate-500">
+                <Database className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+                <p>No custom fields defined for {activeEntity}s yet</p>
+                <p className="text-sm mt-2">Click "Add Field" to create your first custom field</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Field Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Required</TableHead>
+                    <TableHead>Options</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {customFields.map((field: any) => (
+                    <TableRow key={field.id}>
+                      <TableCell className="font-medium">{field.fieldName}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{getFieldTypeLabel(field.fieldType)}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {field.required ? (
+                          <Badge variant="secondary">Required</Badge>
+                        ) : (
+                          <Badge variant="outline">Optional</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-600">
+                        {field.options && field.options.length > 0 
+                          ? `${field.options.length} options` 
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end space-x-2">
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={() => handleEdit(field)}
+                            data-testid={`button-edit-field-${field.id}`}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={() => handleDelete(field.id)}
+                            data-testid={`button-delete-field-${field.id}`}
+                          >
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </Tabs>
+      </CardContent>
+      
+      {/* Create/Edit Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={(open) => { 
+        setIsCreateDialogOpen(open); 
+        if (!open) { setEditingField(null); resetForm(); }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingField ? "Edit Custom Field" : "Create Custom Field"}
+            </DialogTitle>
+            <DialogDescription>
+              Define a custom field for {activeEntity}s
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="fieldName">Field Name *</Label>
+              <Input
+                id="fieldName"
+                value={formData.fieldName}
+                onChange={(e) => setFormData({ ...formData, fieldName: e.target.value })}
+                placeholder="e.g., Property Manager, Emergency Contact"
+                data-testid="input-field-name"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="fieldType">Field Type *</Label>
+              <Select 
+                value={formData.fieldType} 
+                onValueChange={(value) => setFormData({ ...formData, fieldType: value as any })}
+              >
+                <SelectTrigger data-testid="select-field-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="text">Text</SelectItem>
+                  <SelectItem value="textarea">Text Area</SelectItem>
+                  <SelectItem value="number">Number</SelectItem>
+                  <SelectItem value="date">Date</SelectItem>
+                  <SelectItem value="select">Dropdown (Single Select)</SelectItem>
+                  <SelectItem value="multiselect">Multi-Select</SelectItem>
+                  <SelectItem value="checkbox">Checkbox</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="required"
+                checked={formData.required}
+                onCheckedChange={(checked) => setFormData({ ...formData, required: checked })}
+                data-testid="switch-required"
+              />
+              <Label htmlFor="required" className="cursor-pointer">
+                Required Field
+              </Label>
+            </div>
+            
+            <div>
+              <Label htmlFor="placeholder">Placeholder Text</Label>
+              <Input
+                id="placeholder"
+                value={formData.placeholder}
+                onChange={(e) => setFormData({ ...formData, placeholder: e.target.value })}
+                placeholder="e.g., Enter property manager name"
+                data-testid="input-placeholder"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="helpText">Help Text</Label>
+              <Textarea
+                id="helpText"
+                value={formData.helpText}
+                onChange={(e) => setFormData({ ...formData, helpText: e.target.value })}
+                placeholder="Additional information to help users fill out this field"
+                rows={2}
+                data-testid="textarea-help-text"
+              />
+            </div>
+            
+            {["select", "multiselect"].includes(formData.fieldType) && (
+              <div>
+                <Label>Options *</Label>
+                <div className="flex space-x-2 mb-2">
+                  <Input
+                    value={formData.optionInput}
+                    onChange={(e) => setFormData({ ...formData, optionInput: e.target.value })}
+                    placeholder="Enter an option"
+                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addOption())}
+                    data-testid="input-option"
+                  />
+                  <Button type="button" onClick={addOption} data-testid="button-add-option">
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+                <div className="space-y-1">
+                  {formData.options.map((option, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-slate-50 rounded">
+                      <span className="text-sm">{option}</span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => removeOption(index)}
+                        data-testid={`button-remove-option-${index}`}
+                      >
+                        <Trash2 className="w-3 h-3 text-red-600" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => { setIsCreateDialogOpen(false); setEditingField(null); resetForm(); }}
+              data-testid="button-cancel"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSubmit}
+              disabled={createFieldMutation.isPending || updateFieldMutation.isPending}
+              data-testid="button-save-field"
+            >
+              {createFieldMutation.isPending || updateFieldMutation.isPending ? "Saving..." : editingField ? "Update Field" : "Create Field"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }
