@@ -25,7 +25,7 @@ import { useLocation } from "wouter";
 import { format } from "date-fns";
 import type { Task } from "@shared/schema";
 import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
-import CustomFieldsRenderer from "@/components/CustomFieldsRenderer";
+import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
 
 const propertySchema = z.object({
   accountId: z.string().nullable().optional(),

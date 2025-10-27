@@ -6,6 +6,7 @@ import { useLocation, useRoute } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import EnhancedChecklist from "@/components/EnhancedChecklist";
 import { formatRecurrenceRule } from "@/lib/rruleUtils";
+import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -359,6 +360,16 @@ export default function TaskProfile() {
   const { data: linkedClient } = useQuery({
     queryKey: [`/api/clients/${linkedClientId}`],
     enabled: isAuthenticated && !!linkedClientId,
+  });
+
+  // Fetch custom fields for tasks
+  const { data: customFields = [] } = useQuery<any[]>({
+    queryKey: ["/api/custom-fields", "task"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/custom-fields?entityType=task");
+      return response.json();
+    },
+    enabled: isAuthenticated,
   });
 
   // Archive/Unarchive task mutation
@@ -2772,6 +2783,18 @@ export default function TaskProfile() {
                     <Label className="text-sm font-medium text-slate-500">Category</Label>
                     <p className="font-medium capitalize">{(task as any).category || "General"}</p>
                   </div>
+
+                  {/* Custom Fields */}
+                  {customFields.length > 0 && (task as any).customFieldValues && (
+                    <div className="col-span-2">
+                      <CustomFieldsRenderer
+                        fields={customFields}
+                        values={(task as any).customFieldValues || {}}
+                        onChange={() => {}}
+                        mode="view"
+                      />
+                    </div>
+                  )}
 
                   <div>
                     <Label className="text-sm font-medium text-slate-500">Recurring</Label>

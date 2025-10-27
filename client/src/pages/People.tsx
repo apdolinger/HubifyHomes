@@ -37,7 +37,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import CustomFieldsRenderer from "@/components/CustomFieldsRenderer";
+import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
 
 const contactSchema = z.object({
   accountId: z.string().nullable().optional(),
