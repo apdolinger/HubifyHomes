@@ -120,7 +120,7 @@ export default function People() {
       const response = await apiRequest("GET", "/api/custom-fields?entityType=contact");
       return response.json();
     },
-    enabled: isAuthenticated && isAddModalOpen,
+    enabled: isAuthenticated && (isAddModalOpen || isEditModalOpen),
   });
 
   // Add contact form
@@ -300,15 +300,36 @@ export default function People() {
       propertyId: contact.propertyId,
       notes: contact.notes || "",
     });
+    setCustomFieldValues(contact.customFieldValues || {});
     setIsEditModalOpen(true);
   };
 
   const handleUpdateContact = (data: ContactFormData) => {
     if (selectedContact) {
+      // Validate required custom fields
+      const requiredFields = customFields.filter(f => f.required);
+      const missingFields = requiredFields.filter(f => {
+        const value = customFieldValues[f.fieldKey];
+        if (Array.isArray(value)) {
+          return value.length === 0;
+        }
+        return !value && value !== false && value !== 0;
+      });
+      
+      if (missingFields.length > 0) {
+        toast({
+          title: "Validation Error",
+          description: `Please fill in required custom fields: ${missingFields.map(f => f.fieldName).join(', ')}`,
+          variant: "destructive",
+        });
+        return;
+      }
+      
       // For updates: convert empty accountId to null to allow clearing existing values
       const cleanedData = {
         ...data,
         accountId: data.accountId?.trim() === "" ? null : data.accountId?.trim() || null,
+        customFieldValues: Object.keys(customFieldValues).length > 0 ? customFieldValues : undefined,
       };
       updateContactMutation.mutate({ id: selectedContact.id, data: cleanedData });
     }
@@ -1429,6 +1450,16 @@ export default function People() {
                   </FormItem>
                 )}
               />
+              
+              {/* Custom Fields */}
+              {customFields.length > 0 && (
+                <CustomFieldsRenderer
+                  fields={customFields}
+                  values={customFieldValues}
+                  onChange={setCustomFieldValues}
+                  mode="edit"
+                />
+              )}
               
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)}>
