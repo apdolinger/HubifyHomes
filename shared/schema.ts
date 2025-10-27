@@ -1161,6 +1161,16 @@ export const taskChecklistItems = pgTable("task_checklist_items", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Task Comments table for notes and discussions on tasks
+export const taskComments = pgTable("task_comments", {
+  id: serial("id").primaryKey(),
+  taskId: integer("task_id").references(() => tasks.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  text: text("text").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Ignored duplicates table for tracking duplicates that should be ignored
 export const ignoredDuplicates = pgTable("ignored_duplicates", {
   id: serial("id").primaryKey(),
@@ -1674,6 +1684,15 @@ export const insertTaskChecklistItemSchema = createInsertSchema(taskChecklistIte
   updatedAt: true,
   completedAt: true,
 });
+
+export const insertTaskCommentSchema = createInsertSchema(taskComments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertTaskComment = z.infer<typeof insertTaskCommentSchema>;
+export type TaskComment = typeof taskComments.$inferSelect;
 
 export const insertCommunitySchema = createInsertSchema(communities).omit({
   id: true,
