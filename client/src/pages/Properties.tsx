@@ -208,14 +208,17 @@ function BulkTaskForm({ selectedPropertyIds, properties, users, onSuccess, onCan
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Assign To</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
+                <Select 
+                  onValueChange={(value) => field.onChange(value === "unassigned" ? "" : value)} 
+                  value={field.value || "unassigned"}
+                >
                   <FormControl>
                     <SelectTrigger data-testid="select-bulk-task-assigned">
                       <SelectValue placeholder="Select team member" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="">Unassigned</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
                     {users?.map((user: any) => (
                       <SelectItem key={user.id} value={user.id}>
                         {user.firstName} {user.lastName}
@@ -253,14 +256,17 @@ function BulkTaskForm({ selectedPropertyIds, properties, users, onSuccess, onCan
           render={({ field }) => (
             <FormItem>
               <FormLabel>Category</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
+              <Select 
+                onValueChange={(value) => field.onChange(value === "none" ? "" : value)} 
+                value={field.value || "none"}
+              >
                 <FormControl>
                   <SelectTrigger data-testid="select-bulk-task-category">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="">No category</SelectItem>
+                  <SelectItem value="none">No category</SelectItem>
                   <SelectItem value="maintenance">Maintenance</SelectItem>
                   <SelectItem value="inspection">Inspection</SelectItem>
                   <SelectItem value="cleaning">Cleaning</SelectItem>

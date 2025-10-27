@@ -3288,7 +3288,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isArchived: false,
         };
 
-        const task = await req.storage.createTask(taskData, userId);
+        const task = await storage.createTask(taskData, userId);
         createdTasks.push(task);
       }
 
