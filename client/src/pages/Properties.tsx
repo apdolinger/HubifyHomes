@@ -412,11 +412,17 @@ export default function Properties() {
     // Search filter
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
+      const primaryContact = getPrimaryContact(property.id);
+      const clientName = primaryContact 
+        ? `${primaryContact.firstName} ${primaryContact.lastName}`.toLowerCase()
+        : '';
+      
       const matchesSearch = 
         property.name.toLowerCase().includes(searchLower) ||
         formatFullAddress(property).toLowerCase().includes(searchLower) ||
         property.type.toLowerCase().includes(searchLower) ||
-        property.status.toLowerCase().includes(searchLower);
+        property.status.toLowerCase().includes(searchLower) ||
+        clientName.includes(searchLower);
       
       if (!matchesSearch) return false;
     }
@@ -788,10 +794,11 @@ export default function Properties() {
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
             <Input
-              placeholder="Search properties..."
+              placeholder="Search properties by name, address, client..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
+              data-testid="input-search-properties"
             />
           </div>
           <div className="flex gap-2 items-center">
