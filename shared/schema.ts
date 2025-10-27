@@ -769,6 +769,7 @@ export const tasks = pgTable("tasks", {
   billableRateCents: integer("billable_rate_cents"), // Hourly billable rate in cents for time tracking
   isArchived: boolean("is_archived").notNull().default(false),
   attachments: jsonb("attachments").$type<PhotoAttachment[]>().default([]),
+  tags: text("tags"), // Comma-separated tags, e.g., "urgent, maintenance, inspection"
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

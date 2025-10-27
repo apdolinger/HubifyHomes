@@ -1734,6 +1734,7 @@ export class DatabaseStorage implements IStorage {
       billableRateCents: tasks.billableRateCents,
       isArchived: tasks.isArchived,
       attachments: tasks.attachments,
+      tags: tasks.tags,
       createdAt: tasks.createdAt,
       updatedAt: tasks.updatedAt,
       property: {
@@ -1828,6 +1829,7 @@ export class DatabaseStorage implements IStorage {
       billableRateCents: tasks.billableRateCents,
       isArchived: tasks.isArchived,
       attachments: tasks.attachments,
+      tags: tasks.tags,
       createdAt: tasks.createdAt,
       updatedAt: tasks.updatedAt,
       property: {

@@ -629,7 +629,7 @@ export default function TaskProfile() {
         billedSeparately: (task as any).billedSeparately || false,
         billingAmount: (task as any).billingAmount || "",
         roomId: (task as any).roomId?.toString() || "none",
-        clientId: (task as any).clientId?.toString() || "",
+        clientId: (task as any).contactId?.toString() || "",
         tags: (task as any).tags || ""
       });
       
@@ -666,7 +666,7 @@ export default function TaskProfile() {
       recurrenceFrequency: editForm.recurrenceFrequency,
       propertyId: editForm.propertyId ? parseInt(editForm.propertyId) : null,
       roomId: editForm.roomId && editForm.roomId !== "none" ? parseInt(editForm.roomId) : null,
-      clientId: editForm.clientId ? parseInt(editForm.clientId) : null,
+      contactId: editForm.clientId ? parseInt(editForm.clientId) : null,
       billedSeparately: editForm.billedSeparately,
       billingAmount: editForm.billingAmount,
       attachments: photoAttachments,
