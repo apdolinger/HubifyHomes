@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Building, MapPin, Users, Plus, Home, Square, DollarSign, Activity, Eye, Edit, ToggleLeft, ToggleRight, Trash2, FileText, Mail, MessageCircle, ChevronUp, ChevronDown, Search, Filter, Crown, Anchor, Package, Calendar } from "lucide-react";
+import { Building, MapPin, Users, Plus, Home, Square, DollarSign, Activity, Eye, Edit, ToggleLeft, ToggleRight, Trash2, FileText, Mail, MessageCircle, ChevronUp, ChevronDown, Search, Filter, Crown, Anchor, Package, Calendar, Settings } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -24,6 +24,7 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
 import type { Task } from "@shared/schema";
+import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
 
 const propertySchema = z.object({
   accountId: z.string().nullable().optional(),
@@ -98,8 +99,8 @@ function BulkTaskForm({ selectedPropertyIds, properties, users, onSuccess, onCan
     if (template) {
       form.setValue("title", template.title || "");
       form.setValue("description", template.description || "");
-      form.setValue("priority", template.priority || "normal");
-      form.setValue("status", template.status || "pending");
+      form.setValue("priority", (template.priority as "urgent" | "high" | "normal" | "low") || "normal");
+      form.setValue("status", (template.status as "pending" | "in_progress") || "pending");
       form.setValue("category", template.category || "");
       if (template.assignedToId) {
         form.setValue("assignedToId", template.assignedToId);
@@ -399,6 +400,43 @@ export default function Properties() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [bulkTaskModalOpen, setBulkTaskModalOpen] = useState(false);
+  const [isCustomizeModalOpen, setIsCustomizeModalOpen] = useState(false);
+
+  // Default column configuration for properties table
+  const defaultColumns: ColumnConfig[] = [
+    { id: 'name', label: 'Property Name', visible: true, required: true },
+    { id: 'address', label: 'Address', visible: true },
+    { id: 'client', label: 'Client', visible: true },
+    { id: 'type', label: 'Type', visible: true },
+    { id: 'status', label: 'Status', visible: true },
+    { id: 'assignedStaff', label: 'Assigned Staff', visible: true },
+    { id: 'squareFootage', label: 'Sq Ft', visible: false },
+    { id: 'billingType', label: 'Billing Type', visible: false },
+  ];
+
+  // Load column configuration from localStorage
+  const [columns, setColumns] = useState<ColumnConfig[]>(() => {
+    const saved = localStorage.getItem('propertyTableColumns');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return defaultColumns;
+      }
+    }
+    return defaultColumns;
+  });
+
+  // Save column configuration to localStorage
+  const handleSaveColumns = (newColumns: ColumnConfig[]) => {
+    setColumns(newColumns);
+    localStorage.setItem('propertyTableColumns', JSON.stringify(newColumns));
+  };
+
+  // Get visible columns in order
+  const visibleColumns = useMemo(() => {
+    return columns.filter(col => col.visible);
+  }, [columns]);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -415,7 +453,7 @@ export default function Properties() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  const { data: properties, isLoading: propertiesLoading } = useQuery({
+  const { data: properties = [], isLoading: propertiesLoading } = useQuery({
     queryKey: ["/api/properties", showInactive],
     queryFn: async () => {
       const response = await apiRequest("GET", `/api/properties${showInactive ? '?includeInactive=true' : ''}`);
@@ -424,12 +462,12 @@ export default function Properties() {
     enabled: isAuthenticated,
   });
 
-  const { data: contacts } = useQuery({
+  const { data: contacts = [] } = useQuery({
     queryKey: ["/api/contacts"],
     enabled: isAuthenticated,
   });
 
-  const { data: users } = useQuery({
+  const { data: users = [] } = useQuery({
     queryKey: ["/api/users"],
     enabled: isAuthenticated,
   });
@@ -614,6 +652,60 @@ export default function Properties() {
       property.zip
     ].filter(Boolean);
     return parts.join(", ");
+  };
+
+  // Render cell content based on column type
+  const renderCellContent = (columnId: string, property: any) => {
+    switch (columnId) {
+      case 'name':
+        return property.name;
+      
+      case 'address':
+        return formatFullAddress(property);
+      
+      case 'client': {
+        const primaryContact = getPrimaryContact(property.id);
+        return primaryContact 
+          ? `${primaryContact.firstName || ''} ${primaryContact.lastName || ''}`.trim() || 'N/A'
+          : 'N/A';
+      }
+      
+      case 'type':
+        return getTypeDisplay(property.type);
+      
+      case 'status':
+        return (
+          <Badge variant={getStatusColor(property.status)}>
+            {property.status.replace('_', ' ')}
+          </Badge>
+        );
+      
+      case 'assignedStaff': {
+        const staff = getAssignedStaff(property.managerId);
+        if (!staff) return 'Unassigned';
+        return (
+          <div className="flex items-center gap-2">
+            <Avatar className="w-6 h-6">
+              <AvatarFallback className="text-xs">
+                {staff.firstName?.[0]}{staff.lastName?.[0]}
+              </AvatarFallback>
+            </Avatar>
+            <span>{staff.firstName} {staff.lastName}</span>
+          </div>
+        );
+      }
+      
+      case 'squareFootage':
+        return property.squareFootage ? `${property.squareFootage.toLocaleString()} sq ft` : 'N/A';
+      
+      case 'billingType':
+        return property.billingType 
+          ? property.billingType === 'sqft' ? 'Per Sq Ft' : 'Flat Fee'
+          : 'N/A';
+      
+      default:
+        return null;
+    }
   };
 
   // Bulk selection handlers
@@ -1282,16 +1374,29 @@ export default function Properties() {
 
       {/* Properties Table */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Properties List</CardTitle>
-            <div className="text-sm text-slate-600">
-              {filteredAndSortedProperties?.length || 0} of {properties?.length || 0} properties
-              {selectedProperties.size > 0 && (
-                <span className="ml-2 font-medium">
-                  • {selectedProperties.size} selected
-                </span>
-              )}
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <div className="flex-1">
+            <div className="flex items-center justify-between">
+              <CardTitle>Properties List</CardTitle>
+              <div className="flex items-center gap-4">
+                <div className="text-sm text-slate-600">
+                  {filteredAndSortedProperties?.length || 0} of {properties?.length || 0} properties
+                  {selectedProperties.size > 0 && (
+                    <span className="ml-2 font-medium">
+                      • {selectedProperties.size} selected
+                    </span>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsCustomizeModalOpen(true)}
+                  data-testid="customize-property-table-btn"
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Settings
+                </Button>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -1311,206 +1416,70 @@ export default function Properties() {
                       aria-label="Select all properties"
                     />
                   </TableHead>
-                  <TableHead>Image</TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-slate-50 select-none"
-                    onClick={() => handleSort("name")}
-                  >
-                    Property/Community Name {getSortIcon("name")}
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-slate-50 select-none"
-                    onClick={() => handleSort("accountId")}
-                  >
-                    Account ID {getSortIcon("accountId")}
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-slate-50 select-none"
-                    onClick={() => handleSort("address")}
-                  >
-                    Address {getSortIcon("address")}
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-slate-50 select-none"
-                    onClick={() => handleSort("type")}
-                  >
-                    Type {getSortIcon("type")}
-                  </TableHead>
-                  <TableHead>Primary Contact</TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-slate-50 select-none"
-                    onClick={() => handleSort("squareFootage")}
-                  >
-                    Square Footage {getSortIcon("squareFootage")}
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-slate-50 select-none"
-                    onClick={() => handleSort("billingType")}
-                  >
-                    Billing Type {getSortIcon("billingType")}
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-slate-50 select-none"
-                    onClick={() => handleSort("status")}
-                  >
-                    Status {getSortIcon("status")}
-                  </TableHead>
-                  <TableHead>Assigned Staff</TableHead>
+                  {visibleColumns.map((column) => (
+                    <TableHead 
+                      key={column.id}
+                      className="cursor-pointer hover:bg-slate-50 select-none"
+                      onClick={() => handleSort(column.id)}
+                    >
+                      {column.label} {getSortIcon(column.id)}
+                    </TableHead>
+                  ))}
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedProperties?.map((property: any) => {
-                  const primaryContact = getPrimaryContact(property.id);
-                  return (
-                    <TableRow 
-                      key={property.id}
-                      className={`cursor-pointer hover:bg-slate-50 ${
-                        selectedProperties.has(property.id) ? 'bg-blue-50' : ''
-                      }`}
-                      onClick={() => setLocation(`/property-profile/${property.id}`)}
-                    >
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={selectedProperties.has(property.id)}
-                          onCheckedChange={(checked) => 
-                            handleSelectProperty(property.id, checked as boolean)
-                          }
-                          aria-label={`Select ${property.name}`}
-                        />
+                {paginatedProperties?.map((property: any) => (
+                  <TableRow 
+                    key={property.id}
+                    className={`cursor-pointer hover:bg-slate-50 ${
+                      selectedProperties.has(property.id) ? 'bg-blue-50' : ''
+                    }`}
+                    onClick={() => setLocation(`/property-profile/${property.id}`)}
+                  >
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedProperties.has(property.id)}
+                        onCheckedChange={(checked) => 
+                          handleSelectProperty(property.id, checked as boolean)
+                        }
+                        aria-label={`Select ${property.name}`}
+                      />
+                    </TableCell>
+                    {visibleColumns.map((column) => (
+                      <TableCell key={column.id} className={column.id === 'name' ? 'font-medium' : ''}>
+                        {renderCellContent(column.id, property)}
                       </TableCell>
-                      <TableCell>
-                        {property.imageUrl ? (
-                          <Avatar className="h-10 w-10">
-                            <AvatarImage src={property.imageUrl} alt={property.name} />
-                            <AvatarFallback>
-                              <Building className="h-5 w-5" />
-                            </AvatarFallback>
-                          </Avatar>
-                        ) : (
-                          <div className="h-10 w-10 bg-slate-100 rounded-full flex items-center justify-center">
-                            <Building className="h-5 w-5 text-slate-500" />
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-medium">{property.name}</TableCell>
-                      <TableCell className="text-sm text-slate-600">
-                        {property.accountId || <span className="text-slate-400 italic">No account ID</span>}
-                      </TableCell>
-                      <TableCell className="text-sm text-slate-600">{formatFullAddress(property)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="flex items-center gap-1">
-                            {property.type === "storage_unit" && <Package className="w-3 h-3" />}
-                            {property.type === "boat" && <Anchor className="w-3 h-3" />}
-                            {getTypeDisplay(property.type)}
-                          </Badge>
-                          {(property.type === "storage_unit" || property.type === "boat") && (
-                            <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200 flex items-center gap-1">
-                              <Crown className="w-3 h-3" />
-                              Premium
-                            </Badge>
-                          )}
-                          {!property.isActive && (
-                            <Badge variant="secondary" className="bg-red-100 text-red-800 border-red-200">Inactive</Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {primaryContact ? (
-                          <div className="text-sm">
-                            <div 
-                              className="font-medium text-primary hover:text-primary/80 cursor-pointer underline"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setLocation(`/person-profile/${primaryContact.id}`);
-                              }}
-                            >
-                              {primaryContact.firstName} {primaryContact.lastName}
-                            </div>
-                            <div className="text-slate-600">{primaryContact.email}</div>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">No contact</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {property.squareFootage ? (
-                          <span className="flex items-center">
-                            <Square className="h-4 w-4 mr-1" />
-                            {property.squareFootage.toLocaleString()} sq ft
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">N/A</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {property.billingType ? (
-                          <Badge variant="secondary">
-                            {property.billingType === 'sqft' ? 'Per Sq Ft' : 'Flat Fee'}
-                          </Badge>
-                        ) : (
-                          <span className="text-slate-400">N/A</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusColor(property.status)}>
-                          {property.status.replace('_', ' ')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {(() => {
-                          const assignedStaff = getAssignedStaff(property.managerId);
-                          return assignedStaff ? (
-                            <div className="text-sm">
-                              <div 
-                                className="font-medium text-primary hover:text-primary/80 cursor-pointer underline"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setLocation(`/person-profile/${assignedStaff.id}`);
-                                }}
-                              >
-                                {assignedStaff.firstName} {assignedStaff.lastName}
-                              </div>
-                              <div className="text-slate-600 text-xs capitalize">
-                                {assignedStaff.role}
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-slate-400">Unassigned</span>
-                          );
-                        })()}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setLocation(`/property-profile/${property.id}?edit=true`);
-                            }}
-                            title="Edit Property"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteProperty(property);
-                            }}
-                            className="text-red-600 hover:text-red-700 hover:border-red-300"
-                            title="Delete Property"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                    ))}
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLocation(`/property-profile/${property.id}?edit=true`);
+                          }}
+                          title="Edit Property"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteProperty(property);
+                          }}
+                          className="text-red-600 hover:text-red-700 hover:border-red-300"
+                          title="Delete Property"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           ) : (
@@ -1615,6 +1584,15 @@ export default function Properties() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Column Customization Modal */}
+      <TableCustomizationModal
+        isOpen={isCustomizeModalOpen}
+        onClose={() => setIsCustomizeModalOpen(false)}
+        columns={columns}
+        defaultColumns={defaultColumns}
+        onSave={handleSaveColumns}
+      />
     </main>
   );
 }
