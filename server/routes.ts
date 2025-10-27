@@ -3497,6 +3497,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Task comment routes
+  app.get("/api/tasks/:taskId/comments", isAuthenticated, async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId);
+      const comments = await storage.getTaskComments(taskId);
+      res.json(comments);
+    } catch (error) {
+      console.error("Error fetching task comments:", error);
+      res.status(500).json({ message: "Failed to fetch task comments" });
+    }
+  });
+
+  app.post("/api/tasks/:taskId/comments", isAuthenticated, async (req: any, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId);
+      const userId = req.user.claims.sub;
+      const { text } = req.body;
+
+      if (!text || !text.trim()) {
+        return res.status(400).json({ message: "Comment text is required" });
+      }
+
+      const comment = await storage.createTaskComment({
+        taskId,
+        userId,
+        text: text.trim(),
+      });
+
+      // Fetch the comment with user details
+      const comments = await storage.getTaskComments(taskId);
+      const newComment = comments.find(c => c.id === comment.id);
+      
+      res.json(newComment);
+    } catch (error) {
+      console.error("Error creating task comment:", error);
+      res.status(500).json({ message: "Failed to create task comment" });
+    }
+  });
+
+  app.patch("/api/tasks/:taskId/comments/:commentId", isAuthenticated, async (req: any, res) => {
+    try {
+      const commentId = parseInt(req.params.commentId);
+      const userId = req.user.claims.sub;
+      const { text } = req.body;
+
+      if (!text || !text.trim()) {
+        return res.status(400).json({ message: "Comment text is required" });
+      }
+
+      const updatedComment = await storage.updateTaskComment(commentId, userId, text.trim());
+      res.json(updatedComment);
+    } catch (error) {
+      console.error("Error updating task comment:", error);
+      res.status(500).json({ message: "Failed to update task comment" });
+    }
+  });
+
+  app.delete("/api/tasks/:taskId/comments/:commentId", isAuthenticated, async (req: any, res) => {
+    try {
+      const commentId = parseInt(req.params.commentId);
+      const userId = req.user.claims.sub;
+
+      await storage.deleteTaskComment(commentId, userId);
+      res.json({ message: "Comment deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting task comment:", error);
+      res.status(500).json({ message: "Failed to delete task comment" });
+    }
+  });
+
   app.post("/api/tasks/check-conflicts", isAuthenticated, async (req, res) => {
     try {
       const { assignedUserId, dueDate, timeEstimate, excludeTaskId } = req.body;
