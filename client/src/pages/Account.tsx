@@ -862,6 +862,10 @@ export function CustomFieldsSettings() {
   // Fetch custom fields for the current entity type
   const { data: customFields = [], isLoading, refetch } = useQuery<any[]>({
     queryKey: ["/api/custom-fields", activeEntity],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/custom-fields?entityType=${activeEntity}`);
+      return response.json();
+    },
     enabled: !!orgId,
   });
   
