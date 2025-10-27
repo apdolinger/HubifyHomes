@@ -1481,8 +1481,8 @@ export default function Properties() {
           </DialogHeader>
           <BulkTaskForm
             selectedPropertyIds={Array.from(selectedProperties)}
-            properties={properties}
-            users={users}
+            properties={properties || []}
+            users={users || []}
             onSuccess={() => {
               setBulkTaskModalOpen(false);
               setSelectedProperties(new Set());

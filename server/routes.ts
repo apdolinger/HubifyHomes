@@ -3257,6 +3257,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk create tasks for multiple properties
+  app.post("/api/tasks/bulk", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { propertyIds, title, description, priority, status, assignedToId, dueDate, category } = req.body;
+
+      if (!propertyIds || !Array.isArray(propertyIds) || propertyIds.length === 0) {
+        return res.status(400).json({ message: "Property IDs array is required" });
+      }
+
+      if (!title) {
+        return res.status(400).json({ message: "Task title is required" });
+      }
+
+      const createdTasks = [];
+
+      for (const propertyId of propertyIds) {
+        const taskData = {
+          title,
+          description: description || null,
+          priority: priority || "normal",
+          status: status || "pending",
+          propertyId: parseInt(propertyId),
+          assignedToId: assignedToId || null,
+          assignedById: userId,
+          dueDate: dueDate ? new Date(dueDate) : null,
+          category: category || null,
+          orgId: req.user.orgId,
+          isArchived: false,
+        };
+
+        const task = await req.storage.createTask(taskData, userId);
+        createdTasks.push(task);
+      }
+
+      res.json({ 
+        message: `Successfully created ${createdTasks.length} tasks`,
+        tasks: createdTasks 
+      });
+    } catch (error: any) {
+      console.error("Error creating bulk tasks:", error);
+      res.status(500).json({ message: "Failed to create bulk tasks" });
+    }
+  });
+
   // Generate task instances from a recurring task template
   app.post("/api/tasks/:id/generate-instances", isAuthenticated, async (req: any, res) => {
     try {
