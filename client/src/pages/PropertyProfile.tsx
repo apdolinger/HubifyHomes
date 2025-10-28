@@ -196,7 +196,10 @@ export default function PropertyProfile() {
     installDate: "",
     lastServiced: "",
     nextServiceDue: "",
-    notes: ""
+    notes: "",
+    hasWarranty: false,
+    warrantyStartDate: "",
+    warrantyEndDate: ""
   });
   const [isSupplyModalOpen, setIsSupplyModalOpen] = useState(false);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
@@ -1620,7 +1623,10 @@ export default function PropertyProfile() {
       installDate: device.installDate ? device.installDate.split('T')[0] : "",
       lastServiced: device.lastServiced ? device.lastServiced.split('T')[0] : "",
       nextServiceDue: device.nextServiceDue ? device.nextServiceDue.split('T')[0] : "",
-      notes: device.notes || ""
+      notes: device.notes || "",
+      hasWarranty: device.hasWarranty || false,
+      warrantyStartDate: device.warrantyStartDate ? device.warrantyStartDate.split('T')[0] : "",
+      warrantyEndDate: device.warrantyEndDate ? device.warrantyEndDate.split('T')[0] : ""
     });
     setIsDeviceModalOpen(true);
   };
@@ -2898,6 +2904,22 @@ export default function PropertyProfile() {
                                               <span className="font-medium">Next Service:</span> {new Date(device.nextServiceDue).toLocaleDateString()}
                                             </span>
                                           )}
+                                        </div>
+                                      )}
+                                      {device.hasWarranty && (device.warrantyStartDate || device.warrantyEndDate) && (
+                                        <div className="mt-2 text-sm" data-testid={`device-warranty-${device.id}`}>
+                                          <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-100">
+                                            <span className="font-medium">Warranty:</span>
+                                            {device.warrantyStartDate && device.warrantyEndDate ? (
+                                              <span className="ml-1">
+                                                {new Date(device.warrantyStartDate).toLocaleDateString()} - {new Date(device.warrantyEndDate).toLocaleDateString()}
+                                              </span>
+                                            ) : device.warrantyStartDate ? (
+                                              <span className="ml-1">From {new Date(device.warrantyStartDate).toLocaleDateString()}</span>
+                                            ) : device.warrantyEndDate ? (
+                                              <span className="ml-1">Until {new Date(device.warrantyEndDate).toLocaleDateString()}</span>
+                                            ) : null}
+                                          </Badge>
                                         </div>
                                       )}
                                       {device.notes && (
@@ -4196,6 +4218,44 @@ export default function PropertyProfile() {
                   onChange={(e) => setRoomDeviceForm({ ...roomDeviceForm, nextServiceDue: e.target.value })}
                 />
               </div>
+
+              <div className="md:col-span-2 flex items-center space-x-2">
+                <Checkbox
+                  id="device-has-warranty"
+                  checked={roomDeviceForm.hasWarranty}
+                  onCheckedChange={(checked) => setRoomDeviceForm({ ...roomDeviceForm, hasWarranty: !!checked })}
+                  data-testid="checkbox-has-warranty"
+                />
+                <Label htmlFor="device-has-warranty" className="cursor-pointer">
+                  Device has warranty
+                </Label>
+              </div>
+
+              {roomDeviceForm.hasWarranty && (
+                <>
+                  <div>
+                    <Label htmlFor="device-warranty-start">Warranty Start Date</Label>
+                    <Input
+                      id="device-warranty-start"
+                      type="date"
+                      value={roomDeviceForm.warrantyStartDate}
+                      onChange={(e) => setRoomDeviceForm({ ...roomDeviceForm, warrantyStartDate: e.target.value })}
+                      data-testid="input-warranty-start"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="device-warranty-end">Warranty End Date</Label>
+                    <Input
+                      id="device-warranty-end"
+                      type="date"
+                      value={roomDeviceForm.warrantyEndDate}
+                      onChange={(e) => setRoomDeviceForm({ ...roomDeviceForm, warrantyEndDate: e.target.value })}
+                      data-testid="input-warranty-end"
+                    />
+                  </div>
+                </>
+              )}
 
               <div className="md:col-span-2">
                 <Label htmlFor="device-notes">Notes</Label>
