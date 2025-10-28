@@ -1858,6 +1858,23 @@ export default function PropertyProfile() {
           </Card>
         </div>
 
+        {/* Custom Fields Section */}
+        {customFields.length > 0 && (property as any)?.customFieldValues && Object.keys((property as any).customFieldValues).length > 0 && (
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>Custom Fields</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CustomFieldsRenderer
+                fields={customFields}
+                values={(property as any).customFieldValues || {}}
+                onChange={() => {}}
+                mode="view"
+              />
+            </CardContent>
+          </Card>
+        )}
+
         {/* Tabs for detailed information */}
         <Tabs defaultValue="tasks" className="space-y-6">
           <TabsList className="grid w-full grid-cols-6">

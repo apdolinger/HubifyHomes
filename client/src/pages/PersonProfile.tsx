@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
 
 // Form schema for editing contact
 const editContactSchema = z.object({
@@ -670,6 +671,16 @@ export default function PersonProfile() {
   });
 
   const linkedProperties = (contactProperties as any[]) || [];
+
+  // Fetch custom fields for clients
+  const { data: customFields = [] } = useQuery<any[]>({
+    queryKey: ["/api/custom-fields", "client"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/custom-fields?entityType=client");
+      return response.json();
+    },
+    enabled: isAuthenticated,
+  });
 
 
 
@@ -1394,7 +1405,7 @@ export default function PersonProfile() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <div>
                   <label className="text-sm font-medium text-slate-700 mb-2 block">
                     General Notes
@@ -1404,34 +1415,27 @@ export default function PersonProfile() {
                     rows={4}
                     className="resize-none"
                     defaultValue={(person as any)?.notes || ""}
+                    disabled
                   />
                 </div>
                 
-                <div>
-                  <label className="text-sm font-medium text-slate-700 mb-2 block">
-                    Preferred Communication Method
-                  </label>
-                  <select className="w-full p-2 border border-slate-300 rounded-md">
-                    <option value="email">Email</option>
-                    <option value="phone">Phone</option>
-                    <option value="text">Text</option>
-                  </select>
-                </div>
+                {/* Custom Fields Display */}
+                {customFields.length > 0 && (person as any)?.customFieldValues && Object.keys((person as any).customFieldValues).length > 0 && (
+                  <div className="border-t pt-4">
+                    <CustomFieldsRenderer
+                      fields={customFields}
+                      values={(person as any).customFieldValues || {}}
+                      onChange={() => {}}
+                      mode="view"
+                    />
+                  </div>
+                )}
                 
-                <div>
-                  <label className="text-sm font-medium text-slate-700 mb-2 block">
-                    Emergency Contact
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Emergency contact information"
-                    className="w-full p-2 border border-slate-300 rounded-md"
-                  />
-                </div>
-                
-                <Button className="bg-primary hover:bg-primary/90">
-                  Save Changes
-                </Button>
+                {customFields.length > 0 && (!((person as any)?.customFieldValues) || Object.keys((person as any).customFieldValues || {}).length === 0) && (
+                  <div className="border-t pt-4">
+                    <p className="text-sm text-slate-500">No custom field values set for this client.</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
