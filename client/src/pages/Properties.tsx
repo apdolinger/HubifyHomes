@@ -1586,7 +1586,7 @@ export default function Properties() {
           <BulkTaskForm
             selectedPropertyIds={Array.from(selectedProperties)}
             properties={properties || []}
-            users={users || []}
+            users={users as any[] || []}
             onSuccess={() => {
               setBulkTaskModalOpen(false);
               setSelectedProperties(new Set());
