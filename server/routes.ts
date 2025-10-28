@@ -2932,9 +2932,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/property-access", isAuthenticated, async (req, res) => {
+  app.post("/api/property-access", isAuthenticated, async (req: any, res) => {
     try {
-      const validatedData = insertPropertyAccessItemSchema.parse(req.body);
+      const userId = req.user?.claims?.sub;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized - no user ID found" });
+      }
+      
+      // Add createdById BEFORE validation
+      const validatedData = insertPropertyAccessItemSchema.parse({
+        ...req.body,
+        createdById: userId
+      });
+      
       const item = await storage.createPropertyAccessItem(validatedData);
       res.status(201).json(item);
     } catch (error) {
