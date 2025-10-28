@@ -122,7 +122,7 @@ function CascadedClientAlertsDisplay({ propertyId }: { propertyId: string }) {
 }
 
 export default function PropertyProfile() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const { openTaskModal } = useTaskModal();
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
@@ -165,11 +165,11 @@ export default function PropertyProfile() {
   const [selectedRoom, setSelectedRoom] = useState<any>(null);
   const [roomSupplyForm, setRoomSupplyForm] = useState({
     name: "",
-    type: "lightbulb",
+    type: "",
     brand: "",
     model: "",
     quantity: 1,
-    unit: "piece",
+    unit: "",
     location: "",
     purchaseUrl: "",
     lastChanged: "",
@@ -311,6 +311,12 @@ export default function PropertyProfile() {
   const { data: contacts } = useQuery({
     queryKey: ["/api/contacts"],
     enabled: isAuthenticated,
+  });
+
+  // Fetch organization supply settings
+  const { data: supplySettings } = useQuery({
+    queryKey: [`/api/organizations/${(user as any)?.orgId}/supply-settings`],
+    enabled: isAuthenticated && !!(user as any)?.orgId,
   });
 
   const { data: tasks } = useQuery({
@@ -3565,16 +3571,11 @@ export default function PropertyProfile() {
                     <SelectValue placeholder="Select supply type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="lightbulb">Lightbulb</SelectItem>
-                    <SelectItem value="filter">Filter</SelectItem>
-                    <SelectItem value="paint">Paint</SelectItem>
-                    <SelectItem value="battery">Battery</SelectItem>
-                    <SelectItem value="cleaning">Cleaning Supply</SelectItem>
-                    <SelectItem value="hardware">Hardware</SelectItem>
-                    <SelectItem value="electrical">Electrical</SelectItem>
-                    <SelectItem value="plumbing">Plumbing</SelectItem>
-                    <SelectItem value="hvac">HVAC</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    {((supplySettings as any)?.supplyTypes || []).map((type: string) => (
+                      <SelectItem key={type} value={type} className="capitalize">
+                        {type.charAt(0).toUpperCase() + type.slice(1)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -3620,16 +3621,11 @@ export default function PropertyProfile() {
                     <SelectValue placeholder="Select unit" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="piece">Piece</SelectItem>
-                    <SelectItem value="gallon">Gallon</SelectItem>
-                    <SelectItem value="quart">Quart</SelectItem>
-                    <SelectItem value="liter">Liter</SelectItem>
-                    <SelectItem value="bottle">Bottle</SelectItem>
-                    <SelectItem value="box">Box</SelectItem>
-                    <SelectItem value="pack">Pack</SelectItem>
-                    <SelectItem value="roll">Roll</SelectItem>
-                    <SelectItem value="tube">Tube</SelectItem>
-                    <SelectItem value="bag">Bag</SelectItem>
+                    {((supplySettings as any)?.supplyUnits || []).map((unit: string) => (
+                      <SelectItem key={unit} value={unit} className="capitalize">
+                        {unit.charAt(0).toUpperCase() + unit.slice(1)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
