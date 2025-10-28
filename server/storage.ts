@@ -209,6 +209,8 @@ export interface IStorage {
   updateOrg(id: string, org: Partial<InsertOrg>): Promise<Org>;
   getOrgSubscription(orgId: string): Promise<OrgSubscription | undefined>;
   upsertOrgSubscription(subscription: InsertOrgSubscription): Promise<OrgSubscription>;
+  getOrgSupplySettings(id: string): Promise<{ supplyTypes: string[]; supplyUnits: string[] } | undefined>;
+  updateOrgSupplySettings(id: string, settings: { supplyTypes?: string[]; supplyUnits?: string[] }): Promise<{ supplyTypes: string[]; supplyUnits: string[] } | undefined>;
   
   // Client operations
   getClients(orgId: string): Promise<Client[]>;
@@ -784,6 +786,50 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return subscription;
+  }
+
+  async getOrgSupplySettings(id: string): Promise<{ supplyTypes: string[]; supplyUnits: string[] } | undefined> {
+    const [org] = await db
+      .select({
+        supplyTypes: orgs.supplyTypes,
+        supplyUnits: orgs.supplyUnits,
+      })
+      .from(orgs)
+      .where(eq(orgs.id, id));
+    
+    if (!org) return undefined;
+    
+    return {
+      supplyTypes: org.supplyTypes as string[] || [],
+      supplyUnits: org.supplyUnits as string[] || [],
+    };
+  }
+
+  async updateOrgSupplySettings(id: string, settings: { supplyTypes?: string[]; supplyUnits?: string[] }): Promise<{ supplyTypes: string[]; supplyUnits: string[] } | undefined> {
+    const updateData: any = { updatedAt: new Date() };
+    
+    if (settings.supplyTypes !== undefined) {
+      updateData.supplyTypes = settings.supplyTypes;
+    }
+    if (settings.supplyUnits !== undefined) {
+      updateData.supplyUnits = settings.supplyUnits;
+    }
+    
+    const [org] = await db
+      .update(orgs)
+      .set(updateData)
+      .where(eq(orgs.id, id))
+      .returning({
+        supplyTypes: orgs.supplyTypes,
+        supplyUnits: orgs.supplyUnits,
+      });
+    
+    if (!org) return undefined;
+    
+    return {
+      supplyTypes: org.supplyTypes as string[] || [],
+      supplyUnits: org.supplyUnits as string[] || [],
+    };
   }
 
   // Client operations

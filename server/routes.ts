@@ -7595,6 +7595,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Supply settings endpoints
+  app.get("/api/organizations/:id/supply-settings", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Verify user belongs to org or is admin
+      if (req.user?.orgId !== id && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const settings = await storage.getOrgSupplySettings(id);
+      if (!settings) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+      
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching supply settings:", error);
+      res.status(500).json({ message: "Failed to fetch supply settings" });
+    }
+  });
+
+  app.patch("/api/organizations/:id/supply-settings", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { supplyTypes, supplyUnits } = req.body;
+      
+      // Verify user belongs to org or is admin
+      if (req.user?.orgId !== id && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Validate that arrays are provided
+      if (!Array.isArray(supplyTypes) && !Array.isArray(supplyUnits)) {
+        return res.status(400).json({ message: "Supply types or units must be arrays" });
+      }
+
+      const updated = await storage.updateOrgSupplySettings(id, { supplyTypes, supplyUnits });
+      if (!updated) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating supply settings:", error);
+      res.status(500).json({ message: "Failed to update supply settings" });
+    }
+  });
+
   // Platform Invoice routes (Admin → Organizations)
   const statusEnum = z.enum(["draft", "open", "paid", "void", "uncollectible"]);
   
