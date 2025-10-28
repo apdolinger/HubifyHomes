@@ -474,6 +474,11 @@ export default function Properties() {
     enabled: isAuthenticated,
   });
 
+  const { data: communities = [] } = useQuery({
+    queryKey: ["/api/communities"],
+    enabled: isAuthenticated,
+  });
+
   // Fetch custom fields for properties
   const { data: customFields = [] } = useQuery<any[]>({
     queryKey: ["/api/custom-fields", "property"],
