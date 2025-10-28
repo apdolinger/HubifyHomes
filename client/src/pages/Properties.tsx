@@ -905,12 +905,16 @@ export default function Properties() {
         ? [primaryContact.firstName, primaryContact.lastName].filter(Boolean).join(' ').toLowerCase()
         : '';
       
+      const community = (communities as any[])?.find((c: any) => c.id === property.communityId);
+      const communityName = community ? community.name.toLowerCase() : '';
+      
       const matchesSearch = 
         property.name.toLowerCase().includes(searchLower) ||
         formatFullAddress(property).toLowerCase().includes(searchLower) ||
         property.type.toLowerCase().includes(searchLower) ||
         property.status.toLowerCase().includes(searchLower) ||
-        clientName.includes(searchLower);
+        clientName.includes(searchLower) ||
+        communityName.includes(searchLower);
       
       if (!matchesSearch) return false;
     }
