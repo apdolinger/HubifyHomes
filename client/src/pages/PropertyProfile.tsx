@@ -2093,7 +2093,7 @@ export default function PropertyProfile() {
         <Tabs defaultValue="tasks" className="space-y-6">
           <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="tasks">Tasks</TabsTrigger>
-            <TabsTrigger value="contacts">Contacts</TabsTrigger>
+            <TabsTrigger value="contacts">Residents</TabsTrigger>
             <TabsTrigger value="rooms">Rooms</TabsTrigger>
             <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
             <TabsTrigger value="community">Community</TabsTrigger>
