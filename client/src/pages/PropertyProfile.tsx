@@ -197,6 +197,9 @@ export default function PropertyProfile() {
     locationInRoom: "",
     installDate: "",
     lastServiced: "",
+    requiresServicing: false,
+    serviceInterval: "",
+    serviceIntervalUnit: "months",
     nextServiceDue: "",
     notes: "",
     hasWarranty: false,
@@ -1627,6 +1630,9 @@ export default function PropertyProfile() {
       locationInRoom: device.locationInRoom || "",
       installDate: device.installDate ? device.installDate.split('T')[0] : "",
       lastServiced: device.lastServiced ? device.lastServiced.split('T')[0] : "",
+      requiresServicing: device.requiresServicing || false,
+      serviceInterval: device.serviceInterval?.toString() || "",
+      serviceIntervalUnit: device.serviceIntervalUnit || "months",
       nextServiceDue: device.nextServiceDue ? device.nextServiceDue.split('T')[0] : "",
       notes: device.notes || "",
       hasWarranty: device.hasWarranty || false,
@@ -1667,6 +1673,9 @@ export default function PropertyProfile() {
       locationInRoom: "",
       installDate: "",
       lastServiced: "",
+      requiresServicing: false,
+      serviceInterval: "",
+      serviceIntervalUnit: "months",
       nextServiceDue: "",
       notes: "",
       hasWarranty: false,
@@ -4256,15 +4265,63 @@ export default function PropertyProfile() {
                 />
               </div>
 
-              <div>
-                <Label htmlFor="device-next-service">Next Service Due</Label>
-                <Input
-                  id="device-next-service"
-                  type="date"
-                  value={roomDeviceForm.nextServiceDue}
-                  onChange={(e) => setRoomDeviceForm({ ...roomDeviceForm, nextServiceDue: e.target.value })}
+              <div className="md:col-span-2 flex items-center space-x-2">
+                <Checkbox
+                  id="device-requires-servicing"
+                  checked={roomDeviceForm.requiresServicing}
+                  onCheckedChange={(checked) => setRoomDeviceForm({ ...roomDeviceForm, requiresServicing: !!checked })}
+                  data-testid="checkbox-requires-servicing"
                 />
+                <Label htmlFor="device-requires-servicing" className="cursor-pointer">
+                  Device requires servicing
+                </Label>
               </div>
+
+              {roomDeviceForm.requiresServicing && (
+                <>
+                  <div>
+                    <Label htmlFor="service-interval">Service Interval</Label>
+                    <Input
+                      id="service-interval"
+                      type="number"
+                      min="1"
+                      value={roomDeviceForm.serviceInterval}
+                      onChange={(e) => setRoomDeviceForm({ ...roomDeviceForm, serviceInterval: e.target.value })}
+                      placeholder="e.g., 6"
+                      data-testid="input-service-interval"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="service-interval-unit">Service Frequency</Label>
+                    <Select 
+                      value={roomDeviceForm.serviceIntervalUnit}
+                      onValueChange={(value) => setRoomDeviceForm({ ...roomDeviceForm, serviceIntervalUnit: value })}
+                    >
+                      <SelectTrigger id="service-interval-unit" data-testid="select-service-interval-unit">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="days">Days</SelectItem>
+                        <SelectItem value="weeks">Weeks</SelectItem>
+                        <SelectItem value="months">Months</SelectItem>
+                        <SelectItem value="years">Years</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="device-next-service">Next Service Due</Label>
+                    <Input
+                      id="device-next-service"
+                      type="date"
+                      value={roomDeviceForm.nextServiceDue}
+                      onChange={(e) => setRoomDeviceForm({ ...roomDeviceForm, nextServiceDue: e.target.value })}
+                      data-testid="input-next-service-due"
+                    />
+                  </div>
+                </>
+              )}
 
               <div className="md:col-span-2 flex items-center space-x-2">
                 <Checkbox
