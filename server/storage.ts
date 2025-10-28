@@ -24,6 +24,7 @@ import {
   roomFixtures,
   roomPhotos,
   roomChecklists,
+  propertyAccessItems,
   vehicles,
   vehicleMaintenance,
   vehicleNotes,
@@ -108,6 +109,8 @@ import {
   type InsertRoomPhoto,
   type RoomChecklist,
   type InsertRoomChecklist,
+  type SelectPropertyAccessItem,
+  type InsertPropertyAccessItem,
   type Vehicle,
   type InsertVehicle,
   type VehicleMaintenance,
@@ -320,6 +323,12 @@ export interface IStorage {
   createRoomChecklist(checklist: InsertRoomChecklist): Promise<RoomChecklist>;
   updateRoomChecklist(id: number, checklist: Partial<InsertRoomChecklist>): Promise<RoomChecklist>;
   deleteRoomChecklist(id: number): Promise<void>;
+  
+  // Property access items operations
+  getPropertyAccessItems(propertyId: number): Promise<SelectPropertyAccessItem[]>;
+  createPropertyAccessItem(item: InsertPropertyAccessItem): Promise<SelectPropertyAccessItem>;
+  updatePropertyAccessItem(id: number, item: Partial<InsertPropertyAccessItem>): Promise<SelectPropertyAccessItem>;
+  deletePropertyAccessItem(id: number): Promise<void>;
   
   // Vehicle operations
   getVehicles(propertyId: number): Promise<Vehicle[]>;
@@ -1623,6 +1632,29 @@ export class DatabaseStorage implements IStorage {
 
   async deleteRoomChecklist(id: number): Promise<void> {
     await db.delete(roomChecklists).where(eq(roomChecklists.id, id));
+  }
+
+  // Property access items operations
+  async getPropertyAccessItems(propertyId: number): Promise<SelectPropertyAccessItem[]> {
+    return await db.select().from(propertyAccessItems).where(eq(propertyAccessItems.propertyId, propertyId)).orderBy(propertyAccessItems.category, propertyAccessItems.description);
+  }
+
+  async createPropertyAccessItem(item: InsertPropertyAccessItem): Promise<SelectPropertyAccessItem> {
+    const [newItem] = await db.insert(propertyAccessItems).values(item).returning();
+    return newItem;
+  }
+
+  async updatePropertyAccessItem(id: number, item: Partial<InsertPropertyAccessItem>): Promise<SelectPropertyAccessItem> {
+    const [updatedItem] = await db
+      .update(propertyAccessItems)
+      .set({ ...item, updatedAt: new Date() })
+      .where(eq(propertyAccessItems.id, id))
+      .returning();
+    return updatedItem;
+  }
+
+  async deletePropertyAccessItem(id: number): Promise<void> {
+    await db.delete(propertyAccessItems).where(eq(propertyAccessItems.id, id));
   }
 
   // Task operations
