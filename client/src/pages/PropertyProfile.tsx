@@ -694,11 +694,13 @@ export default function PropertyProfile() {
     mutationFn: async ({ contactIds, newPropertyId }: { contactIds: number[], newPropertyId: number }) => {
       return await apiRequest("POST", "/api/contact-properties/bulk-move", {
         contactIds,
+        oldPropertyId: parseInt(propertyId),
         newPropertyId
       });
     },
     onSuccess: () => {
-      refetchContacts();
+      // Invalidate the cache to force a fresh fetch
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/contacts`] });
       setSelectedContactIds([]);
       setIsMoveContactsModalOpen(false);
       setMoveToPropertyId(null);

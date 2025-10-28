@@ -3973,17 +3973,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Bulk move contacts to a new property
   app.post("/api/contact-properties/bulk-move", isAuthenticated, async (req, res) => {
     try {
-      const { contactIds, newPropertyId } = req.body;
+      const { contactIds, oldPropertyId, newPropertyId } = req.body;
       
       if (!Array.isArray(contactIds) || contactIds.length === 0) {
         return res.status(400).json({ message: "Contact IDs array is required" });
       }
       
+      if (!oldPropertyId || isNaN(parseInt(oldPropertyId))) {
+        return res.status(400).json({ message: "Valid origin property ID is required" });
+      }
+      
       if (!newPropertyId || isNaN(parseInt(newPropertyId))) {
-        return res.status(400).json({ message: "Valid property ID is required" });
+        return res.status(400).json({ message: "Valid destination property ID is required" });
       }
 
-      await storage.bulkMoveContactsToProperty(contactIds, parseInt(newPropertyId));
+      await storage.bulkMoveContactsToProperty(contactIds, parseInt(oldPropertyId), parseInt(newPropertyId));
       res.json({ message: "Contacts moved successfully" });
     } catch (error) {
       console.error("Error moving contacts:", error);

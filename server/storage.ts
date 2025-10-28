@@ -383,7 +383,7 @@ export interface IStorage {
   deleteContactProperty(relationshipId: number): Promise<void>;
   setPrimaryProperty(contactId: number, propertyId: number): Promise<void>;
   setPrimaryContactForProperty(propertyId: number, contactId: number): Promise<void>;
-  bulkMoveContactsToProperty(contactIds: number[], newPropertyId: number): Promise<void>;
+  bulkMoveContactsToProperty(contactIds: number[], oldPropertyId: number, newPropertyId: number): Promise<void>;
   
   // Alert operations
   getAlerts(orgId: string, filters?: { type?: string; entityId?: number; isActive?: boolean }): Promise<Alert[]>;
@@ -2494,10 +2494,20 @@ export class DatabaseStorage implements IStorage {
       );
   }
 
-  async bulkMoveContactsToProperty(contactIds: number[], newPropertyId: number): Promise<void> {
-    // For each contact, update their property association
+  async bulkMoveContactsToProperty(contactIds: number[], oldPropertyId: number, newPropertyId: number): Promise<void> {
+    // For each contact, move their property association
     for (const contactId of contactIds) {
-      // Check if this contact already has a relationship with the new property
+      // First, delete the old relationship from the origin property
+      await db
+        .delete(contactProperties)
+        .where(
+          and(
+            eq(contactProperties.contactId, contactId),
+            eq(contactProperties.propertyId, oldPropertyId)
+          )
+        );
+
+      // Then, check if this contact already has a relationship with the new property
       const existing = await db
         .select()
         .from(contactProperties)
@@ -2520,7 +2530,7 @@ export class DatabaseStorage implements IStorage {
             relationship: 'tenant', // Default relationship type
           });
       }
-      // If they already have a relationship with this property, do nothing
+      // If they already have a relationship with the new property, keep the existing one
     }
   }
 
