@@ -2265,32 +2265,16 @@ export default function PropertyProfile() {
           </Card>
         </div>
 
-        {/* Custom Fields Section */}
-        {customFields.length > 0 && (property as any)?.customFieldValues && Object.keys((property as any).customFieldValues).length > 0 && (
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>Custom Fields</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CustomFieldsRenderer
-                fields={customFields}
-                values={(property as any).customFieldValues || {}}
-                onChange={() => {}}
-                mode="view"
-              />
-            </CardContent>
-          </Card>
-        )}
-
         {/* Tabs for detailed information */}
         <Tabs defaultValue="tasks" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="tasks">Tasks</TabsTrigger>
             <TabsTrigger value="contacts">Residents</TabsTrigger>
             <TabsTrigger value="rooms">Rooms</TabsTrigger>
             <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
             <TabsTrigger value="community">Community</TabsTrigger>
             <TabsTrigger value="access">Access</TabsTrigger>
+            <TabsTrigger value="custom">Custom Fields</TabsTrigger>
             <TabsTrigger value="notes">Notes</TabsTrigger>
           </TabsList>
 
@@ -3771,6 +3755,38 @@ export default function PropertyProfile() {
                       <Plus className="w-4 h-4 mr-2" />
                       Add First Access Info
                     </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="custom">
+            <Card>
+              <CardHeader>
+                <CardTitle>Custom Fields</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {customFields.length > 0 ? (
+                  (property as any)?.customFieldValues && Object.keys((property as any).customFieldValues).length > 0 ? (
+                    <CustomFieldsRenderer
+                      fields={customFields}
+                      values={(property as any).customFieldValues || {}}
+                      onChange={() => {}}
+                      mode="view"
+                    />
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-slate-600 dark:text-slate-400 mb-4">No custom field values have been set for this property yet.</p>
+                      <Button onClick={() => setIsEditModalOpen(true)} data-testid="button-edit-property-custom-fields">
+                        <Settings className="w-4 h-4 mr-2" />
+                        Edit Property
+                      </Button>
+                    </div>
+                  )
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-slate-600 dark:text-slate-400 mb-4">No custom fields have been configured for properties. Custom fields can be added in the Admin section.</p>
                   </div>
                 )}
               </CardContent>
