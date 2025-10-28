@@ -661,6 +661,7 @@ export const roomDevices = pgTable("room_devices", {
   serialNumber: varchar("serial_number"),
   macAddress: varchar("mac_address"), // For networked devices
   ipAddress: varchar("ip_address"), // For networked devices
+  link: varchar("link"), // Product page, manual URL, or related resource link
   locationInRoom: varchar("location_in_room"), // e.g. "On west wall", "Mounted above bed"
   installDate: timestamp("install_date"),
   lastServiced: timestamp("last_serviced"),
