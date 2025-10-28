@@ -745,6 +745,19 @@ export const roomChecklists = pgTable("room_checklists", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Property Access Items table - Stores access control information like WiFi, codes, etc.
+export const propertyAccessItems = pgTable("property_access_items", {
+  id: serial("id").primaryKey(),
+  propertyId: integer("property_id").references(() => properties.id, { onDelete: "cascade" }).notNull(),
+  category: varchar("category").notNull(), // 'wifi', 'alarm', 'door', 'garage', 'gate', 'other'
+  description: varchar("description").notNull(), // e.g. "Front Door", "Main WiFi Network", "Alarm Panel"
+  value: varchar("value").notNull(), // Code, password, or key information
+  notes: text("notes"), // Additional details or instructions
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Tasks table
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
@@ -1395,6 +1408,7 @@ export const propertiesRelations = relations(properties, ({ one, many }) => ({
   vehicles: many(vehicles),
   propertyForms: many(propertyForms),
   formSubmissions: many(formSubmissions),
+  propertyAccessItems: many(propertyAccessItems),
 }));
 
 export const tasksRelations = relations(tasks, ({ one, many }) => ({
@@ -1984,6 +1998,15 @@ export const insertRoomChecklistSchema = createInsertSchema(roomChecklists).omit
   createdAt: true,
   updatedAt: true,
 });
+
+export const insertPropertyAccessItemSchema = createInsertSchema(propertyAccessItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPropertyAccessItem = z.infer<typeof insertPropertyAccessItemSchema>;
+export type SelectPropertyAccessItem = typeof propertyAccessItems.$inferSelect;
 
 export const insertContactPropertySchema = createInsertSchema(contactProperties).omit({
   id: true,
