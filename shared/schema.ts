@@ -698,6 +698,19 @@ export const roomSurfaces = pgTable("room_surfaces", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Room surface links table for storing URLs related to surfaces (purchasing, product pages, etc.)
+export const roomSurfaceLinks = pgTable("room_surface_links", {
+  id: serial("id").primaryKey(),
+  roomId: integer("room_id").references(() => rooms.id, { onDelete: "cascade" }).notNull(),
+  name: varchar("name").notNull(), // e.g. "Oak Flooring Purchase", "Paint Product Page"
+  url: varchar("url").notNull(), // The actual link
+  surfaceCategory: varchar("surface_category").notNull(), // 'flooring', 'wall', 'ceiling', 'countertop', 'trim', 'tile', 'cabinet', 'fixture', 'other'
+  notes: text("notes"), // Optional additional information
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Room fixtures and features table
 export const roomFixtures = pgTable("room_fixtures", {
   id: serial("id").primaryKey(),
@@ -1454,6 +1467,7 @@ export const roomsRelations = relations(rooms, ({ one, many }) => ({
   notes: many(roomNotes),
   devices: many(roomDevices),
   surfaces: many(roomSurfaces),
+  surfaceLinks: many(roomSurfaceLinks),
   fixtures: many(roomFixtures),
   photos: many(roomPhotos),
   checklists: many(roomChecklists),
@@ -1495,6 +1509,17 @@ export const roomSurfacesRelations = relations(roomSurfaces, ({ one }) => ({
   }),
   createdBy: one(users, {
     fields: [roomSurfaces.createdById],
+    references: [users.id],
+  }),
+}));
+
+export const roomSurfaceLinksRelations = relations(roomSurfaceLinks, ({ one }) => ({
+  room: one(rooms, {
+    fields: [roomSurfaceLinks.roomId],
+    references: [rooms.id],
+  }),
+  createdBy: one(users, {
+    fields: [roomSurfaceLinks.createdById],
     references: [users.id],
   }),
 }));
@@ -1978,6 +2003,12 @@ export const insertRoomNoteSchema = createInsertSchema(roomNotes).omit({
 });
 
 export const insertRoomDeviceSchema = createInsertSchema(roomDevices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRoomSurfaceLinkSchema = createInsertSchema(roomSurfaceLinks).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
