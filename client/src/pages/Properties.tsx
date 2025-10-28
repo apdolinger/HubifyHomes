@@ -741,6 +741,11 @@ export default function Properties() {
           ? property.billingType === 'sqft' ? 'Per Sq Ft' : 'Flat Fee'
           : 'N/A';
       
+      case 'community': {
+        const community = (communities as any[])?.find((c: any) => c.id === property.communityId);
+        return community ? community.name : 'N/A';
+      }
+      
       default:
         return null;
     }
