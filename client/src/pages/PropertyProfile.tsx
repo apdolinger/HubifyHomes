@@ -4842,10 +4842,10 @@ export default function PropertyProfile() {
         <Dialog open={isContactModalOpen} onOpenChange={setIsContactModalOpen}>
           <DialogContent className="max-w-lg">
             <DialogHeader>
-              <DialogTitle>{editingContact ? 'Edit Contact' : 'Add New Contact'}</DialogTitle>
+              <DialogTitle>{editingContact ? 'Edit Client' : 'Add New Client'}</DialogTitle>
               <DialogDescription>
                 {editingContact 
-                  ? 'Update the contact details and information.'
+                  ? 'Update the client details and information.'
                   : 'Add a new property owner, tenant, or household member.'
                 }
               </DialogDescription>
@@ -4875,13 +4875,13 @@ export default function PropertyProfile() {
               </div>
 
               <div>
-                <Label htmlFor="contact-type">Contact Type</Label>
+                <Label htmlFor="contact-type">Client Type</Label>
                 <Select 
                   value={contactForm.type}
                   onValueChange={(value) => setContactForm({ ...contactForm, type: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select contact type" />
+                    <SelectValue placeholder="Select client type" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="owner">Property Owner</SelectItem>
@@ -4919,7 +4919,7 @@ export default function PropertyProfile() {
                   id="contact-notes"
                   value={contactForm.notes}
                   onChange={(e) => setContactForm({ ...contactForm, notes: e.target.value })}
-                  placeholder="Additional notes or details about this contact"
+                  placeholder="Additional notes or details about this client"
                   rows={3}
                 />
               </div>
