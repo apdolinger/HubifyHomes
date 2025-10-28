@@ -665,6 +665,9 @@ export const roomDevices = pgTable("room_devices", {
   locationInRoom: varchar("location_in_room"), // e.g. "On west wall", "Mounted above bed"
   installDate: timestamp("install_date"),
   lastServiced: timestamp("last_serviced"),
+  requiresServicing: boolean("requires_servicing").default(false),
+  serviceInterval: integer("service_interval"), // e.g. 3, 6, 12
+  serviceIntervalUnit: varchar("service_interval_unit"), // 'days', 'weeks', 'months', 'years'
   nextServiceDue: timestamp("next_service_due"),
   notes: text("notes"), // Troubleshooting tips, remote control info, special access notes
   hasWarranty: boolean("has_warranty").default(false),
