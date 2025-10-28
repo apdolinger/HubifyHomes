@@ -1520,6 +1520,7 @@ export class DatabaseStorage implements IStorage {
       serialNumber: roomDevices.serialNumber,
       macAddress: roomDevices.macAddress,
       ipAddress: roomDevices.ipAddress,
+      link: roomDevices.link,
       locationInRoom: roomDevices.locationInRoom,
       installDate: roomDevices.installDate,
       lastServiced: roomDevices.lastServiced,

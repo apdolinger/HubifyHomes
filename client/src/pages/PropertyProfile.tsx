@@ -54,7 +54,8 @@ import {
   Settings,
   Navigation,
   Key,
-  Lock
+  Lock,
+  ExternalLink
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -192,6 +193,7 @@ export default function PropertyProfile() {
     serialNumber: "",
     macAddress: "",
     ipAddress: "",
+    link: "",
     locationInRoom: "",
     installDate: "",
     lastServiced: "",
@@ -204,6 +206,8 @@ export default function PropertyProfile() {
   const [isSupplyModalOpen, setIsSupplyModalOpen] = useState(false);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
+  const [isDeviceDetailsModalOpen, setIsDeviceDetailsModalOpen] = useState(false);
+  const [selectedDevice, setSelectedDevice] = useState<any>(null);
   const [isSurfaceModalOpen, setIsSurfaceModalOpen] = useState(false);
   const [isFixtureModalOpen, setIsFixtureModalOpen] = useState(false);
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
@@ -1619,6 +1623,7 @@ export default function PropertyProfile() {
       serialNumber: device.serialNumber || "",
       macAddress: device.macAddress || "",
       ipAddress: device.ipAddress || "",
+      link: device.link || "",
       locationInRoom: device.locationInRoom || "",
       installDate: device.installDate ? device.installDate.split('T')[0] : "",
       lastServiced: device.lastServiced ? device.lastServiced.split('T')[0] : "",
@@ -1658,16 +1663,32 @@ export default function PropertyProfile() {
       serialNumber: "",
       macAddress: "",
       ipAddress: "",
+      link: "",
       locationInRoom: "",
       installDate: "",
       lastServiced: "",
       nextServiceDue: "",
-      notes: ""
+      notes: "",
+      hasWarranty: false,
+      warrantyStartDate: "",
+      warrantyEndDate: ""
     });
   };
 
   const handleDeleteDevice = (deviceId: number) => {
     deleteDeviceMutation.mutate(deviceId);
+  };
+
+  const handleViewDevice = (device: any) => {
+    setSelectedDevice(device);
+    setIsDeviceDetailsModalOpen(true);
+  };
+
+  const handleEditFromDetails = () => {
+    if (selectedDevice) {
+      setIsDeviceDetailsModalOpen(false);
+      handleEditDevice(selectedDevice);
+    }
   };
 
   // Helper function to get device icon
@@ -2852,7 +2873,12 @@ export default function PropertyProfile() {
                           {devices.map((device: any) => {
                             const DeviceIcon = getDeviceIcon(device.type);
                             return (
-                              <Card key={device.id} className="p-4">
+                              <Card 
+                                key={device.id} 
+                                className="p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                onClick={() => handleViewDevice(device)}
+                                data-testid={`device-card-${device.id}`}
+                              >
                                 <div className="flex items-start justify-between">
                                   <div className="flex items-start gap-3 flex-1">
                                     <DeviceIcon className="w-5 h-5 text-slate-600 mt-1" />
@@ -2929,18 +2955,28 @@ export default function PropertyProfile() {
                                   </div>
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="sm">
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
                                         <MoreVertical className="w-4 h-4" />
                                       </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                      <DropdownMenuItem onClick={() => handleEditDevice(device)}>
+                                      <DropdownMenuItem onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEditDevice(device);
+                                      }}>
                                         <Edit className="w-4 h-4 mr-2" />
                                         Edit Device
                                       </DropdownMenuItem>
                                       <DropdownMenuItem 
                                         className="text-red-600"
-                                        onClick={() => handleDeleteDevice(device.id)}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteDevice(device.id);
+                                        }}
                                       >
                                         <Trash2 className="w-4 h-4 mr-2" />
                                         Delete Device
@@ -4180,6 +4216,17 @@ export default function PropertyProfile() {
               </div>
 
               <div>
+                <Label htmlFor="device-link">Link</Label>
+                <Input
+                  id="device-link"
+                  value={roomDeviceForm.link}
+                  onChange={(e) => setRoomDeviceForm({ ...roomDeviceForm, link: e.target.value })}
+                  placeholder="Product page, manual URL, etc."
+                  data-testid="input-device-link"
+                />
+              </div>
+
+              <div className="md:col-span-2">
                 <Label htmlFor="device-location">Location in Room</Label>
                 <Input
                   id="device-location"
@@ -4285,6 +4332,176 @@ export default function PropertyProfile() {
                 ) : (
                   editingDevice ? 'Update Device' : 'Add Device'
                 )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Device Details Modal */}
+        <Dialog open={isDeviceDetailsModalOpen} onOpenChange={setIsDeviceDetailsModalOpen}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Device Details</DialogTitle>
+              <DialogDescription>
+                View complete information for {selectedDevice?.name || 'this device'}.
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedDevice && (
+              <div className="space-y-6 py-4">
+                {/* Basic Information */}
+                <div>
+                  <h4 className="font-medium text-slate-900 mb-3">Basic Information</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-slate-600">Device Name</Label>
+                      <p className="font-medium">{selectedDevice.name}</p>
+                    </div>
+                    <div>
+                      <Label className="text-slate-600">Device Type</Label>
+                      <p className="font-medium capitalize">{selectedDevice.type?.replace('_', ' ')}</p>
+                    </div>
+                    {selectedDevice.brand && (
+                      <div>
+                        <Label className="text-slate-600">Brand</Label>
+                        <p className="font-medium">{selectedDevice.brand}</p>
+                      </div>
+                    )}
+                    {selectedDevice.model && (
+                      <div>
+                        <Label className="text-slate-600">Model</Label>
+                        <p className="font-medium">{selectedDevice.model}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Technical Details */}
+                {(selectedDevice.serialNumber || selectedDevice.macAddress || selectedDevice.ipAddress || selectedDevice.link) && (
+                  <div>
+                    <h4 className="font-medium text-slate-900 mb-3">Technical Details</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {selectedDevice.serialNumber && (
+                        <div>
+                          <Label className="text-slate-600">Serial Number</Label>
+                          <p className="font-medium">{selectedDevice.serialNumber}</p>
+                        </div>
+                      )}
+                      {selectedDevice.macAddress && (
+                        <div>
+                          <Label className="text-slate-600">MAC Address</Label>
+                          <p className="font-medium">{selectedDevice.macAddress}</p>
+                        </div>
+                      )}
+                      {selectedDevice.ipAddress && (
+                        <div>
+                          <Label className="text-slate-600">IP Address</Label>
+                          <p className="font-medium">{selectedDevice.ipAddress}</p>
+                        </div>
+                      )}
+                      {selectedDevice.link && (
+                        <div>
+                          <Label className="text-slate-600">Link</Label>
+                          <a 
+                            href={selectedDevice.link} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="font-medium text-blue-600 hover:underline flex items-center gap-1"
+                            data-testid="device-details-link"
+                          >
+                            {selectedDevice.link.length > 50 ? selectedDevice.link.substring(0, 50) + '...' : selectedDevice.link}
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Location */}
+                {selectedDevice.locationInRoom && (
+                  <div>
+                    <h4 className="font-medium text-slate-900 mb-3">Location</h4>
+                    <div>
+                      <Label className="text-slate-600">Location in Room</Label>
+                      <p className="font-medium">{selectedDevice.locationInRoom}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Service Information */}
+                {(selectedDevice.installDate || selectedDevice.lastServiced || selectedDevice.nextServiceDue) && (
+                  <div>
+                    <h4 className="font-medium text-slate-900 mb-3">Service Information</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {selectedDevice.installDate && (
+                        <div>
+                          <Label className="text-slate-600">Install Date</Label>
+                          <p className="font-medium">{new Date(selectedDevice.installDate).toLocaleDateString()}</p>
+                        </div>
+                      )}
+                      {selectedDevice.lastServiced && (
+                        <div>
+                          <Label className="text-slate-600">Last Serviced</Label>
+                          <p className="font-medium">{new Date(selectedDevice.lastServiced).toLocaleDateString()}</p>
+                        </div>
+                      )}
+                      {selectedDevice.nextServiceDue && (
+                        <div>
+                          <Label className="text-slate-600">Next Service Due</Label>
+                          <p className="font-medium">{new Date(selectedDevice.nextServiceDue).toLocaleDateString()}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Warranty Information */}
+                {selectedDevice.hasWarranty && (
+                  <div>
+                    <h4 className="font-medium text-slate-900 mb-3">Warranty Information</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-slate-600">Warranty Status</Label>
+                        <p className="font-medium">
+                          <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-100">
+                            Active Warranty
+                          </Badge>
+                        </p>
+                      </div>
+                      {selectedDevice.warrantyStartDate && (
+                        <div>
+                          <Label className="text-slate-600">Warranty Start</Label>
+                          <p className="font-medium">{new Date(selectedDevice.warrantyStartDate).toLocaleDateString()}</p>
+                        </div>
+                      )}
+                      {selectedDevice.warrantyEndDate && (
+                        <div>
+                          <Label className="text-slate-600">Warranty End</Label>
+                          <p className="font-medium">{new Date(selectedDevice.warrantyEndDate).toLocaleDateString()}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Notes */}
+                {selectedDevice.notes && (
+                  <div>
+                    <h4 className="font-medium text-slate-900 mb-3">Notes</h4>
+                    <p className="text-slate-700 whitespace-pre-wrap">{selectedDevice.notes}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDeviceDetailsModalOpen(false)}>
+                Close
+              </Button>
+              <Button onClick={handleEditFromDetails} data-testid="btn-edit-device-from-details">
+                <Edit className="w-4 h-4 mr-2" />
+                Edit Device
               </Button>
             </DialogFooter>
           </DialogContent>
