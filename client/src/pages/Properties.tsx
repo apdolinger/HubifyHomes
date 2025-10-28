@@ -412,6 +412,7 @@ export default function Properties() {
     { id: 'type', label: 'Type', visible: true },
     { id: 'status', label: 'Status', visible: true },
     { id: 'assignedStaff', label: 'Assigned Staff', visible: true },
+    { id: 'community', label: 'Community', visible: true },
     { id: 'squareFootage', label: 'Sq Ft', visible: false },
     { id: 'billingType', label: 'Billing Type', visible: false },
   ];
