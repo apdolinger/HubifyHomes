@@ -2307,7 +2307,7 @@ export default function PropertyProfile() {
                                   />
                                   <div 
                                     className="flex-1 cursor-pointer flex items-center justify-between"
-                                    onClick={() => setSelectedContact(contact)}
+                                    onClick={() => setLocation(`/person-profile/${contact.id}`)}
                                   >
                                     <div>
                                       <h4 className="font-medium">{contact.firstName} {contact.lastName}</h4>
@@ -2353,7 +2353,7 @@ export default function PropertyProfile() {
                                   />
                                   <div 
                                     className="flex-1 cursor-pointer flex items-center justify-between"
-                                    onClick={() => setSelectedContact(contact)}
+                                    onClick={() => setLocation(`/person-profile/${contact.id}`)}
                                   >
                                     <div>
                                       <h4 className="font-medium">{contact.firstName} {contact.lastName}</h4>
