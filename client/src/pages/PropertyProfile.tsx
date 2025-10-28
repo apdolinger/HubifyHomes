@@ -1162,6 +1162,36 @@ export default function PropertyProfile() {
     }
   };
 
+  const getTaskPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "urgent":
+        return "destructive";
+      case "high":
+        return "secondary";
+      case "normal":
+        return "outline";
+      case "low":
+        return "outline";
+      default:
+        return "outline";
+    }
+  };
+
+  const getTaskStatusColor = (status: string) => {
+    switch (status) {
+      case "completed":
+        return "default";
+      case "in_progress":
+        return "secondary";
+      case "pending":
+        return "outline";
+      case "cancelled":
+        return "destructive";
+      default:
+        return "outline";
+    }
+  };
+
   const getTypeDisplay = (type: string) => {
     switch (type) {
       case "single-family":
@@ -2076,7 +2106,64 @@ export default function PropertyProfile() {
                 <CardTitle>Property Tasks</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-slate-600">Tasks for this property will be displayed here.</p>
+                {propertyTasks.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-slate-600">No tasks found for this property.</p>
+                    <Button
+                      variant="outline"
+                      onClick={() => openTaskModal({ propertyId: parseInt(propertyId) })}
+                      className="mt-4"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create First Task
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {propertyTasks.map((task: any) => (
+                      <div
+                        key={task.id}
+                        className="p-4 rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-blue-50 cursor-pointer transition-all"
+                        onClick={() => setLocation(`/task-profile/${task.id}`)}
+                        data-testid={`task-item-${task.id}`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h4 className="font-medium text-slate-900 truncate">{task.title}</h4>
+                              {task.isTemplate && (
+                                <Badge variant="secondary" className="shrink-0 bg-indigo-100 text-indigo-700">
+                                  Template
+                                </Badge>
+                              )}
+                            </div>
+                            {task.description && (
+                              <p className="text-sm text-slate-600 mb-2 line-clamp-2">{task.description}</p>
+                            )}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge variant={getTaskPriorityColor(task.priority)} className="capitalize">
+                                {task.priority}
+                              </Badge>
+                              <Badge variant={getTaskStatusColor(task.status)} className="capitalize">
+                                {task.status ? String(task.status).replace('_', ' ') : 'pending'}
+                              </Badge>
+                              {task.dueDate && (
+                                <span className="text-xs text-slate-600">
+                                  Due: {new Date(task.dueDate).toLocaleDateString()}
+                                </span>
+                              )}
+                              {task.assignedToName && (
+                                <span className="text-xs text-slate-600">
+                                  Assigned: {task.assignedToName}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
