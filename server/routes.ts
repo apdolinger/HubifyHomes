@@ -2623,7 +2623,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/room-devices", isAuthenticated, async (req, res) => {
     try {
-      const validatedData = insertRoomDeviceSchema.parse(req.body);
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Transform date strings to Date objects or null
+      const deviceData = {
+        ...req.body,
+        createdById: userId,
+        installDate: req.body.installDate ? new Date(req.body.installDate) : null,
+        lastServiced: req.body.lastServiced ? new Date(req.body.lastServiced) : null,
+        nextServiceDue: req.body.nextServiceDue ? new Date(req.body.nextServiceDue) : null,
+        warrantyStartDate: req.body.warrantyStartDate ? new Date(req.body.warrantyStartDate) : null,
+        warrantyEndDate: req.body.warrantyEndDate ? new Date(req.body.warrantyEndDate) : null,
+      };
+
+      const validatedData = insertRoomDeviceSchema.parse(deviceData);
       const device = await storage.createRoomDevice(validatedData);
       res.status(201).json(device);
     } catch (error) {
@@ -2642,7 +2658,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid device ID' });
       }
 
-      const device = await storage.updateRoomDevice(id, req.body);
+      // Transform date strings to Date objects or null, but only for fields that are present
+      const deviceData = { ...req.body };
+      
+      // Only transform date fields if they're present in the request
+      if ('installDate' in req.body) {
+        deviceData.installDate = req.body.installDate ? new Date(req.body.installDate) : null;
+      }
+      if ('lastServiced' in req.body) {
+        deviceData.lastServiced = req.body.lastServiced ? new Date(req.body.lastServiced) : null;
+      }
+      if ('nextServiceDue' in req.body) {
+        deviceData.nextServiceDue = req.body.nextServiceDue ? new Date(req.body.nextServiceDue) : null;
+      }
+      if ('warrantyStartDate' in req.body) {
+        deviceData.warrantyStartDate = req.body.warrantyStartDate ? new Date(req.body.warrantyStartDate) : null;
+      }
+      if ('warrantyEndDate' in req.body) {
+        deviceData.warrantyEndDate = req.body.warrantyEndDate ? new Date(req.body.warrantyEndDate) : null;
+      }
+
+      const device = await storage.updateRoomDevice(id, deviceData);
       res.json(device);
     } catch (error) {
       console.error("Error updating room device:", error);
