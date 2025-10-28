@@ -1718,6 +1718,201 @@ function SettingsTab() {
           </div>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Supply Categories</CardTitle>
+          <CardDescription>
+            Configure custom supply types and units for property inventory management
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <SupplySettingsManager orgId={orgId} />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Supply Settings Manager Component
+function SupplySettingsManager({ orgId }: { orgId: string }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [editingType, setEditingType] = useState<string | null>(null);
+  const [editingUnit, setEditingUnit] = useState<string | null>(null);
+  const [newType, setNewType] = useState("");
+  const [newUnit, setNewUnit] = useState("");
+
+  const { data: settings, isLoading } = useQuery({
+    queryKey: [`/api/organizations/${orgId}/supply-settings`],
+    enabled: !!orgId,
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: { supplyTypes?: string[]; supplyUnits?: string[] }) => {
+      return apiRequest("PATCH", `/api/organizations/${orgId}/supply-settings`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/organizations/${orgId}/supply-settings`] });
+      toast({
+        title: "Settings updated",
+        description: "Supply categories have been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update settings",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAddType = () => {
+    if (!newType.trim()) return;
+    const currentTypes = settings?.supplyTypes || [];
+    if (currentTypes.includes(newType.trim().toLowerCase())) {
+      toast({
+        title: "Duplicate type",
+        description: "This supply type already exists.",
+        variant: "destructive",
+      });
+      return;
+    }
+    updateMutation.mutate({
+      supplyTypes: [...currentTypes, newType.trim().toLowerCase()],
+    });
+    setNewType("");
+  };
+
+  const handleRemoveType = (type: string) => {
+    const currentTypes = settings?.supplyTypes || [];
+    updateMutation.mutate({
+      supplyTypes: currentTypes.filter(t => t !== type),
+    });
+  };
+
+  const handleAddUnit = () => {
+    if (!newUnit.trim()) return;
+    const currentUnits = settings?.supplyUnits || [];
+    if (currentUnits.includes(newUnit.trim().toLowerCase())) {
+      toast({
+        title: "Duplicate unit",
+        description: "This supply unit already exists.",
+        variant: "destructive",
+      });
+      return;
+    }
+    updateMutation.mutate({
+      supplyUnits: [...currentUnits, newUnit.trim().toLowerCase()],
+    });
+    setNewUnit("");
+  };
+
+  const handleRemoveUnit = (unit: string) => {
+    const currentUnits = settings?.supplyUnits || [];
+    updateMutation.mutate({
+      supplyUnits: currentUnits.filter(u => u !== unit),
+    });
+  };
+
+  if (isLoading) {
+    return <div className="text-sm text-slate-500">Loading settings...</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Supply Types Section */}
+      <div>
+        <h4 className="font-medium mb-3">Supply Types</h4>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {(settings?.supplyTypes || []).map((type: string) => (
+            <Badge
+              key={type}
+              variant="secondary"
+              className="pl-3 pr-1 py-1 capitalize"
+            >
+              {type}
+              <button
+                onClick={() => handleRemoveType(type)}
+                className="ml-2 hover:bg-slate-300 rounded p-0.5"
+                data-testid={`button-remove-type-${type}`}
+              >
+                <XIcon className="w-3 h-3" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <Input
+            placeholder="Add new supply type..."
+            value={newType}
+            onChange={(e) => setNewType(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleAddType();
+              }
+            }}
+            className="max-w-xs"
+            data-testid="input-new-supply-type"
+          />
+          <Button
+            onClick={handleAddType}
+            disabled={!newType.trim() || updateMutation.isPending}
+            data-testid="button-add-supply-type"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Type
+          </Button>
+        </div>
+      </div>
+
+      {/* Supply Units Section */}
+      <div className="pt-4 border-t">
+        <h4 className="font-medium mb-3">Supply Units</h4>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {(settings?.supplyUnits || []).map((unit: string) => (
+            <Badge
+              key={unit}
+              variant="secondary"
+              className="pl-3 pr-1 py-1 capitalize"
+            >
+              {unit}
+              <button
+                onClick={() => handleRemoveUnit(unit)}
+                className="ml-2 hover:bg-slate-300 rounded p-0.5"
+                data-testid={`button-remove-unit-${unit}`}
+              >
+                <XIcon className="w-3 h-3" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <Input
+            placeholder="Add new supply unit..."
+            value={newUnit}
+            onChange={(e) => setNewUnit(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleAddUnit();
+              }
+            }}
+            className="max-w-xs"
+            data-testid="input-new-supply-unit"
+          />
+          <Button
+            onClick={handleAddUnit}
+            disabled={!newUnit.trim() || updateMutation.isPending}
+            data-testid="button-add-supply-unit"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Unit
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
