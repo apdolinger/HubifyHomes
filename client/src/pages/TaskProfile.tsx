@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -309,30 +309,48 @@ export default function TaskProfile() {
     enabled: isAuthenticated && !!taskId,
   });
 
-  // Populate editForm when task data is available and modal opens
+  // Track if form has been initialized for current modal session
+  const formInitialized = useRef(false);
+
+  // Reset initialization flag when modal closes
   useEffect(() => {
-    if (task && isEditModalOpen) {
-      setEditForm({
-        title: (task as any).title || "",
-        description: (task as any).description || "",
-        priority: (task as any).priority || "",
-        status: (task as any).status || "",
-        dueDate: (task as any).dueDate || "",
-        assignedTo: (task as any).assignedTo?.toString() || "",
-        timeEstimate: (task as any).timeEstimate || "",
-        category: (task as any).category || "",
-        isRecurring: (task as any).isRecurring || false,
-        recurrenceFrequency: (task as any).recurrenceFrequency || "",
-        propertyId: (task as any).propertyId?.toString() || "",
-        billedSeparately: (task as any).billedSeparately || false,
-        billingAmount: (task as any).billingAmount?.toString() || "",
-        roomId: (task as any).roomId?.toString() || "none",
-        clientId: (task as any).clientId || "",
-        tags: (task as any).tags || "",
-        customFieldValues: (task as any).customFieldValues || {}
-      });
+    if (!isEditModalOpen) {
+      formInitialized.current = false;
     }
-  }, [task, isEditModalOpen]);
+  }, [isEditModalOpen]);
+
+  // Populate editForm when modal opens - only populate once per session to avoid overwriting user edits
+  useEffect(() => {
+    if (isEditModalOpen && taskId && task && !formInitialized.current) {
+      // Populate form from task data
+      setEditForm({
+        title: task.title || "",
+        description: task.description || "",
+        priority: task.priority || "",
+        status: task.status || "",
+        dueDate: task.dueDate || "",
+        assignedTo: task.assignedTo?.toString() || "",
+        timeEstimate: task.timeEstimate || "",
+        category: task.category || "",
+        isRecurring: task.isRecurring || false,
+        recurrenceFrequency: task.recurrenceFrequency || "",
+        propertyId: task.propertyId?.toString() || "",
+        billedSeparately: task.billedSeparately || false,
+        billingAmount: task.billingAmount?.toString() || "",
+        roomId: task.roomId?.toString() || "none",
+        clientId: task.clientId || "",
+        tags: task.tags || "",
+        customFieldValues: task.customFieldValues || {}
+      });
+
+      // Mark as initialized
+      formInitialized.current = true;
+
+      // Refetch task data in background to ensure cache is fresh for next time
+      // This updates the cache but does NOT repopulate the form to avoid overwriting user edits
+      queryClient.refetchQueries({ queryKey: [`/api/tasks/${taskId}`] });
+    }
+  }, [isEditModalOpen, taskId, task, queryClient]);
 
   // Fetch task comments/notes
   const { data: fetchedComments } = useQuery({

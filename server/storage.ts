@@ -1746,6 +1746,7 @@ export class DatabaseStorage implements IStorage {
       isArchived: tasks.isArchived,
       attachments: tasks.attachments,
       tags: tasks.tags,
+      customFieldValues: tasks.customFieldValues,
       createdAt: tasks.createdAt,
       updatedAt: tasks.updatedAt,
       property: {
@@ -1841,6 +1842,7 @@ export class DatabaseStorage implements IStorage {
       isArchived: tasks.isArchived,
       attachments: tasks.attachments,
       tags: tasks.tags,
+      customFieldValues: tasks.customFieldValues,
       createdAt: tasks.createdAt,
       updatedAt: tasks.updatedAt,
       property: {
