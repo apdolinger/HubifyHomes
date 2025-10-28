@@ -2484,6 +2484,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all supplies for a property (grouped by room)
+  app.get("/api/properties/:propertyId/supplies-report", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.propertyId);
+      if (isNaN(propertyId)) {
+        return res.status(400).json({ message: 'Invalid property ID' });
+      }
+      
+      const supplies = await storage.getPropertySupplies(propertyId);
+      res.json(supplies);
+    } catch (error) {
+      console.error("Error fetching property supplies:", error);
+      res.status(500).json({ message: "Failed to fetch property supplies" });
+    }
+  });
+
   app.post("/api/room-supplies", isAuthenticated, async (req, res) => {
     try {
       const validatedData = insertRoomSupplySchema.parse(req.body);

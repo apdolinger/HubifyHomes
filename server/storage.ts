@@ -278,6 +278,7 @@ export interface IStorage {
   
   // Room supply operations
   getRoomSupplies(roomId: number): Promise<RoomSupply[]>;
+  getPropertySupplies(propertyId: number): Promise<any[]>;
   createRoomSupply(supply: InsertRoomSupply): Promise<RoomSupply>;
   updateRoomSupply(id: number, supply: Partial<InsertRoomSupply>): Promise<RoomSupply>;
   deleteRoomSupply(id: number): Promise<void>;
@@ -1350,6 +1351,34 @@ export class DatabaseStorage implements IStorage {
   // Room supply operations
   async getRoomSupplies(roomId: number): Promise<RoomSupply[]> {
     return await db.select().from(roomSupplies).where(eq(roomSupplies.roomId, roomId)).orderBy(desc(roomSupplies.createdAt));
+  }
+
+  async getPropertySupplies(propertyId: number): Promise<any[]> {
+    const supplies = await db
+      .select({
+        id: roomSupplies.id,
+        roomId: roomSupplies.roomId,
+        roomName: rooms.name,
+        roomType: rooms.type,
+        name: roomSupplies.name,
+        type: roomSupplies.type,
+        brand: roomSupplies.brand,
+        model: roomSupplies.model,
+        quantity: roomSupplies.quantity,
+        unit: roomSupplies.unit,
+        location: roomSupplies.location,
+        purchaseUrl: roomSupplies.purchaseUrl,
+        lastChanged: roomSupplies.lastChanged,
+        nextReplacement: roomSupplies.nextReplacement,
+        notes: roomSupplies.notes,
+        createdAt: roomSupplies.createdAt,
+      })
+      .from(roomSupplies)
+      .leftJoin(rooms, eq(roomSupplies.roomId, rooms.id))
+      .where(eq(rooms.propertyId, propertyId))
+      .orderBy(rooms.name, roomSupplies.name);
+    
+    return supplies;
   }
 
   async createRoomSupply(supply: InsertRoomSupply): Promise<RoomSupply> {

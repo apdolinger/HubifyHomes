@@ -59,6 +59,7 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, AlertTriangle, Info, XCircle } from "lucide-react";
+import { PropertyReportsModal } from "@/components/PropertyReportsModal";
 
 // Cascaded Client Alerts Display Component
 function CascadedClientAlertsDisplay({ propertyId }: { propertyId: string }) {
@@ -268,6 +269,7 @@ export default function PropertyProfile() {
   const [selectedContactIds, setSelectedContactIds] = useState<number[]>([]);
   const [isChangePrimaryModalOpen, setIsChangePrimaryModalOpen] = useState(false);
   const [isMoveContactsModalOpen, setIsMoveContactsModalOpen] = useState(false);
+  const [isReportsModalOpen, setIsReportsModalOpen] = useState(false);
   const [moveToPropertyId, setMoveToPropertyId] = useState<number | null>(null);
   const [propertySearchQuery, setPropertySearchQuery] = useState("");
   
@@ -2031,6 +2033,21 @@ export default function PropertyProfile() {
                     <Plus className="w-4 h-4 mr-2" />
                     Add Task
                   </Button>
+                  
+                  {/* Property Actions Sprocket Menu */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
+                        <Settings className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setIsReportsModalOpen(true)}>
+                        <FileText className="w-4 h-4 mr-2" />
+                        Reports
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             </div>
@@ -5302,6 +5319,14 @@ export default function PropertyProfile() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Property Reports Modal */}
+        <PropertyReportsModal 
+          isOpen={isReportsModalOpen}
+          onClose={() => setIsReportsModalOpen(false)}
+          propertyId={propertyId}
+          propertyName={(property as any)?.name || (property as any)?.address1 || 'Property'}
+        />
       </div>
     </div>
   );
