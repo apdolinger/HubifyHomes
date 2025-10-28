@@ -1700,6 +1700,26 @@ export default function PropertyProfile() {
     }
   };
 
+  const handleCreateServiceTask = () => {
+    if (!selectedDevice || !property) return;
+
+    // Close the device details modal
+    setIsDeviceDetailsModalOpen(false);
+
+    // Use the TaskModalContext to open the quick add task modal with pre-populated data
+    openTaskModal({
+      propertyId: property.id,
+      title: `Service: ${selectedDevice.name}`,
+      description: `Regular servicing for ${selectedDevice.name} (${selectedDevice.type})${selectedDevice.serviceInterval && selectedDevice.serviceIntervalUnit ? `\nService schedule: Every ${selectedDevice.serviceInterval} ${selectedDevice.serviceIntervalUnit}` : ''}${selectedDevice.locationInRoom ? `\nLocation: ${selectedDevice.locationInRoom}` : ''}`,
+      dueDate: selectedDevice.nextServiceDue ? new Date(selectedDevice.nextServiceDue).toISOString().split('T')[0] : undefined
+    });
+
+    toast({
+      title: "Task creator opened",
+      description: "Fill in any additional details and save the service task.",
+    });
+  };
+
   // Helper function to get device icon
   const getDeviceIcon = (type: string) => {
     switch (type) {
@@ -4487,7 +4507,7 @@ export default function PropertyProfile() {
                 )}
 
                 {/* Service Information */}
-                {(selectedDevice.installDate || selectedDevice.lastServiced || selectedDevice.nextServiceDue) && (
+                {(selectedDevice.installDate || selectedDevice.lastServiced || selectedDevice.requiresServicing) && (
                   <div>
                     <h4 className="font-medium text-slate-900 mb-3">Service Information</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -4503,11 +4523,23 @@ export default function PropertyProfile() {
                           <p className="font-medium">{new Date(selectedDevice.lastServiced).toLocaleDateString()}</p>
                         </div>
                       )}
-                      {selectedDevice.nextServiceDue && (
-                        <div>
-                          <Label className="text-slate-600">Next Service Due</Label>
-                          <p className="font-medium">{new Date(selectedDevice.nextServiceDue).toLocaleDateString()}</p>
-                        </div>
+                      {selectedDevice.requiresServicing && (
+                        <>
+                          <div>
+                            <Label className="text-slate-600">Requires Servicing</Label>
+                            <p className="font-medium">
+                              <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-100">
+                                Every {selectedDevice.serviceInterval} {selectedDevice.serviceIntervalUnit}
+                              </Badge>
+                            </p>
+                          </div>
+                          {selectedDevice.nextServiceDue && (
+                            <div>
+                              <Label className="text-slate-600">Next Service Due</Label>
+                              <p className="font-medium">{new Date(selectedDevice.nextServiceDue).toLocaleDateString()}</p>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -4556,6 +4588,16 @@ export default function PropertyProfile() {
               <Button variant="outline" onClick={() => setIsDeviceDetailsModalOpen(false)}>
                 Close
               </Button>
+              {selectedDevice?.requiresServicing && (
+                <Button 
+                  onClick={handleCreateServiceTask}
+                  variant="secondary"
+                  data-testid="btn-create-service-task"
+                >
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Create Service Task
+                </Button>
+              )}
               <Button onClick={handleEditFromDetails} data-testid="btn-edit-device-from-details">
                 <Edit className="w-4 h-4 mr-2" />
                 Edit Device
