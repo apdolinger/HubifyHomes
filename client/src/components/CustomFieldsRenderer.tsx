@@ -27,7 +27,7 @@ interface CustomFieldsRendererProps {
 
 export function CustomFieldsRenderer({
   fields,
-  values,
+  values = {},
   onChange,
   mode = "edit",
   className = "",
@@ -44,7 +44,7 @@ export function CustomFieldsRenderer({
   };
 
   const renderField = (field: CustomField) => {
-    const value = values[field.fieldKey];
+    const value = values?.[field.fieldKey];
 
     // View mode - display values
     if (mode === "view") {
