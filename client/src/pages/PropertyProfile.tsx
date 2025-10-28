@@ -52,7 +52,9 @@ import {
   Speaker,
   Car,
   Settings,
-  Navigation
+  Navigation,
+  Key,
+  Lock
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -273,6 +275,16 @@ export default function PropertyProfile() {
   const [moveToPropertyId, setMoveToPropertyId] = useState<number | null>(null);
   const [propertySearchQuery, setPropertySearchQuery] = useState("");
   
+  // Access items state
+  const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
+  const [editingAccessItem, setEditingAccessItem] = useState<any>(null);
+  const [accessItemForm, setAccessItemForm] = useState({
+    category: "wifi",
+    description: "",
+    value: "",
+    notes: ""
+  });
+  
   // Get property ID from URL path parameters
   const params = useParams();
   const propertyId = params.id;
@@ -351,6 +363,12 @@ export default function PropertyProfile() {
   // Get property vehicles
   const { data: vehicles = [], isLoading: vehiclesLoading, refetch: refetchVehicles } = useQuery({
     queryKey: [`/api/properties/${propertyId}/vehicles`],
+    enabled: isAuthenticated && !!propertyId,
+  });
+
+  // Get property access items
+  const { data: accessItems = [], isLoading: accessItemsLoading, refetch: refetchAccessItems } = useQuery({
+    queryKey: [`/api/properties/${propertyId}/access`],
     enabled: isAuthenticated && !!propertyId,
   });
 
@@ -627,6 +645,97 @@ export default function PropertyProfile() {
       }
       toast({
         title: "Failed to add vehicle",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Access item mutations
+  const createAccessItemMutation = useMutation({
+    mutationFn: async (accessData: any) => {
+      return await apiRequest("POST", "/api/property-access", {
+        ...accessData,
+        propertyId: parseInt(propertyId)
+      });
+    },
+    onSuccess: () => {
+      refetchAccessItems();
+      setIsAccessModalOpen(false);
+      setEditingAccessItem(null);
+      setAccessItemForm({
+        category: "wifi",
+        description: "",
+        value: "",
+        notes: ""
+      });
+      toast({
+        title: "Access item added",
+        description: "New access information has been added to the property.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Failed to add access item",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateAccessItemMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number, data: any }) => {
+      return await apiRequest("PATCH", `/api/property-access/${id}`, data);
+    },
+    onSuccess: () => {
+      refetchAccessItems();
+      setIsAccessModalOpen(false);
+      setEditingAccessItem(null);
+      setAccessItemForm({
+        category: "wifi",
+        description: "",
+        value: "",
+        notes: ""
+      });
+      toast({
+        title: "Access item updated",
+        description: "Access information has been updated.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to update access item",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteAccessItemMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("DELETE", `/api/property-access/${id}`, {});
+    },
+    onSuccess: () => {
+      refetchAccessItems();
+      toast({
+        title: "Access item deleted",
+        description: "Access information has been removed.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to delete access item",
         description: error.message,
         variant: "destructive",
       });
@@ -2175,12 +2284,13 @@ export default function PropertyProfile() {
 
         {/* Tabs for detailed information */}
         <Tabs defaultValue="tasks" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="tasks">Tasks</TabsTrigger>
             <TabsTrigger value="contacts">Residents</TabsTrigger>
             <TabsTrigger value="rooms">Rooms</TabsTrigger>
             <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
             <TabsTrigger value="community">Community</TabsTrigger>
+            <TabsTrigger value="access">Access</TabsTrigger>
             <TabsTrigger value="notes">Notes</TabsTrigger>
           </TabsList>
 
@@ -3525,6 +3635,148 @@ export default function PropertyProfile() {
             )}
           </TabsContent>
 
+          <TabsContent value="access">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Key className="w-5 h-5" />
+                    <CardTitle>Property Access</CardTitle>
+                  </div>
+                  <Button onClick={() => {
+                    setEditingAccessItem(null);
+                    setAccessItemForm({
+                      category: "wifi",
+                      description: "",
+                      value: "",
+                      notes: ""
+                    });
+                    setIsAccessModalOpen(true);
+                  }} data-testid="button-add-access">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Access Info
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {accessItemsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <RefreshCw className="w-6 h-6 animate-spin text-slate-400" />
+                  </div>
+                ) : accessItems.length > 0 ? (
+                  <div className="space-y-6">
+                    {/* Group by category */}
+                    {["wifi", "alarm", "door_code", "garage", "gate", "other"].map((category) => {
+                      const categoryItems = accessItems.filter((item: any) => item.category === category);
+                      if (categoryItems.length === 0) return null;
+                      
+                      const categoryConfig = {
+                        wifi: { label: "WiFi", icon: Router },
+                        alarm: { label: "Alarm", icon: Lock },
+                        door_code: { label: "Door Codes", icon: Key },
+                        garage: { label: "Garage", icon: Home },
+                        gate: { label: "Gate", icon: Navigation },
+                        other: { label: "Other", icon: Settings }
+                      };
+                      
+                      const config = categoryConfig[category as keyof typeof categoryConfig];
+                      const Icon = config.icon;
+                      
+                      return (
+                        <div key={category} className="space-y-3">
+                          <div className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300 border-b pb-2">
+                            <Icon className="w-4 h-4" />
+                            {config.label}
+                          </div>
+                          <div className="grid gap-3">
+                            {categoryItems.map((item: any) => (
+                              <Card key={item.id} className="bg-slate-50 dark:bg-slate-800/50" data-testid={`access-item-${item.id}`}>
+                                <CardContent className="p-4">
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1 space-y-2">
+                                      {item.description && (
+                                        <div className="font-medium text-slate-900 dark:text-slate-100" data-testid={`access-description-${item.id}`}>
+                                          {item.description}
+                                        </div>
+                                      )}
+                                      {item.value && (
+                                        <div className="font-mono text-sm text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 px-3 py-2 rounded border" data-testid={`access-value-${item.id}`}>
+                                          {item.value}
+                                        </div>
+                                      )}
+                                      {item.notes && (
+                                        <div className="text-sm text-slate-600 dark:text-slate-400" data-testid={`access-notes-${item.id}`}>
+                                          {item.notes}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="sm" data-testid={`dropdown-access-${item.id}`}>
+                                          <MoreVertical className="w-4 h-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => {
+                                          setEditingAccessItem(item);
+                                          setAccessItemForm({
+                                            category: item.category,
+                                            description: item.description || "",
+                                            value: item.value || "",
+                                            notes: item.notes || ""
+                                          });
+                                          setIsAccessModalOpen(true);
+                                        }} data-testid={`button-edit-access-${item.id}`}>
+                                          <Edit className="w-4 h-4 mr-2" />
+                                          Edit
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem 
+                                          onClick={() => {
+                                            if (confirm("Are you sure you want to delete this access information?")) {
+                                              deleteAccessItemMutation.mutate(item.id);
+                                            }
+                                          }}
+                                          className="text-red-600 dark:text-red-400"
+                                          data-testid={`button-delete-access-${item.id}`}
+                                        >
+                                          <Trash2 className="w-4 h-4 mr-2" />
+                                          Delete
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Key className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                    <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">No access information</h3>
+                    <p className="text-slate-600 dark:text-slate-400 mb-4">Start adding access codes and credentials for this property.</p>
+                    <Button onClick={() => {
+                      setEditingAccessItem(null);
+                      setAccessItemForm({
+                        category: "wifi",
+                        description: "",
+                        value: "",
+                        notes: ""
+                      });
+                      setIsAccessModalOpen(true);
+                    }} data-testid="button-add-first-access">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add First Access Info
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="notes">
             <Card>
               <CardHeader>
@@ -4542,6 +4794,118 @@ export default function PropertyProfile() {
                   <>
                     <Plus className="w-4 h-4 mr-2" />
                     Add Vehicle
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Access Item Modal */}
+        <Dialog open={isAccessModalOpen} onOpenChange={setIsAccessModalOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{editingAccessItem ? 'Edit Access Information' : 'Add Access Information'}</DialogTitle>
+              <DialogDescription>
+                {editingAccessItem 
+                  ? 'Update access codes and credentials for this property.'
+                  : 'Add access codes and credentials for this property.'
+                }
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div>
+                <Label htmlFor="access-category">Category *</Label>
+                <Select 
+                  value={accessItemForm.category}
+                  onValueChange={(value) => setAccessItemForm({ ...accessItemForm, category: value })}
+                >
+                  <SelectTrigger data-testid="select-access-category">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="wifi">WiFi</SelectItem>
+                    <SelectItem value="alarm">Alarm</SelectItem>
+                    <SelectItem value="door_code">Door Code</SelectItem>
+                    <SelectItem value="garage">Garage</SelectItem>
+                    <SelectItem value="gate">Gate</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="access-description">Description</Label>
+                <Input
+                  id="access-description"
+                  value={accessItemForm.description}
+                  onChange={(e) => setAccessItemForm({ ...accessItemForm, description: e.target.value })}
+                  placeholder="e.g. Main entrance, Guest WiFi, Master bedroom"
+                  data-testid="input-access-description"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="access-value">Code/Value *</Label>
+                <Input
+                  id="access-value"
+                  value={accessItemForm.value}
+                  onChange={(e) => setAccessItemForm({ ...accessItemForm, value: e.target.value })}
+                  placeholder="Enter access code, password, or credentials"
+                  data-testid="input-access-value"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="access-notes">Notes</Label>
+                <Textarea
+                  id="access-notes"
+                  value={accessItemForm.notes}
+                  onChange={(e) => setAccessItemForm({ ...accessItemForm, notes: e.target.value })}
+                  placeholder="Additional information about this access item"
+                  rows={3}
+                  data-testid="textarea-access-notes"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsAccessModalOpen(false)} data-testid="button-cancel-access">
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => {
+                  if (!accessItemForm.value) {
+                    toast({
+                      title: "Missing information",
+                      description: "Please provide the access code or value.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  
+                  if (editingAccessItem) {
+                    updateAccessItemMutation.mutate({
+                      id: editingAccessItem.id,
+                      data: accessItemForm
+                    });
+                  } else {
+                    createAccessItemMutation.mutate(accessItemForm);
+                  }
+                }}
+                disabled={createAccessItemMutation.isPending || updateAccessItemMutation.isPending}
+                data-testid="button-save-access"
+              >
+                {(createAccessItemMutation.isPending || updateAccessItemMutation.isPending) ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    {editingAccessItem ? 'Updating...' : 'Adding...'}
+                  </>
+                ) : (
+                  <>
+                    {editingAccessItem ? <Edit className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                    {editingAccessItem ? 'Update' : 'Add'} Access Info
                   </>
                 )}
               </Button>
