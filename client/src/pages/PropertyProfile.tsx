@@ -36,6 +36,7 @@ import {
   ArrowLeft,
   CheckSquare,
   Upload,
+  Image as ImageIcon,
   X,
   RefreshCw,
   Archive,
@@ -67,6 +68,9 @@ export default function PropertyProfile() {
   const [propertyImage, setPropertyImage] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isImageUploading, setIsImageUploading] = useState(false);
+  const [propertyImageFile, setPropertyImageFile] = useState<File | null>(null);
+  const [propertyImageUrl, setPropertyImageUrl] = useState<string>("");
+  const [isDragOver, setIsDragOver] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [showArchivedTasks, setShowArchivedTasks] = useState(false);
   const [isNavigationModalOpen, setIsNavigationModalOpen] = useState(false);
@@ -319,6 +323,81 @@ export default function PropertyProfile() {
     }
   }, [property, isEditModalOpen, communities]);
 
+  // Image upload handlers
+  const handleImageUpload = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    const file = fileArray[0];
+    
+    if (!file) return;
+    
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Invalid File Type",
+        description: "Only JPG, PNG, GIF, and WEBP images are allowed.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Validate file size (10MB max)
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "File Too Large",
+        description: "Image must be smaller than 10MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setPropertyImageFile(file);
+    
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file);
+    setPropertyImageUrl(previewUrl);
+  };
+
+  const handleImageDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleImageDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleImageDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    if (e.dataTransfer.files) {
+      handleImageUpload(e.dataTransfer.files);
+    }
+  };
+
+  const handleImageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      handleImageUpload(e.target.files);
+      e.target.value = '';
+    }
+  };
+
+  const removePropertyImage = () => {
+    setPropertyImageFile(null);
+    setPropertyImageUrl("");
+    if (propertyImageUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(propertyImageUrl);
+    }
+  };
+
+  // Cleanup image state when modal closes
+  useEffect(() => {
+    if (!isEditModalOpen) {
+      removePropertyImage();
+    }
+  }, [isEditModalOpen]);
+
   // Room mutations
   const createRoomMutation = useMutation({
     mutationFn: async (roomData: any) => {
@@ -516,18 +595,58 @@ export default function PropertyProfile() {
   // Property update mutation
   const updatePropertyMutation = useMutation({
     mutationFn: async (propertyData: any) => {
-      return await apiRequest("PATCH", `/api/properties/${propertyId}`, propertyData);
+      let uploadedImageUrl = propertyData.imageUrl;
+      
+      // Upload image if file is selected
+      if (propertyImageFile) {
+        setIsImageUploading(true);
+        
+        try {
+          const formData = new FormData();
+          formData.append('files', propertyImageFile);
+          formData.append('directory', 'public/property-images');
+          
+          const uploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+            credentials: 'include',
+          });
+          
+          if (!uploadResponse.ok) {
+            throw new Error('Failed to upload image');
+          }
+          
+          const uploadData = await uploadResponse.json();
+          if (uploadData.urls && uploadData.urls.length > 0) {
+            uploadedImageUrl = uploadData.urls[0];
+          }
+        } catch (error) {
+          setIsImageUploading(false);
+          throw new Error('Failed to upload property image. Please try again.');
+        }
+        
+        setIsImageUploading(false);
+      }
+      
+      const dataWithImage = {
+        ...propertyData,
+        imageUrl: uploadedImageUrl
+      };
+      
+      return await apiRequest("PATCH", `/api/properties/${propertyId}`, dataWithImage);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
       setIsEditModalOpen(false);
+      removePropertyImage();
       toast({
         title: "Property updated",
         description: "Property information has been updated successfully.",
       });
     },
     onError: (error) => {
+      setIsImageUploading(false);
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
@@ -4404,6 +4523,109 @@ export default function PropertyProfile() {
                     placeholder="Property description or notes"
                     rows={3}
                   />
+                </div>
+
+                {/* Property Image Upload */}
+                <div className="col-span-2">
+                  <Label>Property Image (Optional)</Label>
+                  <div
+                    className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
+                      isDragOver
+                        ? 'border-blue-400 bg-blue-50'
+                        : 'border-slate-300 hover:border-slate-400'
+                    }`}
+                    onDragOver={handleImageDragOver}
+                    onDragLeave={handleImageDragLeave}
+                    onDrop={handleImageDrop}
+                  >
+                    {isImageUploading ? (
+                      <div className="flex flex-col items-center py-4">
+                        <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mb-2" />
+                        <p className="text-sm text-slate-600">Uploading image...</p>
+                      </div>
+                    ) : propertyImageUrl ? (
+                      <div className="relative">
+                        <img
+                          src={propertyImageUrl}
+                          alt="Property preview"
+                          className="max-h-48 mx-auto rounded-lg"
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          className="mt-2"
+                          onClick={removePropertyImage}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Remove Image
+                        </Button>
+                      </div>
+                    ) : (property as any)?.imageUrl ? (
+                      <div className="relative">
+                        <img
+                          src={(property as any).imageUrl}
+                          alt="Current property image"
+                          className="max-h-48 mx-auto rounded-lg"
+                        />
+                        <p className="text-xs text-slate-500 mt-2">
+                          Current image - upload a new one to replace
+                        </p>
+                        <label className="mt-2 inline-block">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            type="button"
+                            disabled={isImageUploading}
+                            asChild
+                          >
+                            <span className="cursor-pointer">
+                              <Upload className="w-4 h-4 mr-2" />
+                              Replace Image
+                            </span>
+                          </Button>
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                            onChange={handleImageInputChange}
+                            className="hidden"
+                            disabled={isImageUploading}
+                          />
+                        </label>
+                      </div>
+                    ) : (
+                      <>
+                        <ImageIcon className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                        <p className="text-sm text-slate-600 mb-1">
+                          Drag and drop an image here, or click to browse
+                        </p>
+                        <p className="text-xs text-slate-500 mb-3">
+                          JPG, PNG, GIF, or WEBP - Max 10MB
+                        </p>
+                        <label>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            type="button"
+                            disabled={isImageUploading}
+                            asChild
+                          >
+                            <span className="cursor-pointer">
+                              <Upload className="w-4 h-4 mr-2" />
+                              Choose Image
+                            </span>
+                          </Button>
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                            onChange={handleImageInputChange}
+                            className="hidden"
+                            disabled={isImageUploading}
+                          />
+                        </label>
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 {/* Custom Fields */}
