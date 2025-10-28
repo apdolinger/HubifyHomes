@@ -666,6 +666,9 @@ export const roomDevices = pgTable("room_devices", {
   lastServiced: timestamp("last_serviced"),
   nextServiceDue: timestamp("next_service_due"),
   notes: text("notes"), // Troubleshooting tips, remote control info, special access notes
+  hasWarranty: boolean("has_warranty").default(false),
+  warrantyStartDate: timestamp("warranty_start_date"),
+  warrantyEndDate: timestamp("warranty_end_date"),
   isActive: boolean("is_active").default(true),
   createdById: varchar("created_by_id").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
