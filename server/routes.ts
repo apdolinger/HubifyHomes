@@ -35,6 +35,7 @@ import {
   insertRoomFixtureSchema,
   insertRoomPhotoSchema,
   insertRoomChecklistSchema,
+  insertPropertyAccessItemSchema,
   insertVehicleSchema,
   insertVehicleMaintenanceSchema,
   insertVehicleNoteSchema,
@@ -2912,6 +2913,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting room checklist:', error);
       res.status(500).json({ message: 'Failed to delete room checklist' });
+    }
+  });
+
+  // Property access items routes
+  app.get("/api/properties/:propertyId/access", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.propertyId);
+      if (isNaN(propertyId)) {
+        return res.status(400).json({ message: 'Invalid property ID' });
+      }
+      
+      const items = await storage.getPropertyAccessItems(propertyId);
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching property access items:", error);
+      res.status(500).json({ message: "Failed to fetch property access items" });
+    }
+  });
+
+  app.post("/api/property-access", isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertPropertyAccessItemSchema.parse(req.body);
+      const item = await storage.createPropertyAccessItem(validatedData);
+      res.status(201).json(item);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating property access item:", error);
+      res.status(500).json({ message: "Failed to create property access item" });
+    }
+  });
+
+  app.patch("/api/property-access/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid access item ID' });
+      }
+
+      const item = await storage.updatePropertyAccessItem(id, req.body);
+      res.json(item);
+    } catch (error) {
+      console.error("Error updating property access item:", error);
+      res.status(500).json({ message: "Failed to update property access item" });
+    }
+  });
+
+  app.delete("/api/property-access/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid access item ID' });
+      }
+
+      await storage.deletePropertyAccessItem(id);
+      res.json({ message: 'Property access item deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting property access item:', error);
+      res.status(500).json({ message: 'Failed to delete property access item' });
     }
   });
 
