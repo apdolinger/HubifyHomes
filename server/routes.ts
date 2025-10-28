@@ -4024,6 +4024,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get cascaded client alerts for a property
+  app.get("/api/alerts/cascaded/property/:propertyId", isAuthenticated, async (req: any, res) => {
+    try {
+      const propertyId = parseInt(req.params.propertyId);
+      const orgId = req.user.claims.orgId;
+      
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+      
+      if (isNaN(propertyId)) {
+        return res.status(400).json({ message: "Invalid property ID" });
+      }
+
+      // Get the property to find its associated client
+      const property = await storage.getProperty(propertyId);
+      if (!property || property.orgId !== orgId) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+
+      // Get client alerts for this property's client
+      if (property.primaryContact) {
+        const alerts = await storage.getAlertsByEntity(orgId, 'client', property.primaryContact);
+        return res.json(alerts);
+      }
+
+      // No client associated, return empty array
+      res.json([]);
+    } catch (error) {
+      console.error("Error fetching cascaded property alerts:", error);
+      res.status(500).json({ message: "Failed to fetch cascaded alerts" });
+    }
+  });
+
+  // Get cascaded client alerts for a task
+  app.get("/api/alerts/cascaded/task/:taskId", isAuthenticated, async (req: any, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId);
+      const orgId = req.user.claims.orgId;
+      
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+      
+      if (isNaN(taskId)) {
+        return res.status(400).json({ message: "Invalid task ID" });
+      }
+
+      // Get the task to find its associated property
+      const task = await storage.getTask(taskId);
+      if (!task || task.orgId !== orgId) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+
+      // Get property and then client alerts
+      if (task.propertyId) {
+        const property = await storage.getProperty(task.propertyId);
+        if (property && property.primaryContact) {
+          const alerts = await storage.getAlertsByEntity(orgId, 'client', property.primaryContact);
+          return res.json(alerts);
+        }
+      }
+
+      // No property/client associated, return empty array
+      res.json([]);
+    } catch (error) {
+      console.error("Error fetching cascaded task alerts:", error);
+      res.status(500).json({ message: "Failed to fetch cascaded alerts" });
+    }
+  });
+
   // Create alert with plan validation
   app.post("/api/alerts", isAuthenticated, async (req: any, res) => {
     try {

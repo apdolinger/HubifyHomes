@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -46,6 +46,7 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
+import { AlertBanner, AlertBannerRef } from "@/components/AlertBanner";
 
 // Form schema for editing contact
 const editContactSchema = z.object({
@@ -578,6 +579,7 @@ export default function PersonProfile() {
   const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const params = useParams();
+  const alertBannerRef = useRef<AlertBannerRef>(null);
   
   // Get person ID from URL path params
   const personId = params.id;
@@ -1121,6 +1123,14 @@ export default function PersonProfile() {
               <Edit className="w-4 h-4 mr-2" />
               Edit Person
             </Button>
+            <Button 
+              variant="outline"
+              onClick={() => alertBannerRef.current?.openDialog()}
+              data-testid="button-add-alert"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Alert
+            </Button>
             <Button onClick={openTaskModal} className="bg-primary hover:bg-primary/90">
               <Plus className="w-4 h-4 mr-2" />
               Add Task
@@ -1136,6 +1146,9 @@ export default function PersonProfile() {
           </div>
         </div>
       </div>
+
+      {/* Alert Banner */}
+      <AlertBanner ref={alertBannerRef} type="client" entityId={parseInt(personId)} canManage={true} />
 
       {/* Person Details Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">

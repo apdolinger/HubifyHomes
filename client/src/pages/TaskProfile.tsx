@@ -56,8 +56,72 @@ import {
   ChevronsUpDown,
   Repeat,
   Archive,
-  Settings
+  Settings,
+  AlertTriangle,
+  Info,
+  XCircle
 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+// Cascaded Client Alerts Display Component
+function CascadedClientAlertsDisplay({ taskId }: { taskId: string }) {
+  const { data: alerts = [], isLoading } = useQuery({
+    queryKey: [`/api/alerts/cascaded/task/${taskId}`],
+    enabled: !!taskId,
+  });
+
+  const severityConfig = {
+    info: {
+      icon: Info,
+      className: "border-blue-500 bg-blue-50 text-blue-900 dark:bg-blue-950 dark:text-blue-100",
+      iconClassName: "text-blue-500",
+    },
+    warning: {
+      icon: AlertTriangle,
+      className: "border-yellow-500 bg-yellow-50 text-yellow-900 dark:bg-yellow-950 dark:text-yellow-100",
+      iconClassName: "text-yellow-500",
+    },
+    error: {
+      icon: AlertCircle,
+      className: "border-orange-500 bg-orange-50 text-orange-900 dark:bg-orange-950 dark:text-orange-100",
+      iconClassName: "text-orange-500",
+    },
+    critical: {
+      icon: XCircle,
+      className: "border-red-500 bg-red-50 text-red-900 dark:bg-red-950 dark:text-red-100",
+      iconClassName: "text-red-500",
+    },
+  };
+
+  if (isLoading || alerts.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-3 mb-6" data-testid="cascaded-alerts-container">
+      {alerts.map((alert: any) => {
+        const config = severityConfig[alert.severity as keyof typeof severityConfig];
+        const Icon = config.icon;
+
+        return (
+          <Alert key={alert.id} className={config.className} data-testid={`cascaded-alert-${alert.id}`}>
+            <Icon className={`h-4 w-4 ${config.iconClassName}`} />
+            <div className="flex items-start justify-between w-full">
+              <div className="flex-1">
+                <AlertTitle className="capitalize" data-testid={`cascaded-alert-title-${alert.id}`}>
+                  {alert.severity} - Client Alert
+                </AlertTitle>
+                <AlertDescription data-testid={`cascaded-alert-message-${alert.id}`}>
+                  {alert.message}
+                </AlertDescription>
+              </div>
+            </div>
+          </Alert>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function TaskProfile() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -2000,6 +2064,9 @@ export default function TaskProfile() {
           </div>
         </div>
       </div>
+
+      {/* Cascaded Client Alerts */}
+      <CascadedClientAlertsDisplay taskId={taskId} />
 
       {/* Task Content */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
