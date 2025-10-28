@@ -1111,11 +1111,18 @@ export default function PropertyProfile() {
         serialNumber: "",
         macAddress: "",
         ipAddress: "",
+        link: "",
         locationInRoom: "",
         installDate: "",
         lastServiced: "",
+        requiresServicing: false,
+        serviceInterval: "",
+        serviceIntervalUnit: "months",
         nextServiceDue: "",
-        notes: ""
+        notes: "",
+        hasWarranty: false,
+        warrantyStartDate: "",
+        warrantyEndDate: ""
       });
       toast({
         title: "Device added",
@@ -1706,17 +1713,14 @@ export default function PropertyProfile() {
     // Close the device details modal
     setIsDeviceDetailsModalOpen(false);
 
-    // Use the TaskModalContext to open the quick add task modal with pre-populated data
+    // Open the task modal with the property pre-selected
     openTaskModal({
-      propertyId: property.id,
-      title: `Service: ${selectedDevice.name}`,
-      description: `Regular servicing for ${selectedDevice.name} (${selectedDevice.type})${selectedDevice.serviceInterval && selectedDevice.serviceIntervalUnit ? `\nService schedule: Every ${selectedDevice.serviceInterval} ${selectedDevice.serviceIntervalUnit}` : ''}${selectedDevice.locationInRoom ? `\nLocation: ${selectedDevice.locationInRoom}` : ''}`,
-      dueDate: selectedDevice.nextServiceDue ? new Date(selectedDevice.nextServiceDue).toISOString().split('T')[0] : undefined
+      propertyId: property.id
     });
 
     toast({
       title: "Task creator opened",
-      description: "Fill in any additional details and save the service task.",
+      description: `Create a service task for ${selectedDevice.name}. The property is pre-selected.${selectedDevice.nextServiceDue ? ` Next service due: ${new Date(selectedDevice.nextServiceDue).toLocaleDateString()}` : ''}`,
     });
   };
 
