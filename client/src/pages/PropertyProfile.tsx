@@ -351,6 +351,11 @@ export default function PropertyProfile() {
       return;
     }
     
+    // Revoke previous blob URL if exists to prevent memory leaks
+    if (propertyImageUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(propertyImageUrl);
+    }
+    
     setPropertyImageFile(file);
     
     // Create preview URL
@@ -628,12 +633,19 @@ export default function PropertyProfile() {
         setIsImageUploading(false);
       }
       
-      const dataWithImage = {
+      // Clean up numeric fields: convert empty strings to undefined/null
+      const cleanedData = {
         ...propertyData,
-        imageUrl: uploadedImageUrl
+        imageUrl: uploadedImageUrl,
+        squareFootage: propertyData.squareFootage === "" || propertyData.squareFootage === null ? undefined : Number(propertyData.squareFootage),
+        bedrooms: propertyData.bedrooms === "" || propertyData.bedrooms === null ? undefined : Number(propertyData.bedrooms),
+        bathrooms: propertyData.bathrooms === "" || propertyData.bathrooms === null ? undefined : Number(propertyData.bathrooms),
+        billingRate: propertyData.billingRate === "" || propertyData.billingRate === null ? undefined : Number(propertyData.billingRate),
+        units: propertyData.units === "" || propertyData.units === null ? undefined : Number(propertyData.units),
+        communityId: propertyData.communityId === "" || propertyData.communityId === null ? undefined : Number(propertyData.communityId)
       };
       
-      return await apiRequest("PATCH", `/api/properties/${propertyId}`, dataWithImage);
+      return await apiRequest("PATCH", `/api/properties/${propertyId}`, cleanedData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}`] });

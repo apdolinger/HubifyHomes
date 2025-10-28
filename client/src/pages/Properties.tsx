@@ -627,6 +627,11 @@ export default function Properties() {
       return;
     }
     
+    // Revoke previous blob URL if exists to prevent memory leaks
+    if (propertyImageUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(propertyImageUrl);
+    }
+    
     setPropertyImageFile(file);
     
     // Create preview URL
