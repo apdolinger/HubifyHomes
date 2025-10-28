@@ -28,12 +28,18 @@ const taskSchema = z.object({
 
 type TaskFormData = z.infer<typeof taskSchema>;
 
+interface TaskModalInitialData {
+  propertyId?: number;
+  contactId?: number;
+}
+
 interface QuickAddTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialData?: TaskModalInitialData;
 }
 
-export default function QuickAddTaskModal({ isOpen, onClose }: QuickAddTaskModalProps) {
+export default function QuickAddTaskModal({ isOpen, onClose, initialData }: QuickAddTaskModalProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -161,6 +167,18 @@ export default function QuickAddTaskModal({ isOpen, onClose }: QuickAddTaskModal
     }
   }, [isOpen, form]);
 
+  // Populate form with initial data when provided
+  useEffect(() => {
+    if (isOpen && initialData) {
+      if (initialData.propertyId) {
+        form.setValue('propertyId', initialData.propertyId);
+      }
+      if (initialData.contactId) {
+        form.setValue('contactId', initialData.contactId);
+      }
+    }
+  }, [isOpen, initialData, form]);
+
   // Build RRULE string from recurrence settings
   const buildRRule = (): string | null => {
     if (!isRecurring) return null;
@@ -275,6 +293,7 @@ export default function QuickAddTaskModal({ isOpen, onClose }: QuickAddTaskModal
                 <FormItem>
                   <FormLabel>Property</FormLabel>
                   <Select 
+                    value={field.value?.toString()}
                     onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
                   >
                     <FormControl>
@@ -302,6 +321,7 @@ export default function QuickAddTaskModal({ isOpen, onClose }: QuickAddTaskModal
                 <FormItem>
                   <FormLabel>Client</FormLabel>
                   <Select 
+                    value={field.value?.toString()}
                     onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
                   >
                     <FormControl>

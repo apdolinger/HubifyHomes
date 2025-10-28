@@ -1934,7 +1934,7 @@ export default function PropertyProfile() {
                   </Button>
                   <Button 
                     variant="outline"
-                    onClick={() => openTaskModal()}
+                    onClick={() => openTaskModal({ propertyId: parseInt(propertyId) })}
                     className="flex items-center"
                   >
                     <Plus className="w-4 h-4 mr-2" />

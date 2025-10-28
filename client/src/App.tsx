@@ -52,12 +52,13 @@ import { useState } from "react";
 
 // Global Task Modal Component
 function GlobalTaskModal() {
-  const { isTaskModalOpen, closeTaskModal } = useTaskModal();
+  const { isTaskModalOpen, initialData, closeTaskModal } = useTaskModal();
   
   return (
     <QuickAddTaskModal 
       isOpen={isTaskModalOpen} 
-      onClose={closeTaskModal} 
+      onClose={closeTaskModal}
+      initialData={initialData}
     />
   );
 }

@@ -1,8 +1,14 @@
 import React, { createContext, useContext, useState } from 'react';
 
+interface TaskModalInitialData {
+  propertyId?: number;
+  contactId?: number;
+}
+
 interface TaskModalContextType {
   isTaskModalOpen: boolean;
-  openTaskModal: () => void;
+  initialData?: TaskModalInitialData;
+  openTaskModal: (data?: TaskModalInitialData) => void;
   closeTaskModal: () => void;
 }
 
@@ -10,13 +16,22 @@ const TaskModalContext = createContext<TaskModalContextType | undefined>(undefin
 
 export function TaskModalProvider({ children }: { children: React.ReactNode }) {
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [initialData, setInitialData] = useState<TaskModalInitialData | undefined>(undefined);
 
-  const openTaskModal = () => setIsTaskModalOpen(true);
-  const closeTaskModal = () => setIsTaskModalOpen(false);
+  const openTaskModal = (data?: TaskModalInitialData) => {
+    setInitialData(data);
+    setIsTaskModalOpen(true);
+  };
+  
+  const closeTaskModal = () => {
+    setIsTaskModalOpen(false);
+    setInitialData(undefined);
+  };
 
   return (
     <TaskModalContext.Provider value={{
       isTaskModalOpen,
+      initialData,
       openTaskModal,
       closeTaskModal,
     }}>
