@@ -12,10 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Building, MapPin, Users, Plus, Home, Square, DollarSign, Activity, Eye, Edit, ToggleLeft, ToggleRight, Trash2, FileText, Mail, MessageCircle, ChevronUp, ChevronDown, Search, Filter, Crown, Anchor, Package, Calendar, Settings } from "lucide-react";
+import { Building, MapPin, Users, Plus, Home, Square, DollarSign, Activity, Eye, Edit, ToggleLeft, ToggleRight, Trash2, FileText, Mail, MessageCircle, ChevronUp, ChevronDown, Search, Filter, Crown, Anchor, Package, Calendar, Settings, Upload, Image as ImageIcon, RefreshCw } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -403,6 +404,10 @@ export default function Properties() {
   const [bulkTaskModalOpen, setBulkTaskModalOpen] = useState(false);
   const [isCustomizeModalOpen, setIsCustomizeModalOpen] = useState(false);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
+  const [propertyImageFile, setPropertyImageFile] = useState<File | null>(null);
+  const [propertyImageUrl, setPropertyImageUrl] = useState<string>("");
+  const [isImageUploading, setIsImageUploading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Default column configuration for properties table
   const defaultColumns: ColumnConfig[] = [
@@ -595,7 +600,74 @@ export default function Properties() {
     },
   });
 
-  const handleAddProperty = (data: PropertyFormData) => {
+  const handleImageUpload = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    const file = fileArray[0];
+    
+    if (!file) return;
+    
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Invalid File Type",
+        description: "Only JPG, PNG, GIF, and WEBP images are allowed.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Validate file size (10MB max)
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "File Too Large",
+        description: "Image must be smaller than 10MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setPropertyImageFile(file);
+    
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file);
+    setPropertyImageUrl(previewUrl);
+  };
+
+  const handleImageDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleImageDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleImageDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    if (e.dataTransfer.files) {
+      handleImageUpload(e.dataTransfer.files);
+    }
+  };
+
+  const handleImageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      handleImageUpload(e.target.files);
+      e.target.value = '';
+    }
+  };
+
+  const removePropertyImage = () => {
+    setPropertyImageFile(null);
+    setPropertyImageUrl("");
+    if (propertyImageUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(propertyImageUrl);
+    }
+  };
+
+  const handleAddProperty = async (data: PropertyFormData) => {
     // Validate required custom fields
     const requiredFields = customFields.filter(f => f.required);
     const missingFields = requiredFields.filter(f => {
@@ -615,9 +687,48 @@ export default function Properties() {
       return;
     }
     
+    let uploadedImageUrl = data.imageUrl;
+    
+    // Upload image if file is selected
+    if (propertyImageFile) {
+      setIsImageUploading(true);
+      
+      try {
+        const formData = new FormData();
+        formData.append('files', propertyImageFile);
+        formData.append('directory', 'public/property-images');
+        
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+          credentials: 'include',
+        });
+        
+        if (!uploadResponse.ok) {
+          throw new Error('Failed to upload image');
+        }
+        
+        const uploadData = await uploadResponse.json();
+        if (uploadData.urls && uploadData.urls.length > 0) {
+          uploadedImageUrl = uploadData.urls[0];
+        }
+      } catch (error) {
+        toast({
+          title: "Upload Failed",
+          description: "Failed to upload property image. Please try again.",
+          variant: "destructive",
+        });
+        setIsImageUploading(false);
+        return;
+      }
+      
+      setIsImageUploading(false);
+    }
+    
     // Convert empty accountId to undefined for creates
     const cleanedData = {
       ...data,
+      imageUrl: uploadedImageUrl,
       accountId: data.accountId?.trim() || undefined,
       customFieldValues: Object.keys(customFieldValues).length > 0 ? customFieldValues : undefined,
     };
@@ -789,10 +900,13 @@ export default function Properties() {
     setCurrentPage(1);
   }, [searchTerm, filterType, filterStatus, showInactive, itemsPerPage]);
 
-  // Reset custom field values when modal opens
+  // Reset custom field values and image when modal opens
   useEffect(() => {
     if (isAddModalOpen) {
       setCustomFieldValues({});
+    } else {
+      // Cleanup when modal closes
+      removePropertyImage();
     }
   }, [isAddModalOpen]);
 
@@ -1259,19 +1373,76 @@ export default function Properties() {
                         />
                       </div>
                       
-                      <FormField
-                        control={form.control}
-                        name="imageUrl"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Image URL (Optional)</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Enter image URL" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                      {/* Property Image Upload */}
+                      <div>
+                        <Label>Property Image (Optional)</Label>
+                        <div
+                          className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
+                            isDragOver
+                              ? 'border-blue-400 bg-blue-50'
+                              : 'border-slate-300 hover:border-slate-400'
+                          }`}
+                          onDragOver={handleImageDragOver}
+                          onDragLeave={handleImageDragLeave}
+                          onDrop={handleImageDrop}
+                        >
+                          {isImageUploading ? (
+                            <div className="flex flex-col items-center py-4">
+                              <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mb-2" />
+                              <p className="text-sm text-slate-600">Uploading image...</p>
+                            </div>
+                          ) : propertyImageUrl ? (
+                            <div className="relative">
+                              <img
+                                src={propertyImageUrl}
+                                alt="Property preview"
+                                className="max-h-48 mx-auto rounded-lg"
+                              />
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                className="mt-2"
+                                onClick={removePropertyImage}
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Remove Image
+                              </Button>
+                            </div>
+                          ) : (
+                            <>
+                              <ImageIcon className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                              <p className="text-sm text-slate-600 mb-1">
+                                Drag and drop an image here, or click to browse
+                              </p>
+                              <p className="text-xs text-slate-500 mb-3">
+                                JPG, PNG, GIF, or WEBP - Max 10MB
+                              </p>
+                              <label>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  type="button"
+                                  disabled={isImageUploading}
+                                  asChild
+                                >
+                                  <span className="cursor-pointer">
+                                    <Upload className="w-4 h-4 mr-2" />
+                                    Choose Image
+                                  </span>
+                                </Button>
+                                <input
+                                  type="file"
+                                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                                  onChange={handleImageInputChange}
+                                  className="hidden"
+                                  disabled={isImageUploading}
+                                />
+                              </label>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     </div>
                     
                     {/* Custom Fields */}
