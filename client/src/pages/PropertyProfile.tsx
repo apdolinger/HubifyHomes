@@ -265,6 +265,11 @@ export default function PropertyProfile() {
     type: "tenant",
     notes: ""
   });
+  const [selectedContactIds, setSelectedContactIds] = useState<number[]>([]);
+  const [isChangePrimaryModalOpen, setIsChangePrimaryModalOpen] = useState(false);
+  const [isMoveContactsModalOpen, setIsMoveContactsModalOpen] = useState(false);
+  const [moveToPropertyId, setMoveToPropertyId] = useState<number | null>(null);
+  const [propertySearchQuery, setPropertySearchQuery] = useState("");
   
   // Get property ID from URL path parameters
   const params = useParams();
@@ -350,6 +355,12 @@ export default function PropertyProfile() {
   // Get communities
   const { data: communities = [] } = useQuery({
     queryKey: ["/api/communities"],
+    enabled: isAuthenticated,
+  });
+
+  // Get all properties for move to property modal
+  const { data: allProperties = [] } = useQuery({
+    queryKey: ["/api/properties"],
     enabled: isAuthenticated,
   });
 
@@ -652,6 +663,54 @@ export default function PropertyProfile() {
       }
       toast({
         title: "Failed to add contact",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const setPrimaryContactMutation = useMutation({
+    mutationFn: async (contactId: number) => {
+      return await apiRequest("PATCH", `/api/properties/${propertyId}/contacts/${contactId}/set-primary`, {});
+    },
+    onSuccess: () => {
+      refetchContacts();
+      setIsChangePrimaryModalOpen(false);
+      toast({
+        title: "Primary contact updated",
+        description: "The primary contact for this property has been changed.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to update primary contact",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const bulkMoveContactsMutation = useMutation({
+    mutationFn: async ({ contactIds, newPropertyId }: { contactIds: number[], newPropertyId: number }) => {
+      return await apiRequest("POST", "/api/contact-properties/bulk-move", {
+        contactIds,
+        newPropertyId
+      });
+    },
+    onSuccess: () => {
+      refetchContacts();
+      setSelectedContactIds([]);
+      setIsMoveContactsModalOpen(false);
+      setMoveToPropertyId(null);
+      setPropertySearchQuery("");
+      toast({
+        title: "Contacts moved",
+        description: "Selected contacts have been moved to the new property.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to move contacts",
         description: error.message,
         variant: "destructive",
       });
@@ -2175,18 +2234,41 @@ export default function PropertyProfile() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle>Property Clients</CardTitle>
-                    <Dialog open={isContactModalOpen} onOpenChange={setIsContactModalOpen}>
-                      <DialogTrigger asChild>
-                        <Button size="sm">
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add Client
-                        </Button>
-                      </DialogTrigger>
-                    </Dialog>
+                    <div className="flex items-center gap-2">
+                      <Dialog open={isContactModalOpen} onOpenChange={setIsContactModalOpen}>
+                        <DialogTrigger asChild>
+                          <Button size="sm">
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Client
+                          </Button>
+                        </DialogTrigger>
+                      </Dialog>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <Settings className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setIsChangePrimaryModalOpen(true)}>
+                            Change Primary
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
+                    {selectedContactIds.length > 0 && (
+                      <Button 
+                        onClick={() => setIsMoveContactsModalOpen(true)}
+                        className="w-full"
+                        variant="outline"
+                      >
+                        Move {selectedContactIds.length} Client{selectedContactIds.length > 1 ? 's' : ''} to Property
+                      </Button>
+                    )}
                     {contactsLoading ? (
                       <div className="text-center py-8">
                         <RefreshCw className="w-6 h-6 mx-auto animate-spin text-slate-400 mb-2" />
@@ -2203,22 +2285,37 @@ export default function PropertyProfile() {
                               .map((contact: any) => (
                               <div
                                 key={contact.id}
-                                className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                                className={`p-3 rounded-lg border transition-colors ${
                                   selectedContact?.id === contact.id
                                     ? "border-blue-200 bg-blue-50"
                                     : "border-green-200 bg-green-50 hover:border-green-300"
                                 }`}
-                                onClick={() => setSelectedContact(contact)}
                               >
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <h4 className="font-medium">{contact.firstName} {contact.lastName}</h4>
-                                    <p className="text-sm text-slate-600 capitalize">{contact.type}</p>
-                                    {contact.phone && (
-                                      <p className="text-xs text-slate-500">{contact.phone}</p>
-                                    )}
+                                <div className="flex items-center gap-3">
+                                  <Checkbox 
+                                    checked={selectedContactIds.includes(contact.id)}
+                                    onCheckedChange={(checked) => {
+                                      if (checked) {
+                                        setSelectedContactIds([...selectedContactIds, contact.id]);
+                                      } else {
+                                        setSelectedContactIds(selectedContactIds.filter(id => id !== contact.id));
+                                      }
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                  <div 
+                                    className="flex-1 cursor-pointer flex items-center justify-between"
+                                    onClick={() => setSelectedContact(contact)}
+                                  >
+                                    <div>
+                                      <h4 className="font-medium">{contact.firstName} {contact.lastName}</h4>
+                                      <p className="text-sm text-slate-600 capitalize">{contact.type}</p>
+                                      {contact.phone && (
+                                        <p className="text-xs text-slate-500">{contact.phone}</p>
+                                      )}
+                                    </div>
+                                    <User className="w-5 h-5 text-green-600" />
                                   </div>
-                                  <User className="w-5 h-5 text-green-600" />
                                 </div>
                               </div>
                             ))}
@@ -2234,22 +2331,37 @@ export default function PropertyProfile() {
                               .map((contact: any) => (
                               <div
                                 key={contact.id}
-                                className={`p-3 rounded-lg border cursor-pointer transition-colors mb-2 ${
+                                className={`p-3 rounded-lg border transition-colors mb-2 ${
                                   selectedContact?.id === contact.id
                                     ? "border-blue-200 bg-blue-50"
                                     : "border-slate-200 hover:border-slate-300"
                                 }`}
-                                onClick={() => setSelectedContact(contact)}
                               >
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <h4 className="font-medium">{contact.firstName} {contact.lastName}</h4>
-                                    <p className="text-sm text-slate-600 capitalize">{contact.type}</p>
-                                    {contact.email && (
-                                      <p className="text-xs text-slate-500">{contact.email}</p>
-                                    )}
+                                <div className="flex items-center gap-3">
+                                  <Checkbox 
+                                    checked={selectedContactIds.includes(contact.id)}
+                                    onCheckedChange={(checked) => {
+                                      if (checked) {
+                                        setSelectedContactIds([...selectedContactIds, contact.id]);
+                                      } else {
+                                        setSelectedContactIds(selectedContactIds.filter(id => id !== contact.id));
+                                      }
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                  <div 
+                                    className="flex-1 cursor-pointer flex items-center justify-between"
+                                    onClick={() => setSelectedContact(contact)}
+                                  >
+                                    <div>
+                                      <h4 className="font-medium">{contact.firstName} {contact.lastName}</h4>
+                                      <p className="text-sm text-slate-600 capitalize">{contact.type}</p>
+                                      {contact.email && (
+                                        <p className="text-xs text-slate-500">{contact.email}</p>
+                                      )}
+                                    </div>
+                                    <User className="w-5 h-5 text-slate-400" />
                                   </div>
-                                  <User className="w-5 h-5 text-slate-400" />
                                 </div>
                               </div>
                             ))}
@@ -4953,6 +5065,144 @@ export default function PropertyProfile() {
                     <Plus className="w-4 h-4 mr-2" />
                     Add Client
                   </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Change Primary Contact Modal */}
+        <Dialog open={isChangePrimaryModalOpen} onOpenChange={setIsChangePrimaryModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Change Primary Contact</DialogTitle>
+              <DialogDescription>
+                Select which contact should be designated as the primary contact for this property.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-2 py-4">
+              {Array.isArray(propertyContacts) && propertyContacts.length > 0 ? (
+                propertyContacts.map((contact: any) => (
+                  <div
+                    key={contact.id}
+                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                      contact.type === 'owner'
+                        ? "border-green-200 bg-green-50"
+                        : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                    }`}
+                    onClick={() => {
+                      setPrimaryContactMutation.mutate(contact.id);
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium">{contact.firstName} {contact.lastName}</h4>
+                        <p className="text-sm text-slate-600 capitalize">{contact.type}</p>
+                      </div>
+                      {contact.type === 'owner' && (
+                        <Badge variant="default">Current Primary</Badge>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-slate-600 py-4">No contacts available</p>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsChangePrimaryModalOpen(false)}>
+                Cancel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Move Contacts to Property Modal */}
+        <Dialog open={isMoveContactsModalOpen} onOpenChange={setIsMoveContactsModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Move Clients to Property</DialogTitle>
+              <DialogDescription>
+                Move {selectedContactIds.length} selected client{selectedContactIds.length > 1 ? 's' : ''} to another property.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div>
+                <Label>Select Destination Property</Label>
+                <div className="mt-2">
+                  <Input
+                    placeholder="Search properties..."
+                    value={propertySearchQuery}
+                    onChange={(e) => setPropertySearchQuery(e.target.value)}
+                    className="mb-2"
+                  />
+                  <div className="max-h-64 overflow-y-auto border rounded-md">
+                    {Array.isArray(allProperties) && allProperties.length > 0 ? (
+                      allProperties
+                        .filter((prop: any) => {
+                          // Exclude current property and filter by search
+                          if (prop.id === parseInt(propertyId)) return false;
+                          if (!propertySearchQuery) return true;
+                          return prop.name?.toLowerCase().includes(propertySearchQuery.toLowerCase()) ||
+                                 prop.address1?.toLowerCase().includes(propertySearchQuery.toLowerCase());
+                        })
+                        .map((prop: any) => (
+                          <div
+                            key={prop.id}
+                            className={`p-3 border-b cursor-pointer transition-colors ${
+                              moveToPropertyId === prop.id
+                                ? "bg-blue-50 border-blue-200"
+                                : "hover:bg-slate-50"
+                            }`}
+                            onClick={() => setMoveToPropertyId(prop.id)}
+                          >
+                            <h4 className="font-medium">{prop.name}</h4>
+                            <p className="text-sm text-slate-600">{prop.address1}</p>
+                          </div>
+                        ))
+                    ) : (
+                      <p className="text-center text-slate-600 py-4">No other properties available</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setIsMoveContactsModalOpen(false);
+                setMoveToPropertyId(null);
+                setPropertySearchQuery("");
+              }}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => {
+                  if (!moveToPropertyId) {
+                    toast({
+                      title: "No property selected",
+                      description: "Please select a destination property.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  bulkMoveContactsMutation.mutate({
+                    contactIds: selectedContactIds,
+                    newPropertyId: moveToPropertyId
+                  });
+                }}
+                disabled={bulkMoveContactsMutation.isPending || !moveToPropertyId}
+              >
+                {bulkMoveContactsMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Moving...
+                  </>
+                ) : (
+                  `Move ${selectedContactIds.length} Client${selectedContactIds.length > 1 ? 's' : ''}`
                 )}
               </Button>
             </DialogFooter>

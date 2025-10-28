@@ -3952,6 +3952,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Set primary contact for a property
+  app.patch("/api/properties/:propertyId/contacts/:contactId/set-primary", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.propertyId);
+      const contactId = parseInt(req.params.contactId);
+      
+      if (isNaN(propertyId) || isNaN(contactId)) {
+        return res.status(400).json({ message: "Invalid property ID or contact ID" });
+      }
+
+      await storage.setPrimaryContactForProperty(propertyId, contactId);
+      res.json({ message: "Primary contact updated successfully" });
+    } catch (error) {
+      console.error("Error setting primary contact:", error);
+      res.status(500).json({ message: "Failed to set primary contact" });
+    }
+  });
+
+  // Bulk move contacts to a new property
+  app.post("/api/contact-properties/bulk-move", isAuthenticated, async (req, res) => {
+    try {
+      const { contactIds, newPropertyId } = req.body;
+      
+      if (!Array.isArray(contactIds) || contactIds.length === 0) {
+        return res.status(400).json({ message: "Contact IDs array is required" });
+      }
+      
+      if (!newPropertyId || isNaN(parseInt(newPropertyId))) {
+        return res.status(400).json({ message: "Valid property ID is required" });
+      }
+
+      await storage.bulkMoveContactsToProperty(contactIds, parseInt(newPropertyId));
+      res.json({ message: "Contacts moved successfully" });
+    } catch (error) {
+      console.error("Error moving contacts:", error);
+      res.status(500).json({ message: "Failed to move contacts" });
+    }
+  });
+
   // Delete contact
   app.delete("/api/contacts/:id", isAuthenticated, async (req, res) => {
     try {

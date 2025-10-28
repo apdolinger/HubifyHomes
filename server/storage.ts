@@ -382,6 +382,8 @@ export interface IStorage {
   unlinkContactFromProperty(contactId: number, propertyId: number): Promise<void>;
   deleteContactProperty(relationshipId: number): Promise<void>;
   setPrimaryProperty(contactId: number, propertyId: number): Promise<void>;
+  setPrimaryContactForProperty(propertyId: number, contactId: number): Promise<void>;
+  bulkMoveContactsToProperty(contactIds: number[], newPropertyId: number): Promise<void>;
   
   // Alert operations
   getAlerts(orgId: string, filters?: { type?: string; entityId?: number; isActive?: boolean }): Promise<Alert[]>;
@@ -2471,6 +2473,55 @@ export class DatabaseStorage implements IStorage {
           eq(contactProperties.propertyId, propertyId)
         )
       );
+  }
+
+  async setPrimaryContactForProperty(propertyId: number, contactId: number): Promise<void> {
+    // First, unset all primary flags for this property
+    await db
+      .update(contactProperties)
+      .set({ isPrimary: false })
+      .where(eq(contactProperties.propertyId, propertyId));
+
+    // Then set the specified contact as primary for this property
+    await db
+      .update(contactProperties)
+      .set({ isPrimary: true })
+      .where(
+        and(
+          eq(contactProperties.contactId, contactId),
+          eq(contactProperties.propertyId, propertyId)
+        )
+      );
+  }
+
+  async bulkMoveContactsToProperty(contactIds: number[], newPropertyId: number): Promise<void> {
+    // For each contact, update their property association
+    for (const contactId of contactIds) {
+      // Check if this contact already has a relationship with the new property
+      const existing = await db
+        .select()
+        .from(contactProperties)
+        .where(
+          and(
+            eq(contactProperties.contactId, contactId),
+            eq(contactProperties.propertyId, newPropertyId)
+          )
+        )
+        .limit(1);
+
+      if (existing.length === 0) {
+        // If no existing relationship, create one (not as primary)
+        await db
+          .insert(contactProperties)
+          .values({
+            contactId,
+            propertyId: newPropertyId,
+            isPrimary: false,
+            relationship: 'tenant', // Default relationship type
+          });
+      }
+      // If they already have a relationship with this property, do nothing
+    }
   }
 
   // Team message operations
