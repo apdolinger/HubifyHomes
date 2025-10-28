@@ -2174,12 +2174,12 @@ export default function PropertyProfile() {
               <Card className="lg:col-span-1">
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle>Property Contacts</CardTitle>
+                    <CardTitle>Property Clients</CardTitle>
                     <Dialog open={isContactModalOpen} onOpenChange={setIsContactModalOpen}>
                       <DialogTrigger asChild>
                         <Button size="sm">
                           <Plus className="w-4 h-4 mr-2" />
-                          Add Contact
+                          Add Client
                         </Button>
                       </DialogTrigger>
                     </Dialog>
@@ -2197,7 +2197,7 @@ export default function PropertyProfile() {
                         {/* Primary Contact */}
                         {Array.isArray(propertyContacts) && propertyContacts.find((contact: any) => contact.type === 'owner') && (
                           <div className="mb-4">
-                            <h4 className="text-sm font-medium text-slate-700 mb-2">Primary Contact</h4>
+                            <h4 className="text-sm font-medium text-slate-700 mb-2">Primary</h4>
                             {(Array.isArray(propertyContacts) ? propertyContacts : [])
                               .filter((contact: any) => contact.type === 'owner')
                               .map((contact: any) => (
@@ -4951,7 +4951,7 @@ export default function PropertyProfile() {
                 ) : (
                   <>
                     <Plus className="w-4 h-4 mr-2" />
-                    Add Contact
+                    Add Client
                   </>
                 )}
               </Button>
