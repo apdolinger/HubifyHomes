@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,10 @@ interface AlertBannerProps {
   canManage?: boolean;
 }
 
+export interface AlertBannerRef {
+  openDialog: () => void;
+}
+
 const severityConfig = {
   info: {
     icon: Info,
@@ -60,11 +64,18 @@ const severityConfig = {
   },
 };
 
-export function AlertBanner({ type, entityId, canManage = false }: AlertBannerProps) {
+export const AlertBanner = forwardRef<AlertBannerRef, AlertBannerProps>(({ type, entityId, canManage = false }, ref) => {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newAlertMessage, setNewAlertMessage] = useState("");
   const [newAlertSeverity, setNewAlertSeverity] = useState<AlertSeverity>("info");
+
+  // Expose openDialog method to parent components via ref
+  useImperativeHandle(ref, () => ({
+    openDialog: () => {
+      setIsDialogOpen(true);
+    },
+  }));
 
   const { data: alerts = [], isLoading } = useQuery<Alert[]>({
     queryKey: ["/api/alerts/entity", type, entityId],
@@ -259,4 +270,4 @@ export function AlertBanner({ type, entityId, canManage = false }: AlertBannerPr
       )}
     </div>
   );
-}
+});

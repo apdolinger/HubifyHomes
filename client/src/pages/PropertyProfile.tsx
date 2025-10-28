@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useTaskModal } from "@/contexts/TaskModalContext";
@@ -56,7 +56,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { AlertBanner } from "@/components/AlertBanner";
+import { AlertBanner, AlertBannerRef } from "@/components/AlertBanner";
 import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
 
 export default function PropertyProfile() {
@@ -65,6 +65,7 @@ export default function PropertyProfile() {
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const alertBannerRef = useRef<AlertBannerRef>(null);
   const [propertyImage, setPropertyImage] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isImageUploading, setIsImageUploading] = useState(false);
@@ -1873,11 +1874,12 @@ export default function PropertyProfile() {
                   </Button>
                   <Button 
                     variant="outline"
-                    onClick={() => setLocation(`/properties/${propertyId}/portal-settings`)}
+                    onClick={() => alertBannerRef.current?.openDialog()}
                     className="flex items-center"
+                    data-testid="button-add-alert"
                   >
-                    <Settings className="w-4 h-4 mr-2" />
-                    Portal Settings
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Alert
                   </Button>
                   <Button 
                     variant="outline"
@@ -1894,7 +1896,7 @@ export default function PropertyProfile() {
         </div>
 
         {/* Alert Banner */}
-        <AlertBanner type="property" entityId={parseInt(propertyId)} canManage={true} />
+        <AlertBanner ref={alertBannerRef} type="property" entityId={parseInt(propertyId)} canManage={true} />
 
         {/* Property Details Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">

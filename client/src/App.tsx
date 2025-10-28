@@ -24,7 +24,6 @@ import Vendors from "@/pages/Vendors";
 import DuplicatesManagement from "@/pages/DuplicatesManagement";
 import TeamMessages from "@/pages/TeamMessages";
 import HubifyConsole from "@/pages/HubifyConsole";
-import PropertyPortalSettings from "@/pages/PropertyPortalSettings";
 import AdminClientPortal from "@/pages/AdminClientPortal";
 import AdminClientPortalProperty from "@/pages/AdminClientPortalProperty";
 import Admin from "@/pages/Admin";
@@ -50,10 +49,6 @@ import { TaskModalProvider, useTaskModal } from "@/contexts/TaskModalContext";
 import { PortalAuthProvider } from "@/contexts/PortalAuthContext";
 import { routes } from "@/lib/routes";
 import { useState } from "react";
-import Portal from "@/pages/Portal";
-import PortalLogin from "@/pages/PortalLogin";
-import PortalRegister from "@/pages/PortalRegister";
-import PortalPreview from "@/pages/PortalPreview";
 
 // Global Task Modal Component
 function GlobalTaskModal() {
@@ -77,10 +72,6 @@ function Router() {
       <Route path="/terms" component={TermsOfService} />
       <Route path="/super-admin/login" component={SuperAdminLogin} />
       
-      {/* Portal routes (separate auth system) */}
-      <Route path="/portal/login" component={PortalLogin} />
-      <Route path="/portal/register" component={PortalRegister} />
-      <Route path="/portal" component={Portal} />
       {isLoading ? (
         <Route>
           <div className="min-h-screen flex items-center justify-center">
@@ -149,9 +140,6 @@ function Router() {
           <Route path="/hubify-console" component={AdminClientPortal} />
           <Route path="/hubify-console/:propertyId" component={AdminClientPortalProperty} />
           
-          {/* Portal Preview */}
-          <Route path="/portal-preview" component={PortalPreview} />
-          
           {/* Admin Routes */}
           <Route path="/admin/import" component={ImportManager} />
           <Route path="/admin/vendors" component={Vendors} />
@@ -180,12 +168,6 @@ function Router() {
           <Route path="/property-center">
             {() => {
               window.location.replace(routes.hubifyConsole());
-              return null;
-            }}
-          </Route>
-          <Route path="/properties/:propertyId/portal-settings">
-            {(params) => {
-              window.location.replace(routes.hubifyConsoleSettings(params.propertyId));
               return null;
             }}
           </Route>
