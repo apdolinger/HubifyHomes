@@ -7599,9 +7599,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/organizations/:id/supply-settings", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
+      const userOrgId = req.user?.claims?.orgId;
       
-      // Verify user belongs to org or is admin
-      if (req.user?.orgId !== id && req.user?.role !== "admin") {
+      // Verify user belongs to org or is platform admin
+      if (userOrgId !== id && req.user?.role !== "admin") {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -7621,9 +7622,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { supplyTypes, supplyUnits } = req.body;
+      const userOrgId = req.user?.claims?.orgId;
       
-      // Verify user belongs to org or is admin
-      if (req.user?.orgId !== id && req.user?.role !== "admin") {
+      // Verify user belongs to org or is platform admin
+      if (userOrgId !== id && req.user?.role !== "admin") {
         return res.status(403).json({ message: "Access denied" });
       }
 
