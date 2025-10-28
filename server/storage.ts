@@ -1525,6 +1525,11 @@ export class DatabaseStorage implements IStorage {
       lastServiced: roomDevices.lastServiced,
       nextServiceDue: roomDevices.nextServiceDue,
       notes: roomDevices.notes,
+      hasWarranty: roomDevices.hasWarranty,
+      warrantyStartDate: roomDevices.warrantyStartDate,
+      warrantyEndDate: roomDevices.warrantyEndDate,
+      isActive: roomDevices.isActive,
+      createdById: roomDevices.createdById,
       createdAt: roomDevices.createdAt,
       updatedAt: roomDevices.updatedAt,
     })
