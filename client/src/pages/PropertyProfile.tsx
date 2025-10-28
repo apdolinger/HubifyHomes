@@ -1094,11 +1094,15 @@ export default function PropertyProfile() {
   // Room device mutations
   const createDeviceMutation = useMutation({
     mutationFn: async (deviceData: any) => {
-      return await apiRequest("POST", "/api/room-devices", {
+      // Transform data types for backend validation
+      const payload = {
         ...deviceData,
         roomId: selectedRoom?.id,
-        createdById: "current-user"
-      });
+        createdById: "current-user",
+        // Convert serviceInterval from string to number if present
+        serviceInterval: deviceData.serviceInterval ? parseInt(deviceData.serviceInterval) : null,
+      };
+      return await apiRequest("POST", "/api/room-devices", payload);
     },
     onSuccess: () => {
       refetchDevices();
@@ -1140,7 +1144,13 @@ export default function PropertyProfile() {
 
   const updateDeviceMutation = useMutation({
     mutationFn: async ({ id, ...data }: any) => {
-      return await apiRequest("PATCH", `/api/room-devices/${id}`, data);
+      // Transform data types for backend validation
+      const payload = {
+        ...data,
+        // Convert serviceInterval from string to number if present
+        serviceInterval: data.serviceInterval ? parseInt(data.serviceInterval) : null,
+      };
+      return await apiRequest("PATCH", `/api/room-devices/${id}`, payload);
     },
     onSuccess: () => {
       refetchDevices();
