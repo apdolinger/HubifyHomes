@@ -2391,6 +2391,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update property community
+  app.patch("/api/properties/:id/community", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid property ID' });
+      }
+
+      const { communityId } = req.body;
+      
+      // communityId can be null (to remove community) or a valid number
+      if (communityId !== null && communityId !== undefined) {
+        const parsedCommunityId = parseInt(communityId);
+        if (isNaN(parsedCommunityId)) {
+          return res.status(400).json({ message: 'Invalid community ID' });
+        }
+      }
+
+      const property = await storage.updateProperty(id, { communityId });
+      res.json(property);
+    } catch (error) {
+      console.error("Error updating property community:", error);
+      res.status(500).json({ message: "Failed to update property community" });
+    }
+  });
+
   // Delete property
   app.delete("/api/properties/:id", isAuthenticated, async (req, res) => {
     try {
