@@ -923,8 +923,7 @@ export default function People() {
                 onClick={() => setIsCustomizeModalOpen(true)}
                 data-testid="customize-clients-table-btn"
               >
-                <Settings className="w-4 h-4 mr-2" />
-                Customize Table
+                <Settings className="w-4 h-4" />
               </Button>
             </div>
           </div>

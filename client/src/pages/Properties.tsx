@@ -1633,8 +1633,7 @@ export default function Properties() {
                   onClick={() => setIsCustomizeModalOpen(true)}
                   data-testid="customize-property-table-btn"
                 >
-                  <Settings className="w-4 h-4 mr-2" />
-                  Settings
+                  <Settings className="w-4 h-4" />
                 </Button>
               </div>
             </div>
