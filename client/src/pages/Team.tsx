@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Plus, Mail, User } from "lucide-react";
+import { Users, Plus, Mail, User, Search } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 // Form schema for inviting team members
@@ -38,6 +38,7 @@ export default function Team() {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -140,13 +141,25 @@ export default function Team() {
     return `${firstName[0]}${lastName[0]}`.toUpperCase();
   };
 
-  // Reset to page 1 when items per page changes
+  // Reset to page 1 when items per page or search term changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [itemsPerPage]);
+  }, [itemsPerPage, searchTerm]);
 
-  // Paginate the team members
-  const totalItems = teamMembers.length;
+  // Filter team members based on search term
+  const filteredTeamMembers = teamMembers.filter((member: any) => {
+    if (!searchTerm) return true;
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      member.firstName?.toLowerCase().includes(searchLower) ||
+      member.lastName?.toLowerCase().includes(searchLower) ||
+      member.email?.toLowerCase().includes(searchLower) ||
+      member.role?.toLowerCase().includes(searchLower)
+    );
+  });
+
+  // Paginate the filtered team members
+  const totalItems = filteredTeamMembers.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const effectivePage = totalPages > 0 ? Math.min(currentPage, totalPages) : 1;
 
@@ -159,7 +172,7 @@ export default function Team() {
 
   const startIndex = (effectivePage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedTeamMembers = teamMembers.slice(startIndex, endIndex);
+  const paginatedTeamMembers = filteredTeamMembers.slice(startIndex, endIndex);
 
   if (isLoading) {
     return (
@@ -285,6 +298,21 @@ export default function Team() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Search Bar */}
+      <div className="mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+          <Input
+            type="text"
+            placeholder="Search team members by name, email, or role..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+            data-testid="team-search-input"
+          />
+        </div>
       </div>
 
       {/* Team Members Table */}
