@@ -44,6 +44,7 @@ import {
   insertTimeEntrySchema,
   insertContactSchema,
   insertAlertSchema,
+  insertSystemAlertSchema,
   insertTeamMessageSchema,
   insertFormSchema,
   insertFormSubmissionSchema,
@@ -4958,6 +4959,186 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching alert limits:", error);
       res.status(500).json({ message: "Failed to fetch alert limits" });
+    }
+  });
+
+  // System Alert routes - for platform-wide or role-based notifications
+  
+  // Get active system alerts for current user (unacknowledged only)
+  app.get("/api/system-alerts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const orgId = req.user.claims.orgId;
+      const userRole = req.user.claims.role;
+      
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+
+      const alerts = await storage.getSystemAlertsForUser(orgId, userId, userRole);
+      res.json(alerts);
+    } catch (error) {
+      console.error("Error fetching system alerts:", error);
+      res.status(500).json({ message: "Failed to fetch system alerts" });
+    }
+  });
+
+  // Get all system alerts (admin only - for management interface)
+  app.get("/api/system-alerts/all", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user.claims.orgId;
+      const userRole = req.user.claims.role;
+      
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+
+      // Only admins can view all system alerts
+      if (userRole !== 'admin') {
+        return res.status(403).json({ message: "Unauthorized: Admin access required" });
+      }
+
+      const alerts = await storage.getAllSystemAlerts(orgId);
+      res.json(alerts);
+    } catch (error) {
+      console.error("Error fetching all system alerts:", error);
+      res.status(500).json({ message: "Failed to fetch system alerts" });
+    }
+  });
+
+  // Create system alert (admin only)
+  app.post("/api/system-alerts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const orgId = req.user.claims.orgId;
+      const userRole = req.user.claims.role;
+      
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+
+      // Only admins can create system alerts
+      if (userRole !== 'admin') {
+        return res.status(403).json({ message: "Unauthorized: Admin access required" });
+      }
+
+      const validatedData = insertSystemAlertSchema.parse({
+        ...req.body,
+        orgId,
+        createdBy: userId,
+      });
+
+      const alert = await storage.createSystemAlert(validatedData);
+      res.status(201).json(alert);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating system alert:", error);
+      res.status(500).json({ message: "Failed to create system alert" });
+    }
+  });
+
+  // Update system alert (admin only)
+  app.patch("/api/system-alerts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid alert ID" });
+      }
+
+      const orgId = req.user.claims.orgId;
+      const userRole = req.user.claims.role;
+      
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+
+      // Only admins can update system alerts
+      if (userRole !== 'admin') {
+        return res.status(403).json({ message: "Unauthorized: Admin access required" });
+      }
+
+      // Verify alert exists and belongs to this org
+      const existingAlert = await storage.getSystemAlert(id, orgId);
+      if (!existingAlert) {
+        return res.status(404).json({ message: "System alert not found" });
+      }
+
+      const updatedAlert = await storage.updateSystemAlert(id, orgId, req.body);
+      res.json(updatedAlert);
+    } catch (error) {
+      console.error("Error updating system alert:", error);
+      res.status(500).json({ message: "Failed to update system alert" });
+    }
+  });
+
+  // Delete system alert (admin only)
+  app.delete("/api/system-alerts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid alert ID" });
+      }
+
+      const orgId = req.user.claims.orgId;
+      const userRole = req.user.claims.role;
+      
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+
+      // Only admins can delete system alerts
+      if (userRole !== 'admin') {
+        return res.status(403).json({ message: "Unauthorized: Admin access required" });
+      }
+
+      // Verify alert exists and belongs to this org
+      const existingAlert = await storage.getSystemAlert(id, orgId);
+      if (!existingAlert) {
+        return res.status(404).json({ message: "System alert not found" });
+      }
+
+      await storage.deleteSystemAlert(id, orgId);
+      res.json({ message: "System alert deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting system alert:", error);
+      res.status(500).json({ message: "Failed to delete system alert" });
+    }
+  });
+
+  // Acknowledge system alert
+  app.post("/api/system-alerts/:id/acknowledge", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid alert ID" });
+      }
+
+      const userId = req.user.claims.sub;
+      const orgId = req.user.claims.orgId;
+      
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+
+      // Verify alert exists and belongs to this org
+      const existingAlert = await storage.getSystemAlert(id, orgId);
+      if (!existingAlert) {
+        return res.status(404).json({ message: "System alert not found" });
+      }
+
+      // Check if already acknowledged
+      const hasAcknowledged = await storage.hasUserAcknowledgedAlert(id, userId);
+      if (hasAcknowledged) {
+        return res.status(400).json({ message: "Alert already acknowledged" });
+      }
+
+      const acknowledgement = await storage.acknowledgeSystemAlert(id, userId);
+      res.status(201).json(acknowledgement);
+    } catch (error) {
+      console.error("Error acknowledging system alert:", error);
+      res.status(500).json({ message: "Failed to acknowledge system alert" });
     }
   });
 
