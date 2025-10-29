@@ -184,7 +184,7 @@ import {
   type InsertCustomField,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, or, like, count, sql, inArray } from "drizzle-orm";
+import { eq, desc, and, or, like, count, sql, inArray, isNotNull } from "drizzle-orm";
 
 export interface IStorage {
   // User operations - required for Replit Auth
@@ -290,6 +290,12 @@ export interface IStorage {
   createRoomSupply(supply: InsertRoomSupply): Promise<RoomSupply>;
   updateRoomSupply(id: number, supply: Partial<InsertRoomSupply>): Promise<RoomSupply>;
   deleteRoomSupply(id: number): Promise<void>;
+  
+  // Property report operations
+  getPropertyDevices(propertyId: number): Promise<any[]>;
+  getPropertyFixtures(propertyId: number): Promise<any[]>;
+  getPropertySurfaceLinks(propertyId: number): Promise<any[]>;
+  getPropertyShoppingList(propertyId: number): Promise<any>;
   
   // Room note operations
   getRoomNotes(roomId: number): Promise<RoomNote[]>;
@@ -1461,6 +1467,169 @@ export class DatabaseStorage implements IStorage {
 
   async deleteRoomSupply(id: number): Promise<void> {
     await db.delete(roomSupplies).where(eq(roomSupplies.id, id));
+  }
+
+  // Property report operations
+  async getPropertyDevices(propertyId: number): Promise<any[]> {
+    const devices = await db
+      .select({
+        id: roomDevices.id,
+        roomId: roomDevices.roomId,
+        roomName: rooms.name,
+        roomType: rooms.type,
+        name: roomDevices.name,
+        type: roomDevices.type,
+        brand: roomDevices.brand,
+        model: roomDevices.model,
+        serialNumber: roomDevices.serialNumber,
+        location: roomDevices.location,
+        purchaseDate: roomDevices.purchaseDate,
+        link: roomDevices.link,
+        hasWarranty: roomDevices.hasWarranty,
+        warrantyStart: roomDevices.warrantyStart,
+        warrantyEnd: roomDevices.warrantyEnd,
+        requiresServicing: roomDevices.requiresServicing,
+        serviceInterval: roomDevices.serviceInterval,
+        serviceIntervalUnit: roomDevices.serviceIntervalUnit,
+        nextServiceDue: roomDevices.nextServiceDue,
+        notes: roomDevices.notes,
+        createdAt: roomDevices.createdAt,
+      })
+      .from(roomDevices)
+      .leftJoin(rooms, eq(roomDevices.roomId, rooms.id))
+      .where(eq(rooms.propertyId, propertyId))
+      .orderBy(rooms.name, roomDevices.name);
+    
+    return devices;
+  }
+
+  async getPropertyFixtures(propertyId: number): Promise<any[]> {
+    const fixtures = await db
+      .select({
+        id: roomFixtures.id,
+        roomId: roomFixtures.roomId,
+        roomName: rooms.name,
+        roomType: rooms.type,
+        lightFixtures: roomFixtures.lightFixtures,
+        ceilingFans: roomFixtures.ceilingFans,
+        smokeDetectors: roomFixtures.smokeDetectors,
+        coDetectors: roomFixtures.coDetectors,
+        thermostats: roomFixtures.thermostats,
+        waterShutoffValves: roomFixtures.waterShutoffValves,
+        electricalOutlets: roomFixtures.electricalOutlets,
+        lightingNotes: roomFixtures.lightingNotes,
+        hvacNotes: roomFixtures.hvacNotes,
+        plumbingNotes: roomFixtures.plumbingNotes,
+        electricalNotes: roomFixtures.electricalNotes,
+        createdAt: roomFixtures.createdAt,
+      })
+      .from(roomFixtures)
+      .leftJoin(rooms, eq(roomFixtures.roomId, rooms.id))
+      .where(eq(rooms.propertyId, propertyId))
+      .orderBy(rooms.name);
+    
+    return fixtures;
+  }
+
+  async getPropertySurfaceLinks(propertyId: number): Promise<any[]> {
+    const links = await db
+      .select({
+        id: roomSurfaceLinks.id,
+        roomId: roomSurfaceLinks.roomId,
+        roomName: rooms.name,
+        roomType: rooms.type,
+        name: roomSurfaceLinks.name,
+        url: roomSurfaceLinks.url,
+        surfaceCategory: roomSurfaceLinks.surfaceCategory,
+        notes: roomSurfaceLinks.notes,
+        createdAt: roomSurfaceLinks.createdAt,
+      })
+      .from(roomSurfaceLinks)
+      .leftJoin(rooms, eq(roomSurfaceLinks.roomId, rooms.id))
+      .where(eq(rooms.propertyId, propertyId))
+      .orderBy(rooms.name, roomSurfaceLinks.surfaceCategory);
+    
+    return links;
+  }
+
+  async getPropertyShoppingList(propertyId: number): Promise<any> {
+    // Get supplies needing replacement (within next 90 days or past due)
+    const now = new Date();
+    const ninetyDaysFromNow = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+    
+    const suppliesNeedingReplacement = await db
+      .select({
+        id: roomSupplies.id,
+        roomId: roomSupplies.roomId,
+        roomName: rooms.name,
+        roomType: rooms.type,
+        name: roomSupplies.name,
+        type: roomSupplies.type,
+        brand: roomSupplies.brand,
+        model: roomSupplies.model,
+        quantity: roomSupplies.quantity,
+        unit: roomSupplies.unit,
+        purchaseUrl: roomSupplies.purchaseUrl,
+        nextReplacement: roomSupplies.nextReplacement,
+        notes: roomSupplies.notes,
+      })
+      .from(roomSupplies)
+      .leftJoin(rooms, eq(roomSupplies.roomId, rooms.id))
+      .where(
+        and(
+          eq(rooms.propertyId, propertyId),
+          isNotNull(roomSupplies.nextReplacement)
+        )
+      );
+    
+    // Filter in memory for date comparison
+    const filteredSupplies = suppliesNeedingReplacement.filter(supply => {
+      if (!supply.nextReplacement) return false;
+      const replacementDate = new Date(supply.nextReplacement);
+      return replacementDate <= ninetyDaysFromNow;
+    });
+
+    // Get devices needing service (within next 90 days or past due)
+    const devicesNeedingService = await db
+      .select({
+        id: roomDevices.id,
+        roomId: roomDevices.roomId,
+        roomName: rooms.name,
+        roomType: rooms.type,
+        name: roomDevices.name,
+        type: roomDevices.type,
+        brand: roomDevices.brand,
+        model: roomDevices.model,
+        serviceInterval: roomDevices.serviceInterval,
+        serviceIntervalUnit: roomDevices.serviceIntervalUnit,
+        nextServiceDue: roomDevices.nextServiceDue,
+        notes: roomDevices.notes,
+      })
+      .from(roomDevices)
+      .leftJoin(rooms, eq(roomDevices.roomId, rooms.id))
+      .where(
+        and(
+          eq(rooms.propertyId, propertyId),
+          eq(roomDevices.requiresServicing, true),
+          isNotNull(roomDevices.nextServiceDue)
+        )
+      );
+    
+    // Filter in memory for date comparison
+    const filteredDevices = devicesNeedingService.filter(device => {
+      if (!device.nextServiceDue) return false;
+      const serviceDate = new Date(device.nextServiceDue);
+      return serviceDate <= ninetyDaysFromNow;
+    });
+
+    // Get all surface links
+    const surfaceLinks = await this.getPropertySurfaceLinks(propertyId);
+
+    return {
+      supplies: filteredSupplies,
+      devices: filteredDevices,
+      surfaceLinks: surfaceLinks,
+    };
   }
 
   // Room note operations

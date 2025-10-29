@@ -2502,6 +2502,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all devices for a property (grouped by room)
+  app.get("/api/properties/:propertyId/devices-report", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.propertyId);
+      if (isNaN(propertyId)) {
+        return res.status(400).json({ message: 'Invalid property ID' });
+      }
+      
+      const devices = await storage.getPropertyDevices(propertyId);
+      res.json(devices);
+    } catch (error) {
+      console.error("Error fetching property devices:", error);
+      res.status(500).json({ message: "Failed to fetch property devices" });
+    }
+  });
+
+  // Get all fixtures for a property (grouped by room)
+  app.get("/api/properties/:propertyId/fixtures-report", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.propertyId);
+      if (isNaN(propertyId)) {
+        return res.status(400).json({ message: 'Invalid property ID' });
+      }
+      
+      const fixtures = await storage.getPropertyFixtures(propertyId);
+      res.json(fixtures);
+    } catch (error) {
+      console.error("Error fetching property fixtures:", error);
+      res.status(500).json({ message: "Failed to fetch property fixtures" });
+    }
+  });
+
+  // Get all surface links for a property (grouped by room)
+  app.get("/api/properties/:propertyId/surface-links-report", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.propertyId);
+      if (isNaN(propertyId)) {
+        return res.status(400).json({ message: 'Invalid property ID' });
+      }
+      
+      const links = await storage.getPropertySurfaceLinks(propertyId);
+      res.json(links);
+    } catch (error) {
+      console.error("Error fetching property surface links:", error);
+      res.status(500).json({ message: "Failed to fetch property surface links" });
+    }
+  });
+
+  // Get shopping list for a property (supplies needing replacement, devices needing service, surface links)
+  app.get("/api/properties/:propertyId/shopping-list", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.propertyId);
+      if (isNaN(propertyId)) {
+        return res.status(400).json({ message: 'Invalid property ID' });
+      }
+      
+      const shoppingList = await storage.getPropertyShoppingList(propertyId);
+      res.json(shoppingList);
+    } catch (error) {
+      console.error("Error fetching property shopping list:", error);
+      res.status(500).json({ message: "Failed to fetch property shopping list" });
+    }
+  });
+
   app.post("/api/room-supplies", isAuthenticated, async (req, res) => {
     try {
       const validatedData = insertRoomSupplySchema.parse(req.body);
