@@ -548,6 +548,22 @@ export const communities = pgTable("communities", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Community Documents table
+export const communityDocuments = pgTable("community_documents", {
+  id: serial("id").primaryKey(),
+  communityId: integer("community_id").references(() => communities.id, { onDelete: "cascade" }).notNull(),
+  propertyId: integer("property_id").references(() => properties.id, { onDelete: "cascade" }), // Null for community-wide documents
+  documentType: varchar("document_type").notNull(), // 'hoa_declarations', 'ccrs_bylaws', 'community_faq', 'welcome_packet'
+  classification: varchar("classification").notNull().$type<"community-wide"|"residential-based">(), // 'community-wide' or 'residential-based'
+  fileUrl: varchar("file_url").notNull(),
+  fileName: varchar("file_name").notNull(),
+  uploadedBy: varchar("uploaded_by").references(() => users.id).notNull(),
+  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+}, (table) => [
+  index("community_docs_community_idx").on(table.communityId),
+  index("community_docs_property_idx").on(table.propertyId),
+]);
+
 // Properties table
 export const properties = pgTable("properties", {
   id: serial("id").primaryKey(),
@@ -1808,6 +1824,11 @@ export const insertCommunitySchema = createInsertSchema(communities).omit({
   updatedAt: true,
 });
 
+export const insertCommunityDocumentSchema = createInsertSchema(communityDocuments).omit({
+  id: true,
+  uploadedAt: true,
+});
+
 export const insertPropertySchema = createInsertSchema(properties).omit({
   id: true,
   createdAt: true,
@@ -2166,6 +2187,8 @@ export type InsertPortalInvitation = z.infer<typeof insertPortalInvitationSchema
 export type PortalInvitation = typeof portalInvitations.$inferSelect;
 export type InsertCommunity = z.infer<typeof insertCommunitySchema>;
 export type Community = typeof communities.$inferSelect;
+export type InsertCommunityDocument = z.infer<typeof insertCommunityDocumentSchema>;
+export type CommunityDocument = typeof communityDocuments.$inferSelect;
 export type InsertProperty = z.infer<typeof insertPropertySchema>;
 export type Property = typeof properties.$inferSelect;
 export type InsertPropertyForm = z.infer<typeof insertPropertyFormSchema>;
