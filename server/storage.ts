@@ -15,6 +15,7 @@ import {
   portalSessions,
   portalInvitations,
   communities,
+  communityDocuments,
   properties,
   rooms,
   roomSupplies,
@@ -93,6 +94,8 @@ import {
   type InsertPortalInvitation,
   type Community,
   type InsertCommunity,
+  type CommunityDocument,
+  type InsertCommunityDocument,
   type Property,
   type InsertProperty,
   type Room,
@@ -272,6 +275,11 @@ export interface IStorage {
   updateCommunity(id: number, community: Partial<InsertCommunity>): Promise<Community>;
   deleteCommunity(id: number): Promise<void>;
   getAllCommunitiesForSuperAdmin(): Promise<any[]>;
+  
+  // Community Documents operations
+  getCommunityDocuments(communityId: number): Promise<CommunityDocument[]>;
+  createCommunityDocument(doc: InsertCommunityDocument): Promise<CommunityDocument>;
+  deleteCommunityDocument(id: number): Promise<void>;
   
   // Property operations
   getProperties(includeInactive?: boolean): Promise<Property[]>;
@@ -1346,6 +1354,27 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCommunity(id: number): Promise<void> {
     await db.delete(communities).where(eq(communities.id, id));
+  }
+
+  // Community Documents operations
+  async getCommunityDocuments(communityId: number): Promise<CommunityDocument[]> {
+    return await db
+      .select()
+      .from(communityDocuments)
+      .where(eq(communityDocuments.communityId, communityId))
+      .orderBy(communityDocuments.documentType);
+  }
+
+  async createCommunityDocument(doc: InsertCommunityDocument): Promise<CommunityDocument> {
+    const [document] = await db
+      .insert(communityDocuments)
+      .values(doc)
+      .returning();
+    return document;
+  }
+
+  async deleteCommunityDocument(id: number): Promise<void> {
+    await db.delete(communityDocuments).where(eq(communityDocuments.id, id));
   }
 
   // Property operations

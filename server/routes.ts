@@ -2267,6 +2267,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Community documents routes
+  app.get("/api/communities/:id/documents", isAuthenticated, async (req, res) => {
+    try {
+      const communityId = parseInt(req.params.id);
+      if (isNaN(communityId)) {
+        return res.status(400).json({ message: 'Invalid community ID' });
+      }
+
+      const documents = await storage.getCommunityDocuments(communityId);
+      res.json(documents);
+    } catch (error) {
+      console.error("Error fetching community documents:", error);
+      res.status(500).json({ message: "Failed to fetch documents" });
+    }
+  });
+
+  app.post("/api/communities/:id/documents", isAuthenticated, async (req: any, res) => {
+    try {
+      const communityId = parseInt(req.params.id);
+      if (isNaN(communityId)) {
+        return res.status(400).json({ message: 'Invalid community ID' });
+      }
+
+      const { documentType, classification, fileUrl, fileName, propertyId } = req.body;
+      const userId = req.user.claims.sub;
+      const userRole = req.user.role;
+
+      // Validate required fields
+      if (!documentType || !classification || !fileUrl || !fileName) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // If community-wide, check if a document of this type already exists
+      if (classification === "community-wide") {
+        const existingDocs = await storage.getCommunityDocuments(communityId);
+        const existingDoc = existingDocs.find(
+          (doc) => doc.documentType === documentType && doc.classification === "community-wide" && !doc.propertyId
+        );
+
+        if (existingDoc) {
+          // Only admins can replace existing community-wide documents
+          if (userRole !== "admin") {
+            return res.status(403).json({ 
+              message: "Only administrators can replace existing community-wide documents" 
+            });
+          }
+          
+          // Delete the old document before adding the new one
+          await storage.deleteCommunityDocument(existingDoc.id);
+        }
+      }
+
+      // Create the document
+      const document = await storage.createCommunityDocument({
+        communityId,
+        propertyId: propertyId || null,
+        documentType,
+        classification: classification as "community-wide" | "residential-based",
+        fileUrl,
+        fileName,
+        uploadedBy: userId,
+      });
+
+      res.status(201).json(document);
+    } catch (error) {
+      console.error("Error uploading community document:", error);
+      res.status(500).json({ message: "Failed to upload document" });
+    }
+  });
+
+  app.delete("/api/community-documents/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid document ID' });
+      }
+
+      const userRole = req.user.role;
+
+      // Only admins can delete documents
+      if (userRole !== "admin") {
+        return res.status(403).json({ 
+          message: "Only administrators can delete community documents" 
+        });
+      }
+
+      await storage.deleteCommunityDocument(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting community document:", error);
+      res.status(500).json({ message: "Failed to delete document" });
+    }
+  });
+
   // Property routes
   app.get("/api/properties", isAuthenticated, async (req, res) => {
     try {
