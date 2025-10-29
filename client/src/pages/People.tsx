@@ -723,8 +723,16 @@ export default function People() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <Card>
-          <CardContent className="p-6">
+        <Card 
+          className="cursor-pointer transition-all hover:shadow-md"
+          onClick={() => {
+            setTypeFilter("all");
+            setSearchQuery("");
+            setPropertyFilter("all");
+          }}
+          data-testid="stat-total-clients"
+        >
+          <CardContent className="p-6 hover:bg-slate-50 transition-colors">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
@@ -745,8 +753,16 @@ export default function People() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
+        <Card 
+          className="cursor-pointer transition-all hover:shadow-md"
+          onClick={() => {
+            setTypeFilter("tenant");
+            setSearchQuery("");
+            setPropertyFilter("all");
+          }}
+          data-testid="stat-tenants"
+        >
+          <CardContent className="p-6 hover:bg-slate-50 transition-colors">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
@@ -767,8 +783,16 @@ export default function People() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
+        <Card 
+          className="cursor-pointer transition-all hover:shadow-md"
+          onClick={() => {
+            setTypeFilter("owner");
+            setSearchQuery("");
+            setPropertyFilter("all");
+          }}
+          data-testid="stat-owners"
+        >
+          <CardContent className="p-6 hover:bg-slate-50 transition-colors">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
@@ -789,8 +813,16 @@ export default function People() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
+        <Card 
+          className="cursor-pointer transition-all hover:shadow-md"
+          onClick={() => {
+            setTypeFilter("emergency_contact");
+            setSearchQuery("");
+            setPropertyFilter("all");
+          }}
+          data-testid="stat-emergency-contacts"
+        >
+          <CardContent className="p-6 hover:bg-slate-50 transition-colors">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
