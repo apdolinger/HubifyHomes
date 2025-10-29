@@ -618,6 +618,19 @@ export const vehicleNotes = pgTable("vehicle_notes", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Vehicle Photos table
+export const vehiclePhotos = pgTable("vehicle_photos", {
+  id: serial("id").primaryKey(),
+  vehicleId: integer("vehicle_id").references(() => vehicles.id, { onDelete: "cascade" }).notNull(),
+  filename: varchar("filename").notNull(),
+  originalName: varchar("original_name").notNull(),
+  url: varchar("url").notNull(),
+  description: text("description"),
+  category: varchar("category").default("general"), // general, damage, before, after, repair, insurance, etc.
+  uploadedById: varchar("uploaded_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Room Supplies table
 export const roomSupplies = pgTable("room_supplies", {
   id: serial("id").primaryKey(),
@@ -1990,6 +2003,11 @@ export const insertVehicleNoteSchema = createInsertSchema(vehicleNotes).omit({
   updatedAt: true,
 });
 
+export const insertVehiclePhotoSchema = createInsertSchema(vehiclePhotos).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertRoomSupplySchema = createInsertSchema(roomSupplies).omit({
   id: true,
   createdAt: true,
@@ -2198,6 +2216,8 @@ export type InsertVehicleMaintenance = z.infer<typeof insertVehicleMaintenanceSc
 export type VehicleMaintenance = typeof vehicleMaintenance.$inferSelect;
 export type InsertVehicleNote = z.infer<typeof insertVehicleNoteSchema>;
 export type VehicleNote = typeof vehicleNotes.$inferSelect;
+export type InsertVehiclePhoto = z.infer<typeof insertVehiclePhotoSchema>;
+export type VehiclePhoto = typeof vehiclePhotos.$inferSelect;
 export type IgnoredDuplicate = typeof ignoredDuplicates.$inferSelect;
 export type InsertIgnoredDuplicate = typeof ignoredDuplicates.$inferInsert;
 export type DuplicateHistory = typeof duplicateHistory.$inferSelect;

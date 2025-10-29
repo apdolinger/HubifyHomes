@@ -55,7 +55,8 @@ import {
   Navigation,
   Key,
   Lock,
-  ExternalLink
+  ExternalLink,
+  Wrench
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -63,6 +64,7 @@ import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, AlertTriangle, Info, XCircle } from "lucide-react";
 import { PropertyReportsModal } from "@/components/PropertyReportsModal";
+import { format, parseISO, differenceInDays } from "date-fns";
 
 // Cascaded Client Alerts Display Component
 function CascadedClientAlertsDisplay({ propertyId }: { propertyId: string }) {
@@ -303,6 +305,29 @@ export default function PropertyProfile() {
     notes: ""
   });
   
+  // Vehicle photos state
+  const [isVehiclePhotoModalOpen, setIsVehiclePhotoModalOpen] = useState(false);
+  const [vehiclePhotoForm, setVehiclePhotoForm] = useState({
+    description: "",
+    category: "general"
+  });
+  const [vehiclePhotoFile, setVehiclePhotoFile] = useState<File | null>(null);
+  const [vehiclePhotoPreview, setVehiclePhotoPreview] = useState<string>("");
+  
+  // Vehicle maintenance state
+  const [isVehicleMaintenanceModalOpen, setIsVehicleMaintenanceModalOpen] = useState(false);
+  const [editingMaintenance, setEditingMaintenance] = useState<any>(null);
+  const [vehicleMaintenanceForm, setVehicleMaintenanceForm] = useState({
+    type: "oil_change",
+    description: "",
+    serviceDate: "",
+    nextDueDate: "",
+    cost: "",
+    mileage: "",
+    vendor: "",
+    notes: ""
+  });
+  
   // Get property ID from URL path parameters
   const params = useParams();
   const propertyId = params.id;
@@ -388,6 +413,18 @@ export default function PropertyProfile() {
   const { data: vehicles = [], isLoading: vehiclesLoading, refetch: refetchVehicles } = useQuery({
     queryKey: [`/api/properties/${propertyId}/vehicles`],
     enabled: isAuthenticated && !!propertyId,
+  });
+
+  // Get vehicle photos
+  const { data: vehiclePhotos = [], isLoading: vehiclePhotosLoading, refetch: refetchVehiclePhotos } = useQuery({
+    queryKey: [`/api/vehicles`, selectedVehicle?.id, "photos"],
+    enabled: isAuthenticated && !!selectedVehicle?.id,
+  });
+
+  // Get vehicle maintenance records
+  const { data: vehicleMaintenance = [], isLoading: vehicleMaintenanceLoading, refetch: refetchVehicleMaintenance } = useQuery({
+    queryKey: [`/api/vehicles/${selectedVehicle?.id}/maintenance`],
+    enabled: isAuthenticated && !!selectedVehicle?.id,
   });
 
   // Get property access items
@@ -669,6 +706,230 @@ export default function PropertyProfile() {
       }
       toast({
         title: "Failed to add vehicle",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Vehicle photo mutations
+  const uploadVehiclePhotoMutation = useMutation({
+    mutationFn: async ({ file, photoData }: { file: File; photoData: any }) => {
+      const formData = new FormData();
+      formData.append('photo', file);
+      formData.append('vehicleId', selectedVehicle?.id?.toString() || '');
+      formData.append('category', photoData.category || 'general');
+      formData.append('description', photoData.description || '');
+
+      const response = await fetch('/api/vehicle-photos', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to upload photo' }));
+        throw new Error(errorData.message || 'Failed to upload photo');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      setIsVehiclePhotoModalOpen(false);
+      setVehiclePhotoFile(null);
+      setVehiclePhotoPreview("");
+      setVehiclePhotoForm({
+        description: "",
+        category: "general"
+      });
+      if (selectedVehicle?.id) {
+        queryClient.invalidateQueries({ queryKey: ["/api/vehicles", selectedVehicle.id, "photos"] });
+      }
+      toast({
+        title: "Photo uploaded",
+        description: "Vehicle photo has been uploaded successfully.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Failed to upload photo",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteVehiclePhotoMutation = useMutation({
+    mutationFn: async (photoId: number) => {
+      return await apiRequest("DELETE", `/api/vehicle-photos/${photoId}`);
+    },
+    onSuccess: () => {
+      if (selectedVehicle?.id) {
+        queryClient.invalidateQueries({ queryKey: ["/api/vehicles", selectedVehicle.id, "photos"] });
+      }
+      toast({
+        title: "Photo deleted",
+        description: "Vehicle photo has been removed successfully.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Failed to delete photo",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Vehicle maintenance mutations
+  const createVehicleMaintenanceMutation = useMutation({
+    mutationFn: async (maintenanceData: any) => {
+      return await apiRequest("POST", "/api/vehicle-maintenance", {
+        ...maintenanceData,
+        vehicleId: selectedVehicle?.id,
+        mileage: maintenanceData.mileage ? parseInt(maintenanceData.mileage) : null,
+        cost: maintenanceData.cost || null
+      });
+    },
+    onSuccess: () => {
+      setIsVehicleMaintenanceModalOpen(false);
+      setEditingMaintenance(null);
+      setVehicleMaintenanceForm({
+        type: "oil_change",
+        description: "",
+        serviceDate: "",
+        nextDueDate: "",
+        cost: "",
+        mileage: "",
+        vendor: "",
+        notes: ""
+      });
+      if (selectedVehicle?.id) {
+        queryClient.invalidateQueries({ queryKey: [`/api/vehicles/${selectedVehicle.id}/maintenance`] });
+      }
+      toast({
+        title: "Maintenance added",
+        description: "Vehicle maintenance record has been added successfully.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Failed to add maintenance",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateVehicleMaintenanceMutation = useMutation({
+    mutationFn: async ({ id, ...data }: any) => {
+      return await apiRequest("PATCH", `/api/vehicle-maintenance/${id}`, {
+        ...data,
+        mileage: data.mileage ? parseInt(data.mileage) : null,
+        cost: data.cost || null
+      });
+    },
+    onSuccess: () => {
+      setIsVehicleMaintenanceModalOpen(false);
+      setEditingMaintenance(null);
+      setVehicleMaintenanceForm({
+        type: "oil_change",
+        description: "",
+        serviceDate: "",
+        nextDueDate: "",
+        cost: "",
+        mileage: "",
+        vendor: "",
+        notes: ""
+      });
+      if (selectedVehicle?.id) {
+        queryClient.invalidateQueries({ queryKey: [`/api/vehicles/${selectedVehicle.id}/maintenance`] });
+      }
+      toast({
+        title: "Maintenance updated",
+        description: "Vehicle maintenance record has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Failed to update maintenance",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteVehicleMaintenanceMutation = useMutation({
+    mutationFn: async (maintenanceId: number) => {
+      return await apiRequest("DELETE", `/api/vehicle-maintenance/${maintenanceId}`);
+    },
+    onSuccess: () => {
+      if (selectedVehicle?.id) {
+        queryClient.invalidateQueries({ queryKey: [`/api/vehicles/${selectedVehicle.id}/maintenance`] });
+      }
+      toast({
+        title: "Maintenance deleted",
+        description: "Vehicle maintenance record has been removed successfully.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Failed to delete maintenance",
         description: error.message,
         variant: "destructive",
       });
@@ -1870,6 +2131,23 @@ export default function PropertyProfile() {
     });
   };
 
+  const handleCreateMaintenanceTask = (maintenance: any) => {
+    if (!selectedVehicle || !property) return;
+
+    // Open the task modal with property pre-selected and pre-filled title/description
+    openTaskModal({
+      propertyId: property.id,
+      title: `${maintenance.type.replace('_', ' ')} - ${selectedVehicle.make} ${selectedVehicle.model}`,
+      description: `${maintenance.description}${maintenance.nextDueDate ? `\nNext due: ${format(parseISO(maintenance.nextDueDate), 'MMM d, yyyy')}` : ''}${maintenance.vendor ? `\nVendor: ${maintenance.vendor}` : ''}`,
+      dueDate: maintenance.nextDueDate || undefined
+    });
+
+    toast({
+      title: "Task creator opened",
+      description: `Create a task for ${maintenance.type.replace('_', ' ')} on ${selectedVehicle.make} ${selectedVehicle.model}.`,
+    });
+  };
+
   // Helper function to get device icon
   const getDeviceIcon = (type: string) => {
     switch (type) {
@@ -1927,6 +2205,135 @@ export default function PropertyProfile() {
 
   const handleDeletePhoto = (photoId: number) => {
     deletePhotoMutation.mutate(photoId);
+  };
+
+  // Vehicle photo handlers
+  const handleVehiclePhotoUpload = () => {
+    if (!vehiclePhotoFile) {
+      toast({
+        title: "No file selected",
+        description: "Please select a photo to upload.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    uploadVehiclePhotoMutation.mutate({
+      file: vehiclePhotoFile,
+      photoData: vehiclePhotoForm
+    });
+  };
+
+  const handleDeleteVehiclePhoto = (photoId: number) => {
+    deleteVehiclePhotoMutation.mutate(photoId);
+  };
+
+  const handleVehiclePhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        toast({
+          title: "Invalid File Type",
+          description: "Only JPG, PNG, GIF, and WEBP images are allowed.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File Too Large",
+          description: "Image must be smaller than 10MB.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setVehiclePhotoFile(file);
+      const previewUrl = URL.createObjectURL(file);
+      setVehiclePhotoPreview(previewUrl);
+    }
+  };
+
+  // Vehicle maintenance handlers
+  const handleAddMaintenance = () => {
+    setEditingMaintenance(null);
+    setVehicleMaintenanceForm({
+      type: "oil_change",
+      description: "",
+      serviceDate: "",
+      nextDueDate: "",
+      cost: "",
+      mileage: "",
+      vendor: "",
+      notes: ""
+    });
+    setIsVehicleMaintenanceModalOpen(true);
+  };
+
+  const handleEditMaintenance = (maintenance: any) => {
+    setEditingMaintenance(maintenance);
+    setVehicleMaintenanceForm({
+      type: maintenance.type || "oil_change",
+      description: maintenance.description || "",
+      serviceDate: maintenance.serviceDate ? maintenance.serviceDate.split('T')[0] : "",
+      nextDueDate: maintenance.nextDueDate ? maintenance.nextDueDate.split('T')[0] : "",
+      cost: maintenance.cost || "",
+      mileage: maintenance.mileage?.toString() || "",
+      vendor: maintenance.vendor || "",
+      notes: maintenance.notes || ""
+    });
+    setIsVehicleMaintenanceModalOpen(true);
+  };
+
+  const handleSaveMaintenance = () => {
+    if (!vehicleMaintenanceForm.description.trim()) {
+      toast({
+        title: "Description required",
+        description: "Please provide a description for this maintenance record.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!vehicleMaintenanceForm.serviceDate) {
+      toast({
+        title: "Service date required",
+        description: "Please select the date of service.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (editingMaintenance) {
+      updateVehicleMaintenanceMutation.mutate({
+        id: editingMaintenance.id,
+        ...vehicleMaintenanceForm
+      });
+    } else {
+      createVehicleMaintenanceMutation.mutate(vehicleMaintenanceForm);
+    }
+  };
+
+  const handleDeleteMaintenance = (maintenanceId: number) => {
+    deleteVehicleMaintenanceMutation.mutate(maintenanceId);
+  };
+
+  // Calculate maintenance alerts for a vehicle
+  const getMaintenanceAlerts = (vehicleId: number) => {
+    if (!Array.isArray(vehicleMaintenance)) return [];
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return vehicleMaintenance.filter((m: any) => {
+      if (!m.nextDueDate || m.vehicleId !== vehicleId) return false;
+      const dueDate = new Date(m.nextDueDate);
+      dueDate.setHours(0, 0, 0, 0);
+      const daysDiff = differenceInDays(dueDate, today);
+      return daysDiff <= 7; // Show if due within 7 days or overdue
+    });
   };
 
   return (
@@ -3509,28 +3916,41 @@ export default function PropertyProfile() {
                       </div>
                     ) : Array.isArray(vehicles) && vehicles.length > 0 ? (
                       <div className="space-y-2">
-                        {vehicles.map((vehicle: any) => (
-                          <div
-                            key={vehicle.id}
-                            className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                              selectedVehicle?.id === vehicle.id
-                                ? "border-blue-200 bg-blue-50"
-                                : "border-slate-200 hover:border-slate-300"
-                            }`}
-                            onClick={() => setSelectedVehicle(vehicle)}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <h4 className="font-medium">{vehicle.year} {vehicle.make} {vehicle.model}</h4>
-                                <p className="text-sm text-slate-600">{vehicle.licensePlate || 'No plate'}</p>
-                                {vehicle.color && (
-                                  <p className="text-xs text-slate-500">{vehicle.color}</p>
-                                )}
+                        {vehicles.map((vehicle: any) => {
+                          const alerts = getMaintenanceAlerts(vehicle.id);
+                          const hasAlerts = alerts.length > 0;
+                          
+                          return (
+                            <div
+                              key={vehicle.id}
+                              className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                                selectedVehicle?.id === vehicle.id
+                                  ? "border-blue-200 bg-blue-50"
+                                  : "border-slate-200 hover:border-slate-300"
+                              }`}
+                              onClick={() => setSelectedVehicle(vehicle)}
+                              data-testid={`vehicle-item-${vehicle.id}`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="font-medium">{vehicle.year} {vehicle.make} {vehicle.model}</h4>
+                                    {hasAlerts && (
+                                      <Badge variant="destructive" className="text-xs" data-testid={`vehicle-alert-badge-${vehicle.id}`}>
+                                        {alerts.length} Due
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-slate-600">{vehicle.licensePlate || 'No plate'}</p>
+                                  {vehicle.color && (
+                                    <p className="text-xs text-slate-500">{vehicle.color}</p>
+                                  )}
+                                </div>
+                                <Car className="w-5 h-5 text-slate-400" />
                               </div>
-                              <Car className="w-5 h-5 text-slate-400" />
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : (
                       <div className="text-center py-8">
@@ -3545,16 +3965,284 @@ export default function PropertyProfile() {
                 </CardContent>
               </Card>
 
-              {/* Vehicle Details Placeholder */}
-              <Card className="lg:col-span-2">
-                <CardContent className="flex items-center justify-center py-12">
-                  <div className="text-center">
-                    <Car className="w-12 h-12 mx-auto text-slate-400 mb-4" />
-                    <h3 className="text-lg font-medium text-slate-900 mb-2">Select a vehicle</h3>
-                    <p className="text-slate-600">Click on a vehicle from the left to view its maintenance records and details.</p>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Vehicle Details */}
+              {selectedVehicle && (
+                <Card className="lg:col-span-2">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center">
+                        <Car className="w-5 h-5 mr-2" />
+                        {selectedVehicle.year} {selectedVehicle.make} {selectedVehicle.model}
+                      </CardTitle>
+                    </div>
+                    {selectedVehicle.licensePlate && (
+                      <p className="text-sm text-slate-600">License Plate: {selectedVehicle.licensePlate}</p>
+                    )}
+                  </CardHeader>
+                  <CardContent>
+                    {/* Maintenance Alerts */}
+                    {(() => {
+                      const alerts = getMaintenanceAlerts(selectedVehicle.id);
+                      if (alerts.length > 0) {
+                        return (
+                          <Alert className="mb-6 border-amber-500 bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-100" data-testid="vehicle-maintenance-alert">
+                            <AlertTriangle className="h-4 w-4 text-amber-500" />
+                            <AlertTitle data-testid="vehicle-maintenance-alert-title">Maintenance Due</AlertTitle>
+                            <AlertDescription data-testid="vehicle-maintenance-alert-description">
+                              {alerts.length} maintenance {alerts.length === 1 ? 'item' : 'items'} {alerts.length === 1 ? 'needs' : 'need'} attention.
+                            </AlertDescription>
+                          </Alert>
+                        );
+                      }
+                      return null;
+                    })()}
+
+                    <Tabs defaultValue="details" className="space-y-4">
+                      <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="details" data-testid="tab-vehicle-details">Details</TabsTrigger>
+                        <TabsTrigger value="photos" data-testid="tab-vehicle-photos">Photos</TabsTrigger>
+                        <TabsTrigger value="maintenance" data-testid="tab-vehicle-maintenance">Maintenance</TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="details" className="space-y-4" data-testid="content-vehicle-details">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {selectedVehicle.vin && (
+                            <div>
+                              <Label className="text-slate-600">VIN</Label>
+                              <p className="font-medium">{selectedVehicle.vin}</p>
+                            </div>
+                          )}
+                          {selectedVehicle.color && (
+                            <div>
+                              <Label className="text-slate-600">Color</Label>
+                              <p className="font-medium">{selectedVehicle.color}</p>
+                            </div>
+                          )}
+                          {selectedVehicle.type && (
+                            <div>
+                              <Label className="text-slate-600">Type</Label>
+                              <p className="font-medium capitalize">{selectedVehicle.type.replace('_', ' ')}</p>
+                            </div>
+                          )}
+                          {selectedVehicle.details && (
+                            <div className="md:col-span-2">
+                              <Label className="text-slate-600">Notes</Label>
+                              <p className="font-medium">{selectedVehicle.details}</p>
+                            </div>
+                          )}
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="photos" className="space-y-4" data-testid="content-vehicle-photos">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-lg font-medium">Vehicle Photos</h4>
+                          <Button onClick={() => setIsVehiclePhotoModalOpen(true)} data-testid="button-add-vehicle-photo">
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Photo
+                          </Button>
+                        </div>
+
+                        {vehiclePhotosLoading ? (
+                          <div className="flex items-center justify-center py-8">
+                            <RefreshCw className="w-6 h-6 animate-spin text-slate-400" />
+                          </div>
+                        ) : Array.isArray(vehiclePhotos) && vehiclePhotos.length > 0 ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="vehicle-photos-grid">
+                            {vehiclePhotos.map((photo: any) => (
+                              <Card key={photo.id} className="overflow-hidden" data-testid={`vehicle-photo-card-${photo.id}`}>
+                                <div className="aspect-video relative">
+                                  <img 
+                                    src={photo.url || photo.photoUrl} 
+                                    alt={photo.description || photo.originalName}
+                                    className="w-full h-full object-cover"
+                                    data-testid={`vehicle-photo-img-${photo.id}`}
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23f1f5f9'/%3E%3Ctext x='50' y='50' font-family='sans-serif' font-size='14' fill='%2394a3b8' text-anchor='middle' dy='.3em'%3EImage not found%3C/text%3E%3C/svg%3E";
+                                    }}
+                                  />
+                                  <Badge 
+                                    className="absolute top-2 right-2 text-xs"
+                                    variant={photo.category === 'damage' ? 'destructive' : 'secondary'}
+                                    data-testid={`vehicle-photo-badge-${photo.id}`}
+                                  >
+                                    {photo.category}
+                                  </Badge>
+                                </div>
+                                <CardContent className="p-3">
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                      <p className="text-sm font-medium text-slate-900 mb-1" data-testid={`vehicle-photo-name-${photo.id}`}>
+                                        {photo.originalName}
+                                      </p>
+                                      {photo.description && (
+                                        <p className="text-xs text-slate-600 mb-2" data-testid={`vehicle-photo-desc-${photo.id}`}>{photo.description}</p>
+                                      )}
+                                      <p className="text-xs text-slate-500">
+                                        {new Date(photo.createdAt).toLocaleDateString()}
+                                      </p>
+                                    </div>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" data-testid={`button-vehicle-photo-menu-${photo.id}`}>
+                                          <MoreVertical className="w-4 h-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem 
+                                          className="text-red-600"
+                                          onClick={() => handleDeleteVehiclePhoto(photo.id)}
+                                          data-testid={`button-delete-vehicle-photo-${photo.id}`}
+                                        >
+                                          <Trash2 className="w-4 h-4 mr-2" />
+                                          Delete Photo
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8">
+                            <Camera className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                            <h3 className="text-lg font-medium text-slate-900 mb-2">No photos uploaded</h3>
+                            <p className="text-slate-600 mb-4">Add photos to document the condition of this vehicle.</p>
+                            <Button onClick={() => setIsVehiclePhotoModalOpen(true)} data-testid="button-upload-first-vehicle-photo">
+                              <Upload className="w-4 h-4 mr-2" />
+                              Upload First Photo
+                            </Button>
+                          </div>
+                        )}
+                      </TabsContent>
+
+                      <TabsContent value="maintenance" className="space-y-4" data-testid="content-vehicle-maintenance">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-lg font-medium">Maintenance History</h4>
+                          <Button onClick={handleAddMaintenance} data-testid="button-add-maintenance">
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Maintenance
+                          </Button>
+                        </div>
+
+                        {vehicleMaintenanceLoading ? (
+                          <div className="flex items-center justify-center py-8">
+                            <RefreshCw className="w-6 h-6 animate-spin text-slate-400" />
+                          </div>
+                        ) : Array.isArray(vehicleMaintenance) && vehicleMaintenance.length > 0 ? (
+                          <div className="space-y-3" data-testid="vehicle-maintenance-list">
+                            {vehicleMaintenance.map((maintenance: any) => {
+                              const isOverdue = maintenance.nextDueDate && differenceInDays(new Date(maintenance.nextDueDate), new Date()) < 0;
+                              const isDueSoon = maintenance.nextDueDate && differenceInDays(new Date(maintenance.nextDueDate), new Date()) >= 0 && differenceInDays(new Date(maintenance.nextDueDate), new Date()) <= 7;
+                              
+                              return (
+                                <Card key={maintenance.id} className={isOverdue ? 'border-red-300' : isDueSoon ? 'border-amber-300' : ''} data-testid={`maintenance-card-${maintenance.id}`}>
+                                  <CardContent className="p-4">
+                                    <div className="flex items-start justify-between">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <Badge variant="outline" data-testid={`maintenance-type-${maintenance.id}`}>
+                                            {maintenance.type.replace('_', ' ')}
+                                          </Badge>
+                                          {isOverdue && (
+                                            <Badge variant="destructive" data-testid={`maintenance-overdue-${maintenance.id}`}>Overdue</Badge>
+                                          )}
+                                          {isDueSoon && !isOverdue && (
+                                            <Badge className="bg-amber-500" data-testid={`maintenance-due-soon-${maintenance.id}`}>Due Soon</Badge>
+                                          )}
+                                        </div>
+                                        <p className="font-medium mb-2" data-testid={`maintenance-desc-${maintenance.id}`}>{maintenance.description}</p>
+                                        <div className="grid grid-cols-2 gap-2 text-sm text-slate-600">
+                                          <div>
+                                            <span className="font-medium">Service Date:</span> {format(parseISO(maintenance.serviceDate), 'MMM d, yyyy')}
+                                          </div>
+                                          {maintenance.nextDueDate && (
+                                            <div data-testid={`maintenance-next-due-${maintenance.id}`}>
+                                              <span className="font-medium">Next Due:</span> {format(parseISO(maintenance.nextDueDate), 'MMM d, yyyy')}
+                                            </div>
+                                          )}
+                                          {maintenance.mileage && (
+                                            <div data-testid={`maintenance-mileage-${maintenance.id}`}>
+                                              <span className="font-medium">Mileage:</span> {maintenance.mileage.toLocaleString()} mi
+                                            </div>
+                                          )}
+                                          {maintenance.cost && (
+                                            <div data-testid={`maintenance-cost-${maintenance.id}`}>
+                                              <span className="font-medium">Cost:</span> ${maintenance.cost}
+                                            </div>
+                                          )}
+                                          {maintenance.vendor && (
+                                            <div className="col-span-2" data-testid={`maintenance-vendor-${maintenance.id}`}>
+                                              <span className="font-medium">Vendor:</span> {maintenance.vendor}
+                                            </div>
+                                          )}
+                                          {maintenance.notes && (
+                                            <div className="col-span-2" data-testid={`maintenance-notes-${maintenance.id}`}>
+                                              <span className="font-medium">Notes:</span> {maintenance.notes}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" data-testid={`button-maintenance-menu-${maintenance.id}`}>
+                                            <MoreVertical className="w-4 h-4" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                          <DropdownMenuItem onClick={() => handleCreateMaintenanceTask(maintenance)} data-testid={`button-create-task-maintenance-${maintenance.id}`}>
+                                            <Calendar className="w-4 h-4 mr-2" />
+                                            Create Task
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => handleEditMaintenance(maintenance)} data-testid={`button-edit-maintenance-${maintenance.id}`}>
+                                            <Edit className="w-4 h-4 mr-2" />
+                                            Edit Maintenance
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem 
+                                            className="text-red-600"
+                                            onClick={() => handleDeleteMaintenance(maintenance.id)}
+                                            data-testid={`button-delete-maintenance-${maintenance.id}`}
+                                          >
+                                            <Trash2 className="w-4 h-4 mr-2" />
+                                            Delete Maintenance
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8">
+                            <Wrench className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                            <h3 className="text-lg font-medium text-slate-900 mb-2">No maintenance records</h3>
+                            <p className="text-slate-600 mb-4">Track oil changes, inspections, repairs, and other service history.</p>
+                            <Button onClick={handleAddMaintenance} data-testid="button-add-first-maintenance">
+                              <Plus className="w-4 h-4 mr-2" />
+                              Add First Record
+                            </Button>
+                          </div>
+                        )}
+                      </TabsContent>
+                    </Tabs>
+                  </CardContent>
+                </Card>
+              )}
+
+              {!selectedVehicle && (
+                <Card className="lg:col-span-2">
+                  <CardContent className="flex items-center justify-center py-12">
+                    <div className="text-center">
+                      <Car className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                      <h3 className="text-lg font-medium text-slate-900 mb-2">Select a vehicle</h3>
+                      <p className="text-slate-600">Click on a vehicle from the left to view its maintenance records and details.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </TabsContent>
 
@@ -5528,6 +6216,248 @@ export default function PropertyProfile() {
                   <>
                     <Plus className="w-4 h-4 mr-2" />
                     Add Vehicle
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Vehicle Photo Upload Modal */}
+        <Dialog open={isVehiclePhotoModalOpen} onOpenChange={setIsVehiclePhotoModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add Vehicle Photo</DialogTitle>
+              <DialogDescription>
+                Upload a photo for {selectedVehicle?.make} {selectedVehicle?.model || 'this vehicle'}.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div>
+                <Label htmlFor="vehicle-photo-file">Photo *</Label>
+                <Input
+                  id="vehicle-photo-file"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleVehiclePhotoFileChange}
+                  data-testid="input-vehicle-photo-file"
+                />
+                {vehiclePhotoPreview && (
+                  <div className="mt-2 relative">
+                    <img 
+                      src={vehiclePhotoPreview} 
+                      alt="Preview" 
+                      className="w-full h-48 object-cover rounded-md"
+                      data-testid="vehicle-photo-preview"
+                    />
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="absolute top-2 right-2"
+                      onClick={() => {
+                        setVehiclePhotoFile(null);
+                        setVehiclePhotoPreview("");
+                      }}
+                      data-testid="button-remove-vehicle-photo-preview"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="vehicle-photo-category">Category</Label>
+                <Select 
+                  value={vehiclePhotoForm.category}
+                  onValueChange={(value) => setVehiclePhotoForm({ ...vehiclePhotoForm, category: value })}
+                >
+                  <SelectTrigger data-testid="select-vehicle-photo-category">
+                    <SelectValue placeholder="Select photo category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General</SelectItem>
+                    <SelectItem value="damage">Damage</SelectItem>
+                    <SelectItem value="before">Before</SelectItem>
+                    <SelectItem value="after">After</SelectItem>
+                    <SelectItem value="repair">Repair</SelectItem>
+                    <SelectItem value="insurance">Insurance</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="vehicle-photo-description">Description</Label>
+                <Textarea
+                  id="vehicle-photo-description"
+                  value={vehiclePhotoForm.description}
+                  onChange={(e) => setVehiclePhotoForm({ ...vehiclePhotoForm, description: e.target.value })}
+                  placeholder="Optional description of what this photo shows"
+                  rows={3}
+                  data-testid="input-vehicle-photo-description"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsVehiclePhotoModalOpen(false)} data-testid="button-cancel-vehicle-photo">
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleVehiclePhotoUpload}
+                disabled={!vehiclePhotoFile || uploadVehiclePhotoMutation.isPending}
+                data-testid="button-upload-vehicle-photo"
+              >
+                {uploadVehiclePhotoMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload Photo
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Vehicle Maintenance Modal */}
+        <Dialog open={isVehicleMaintenanceModalOpen} onOpenChange={setIsVehicleMaintenanceModalOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{editingMaintenance ? 'Edit Maintenance Record' : 'Add Maintenance Record'}</DialogTitle>
+              <DialogDescription>
+                {editingMaintenance 
+                  ? 'Update maintenance details and information.'
+                  : `Add a maintenance record for ${selectedVehicle?.make} ${selectedVehicle?.model || 'this vehicle'}.`
+                }
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+              <div>
+                <Label htmlFor="maintenance-type">Type *</Label>
+                <Select 
+                  value={vehicleMaintenanceForm.type}
+                  onValueChange={(value) => setVehicleMaintenanceForm({ ...vehicleMaintenanceForm, type: value })}
+                >
+                  <SelectTrigger data-testid="select-maintenance-type">
+                    <SelectValue placeholder="Select maintenance type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="oil_change">Oil Change</SelectItem>
+                    <SelectItem value="inspection">Inspection</SelectItem>
+                    <SelectItem value="registration">Registration</SelectItem>
+                    <SelectItem value="repair">Repair</SelectItem>
+                    <SelectItem value="service">Service</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="maintenance-service-date">Service Date *</Label>
+                <Input
+                  id="maintenance-service-date"
+                  type="date"
+                  value={vehicleMaintenanceForm.serviceDate}
+                  onChange={(e) => setVehicleMaintenanceForm({ ...vehicleMaintenanceForm, serviceDate: e.target.value })}
+                  data-testid="input-maintenance-service-date"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor="maintenance-description">Description *</Label>
+                <Textarea
+                  id="maintenance-description"
+                  value={vehicleMaintenanceForm.description}
+                  onChange={(e) => setVehicleMaintenanceForm({ ...vehicleMaintenanceForm, description: e.target.value })}
+                  placeholder="e.g. Changed engine oil and oil filter"
+                  rows={2}
+                  data-testid="input-maintenance-description"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="maintenance-next-due">Next Due Date (Optional)</Label>
+                <Input
+                  id="maintenance-next-due"
+                  type="date"
+                  value={vehicleMaintenanceForm.nextDueDate}
+                  onChange={(e) => setVehicleMaintenanceForm({ ...vehicleMaintenanceForm, nextDueDate: e.target.value })}
+                  data-testid="input-maintenance-next-due"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="maintenance-cost">Cost</Label>
+                <Input
+                  id="maintenance-cost"
+                  value={vehicleMaintenanceForm.cost}
+                  onChange={(e) => setVehicleMaintenanceForm({ ...vehicleMaintenanceForm, cost: e.target.value })}
+                  placeholder="e.g. 49.99"
+                  data-testid="input-maintenance-cost"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="maintenance-mileage">Mileage</Label>
+                <Input
+                  id="maintenance-mileage"
+                  type="number"
+                  value={vehicleMaintenanceForm.mileage}
+                  onChange={(e) => setVehicleMaintenanceForm({ ...vehicleMaintenanceForm, mileage: e.target.value })}
+                  placeholder="e.g. 45000"
+                  data-testid="input-maintenance-mileage"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="maintenance-vendor">Vendor/Shop</Label>
+                <Input
+                  id="maintenance-vendor"
+                  value={vehicleMaintenanceForm.vendor}
+                  onChange={(e) => setVehicleMaintenanceForm({ ...vehicleMaintenanceForm, vendor: e.target.value })}
+                  placeholder="e.g. Jiffy Lube, Toyota Dealership"
+                  data-testid="input-maintenance-vendor"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor="maintenance-notes">Notes</Label>
+                <Textarea
+                  id="maintenance-notes"
+                  value={vehicleMaintenanceForm.notes}
+                  onChange={(e) => setVehicleMaintenanceForm({ ...vehicleMaintenanceForm, notes: e.target.value })}
+                  placeholder="Additional notes or observations..."
+                  rows={3}
+                  data-testid="input-maintenance-notes"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsVehicleMaintenanceModalOpen(false)} data-testid="button-cancel-maintenance">
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveMaintenance}
+                disabled={createVehicleMaintenanceMutation.isPending || updateVehicleMaintenanceMutation.isPending}
+                data-testid="button-save-maintenance"
+              >
+                {(createVehicleMaintenanceMutation.isPending || updateVehicleMaintenanceMutation.isPending) ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 mr-2" />
+                    {editingMaintenance ? 'Update Maintenance' : 'Add Maintenance'}
                   </>
                 )}
               </Button>

@@ -3414,6 +3414,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Vehicle photos routes
+  app.get("/api/vehicles/:vehicleId/photos", isAuthenticated, async (req, res) => {
+    try {
+      const vehicleId = parseInt(req.params.vehicleId);
+      if (isNaN(vehicleId)) {
+        return res.status(400).json({ message: 'Invalid vehicle ID' });
+      }
+      
+      const photos = await storage.getVehiclePhotos(vehicleId);
+      res.json(photos);
+    } catch (error) {
+      console.error("Error fetching vehicle photos:", error);
+      res.status(500).json({ message: "Failed to fetch vehicle photos" });
+    }
+  });
+
+  app.post("/api/vehicle-photos", isAuthenticated, upload.single('photo'), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No photo file provided" });
+      }
+
+      const { vehicleId, category, description } = req.body;
+      
+      if (!vehicleId) {
+        return res.status(400).json({ message: "Vehicle ID is required" });
+      }
+
+      const userId = req.user.claims.sub;
+      const photoData = {
+        vehicleId: parseInt(vehicleId),
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        url: `/uploads/photos/${req.file.filename}`,
+        category: category || 'general',
+        description: description || '',
+        uploadedById: userId,
+      };
+
+      const photo = await storage.createVehiclePhoto(photoData);
+      
+      // Return photo with accessible URL
+      res.status(201).json({
+        ...photo,
+        photoUrl: `/uploads/photos/${req.file.filename}`
+      });
+    } catch (error) {
+      console.error("Error uploading vehicle photo:", error);
+      // Clean up uploaded file if database save failed
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      res.status(500).json({ message: "Failed to upload vehicle photo" });
+    }
+  });
+
+  app.delete("/api/vehicle-photos/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid photo ID' });
+      }
+
+      await storage.deleteVehiclePhoto(id);
+      res.json({ message: 'Vehicle photo deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting vehicle photo:', error);
+      res.status(500).json({ message: 'Failed to delete vehicle photo' });
+    }
+  });
+
   // Task routes
   app.get("/api/tasks", isAuthenticated, async (req, res) => {
     try {

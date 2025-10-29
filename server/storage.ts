@@ -29,6 +29,7 @@ import {
   vehicles,
   vehicleMaintenance,
   vehicleNotes,
+  vehiclePhotos,
   tasks,
   taskChecklistItems,
   timeEntries,
@@ -120,6 +121,8 @@ import {
   type InsertVehicleMaintenance,
   type VehicleNote,
   type InsertVehicleNote,
+  type VehiclePhoto,
+  type InsertVehiclePhoto,
   type Task,
   type InsertTask,
   type TaskChecklistItem,
@@ -363,6 +366,11 @@ export interface IStorage {
   createVehicleNote(note: InsertVehicleNote): Promise<VehicleNote>;
   updateVehicleNote(id: number, note: Partial<InsertVehicleNote>): Promise<VehicleNote>;
   deleteVehicleNote(id: number): Promise<void>;
+  
+  // Vehicle photo operations
+  getVehiclePhotos(vehicleId: number): Promise<VehiclePhoto[]>;
+  createVehiclePhoto(photo: InsertVehiclePhoto): Promise<VehiclePhoto>;
+  deleteVehiclePhoto(id: number): Promise<void>;
   
   // Task operations
   getTasks(): Promise<Task[]>;
@@ -3367,6 +3375,20 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(vehicleNotes)
       .where(eq(vehicleNotes.id, id));
+  }
+
+  // Vehicle photo operations
+  async getVehiclePhotos(vehicleId: number): Promise<VehiclePhoto[]> {
+    return await db.select().from(vehiclePhotos).where(eq(vehiclePhotos.vehicleId, vehicleId)).orderBy(desc(vehiclePhotos.createdAt));
+  }
+
+  async createVehiclePhoto(photo: InsertVehiclePhoto): Promise<VehiclePhoto> {
+    const [newPhoto] = await db.insert(vehiclePhotos).values(photo).returning();
+    return newPhoto;
+  }
+
+  async deleteVehiclePhoto(id: number): Promise<void> {
+    await db.delete(vehiclePhotos).where(eq(vehiclePhotos.id, id));
   }
 
   // Duplicate detection operations
