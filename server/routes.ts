@@ -22,6 +22,7 @@ import {
   requireAllowedIP,
   trackSession
 } from "./security";
+import { sendGenericEmail } from "./emailUtils";
 import { 
   insertPortalUserSchema,
   insertCommunitySchema,
@@ -4700,6 +4701,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting contact:', error);
       res.status(500).json({ message: 'Failed to delete contact' });
+    }
+  });
+
+  // Send email to client
+  app.post("/api/send-email", isAuthenticated, async (req: any, res) => {
+    try {
+      const { recipientEmail, subject, message } = req.body;
+      
+      if (!recipientEmail || !subject || !message) {
+        return res.status(400).json({ message: 'Recipient email, subject, and message are required' });
+      }
+
+      const orgId = req.user.claims.orgId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+
+      // Get organization details for branding
+      const org = await storage.getOrganization(orgId);
+      const organizationName = org?.name || "Hubify";
+      
+      // Create a simple HTML email with branding
+      const htmlContent = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background-color: #f5f5f5;
+      color: #333333;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+    }
+    .header {
+      background: linear-gradient(135deg, #0066cc 0%, #004499 100%);
+      padding: 30px 20px;
+      text-align: center;
+    }
+    .header-text {
+      color: #ffffff;
+      font-size: 20px;
+      font-weight: 600;
+      margin: 0;
+    }
+    .content {
+      padding: 40px 30px;
+    }
+    .message {
+      line-height: 1.6;
+      color: #333333;
+      white-space: pre-wrap;
+    }
+    .footer {
+      background-color: #f5f5f5;
+      padding: 20px;
+      text-align: center;
+      border-top: 1px solid #e0e0e0;
+    }
+    .footer-text {
+      color: #777777;
+      font-size: 14px;
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <p class="header-text">${organizationName}</p>
+    </div>
+    <div class="content">
+      <div class="message">${message}</div>
+    </div>
+    <div class="footer">
+      <p class="footer-text">This message was sent from ${organizationName}</p>
+    </div>
+  </div>
+</body>
+</html>
+`;
+
+      await sendGenericEmail({
+        to: recipientEmail,
+        subject,
+        htmlContent,
+        fromName: organizationName,
+      });
+
+      res.json({ message: 'Email sent successfully' });
+    } catch (error: any) {
+      console.error('Error sending email:', error);
+      res.status(500).json({ message: error.message || 'Failed to send email' });
     }
   });
 

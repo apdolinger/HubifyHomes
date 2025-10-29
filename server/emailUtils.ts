@@ -696,3 +696,39 @@ export function generateInvoiceEmailHTML(data: InvoiceEmailData): string {
 </html>
 `;
 }
+
+// Generic function to send simple HTML emails
+export async function sendGenericEmail({
+  to,
+  subject,
+  htmlContent,
+  fromEmail,
+  fromName,
+}: {
+  to: string;
+  subject: string;
+  htmlContent: string;
+  fromEmail?: string;
+  fromName?: string;
+}): Promise<void> {
+  if (!SENDGRID_API_KEY) {
+    throw new Error("SENDGRID_API_KEY is not configured. Email sending is disabled.");
+  }
+
+  const msg = {
+    to,
+    from: {
+      email: fromEmail || process.env.SUPPORT_EMAIL_FROM || "noreply@hubify.app",
+      name: fromName || "Hubify",
+    },
+    subject,
+    html: htmlContent,
+  };
+
+  try {
+    await sgMail.send(msg);
+  } catch (error: any) {
+    console.error("Error sending email:", error.response?.body || error.message);
+    throw new Error("Failed to send email. Please try again later.");
+  }
+}
