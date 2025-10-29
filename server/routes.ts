@@ -32,6 +32,7 @@ import {
   insertRoomNoteSchema,
   insertRoomDeviceSchema,
   insertRoomSurfaceSchema,
+  insertRoomSurfaceLinkSchema,
   insertRoomFixtureSchema,
   insertRoomPhotoSchema,
   insertRoomChecklistSchema,
@@ -2758,6 +2759,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting room surface:', error);
       res.status(500).json({ message: 'Failed to delete room surface' });
+    }
+  });
+
+  // Room surface link routes
+  app.get("/api/rooms/:roomId/surface-links", isAuthenticated, async (req, res) => {
+    try {
+      const roomId = parseInt(req.params.roomId);
+      if (isNaN(roomId)) {
+        return res.status(400).json({ message: 'Invalid room ID' });
+      }
+      
+      const links = await storage.getRoomSurfaceLinks(roomId);
+      res.json(links);
+    } catch (error) {
+      console.error("Error fetching room surface links:", error);
+      res.status(500).json({ message: "Failed to fetch room surface links" });
+    }
+  });
+
+  app.post("/api/room-surface-links", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Check if a link already exists for this surface category in this room
+      const roomId = req.body.roomId;
+      const surfaceCategory = req.body.surfaceCategory;
+      
+      if (roomId && surfaceCategory) {
+        const existingLinks = await storage.getRoomSurfaceLinks(roomId);
+        const categoryExists = existingLinks.some(link => link.surfaceCategory === surfaceCategory);
+        
+        if (categoryExists) {
+          return res.status(400).json({ 
+            message: `A link already exists for the ${surfaceCategory} category in this room. Please edit the existing link instead.` 
+          });
+        }
+      }
+
+      const linkData = {
+        ...req.body,
+        createdById: userId,
+      };
+
+      const validatedData = insertRoomSurfaceLinkSchema.parse(linkData);
+      const link = await storage.createRoomSurfaceLink(validatedData);
+      res.status(201).json(link);
+    } catch (error: any) {
+      console.error("Error creating room surface link:", error);
+      res.status(400).json({ message: error.message || "Failed to create room surface link" });
+    }
+  });
+
+  app.patch("/api/room-surface-links/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid link ID' });
+      }
+
+      // Check if changing surface category would create a duplicate
+      if (req.body.surfaceCategory && req.body.roomId) {
+        const existingLinks = await storage.getRoomSurfaceLinks(req.body.roomId);
+        const categoryExists = existingLinks.some(
+          link => link.surfaceCategory === req.body.surfaceCategory && link.id !== id
+        );
+        
+        if (categoryExists) {
+          return res.status(400).json({ 
+            message: `A link already exists for the ${req.body.surfaceCategory} category in this room.` 
+          });
+        }
+      }
+
+      const link = await storage.updateRoomSurfaceLink(id, req.body);
+      res.json(link);
+    } catch (error: any) {
+      console.error('Error updating room surface link:', error);
+      res.status(400).json({ message: error.message || 'Failed to update room surface link' });
+    }
+  });
+
+  app.delete("/api/room-surface-links/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid link ID' });
+      }
+
+      await storage.deleteRoomSurfaceLink(id);
+      res.json({ message: 'Room surface link deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting room surface link:', error);
+      res.status(500).json({ message: 'Failed to delete room surface link' });
     }
   });
 
