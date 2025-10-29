@@ -4737,6 +4737,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { type, entityId } = req.params;
       const orgId = req.user.claims.orgId;
+      const userId = req.user.id;
+      const userRole = req.user.claims.role;
       
       if (!orgId) {
         return res.status(400).json({ message: "Organization ID not found" });
@@ -4751,7 +4753,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid entity ID" });
       }
 
-      const alerts = await storage.getAlertsByEntity(orgId, type as "client" | "property" | "task", id);
+      const alerts = await storage.getAlertsByEntity(orgId, type as "client" | "property" | "task", id, userId, userRole);
       res.json(alerts);
     } catch (error) {
       console.error("Error fetching entity alerts:", error);

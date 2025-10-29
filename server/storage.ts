@@ -437,7 +437,7 @@ export interface IStorage {
   
   // Alert operations
   getAlerts(orgId: string, filters?: { type?: string; entityId?: number; isActive?: boolean }): Promise<Alert[]>;
-  getAlertsByEntity(orgId: string, type: "client" | "property" | "task", entityId: number): Promise<Alert[]>;
+  getAlertsByEntity(orgId: string, type: "client" | "property" | "task", entityId: number, userId?: string, userRole?: string): Promise<Alert[]>;
   getAlert(id: number, orgId: string): Promise<Alert | undefined>;
   createAlert(alert: InsertAlert): Promise<Alert>;
   updateAlert(id: number, orgId: string, alert: Partial<InsertAlert>): Promise<Alert>;
@@ -2720,8 +2720,8 @@ export class DatabaseStorage implements IStorage {
     return await query.orderBy(desc(alerts.createdAt));
   }
 
-  async getAlertsByEntity(orgId: string, type: "client" | "property" | "task", entityId: number): Promise<Alert[]> {
-    return await db
+  async getAlertsByEntity(orgId: string, type: "client" | "property" | "task", entityId: number, userId?: string, userRole?: string): Promise<Alert[]> {
+    const allAlerts = await db
       .select()
       .from(alerts)
       .where(and(
@@ -2731,6 +2731,30 @@ export class DatabaseStorage implements IStorage {
         eq(alerts.isActive, true)
       ))
       .orderBy(desc(alerts.severity), desc(alerts.createdAt));
+    
+    // Filter based on targeting if userId and userRole are provided
+    if (!userId || !userRole) {
+      return allAlerts;
+    }
+    
+    return allAlerts.filter(alert => {
+      // If targetType is 'all' or not set, show to everyone
+      if (!alert.targetType || alert.targetType === 'all') {
+        return true;
+      }
+      
+      // If targetType is 'roles', check if user's role is in targetRoles
+      if (alert.targetType === 'roles' && alert.targetRoles) {
+        return alert.targetRoles.includes(userRole);
+      }
+      
+      // If targetType is 'users', check if userId is in targetUserIds
+      if (alert.targetType === 'users' && alert.targetUserIds) {
+        return alert.targetUserIds.includes(userId);
+      }
+      
+      return false;
+    });
   }
 
   async getAlert(id: number, orgId: string): Promise<Alert | undefined> {
