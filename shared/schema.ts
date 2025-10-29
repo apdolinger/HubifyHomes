@@ -976,6 +976,9 @@ export const alerts = pgTable("alerts", {
   message: text("message").notNull(),
   severity: varchar("severity").$type<"info"|"warning"|"critical">().notNull().default("info"),
   isActive: boolean("is_active").notNull().default(true),
+  targetType: varchar("target_type").$type<"all"|"roles"|"users">().notNull().default("all"), // all, roles, users
+  targetRoles: text("target_roles").array(), // Array of role names if targetType is 'roles'
+  targetUserIds: text("target_user_ids").array(), // Array of user IDs if targetType is 'users'
   createdBy: varchar("created_by").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
