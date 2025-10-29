@@ -4654,6 +4654,19 @@ export default function PropertyProfile() {
                       </TabsList>
 
                       <TabsContent value="overview" className="space-y-4">
+                        <div className="flex justify-end mb-4">
+                          {(user?.role === 'admin' || user?.role === 'supervisor') && (
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setIsEditOverviewDialogOpen(true)}
+                              data-testid="button-edit-overview"
+                            >
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Overview
+                            </Button>
+                          )}
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <Card>
                             <CardHeader>
@@ -4697,6 +4710,19 @@ export default function PropertyProfile() {
                       </TabsContent>
 
                       <TabsContent value="rules" className="space-y-4">
+                        <div className="flex justify-end mb-4">
+                          {(user?.role === 'admin' || user?.role === 'supervisor') && (
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setIsEditRulesDialogOpen(true)}
+                              data-testid="button-edit-rules"
+                            >
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Rules
+                            </Button>
+                          )}
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <Card>
                             <CardHeader>
@@ -4747,6 +4773,19 @@ export default function PropertyProfile() {
                       </TabsContent>
 
                       <TabsContent value="schedule" className="space-y-4">
+                        <div className="flex justify-end mb-4">
+                          {(user?.role === 'admin' || user?.role === 'supervisor') && (
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setIsEditScheduleDialogOpen(true)}
+                              data-testid="button-edit-schedule"
+                            >
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Schedule
+                            </Button>
+                          )}
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <Card>
                             <CardHeader>
@@ -7966,6 +8005,285 @@ export default function PropertyProfile() {
                 data-testid="button-cancel-community-change"
               >
                 Cancel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Community Overview Dialog */}
+        <Dialog open={isEditOverviewDialogOpen} onOpenChange={setIsEditOverviewDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Community Overview</DialogTitle>
+              <DialogDescription>
+                Update basic information and contact details for {community?.name}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-gate-code">Gate Code</Label>
+                  <Input
+                    id="edit-gate-code"
+                    placeholder="Enter gate code..."
+                    defaultValue={community?.gateCode || ""}
+                    data-testid="input-gate-code"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-property-manager">Property Manager</Label>
+                  <Input
+                    id="edit-property-manager"
+                    placeholder="Enter property manager name..."
+                    defaultValue={community?.propertyManagerName || ""}
+                    data-testid="input-property-manager"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-emergency-contact">Emergency Contact</Label>
+                  <Input
+                    id="edit-emergency-contact"
+                    placeholder="Enter emergency contact..."
+                    defaultValue={community?.emergencyContact || ""}
+                    data-testid="input-emergency-contact"
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="edit-hoa-address">HOA Mailing Address</Label>
+                  <textarea
+                    id="edit-hoa-address"
+                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="Enter HOA mailing address..."
+                    defaultValue={community?.hoaMailingAddress || ""}
+                    data-testid="input-hoa-address"
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="edit-notes">Notes</Label>
+                  <textarea
+                    id="edit-notes"
+                    className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="Enter additional notes..."
+                    defaultValue={community?.notes || ""}
+                    data-testid="input-notes"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsEditOverviewDialogOpen(false)}
+                data-testid="button-cancel-overview"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  const gateCode = (document.getElementById("edit-gate-code") as HTMLInputElement)?.value || null;
+                  const propertyManagerName = (document.getElementById("edit-property-manager") as HTMLInputElement)?.value || null;
+                  const emergencyContact = (document.getElementById("edit-emergency-contact") as HTMLInputElement)?.value || null;
+                  const hoaMailingAddress = (document.getElementById("edit-hoa-address") as HTMLTextAreaElement)?.value || null;
+                  const notes = (document.getElementById("edit-notes") as HTMLTextAreaElement)?.value || null;
+
+                  updateCommunityMutation.mutate({
+                    communityId: community.id,
+                    data: { gateCode, propertyManagerName, emergencyContact, hoaMailingAddress, notes }
+                  });
+                }}
+                disabled={updateCommunityMutation.isPending}
+                data-testid="button-save-overview"
+              >
+                {updateCommunityMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Community Rules Dialog */}
+        <Dialog open={isEditRulesDialogOpen} onOpenChange={setIsEditRulesDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Community Rules</DialogTitle>
+              <DialogDescription>
+                Update rules and guidelines for {community?.name}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-rental-restrictions">Rental Restrictions</Label>
+                  <textarea
+                    id="edit-rental-restrictions"
+                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="Enter rental restrictions..."
+                    defaultValue={community?.rentalRestrictions || ""}
+                    data-testid="input-rental-restrictions"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-pet-policy">Pet Policy</Label>
+                  <textarea
+                    id="edit-pet-policy"
+                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="Enter pet policy..."
+                    defaultValue={community?.petPolicy || ""}
+                    data-testid="input-pet-policy"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-parking-rules">Parking Rules</Label>
+                  <textarea
+                    id="edit-parking-rules"
+                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="Enter parking rules..."
+                    defaultValue={community?.parkingRules || ""}
+                    data-testid="input-parking-rules"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-noise-restrictions">Noise Restrictions</Label>
+                  <textarea
+                    id="edit-noise-restrictions"
+                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="Enter noise restrictions..."
+                    defaultValue={community?.noiseRestrictions || ""}
+                    data-testid="input-noise-restrictions"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-vendor-access">Vendor Access Procedures</Label>
+                  <textarea
+                    id="edit-vendor-access"
+                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="Enter vendor access procedures..."
+                    defaultValue={community?.vendorAccessProcedures || ""}
+                    data-testid="input-vendor-access"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsEditRulesDialogOpen(false)}
+                data-testid="button-cancel-rules"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  const rentalRestrictions = (document.getElementById("edit-rental-restrictions") as HTMLTextAreaElement)?.value || null;
+                  const petPolicy = (document.getElementById("edit-pet-policy") as HTMLTextAreaElement)?.value || null;
+                  const parkingRules = (document.getElementById("edit-parking-rules") as HTMLTextAreaElement)?.value || null;
+                  const noiseRestrictions = (document.getElementById("edit-noise-restrictions") as HTMLTextAreaElement)?.value || null;
+                  const vendorAccessProcedures = (document.getElementById("edit-vendor-access") as HTMLTextAreaElement)?.value || null;
+
+                  updateCommunityMutation.mutate({
+                    communityId: community.id,
+                    data: { rentalRestrictions, petPolicy, parkingRules, noiseRestrictions, vendorAccessProcedures }
+                  });
+                }}
+                disabled={updateCommunityMutation.isPending}
+                data-testid="button-save-rules"
+              >
+                {updateCommunityMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Community Schedule Dialog */}
+        <Dialog open={isEditScheduleDialogOpen} onOpenChange={setIsEditScheduleDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Community Schedule</DialogTitle>
+              <DialogDescription>
+                Update maintenance and event schedules for {community?.name}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-trash-recycling">Trash/Recycling Pickup</Label>
+                  <Input
+                    id="edit-trash-recycling"
+                    placeholder="e.g., Tuesday and Friday at 7 AM"
+                    defaultValue={community?.trashRecyclingPickup || ""}
+                    data-testid="input-trash-recycling"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-bulk-trash">Bulk Trash Pickup</Label>
+                  <Input
+                    id="edit-bulk-trash"
+                    placeholder="e.g., First Monday of every month"
+                    defaultValue={community?.bulkTrash || ""}
+                    data-testid="input-bulk-trash"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-landscaping">Landscaping Maintenance</Label>
+                  <Input
+                    id="edit-landscaping"
+                    placeholder="e.g., Every Wednesday at 9 AM"
+                    defaultValue={community?.landscapeMaintenance || ""}
+                    data-testid="input-landscaping"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-community-events">Community Events</Label>
+                  <textarea
+                    id="edit-community-events"
+                    className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="Enter community events schedule..."
+                    defaultValue={community?.communityEvents || ""}
+                    data-testid="input-community-events"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsEditScheduleDialogOpen(false)}
+                data-testid="button-cancel-schedule"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  const trashRecyclingPickup = (document.getElementById("edit-trash-recycling") as HTMLInputElement)?.value || null;
+                  const bulkTrash = (document.getElementById("edit-bulk-trash") as HTMLInputElement)?.value || null;
+                  const landscapeMaintenance = (document.getElementById("edit-landscaping") as HTMLInputElement)?.value || null;
+                  const communityEvents = (document.getElementById("edit-community-events") as HTMLTextAreaElement)?.value || null;
+
+                  updateCommunityMutation.mutate({
+                    communityId: community.id,
+                    data: { trashRecyclingPickup, bulkTrash, landscapeMaintenance, communityEvents }
+                  });
+                }}
+                disabled={updateCommunityMutation.isPending}
+                data-testid="button-save-schedule"
+              >
+                {updateCommunityMutation.isPending ? "Saving..." : "Save Changes"}
               </Button>
             </DialogFooter>
           </DialogContent>
