@@ -41,7 +41,8 @@ import {
   ChevronRight,
   Star,
   MoreVertical,
-  Trash2
+  Trash2,
+  TrendingUp
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -1134,44 +1135,13 @@ export default function PersonProfile() {
         </div>
       </div>
 
-      {/* Alert Banner */}
-      <AlertBanner ref={alertBannerRef} type="client" entityId={parseInt(personId)} canManage={true} />
+      {/* Alert Banner - Hidden, using header button instead */}
+      <div style={{ display: 'none' }}>
+        <AlertBanner ref={alertBannerRef} type="client" entityId={parseInt(personId)} canManage={true} />
+      </div>
 
       {/* Person Details Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Contact Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <UserCheck className="w-5 h-5 mr-2" />
-              Contact Details
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between">
-              <span className="text-slate-500">Type:</span>
-              <Badge variant={getContactTypeColor((person as any)?.type)}>
-                {getContactTypeDisplay((person as any)?.type)}
-              </Badge>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Email:</span>
-              <span className="font-medium">{(person as any)?.email || 'Not provided'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Phone:</span>
-              <span className="font-medium">{(person as any)?.phone || 'Not provided'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Added:</span>
-              <span className="font-medium">{formatDate((person as any)?.createdAt)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Last Interaction:</span>
-              <span className="font-medium">2 days ago</span>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
 
         {/* Linked Properties */}
         <Card>
@@ -1310,26 +1280,26 @@ export default function PersonProfile() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
-              <Settings className="w-5 h-5 mr-2" />
+              <TrendingUp className="w-5 h-5 mr-2" />
               Quick Stats
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between">
-              <span className="text-slate-500">Total Properties:</span>
-              <span className="font-medium">{linkedProperties?.length || 0}</span>
+          <CardContent className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-slate-600">Properties:</span>
+              <span className="font-semibold text-slate-900">{linkedProperties?.length || 0}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Related Tasks:</span>
-              <span className="font-medium">{relatedTasks?.length || 0}</span>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-600">Related Tasks:</span>
+              <span className="font-semibold text-slate-900">{relatedTasks?.length || 0}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Status:</span>
-              <Badge variant="default">Active</Badge>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-600">Status:</span>
+              <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Preferred Vendor:</span>
-              <span className="font-medium">{(person as any)?.type === 'vendor' ? 'Yes' : 'No'}</span>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-600">Account Created:</span>
+              <span className="text-sm font-medium text-slate-700">{formatDate((person as any)?.createdAt)}</span>
             </div>
           </CardContent>
         </Card>

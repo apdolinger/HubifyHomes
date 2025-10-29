@@ -14,7 +14,7 @@ Preferred communication style: Simple, everyday language.
 - **Styling**: Tailwind CSS with a custom design system
 - **State Management**: TanStack React Query
 - **Forms**: React Hook Form with Zod validation
-- **Design Decisions**: Modern UI, gradient backgrounds, role-specific cards, responsive layouts, global keyboard shortcuts, and a centralized Support modal. **Customizable Views**: Table customization on Tasks, Properties, and Clients pages with column show/hide and drag-to-reorder. Stats widget customization on Clients page with toggle on/off and drag-to-reorder functionality. Interactive dashboard-style stats cards with click-to-filter. All customizations persist via localStorage.
+- **Design Decisions**: Modern UI, gradient backgrounds, role-specific cards, responsive layouts, global keyboard shortcuts, and a centralized Support modal. **Customizable Views**: Table customization on Tasks, Properties, and Clients pages with column show/hide and drag-to-reorder (icon-only sprocket buttons). Stats widget customization on Clients page with toggle on/off and drag-to-reorder functionality. Interactive dashboard-style stats cards with click-to-filter. All customizations persist via localStorage. **Clean UI**: Client detail page uses streamlined 2-column layout (Linked Properties + Quick Stats) with redundant elements removed for improved visual clarity.
 
 ### Technical Implementations
 - **Backend Runtime**: Node.js with Express.js (TypeScript, ES modules)
