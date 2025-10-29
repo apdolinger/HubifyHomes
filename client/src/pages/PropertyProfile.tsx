@@ -64,7 +64,29 @@ import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, AlertTriangle, Info, XCircle } from "lucide-react";
 import { PropertyReportsModal } from "@/components/PropertyReportsModal";
-import { format, parseISO, differenceInDays } from "date-fns";
+import { format, parseISO, differenceInDays, isValid } from "date-fns";
+
+// Safe date parsing helper
+function safeParseDateString(dateValue: any): Date | null {
+  if (!dateValue) return null;
+  
+  // If it's already a Date object, validate it
+  if (dateValue instanceof Date) {
+    return isValid(dateValue) ? dateValue : null;
+  }
+  
+  // If it's a string, try to parse it and validate
+  if (typeof dateValue === 'string') {
+    try {
+      const parsed = parseISO(dateValue);
+      return isValid(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  
+  return null;
+}
 
 // Cascaded Client Alerts Display Component
 function CascadedClientAlertsDisplay({ propertyId }: { propertyId: string }) {
@@ -2134,11 +2156,13 @@ export default function PropertyProfile() {
   const handleCreateMaintenanceTask = (maintenance: any) => {
     if (!selectedVehicle || !property) return;
 
+    const nextDueDate = safeParseDateString(maintenance.nextDueDate);
+    
     // Open the task modal with property pre-selected and pre-filled title/description
     openTaskModal({
       propertyId: property.id,
       title: `${maintenance.type.replace('_', ' ')} - ${selectedVehicle.make} ${selectedVehicle.model}`,
-      description: `${maintenance.description}${maintenance.nextDueDate ? `\nNext due: ${format(parseISO(maintenance.nextDueDate), 'MMM d, yyyy')}` : ''}${maintenance.vendor ? `\nVendor: ${maintenance.vendor}` : ''}`,
+      description: `${maintenance.description}${nextDueDate ? `\nNext due: ${format(nextDueDate, 'MMM d, yyyy')}` : ''}${maintenance.vendor ? `\nVendor: ${maintenance.vendor}` : ''}`,
       dueDate: maintenance.nextDueDate || undefined
     });
 
@@ -2329,7 +2353,10 @@ export default function PropertyProfile() {
     
     return vehicleMaintenance.filter((m: any) => {
       if (!m.nextDueDate || m.vehicleId !== vehicleId) return false;
-      const dueDate = new Date(m.nextDueDate);
+      
+      const dueDate = safeParseDateString(m.nextDueDate);
+      if (!dueDate) return false;
+      
       dueDate.setHours(0, 0, 0, 0);
       const daysDiff = differenceInDays(dueDate, today);
       return daysDiff <= 7; // Show if due within 7 days or overdue
@@ -4133,8 +4160,11 @@ export default function PropertyProfile() {
                         ) : Array.isArray(vehicleMaintenance) && vehicleMaintenance.length > 0 ? (
                           <div className="space-y-3" data-testid="vehicle-maintenance-list">
                             {vehicleMaintenance.map((maintenance: any) => {
-                              const isOverdue = maintenance.nextDueDate && differenceInDays(new Date(maintenance.nextDueDate), new Date()) < 0;
-                              const isDueSoon = maintenance.nextDueDate && differenceInDays(new Date(maintenance.nextDueDate), new Date()) >= 0 && differenceInDays(new Date(maintenance.nextDueDate), new Date()) <= 7;
+                              const serviceDate = safeParseDateString(maintenance.serviceDate);
+                              const nextDueDate = safeParseDateString(maintenance.nextDueDate);
+                              
+                              const isOverdue = nextDueDate ? differenceInDays(nextDueDate, new Date()) < 0 : false;
+                              const isDueSoon = nextDueDate ? (differenceInDays(nextDueDate, new Date()) >= 0 && differenceInDays(nextDueDate, new Date()) <= 7) : false;
                               
                               return (
                                 <Card key={maintenance.id} className={isOverdue ? 'border-red-300' : isDueSoon ? 'border-amber-300' : ''} data-testid={`maintenance-card-${maintenance.id}`}>
@@ -4155,11 +4185,11 @@ export default function PropertyProfile() {
                                         <p className="font-medium mb-2" data-testid={`maintenance-desc-${maintenance.id}`}>{maintenance.description}</p>
                                         <div className="grid grid-cols-2 gap-2 text-sm text-slate-600">
                                           <div>
-                                            <span className="font-medium">Service Date:</span> {format(parseISO(maintenance.serviceDate), 'MMM d, yyyy')}
+                                            <span className="font-medium">Service Date:</span> {serviceDate ? format(serviceDate, 'MMM d, yyyy') : 'N/A'}
                                           </div>
-                                          {maintenance.nextDueDate && (
+                                          {nextDueDate && (
                                             <div data-testid={`maintenance-next-due-${maintenance.id}`}>
-                                              <span className="font-medium">Next Due:</span> {format(parseISO(maintenance.nextDueDate), 'MMM d, yyyy')}
+                                              <span className="font-medium">Next Due:</span> {format(nextDueDate, 'MMM d, yyyy')}
                                             </div>
                                           )}
                                           {maintenance.mileage && (
