@@ -244,6 +244,7 @@ export default function PropertyProfile() {
   const [editingNote, setEditingNote] = useState<any>(null);
   const [editingDevice, setEditingDevice] = useState<any>(null);
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
+  const [isEditVehicleModalOpen, setIsEditVehicleModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
   const [editingVehicle, setEditingVehicle] = useState<any>(null);
   const [vehicleForm, setVehicleForm] = useState({
@@ -255,6 +256,19 @@ export default function PropertyProfile() {
     color: "",
     type: "car",
     description: ""
+  });
+  const [editVehicleForm, setEditVehicleForm] = useState({
+    make: "",
+    model: "",
+    year: "",
+    vin: "",
+    licensePlate: "",
+    color: "",
+    type: "car",
+    odometer: "",
+    registrationDate: "",
+    registrationDueDate: "",
+    details: ""
   });
   const [roomSurfaceForm, setRoomSurfaceForm] = useState({
     flooringType: "",
@@ -728,6 +742,61 @@ export default function PropertyProfile() {
       }
       toast({
         title: "Failed to add vehicle",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Vehicle update mutation
+  const updateVehicleMutation = useMutation({
+    mutationFn: async ({ id, vehicleData }: { id: number; vehicleData: any }) => {
+      return await apiRequest("PATCH", `/api/vehicles/${id}`, {
+        ...vehicleData,
+        year: vehicleData.year ? parseInt(vehicleData.year) : null,
+        odometer: vehicleData.odometer ? parseInt(vehicleData.odometer) : null
+      });
+    },
+    onSuccess: async (updatedVehicle) => {
+      // Update the selected vehicle with the new data immediately
+      if (selectedVehicle && updatedVehicle.id === selectedVehicle.id) {
+        setSelectedVehicle(updatedVehicle);
+      }
+      // Also refetch to keep the list in sync
+      await refetchVehicles();
+      setIsEditVehicleModalOpen(false);
+      setEditVehicleForm({
+        make: "",
+        model: "",
+        year: "",
+        vin: "",
+        licensePlate: "",
+        color: "",
+        type: "car",
+        odometer: "",
+        registrationDate: "",
+        registrationDueDate: "",
+        details: ""
+      });
+      toast({
+        title: "Vehicle updated",
+        description: "Vehicle details have been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Failed to update vehicle",
         description: error.message,
         variant: "destructive",
       });
@@ -2344,6 +2413,35 @@ export default function PropertyProfile() {
     deleteVehicleMaintenanceMutation.mutate(maintenanceId);
   };
 
+  // Vehicle edit handler
+  const handleEditVehicle = () => {
+    if (!selectedVehicle) return;
+    
+    // Convert date fields from timestamps to YYYY-MM-DD format for date inputs
+    const formatDate = (dateValue: any): string => {
+      if (!dateValue) return "";
+      const parsed = safeParseDateString(dateValue);
+      if (!parsed) return "";
+      return format(parsed, 'yyyy-MM-dd');
+    };
+
+    setEditVehicleForm({
+      make: selectedVehicle.make || "",
+      model: selectedVehicle.model || "",
+      year: selectedVehicle.year?.toString() || "",
+      color: selectedVehicle.color || "",
+      licensePlate: selectedVehicle.licensePlate || "",
+      vin: selectedVehicle.vin || "",
+      type: selectedVehicle.type || "car",
+      odometer: selectedVehicle.odometer?.toString() || "",
+      registrationDate: formatDate(selectedVehicle.registrationDate),
+      registrationDueDate: formatDate(selectedVehicle.registrationDueDate),
+      details: selectedVehicle.details || ""
+    });
+    
+    setIsEditVehicleModalOpen(true);
+  };
+
   // Calculate maintenance alerts for a vehicle
   const getMaintenanceAlerts = (vehicleId: number) => {
     if (!Array.isArray(vehicleMaintenance)) return [];
@@ -2361,6 +2459,35 @@ export default function PropertyProfile() {
       const daysDiff = differenceInDays(dueDate, today);
       return daysDiff <= 7; // Show if due within 7 days or overdue
     });
+  };
+
+  // Calculate registration alerts for a vehicle
+  const getRegistrationAlerts = (vehicleId: number) => {
+    if (!Array.isArray(vehicles)) return [];
+    
+    const vehicle = vehicles.find((v: any) => v.id === vehicleId);
+    if (!vehicle || !vehicle.registrationDueDate) return [];
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const dueDate = safeParseDateString(vehicle.registrationDueDate);
+    if (!dueDate) return [];
+    
+    dueDate.setHours(0, 0, 0, 0);
+    const diffDays = differenceInDays(dueDate, today);
+    
+    // Return alert if overdue or due within 7 days
+    if (diffDays <= 7) {
+      return [{
+        vehicleId: vehicle.id,
+        dueDate: vehicle.registrationDueDate,
+        diffDays,
+        isOverdue: diffDays < 0
+      }];
+    }
+    
+    return [];
   };
 
   return (
@@ -3944,8 +4071,10 @@ export default function PropertyProfile() {
                     ) : Array.isArray(vehicles) && vehicles.length > 0 ? (
                       <div className="space-y-2">
                         {vehicles.map((vehicle: any) => {
-                          const alerts = getMaintenanceAlerts(vehicle.id);
-                          const hasAlerts = alerts.length > 0;
+                          const maintenanceAlerts = getMaintenanceAlerts(vehicle.id);
+                          const registrationAlerts = getRegistrationAlerts(vehicle.id);
+                          const hasMaintenanceAlerts = maintenanceAlerts.length > 0;
+                          const hasRegistrationAlerts = registrationAlerts.length > 0;
                           
                           return (
                             <div
@@ -3960,11 +4089,20 @@ export default function PropertyProfile() {
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex-1">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
                                     <h4 className="font-medium">{vehicle.year} {vehicle.make} {vehicle.model}</h4>
-                                    {hasAlerts && (
-                                      <Badge variant="destructive" className="text-xs" data-testid={`vehicle-alert-badge-${vehicle.id}`}>
-                                        {alerts.length} Due
+                                    {hasMaintenanceAlerts && (
+                                      <Badge variant="destructive" className="text-xs" data-testid={`vehicle-maintenance-badge-${vehicle.id}`}>
+                                        {maintenanceAlerts.length} Maintenance Due
+                                      </Badge>
+                                    )}
+                                    {hasRegistrationAlerts && (
+                                      <Badge 
+                                        variant={registrationAlerts[0].isOverdue ? "destructive" : "default"}
+                                        className={`text-xs ${!registrationAlerts[0].isOverdue ? "bg-amber-500 hover:bg-amber-600" : ""}`}
+                                        data-testid={`vehicle-registration-badge-${vehicle.id}`}
+                                      >
+                                        Registration Due
                                       </Badge>
                                     )}
                                   </div>
@@ -4001,6 +4139,15 @@ export default function PropertyProfile() {
                         <Car className="w-5 h-5 mr-2" />
                         {selectedVehicle.year} {selectedVehicle.make} {selectedVehicle.model}
                       </CardTitle>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleEditVehicle}
+                        data-testid="button-edit-vehicle"
+                      >
+                        <Edit className="w-4 h-4 mr-2" />
+                        Edit Vehicle
+                      </Button>
                     </div>
                     {selectedVehicle.licensePlate && (
                       <p className="text-sm text-slate-600">License Plate: {selectedVehicle.licensePlate}</p>
@@ -4017,6 +4164,33 @@ export default function PropertyProfile() {
                             <AlertTitle data-testid="vehicle-maintenance-alert-title">Maintenance Due</AlertTitle>
                             <AlertDescription data-testid="vehicle-maintenance-alert-description">
                               {alerts.length} maintenance {alerts.length === 1 ? 'item' : 'items'} {alerts.length === 1 ? 'needs' : 'need'} attention.
+                            </AlertDescription>
+                          </Alert>
+                        );
+                      }
+                      return null;
+                    })()}
+
+                    {/* Registration Alerts */}
+                    {(() => {
+                      const registrationAlerts = getRegistrationAlerts(selectedVehicle.id);
+                      if (registrationAlerts.length > 0) {
+                        const alert = registrationAlerts[0];
+                        const isOverdue = alert.isOverdue;
+                        return (
+                          <Alert 
+                            className={`mb-6 ${isOverdue ? 'border-red-500 bg-red-50 text-red-900 dark:bg-red-950 dark:text-red-100' : 'border-amber-500 bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-100'}`}
+                            data-testid="vehicle-registration-alert"
+                          >
+                            <AlertCircle className={`h-4 w-4 ${isOverdue ? 'text-red-500' : 'text-amber-500'}`} />
+                            <AlertTitle data-testid="vehicle-registration-alert-title">
+                              Registration {isOverdue ? 'Overdue' : 'Due Soon'}
+                            </AlertTitle>
+                            <AlertDescription data-testid="vehicle-registration-alert-description">
+                              {isOverdue 
+                                ? `Vehicle registration is ${Math.abs(alert.diffDays)} day${Math.abs(alert.diffDays) !== 1 ? 's' : ''} overdue.`
+                                : `Vehicle registration is due in ${alert.diffDays} day${alert.diffDays !== 1 ? 's' : ''}.`
+                              }
                             </AlertDescription>
                           </Alert>
                         );
@@ -4051,6 +4225,45 @@ export default function PropertyProfile() {
                               <p className="font-medium capitalize">{selectedVehicle.type.replace('_', ' ')}</p>
                             </div>
                           )}
+                          {selectedVehicle.odometer && (
+                            <div data-testid="vehicle-odometer">
+                              <Label className="text-slate-600">Current Mileage</Label>
+                              <p className="font-medium">{selectedVehicle.odometer.toLocaleString()} mi</p>
+                            </div>
+                          )}
+                          {selectedVehicle.registrationDate && (() => {
+                            const regDate = safeParseDateString(selectedVehicle.registrationDate);
+                            if (!regDate) return null;
+                            return (
+                              <div data-testid="vehicle-registration-date">
+                                <Label className="text-slate-600">Registration Date</Label>
+                                <p className="font-medium">{format(regDate, 'MMM d, yyyy')}</p>
+                              </div>
+                            );
+                          })()}
+                          {selectedVehicle.registrationDueDate && (() => {
+                            const dueDate = safeParseDateString(selectedVehicle.registrationDueDate);
+                            if (!dueDate) return null;
+                            const registrationAlerts = getRegistrationAlerts(selectedVehicle.id);
+                            const hasAlert = registrationAlerts.length > 0;
+                            const isOverdue = hasAlert && registrationAlerts[0].isOverdue;
+                            return (
+                              <div data-testid="vehicle-registration-due">
+                                <Label className="text-slate-600">Registration Due</Label>
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium">{format(dueDate, 'MMM d, yyyy')}</p>
+                                  {hasAlert && (
+                                    <Badge 
+                                      variant={isOverdue ? "destructive" : "default"}
+                                      className={`text-xs ${!isOverdue ? "bg-amber-500 hover:bg-amber-600" : ""}`}
+                                    >
+                                      {isOverdue ? 'Overdue' : 'Due Soon'}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })()}
                           {selectedVehicle.details && (
                             <div className="md:col-span-2">
                               <Label className="text-slate-600">Notes</Label>
@@ -6488,6 +6701,194 @@ export default function PropertyProfile() {
                   <>
                     <Plus className="w-4 h-4 mr-2" />
                     {editingMaintenance ? 'Update Maintenance' : 'Add Maintenance'}
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Vehicle Modal */}
+        <Dialog open={isEditVehicleModalOpen} onOpenChange={setIsEditVehicleModalOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Vehicle Details</DialogTitle>
+              <DialogDescription>
+                Update the vehicle information and details.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+              <div>
+                <Label htmlFor="edit-vehicle-make">Make *</Label>
+                <Input
+                  id="edit-vehicle-make"
+                  data-testid="input-edit-vehicle-make"
+                  value={editVehicleForm.make}
+                  onChange={(e) => setEditVehicleForm({ ...editVehicleForm, make: e.target.value })}
+                  placeholder="e.g. Toyota, Honda, Ford"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-vehicle-model">Model *</Label>
+                <Input
+                  id="edit-vehicle-model"
+                  data-testid="input-edit-vehicle-model"
+                  value={editVehicleForm.model}
+                  onChange={(e) => setEditVehicleForm({ ...editVehicleForm, model: e.target.value })}
+                  placeholder="e.g. Camry, Civic, F-150"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-vehicle-year">Year</Label>
+                <Input
+                  id="edit-vehicle-year"
+                  data-testid="input-edit-vehicle-year"
+                  type="number"
+                  value={editVehicleForm.year}
+                  onChange={(e) => setEditVehicleForm({ ...editVehicleForm, year: e.target.value })}
+                  placeholder="e.g. 2020"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-vehicle-color">Color</Label>
+                <Input
+                  id="edit-vehicle-color"
+                  data-testid="input-edit-vehicle-color"
+                  value={editVehicleForm.color}
+                  onChange={(e) => setEditVehicleForm({ ...editVehicleForm, color: e.target.value })}
+                  placeholder="e.g. White, Blue, Red"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-vehicle-license">License Plate</Label>
+                <Input
+                  id="edit-vehicle-license"
+                  data-testid="input-edit-vehicle-license"
+                  value={editVehicleForm.licensePlate}
+                  onChange={(e) => setEditVehicleForm({ ...editVehicleForm, licensePlate: e.target.value })}
+                  placeholder="e.g. ABC-1234"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-vehicle-type">Vehicle Type</Label>
+                <Select 
+                  value={editVehicleForm.type}
+                  onValueChange={(value) => setEditVehicleForm({ ...editVehicleForm, type: value })}
+                >
+                  <SelectTrigger data-testid="select-edit-vehicle-type">
+                    <SelectValue placeholder="Select vehicle type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="car">Car</SelectItem>
+                    <SelectItem value="truck">Truck</SelectItem>
+                    <SelectItem value="motorcycle">Motorcycle</SelectItem>
+                    <SelectItem value="boat">Boat</SelectItem>
+                    <SelectItem value="rv">RV</SelectItem>
+                    <SelectItem value="trailer">Trailer</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor="edit-vehicle-vin">VIN</Label>
+                <Input
+                  id="edit-vehicle-vin"
+                  data-testid="input-edit-vehicle-vin"
+                  value={editVehicleForm.vin}
+                  onChange={(e) => setEditVehicleForm({ ...editVehicleForm, vin: e.target.value })}
+                  placeholder="17-character Vehicle Identification Number"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-vehicle-odometer">Current Mileage/Hours</Label>
+                <Input
+                  id="edit-vehicle-odometer"
+                  data-testid="input-edit-vehicle-odometer"
+                  type="number"
+                  value={editVehicleForm.odometer}
+                  onChange={(e) => setEditVehicleForm({ ...editVehicleForm, odometer: e.target.value })}
+                  placeholder="e.g. 45000"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-vehicle-registration-date">Registration Date</Label>
+                <Input
+                  id="edit-vehicle-registration-date"
+                  data-testid="input-edit-vehicle-registration-date"
+                  type="date"
+                  value={editVehicleForm.registrationDate}
+                  onChange={(e) => setEditVehicleForm({ ...editVehicleForm, registrationDate: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-vehicle-registration-due">Registration Due Date</Label>
+                <Input
+                  id="edit-vehicle-registration-due"
+                  data-testid="input-edit-vehicle-registration-due"
+                  type="date"
+                  value={editVehicleForm.registrationDueDate}
+                  onChange={(e) => setEditVehicleForm({ ...editVehicleForm, registrationDueDate: e.target.value })}
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor="edit-vehicle-details">Details/Notes</Label>
+                <Textarea
+                  id="edit-vehicle-details"
+                  data-testid="input-edit-vehicle-details"
+                  value={editVehicleForm.details}
+                  onChange={(e) => setEditVehicleForm({ ...editVehicleForm, details: e.target.value })}
+                  placeholder="Additional notes or information about this vehicle"
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsEditVehicleModalOpen(false)} 
+                data-testid="button-cancel-edit-vehicle"
+              >
+                Cancel
+              </Button>
+              <Button 
+                data-testid="button-save-edit-vehicle"
+                onClick={() => {
+                  if (!editVehicleForm.make || !editVehicleForm.model) {
+                    toast({
+                      title: "Missing information",
+                      description: "Please provide at least the vehicle make and model.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  updateVehicleMutation.mutate({ 
+                    id: selectedVehicle.id, 
+                    vehicleData: editVehicleForm 
+                  });
+                }}
+                disabled={updateVehicleMutation.isPending}
+              >
+                {updateVehicleMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Save Changes
                   </>
                 )}
               </Button>

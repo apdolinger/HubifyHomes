@@ -582,6 +582,9 @@ export const vehicles = pgTable("vehicles", {
   licensePlate: varchar("license_plate"),
   vin: varchar("vin"),
   type: varchar("type").notNull(), // 'car', 'truck', 'motorcycle', 'boat', 'rv', 'trailer', 'other'
+  odometer: integer("odometer"), // Current mileage/hours
+  registrationDate: timestamp("registration_date"), // When registration was last completed
+  registrationDueDate: timestamp("registration_due_date"), // When registration renewal is due
   details: text("details"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),

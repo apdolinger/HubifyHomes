@@ -3271,7 +3271,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid vehicle ID' });
       }
 
-      const vehicle = await storage.updateVehicle(id, req.body);
+      // Convert date strings to Date objects for timestamp fields
+      const vehicleData = { ...req.body };
+      if (vehicleData.registrationDate) {
+        vehicleData.registrationDate = new Date(vehicleData.registrationDate);
+      }
+      if (vehicleData.registrationDueDate) {
+        vehicleData.registrationDueDate = new Date(vehicleData.registrationDueDate);
+      }
+
+      const vehicle = await storage.updateVehicle(id, vehicleData);
       res.json(vehicle);
     } catch (error) {
       console.error("Error updating vehicle:", error);
