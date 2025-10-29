@@ -632,7 +632,7 @@ export default function PropertyProfile() {
     mutationFn: async (vehicleData: any) => {
       return await apiRequest("POST", "/api/vehicles", {
         ...vehicleData,
-        propertyId: propertyId,
+        propertyId: parseInt(propertyId),
         year: vehicleData.year ? parseInt(vehicleData.year) : null,
         details: vehicleData.description // Map description to details field
       });
@@ -5401,6 +5401,7 @@ export default function PropertyProfile() {
                 <Label htmlFor="vehicle-make">Make *</Label>
                 <Input
                   id="vehicle-make"
+                  data-testid="input-vehicle-make"
                   value={vehicleForm.make}
                   onChange={(e) => setVehicleForm({ ...vehicleForm, make: e.target.value })}
                   placeholder="e.g. Toyota, Honda, Ford"
@@ -5411,6 +5412,7 @@ export default function PropertyProfile() {
                 <Label htmlFor="vehicle-model">Model *</Label>
                 <Input
                   id="vehicle-model"
+                  data-testid="input-vehicle-model"
                   value={vehicleForm.model}
                   onChange={(e) => setVehicleForm({ ...vehicleForm, model: e.target.value })}
                   placeholder="e.g. Camry, Civic, F-150"
@@ -5421,6 +5423,7 @@ export default function PropertyProfile() {
                 <Label htmlFor="vehicle-year">Year</Label>
                 <Input
                   id="vehicle-year"
+                  data-testid="input-vehicle-year"
                   type="number"
                   value={vehicleForm.year}
                   onChange={(e) => setVehicleForm({ ...vehicleForm, year: e.target.value })}
@@ -5432,6 +5435,7 @@ export default function PropertyProfile() {
                 <Label htmlFor="vehicle-color">Color</Label>
                 <Input
                   id="vehicle-color"
+                  data-testid="input-vehicle-color"
                   value={vehicleForm.color}
                   onChange={(e) => setVehicleForm({ ...vehicleForm, color: e.target.value })}
                   placeholder="e.g. White, Blue, Red"
@@ -5442,6 +5446,7 @@ export default function PropertyProfile() {
                 <Label htmlFor="vehicle-license">License Plate</Label>
                 <Input
                   id="vehicle-license"
+                  data-testid="input-vehicle-license"
                   value={vehicleForm.licensePlate}
                   onChange={(e) => setVehicleForm({ ...vehicleForm, licensePlate: e.target.value })}
                   placeholder="e.g. ABC-1234"
@@ -5454,7 +5459,7 @@ export default function PropertyProfile() {
                   value={vehicleForm.type}
                   onValueChange={(value) => setVehicleForm({ ...vehicleForm, type: value })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger data-testid="select-vehicle-type">
                     <SelectValue placeholder="Select vehicle type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -5475,6 +5480,7 @@ export default function PropertyProfile() {
                 <Label htmlFor="vehicle-vin">VIN</Label>
                 <Input
                   id="vehicle-vin"
+                  data-testid="input-vehicle-vin"
                   value={vehicleForm.vin}
                   onChange={(e) => setVehicleForm({ ...vehicleForm, vin: e.target.value })}
                   placeholder="17-character Vehicle Identification Number"
@@ -5485,6 +5491,7 @@ export default function PropertyProfile() {
                 <Label htmlFor="vehicle-description">Description</Label>
                 <Textarea
                   id="vehicle-description"
+                  data-testid="input-vehicle-description"
                   value={vehicleForm.description}
                   onChange={(e) => setVehicleForm({ ...vehicleForm, description: e.target.value })}
                   placeholder="Additional notes or description about this vehicle"
@@ -5494,10 +5501,11 @@ export default function PropertyProfile() {
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsVehicleModalOpen(false)}>
+              <Button variant="outline" onClick={() => setIsVehicleModalOpen(false)} data-testid="button-cancel-vehicle">
                 Cancel
               </Button>
               <Button 
+                data-testid="button-add-vehicle"
                 onClick={() => {
                   if (!vehicleForm.make || !vehicleForm.model) {
                     toast({
