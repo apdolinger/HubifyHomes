@@ -33,11 +33,13 @@ import {
   ArrowDown,
   Filter,
   Download,
-  MoreHorizontal
+  MoreHorizontal,
+  Settings
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
+import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
 
 const contactSchema = z.object({
   accountId: z.string().nullable().optional(),
@@ -74,6 +76,37 @@ export default function People() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
+  const [isCustomizeModalOpen, setIsCustomizeModalOpen] = useState(false);
+
+  // Default column configuration for clients table
+  const defaultColumns: ColumnConfig[] = [
+    { id: 'name', label: 'Name', visible: true, required: true },
+    { id: 'accountId', label: 'Account ID', visible: true },
+    { id: 'type', label: 'Type', visible: true },
+    { id: 'email', label: 'Email', visible: true },
+    { id: 'phone', label: 'Phone', visible: true },
+    { id: 'property', label: 'Property', visible: true },
+    { id: 'actions', label: 'Actions', visible: true, required: true },
+  ];
+
+  // Load column configuration from localStorage
+  const [columns, setColumns] = useState<ColumnConfig[]>(() => {
+    const saved = localStorage.getItem('clientsTableColumns');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return defaultColumns;
+      }
+    }
+    return defaultColumns;
+  });
+
+  // Save column configuration to localStorage
+  const handleSaveColumns = (newColumns: ColumnConfig[]) => {
+    setColumns(newColumns);
+    localStorage.setItem('clientsTableColumns', JSON.stringify(newColumns));
+  };
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -848,8 +881,19 @@ export default function People() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Clients</CardTitle>
-            <div className="text-sm text-slate-600">
-              {groupedContacts?.length || 0} people ({filteredAndSortedContacts?.length || 0} clients)
+            <div className="flex items-center gap-3">
+              <div className="text-sm text-slate-600">
+                {groupedContacts?.length || 0} people ({filteredAndSortedContacts?.length || 0} clients)
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsCustomizeModalOpen(true)}
+                data-testid="customize-clients-table-btn"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Customize Table
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -911,61 +955,75 @@ export default function People() {
                         aria-label="Select all clients"
                       />
                     </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-slate-50 select-none"
-                      onClick={() => handleSort("name")}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <span>Name</span>
-                        {getSortIcon("name")}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-slate-50 select-none"
-                      onClick={() => handleSort("accountId")}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <span>Account ID</span>
-                        {getSortIcon("accountId")}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-slate-50 select-none"
-                      onClick={() => handleSort("type")}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <span>Type</span>
-                        {getSortIcon("type")}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-slate-50 select-none"
-                      onClick={() => handleSort("email")}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <span>Email</span>
-                        {getSortIcon("email")}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-slate-50 select-none"
-                      onClick={() => handleSort("phone")}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <span>Phone</span>
-                        {getSortIcon("phone")}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-slate-50 select-none"
-                      onClick={() => handleSort("property")}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <span>Properties</span>
-                        {getSortIcon("property")}
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    {columns.find(col => col.id === 'name')?.visible && (
+                      <TableHead 
+                        className="cursor-pointer hover:bg-slate-50 select-none"
+                        onClick={() => handleSort("name")}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <span>Name</span>
+                          {getSortIcon("name")}
+                        </div>
+                      </TableHead>
+                    )}
+                    {columns.find(col => col.id === 'accountId')?.visible && (
+                      <TableHead 
+                        className="cursor-pointer hover:bg-slate-50 select-none"
+                        onClick={() => handleSort("accountId")}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <span>Account ID</span>
+                          {getSortIcon("accountId")}
+                        </div>
+                      </TableHead>
+                    )}
+                    {columns.find(col => col.id === 'type')?.visible && (
+                      <TableHead 
+                        className="cursor-pointer hover:bg-slate-50 select-none"
+                        onClick={() => handleSort("type")}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <span>Type</span>
+                          {getSortIcon("type")}
+                        </div>
+                      </TableHead>
+                    )}
+                    {columns.find(col => col.id === 'email')?.visible && (
+                      <TableHead 
+                        className="cursor-pointer hover:bg-slate-50 select-none"
+                        onClick={() => handleSort("email")}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <span>Email</span>
+                          {getSortIcon("email")}
+                        </div>
+                      </TableHead>
+                    )}
+                    {columns.find(col => col.id === 'phone')?.visible && (
+                      <TableHead 
+                        className="cursor-pointer hover:bg-slate-50 select-none"
+                        onClick={() => handleSort("phone")}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <span>Phone</span>
+                          {getSortIcon("phone")}
+                        </div>
+                      </TableHead>
+                    )}
+                    {columns.find(col => col.id === 'property')?.visible && (
+                      <TableHead 
+                        className="cursor-pointer hover:bg-slate-50 select-none"
+                        onClick={() => handleSort("property")}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <span>Properties</span>
+                          {getSortIcon("property")}
+                        </div>
+                      </TableHead>
+                    )}
+                    {columns.find(col => col.id === 'actions')?.visible && (
+                      <TableHead className="text-right">Actions</TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -985,108 +1043,122 @@ export default function People() {
                           onCheckedChange={() => toggleContactSelection(group.id)}
                         />
                       </TableCell>
-                      <TableCell
-                        className="cursor-pointer"
-                        onClick={() => setLocation(`/person-profile/${group.id}`)}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div>
-                            <div className="font-medium text-slate-900">
-                              {group.firstName} {group.lastName}
+                      {columns.find(col => col.id === 'name')?.visible && (
+                        <TableCell
+                          className="cursor-pointer"
+                          onClick={() => setLocation(`/person-profile/${group.id}`)}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div>
+                              <div className="font-medium text-slate-900">
+                                {group.firstName} {group.lastName}
+                              </div>
+                              {!group.isActive && (
+                                <Badge variant="secondary" className="bg-red-100 text-red-800 border-red-200 text-xs">
+                                  Inactive
+                                </Badge>
+                              )}
                             </div>
-                            {!group.isActive && (
-                              <Badge variant="secondary" className="bg-red-100 text-red-800 border-red-200 text-xs">
-                                Inactive
-                              </Badge>
-                            )}
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell
-                        className="cursor-pointer"
-                        onClick={() => setLocation(`/person-profile/${group.id}`)}
-                      >
-                        <div className="text-sm text-slate-600">
-                          {group.accountId || <span className="text-slate-400 italic">No account ID</span>}
-                        </div>
-                      </TableCell>
-                      <TableCell
-                        className="cursor-pointer"
-                        onClick={() => setLocation(`/person-profile/${group.id}`)}
-                      >
-                        <Badge variant={getTypeColor(group.type)}>
-                          {group.type.replace('_', ' ')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell
-                        className="cursor-pointer"
-                        onClick={() => setLocation(`/person-profile/${group.id}`)}
-                      >
-                        {group.email ? (
+                        </TableCell>
+                      )}
+                      {columns.find(col => col.id === 'accountId')?.visible && (
+                        <TableCell
+                          className="cursor-pointer"
+                          onClick={() => setLocation(`/person-profile/${group.id}`)}
+                        >
+                          <div className="text-sm text-slate-600">
+                            {group.accountId || <span className="text-slate-400 italic">No account ID</span>}
+                          </div>
+                        </TableCell>
+                      )}
+                      {columns.find(col => col.id === 'type')?.visible && (
+                        <TableCell
+                          className="cursor-pointer"
+                          onClick={() => setLocation(`/person-profile/${group.id}`)}
+                        >
+                          <Badge variant={getTypeColor(group.type)}>
+                            {group.type.replace('_', ' ')}
+                          </Badge>
+                        </TableCell>
+                      )}
+                      {columns.find(col => col.id === 'email')?.visible && (
+                        <TableCell
+                          className="cursor-pointer"
+                          onClick={() => setLocation(`/person-profile/${group.id}`)}
+                        >
+                          {group.email ? (
+                            <div className="flex items-center space-x-2">
+                              <Mail className="w-4 h-4 text-slate-400" />
+                              <span className="text-sm">{group.email}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-sm">—</span>
+                          )}
+                        </TableCell>
+                      )}
+                      {columns.find(col => col.id === 'phone')?.visible && (
+                        <TableCell
+                          className="cursor-pointer"
+                          onClick={() => setLocation(`/person-profile/${group.id}`)}
+                        >
+                          {group.phone ? (
+                            <div className="flex items-center space-x-2">
+                              <Phone className="w-4 h-4 text-slate-400" />
+                              <span className="text-sm">{group.phone}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-sm">—</span>
+                          )}
+                        </TableCell>
+                      )}
+                      {columns.find(col => col.id === 'property')?.visible && (
+                        <TableCell>
                           <div className="flex items-center space-x-2">
-                            <Mail className="w-4 h-4 text-slate-400" />
-                            <span className="text-sm">{group.email}</span>
+                            <Building className="w-4 h-4 text-slate-400" />
+                            <div className="space-y-1">
+                              {group.properties.length > 0 ? (
+                                group.properties.map((property: any, index: number) => (
+                                  <div key={property.propertyId} className="flex items-center space-x-1">
+                                    <span 
+                                      className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer underline"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setLocation(`/property-profile/${property.propertyId}`);
+                                      }}
+                                    >
+                                      {property.propertyName}
+                                    </span>
+                                    {property.isPrimary && (
+                                      <Badge variant="outline" className="text-xs px-1 py-0 h-4">
+                                        Primary
+                                      </Badge>
+                                    )}
+                                  </div>
+                                ))
+                              ) : (
+                                <span className="text-sm text-slate-400">No properties</span>
+                              )}
+                            </div>
                           </div>
-                        ) : (
-                          <span className="text-slate-400 text-sm">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell
-                        className="cursor-pointer"
-                        onClick={() => setLocation(`/person-profile/${group.id}`)}
-                      >
-                        {group.phone ? (
-                          <div className="flex items-center space-x-2">
-                            <Phone className="w-4 h-4 text-slate-400" />
-                            <span className="text-sm">{group.phone}</span>
+                        </TableCell>
+                      )}
+                      {columns.find(col => col.id === 'actions')?.visible && (
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditContact(group);
+                              }}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
                           </div>
-                        ) : (
-                          <span className="text-slate-400 text-sm">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <Building className="w-4 h-4 text-slate-400" />
-                          <div className="space-y-1">
-                            {group.properties.length > 0 ? (
-                              group.properties.map((property: any, index: number) => (
-                                <div key={property.propertyId} className="flex items-center space-x-1">
-                                  <span 
-                                    className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer underline"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setLocation(`/property-profile/${property.propertyId}`);
-                                    }}
-                                  >
-                                    {property.propertyName}
-                                  </span>
-                                  {property.isPrimary && (
-                                    <Badge variant="outline" className="text-xs px-1 py-0 h-4">
-                                      Primary
-                                    </Badge>
-                                  )}
-                                </div>
-                              ))
-                            ) : (
-                              <span className="text-sm text-slate-400">No properties</span>
-                            )}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditContact(group);
-                            }}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1524,6 +1596,15 @@ export default function People() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Column Customization Modal */}
+      <TableCustomizationModal
+        isOpen={isCustomizeModalOpen}
+        onClose={() => setIsCustomizeModalOpen(false)}
+        columns={columns}
+        defaultColumns={defaultColumns}
+        onSave={handleSaveColumns}
+      />
     </main>
   );
 }
