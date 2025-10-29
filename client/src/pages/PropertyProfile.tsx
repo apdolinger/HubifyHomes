@@ -4894,7 +4894,10 @@ export default function PropertyProfile() {
                   <Building className="w-12 h-12 mx-auto text-slate-400 mb-4" />
                   <h3 className="text-lg font-medium text-slate-900 mb-2">No community assigned</h3>
                   <p className="text-slate-600 mb-4">This property is not currently assigned to a community or HOA.</p>
-                  <Button onClick={() => setIsEditModalOpen(true)}>
+                  <Button 
+                    onClick={() => setIsChangeCommunityDialogOpen(true)}
+                    data-testid="button-assign-community"
+                  >
                     <Settings className="w-4 h-4 mr-2" />
                     Assign Community
                   </Button>
