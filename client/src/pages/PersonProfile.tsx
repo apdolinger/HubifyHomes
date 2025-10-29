@@ -603,6 +603,11 @@ export default function PersonProfile() {
   // Edit modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
+  // Email composition modal state
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
+
   // Edit form
   const editForm = useForm<EditContactFormData>({
     resolver: zodResolver(editContactSchema),
@@ -948,6 +953,52 @@ export default function PersonProfile() {
     updateContactMutation.mutate(data);
   };
 
+  // Send email mutation
+  const sendEmailMutation = useMutation({
+    mutationFn: async ({ recipientEmail, subject, message }: { recipientEmail: string; subject: string; message: string }) => {
+      return apiRequest("POST", "/api/send-email", { recipientEmail, subject, message });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Email Sent",
+        description: "Your email has been sent successfully.",
+      });
+      setIsEmailModalOpen(false);
+      setEmailSubject("");
+      setEmailMessage("");
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to send email",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSendEmail = () => {
+    if (!emailSubject.trim() || !emailMessage.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please provide both subject and message.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const recipientEmail = (person as any)?.email;
+    if (!recipientEmail) {
+      toast({
+        title: "No Email Address",
+        description: "This client doesn't have an email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    sendEmailMutation.mutate({ recipientEmail, subject: emailSubject, message: emailMessage });
+  };
+
   // Filter properties for search and exclude already linked properties
   const alreadyLinkedPropertyIds = linkedProperties.map((lp: any) => lp.property?.id);
   const filteredProperties = (properties as any[] || []).filter((property: any) => {
@@ -1091,7 +1142,11 @@ export default function PersonProfile() {
                   {getContactTypeDisplay((person as any)?.type)}
                 </Badge>
                 {(person as any)?.email && (
-                  <div className="flex items-center text-slate-600">
+                  <div 
+                    className="flex items-center text-slate-600 cursor-pointer hover:text-blue-600 transition-colors" 
+                    onClick={() => setIsEmailModalOpen(true)}
+                    data-testid="client-email-link"
+                  >
                     <Mail className="w-4 h-4 mr-1" />
                     {(person as any)?.email}
                   </div>
@@ -2034,6 +2089,75 @@ export default function PersonProfile() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Email Composition Modal */}
+      <Dialog open={isEmailModalOpen} onOpenChange={setIsEmailModalOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Send Email</DialogTitle>
+            <DialogDescription>
+              Compose an email to {(person as any)?.firstName} {(person as any)?.lastName}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="email-recipient">To</Label>
+              <Input
+                id="email-recipient"
+                value={(person as any)?.email || ""}
+                disabled
+                className="bg-slate-50"
+                data-testid="email-recipient-input"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="email-subject">Subject</Label>
+              <Input
+                id="email-subject"
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+                placeholder="Enter email subject"
+                data-testid="email-subject-input"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="email-message">Message</Label>
+              <Textarea
+                id="email-message"
+                value={emailMessage}
+                onChange={(e) => setEmailMessage(e.target.value)}
+                placeholder="Compose your message..."
+                rows={8}
+                data-testid="email-message-input"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsEmailModalOpen(false);
+                setEmailSubject("");
+                setEmailMessage("");
+              }}
+              data-testid="email-cancel-button"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSendEmail}
+              disabled={sendEmailMutation.isPending}
+              data-testid="email-send-button"
+            >
+              {sendEmailMutation.isPending ? "Sending..." : "Send Email"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </main>
