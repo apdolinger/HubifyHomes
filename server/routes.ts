@@ -3310,13 +3310,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/vehicle-maintenance", isAuthenticated, async (req, res) => {
+  app.post("/api/vehicle-maintenance", isAuthenticated, async (req: any, res) => {
     try {
-      const validatedData = insertVehicleMaintenanceSchema.parse(req.body);
-      const maintenance = await storage.createVehicleMaintenance(validatedData);
+      // Extract userId from session/claims with fallback
+      const userId = req.user?.claims?.sub || req.user?.sub || req.user?.id;
+      
+      console.log('[VEHICLE MAINTENANCE] Creating maintenance record, userId:', userId, 'user object:', JSON.stringify(req.user));
+      
+      if (!userId) {
+        console.error('[VEHICLE MAINTENANCE] No user ID found in request');
+        return res.status(401).json({ message: "User authentication failed" });
+      }
+      
+      // Convert date strings to Date objects
+      const dataWithDates = {
+        ...req.body,
+        serviceDate: req.body.serviceDate ? new Date(req.body.serviceDate) : null,
+        nextDueDate: req.body.nextDueDate ? new Date(req.body.nextDueDate) : null,
+      };
+      
+      const validatedData = insertVehicleMaintenanceSchema.parse(dataWithDates);
+      const maintenance = await storage.createVehicleMaintenance({
+        ...validatedData,
+        createdById: userId,
+      });
       res.status(201).json(maintenance);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error('[VEHICLE MAINTENANCE] Validation error:', error.errors);
         return res.status(400).json({ message: "Invalid data", errors: error.errors });
       }
       console.error("Error creating vehicle maintenance:", error);
@@ -3331,7 +3352,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid maintenance ID' });
       }
 
-      const maintenance = await storage.updateVehicleMaintenance(id, req.body);
+      // Convert date strings to Date objects if present
+      const dataWithDates = {
+        ...req.body,
+        serviceDate: req.body.serviceDate ? new Date(req.body.serviceDate) : undefined,
+        nextDueDate: req.body.nextDueDate ? new Date(req.body.nextDueDate) : undefined,
+      };
+
+      const maintenance = await storage.updateVehicleMaintenance(id, dataWithDates);
       res.json(maintenance);
     } catch (error) {
       console.error("Error updating vehicle maintenance:", error);

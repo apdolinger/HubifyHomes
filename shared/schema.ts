@@ -1993,6 +1993,7 @@ export const insertVehicleSchema = createInsertSchema(vehicles).omit({
 
 export const insertVehicleMaintenanceSchema = createInsertSchema(vehicleMaintenance).omit({
   id: true,
+  createdById: true,
   createdAt: true,
   updatedAt: true,
 });
