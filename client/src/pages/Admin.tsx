@@ -6,6 +6,7 @@ import AdminForms from "./AdminForms";
 import SupportModal from "@/components/SupportModal";
 import Billing from "./Billing";
 import { CustomFieldsSettings } from "./Account";
+import { SystemAlertsManagement } from "@/components/SystemAlertsManagement";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { z } from "zod";
@@ -842,7 +843,7 @@ export default function Admin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-10">
+        <TabsList className="grid w-full grid-cols-11">
           <TabsTrigger value="forms" className="flex items-center gap-2">
             <FileText className="w-4 h-4" />
             Forms
@@ -874,6 +875,10 @@ export default function Admin() {
           <TabsTrigger value="roles" className="flex items-center gap-2">
             <Users className="w-4 h-4" />
             Roles & Permissions
+          </TabsTrigger>
+          <TabsTrigger value="alerts" className="flex items-center gap-2" data-testid="tab-alerts">
+            <AlertCircle className="w-4 h-4" />
+            System Alerts
           </TabsTrigger>
           <TabsTrigger value="notifications" className="flex items-center gap-2">
             <Bell className="w-4 h-4" />
@@ -1643,6 +1648,11 @@ export default function Admin() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* System Alerts Tab */}
+        <TabsContent value="alerts" className="space-y-6">
+          {user?.claims?.orgId && <SystemAlertsManagement orgId={user.claims.orgId} />}
         </TabsContent>
 
         {/* Notifications Tab */}
