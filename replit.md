@@ -37,6 +37,7 @@ Preferred communication style: Simple, everyday language.
 - **Import Manager**: Comprehensive CSV import functionality for Properties, Contacts, and Tasks with AI field mapping, data validation, and history tracking.
 - **Time Tracking**: Dedicated tracking for billable "Client Work" and non-billable "Organizational Time" with role-based editing permissions.
 - **Support Ticket System**: Internal system for users to submit requests to the platform owner, managed exclusively in the Super Admin Console.
+- **System Alerts**: Organization-level alert system for admins to create blocking notifications with severity levels (info/warning/critical), targeting options (all users/roles/specific users), and acknowledgement tracking. Alerts appear as modals that block interaction until acknowledged.
 
 ### System Design Choices
 - **Database**: PostgreSQL with Drizzle ORM (Better SQLite3 for local development, Neon Database serverless for connection).
