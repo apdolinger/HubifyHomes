@@ -381,6 +381,10 @@ export default function PropertyProfile() {
     notes: ""
   });
   
+  // Property notes state
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [notesValue, setNotesValue] = useState("");
+  
   // Get property ID from URL path parameters
   const params = useParams();
   const propertyId = params.id;
@@ -540,6 +544,13 @@ export default function PropertyProfile() {
       }
     }
   }, [property, isEditModalOpen, communities]);
+
+  // Sync notesValue with property description
+  useEffect(() => {
+    if (property) {
+      setNotesValue((property as any).description || "");
+    }
+  }, [property]);
 
   // Image upload handlers
   const handleImageUpload = async (files: FileList | File[]) => {
@@ -1310,6 +1321,28 @@ export default function PropertyProfile() {
       }
       toast({
         title: "Failed to update property",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update property notes mutation
+  const updatePropertyNotesMutation = useMutation({
+    mutationFn: async (description: string) => {
+      return await apiRequest("PATCH", `/api/properties/${propertyId}`, { description });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}`] });
+      setIsEditingNotes(false);
+      toast({
+        title: "Notes updated",
+        description: "Property notes have been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to update notes",
         description: error.message,
         variant: "destructive",
       });
@@ -5346,11 +5379,78 @@ export default function PropertyProfile() {
 
           <TabsContent value="notes">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                 <CardTitle>Property Notes</CardTitle>
+                {!isEditingNotes ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIsEditingNotes(true)}
+                    data-testid="button-edit-notes"
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edit Notes
+                  </Button>
+                ) : null}
               </CardHeader>
               <CardContent>
-                <p className="text-slate-600">Notes and observations for this property will be displayed here.</p>
+                {isEditingNotes ? (
+                  <div className="space-y-4">
+                    <Textarea
+                      value={notesValue}
+                      onChange={(e) => setNotesValue(e.target.value)}
+                      placeholder="Add property notes, observations, special instructions, or any other important information..."
+                      rows={8}
+                      className="resize-none"
+                      data-testid="textarea-notes"
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={() => {
+                          updatePropertyNotesMutation.mutate(notesValue);
+                        }}
+                        disabled={updatePropertyNotesMutation.isPending}
+                        data-testid="button-save-notes"
+                      >
+                        {updatePropertyNotesMutation.isPending ? "Saving..." : "Save Notes"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setNotesValue((property as any).description || "");
+                          setIsEditingNotes(false);
+                        }}
+                        disabled={updatePropertyNotesMutation.isPending}
+                        data-testid="button-cancel-notes"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {notesValue ? (
+                      <div className="prose max-w-none">
+                        <p className="text-slate-700 whitespace-pre-wrap" data-testid="display-notes">
+                          {notesValue}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                        <p className="text-slate-600 mb-4">No notes have been added for this property yet.</p>
+                        <Button
+                          variant="outline"
+                          onClick={() => setIsEditingNotes(true)}
+                          data-testid="button-add-notes"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Notes
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
