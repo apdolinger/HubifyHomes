@@ -21,6 +21,7 @@ import {
   roomNotes,
   roomDevices,
   roomSurfaces,
+  roomSurfaceLinks,
   roomFixtures,
   roomPhotos,
   roomChecklists,
@@ -103,6 +104,8 @@ import {
   type InsertRoomDevice,
   type RoomSurface,
   type InsertRoomSurface,
+  type RoomSurfaceLink,
+  type InsertRoomSurfaceLink,
   type RoomFixture,
   type InsertRoomFixture,
   type RoomPhoto,
@@ -306,6 +309,12 @@ export interface IStorage {
   createRoomSurface(surface: InsertRoomSurface): Promise<RoomSurface>;
   updateRoomSurface(id: number, surface: Partial<InsertRoomSurface>): Promise<RoomSurface>;
   deleteRoomSurface(id: number): Promise<void>;
+  
+  // Room surface link operations
+  getRoomSurfaceLinks(roomId: number): Promise<RoomSurfaceLink[]>;
+  createRoomSurfaceLink(link: InsertRoomSurfaceLink): Promise<RoomSurfaceLink>;
+  updateRoomSurfaceLink(id: number, link: Partial<InsertRoomSurfaceLink>): Promise<RoomSurfaceLink>;
+  deleteRoomSurfaceLink(id: number): Promise<void>;
   
   // Room fixture operations
   getRoomFixtures(roomId: number): Promise<RoomFixture[]>;
@@ -1581,6 +1590,29 @@ export class DatabaseStorage implements IStorage {
 
   async deleteRoomSurface(id: number): Promise<void> {
     await db.delete(roomSurfaces).where(eq(roomSurfaces.id, id));
+  }
+
+  // Room surface link operations
+  async getRoomSurfaceLinks(roomId: number): Promise<RoomSurfaceLink[]> {
+    return await db.select().from(roomSurfaceLinks).where(eq(roomSurfaceLinks.roomId, roomId));
+  }
+
+  async createRoomSurfaceLink(link: InsertRoomSurfaceLink): Promise<RoomSurfaceLink> {
+    const [newLink] = await db.insert(roomSurfaceLinks).values(link).returning();
+    return newLink;
+  }
+
+  async updateRoomSurfaceLink(id: number, link: Partial<InsertRoomSurfaceLink>): Promise<RoomSurfaceLink> {
+    const [updatedLink] = await db
+      .update(roomSurfaceLinks)
+      .set({ ...link, updatedAt: new Date() })
+      .where(eq(roomSurfaceLinks.id, id))
+      .returning();
+    return updatedLink;
+  }
+
+  async deleteRoomSurfaceLink(id: number): Promise<void> {
+    await db.delete(roomSurfaceLinks).where(eq(roomSurfaceLinks.id, id));
   }
 
   // Room fixture operations
