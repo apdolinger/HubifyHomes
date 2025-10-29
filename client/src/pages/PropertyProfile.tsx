@@ -7854,8 +7854,23 @@ export default function PropertyProfile() {
 
                   if (filteredCommunities.length === 0) {
                     return (
-                      <div className="p-8 text-center text-slate-500">
-                        {communitySearchQuery ? "No communities found" : "No communities available"}
+                      <div className="p-8 text-center">
+                        <Building className="w-12 h-12 mx-auto text-slate-400 mb-3" />
+                        <p className="text-slate-500 mb-4">
+                          {communitySearchQuery ? "No communities found" : "No communities available"}
+                        </p>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setIsChangeCommunityDialogOpen(false);
+                            setCommunitySearchQuery("");
+                            window.location.href = "/admin?tab=communities";
+                          }}
+                          data-testid="button-add-new-community"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add New Community
+                        </Button>
                       </div>
                     );
                   }
