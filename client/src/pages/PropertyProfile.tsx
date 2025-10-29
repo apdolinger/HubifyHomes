@@ -330,6 +330,8 @@ export default function PropertyProfile() {
   const [isReportsModalOpen, setIsReportsModalOpen] = useState(false);
   const [moveToPropertyId, setMoveToPropertyId] = useState<number | null>(null);
   const [propertySearchQuery, setPropertySearchQuery] = useState("");
+  const [isChangeCommunityDialogOpen, setIsChangeCommunityDialogOpen] = useState(false);
+  const [communitySearchQuery, setCommunitySearchQuery] = useState("");
   
   // Access items state
   const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
@@ -1287,6 +1289,41 @@ export default function PropertyProfile() {
       }
       toast({
         title: "Failed to update property",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update property community mutation
+  const updatePropertyCommunityMutation = useMutation({
+    mutationFn: async (communityId: number | null) => {
+      return await apiRequest("PATCH", `/api/properties/${propertyId}/community`, { communityId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
+      setIsChangeCommunityDialogOpen(false);
+      setCommunitySearchQuery("");
+      toast({
+        title: "Community updated",
+        description: "Property community has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Failed to update community",
         description: error.message,
         variant: "destructive",
       });
@@ -4516,7 +4553,8 @@ export default function PropertyProfile() {
                             <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => setIsEditModalOpen(true)}
+                              onClick={() => setIsChangeCommunityDialogOpen(true)}
+                              data-testid="button-change-community"
                             >
                               <Edit className="w-4 h-4 mr-2" />
                               Change Community
@@ -7769,6 +7807,105 @@ export default function PropertyProfile() {
 
             <DialogFooter className="mt-6">
               <Button variant="outline" onClick={() => setIsNavigationModalOpen(false)}>
+                Cancel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Change Community Dialog */}
+        <Dialog open={isChangeCommunityDialogOpen} onOpenChange={setIsChangeCommunityDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Change Community</DialogTitle>
+              <DialogDescription>
+                Search for a community to associate with this property
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="community-search">Search Communities</Label>
+                <Input
+                  id="community-search"
+                  placeholder="Type to search communities..."
+                  value={communitySearchQuery}
+                  onChange={(e) => setCommunitySearchQuery(e.target.value)}
+                  data-testid="input-community-search"
+                  autoFocus
+                />
+              </div>
+
+              <div className="border rounded-lg max-h-80 overflow-y-auto">
+                {(() => {
+                  const filteredCommunities = (communities as any[]).filter((c) => {
+                    const searchLower = communitySearchQuery.toLowerCase();
+                    const nameMatch = c.name?.toLowerCase().includes(searchLower);
+                    const addressMatch = [c.address1, c.city, c.state, c.zip]
+                      .filter(Boolean)
+                      .join(" ")
+                      .toLowerCase()
+                      .includes(searchLower);
+                    return nameMatch || addressMatch;
+                  });
+
+                  if (filteredCommunities.length === 0) {
+                    return (
+                      <div className="p-8 text-center text-slate-500">
+                        {communitySearchQuery ? "No communities found" : "No communities available"}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="divide-y">
+                      {filteredCommunities.map((community: any) => (
+                        <button
+                          key={community.id}
+                          onClick={() => {
+                            updatePropertyCommunityMutation.mutate(community.id);
+                          }}
+                          disabled={updatePropertyCommunityMutation.isPending}
+                          className="w-full p-3 text-left hover:bg-slate-50 transition-colors disabled:opacity-50"
+                          data-testid={`button-select-community-${community.id}`}
+                        >
+                          <div className="font-medium text-slate-900">{community.name}</div>
+                          <div className="text-sm text-slate-600">
+                            {[community.address1, community.city, community.state, community.zip]
+                              .filter(Boolean)
+                              .join(", ") || "No address"}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {(property as any)?.communityId && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    updatePropertyCommunityMutation.mutate(null);
+                  }}
+                  disabled={updatePropertyCommunityMutation.isPending}
+                  data-testid="button-remove-community"
+                >
+                  Remove Community Association
+                </Button>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setIsChangeCommunityDialogOpen(false);
+                  setCommunitySearchQuery("");
+                }}
+                data-testid="button-cancel-community-change"
+              >
                 Cancel
               </Button>
             </DialogFooter>
