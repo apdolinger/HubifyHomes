@@ -40,6 +40,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
 import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
+import ClientsStatsCustomizationModal, { StatsWidget } from "@/components/ClientsStatsCustomizationModal";
 
 const contactSchema = z.object({
   accountId: z.string().nullable().optional(),
@@ -77,6 +78,34 @@ export default function People() {
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
   const [isCustomizeModalOpen, setIsCustomizeModalOpen] = useState(false);
+  const [isStatsCustomizeModalOpen, setIsStatsCustomizeModalOpen] = useState(false);
+
+  // Default stats widgets configuration
+  const defaultStatsWidgets: StatsWidget[] = [
+    { id: 'total', name: 'Total Clients', description: 'Show all clients count', enabled: true, order: 1 },
+    { id: 'tenants', name: 'Tenants', description: 'Show tenants count', enabled: true, order: 2 },
+    { id: 'owners', name: 'Owners', description: 'Show owners count', enabled: true, order: 3 },
+    { id: 'emergency', name: 'Emergency Contacts', description: 'Show emergency contacts count', enabled: true, order: 4 },
+  ];
+
+  // Load stats widgets configuration from localStorage
+  const [statsWidgets, setStatsWidgets] = useState<StatsWidget[]>(() => {
+    const saved = localStorage.getItem('clientsStatsWidgets');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return defaultStatsWidgets;
+      }
+    }
+    return defaultStatsWidgets;
+  });
+
+  // Save stats widgets configuration to localStorage
+  const handleSaveStatsWidgets = (newWidgets: StatsWidget[]) => {
+    setStatsWidgets(newWidgets);
+    localStorage.setItem('clientsStatsWidgets', JSON.stringify(newWidgets));
+  };
 
   // Default column configuration for clients table
   const defaultColumns: ColumnConfig[] = [
@@ -722,126 +751,112 @@ export default function People() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <Card 
-          className="cursor-pointer transition-all hover:shadow-md"
-          onClick={() => {
-            setTypeFilter("all");
-            setSearchQuery("");
-            setPropertyFilter("all");
-          }}
-          data-testid="stat-total-clients"
-        >
-          <CardContent className="p-6 hover:bg-slate-50 transition-colors">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                  <UserCheck className="w-4 h-4 text-blue-600" />
-                </div>
-              </div>
-              <div className="ml-4">
-                <dl>
-                  <dt className="text-sm font-medium text-slate-500 truncate">
-                    Total Clients
-                  </dt>
-                  <dd className="text-2xl font-semibold text-slate-900">
-                    {stats.total}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-slate-900">Stats Overview</h2>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsStatsCustomizeModalOpen(true)}
+            data-testid="customize-stats-btn"
+          >
+            <Settings className="w-4 h-4" />
+          </Button>
+        </div>
+        <div className={`grid grid-cols-1 gap-6 ${
+          statsWidgets.filter(w => w.enabled).length === 1 ? 'md:grid-cols-1 max-w-sm' :
+          statsWidgets.filter(w => w.enabled).length === 2 ? 'md:grid-cols-2' :
+          statsWidgets.filter(w => w.enabled).length === 3 ? 'md:grid-cols-3' :
+          'md:grid-cols-4'
+        }`}>
+          {statsWidgets
+            .filter(widget => widget.enabled)
+            .sort((a, b) => a.order - b.order)
+            .map((widget) => {
+              const widgetConfigs = {
+                total: {
+                  bgColor: 'bg-blue-100',
+                  iconColor: 'text-blue-600',
+                  label: 'Total Clients',
+                  value: stats.total,
+                  onClick: () => {
+                    setTypeFilter("all");
+                    setSearchQuery("");
+                    setPropertyFilter("all");
+                  },
+                  testId: 'stat-total-clients'
+                },
+                tenants: {
+                  bgColor: 'bg-green-100',
+                  iconColor: 'text-green-600',
+                  label: 'Tenants',
+                  value: stats.tenants,
+                  onClick: () => {
+                    setTypeFilter("tenant");
+                    setSearchQuery("");
+                    setPropertyFilter("all");
+                  },
+                  testId: 'stat-tenants'
+                },
+                owners: {
+                  bgColor: 'bg-purple-100',
+                  iconColor: 'text-purple-600',
+                  label: 'Owners',
+                  value: stats.owners,
+                  onClick: () => {
+                    setTypeFilter("owner");
+                    setSearchQuery("");
+                    setPropertyFilter("all");
+                  },
+                  testId: 'stat-owners'
+                },
+                emergency: {
+                  bgColor: 'bg-amber-100',
+                  iconColor: 'text-amber-600',
+                  label: 'Emergency Contacts',
+                  value: stats.emergencyContacts,
+                  onClick: () => {
+                    setTypeFilter("emergency_contact");
+                    setSearchQuery("");
+                    setPropertyFilter("all");
+                  },
+                  testId: 'stat-emergency-contacts'
+                }
+              };
 
-        <Card 
-          className="cursor-pointer transition-all hover:shadow-md"
-          onClick={() => {
-            setTypeFilter("tenant");
-            setSearchQuery("");
-            setPropertyFilter("all");
-          }}
-          data-testid="stat-tenants"
-        >
-          <CardContent className="p-6 hover:bg-slate-50 transition-colors">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                  <UserCheck className="w-4 h-4 text-green-600" />
-                </div>
-              </div>
-              <div className="ml-4">
-                <dl>
-                  <dt className="text-sm font-medium text-slate-500 truncate">
-                    Tenants
-                  </dt>
-                  <dd className="text-2xl font-semibold text-slate-900">
-                    {stats.tenants}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              const config = widgetConfigs[widget.id as keyof typeof widgetConfigs];
+              if (!config) return null;
 
-        <Card 
-          className="cursor-pointer transition-all hover:shadow-md"
-          onClick={() => {
-            setTypeFilter("owner");
-            setSearchQuery("");
-            setPropertyFilter("all");
-          }}
-          data-testid="stat-owners"
-        >
-          <CardContent className="p-6 hover:bg-slate-50 transition-colors">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                  <UserCheck className="w-4 h-4 text-purple-600" />
-                </div>
-              </div>
-              <div className="ml-4">
-                <dl>
-                  <dt className="text-sm font-medium text-slate-500 truncate">
-                    Owners
-                  </dt>
-                  <dd className="text-2xl font-semibold text-slate-900">
-                    {stats.owners}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card 
-          className="cursor-pointer transition-all hover:shadow-md"
-          onClick={() => {
-            setTypeFilter("emergency_contact");
-            setSearchQuery("");
-            setPropertyFilter("all");
-          }}
-          data-testid="stat-emergency-contacts"
-        >
-          <CardContent className="p-6 hover:bg-slate-50 transition-colors">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
-                  <UserCheck className="w-4 h-4 text-amber-600" />
-                </div>
-              </div>
-              <div className="ml-4">
-                <dl>
-                  <dt className="text-sm font-medium text-slate-500 truncate">
-                    Emergency Contacts
-                  </dt>
-                  <dd className="text-2xl font-semibold text-slate-900">
-                    {stats.emergencyContacts}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              return (
+                <Card 
+                  key={widget.id}
+                  className="cursor-pointer transition-all hover:shadow-md"
+                  onClick={config.onClick}
+                  data-testid={config.testId}
+                >
+                  <CardContent className="p-6 hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <div className={`w-8 h-8 ${config.bgColor} rounded-full flex items-center justify-center`}>
+                          <UserCheck className={`w-4 h-4 ${config.iconColor}`} />
+                        </div>
+                      </div>
+                      <div className="ml-4">
+                        <dl>
+                          <dt className="text-sm font-medium text-slate-500 truncate">
+                            {config.label}
+                          </dt>
+                          <dd className="text-2xl font-semibold text-slate-900">
+                            {config.value}
+                          </dd>
+                        </dl>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+        </div>
       </div>
 
       {/* Search and Filters */}
@@ -1635,6 +1650,15 @@ export default function People() {
         columns={columns}
         defaultColumns={defaultColumns}
         onSave={handleSaveColumns}
+      />
+
+      {/* Stats Widgets Customization Modal */}
+      <ClientsStatsCustomizationModal
+        isOpen={isStatsCustomizeModalOpen}
+        onClose={() => setIsStatsCustomizeModalOpen(false)}
+        currentWidgets={statsWidgets}
+        defaultWidgets={defaultStatsWidgets}
+        onSave={handleSaveStatsWidgets}
       />
     </main>
   );
