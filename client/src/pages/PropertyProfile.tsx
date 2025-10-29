@@ -212,6 +212,8 @@ export default function PropertyProfile() {
   const [isDeviceDetailsModalOpen, setIsDeviceDetailsModalOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<any>(null);
   const [isSurfaceModalOpen, setIsSurfaceModalOpen] = useState(false);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [selectedLink, setSelectedLink] = useState<any>(null);
   const [isFixtureModalOpen, setIsFixtureModalOpen] = useState(false);
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
   const [editingSupply, setEditingSupply] = useState<any>(null);
@@ -241,6 +243,12 @@ export default function PropertyProfile() {
     ceilingType: "",
     ceilingHeight: "",
     ceilingNotes: ""
+  });
+  const [surfaceLinkForm, setSurfaceLinkForm] = useState({
+    name: "",
+    url: "",
+    surfaceCategory: "flooring",
+    notes: ""
   });
   const [roomFixtureForm, setRoomFixtureForm] = useState({
     windowCount: 0,
@@ -367,6 +375,12 @@ export default function PropertyProfile() {
   // Get room devices
   const { data: devices = [], isLoading: devicesLoading, refetch: refetchDevices } = useQuery({
     queryKey: [`/api/rooms/${selectedRoom?.id}/devices`],
+    enabled: isAuthenticated && !!selectedRoom?.id,
+  });
+
+  // Get room surface links
+  const { data: surfaceLinks = [], isLoading: surfaceLinksLoading, refetch: refetchSurfaceLinks } = useQuery({
+    queryKey: [`/api/rooms/${selectedRoom?.id}/surface-links`],
     enabled: isAuthenticated && !!selectedRoom?.id,
   });
 
@@ -1190,6 +1204,88 @@ export default function PropertyProfile() {
     },
   });
 
+  // Room surface link mutations
+  const createSurfaceLinkMutation = useMutation({
+    mutationFn: async (linkData: any) => {
+      return await apiRequest("POST", "/api/room-surface-links", {
+        ...linkData,
+        roomId: selectedRoom?.id,
+      });
+    },
+    onSuccess: () => {
+      refetchSurfaceLinks();
+      setIsLinkModalOpen(false);
+      setSurfaceLinkForm({
+        name: "",
+        url: "",
+        surfaceCategory: "flooring",
+        notes: ""
+      });
+      toast({
+        title: "Surface link added",
+        description: "Purchasing link has been saved successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to add link",
+        description: error.message || "An error occurred while adding the link.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateSurfaceLinkMutation = useMutation({
+    mutationFn: async ({ id, ...data }: any) => {
+      return await apiRequest("PATCH", `/api/room-surface-links/${id}`, {
+        ...data,
+        roomId: selectedRoom?.id,
+      });
+    },
+    onSuccess: () => {
+      refetchSurfaceLinks();
+      setIsLinkModalOpen(false);
+      setSelectedLink(null);
+      setSurfaceLinkForm({
+        name: "",
+        url: "",
+        surfaceCategory: "flooring",
+        notes: ""
+      });
+      toast({
+        title: "Link updated",
+        description: "Surface link has been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update link",
+        description: error.message || "An error occurred while updating the link.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteSurfaceLinkMutation = useMutation({
+    mutationFn: async (linkId: number) => {
+      return await apiRequest("DELETE", `/api/room-surface-links/${linkId}`);
+    },
+    onSuccess: () => {
+      refetchSurfaceLinks();
+      toast({
+        title: "Link deleted",
+        description: "Surface link has been removed.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to delete link",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Room surface mutations
   const saveSurfaceMutation = useMutation({
     mutationFn: async (surfaceData: any) => {
@@ -1714,6 +1810,46 @@ export default function PropertyProfile() {
     if (selectedDevice) {
       setIsDeviceDetailsModalOpen(false);
       handleEditDevice(selectedDevice);
+    }
+  };
+
+  // Surface link handlers
+  const handleAddLink = () => {
+    setSelectedLink(null);
+    setSurfaceLinkForm({
+      name: "",
+      url: "",
+      surfaceCategory: "flooring",
+      notes: ""
+    });
+    setIsLinkModalOpen(true);
+  };
+
+  const handleEditLink = (link: any) => {
+    setSelectedLink(link);
+    setSurfaceLinkForm({
+      name: link.name || "",
+      url: link.url || "",
+      surfaceCategory: link.surfaceCategory || "flooring",
+      notes: link.notes || ""
+    });
+    setIsLinkModalOpen(true);
+  };
+
+  const handleDeleteLink = (linkId: number) => {
+    if (confirm("Are you sure you want to delete this link?")) {
+      deleteSurfaceLinkMutation.mutate(linkId);
+    }
+  };
+
+  const handleSubmitLink = () => {
+    if (selectedLink) {
+      updateSurfaceLinkMutation.mutate({
+        id: selectedLink.id,
+        ...surfaceLinkForm
+      });
+    } else {
+      createSurfaceLinkMutation.mutate(surfaceLinkForm);
     }
   };
 
@@ -2796,11 +2932,12 @@ export default function PropertyProfile() {
                 </CardHeader>
                 <CardContent>
                   <Tabs defaultValue="supplies" className="w-full">
-                    <TabsList className="grid w-full grid-cols-7">
+                    <TabsList className="grid w-full grid-cols-8">
                       <TabsTrigger value="supplies">Supplies</TabsTrigger>
                       <TabsTrigger value="devices">Devices</TabsTrigger>
                       <TabsTrigger value="surfaces">Surfaces</TabsTrigger>
                       <TabsTrigger value="fixtures">Fixtures</TabsTrigger>
+                      <TabsTrigger value="links">Links</TabsTrigger>
                       <TabsTrigger value="photos">Photos</TabsTrigger>
                       <TabsTrigger value="notes">Notes</TabsTrigger>
                       <TabsTrigger value="history">History</TabsTrigger>
@@ -3156,6 +3293,83 @@ export default function PropertyProfile() {
                           Configure Fixtures
                         </Button>
                       </div>
+                    </TabsContent>
+
+                    <TabsContent value="links" className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-lg font-medium">Surface Links</h4>
+                        <Button onClick={handleAddLink} data-testid="button-add-link">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Link
+                        </Button>
+                      </div>
+
+                      {surfaceLinksLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <RefreshCw className="w-6 h-6 animate-spin text-slate-400" />
+                        </div>
+                      ) : Array.isArray(surfaceLinks) && surfaceLinks.length > 0 ? (
+                        <div className="grid gap-4">
+                          {surfaceLinks.map((link: any) => (
+                            <Card key={link.id} className="p-4" data-testid={`card-link-${link.id}`}>
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <h5 className="font-medium text-slate-900">{link.name}</h5>
+                                    <Badge variant="secondary" className="text-xs capitalize">
+                                      {link.surfaceCategory.replace('_', ' ')}
+                                    </Badge>
+                                  </div>
+                                  <a 
+                                    href={link.url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1 mb-2"
+                                    data-testid={`link-url-${link.id}`}
+                                  >
+                                    <ExternalLink className="w-3 h-3" />
+                                    {link.url}
+                                  </a>
+                                  {link.notes && (
+                                    <p className="text-sm text-slate-600">{link.notes}</p>
+                                  )}
+                                </div>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                    <Button variant="ghost" size="sm" data-testid={`button-link-menu-${link.id}`}>
+                                      <MoreVertical className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleEditLink(link)} data-testid={`button-edit-link-${link.id}`}>
+                                      <Edit className="w-4 h-4 mr-2" />
+                                      Edit Link
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      className="text-red-600"
+                                      onClick={() => handleDeleteLink(link.id)}
+                                      data-testid={`button-delete-link-${link.id}`}
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Delete Link
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <ExternalLink className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                          <h3 className="text-lg font-medium text-slate-900 mb-2">No links added</h3>
+                          <p className="text-slate-600 mb-4">Add purchasing links for room surfaces like flooring, walls, and fixtures.</p>
+                          <Button onClick={handleAddLink} data-testid="button-add-first-link">
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add First Link
+                          </Button>
+                        </div>
+                      )}
                     </TabsContent>
 
                     <TabsContent value="photos" className="space-y-4">
@@ -4981,6 +5195,112 @@ export default function PropertyProfile() {
                   </>
                 ) : (
                   'Save Fixture Information'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Surface Link Modal */}
+        <Dialog open={isLinkModalOpen} onOpenChange={setIsLinkModalOpen}>
+          <DialogContent className="max-w-xl">
+            <DialogHeader>
+              <DialogTitle>{selectedLink ? 'Edit Surface Link' : 'Add Surface Link'}</DialogTitle>
+              <DialogDescription>
+                {selectedLink 
+                  ? 'Update the purchasing link information.'
+                  : `Add a purchasing link for surfaces in ${selectedRoom?.name || 'this room'}.`
+                }
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="link-name">Name *</Label>
+                <Input
+                  id="link-name"
+                  value={surfaceLinkForm.name}
+                  onChange={(e) => setSurfaceLinkForm({ ...surfaceLinkForm, name: e.target.value })}
+                  placeholder="e.g., Home Depot Oak Flooring"
+                  data-testid="input-link-name"
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="link-url">URL *</Label>
+                <Input
+                  id="link-url"
+                  type="url"
+                  value={surfaceLinkForm.url}
+                  onChange={(e) => setSurfaceLinkForm({ ...surfaceLinkForm, url: e.target.value })}
+                  placeholder="https://example.com/product"
+                  data-testid="input-link-url"
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="link-category">Surface Category *</Label>
+                <Select
+                  value={surfaceLinkForm.surfaceCategory}
+                  onValueChange={(value) => setSurfaceLinkForm({ ...surfaceLinkForm, surfaceCategory: value })}
+                >
+                  <SelectTrigger id="link-category" data-testid="select-link-category">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="flooring">Flooring</SelectItem>
+                    <SelectItem value="wall">Wall</SelectItem>
+                    <SelectItem value="ceiling">Ceiling</SelectItem>
+                    <SelectItem value="countertop">Countertop</SelectItem>
+                    <SelectItem value="trim">Trim</SelectItem>
+                    <SelectItem value="tile">Tile</SelectItem>
+                    <SelectItem value="cabinet">Cabinet</SelectItem>
+                    <SelectItem value="fixture">Fixture</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="link-notes">Notes</Label>
+                <Textarea
+                  id="link-notes"
+                  value={surfaceLinkForm.notes}
+                  onChange={(e) => setSurfaceLinkForm({ ...surfaceLinkForm, notes: e.target.value })}
+                  placeholder="Additional notes about this link..."
+                  rows={3}
+                  data-testid="textarea-link-notes"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setIsLinkModalOpen(false);
+                  setSelectedLink(null);
+                }}
+                data-testid="button-cancel-link"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSubmitLink}
+                disabled={!surfaceLinkForm.name || !surfaceLinkForm.url || createSurfaceLinkMutation.isPending || updateSurfaceLinkMutation.isPending}
+                data-testid="button-save-link"
+              >
+                {(createSurfaceLinkMutation.isPending || updateSurfaceLinkMutation.isPending) ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : selectedLink ? (
+                  'Update Link'
+                ) : (
+                  'Add Link'
                 )}
               </Button>
             </DialogFooter>
