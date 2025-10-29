@@ -528,6 +528,22 @@ export const communities = pgTable("communities", {
   hoaPresidentId: varchar("hoa_president_id").references(() => users.id),
   isActive: boolean("is_active").notNull().default(true),
   notes: text("notes"),
+  // Overview section
+  gateCode: varchar("gate_code"),
+  propertyManagerName: varchar("property_manager_name"),
+  emergencyContact: varchar("emergency_contact"),
+  hoaMailingAddress: text("hoa_mailing_address"),
+  // Rules section
+  rentalRestrictions: text("rental_restrictions"),
+  petPolicy: text("pet_policy"),
+  parkingRules: text("parking_rules"),
+  noiseRestrictions: text("noise_restrictions"),
+  vendorAccessProcedures: text("vendor_access_procedures"),
+  // Schedule section
+  trashRecyclingPickup: varchar("trash_recycling_pickup"),
+  bulkTrash: varchar("bulk_trash"),
+  landscapeMaintenance: varchar("landscape_maintenance"),
+  communityEvents: text("community_events"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
