@@ -333,6 +333,11 @@ export default function PropertyProfile() {
   const [isChangeCommunityDialogOpen, setIsChangeCommunityDialogOpen] = useState(false);
   const [communitySearchQuery, setCommunitySearchQuery] = useState("");
   
+  // Community edit dialogs state
+  const [isEditOverviewDialogOpen, setIsEditOverviewDialogOpen] = useState(false);
+  const [isEditRulesDialogOpen, setIsEditRulesDialogOpen] = useState(false);
+  const [isEditScheduleDialogOpen, setIsEditScheduleDialogOpen] = useState(false);
+  
   // Access items state
   const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
   const [editingAccessItem, setEditingAccessItem] = useState<any>(null);
@@ -1308,6 +1313,42 @@ export default function PropertyProfile() {
       toast({
         title: "Community updated",
         description: "Property community has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Failed to update community",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update community details mutation
+  const updateCommunityMutation = useMutation({
+    mutationFn: async ({ communityId, data }: { communityId: number, data: any }) => {
+      return await apiRequest("PATCH", `/api/communities/${communityId}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/communities"] });
+      setIsEditOverviewDialogOpen(false);
+      setIsEditRulesDialogOpen(false);
+      setIsEditScheduleDialogOpen(false);
+      toast({
+        title: "Community updated",
+        description: "Community details have been updated successfully.",
       });
     },
     onError: (error) => {
