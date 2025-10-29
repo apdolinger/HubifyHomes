@@ -278,6 +278,7 @@ export interface IStorage {
   
   // Community Documents operations
   getCommunityDocuments(communityId: number): Promise<CommunityDocument[]>;
+  getCommunityDocument(id: number): Promise<CommunityDocument | undefined>;
   createCommunityDocument(doc: InsertCommunityDocument): Promise<CommunityDocument>;
   deleteCommunityDocument(id: number): Promise<void>;
   
@@ -1363,6 +1364,14 @@ export class DatabaseStorage implements IStorage {
       .from(communityDocuments)
       .where(eq(communityDocuments.communityId, communityId))
       .orderBy(communityDocuments.documentType);
+  }
+
+  async getCommunityDocument(id: number): Promise<CommunityDocument | undefined> {
+    const [document] = await db
+      .select()
+      .from(communityDocuments)
+      .where(eq(communityDocuments.id, id));
+    return document;
   }
 
   async createCommunityDocument(doc: InsertCommunityDocument): Promise<CommunityDocument> {

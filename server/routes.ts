@@ -2280,6 +2280,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'File name is required' });
       }
 
+      const objectStorageService = new ObjectStorageService();
       const uploadInfo = await objectStorageService.getCommunityDocumentUploadURL(communityId, fileName);
       res.json(uploadInfo);
     } catch (error) {
@@ -2312,11 +2313,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { documentType, classification, fileUrl, fileName, propertyId } = req.body;
       const userId = req.user.claims.sub;
-      const userRole = req.user.role;
+      const userRole = req.user.claims.role;
+      const userOrgId = req.user.claims.orgId || req.user.orgId;
 
       // Validate required fields
       if (!documentType || !classification || !fileUrl || !fileName) {
         return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // SECURITY: Validate fileUrl matches expected format and prevent path traversal
+      const expectedPattern = `/community-documents/community-${communityId}_`;
+      let pathToCheck = fileUrl;
+      
+      // Parse URL if it's a full URL, otherwise treat as path
+      try {
+        const url = new URL(fileUrl);
+        pathToCheck = url.pathname;
+      } catch (error) {
+        // fileUrl is a path, not a full URL
+      }
+      
+      // Normalize path and check for traversal attempts
+      const normalizedPath = pathToCheck.replace(/\/+/g, '/'); // Remove duplicate slashes
+      if (normalizedPath.includes('..')) {
+        return res.status(400).json({ 
+          message: "Invalid file URL - path traversal detected" 
+        });
+      }
+      
+      // Check if path contains the expected community pattern
+      if (!normalizedPath.includes(expectedPattern)) {
+        return res.status(400).json({ 
+          message: "Invalid file URL - does not match community path pattern" 
+        });
+      }
+
+      // SECURITY: Validate propertyId and organization access
+      if (classification === "residential-based") {
+        if (!propertyId) {
+          return res.status(400).json({ 
+            message: "Property ID is required for residential-based documents" 
+          });
+        }
+
+        // Verify property exists, belongs to this community, AND user's organization
+        const property = await storage.getProperty(propertyId);
+        if (!property) {
+          return res.status(404).json({ message: "Property not found" });
+        }
+        if (property.communityId !== communityId) {
+          return res.status(403).json({ 
+            message: "Property does not belong to this community" 
+          });
+        }
+        if (property.orgId !== userOrgId) {
+          return res.status(403).json({ 
+            message: "You do not have access to upload documents for this property" 
+          });
+        }
+      } else if (classification === "community-wide") {
+        if (propertyId) {
+          return res.status(400).json({ 
+            message: "Community-wide documents should not have a property ID" 
+          });
+        }
+        
+        // SECURITY: Verify user's org has at least one property in this community
+        const allProperties = await storage.getProperties(true);
+        const orgCommunityProperties = allProperties.filter(
+          p => p.communityId === communityId && p.orgId === userOrgId
+        );
+        
+        if (orgCommunityProperties.length === 0) {
+          return res.status(403).json({ 
+            message: "You do not have access to upload community-wide documents for this community" 
+          });
+        }
       }
 
       // If community-wide, check if a document of this type already exists
@@ -2364,13 +2436,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid document ID' });
       }
 
-      const userRole = req.user.role;
+      const userRole = req.user.claims.role;
 
       // Only admins can delete documents
       if (userRole !== "admin") {
         return res.status(403).json({ 
           message: "Only administrators can delete community documents" 
         });
+      }
+
+      // SECURITY: Verify document exists and user has organization-level access
+      const document = await storage.getCommunityDocument(id);
+      
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+
+      // SECURITY: Verify user's organization has access to this document's community
+      const userOrgId = req.user.claims.orgId || req.user.orgId;
+      
+      // For residential-based documents, verify through property ownership
+      if (document.propertyId) {
+        const property = await storage.getProperty(document.propertyId);
+        if (!property) {
+          return res.status(404).json({ message: "Property not found" });
+        }
+        if (property.orgId !== userOrgId) {
+          return res.status(403).json({ 
+            message: "You do not have access to delete this document" 
+          });
+        }
+      } else {
+        // For community-wide documents, verify user's org has at least one property in this community
+        const allProperties = await storage.getProperties(true); // Include inactive
+        const orgCommunityProperties = allProperties.filter(
+          p => p.communityId === document.communityId && p.orgId === userOrgId
+        );
+        
+        if (orgCommunityProperties.length === 0) {
+          return res.status(403).json({ 
+            message: "You do not have access to delete this document" 
+          });
+        }
       }
 
       await storage.deleteCommunityDocument(id);
