@@ -564,6 +564,39 @@ export const communityDocuments = pgTable("community_documents", {
   index("community_docs_property_idx").on(table.propertyId),
 ]);
 
+// System Alerts table - for system-wide or targeted user alerts (blocking modal)
+export const systemAlerts = pgTable("system_alerts", {
+  id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  title: varchar("title").notNull(),
+  message: text("message").notNull(),
+  severity: varchar("severity").notNull().$type<"info"|"warning"|"critical">(), // info, warning, critical
+  isActive: boolean("is_active").notNull().default(true),
+  targetType: varchar("target_type").notNull().$type<"all"|"roles"|"users">(), // all, roles, users
+  targetRoles: text("target_roles").array(), // Array of role names if targetType is 'roles'
+  targetUserIds: text("target_user_ids").array(), // Array of user IDs if targetType is 'users'
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  expiresAt: timestamp("expires_at"), // Optional expiration date
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("system_alerts_org_idx").on(table.orgId),
+  index("system_alerts_active_idx").on(table.isActive),
+]);
+
+// System Alert Acknowledgements table - tracks which users have acknowledged which system alerts
+export const systemAlertAcknowledgements = pgTable("system_alert_acknowledgements", {
+  id: serial("id").primaryKey(),
+  alertId: integer("alert_id").references(() => systemAlerts.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  acknowledgedAt: timestamp("acknowledged_at").defaultNow().notNull(),
+}, (table) => [
+  index("system_alert_ack_alert_idx").on(table.alertId),
+  index("system_alert_ack_user_idx").on(table.userId),
+  // Unique constraint to prevent duplicate acknowledgements
+  index("system_alert_ack_unique_idx").on(table.alertId, table.userId),
+]);
+
 // Properties table
 export const properties = pgTable("properties", {
   id: serial("id").primaryKey(),
@@ -1829,6 +1862,17 @@ export const insertCommunityDocumentSchema = createInsertSchema(communityDocumen
   uploadedAt: true,
 });
 
+export const insertSystemAlertSchema = createInsertSchema(systemAlerts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSystemAlertAcknowledgementSchema = createInsertSchema(systemAlertAcknowledgements).omit({
+  id: true,
+  acknowledgedAt: true,
+});
+
 export const insertPropertySchema = createInsertSchema(properties).omit({
   id: true,
   createdAt: true,
@@ -2189,6 +2233,10 @@ export type InsertCommunity = z.infer<typeof insertCommunitySchema>;
 export type Community = typeof communities.$inferSelect;
 export type InsertCommunityDocument = z.infer<typeof insertCommunityDocumentSchema>;
 export type CommunityDocument = typeof communityDocuments.$inferSelect;
+export type InsertSystemAlert = z.infer<typeof insertSystemAlertSchema>;
+export type SystemAlert = typeof systemAlerts.$inferSelect;
+export type InsertSystemAlertAcknowledgement = z.infer<typeof insertSystemAlertAcknowledgementSchema>;
+export type SystemAlertAcknowledgement = typeof systemAlertAcknowledgements.$inferSelect;
 export type InsertProperty = z.infer<typeof insertPropertySchema>;
 export type Property = typeof properties.$inferSelect;
 export type InsertPropertyForm = z.infer<typeof insertPropertyFormSchema>;
