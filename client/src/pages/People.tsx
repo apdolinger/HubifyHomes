@@ -160,8 +160,8 @@ export default function People() {
     onSuccess: (newContact) => {
       queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
       toast({
-        title: "Contact Added",
-        description: "Contact has been added successfully. Redirecting to profile...",
+        title: "Client Added",
+        description: "Client has been added successfully. Redirecting to profile...",
       });
       setIsAddModalOpen(false);
       addForm.reset();
@@ -184,7 +184,7 @@ export default function People() {
       }
       toast({
         title: "Error",
-        description: "Failed to add contact. Please try again.",
+        description: "Failed to add client. Please try again.",
         variant: "destructive",
       });
     },
@@ -199,8 +199,8 @@ export default function People() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
       toast({
-        title: "Contact Updated",
-        description: "Contact has been updated successfully.",
+        title: "Client Updated",
+        description: "Client has been updated successfully.",
       });
       setIsEditModalOpen(false);
       setSelectedContact(null);
@@ -220,7 +220,7 @@ export default function People() {
       }
       toast({
         title: "Error",
-        description: "Failed to update contact. Please try again.",
+        description: "Failed to update client. Please try again.",
         variant: "destructive",
       });
     },
@@ -235,8 +235,8 @@ export default function People() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
       toast({
-        title: "Contact Deleted",
-        description: "Contact has been deleted successfully.",
+        title: "Client Deleted",
+        description: "Client has been deleted successfully.",
       });
     },
     onError: (error) => {
@@ -253,7 +253,7 @@ export default function People() {
       }
       toast({
         title: "Error",
-        description: "Failed to delete contact. Please try again.",
+        description: "Failed to delete client. Please try again.",
         variant: "destructive",
       });
     },
@@ -682,7 +682,7 @@ export default function People() {
             
             <Button onClick={() => setIsAddModalOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
-              Add Contact
+              Add Client
             </Button>
           </div>
         </div>
@@ -701,7 +701,7 @@ export default function People() {
               <div className="ml-4">
                 <dl>
                   <dt className="text-sm font-medium text-slate-500 truncate">
-                    Total Contacts
+                    Total Clients
                   </dt>
                   <dd className="text-2xl font-semibold text-slate-900">
                     {stats.total}
@@ -786,7 +786,7 @@ export default function People() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
               <Input
-                placeholder="Search contacts by name, email, or type..."
+                placeholder="Search clients by name, email, or type..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -843,13 +843,13 @@ export default function People() {
         </CardContent>
       </Card>
 
-      {/* Contacts Table */}
+      {/* Clients Table */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Contacts</CardTitle>
+            <CardTitle>Clients</CardTitle>
             <div className="text-sm text-slate-600">
-              {groupedContacts?.length || 0} people ({filteredAndSortedContacts?.length || 0} contacts)
+              {groupedContacts?.length || 0} people ({filteredAndSortedContacts?.length || 0} clients)
             </div>
           </div>
         </CardHeader>
@@ -866,7 +866,7 @@ export default function People() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <span className="text-sm font-medium text-blue-900">
-                        {selectedContacts.size} contact{selectedContacts.size === 1 ? '' : 's'} selected
+                        {selectedContacts.size} client{selectedContacts.size === 1 ? '' : 's'} selected
                       </span>
                       <Button
                         variant="outline"
@@ -894,7 +894,7 @@ export default function People() {
                         className="flex items-center gap-2"
                       >
                         <Mail className="w-4 h-4" />
-                        Email Contacts
+                        Email Clients
                       </Button>
                     </div>
                   </div>
@@ -908,7 +908,7 @@ export default function People() {
                       <Checkbox
                         checked={selectAll}
                         onCheckedChange={toggleSelectAll}
-                        aria-label="Select all contacts"
+                        aria-label="Select all clients"
                       />
                     </TableHead>
                     <TableHead 
@@ -1097,18 +1097,18 @@ export default function People() {
               <UserCheck className="w-12 h-12 text-slate-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-slate-900 mb-2">
                 {searchQuery || typeFilter !== "all" || propertyFilter !== "all" 
-                  ? "No contacts found" 
-                  : "No contacts yet"}
+                  ? "No clients found" 
+                  : "No clients yet"}
               </h3>
               <p className="text-slate-600 mb-4">
                 {searchQuery || typeFilter !== "all" || propertyFilter !== "all"
                   ? "Try adjusting your search terms or filters"
-                  : "Add your first contact to get started"}
+                  : "Add your first client to get started"}
               </p>
               {!(searchQuery || typeFilter !== "all" || propertyFilter !== "all") && (
                 <Button onClick={() => setIsAddModalOpen(true)}>
                   <Plus className="w-4 h-4 mr-2" />
-                  Add Contact
+                  Add Client
                 </Button>
               )}
             </div>
@@ -1127,11 +1127,11 @@ export default function People() {
         </CardContent>
       </Card>
 
-      {/* Add Contact Modal */}
+      {/* Add Client Modal */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Add New Contact</DialogTitle>
+            <DialogTitle>Add New Client</DialogTitle>
           </DialogHeader>
           
           <Form {...addForm}>
@@ -1291,7 +1291,7 @@ export default function People() {
                   Cancel
                 </Button>
                 <Button type="submit" disabled={createContactMutation.isPending}>
-                  {createContactMutation.isPending ? "Adding..." : "Add Contact"}
+                  {createContactMutation.isPending ? "Adding..." : "Add Client"}
                 </Button>
               </DialogFooter>
             </form>
@@ -1299,11 +1299,11 @@ export default function People() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Contact Modal */}
+      {/* Edit Client Modal */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Edit Contact</DialogTitle>
+            <DialogTitle>Edit Client</DialogTitle>
           </DialogHeader>
           
           <Form {...editForm}>
@@ -1466,7 +1466,7 @@ export default function People() {
                   Cancel
                 </Button>
                 <Button type="submit" disabled={updateContactMutation.isPending}>
-                  {updateContactMutation.isPending ? "Updating..." : "Update Contact"}
+                  {updateContactMutation.isPending ? "Updating..." : "Update Client"}
                 </Button>
               </DialogFooter>
             </form>
@@ -1474,7 +1474,7 @@ export default function People() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Contact Confirmation Modal */}
+      {/* Delete Client Confirmation Modal */}
       <Dialog open={deleteModalOpen} onOpenChange={(open) => {
         setDeleteModalOpen(open);
         if (!open) {
@@ -1484,7 +1484,7 @@ export default function People() {
       }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-red-600">Delete Contact</DialogTitle>
+            <DialogTitle className="text-red-600">Delete Client</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
