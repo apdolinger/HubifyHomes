@@ -45,6 +45,7 @@ import QuickSearchModal from "@/components/QuickSearchModal";
 import QuickAddTaskModal from "@/components/QuickAddTaskModal";
 import KeyboardHelpModal from "@/components/KeyboardHelpModal";
 import SupportModal from "@/components/SupportModal";
+import { GlobalAlertModal } from "@/components/GlobalAlertModal";
 import { TaskModalProvider, useTaskModal } from "@/contexts/TaskModalContext";
 import { PortalAuthProvider } from "@/contexts/PortalAuthContext";
 import { routes } from "@/lib/routes";
@@ -247,6 +248,7 @@ function AuthenticatedAppContent() {
       isOpen={isSupportModalOpen} 
       onClose={() => setIsSupportModalOpen(false)} 
     />
+    <GlobalAlertModal />
     </div>
   );
 }
