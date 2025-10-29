@@ -338,6 +338,16 @@ export default function PropertyProfile() {
   const [isEditRulesDialogOpen, setIsEditRulesDialogOpen] = useState(false);
   const [isEditScheduleDialogOpen, setIsEditScheduleDialogOpen] = useState(false);
   
+  // Community documents state
+  const [isUploadDocumentDialogOpen, setIsUploadDocumentDialogOpen] = useState(false);
+  const [documentForm, setDocumentForm] = useState({
+    documentType: "hoa_declarations",
+    classification: "community-wide" as "community-wide" | "residential-based",
+    propertyId: null as number | null,
+  });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  
   // Access items state
   const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
   const [editingAccessItem, setEditingAccessItem] = useState<any>(null);
@@ -486,6 +496,12 @@ export default function PropertyProfile() {
   const { data: communities = [] } = useQuery({
     queryKey: ["/api/communities"],
     enabled: isAuthenticated,
+  });
+
+  // Get community documents
+  const { data: communityDocuments = [], isLoading: documentsLoading, refetch: refetchDocuments } = useQuery({
+    queryKey: [`/api/communities/${(property as any)?.communityId}/documents`],
+    enabled: isAuthenticated && !!(property as any)?.communityId,
   });
 
   // Get all properties for move to property modal
@@ -1366,6 +1382,108 @@ export default function PropertyProfile() {
       toast({
         title: "Failed to update community",
         description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Community document upload mutation
+  const uploadDocumentMutation = useMutation({
+    mutationFn: async ({ communityId, file, documentType, classification, propertyId }: { 
+      communityId: number; 
+      file: File; 
+      documentType: string; 
+      classification: "community-wide" | "residential-based";
+      propertyId?: number | null;
+    }) => {
+      // Step 1: Get upload URL
+      const { uploadUrl, fileUrl } = await apiRequest("POST", `/api/communities/${communityId}/documents/upload-url`, {
+        fileName: file.name,
+      });
+
+      // Step 2: Upload file to object storage
+      const uploadResponse = await fetch(uploadUrl, {
+        method: "PUT",
+        body: file,
+        headers: {
+          "Content-Type": file.type || "application/octet-stream",
+        },
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error("Failed to upload file to storage");
+      }
+
+      // Step 3: Create document record
+      return await apiRequest("POST", `/api/communities/${communityId}/documents`, {
+        documentType,
+        classification,
+        fileUrl,
+        fileName: file.name,
+        propertyId,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/communities/${(property as any)?.communityId}/documents`] });
+      setIsUploadDocumentDialogOpen(false);
+      setSelectedFile(null);
+      setDocumentForm({
+        documentType: "hoa_declarations",
+        classification: "community-wide",
+        propertyId: null,
+      });
+      toast({
+        title: "Document uploaded",
+        description: "The document has been uploaded successfully.",
+      });
+    },
+    onError: (error: any) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Upload failed",
+        description: error.message || "Failed to upload document",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete document mutation
+  const deleteDocumentMutation = useMutation({
+    mutationFn: async (documentId: number) => {
+      return await apiRequest("DELETE", `/api/community-documents/${documentId}`, null);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/communities/${(property as any)?.communityId}/documents`] });
+      toast({
+        title: "Document deleted",
+        description: "The document has been deleted successfully.",
+      });
+    },
+    onError: (error: any) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Delete failed",
+        description: error.message || "Failed to delete document",
         variant: "destructive",
       });
     },
@@ -4928,24 +5046,87 @@ export default function PropertyProfile() {
                             </CardHeader>
                             <CardContent className="space-y-3">
                               <p className="text-slate-600 mb-4">Community documents and resources</p>
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
-                                  <span className="text-slate-700">HOA Declarations</span>
-                                  <span className="text-slate-500 text-sm">Not available</span>
+                              {documentsLoading ? (
+                                <div className="text-center py-8 text-slate-500">Loading documents...</div>
+                              ) : (
+                                <div className="space-y-2">
+                                  {["hoa_declarations", "ccrs_bylaws", "community_faq", "welcome_packet"].map((docType) => {
+                                    const docs = (communityDocuments as any[]).filter((d: any) => d.documentType === docType);
+                                    const communityWideDoc = docs.find((d: any) => d.classification === "community-wide" && !d.propertyId);
+                                    const residentialDocs = docs.filter((d: any) => d.classification === "residential-based" || d.propertyId);
+
+                                    const displayNames: Record<string, string> = {
+                                      hoa_declarations: "HOA Declarations",
+                                      ccrs_bylaws: "CC&Rs & Bylaws",
+                                      community_faq: "Community FAQ",
+                                      welcome_packet: "Welcome Packet",
+                                    };
+
+                                    return (
+                                      <div key={docType} className="border border-slate-200 rounded-lg">
+                                        <div className="flex items-center justify-between p-3">
+                                          <span className="text-slate-700 font-medium">{displayNames[docType]}</span>
+                                          {communityWideDoc ? (
+                                            <div className="flex items-center gap-2">
+                                              <a
+                                                href={`/api/download-document?path=${encodeURIComponent(communityWideDoc.fileUrl)}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-blue-600 hover:text-blue-700 text-sm flex items-center gap-1"
+                                                data-testid={`link-download-${docType}`}
+                                              >
+                                                <FileText className="w-4 h-4" />
+                                                {communityWideDoc.fileName}
+                                              </a>
+                                              {user?.role === "admin" && (
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  onClick={() => deleteDocumentMutation.mutate(communityWideDoc.id)}
+                                                  data-testid={`button-delete-${docType}`}
+                                                >
+                                                  <Trash2 className="w-4 h-4 text-red-600" />
+                                                </Button>
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <span className="text-slate-500 text-sm">Not available</span>
+                                          )}
+                                        </div>
+                                        {residentialDocs.length > 0 && (
+                                          <div className="border-t border-slate-200 px-3 py-2 bg-slate-50">
+                                            <p className="text-xs text-slate-600 mb-2">Property-specific documents:</p>
+                                            <div className="space-y-1">
+                                              {residentialDocs.map((doc: any) => (
+                                                <div key={doc.id} className="flex items-center justify-between text-sm">
+                                                  <a
+                                                    href={`/api/download-document?path=${encodeURIComponent(doc.fileUrl)}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                                                  >
+                                                    <FileText className="w-3 h-3" />
+                                                    {doc.fileName}
+                                                  </a>
+                                                  {user?.role === "admin" && (
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      onClick={() => deleteDocumentMutation.mutate(doc.id)}
+                                                    >
+                                                      <Trash2 className="w-3 h-3 text-red-600" />
+                                                    </Button>
+                                                  )}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
                                 </div>
-                                <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
-                                  <span className="text-slate-700">CC&Rs & Bylaws</span>
-                                  <span className="text-slate-500 text-sm">Not available</span>
-                                </div>
-                                <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
-                                  <span className="text-slate-700">Community FAQ</span>
-                                  <span className="text-slate-500 text-sm">Not available</span>
-                                </div>
-                                <div className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
-                                  <span className="text-slate-700">Welcome Packet</span>
-                                  <span className="text-slate-500 text-sm">Not available</span>
-                                </div>
-                              </div>
+                              )}
                             </CardContent>
                           </Card>
 
@@ -4955,10 +5136,13 @@ export default function PropertyProfile() {
                             </CardHeader>
                             <CardContent>
                               <p className="text-slate-600 mb-4">Upload community documents for easy access</p>
-                              <Button variant="outline" disabled>
+                              <Button 
+                                variant="outline"
+                                onClick={() => setIsUploadDocumentDialogOpen(true)}
+                                data-testid="button-upload-documents"
+                              >
                                 <Upload className="w-4 h-4 mr-2" />
                                 Upload Documents
-                                <span className="ml-2 text-xs text-slate-500">(Coming Soon)</span>
                               </Button>
                             </CardContent>
                           </Card>
@@ -8309,6 +8493,165 @@ export default function PropertyProfile() {
             </Dialog>
           );
         })()}
+
+        {/* Upload Document Dialog */}
+        {(property as any)?.communityId && (
+          <Dialog open={isUploadDocumentDialogOpen} onOpenChange={setIsUploadDocumentDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Upload Community Document</DialogTitle>
+                <DialogDescription>
+                  Upload documents for the community. Choose document type and classification.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="document-type">Document Type</Label>
+                  <select
+                    id="document-type"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={documentForm.documentType}
+                    onChange={(e) => setDocumentForm({ ...documentForm, documentType: e.target.value })}
+                    data-testid="select-document-type"
+                  >
+                    <option value="hoa_declarations">HOA Declarations</option>
+                    <option value="ccrs_bylaws">CC&Rs & Bylaws</option>
+                    <option value="community_faq">Community FAQ</option>
+                    <option value="welcome_packet">Welcome Packet</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Classification</Label>
+                  <div className="flex flex-col space-y-2">
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="classification"
+                        value="community-wide"
+                        checked={documentForm.classification === "community-wide"}
+                        onChange={(e) => setDocumentForm({ ...documentForm, classification: e.target.value as any })}
+                        className="w-4 h-4"
+                        data-testid="radio-community-wide"
+                      />
+                      <div>
+                        <span className="font-medium">Community-Wide</span>
+                        <p className="text-sm text-slate-600">Single document shared across all properties</p>
+                      </div>
+                    </label>
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="classification"
+                        value="residential-based"
+                        checked={documentForm.classification === "residential-based"}
+                        onChange={(e) => setDocumentForm({ ...documentForm, classification: e.target.value as any })}
+                        className="w-4 h-4"
+                        data-testid="radio-residential-based"
+                      />
+                      <div>
+                        <span className="font-medium">Residential-Based</span>
+                        <p className="text-sm text-slate-600">Property-specific document (multiple uploads allowed)</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="document-file">Select File</Label>
+                  <Input
+                    id="document-file"
+                    type="file"
+                    accept=".pdf,.doc,.docx,.txt"
+                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                    data-testid="input-document-file"
+                  />
+                  {selectedFile && (
+                    <p className="text-sm text-slate-600">Selected: {selectedFile.name}</p>
+                  )}
+                </div>
+
+                {(() => {
+                  const docs = (communityDocuments as any[]).filter((d: any) => d.documentType === documentForm.documentType);
+                  const communityWideExists = docs.some((d: any) => d.classification === "community-wide" && !d.propertyId);
+
+                  if (documentForm.classification === "community-wide" && communityWideExists && user?.role !== "admin") {
+                    return (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                        <p className="text-sm text-yellow-800">
+                          <strong>Note:</strong> A community-wide document of this type already exists. 
+                          Only administrators can replace existing community-wide documents.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  if (documentForm.classification === "community-wide" && communityWideExists && user?.role === "admin") {
+                    return (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p className="text-sm text-blue-800">
+                          <strong>Note:</strong> Uploading will replace the existing community-wide document of this type.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return null;
+                })()}
+              </div>
+
+              <DialogFooter>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setIsUploadDocumentDialogOpen(false);
+                    setSelectedFile(null);
+                  }}
+                  data-testid="button-cancel-upload"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (!selectedFile) {
+                      toast({
+                        title: "No file selected",
+                        description: "Please select a file to upload",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+
+                    const docs = (communityDocuments as any[]).filter((d: any) => d.documentType === documentForm.documentType);
+                    const communityWideExists = docs.some((d: any) => d.classification === "community-wide" && !d.propertyId);
+
+                    if (documentForm.classification === "community-wide" && communityWideExists && user?.role !== "admin") {
+                      toast({
+                        title: "Permission denied",
+                        description: "Only administrators can replace existing community-wide documents",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+
+                    uploadDocumentMutation.mutate({
+                      communityId: (property as any).communityId,
+                      file: selectedFile,
+                      documentType: documentForm.documentType,
+                      classification: documentForm.classification,
+                      propertyId: documentForm.classification === "residential-based" ? Number(propertyId) : null,
+                    });
+                  }}
+                  disabled={uploadDocumentMutation.isPending || !selectedFile}
+                  data-testid="button-confirm-upload"
+                >
+                  {uploadDocumentMutation.isPending ? "Uploading..." : "Upload Document"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
 
         {/* Property Reports Modal */}
         <PropertyReportsModal 

@@ -2268,6 +2268,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Community documents routes
+  app.post("/api/communities/:id/documents/upload-url", isAuthenticated, async (req, res) => {
+    try {
+      const communityId = parseInt(req.params.id);
+      if (isNaN(communityId)) {
+        return res.status(400).json({ message: 'Invalid community ID' });
+      }
+
+      const { fileName } = req.body;
+      if (!fileName) {
+        return res.status(400).json({ message: 'File name is required' });
+      }
+
+      const uploadInfo = await objectStorageService.getCommunityDocumentUploadURL(communityId, fileName);
+      res.json(uploadInfo);
+    } catch (error) {
+      console.error("Error generating upload URL:", error);
+      res.status(500).json({ message: "Failed to generate upload URL" });
+    }
+  });
+
   app.get("/api/communities/:id/documents", isAuthenticated, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
@@ -2358,6 +2378,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting community document:", error);
       res.status(500).json({ message: "Failed to delete document" });
+    }
+  });
+
+  // Download community document
+  app.get("/api/download-document", isAuthenticated, async (req: any, res) => {
+    try {
+      const { path: filePath } = req.query;
+      if (!filePath) {
+        return res.status(400).json({ message: "File path is required" });
+      }
+
+      // Parse the object path to get bucket and object name
+      const parseObjectPath = (path: string): { bucketName: string; objectName: string } => {
+        if (!path.startsWith("/")) {
+          path = `/${path}`;
+        }
+        const pathParts = path.split("/");
+        if (pathParts.length < 3) {
+          throw new Error("Invalid path: must contain at least a bucket name");
+        }
+        const bucketName = pathParts[1];
+        const objectName = pathParts.slice(2).join("/");
+        return { bucketName, objectName };
+      };
+
+      const { bucketName, objectName } = parseObjectPath(filePath as string);
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectName);
+
+      const objectStorage = new ObjectStorageService();
+      await objectStorage.downloadObject(file, res);
+    } catch (error) {
+      console.error("Error downloading document:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Failed to download document" });
+      }
     }
   });
 

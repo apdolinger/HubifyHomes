@@ -84,6 +84,30 @@ export class ObjectStorageService {
     });
   }
 
+  // Gets the upload URL for community documents.
+  async getCommunityDocumentUploadURL(communityId: number, fileName: string): Promise<{ uploadUrl: string; fileUrl: string }> {
+    const privateObjectDir = this.getPrivateObjectDir();
+    const fileExtension = fileName.split('.').pop();
+    const objectId = `community-${communityId}_${randomUUID()}.${fileExtension}`;
+    const fullPath = `${privateObjectDir}/community-documents/${objectId}`;
+
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+
+    // Sign URL for PUT method with TTL (15 minutes)
+    const uploadUrl = await signObjectURL({
+      bucketName,
+      objectName,
+      method: "PUT",
+      ttlSec: 900,
+    });
+
+    // Return both the upload URL and the permanent file URL (path)
+    return {
+      uploadUrl,
+      fileUrl: fullPath,
+    };
+  }
+
   // Downloads an object to the response.
   async downloadObject(file: File, res: Response, cacheTtlSec: number = 3600) {
     try {
