@@ -37,6 +37,8 @@ import {
   contacts,
   contactProperties,
   alerts,
+  systemAlerts,
+  systemAlertAcknowledgements,
   teamMessages,
   messageReactions,
   messageMentions,
@@ -140,6 +142,10 @@ import {
   type InsertContactProperty,
   type Alert,
   type InsertAlert,
+  type SystemAlert,
+  type InsertSystemAlert,
+  type SystemAlertAcknowledgement,
+  type InsertSystemAlertAcknowledgement,
   type TeamMessage,
   type InsertTeamMessage,
   type MessageReaction,
@@ -436,6 +442,16 @@ export interface IStorage {
   createAlert(alert: InsertAlert): Promise<Alert>;
   updateAlert(id: number, orgId: string, alert: Partial<InsertAlert>): Promise<Alert>;
   deleteAlert(id: number, orgId: string): Promise<void>;
+  
+  // System Alert operations
+  getSystemAlertsForUser(orgId: string, userId: string, userRole: string): Promise<SystemAlert[]>;
+  getSystemAlert(id: number, orgId: string): Promise<SystemAlert | undefined>;
+  getAllSystemAlerts(orgId: string): Promise<SystemAlert[]>;
+  createSystemAlert(alert: InsertSystemAlert): Promise<SystemAlert>;
+  updateSystemAlert(id: number, orgId: string, alert: Partial<InsertSystemAlert>): Promise<SystemAlert>;
+  deleteSystemAlert(id: number, orgId: string): Promise<void>;
+  acknowledgeSystemAlert(alertId: number, userId: string): Promise<SystemAlertAcknowledgement>;
+  hasUserAcknowledgedAlert(alertId: number, userId: string): Promise<boolean>;
   
   // Team message operations
   getTeamMessages(limit?: number): Promise<TeamMessage[]>;
@@ -2741,6 +2757,102 @@ export class DatabaseStorage implements IStorage {
 
   async deleteAlert(id: number, orgId: string): Promise<void> {
     await db.delete(alerts).where(and(eq(alerts.id, id), eq(alerts.orgId, orgId)));
+  }
+
+  // System Alert operations
+  async getSystemAlertsForUser(orgId: string, userId: string, userRole: string): Promise<SystemAlert[]> {
+    // Get active system alerts that the user hasn't acknowledged
+    const activeAlerts = await db
+      .select()
+      .from(systemAlerts)
+      .where(and(
+        eq(systemAlerts.orgId, orgId),
+        eq(systemAlerts.isActive, true),
+        or(
+          isNotNull(systemAlerts.expiresAt) ? sql`${systemAlerts.expiresAt} > NOW()` : sql`true`,
+          sql`${systemAlerts.expiresAt} IS NULL`
+        )
+      ))
+      .orderBy(desc(systemAlerts.severity), desc(systemAlerts.createdAt));
+
+    // Filter based on targeting and check acknowledgements
+    const userAlerts: SystemAlert[] = [];
+    
+    for (const alert of activeAlerts) {
+      // Check targeting
+      let isTargeted = false;
+      
+      if (alert.targetType === 'all') {
+        isTargeted = true;
+      } else if (alert.targetType === 'roles' && alert.targetRoles) {
+        isTargeted = alert.targetRoles.includes(userRole);
+      } else if (alert.targetType === 'users' && alert.targetUserIds) {
+        isTargeted = alert.targetUserIds.includes(userId);
+      }
+      
+      if (!isTargeted) continue;
+      
+      // Check if user has acknowledged this alert
+      const hasAcknowledged = await this.hasUserAcknowledgedAlert(alert.id, userId);
+      if (!hasAcknowledged) {
+        userAlerts.push(alert);
+      }
+    }
+    
+    return userAlerts;
+  }
+
+  async getSystemAlert(id: number, orgId: string): Promise<SystemAlert | undefined> {
+    const [alert] = await db
+      .select()
+      .from(systemAlerts)
+      .where(and(eq(systemAlerts.id, id), eq(systemAlerts.orgId, orgId)));
+    return alert;
+  }
+
+  async getAllSystemAlerts(orgId: string): Promise<SystemAlert[]> {
+    return await db
+      .select()
+      .from(systemAlerts)
+      .where(eq(systemAlerts.orgId, orgId))
+      .orderBy(desc(systemAlerts.createdAt));
+  }
+
+  async createSystemAlert(alert: InsertSystemAlert): Promise<SystemAlert> {
+    const [newAlert] = await db.insert(systemAlerts).values(alert).returning();
+    return newAlert;
+  }
+
+  async updateSystemAlert(id: number, orgId: string, alertData: Partial<InsertSystemAlert>): Promise<SystemAlert> {
+    const [updatedAlert] = await db
+      .update(systemAlerts)
+      .set({ ...alertData, updatedAt: new Date() })
+      .where(and(eq(systemAlerts.id, id), eq(systemAlerts.orgId, orgId)))
+      .returning();
+    return updatedAlert;
+  }
+
+  async deleteSystemAlert(id: number, orgId: string): Promise<void> {
+    await db.delete(systemAlerts).where(and(eq(systemAlerts.id, id), eq(systemAlerts.orgId, orgId)));
+  }
+
+  async acknowledgeSystemAlert(alertId: number, userId: string): Promise<SystemAlertAcknowledgement> {
+    const [acknowledgement] = await db
+      .insert(systemAlertAcknowledgements)
+      .values({ alertId, userId })
+      .returning();
+    return acknowledgement;
+  }
+
+  async hasUserAcknowledgedAlert(alertId: number, userId: string): Promise<boolean> {
+    const [result] = await db
+      .select()
+      .from(systemAlertAcknowledgements)
+      .where(and(
+        eq(systemAlertAcknowledgements.alertId, alertId),
+        eq(systemAlertAcknowledgements.userId, userId)
+      ));
+    return !!result;
   }
 
   // Contact-Property relationship operations
