@@ -347,36 +347,63 @@ export default function Team() {
       {/* Team Members Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Team Members</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Team Members</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsCustomizeModalOpen(true)}
+              data-testid="customize-team-table-btn"
+            >
+              <Settings className="w-4 h-4" />
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {teamLoading ? (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[300px]">Member</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
+                  {columns.find(col => col.id === 'member')?.visible && (
+                    <TableHead className="w-[300px]">Member</TableHead>
+                  )}
+                  {columns.find(col => col.id === 'email')?.visible && (
+                    <TableHead>Email</TableHead>
+                  )}
+                  {columns.find(col => col.id === 'role')?.visible && (
+                    <TableHead>Role</TableHead>
+                  )}
+                  {columns.find(col => col.id === 'status')?.visible && (
+                    <TableHead>Status</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {[1, 2, 3].map((i) => (
                   <TableRow key={i}>
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <div className="h-10 w-10 bg-slate-200 rounded-full animate-pulse"></div>
-                        <div className="space-y-2">
+                    {columns.find(col => col.id === 'member')?.visible && (
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          <div className="h-10 w-10 bg-slate-200 rounded-full animate-pulse"></div>
                           <div className="h-4 w-32 bg-slate-200 rounded animate-pulse"></div>
-                          <div className="h-3 w-48 bg-slate-200 rounded animate-pulse"></div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="h-5 w-16 bg-slate-200 rounded animate-pulse"></div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="h-5 w-12 bg-slate-200 rounded animate-pulse"></div>
-                    </TableCell>
+                      </TableCell>
+                    )}
+                    {columns.find(col => col.id === 'email')?.visible && (
+                      <TableCell>
+                        <div className="h-3 w-48 bg-slate-200 rounded animate-pulse"></div>
+                      </TableCell>
+                    )}
+                    {columns.find(col => col.id === 'role')?.visible && (
+                      <TableCell>
+                        <div className="h-5 w-16 bg-slate-200 rounded animate-pulse"></div>
+                      </TableCell>
+                    )}
+                    {columns.find(col => col.id === 'status')?.visible && (
+                      <TableCell>
+                        <div className="h-5 w-12 bg-slate-200 rounded animate-pulse"></div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -385,9 +412,18 @@ export default function Team() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[300px]">Member</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
+                  {columns.find(col => col.id === 'member')?.visible && (
+                    <TableHead className="w-[300px]">Member</TableHead>
+                  )}
+                  {columns.find(col => col.id === 'email')?.visible && (
+                    <TableHead>Email</TableHead>
+                  )}
+                  {columns.find(col => col.id === 'role')?.visible && (
+                    <TableHead>Role</TableHead>
+                  )}
+                  {columns.find(col => col.id === 'status')?.visible && (
+                    <TableHead>Status</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -398,45 +434,54 @@ export default function Team() {
                     onClick={() => setLocation(`/team/member/${member.id}`)}
                     data-testid={`team-row-${member.id}`}
                   >
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage src={member.profileImageUrl || undefined} />
-                          <AvatarFallback>
-                            {getUserInitials(member.firstName || 'U', member.lastName || 'U')}
-                          </AvatarFallback>
-                        </Avatar>
-                        
-                        <div>
+                    {columns.find(col => col.id === 'member')?.visible && (
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={member.profileImageUrl || undefined} />
+                            <AvatarFallback>
+                              {getUserInitials(member.firstName || 'U', member.lastName || 'U')}
+                            </AvatarFallback>
+                          </Avatar>
+                          
                           <div className="font-medium text-slate-900">
                             {member.firstName} {member.lastName}
                           </div>
-                          <div className="flex items-center space-x-2 mt-1">
-                            <Mail className="w-3 h-3 text-slate-500" />
-                            <span className="text-sm text-slate-600">{member.email}</span>
-                          </div>
                         </div>
-                      </div>
-                    </TableCell>
+                      </TableCell>
+                    )}
                     
-                    <TableCell>
-                      <Badge variant={getRoleColor(member.role)}>
-                        {member.role}
-                      </Badge>
-                    </TableCell>
+                    {columns.find(col => col.id === 'email')?.visible && (
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Mail className="w-3 h-3 text-slate-500" />
+                          <span className="text-sm text-slate-600">{member.email}</span>
+                        </div>
+                      </TableCell>
+                    )}
                     
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant={member.isActive ? "default" : "secondary"}>
-                          {member.isActive ? "Active" : "Inactive"}
+                    {columns.find(col => col.id === 'role')?.visible && (
+                      <TableCell>
+                        <Badge variant={getRoleColor(member.role)}>
+                          {member.role}
                         </Badge>
-                        {isUserOutOfOffice(member) && (
-                          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">
-                            Out of Office
+                      </TableCell>
+                    )}
+                    
+                    {columns.find(col => col.id === 'status')?.visible && (
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant={member.isActive ? "default" : "secondary"}>
+                            {member.isActive ? "Active" : "Inactive"}
                           </Badge>
-                        )}
-                      </div>
-                    </TableCell>
+                          {isUserOutOfOffice(member) && (
+                            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">
+                              Out of Office
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -591,6 +636,15 @@ export default function Team() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Table Customization Modal */}
+      <TableCustomizationModal
+        isOpen={isCustomizeModalOpen}
+        onClose={() => setIsCustomizeModalOpen(false)}
+        columns={columns}
+        defaultColumns={defaultColumns}
+        onSave={handleSaveColumns}
+      />
     </main>
   );
 }
