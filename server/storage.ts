@@ -230,7 +230,7 @@ export interface IStorage {
   getTeams(orgId: string): Promise<Team[]>;
   getTeam(id: string): Promise<Team | undefined>;
   getTeamWithMembers(id: string): Promise<(Team & { members: (TeamMember & { user: User })[] }) | undefined>;
-  getUserTeams(userId: string): Promise<Team[]>;
+  getUserTeams(userId: string): Promise<(Team & { memberCount: number })[]>;
   createTeam(team: InsertTeam): Promise<Team>;
   updateTeam(id: string, team: Partial<InsertTeam>): Promise<Team>;
   deleteTeam(id: string): Promise<void>;
@@ -845,8 +845,8 @@ export class DatabaseStorage implements IStorage {
     return { ...team, members };
   }
 
-  async getUserTeams(userId: string): Promise<Team[]> {
-    // Get all teams where the user is a member
+  async getUserTeams(userId: string): Promise<(Team & { memberCount: number })[]> {
+    // Get all teams where the user is a member with member count
     const memberships = await db
       .select()
       .from(teamMembers)
@@ -855,14 +855,26 @@ export class DatabaseStorage implements IStorage {
     if (memberships.length === 0) return [];
 
     const teamIds = memberships.map(m => m.teamId);
-    return await db
-      .select()
+    
+    // Get teams with member counts in a single query
+    const teamsWithCounts = await db
+      .select({
+        team: teams,
+        memberCount: sql<number>`COUNT(DISTINCT ${teamMembers.userId})::int`,
+      })
       .from(teams)
+      .leftJoin(teamMembers, eq(teams.id, teamMembers.teamId))
       .where(and(
         sql`${teams.id} = ANY(${teamIds})`,
         eq(teams.isActive, true)
       ))
+      .groupBy(teams.id)
       .orderBy(desc(teams.createdAt));
+
+    return teamsWithCounts.map(({ team, memberCount }) => ({
+      ...team,
+      memberCount,
+    }));
   }
 
   async createTeam(team: InsertTeam): Promise<Team> {

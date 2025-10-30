@@ -123,7 +123,7 @@ export default function Team() {
   }, [isAuthenticated, isLoading, toast]);
 
   // Fetch current user info
-  const { data: currentUser } = useQuery({
+  const { data: currentUser, isLoading: currentUserLoading } = useQuery({
     queryKey: ["/api/current-user"],
     enabled: isAuthenticated,
   });
@@ -134,10 +134,10 @@ export default function Team() {
     enabled: isAuthenticated,
   });
 
-  // Fetch user's teams
+  // Fetch user's teams - only when currentUser is loaded
   const { data: userTeams = [], isLoading: teamsLoading } = useQuery({
-    queryKey: ["/api/users", currentUser?.id, "teams"],
-    enabled: isAuthenticated && !!currentUser?.id,
+    queryKey: [`/api/users/${currentUser?.id}/teams`],
+    enabled: isAuthenticated && !!currentUser?.id && !currentUserLoading,
   });
 
   // Fetch all organization teams
@@ -249,7 +249,7 @@ export default function Team() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/users", currentUser?.id, "teams"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/users/${currentUser?.id}/teams`] });
       setIsTeamCreationModalOpen(false);
       teamCreationForm.reset();
       toast({
@@ -280,7 +280,7 @@ export default function Team() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/users", currentUser?.id, "teams"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/users/${currentUser?.id}/teams`] });
       toast({
         title: "Member added",
         description: "Team member has been added successfully.",
@@ -302,7 +302,7 @@ export default function Team() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/users", currentUser?.id, "teams"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/users/${currentUser?.id}/teams`] });
       toast({
         title: "Member removed",
         description: "Team member has been removed successfully.",
