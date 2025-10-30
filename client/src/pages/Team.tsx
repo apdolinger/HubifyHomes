@@ -16,8 +16,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Plus, Mail, User, Search } from "lucide-react";
+import { Users, Plus, Mail, User, Search, Settings } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
 
 // Form schema for inviting team members
 const inviteTeamMemberSchema = z.object({
@@ -39,6 +40,34 @@ export default function Team() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isCustomizeModalOpen, setIsCustomizeModalOpen] = useState(false);
+
+  // Default column configuration for team table
+  const defaultColumns: ColumnConfig[] = [
+    { id: 'member', label: 'Member', visible: true, required: true },
+    { id: 'email', label: 'Email', visible: true },
+    { id: 'role', label: 'Role', visible: true },
+    { id: 'status', label: 'Status', visible: true },
+  ];
+
+  // Load column configuration from localStorage
+  const [columns, setColumns] = useState<ColumnConfig[]>(() => {
+    const saved = localStorage.getItem('teamTableColumns');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return defaultColumns;
+      }
+    }
+    return defaultColumns;
+  });
+
+  // Save column configuration to localStorage
+  const handleSaveColumns = (newColumns: ColumnConfig[]) => {
+    setColumns(newColumns);
+    localStorage.setItem('teamTableColumns', JSON.stringify(newColumns));
+  };
 
   // Redirect if not authenticated
   useEffect(() => {
