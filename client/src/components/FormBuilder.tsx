@@ -489,9 +489,9 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
     mutationFn: async (formData: FormSchema) => {
       return apiRequest('POST', '/api/forms', {
         name: formData.formTitle,
-        displayName: formData.exteriorName,
+        slug: formData.slug,
         description: formData.internalDescription,
-        displayDescription: formData.exteriorDescription,
+        contexts: formData.contexts,
         schema: {
           fields: formData.fields.map(field => ({
             id: field.profileFieldKey,
@@ -501,6 +501,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
             options: field.options,
             profileFieldKey: field.profileFieldKey
           })),
+          allowMultipleSubmissions: formData.allowMultipleSubmissions,
           matchExistingBy: formData.matchExistingBy,
           fieldMapping: formData.fields.reduce((acc, field) => {
             acc[field.profileFieldKey] = field.profileFieldKey;
