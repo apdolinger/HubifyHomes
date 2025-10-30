@@ -120,10 +120,22 @@ export default function Team() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
+  // Fetch current user info
+  const { data: currentUser } = useQuery({
+    queryKey: ["/api/current-user"],
+    enabled: isAuthenticated,
+  });
+
   // Fetch team members from API
   const { data: teamMembers = [], isLoading: teamLoading } = useQuery({
     queryKey: ["/api/users"],
     enabled: isAuthenticated,
+  });
+
+  // Fetch user's teams
+  const { data: userTeams = [], isLoading: teamsLoading } = useQuery({
+    queryKey: ["/api/users", currentUser?.id, "teams"],
+    enabled: isAuthenticated && !!currentUser?.id,
   });
 
   // Fetch active OOO periods for all team members
@@ -217,6 +229,7 @@ export default function Team() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users", currentUser?.id, "teams"] });
       setIsTeamCreationModalOpen(false);
       teamCreationForm.reset();
       toast({
@@ -395,27 +408,88 @@ export default function Team() {
         {isMyTeamExpanded && (
           <CardContent>
             <div className="space-y-4">
-              {/* Empty state - Build your team */}
-              <div className="text-center py-8">
-                <UserPlus className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-slate-900 mb-2">Build Your Team</h3>
-                <p className="text-slate-600 mb-4">
-                  Create and manage your direct team assignments to collaborate more effectively.
-                </p>
-                <div className="flex justify-center gap-3">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setIsTeamCreationModalOpen(true)}
-                    data-testid="build-team-btn"
-                  >
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Build Team
-                  </Button>
-                  <Button variant="outline" disabled data-testid="manage-team-assignments-btn">
-                    Manage Team Assignments
-                  </Button>
+              {teamsLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="text-sm text-slate-500 mt-2">Loading teams...</p>
                 </div>
-              </div>
+              ) : userTeams.length === 0 ? (
+                /* Empty state - Build your team */
+                <div className="text-center py-8">
+                  <UserPlus className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-slate-900 mb-2">Build Your Team</h3>
+                  <p className="text-slate-600 mb-4">
+                    Create and manage your direct team assignments to collaborate more effectively.
+                  </p>
+                  <div className="flex justify-center gap-3">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setIsTeamCreationModalOpen(true)}
+                      data-testid="build-team-btn"
+                    >
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Build Team
+                    </Button>
+                    <Button variant="outline" disabled data-testid="manage-team-assignments-btn">
+                      Manage Team Assignments
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                /* Display teams */
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <p className="text-sm text-slate-600">
+                      You are a member of {userTeams.length} team{userTeams.length !== 1 ? 's' : ''}
+                    </p>
+                    <Button 
+                      size="sm"
+                      onClick={() => setIsTeamCreationModalOpen(true)}
+                      data-testid="add-team-btn"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Team
+                    </Button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {userTeams.map((team: any) => (
+                      <Card key={team.id} data-testid={`team-card-${team.id}`}>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base">{team.name}</CardTitle>
+                          {team.description && (
+                            <p className="text-sm text-slate-500 mt-1">{team.description}</p>
+                          )}
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-slate-600">Members</span>
+                              <Badge variant="secondary">{team.memberCount || 0}</Badge>
+                            </div>
+                            {team.members && team.members.length > 0 && (
+                              <div className="flex -space-x-2 mt-2">
+                                {team.members.slice(0, 5).map((member: any) => (
+                                  <Avatar key={member.userId} className="h-8 w-8 border-2 border-white">
+                                    <AvatarFallback className="text-xs">
+                                      {getUserInitials(member.firstName || '', member.lastName || '')}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                ))}
+                                {team.members.length > 5 && (
+                                  <div className="h-8 w-8 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center">
+                                    <span className="text-xs text-slate-600">+{team.members.length - 5}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         )}
