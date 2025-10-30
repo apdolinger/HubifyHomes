@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Plus, Mail, User, Search, Settings, ArrowUpDown, ArrowUp, ArrowDown, Filter } from "lucide-react";
+import { Users, Plus, Mail, User, Search, Settings, ArrowUpDown, ArrowUp, ArrowDown, Filter, ChevronDown, ChevronUp, UserPlus } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
 
@@ -45,6 +45,7 @@ export default function Team() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [isMyTeamExpanded, setIsMyTeamExpanded] = useState(true);
 
   // Default column configuration for team table
   const defaultColumns: ColumnConfig[] = [
@@ -305,6 +306,55 @@ export default function Team() {
           </div>
         </div>
       </div>
+
+      {/* My Team Section - Collapsible */}
+      <Card className="mb-8">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>My Team</CardTitle>
+              <p className="text-sm text-slate-600 mt-1">
+                Team members assigned to you or those you work closely with
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsMyTeamExpanded(!isMyTeamExpanded)}
+              data-testid="toggle-my-team-btn"
+            >
+              {isMyTeamExpanded ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </Button>
+          </div>
+        </CardHeader>
+        {isMyTeamExpanded && (
+          <CardContent>
+            <div className="space-y-4">
+              {/* Empty state - Build your team */}
+              <div className="text-center py-8">
+                <UserPlus className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-slate-900 mb-2">Build Your Team</h3>
+                <p className="text-slate-600 mb-4">
+                  Create and manage your direct team assignments to collaborate more effectively.
+                </p>
+                <div className="flex justify-center gap-3">
+                  <Button variant="outline" disabled>
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Build Team
+                  </Button>
+                  <Button variant="outline" disabled>
+                    Manage Team Assignments
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        )}
+      </Card>
 
       {/* Team Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -652,31 +702,6 @@ export default function Team() {
               onItemsPerPageChange={setItemsPerPage}
             />
           )}
-        </CardContent>
-      </Card>
-
-      {/* My Team Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>My Team</CardTitle>
-          <p className="text-sm text-slate-600">
-            Team members assigned to you or those you work closely with
-          </p>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {/* For now, showing placeholder content - this would be populated based on user's direct reports/teammates */}
-            <div className="text-center py-8">
-              <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-slate-900 mb-2">No Direct Team Members</h3>
-              <p className="text-slate-600 mb-4">
-                Team assignment features will be available in a future update.
-              </p>
-              <Button variant="outline" disabled>
-                Manage Team Assignments
-              </Button>
-            </div>
-          </div>
         </CardContent>
       </Card>
 
