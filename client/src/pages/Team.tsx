@@ -17,6 +17,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users, Plus, Mail, User, Search, Settings, ArrowUpDown, ArrowUp, ArrowDown, Filter, ChevronDown, ChevronUp, UserPlus } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
 
@@ -32,11 +33,21 @@ const inviteTeamMemberSchema = z.object({
 
 type InviteTeamMemberForm = z.infer<typeof inviteTeamMemberSchema>;
 
+// Form schema for creating teams
+const createTeamSchema = z.object({
+  name: z.string().min(1, "Team name is required"),
+  description: z.string().optional(),
+  memberIds: z.array(z.string()).min(1, "At least one team member is required"),
+});
+
+type CreateTeamForm = z.infer<typeof createTeamSchema>;
+
 export default function Team() {
   const { isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [isTeamCreationModalOpen, setIsTeamCreationModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [searchTerm, setSearchTerm] = useState("");
@@ -174,6 +185,56 @@ export default function Team() {
 
   const handleInviteTeamMember = (data: InviteTeamMemberForm) => {
     createTeamMemberMutation.mutate(data);
+  };
+
+  // Form for creating teams
+  const teamCreationForm = useForm<CreateTeamForm>({
+    resolver: zodResolver(createTeamSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      memberIds: [],
+    },
+  });
+
+  // Mutation for creating new teams
+  const createTeamMutation = useMutation({
+    mutationFn: async (data: CreateTeamForm) => {
+      const team = await apiRequest("POST", "/api/teams", {
+        name: data.name,
+        description: data.description,
+      });
+      
+      // Add members to the team
+      for (const memberId of data.memberIds) {
+        await apiRequest("POST", `/api/teams/${team.id}/members`, {
+          userId: memberId,
+          role: "member",
+        });
+      }
+      
+      return team;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
+      setIsTeamCreationModalOpen(false);
+      teamCreationForm.reset();
+      toast({
+        title: "Team created!",
+        description: "Your team has been created successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create team. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateTeam = (data: CreateTeamForm) => {
+    createTeamMutation.mutate(data);
   };
 
   const getRoleColor = (role: string) => {
@@ -342,7 +403,11 @@ export default function Team() {
                   Create and manage your direct team assignments to collaborate more effectively.
                 </p>
                 <div className="flex justify-center gap-3">
-                  <Button variant="outline" disabled data-testid="build-team-btn">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setIsTeamCreationModalOpen(true)}
+                    data-testid="build-team-btn"
+                  >
                     <UserPlus className="w-4 h-4 mr-2" />
                     Build Team
                   </Button>
@@ -824,6 +889,130 @@ export default function Team() {
         defaultColumns={defaultColumns}
         onSave={handleSaveColumns}
       />
+
+      {/* Team Creation Modal */}
+      <Dialog open={isTeamCreationModalOpen} onOpenChange={setIsTeamCreationModalOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Build Your Team</DialogTitle>
+          </DialogHeader>
+          
+          <Form {...teamCreationForm}>
+            <form onSubmit={teamCreationForm.handleSubmit(handleCreateTeam)} className="space-y-4">
+              <FormField
+                control={teamCreationForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Team Name</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        placeholder="e.g., Field Crew A, Office Team"
+                        data-testid="input-team-name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={teamCreationForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description (Optional)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        placeholder="Brief description of the team's purpose"
+                        data-testid="input-team-description"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={teamCreationForm.control}
+                name="memberIds"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Team Members</FormLabel>
+                    <FormControl>
+                      <div className="border rounded-md p-4 space-y-2 max-h-64 overflow-y-auto">
+                        {teamMembers.length === 0 ? (
+                          <p className="text-sm text-slate-500">No team members available</p>
+                        ) : (
+                          teamMembers
+                            .filter((member: any) => member.isActive)
+                            .map((member: any) => (
+                              <div key={member.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`member-${member.id}`}
+                                  checked={field.value?.includes(member.id)}
+                                  onCheckedChange={(checked) => {
+                                    const currentValue = field.value || [];
+                                    if (checked) {
+                                      field.onChange([...currentValue, member.id]);
+                                    } else {
+                                      field.onChange(currentValue.filter((id: string) => id !== member.id));
+                                    }
+                                  }}
+                                  data-testid={`checkbox-member-${member.id}`}
+                                />
+                                <label
+                                  htmlFor={`member-${member.id}`}
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center space-x-2"
+                                >
+                                  <Avatar className="h-6 w-6">
+                                    <AvatarFallback className="text-xs">
+                                      {getUserInitials(member.firstName || '', member.lastName || '')}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <span>
+                                    {member.firstName} {member.lastName}
+                                  </span>
+                                  <Badge variant={getRoleColor(member.role)} className="text-xs">
+                                    {member.role}
+                                  </Badge>
+                                </label>
+                              </div>
+                            ))
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                    <p className="text-xs text-slate-500 mt-1">
+                      Select at least one team member
+                    </p>
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsTeamCreationModalOpen(false)}
+                  data-testid="button-cancel-team"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={createTeamMutation.isPending}
+                  data-testid="button-create-team"
+                >
+                  {createTeamMutation.isPending ? "Creating..." : "Create Team"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
