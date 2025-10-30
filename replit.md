@@ -6,6 +6,25 @@ Hubify is a professional property management platform designed to streamline ope
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+### Team Management Fix (October 2025)
+Fixed critical bug where teams created successfully on the backend but didn't appear in the "My Teams" section of the UI.
+
+**Root Cause**: Missing `/api/current-user` endpoint caused `currentUser` to be undefined, preventing the user teams query from executing.
+
+**Solution**:
+1. Added `/api/current-user` endpoint that returns the authenticated user via session
+2. Updated frontend query to use TanStack Query v5 default fetcher pattern with proper query key
+3. Optimized `getUserTeams()` backend function to use single SQL query with JOIN and GROUP BY (eliminated N+1 query pattern)
+4. Ensured consistent cache invalidation across all team mutations
+
+**Technical Details**:
+- Backend routes: `/api/current-user` (new), `/api/users/:userId/teams` (optimized)
+- Frontend: Team.tsx uses default queryClient fetcher with enabled gating on currentUser
+- Storage: Single aggregated query returns teams with memberCount instead of sequential fetches
+- Cache invalidation: Matches query key format for proper refresh behavior
+
 ## System Architecture
 
 ### UI/UX
