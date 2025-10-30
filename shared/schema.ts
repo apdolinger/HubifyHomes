@@ -514,6 +514,34 @@ export const outOfOfficePeriods = pgTable("out_of_office_periods", {
   index("out_of_office_dates_idx").on(table.startDate, table.endDate),
 ]);
 
+// Teams for managing team assignments
+export const teams = pgTable("teams", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id, { onDelete: "cascade" }).notNull(),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("teams_org_idx").on(table.orgId),
+  index("teams_created_by_idx").on(table.createdBy),
+]);
+
+// Team members junction table
+export const teamMembers = pgTable("team_members", {
+  id: serial("id").primaryKey(),
+  teamId: uuid("team_id").references(() => teams.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  role: varchar("role").$type<"lead"|"member">().notNull().default("member"),
+  assignedAt: timestamp("assigned_at").defaultNow(),
+}, (table) => [
+  index("team_members_team_idx").on(table.teamId),
+  index("team_members_user_idx").on(table.userId),
+  unique("team_members_unique").on(table.teamId, table.userId),
+]);
+
 // Communities table
 export const communities = pgTable("communities", {
   id: serial("id").primaryKey(),
@@ -1479,6 +1507,31 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   createdTasks: many(tasks, { relationName: "assignedBy" }),
   messages: many(teamMessages),
   activities: many(activityLog),
+  createdTeams: many(teams),
+  teamMemberships: many(teamMembers),
+}));
+
+export const teamsRelations = relations(teams, ({ one, many }) => ({
+  org: one(orgs, {
+    fields: [teams.orgId],
+    references: [orgs.id],
+  }),
+  creator: one(users, {
+    fields: [teams.createdBy],
+    references: [users.id],
+  }),
+  members: many(teamMembers),
+}));
+
+export const teamMembersRelations = relations(teamMembers, ({ one }) => ({
+  team: one(teams, {
+    fields: [teamMembers.teamId],
+    references: [teams.id],
+  }),
+  user: one(users, {
+    fields: [teamMembers.userId],
+    references: [users.id],
+  }),
 }));
 
 export const communitiesRelations = relations(communities, ({ one, many }) => ({
@@ -1831,6 +1884,22 @@ export const insertOutOfOfficePeriodSchema = createInsertSchema(outOfOfficePerio
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
 });
+
+export const insertTeamSchema = createInsertSchema(teams).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTeamMemberSchema = createInsertSchema(teamMembers).omit({
+  id: true,
+  assignedAt: true,
+});
+
+export type InsertTeam = z.infer<typeof insertTeamSchema>;
+export type Team = typeof teams.$inferSelect;
+export type InsertTeamMember = z.infer<typeof insertTeamMemberSchema>;
+export type TeamMember = typeof teamMembers.$inferSelect;
 
 export const insertChecklistTemplateSchema = createInsertSchema(checklistTemplates).omit({
   id: true,
