@@ -1,6 +1,8 @@
 import {
   users,
   outOfOfficePeriods,
+  teams,
+  teamMembers,
   orgs,
   orgSubscriptions,
   orgStripeConnections,
@@ -68,6 +70,12 @@ import {
   customFields,
   type User,
   type UpsertUser,
+  type OutOfOfficePeriod,
+  type InsertOutOfOfficePeriod,
+  type Team,
+  type InsertTeam,
+  type TeamMember,
+  type InsertTeamMember,
   type Org,
   type InsertOrg,
   type OrgSubscription,
@@ -219,6 +227,19 @@ export interface IStorage {
   updateOutOfOfficePeriod(id: number, period: Partial<InsertOutOfOfficePeriod>): Promise<OutOfOfficePeriod>;
   deleteOutOfOfficePeriod(id: number): Promise<void>;
   getUsersOutOfOffice(orgId: string, startDate: Date, endDate: Date): Promise<User[]>;
+  
+  // Team operations
+  getTeams(orgId: string): Promise<Team[]>;
+  getTeam(id: string): Promise<Team | undefined>;
+  getTeamWithMembers(id: string): Promise<(Team & { members: (TeamMember & { user: User })[] }) | undefined>;
+  getUserTeams(userId: string): Promise<Team[]>;
+  createTeam(team: InsertTeam): Promise<Team>;
+  updateTeam(id: string, team: Partial<InsertTeam>): Promise<Team>;
+  deleteTeam(id: string): Promise<void>;
+  addTeamMember(teamMember: InsertTeamMember): Promise<TeamMember>;
+  removeTeamMember(teamId: string, userId: string): Promise<void>;
+  getTeamMembers(teamId: string): Promise<(TeamMember & { user: User })[]>;
+  updateTeamMemberRole(teamId: string, userId: string, role: 'lead' | 'member'): Promise<TeamMember>;
   
   // Organization operations
   getOrgs(): Promise<Org[]>;
@@ -799,6 +820,110 @@ export class DatabaseStorage implements IStorage {
 
     const userIds = Array.from(new Set(periods.map(p => p.userId)));
     return await db.select().from(users).where(sql`${users.id} = ANY(${userIds})`);
+  }
+
+  // Team operations
+  async getTeams(orgId: string): Promise<Team[]> {
+    return await db
+      .select()
+      .from(teams)
+      .where(and(eq(teams.orgId, orgId), eq(teams.isActive, true)))
+      .orderBy(desc(teams.createdAt));
+  }
+
+  async getTeam(id: string): Promise<Team | undefined> {
+    const [team] = await db.select().from(teams).where(eq(teams.id, id));
+    return team;
+  }
+
+  async getTeamWithMembers(id: string): Promise<(Team & { members: (TeamMember & { user: User })[] }) | undefined> {
+    const team = await this.getTeam(id);
+    if (!team) return undefined;
+
+    const members = await this.getTeamMembers(id);
+    return { ...team, members };
+  }
+
+  async getUserTeams(userId: string): Promise<Team[]> {
+    // Get all teams where the user is a member
+    const memberships = await db
+      .select()
+      .from(teamMembers)
+      .where(eq(teamMembers.userId, userId));
+
+    if (memberships.length === 0) return [];
+
+    const teamIds = memberships.map(m => m.teamId);
+    return await db
+      .select()
+      .from(teams)
+      .where(and(
+        sql`${teams.id} = ANY(${teamIds})`,
+        eq(teams.isActive, true)
+      ))
+      .orderBy(desc(teams.createdAt));
+  }
+
+  async createTeam(team: InsertTeam): Promise<Team> {
+    const [newTeam] = await db.insert(teams).values(team).returning();
+    return newTeam;
+  }
+
+  async updateTeam(id: string, teamData: Partial<InsertTeam>): Promise<Team> {
+    const [updated] = await db
+      .update(teams)
+      .set({ ...teamData, updatedAt: new Date() })
+      .where(eq(teams.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTeam(id: string): Promise<void> {
+    await db.update(teams).set({ isActive: false }).where(eq(teams.id, id));
+  }
+
+  async addTeamMember(teamMember: InsertTeamMember): Promise<TeamMember> {
+    const [newMember] = await db.insert(teamMembers).values(teamMember).returning();
+    return newMember;
+  }
+
+  async removeTeamMember(teamId: string, userId: string): Promise<void> {
+    await db
+      .delete(teamMembers)
+      .where(and(
+        eq(teamMembers.teamId, teamId),
+        eq(teamMembers.userId, userId)
+      ));
+  }
+
+  async getTeamMembers(teamId: string): Promise<(TeamMember & { user: User })[]> {
+    const members = await db
+      .select({
+        id: teamMembers.id,
+        teamId: teamMembers.teamId,
+        userId: teamMembers.userId,
+        role: teamMembers.role,
+        assignedAt: teamMembers.assignedAt,
+        user: users,
+      })
+      .from(teamMembers)
+      .innerJoin(users, eq(teamMembers.userId, users.id))
+      .where(eq(teamMembers.teamId, teamId))
+      .orderBy(teamMembers.assignedAt);
+
+    return members;
+  }
+
+  async updateTeamMemberRole(teamId: string, userId: string, role: 'lead' | 'member'): Promise<TeamMember> {
+    const [updated] = await db
+      .update(teamMembers)
+      .set({ role })
+      .where(and(
+        eq(teamMembers.teamId, teamId),
+        eq(teamMembers.userId, userId)
+      ))
+      .returning();
+    return updated;
   }
 
   // Organization operations
