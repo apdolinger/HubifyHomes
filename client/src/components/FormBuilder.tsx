@@ -296,108 +296,6 @@ const FormSettingsPanel: React.FC<FormSettingsPanelProps> = ({
   );
 };
 
-// FormDeploySection Component
-interface FormDeploySectionProps {
-  formSchema: FormSchema;
-}
-
-const FormDeploySection: React.FC<FormDeploySectionProps> = ({ formSchema }) => {
-  const { toast } = useToast();
-  
-  const embedCode = `<iframe src="${window.location.origin}/forms/${formSchema.slug}" width="100%" height="600" frameborder="0"></iframe>`;
-  
-  const handlePublish = () => {
-    if (!formSchema.formTitle || !formSchema.slug) {
-      toast({
-        title: "Cannot Publish",
-        description: "Please save the form first before publishing.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    toast({
-      title: "Form Published",
-      description: "Your form is now live and accepting submissions.",
-    });
-  };
-  
-  const copyEmbedCode = async () => {
-    try {
-      await navigator.clipboard.writeText(embedCode);
-      toast({
-        title: "Copied!",
-        description: "Embed code copied to clipboard.",
-      });
-    } catch (err) {
-      toast({
-        title: "Copy Failed",
-        description: "Please manually copy the embed code.",
-        variant: "destructive",
-      });
-    }
-  };
-  
-  return (
-    <Card className="mt-6">
-      <CardHeader>
-        <CardTitle className="flex items-center">
-          <Upload className="w-5 h-5 mr-2" />
-          Form Deployment
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center space-x-2">
-          <Button onClick={handlePublish} className="bg-green-600 hover:bg-green-700">
-            <Upload className="w-4 h-4 mr-2" />
-            Publish Form
-          </Button>
-          <Badge variant={formSchema.formTitle ? "default" : "secondary"}>
-            {formSchema.formTitle ? "Ready to Publish" : "Save First"}
-          </Badge>
-        </div>
-        
-        <div>
-          <Label htmlFor="embedCode">Embed Code</Label>
-          <div className="flex space-x-2">
-            <Input
-              id="embedCode"
-              value={embedCode}
-              readOnly
-              className="flex-1"
-            />
-            <Button variant="outline" onClick={copyEmbedCode}>
-              Copy Embed Code
-            </Button>
-          </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Use this code to embed the form on your website.
-          </p>
-        </div>
-        
-        {formSchema.slug && (
-          <div>
-            <Label>Form URL</Label>
-            <div className="flex space-x-2">
-              <Input
-                value={`${window.location.origin}/forms/${formSchema.slug}`}
-                readOnly
-                className="flex-1"
-              />
-              <Button 
-                variant="outline" 
-                onClick={() => window.open(`/forms/${formSchema.slug}`, '_blank')}
-              >
-                Open Form
-              </Button>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-};
-
 export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -868,9 +766,6 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Form Deploy Section */}
-      <FormDeploySection formSchema={formSchema} />
     </div>
   );
 }
