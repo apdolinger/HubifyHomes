@@ -128,6 +128,14 @@ app.use((req, res, next) => {
     // Start scheduled background tasks
     startScheduledTasks();
     
+    // Initialize default test organization (only creates if not exists)
+    try {
+      const { initializeDefaultOrganization } = await import('./seedOrgs.js');
+      await initializeDefaultOrganization();
+    } catch (error) {
+      console.error('Error initializing default organization:', error);
+    }
+    
     // Initialize default platform templates (only creates if not exists)
     try {
       const { initializeTemplates } = await import('./seedTemplates.js');

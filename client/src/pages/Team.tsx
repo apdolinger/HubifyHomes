@@ -220,17 +220,29 @@ export default function Team() {
   // Mutation for creating new teams
   const createTeamMutation = useMutation({
     mutationFn: async (data: CreateTeamForm) => {
-      const team = await apiRequest("POST", "/api/teams", {
+      const response = await apiRequest("POST", "/api/teams", {
         name: data.name,
         description: data.description,
       });
+      const team = await response.json();
       
-      // Add members to the team
-      for (const memberId of data.memberIds) {
+      // Add the creator as a member of the team first
+      if (currentUser?.id) {
         await apiRequest("POST", `/api/teams/${team.id}/members`, {
-          userId: memberId,
+          userId: currentUser.id,
           role: "member",
         });
+      }
+      
+      // Add selected members to the team
+      for (const memberId of data.memberIds) {
+        // Skip if already added (the creator)
+        if (memberId !== currentUser?.id) {
+          await apiRequest("POST", `/api/teams/${team.id}/members`, {
+            userId: memberId,
+            role: "member",
+          });
+        }
       }
       
       return team;
@@ -1074,49 +1086,48 @@ export default function Team() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Team Members</FormLabel>
-                    <FormControl>
-                      <div className="border rounded-md p-4 space-y-2 max-h-64 overflow-y-auto">
-                        {teamMembers.length === 0 ? (
-                          <p className="text-sm text-slate-500">No team members available</p>
-                        ) : (
-                          teamMembers
-                            .filter((member: any) => member.isActive)
-                            .map((member: any) => (
-                              <div key={member.id} className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={`member-${member.id}`}
-                                  checked={field.value?.includes(member.id)}
-                                  onCheckedChange={(checked) => {
-                                    const currentValue = field.value || [];
-                                    if (checked) {
-                                      field.onChange([...currentValue, member.id]);
-                                    } else {
-                                      field.onChange(currentValue.filter((id: string) => id !== member.id));
-                                    }
-                                  }}
-                                  data-testid={`checkbox-member-${member.id}`}
-                                />
-                                <label
-                                  htmlFor={`member-${member.id}`}
-                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center space-x-2"
-                                >
-                                  <Avatar className="h-6 w-6">
-                                    <AvatarFallback className="text-xs">
-                                      {getUserInitials(member.firstName || '', member.lastName || '')}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <span>
-                                    {member.firstName} {member.lastName}
-                                  </span>
-                                  <Badge variant={getRoleColor(member.role)} className="text-xs">
-                                    {member.role}
-                                  </Badge>
-                                </label>
-                              </div>
-                            ))
-                        )}
-                      </div>
-                    </FormControl>
+                    <div className="border rounded-md p-4 space-y-2 max-h-64 overflow-y-auto">
+                      {teamMembers.length === 0 ? (
+                        <p className="text-sm text-slate-500">No team members available</p>
+                      ) : (
+                        teamMembers
+                          .filter((member: any) => member.isActive)
+                          .map((member: any) => (
+                            <div key={member.id} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`member-${member.id}`}
+                                checked={field.value?.includes(member.id)}
+                                onCheckedChange={(checked) => {
+                                  const currentValue = field.value || [];
+                                  if (checked) {
+                                    field.onChange([...currentValue, member.id]);
+                                  } else {
+                                    field.onChange(currentValue.filter((id: string) => id !== member.id));
+                                  }
+                                }}
+                                data-testid={`checkbox-member-${member.id}`}
+                              />
+                              <label
+                                htmlFor={`member-${member.id}`}
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center space-x-2 cursor-pointer"
+                                data-testid={`label-member-${member.id}`}
+                              >
+                                <Avatar className="h-6 w-6">
+                                  <AvatarFallback className="text-xs">
+                                    {getUserInitials(member.firstName || '', member.lastName || '')}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span>
+                                  {member.firstName} {member.lastName}
+                                </span>
+                                <Badge variant={getRoleColor(member.role)} className="text-xs">
+                                  {member.role}
+                                </Badge>
+                              </label>
+                            </div>
+                          ))
+                      )}
+                    </div>
                     <FormMessage />
                     <p className="text-xs text-slate-500 mt-1">
                       Select at least one team member

@@ -82,6 +82,14 @@ export async function setupAuth(app: Express) {
     
     try {
       await upsertUser(claims);
+      
+      // Fetch user from database to get orgId and role
+      const dbUser = await storage.getUser(claims["sub"]);
+      if (dbUser) {
+        // Add orgId and role from database to session claims
+        user.claims.orgId = dbUser.orgId;
+        user.claims.role = dbUser.role;
+      }
     } catch (error) {
       console.error('[OIDC] Error upserting user:', error);
       // Continue anyway - user session will still work with just claims
