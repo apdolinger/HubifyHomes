@@ -48,6 +48,8 @@ export default function Team() {
   const [, setLocation] = useLocation();
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isTeamCreationModalOpen, setIsTeamCreationModalOpen] = useState(false);
+  const [isTeamAssignmentsModalOpen, setIsTeamAssignmentsModalOpen] = useState(false);
+  const [selectedTeamForManagement, setSelectedTeamForManagement] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [searchTerm, setSearchTerm] = useState("");
@@ -136,6 +138,12 @@ export default function Team() {
   const { data: userTeams = [], isLoading: teamsLoading } = useQuery({
     queryKey: ["/api/users", currentUser?.id, "teams"],
     enabled: isAuthenticated && !!currentUser?.id,
+  });
+
+  // Fetch all organization teams
+  const { data: allTeams = [], isLoading: allTeamsLoading } = useQuery({
+    queryKey: ["/api/teams"],
+    enabled: isAuthenticated,
   });
 
   // Fetch active OOO periods for all team members
@@ -249,6 +257,53 @@ export default function Team() {
   const handleCreateTeam = (data: CreateTeamForm) => {
     createTeamMutation.mutate(data);
   };
+
+  // Mutation for adding team member
+  const addTeamMemberMutation = useMutation({
+    mutationFn: async ({ teamId, userId }: { teamId: string; userId: string }) => {
+      return apiRequest("POST", `/api/teams/${teamId}/members`, {
+        userId,
+        role: "member",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users", currentUser?.id, "teams"] });
+      toast({
+        title: "Member added",
+        description: "Team member has been added successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add team member. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation for removing team member
+  const removeTeamMemberMutation = useMutation({
+    mutationFn: async ({ teamId, userId }: { teamId: string; userId: string }) => {
+      return apiRequest("DELETE", `/api/teams/${teamId}/members/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users", currentUser?.id, "teams"] });
+      toast({
+        title: "Member removed",
+        description: "Team member has been removed successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove team member. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -430,7 +485,11 @@ export default function Team() {
                       <UserPlus className="w-4 h-4 mr-2" />
                       Build Team
                     </Button>
-                    <Button variant="outline" disabled data-testid="manage-team-assignments-btn">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setIsTeamAssignmentsModalOpen(true)}
+                      data-testid="manage-team-assignments-btn"
+                    >
                       Manage Team Assignments
                     </Button>
                   </div>
@@ -1085,6 +1144,171 @@ export default function Team() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Team Assignments Modal */}
+      <Dialog open={isTeamAssignmentsModalOpen} onOpenChange={setIsTeamAssignmentsModalOpen}>
+        <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Manage Team Assignments</DialogTitle>
+            <p className="text-sm text-slate-600 mt-1">
+              Add or remove members from teams across your organization
+            </p>
+          </DialogHeader>
+          
+          <div className="space-y-6 mt-4">
+            {allTeamsLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="text-sm text-slate-500 mt-2">Loading teams...</p>
+              </div>
+            ) : allTeams.length === 0 ? (
+              <div className="text-center py-8">
+                <UserPlus className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-slate-900 mb-2">No teams yet</h3>
+                <p className="text-slate-600 mb-4">
+                  Create your first team to start managing team assignments
+                </p>
+                <Button onClick={() => {
+                  setIsTeamAssignmentsModalOpen(false);
+                  setIsTeamCreationModalOpen(true);
+                }}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Team
+                </Button>
+              </div>
+            ) : (
+              allTeams.map((team: any) => (
+                <Card key={team.id} data-testid={`team-assignment-${team.id}`}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-lg">{team.name}</CardTitle>
+                        {team.description && (
+                          <p className="text-sm text-slate-500 mt-1">{team.description}</p>
+                        )}
+                      </div>
+                      <Badge variant="secondary">
+                        {team.members?.length || 0} member{team.members?.length !== 1 ? 's' : ''}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {/* Current Members */}
+                      {team.members && team.members.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium text-slate-700 mb-2">Current Members</h4>
+                          <div className="space-y-2">
+                            {team.members.map((member: any) => (
+                              <div 
+                                key={member.userId} 
+                                className="flex items-center justify-between p-2 border rounded hover:bg-slate-50"
+                                data-testid={`team-member-${team.id}-${member.userId}`}
+                              >
+                                <div className="flex items-center space-x-3">
+                                  <Avatar className="h-8 w-8">
+                                    <AvatarFallback className="text-xs">
+                                      {getUserInitials(member.firstName || '', member.lastName || '')}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <p className="text-sm font-medium">
+                                      {member.firstName} {member.lastName}
+                                    </p>
+                                    <p className="text-xs text-slate-500">{member.email}</p>
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeTeamMemberMutation.mutate({ 
+                                    teamId: team.id, 
+                                    userId: member.userId 
+                                  })}
+                                  disabled={removeTeamMemberMutation.isPending}
+                                  data-testid={`remove-member-${team.id}-${member.userId}`}
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Add Members */}
+                      <div>
+                        <h4 className="text-sm font-medium text-slate-700 mb-2">
+                          {team.members?.length > 0 ? 'Add More Members' : 'Add Members'}
+                        </h4>
+                        <div className="space-y-2 max-h-48 overflow-y-auto border rounded p-2">
+                          {teamMembers
+                            .filter((member: any) => 
+                              member.isActive && 
+                              !team.members?.some((m: any) => m.userId === member.id)
+                            )
+                            .map((member: any) => (
+                              <div 
+                                key={member.id} 
+                                className="flex items-center justify-between p-2 hover:bg-slate-50 rounded"
+                              >
+                                <div className="flex items-center space-x-3">
+                                  <Avatar className="h-8 w-8">
+                                    <AvatarFallback className="text-xs">
+                                      {getUserInitials(member.firstName || '', member.lastName || '')}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <p className="text-sm font-medium">
+                                      {member.firstName} {member.lastName}
+                                    </p>
+                                    <Badge variant={getRoleColor(member.role)} className="text-xs">
+                                      {member.role}
+                                    </Badge>
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => addTeamMemberMutation.mutate({ 
+                                    teamId: team.id, 
+                                    userId: member.id 
+                                  })}
+                                  disabled={addTeamMemberMutation.isPending}
+                                  data-testid={`add-member-${team.id}-${member.id}`}
+                                >
+                                  <Plus className="w-3 h-3 mr-1" />
+                                  Add
+                                </Button>
+                              </div>
+                            ))}
+                          {teamMembers.filter((member: any) => 
+                            member.isActive && 
+                            !team.members?.some((m: any) => m.userId === member.id)
+                          ).length === 0 && (
+                            <p className="text-sm text-slate-500 text-center py-4">
+                              All active team members are already assigned
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              onClick={() => setIsTeamAssignmentsModalOpen(false)}
+              data-testid="button-close-assignments"
+            >
+              Done
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </main>
