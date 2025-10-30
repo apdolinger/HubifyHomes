@@ -1759,10 +1759,21 @@ export default function Admin() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3">
-                  <Button variant="outline" className="w-full justify-start">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export All People (CSV)
-                  </Button>
+                  <Link href="/admin/notes/search">
+                    <Button variant="outline" className="w-full justify-start" data-testid="button-note-search">
+                      <Search className="w-4 h-4 mr-2" />
+                      Search All Notes
+                    </Button>
+                  </Link>
+                  <p className="text-xs text-slate-500">
+                    Find notes across properties, vehicles, rooms, contacts, and more
+                  </p>
+                  <div className="border-t pt-3 space-y-3">
+                    <Button variant="outline" className="w-full justify-start">
+                      <Download className="w-4 h-4 mr-2" />
+                      Export All People (CSV)
+                    </Button>
+                  </div>
                   <Button variant="outline" className="w-full justify-start">
                     <Download className="w-4 h-4 mr-2" />
                     Export All Properties (CSV)

@@ -8851,6 +8851,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin Notes Search - Search across all note types in the system
+  app.get("/api/admin/notes/search", isAuthenticated, async (req, res) => {
+    try {
+      if (req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { q: searchQuery } = req.query;
+      const orgId = req.user?.claims?.orgId;
+
+      if (!orgId) {
+        return res.status(403).json({ message: "Organization required" });
+      }
+
+      const results = await storage.searchAllNotes(orgId, searchQuery as string || "");
+      res.json(results);
+    } catch (error) {
+      console.error("Error searching notes:", error);
+      res.status(500).json({ message: "Failed to search notes" });
+    }
+  });
+
   // Upload/Download endpoints for admin platform invoices
   app.post("/api/admin/invoices/:id/upload", uploadInvoice.single('file'), isAuthenticated, async (req, res) => {
     try {

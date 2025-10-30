@@ -667,6 +667,9 @@ export interface IStorage {
   updateCustomField(id: number, orgId: string, field: Partial<Omit<InsertCustomField, "orgId"|"fieldKey">>): Promise<CustomField>;
   deleteCustomField(id: number, orgId: string): Promise<void>;
   reorderCustomFields(orgId: string, fieldIds: number[]): Promise<void>;
+  
+  // Admin note search
+  searchAllNotes(orgId: string, searchQuery: string): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -5339,6 +5342,213 @@ export class DatabaseStorage implements IStorage {
         .set({ displayOrder: i, updatedAt: new Date() })
         .where(and(eq(customFields.id, fieldIds[i]), eq(customFields.orgId, orgId)));
     }
+  }
+  
+  // Admin note search - searches across all note sources in the system
+  async searchAllNotes(orgId: string, searchQuery: string): Promise<any[]> {
+    const searchTerm = `%${searchQuery}%`;
+    const results: any[] = [];
+    
+    // 1. Vehicle Notes
+    const vehicleNotesResults = await db
+      .select({
+        id: vehicleNotes.id,
+        type: sql<string>`'vehicle_note'`,
+        title: vehicleNotes.title,
+        content: vehicleNotes.content,
+        category: vehicleNotes.category,
+        createdBy: users.name,
+        createdAt: vehicleNotes.createdAt,
+        relatedEntity: vehicles.name,
+        relatedEntityId: vehicles.id,
+        relatedEntityType: sql<string>`'vehicle'`,
+        isImportant: vehicleNotes.isImportant,
+      })
+      .from(vehicleNotes)
+      .innerJoin(vehicles, eq(vehicleNotes.vehicleId, vehicles.id))
+      .innerJoin(users, eq(vehicleNotes.createdById, users.id))
+      .innerJoin(properties, eq(vehicles.propertyId, properties.id))
+      .where(and(
+        eq(properties.orgId, orgId),
+        or(
+          like(vehicleNotes.title, searchTerm),
+          like(vehicleNotes.content, searchTerm)
+        )
+      ))
+      .orderBy(desc(vehicleNotes.createdAt))
+      .limit(50);
+    results.push(...vehicleNotesResults);
+    
+    // 2. Room Notes
+    const roomNotesResults = await db
+      .select({
+        id: roomNotes.id,
+        type: sql<string>`'room_note'`,
+        title: roomNotes.title,
+        content: roomNotes.content,
+        category: roomNotes.category,
+        createdBy: users.name,
+        createdAt: roomNotes.createdAt,
+        relatedEntity: sql<string>`${rooms.name} || ' (' || ${properties.address} || ')'`,
+        relatedEntityId: rooms.id,
+        relatedEntityType: sql<string>`'room'`,
+        isImportant: roomNotes.isImportant,
+      })
+      .from(roomNotes)
+      .innerJoin(rooms, eq(roomNotes.roomId, rooms.id))
+      .innerJoin(properties, eq(rooms.propertyId, properties.id))
+      .innerJoin(users, eq(roomNotes.createdById, users.id))
+      .where(and(
+        eq(properties.orgId, orgId),
+        or(
+          like(roomNotes.title, searchTerm),
+          like(roomNotes.content, searchTerm)
+        )
+      ))
+      .orderBy(desc(roomNotes.createdAt))
+      .limit(50);
+    results.push(...roomNotesResults);
+    
+    // 3. Property notes
+    const propertyNotesResults = await db
+      .select({
+        id: properties.id,
+        type: sql<string>`'property_note'`,
+        title: sql<string>`'Property Note'`,
+        content: properties.notes,
+        category: sql<string>`'general'`,
+        createdBy: sql<string>`''`,
+        createdAt: properties.createdAt,
+        relatedEntity: properties.address,
+        relatedEntityId: properties.id,
+        relatedEntityType: sql<string>`'property'`,
+        isImportant: sql<boolean>`false`,
+      })
+      .from(properties)
+      .where(and(
+        eq(properties.orgId, orgId),
+        isNotNull(properties.notes),
+        like(properties.notes, searchTerm)
+      ))
+      .orderBy(desc(properties.createdAt))
+      .limit(50);
+    results.push(...propertyNotesResults);
+    
+    // 4. Contact notes
+    const contactNotesResults = await db
+      .select({
+        id: contacts.id,
+        type: sql<string>`'contact_note'`,
+        title: sql<string>`'Contact Note'`,
+        content: contacts.notes,
+        category: contacts.type,
+        createdBy: sql<string>`''`,
+        createdAt: contacts.createdAt,
+        relatedEntity: sql<string>`${contacts.firstName} || ' ' || ${contacts.lastName}`,
+        relatedEntityId: contacts.id,
+        relatedEntityType: sql<string>`'contact'`,
+        isImportant: sql<boolean>`false`,
+      })
+      .from(contacts)
+      .where(and(
+        eq(contacts.orgId, orgId),
+        eq(contacts.isActive, true),
+        isNotNull(contacts.notes),
+        like(contacts.notes, searchTerm)
+      ))
+      .orderBy(desc(contacts.createdAt))
+      .limit(50);
+    results.push(...contactNotesResults);
+    
+    // 5. Task notes (checklist items)
+    const taskNotesResults = await db
+      .select({
+        id: checklistItems.id,
+        type: sql<string>`'task_note'`,
+        title: tasks.title,
+        content: checklistItems.notes,
+        category: sql<string>`'task'`,
+        createdBy: sql<string>`''`,
+        createdAt: tasks.createdAt,
+        relatedEntity: tasks.title,
+        relatedEntityId: tasks.id,
+        relatedEntityType: sql<string>`'task'`,
+        isImportant: sql<boolean>`false`,
+      })
+      .from(checklistItems)
+      .innerJoin(tasks, eq(checklistItems.taskId, tasks.id))
+      .where(and(
+        eq(tasks.orgId, orgId),
+        isNotNull(checklistItems.notes),
+        like(checklistItems.notes, searchTerm)
+      ))
+      .orderBy(desc(tasks.createdAt))
+      .limit(50);
+    results.push(...taskNotesResults);
+    
+    // 6. Time tracking notes
+    const timeTrackingNotesResults = await db
+      .select({
+        id: timeTracking.id,
+        type: sql<string>`'time_tracking_note'`,
+        title: sql<string>`'Time Entry Note'`,
+        content: timeTracking.notes,
+        category: timeTracking.workType,
+        createdBy: users.name,
+        createdAt: timeTracking.clockIn,
+        relatedEntity: sql<string>`${users.name} || ' - ' || ${timeTracking.workType}`,
+        relatedEntityId: timeTracking.id,
+        relatedEntityType: sql<string>`'time_tracking'`,
+        isImportant: sql<boolean>`false`,
+      })
+      .from(timeTracking)
+      .innerJoin(users, eq(timeTracking.userId, users.id))
+      .where(and(
+        eq(users.orgId, orgId),
+        isNotNull(timeTracking.notes),
+        like(timeTracking.notes, searchTerm)
+      ))
+      .orderBy(desc(timeTracking.clockIn))
+      .limit(50);
+    results.push(...timeTrackingNotesResults);
+    
+    // 7. Vehicle Maintenance notes
+    const vehicleMaintenanceNotesResults = await db
+      .select({
+        id: vehicleMaintenance.id,
+        type: sql<string>`'vehicle_maintenance_note'`,
+        title: vehicleMaintenance.serviceType,
+        content: vehicleMaintenance.notes,
+        category: vehicleMaintenance.serviceType,
+        createdBy: users.name,
+        createdAt: vehicleMaintenance.createdAt,
+        relatedEntity: sql<string>`${vehicles.name} || ' - ' || ${vehicleMaintenance.serviceType}`,
+        relatedEntityId: vehicles.id,
+        relatedEntityType: sql<string>`'vehicle'`,
+        isImportant: sql<boolean>`false`,
+      })
+      .from(vehicleMaintenance)
+      .innerJoin(vehicles, eq(vehicleMaintenance.vehicleId, vehicles.id))
+      .innerJoin(users, eq(vehicleMaintenance.createdById, users.id))
+      .innerJoin(properties, eq(vehicles.propertyId, properties.id))
+      .where(and(
+        eq(properties.orgId, orgId),
+        isNotNull(vehicleMaintenance.notes),
+        like(vehicleMaintenance.notes, searchTerm)
+      ))
+      .orderBy(desc(vehicleMaintenance.createdAt))
+      .limit(50);
+    results.push(...vehicleMaintenanceNotesResults);
+    
+    // Sort all results by created date
+    results.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+    
+    // Return top 100 results
+    return results.slice(0, 100);
   }
 }
 

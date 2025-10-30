@@ -26,6 +26,7 @@ import TeamMessages from "@/pages/TeamMessages";
 import HubifyConsole from "@/pages/HubifyConsole";
 import AdminClientPortal from "@/pages/AdminClientPortal";
 import AdminClientPortalProperty from "@/pages/AdminClientPortalProperty";
+import AdminNoteSearch from "@/pages/AdminNoteSearch";
 import Admin from "@/pages/Admin";
 import Account from "@/pages/Account";
 import SuperAdmin from "@/pages/SuperAdmin";
@@ -145,6 +146,7 @@ function Router() {
           {/* Admin Routes */}
           <Route path="/admin/import" component={ImportManager} />
           <Route path="/admin/vendors" component={Vendors} />
+          <Route path="/admin/notes/search" component={AdminNoteSearch} />
           
           {/* Billing Routes */}
           <Route path="/billing" component={Billing} />
