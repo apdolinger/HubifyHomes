@@ -50,7 +50,9 @@ interface FormFieldOption {
 
 interface FormSchema {
   formTitle: string;
+  exteriorName?: string;
   internalDescription?: string;
+  exteriorDescription?: string;
   slug: string;
   contexts: FormContext[];
   fields: FormFieldOption[];
@@ -146,9 +148,10 @@ const FormSettingsPanel: React.FC<FormSettingsPanelProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Form Names */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="formTitle">Form Title *</Label>
+            <Label htmlFor="formTitle">Interior Name (Admin View) *</Label>
             <Input
               id="formTitle"
               value={formSchema.formTitle}
@@ -159,32 +162,67 @@ const FormSettingsPanel: React.FC<FormSettingsPanelProps> = ({
                   slug: title.toLowerCase().replace(/[^a-z0-9]+/g, '-')
                 });
               }}
-              placeholder="new client inquiry"
+              placeholder="New Client Intake Form"
+              data-testid="input-interior-name"
             />
+            <p className="text-xs text-gray-500 mt-1">Internal name you see in the admin panel</p>
           </div>
           
           <div>
-            <Label htmlFor="formSlug">Form Slug</Label>
+            <Label htmlFor="exteriorName">Exterior Name (Public View)</Label>
             <Input
-              id="formSlug"
-              value={formSchema.slug}
-              onChange={(e) => updateFormSchema({ slug: e.target.value })}
-              placeholder="new-client-inquiry"
+              id="exteriorName"
+              value={formSchema.exteriorName || ''}
+              onChange={(e) => updateFormSchema({ exteriorName: e.target.value })}
+              placeholder="Get Started Today!"
+              data-testid="input-exterior-name"
             />
-            <p className="text-xs text-gray-500 mt-1">Used in form URLs. Auto-generated from title.</p>
+            <p className="text-xs text-gray-500 mt-1">Name shown to people filling out the form</p>
           </div>
         </div>
-        
+
+        {/* Form Slug */}
         <div>
-          <Label htmlFor="internalDescription">Internal Description</Label>
-          <Textarea
-            id="internalDescription"
-            value={formSchema.internalDescription || ''}
-            onChange={(e) => updateFormSchema({ internalDescription: e.target.value })}
-            placeholder="Internal notes about this form..."
-            rows={3}
-            className="resize-none"
+          <Label htmlFor="formSlug">Form Slug</Label>
+          <Input
+            id="formSlug"
+            value={formSchema.slug}
+            onChange={(e) => updateFormSchema({ slug: e.target.value })}
+            placeholder="new-client-inquiry"
+            data-testid="input-form-slug"
           />
+          <p className="text-xs text-gray-500 mt-1">Used in form URLs. Auto-generated from interior name.</p>
+        </div>
+        
+        {/* Form Descriptions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="internalDescription">Interior Description (Admin Notes)</Label>
+            <Textarea
+              id="internalDescription"
+              value={formSchema.internalDescription || ''}
+              onChange={(e) => updateFormSchema({ internalDescription: e.target.value })}
+              placeholder="Internal notes about this form..."
+              rows={3}
+              className="resize-none"
+              data-testid="textarea-interior-description"
+            />
+            <p className="text-xs text-gray-500 mt-1">Private notes for your team</p>
+          </div>
+
+          <div>
+            <Label htmlFor="exteriorDescription">Exterior Description (Public View)</Label>
+            <Textarea
+              id="exteriorDescription"
+              value={formSchema.exteriorDescription || ''}
+              onChange={(e) => updateFormSchema({ exteriorDescription: e.target.value })}
+              placeholder="Please provide your information below..."
+              rows={3}
+              className="resize-none"
+              data-testid="textarea-exterior-description"
+            />
+            <p className="text-xs text-gray-500 mt-1">Instructions shown to form users</p>
+          </div>
         </div>
 
         <div className="border rounded-lg p-4">
@@ -366,7 +404,9 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
   
   const [formSchema, setFormSchema] = useState<FormSchema>({
     formTitle: initialForm?.formTitle || '',
+    exteriorName: initialForm?.exteriorName || '',
     internalDescription: initialForm?.internalDescription || '',
+    exteriorDescription: initialForm?.exteriorDescription || '',
     slug: initialForm?.slug || '',
     contexts: initialForm?.contexts ? (Array.isArray(initialForm.contexts) ? initialForm.contexts : [initialForm.context || 'people']) : ['people'],
     fields: initialForm?.fields || [],
@@ -449,7 +489,9 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
     mutationFn: async (formData: FormSchema) => {
       return apiRequest('POST', '/api/forms', {
         name: formData.formTitle,
+        displayName: formData.exteriorName,
         description: formData.internalDescription,
+        displayDescription: formData.exteriorDescription,
         schema: {
           fields: formData.fields.map(field => ({
             id: field.profileFieldKey,
