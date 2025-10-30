@@ -253,15 +253,6 @@ const FormSettingsPanel: React.FC<FormSettingsPanelProps> = ({
             </SelectContent>
           </Select>
         </div>
-        
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="triggerAutomation"
-            checked={formSchema.triggerAutomation || false}
-            onCheckedChange={(checked) => updateFormSchema({ triggerAutomation: checked })}
-          />
-          <Label htmlFor="triggerAutomation">Trigger Automation on Submit?</Label>
-        </div>
       </CardContent>
     </Card>
   );
