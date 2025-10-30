@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Plus, Mail, User, Search, Settings } from "lucide-react";
+import { Users, Plus, Mail, User, Search, Settings, ArrowUpDown, ArrowUp, ArrowDown, Filter } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
 
@@ -41,6 +41,10 @@ export default function Team() {
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [searchTerm, setSearchTerm] = useState("");
   const [isCustomizeModalOpen, setIsCustomizeModalOpen] = useState(false);
+  const [sortField, setSortField] = useState<string>("lastName");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   // Default column configuration for team table
   const defaultColumns: ColumnConfig[] = [
@@ -67,6 +71,26 @@ export default function Team() {
   const handleSaveColumns = (newColumns: ColumnConfig[]) => {
     setColumns(newColumns);
     localStorage.setItem('teamTableColumns', JSON.stringify(newColumns));
+  };
+
+  // Sort handler
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  // Sort icon helper
+  const getSortIcon = (field: string) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="w-4 h-4 text-slate-400" />;
+    }
+    return sortDirection === "asc" 
+      ? <ArrowUp className="w-4 h-4 text-blue-600" />
+      : <ArrowDown className="w-4 h-4 text-blue-600" />;
   };
 
   // Redirect if not authenticated
@@ -170,25 +194,69 @@ export default function Team() {
     return `${firstName[0]}${lastName[0]}`.toUpperCase();
   };
 
-  // Reset to page 1 when items per page or search term changes
+  // Reset to page 1 when items per page, search term, or filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [itemsPerPage, searchTerm]);
+  }, [itemsPerPage, searchTerm, roleFilter, statusFilter]);
 
-  // Filter team members based on search term
-  const filteredTeamMembers = teamMembers.filter((member: any) => {
-    if (!searchTerm) return true;
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      member.firstName?.toLowerCase().includes(searchLower) ||
-      member.lastName?.toLowerCase().includes(searchLower) ||
-      member.email?.toLowerCase().includes(searchLower) ||
-      member.role?.toLowerCase().includes(searchLower)
-    );
-  });
+  // Filter and sort team members
+  const filteredAndSortedTeamMembers = teamMembers
+    .filter((member: any) => {
+      // Search filter
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        const matchesSearch = 
+          member.firstName?.toLowerCase().includes(searchLower) ||
+          member.lastName?.toLowerCase().includes(searchLower) ||
+          member.email?.toLowerCase().includes(searchLower) ||
+          member.role?.toLowerCase().includes(searchLower);
+        if (!matchesSearch) return false;
+      }
 
-  // Paginate the filtered team members
-  const totalItems = filteredTeamMembers.length;
+      // Role filter
+      if (roleFilter !== "all" && member.role !== roleFilter) {
+        return false;
+      }
+
+      // Status filter
+      if (statusFilter === "active" && !member.isActive) {
+        return false;
+      }
+      if (statusFilter === "inactive" && member.isActive) {
+        return false;
+      }
+      if (statusFilter === "out_of_office" && !isUserOutOfOffice(member)) {
+        return false;
+      }
+
+      return true;
+    })
+    .sort((a: any, b: any) => {
+      let aValue = a[sortField];
+      let bValue = b[sortField];
+
+      // Handle special cases
+      if (sortField === "name" || sortField === "lastName") {
+        aValue = `${a.lastName} ${a.firstName}`;
+        bValue = `${b.lastName} ${b.firstName}`;
+      } else if (sortField === "firstName") {
+        aValue = a.firstName;
+        bValue = b.firstName;
+      }
+
+      // Convert to lowercase for comparison
+      aValue = aValue?.toString().toLowerCase() || "";
+      bValue = bValue?.toString().toLowerCase() || "";
+
+      if (sortDirection === "asc") {
+        return aValue.localeCompare(bValue);
+      } else {
+        return bValue.localeCompare(aValue);
+      }
+    });
+
+  // Paginate the filtered and sorted team members
+  const totalItems = filteredAndSortedTeamMembers.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const effectivePage = totalPages > 0 ? Math.min(currentPage, totalPages) : 1;
 
@@ -201,7 +269,7 @@ export default function Team() {
 
   const startIndex = (effectivePage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedTeamMembers = filteredTeamMembers.slice(startIndex, endIndex);
+  const paginatedTeamMembers = filteredAndSortedTeamMembers.slice(startIndex, endIndex);
 
   if (isLoading) {
     return (
@@ -329,20 +397,70 @@ export default function Team() {
         </Card>
       </div>
 
-      {/* Search Bar */}
-      <div className="mb-6">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-          <Input
-            type="text"
-            placeholder="Search team members by name, email, or role..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-            data-testid="team-search-input"
-          />
-        </div>
-      </div>
+      {/* Search and Filters */}
+      <Card className="mb-6">
+        <CardContent className="p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <Input
+                type="text"
+                placeholder="Search team members by name, email, or role..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+                data-testid="team-search-input"
+              />
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <div className="min-w-[140px]">
+                <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <SelectTrigger data-testid="role-filter">
+                    <SelectValue placeholder="All Roles" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Roles</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="supervisor">Supervisor</SelectItem>
+                    <SelectItem value="staff">Staff</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="min-w-[160px]">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger data-testid="status-filter">
+                    <SelectValue placeholder="All Statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="out_of_office">Out of Office</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {(searchTerm || roleFilter !== "all" || statusFilter !== "all") && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setRoleFilter("all");
+                    setStatusFilter("all");
+                  }}
+                  className="whitespace-nowrap"
+                  data-testid="clear-filters-btn"
+                >
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Team Members Table */}
       <Card>
@@ -365,13 +483,25 @@ export default function Team() {
               <TableHeader>
                 <TableRow>
                   {columns.find(col => col.id === 'member')?.visible && (
-                    <TableHead className="w-[300px]">Member</TableHead>
+                    <TableHead className="w-[300px]">
+                      <div className="flex items-center space-x-2">
+                        <span>Member</span>
+                      </div>
+                    </TableHead>
                   )}
                   {columns.find(col => col.id === 'email')?.visible && (
-                    <TableHead>Email</TableHead>
+                    <TableHead>
+                      <div className="flex items-center space-x-2">
+                        <span>Email</span>
+                      </div>
+                    </TableHead>
                   )}
                   {columns.find(col => col.id === 'role')?.visible && (
-                    <TableHead>Role</TableHead>
+                    <TableHead>
+                      <div className="flex items-center space-x-2">
+                        <span>Role</span>
+                      </div>
+                    </TableHead>
                   )}
                   {columns.find(col => col.id === 'status')?.visible && (
                     <TableHead>Status</TableHead>
@@ -413,13 +543,37 @@ export default function Team() {
               <TableHeader>
                 <TableRow>
                   {columns.find(col => col.id === 'member')?.visible && (
-                    <TableHead className="w-[300px]">Member</TableHead>
+                    <TableHead 
+                      className="w-[300px] cursor-pointer hover:bg-slate-50 select-none"
+                      onClick={() => handleSort("lastName")}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <span>Member</span>
+                        {getSortIcon("lastName")}
+                      </div>
+                    </TableHead>
                   )}
                   {columns.find(col => col.id === 'email')?.visible && (
-                    <TableHead>Email</TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-slate-50 select-none"
+                      onClick={() => handleSort("email")}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <span>Email</span>
+                        {getSortIcon("email")}
+                      </div>
+                    </TableHead>
                   )}
                   {columns.find(col => col.id === 'role')?.visible && (
-                    <TableHead>Role</TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-slate-50 select-none"
+                      onClick={() => handleSort("role")}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <span>Role</span>
+                        {getSortIcon("role")}
+                      </div>
+                    </TableHead>
                   )}
                   {columns.find(col => col.id === 'status')?.visible && (
                     <TableHead>Status</TableHead>
