@@ -29,6 +29,8 @@ import {
   insertPropertySchema,
   insertRoomSchema,
   insertOutOfOfficePeriodSchema,
+  insertTeamSchema,
+  insertTeamMemberSchema,
   insertRoomSupplySchema,
   insertRoomNoteSchema,
   insertRoomDeviceSchema,
@@ -1118,6 +1120,144 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating user:", error);
       res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
+  // Team routes
+  app.get("/api/teams", isAuthenticated, async (req, res) => {
+    try {
+      const userOrgId = (req.user as any)?.claims?.orgId;
+      if (!userOrgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+
+      const teams = await storage.getTeams(userOrgId);
+      res.json(teams);
+    } catch (error) {
+      console.error("Error fetching teams:", error);
+      res.status(500).json({ message: "Failed to fetch teams" });
+    }
+  });
+
+  app.post("/api/teams", isAuthenticated, async (req, res) => {
+    try {
+      const userOrgId = (req.user as any)?.claims?.orgId;
+      const userId = (req.user as any)?.claims?.sub;
+      if (!userOrgId || !userId) {
+        return res.status(400).json({ message: "Organization ID or User ID not found" });
+      }
+
+      const result = insertTeamSchema.safeParse({
+        ...req.body,
+        orgId: userOrgId,
+        createdBy: userId,
+      });
+
+      if (!result.success) {
+        return res.status(400).json({ errors: result.error.errors });
+      }
+
+      const team = await storage.createTeam(result.data);
+      res.status(201).json(team);
+    } catch (error) {
+      console.error("Error creating team:", error);
+      res.status(500).json({ message: "Failed to create team" });
+    }
+  });
+
+  app.get("/api/teams/:id", isAuthenticated, async (req, res) => {
+    try {
+      const teamId = req.params.id;
+      const team = await storage.getTeamWithMembers(teamId);
+      if (!team) {
+        return res.status(404).json({ message: "Team not found" });
+      }
+      res.json(team);
+    } catch (error) {
+      console.error("Error fetching team:", error);
+      res.status(500).json({ message: "Failed to fetch team" });
+    }
+  });
+
+  app.patch("/api/teams/:id", isAuthenticated, async (req, res) => {
+    try {
+      const teamId = req.params.id;
+      const updates = req.body;
+      const updatedTeam = await storage.updateTeam(teamId, updates);
+      res.json(updatedTeam);
+    } catch (error) {
+      console.error("Error updating team:", error);
+      res.status(500).json({ message: "Failed to update team" });
+    }
+  });
+
+  app.delete("/api/teams/:id", isAuthenticated, async (req, res) => {
+    try {
+      const teamId = req.params.id;
+      await storage.deleteTeam(teamId);
+      res.json({ message: "Team deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting team:", error);
+      res.status(500).json({ message: "Failed to delete team" });
+    }
+  });
+
+  app.post("/api/teams/:teamId/members", isAuthenticated, async (req, res) => {
+    try {
+      const { teamId } = req.params;
+      const result = insertTeamMemberSchema.safeParse({
+        ...req.body,
+        teamId,
+      });
+
+      if (!result.success) {
+        return res.status(400).json({ errors: result.error.errors });
+      }
+
+      const member = await storage.addTeamMember(result.data);
+      res.status(201).json(member);
+    } catch (error) {
+      console.error("Error adding team member:", error);
+      res.status(500).json({ message: "Failed to add team member" });
+    }
+  });
+
+  app.delete("/api/teams/:teamId/members/:userId", isAuthenticated, async (req, res) => {
+    try {
+      const { teamId, userId } = req.params;
+      await storage.removeTeamMember(teamId, userId);
+      res.json({ message: "Team member removed successfully" });
+    } catch (error) {
+      console.error("Error removing team member:", error);
+      res.status(500).json({ message: "Failed to remove team member" });
+    }
+  });
+
+  app.get("/api/users/:userId/teams", isAuthenticated, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const teams = await storage.getUserTeams(userId);
+      res.json(teams);
+    } catch (error) {
+      console.error("Error fetching user teams:", error);
+      res.status(500).json({ message: "Failed to fetch user teams" });
+    }
+  });
+
+  app.patch("/api/teams/:teamId/members/:userId/role", isAuthenticated, async (req, res) => {
+    try {
+      const { teamId, userId } = req.params;
+      const { role } = req.body;
+      
+      if (!role || (role !== 'lead' && role !== 'member')) {
+        return res.status(400).json({ message: "Invalid role. Must be 'lead' or 'member'" });
+      }
+
+      const updatedMember = await storage.updateTeamMemberRole(teamId, userId, role);
+      res.json(updatedMember);
+    } catch (error) {
+      console.error("Error updating team member role:", error);
+      res.status(500).json({ message: "Failed to update team member role" });
     }
   });
 

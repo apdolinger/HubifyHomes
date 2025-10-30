@@ -70,8 +70,6 @@ import {
   customFields,
   type User,
   type UpsertUser,
-  type OutOfOfficePeriod,
-  type InsertOutOfOfficePeriod,
   type Team,
   type InsertTeam,
   type TeamMember,
