@@ -16,10 +16,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Plus, Mail, User, Search, Settings, ArrowUpDown, ArrowUp, ArrowDown, Filter, ChevronDown, ChevronUp, UserPlus } from "lucide-react";
+import { Users, Plus, Mail, User, Search, Settings, ArrowUpDown, ArrowUp, ArrowDown, Filter, ChevronDown, ChevronUp, UserPlus, UserCheck, ShieldCheck, UserCog } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
+import ClientsStatsCustomizationModal, { StatsWidget } from "@/components/ClientsStatsCustomizationModal";
 
 // Form schema for inviting team members
 const inviteTeamMemberSchema = z.object({
@@ -59,6 +60,35 @@ export default function Team() {
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isMyTeamExpanded, setIsMyTeamExpanded] = useState(true);
+  const [isStatsCustomizeModalOpen, setIsStatsCustomizeModalOpen] = useState(false);
+
+  // Default stats widgets configuration
+  const defaultStatsWidgets: StatsWidget[] = [
+    { id: 'totalTeams', name: 'Total Teams', description: 'Show total number of teams', enabled: true, order: 1 },
+    { id: 'totalMembers', name: 'Total Members', description: 'Show total team members count', enabled: true, order: 2 },
+    { id: 'admins', name: 'Admins', description: 'Show admins count', enabled: true, order: 3 },
+    { id: 'supervisors', name: 'Supervisors', description: 'Show supervisors count', enabled: true, order: 4 },
+    { id: 'staff', name: 'Staff', description: 'Show staff count', enabled: true, order: 5 },
+  ];
+
+  // Load stats widgets configuration from localStorage
+  const [statsWidgets, setStatsWidgets] = useState<StatsWidget[]>(() => {
+    const saved = localStorage.getItem('teamStatsWidgets');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return defaultStatsWidgets;
+      }
+    }
+    return defaultStatsWidgets;
+  });
+
+  // Save stats widgets configuration to localStorage
+  const handleSaveStatsWidgets = (newWidgets: StatsWidget[]) => {
+    setStatsWidgets(newWidgets);
+    localStorage.setItem('teamStatsWidgets', JSON.stringify(newWidgets));
+  };
 
   // Default column configuration for team table
   const defaultColumns: ColumnConfig[] = [
@@ -567,94 +597,105 @@ export default function Team() {
       </Card>
 
       {/* Team Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                  <Users className="w-4 h-4 text-purple-600" />
-                </div>
-              </div>
-              <div className="ml-4">
-                <dl>
-                  <dt className="text-sm font-medium text-slate-500 truncate">
-                    Total Members
-                  </dt>
-                  <dd className="text-2xl font-semibold text-slate-900">
-                    {teamMembers.length}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-slate-900">Stats Overview</h2>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsStatsCustomizeModalOpen(true)}
+            data-testid="customize-team-stats-btn"
+          >
+            <Settings className="w-4 h-4" />
+          </Button>
+        </div>
+        <div className={`grid grid-cols-1 gap-6 ${
+          statsWidgets.filter(w => w.enabled).length === 1 ? 'md:grid-cols-1 max-w-sm' :
+          statsWidgets.filter(w => w.enabled).length === 2 ? 'md:grid-cols-2' :
+          statsWidgets.filter(w => w.enabled).length === 3 ? 'md:grid-cols-3' :
+          statsWidgets.filter(w => w.enabled).length === 4 ? 'md:grid-cols-4' :
+          'md:grid-cols-5'
+        }`}>
+          {statsWidgets
+            .filter(widget => widget.enabled)
+            .sort((a, b) => a.order - b.order)
+            .map((widget) => {
+              const widgetConfigs = {
+                totalTeams: {
+                  bgColor: 'bg-indigo-100',
+                  iconColor: 'text-indigo-600',
+                  label: 'Total Teams',
+                  value: allTeams.length,
+                  icon: Users,
+                  testId: 'stat-total-teams'
+                },
+                totalMembers: {
+                  bgColor: 'bg-purple-100',
+                  iconColor: 'text-purple-600',
+                  label: 'Total Members',
+                  value: teamMembers.length,
+                  icon: UserCheck,
+                  testId: 'stat-total-members'
+                },
+                admins: {
+                  bgColor: 'bg-blue-100',
+                  iconColor: 'text-blue-600',
+                  label: 'Admins',
+                  value: teamMembers.filter((m: any) => m.role === 'admin').length,
+                  icon: ShieldCheck,
+                  testId: 'stat-admins'
+                },
+                supervisors: {
+                  bgColor: 'bg-green-100',
+                  iconColor: 'text-green-600',
+                  label: 'Supervisors',
+                  value: teamMembers.filter((m: any) => m.role === 'supervisor').length,
+                  icon: UserCog,
+                  testId: 'stat-supervisors'
+                },
+                staff: {
+                  bgColor: 'bg-amber-100',
+                  iconColor: 'text-amber-600',
+                  label: 'Staff',
+                  value: teamMembers.filter((m: any) => m.role === 'staff').length,
+                  icon: User,
+                  testId: 'stat-staff'
+                }
+              };
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-blue-600" />
-                </div>
-              </div>
-              <div className="ml-4">
-                <dl>
-                  <dt className="text-sm font-medium text-slate-500 truncate">
-                    Admins
-                  </dt>
-                  <dd className="text-2xl font-semibold text-slate-900">
-                    {teamMembers.filter(m => m.role === 'admin').length}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              const config = widgetConfigs[widget.id as keyof typeof widgetConfigs];
+              if (!config) return null;
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-green-600" />
-                </div>
-              </div>
-              <div className="ml-4">
-                <dl>
-                  <dt className="text-sm font-medium text-slate-500 truncate">
-                    Supervisors
-                  </dt>
-                  <dd className="text-2xl font-semibold text-slate-900">
-                    {teamMembers.filter(m => m.role === 'supervisor').length}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              const IconComponent = config.icon;
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-amber-600" />
-                </div>
-              </div>
-              <div className="ml-4">
-                <dl>
-                  <dt className="text-sm font-medium text-slate-500 truncate">
-                    Staff
-                  </dt>
-                  <dd className="text-2xl font-semibold text-slate-900">
-                    {teamMembers.filter(m => m.role === 'staff').length}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              return (
+                <Card 
+                  key={widget.id}
+                  data-testid={config.testId}
+                >
+                  <CardContent className="p-6">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <div className={`w-8 h-8 ${config.bgColor} rounded-full flex items-center justify-center`}>
+                          <IconComponent className={`w-4 h-4 ${config.iconColor}`} />
+                        </div>
+                      </div>
+                      <div className="ml-4">
+                        <dl>
+                          <dt className="text-sm font-medium text-slate-500 truncate">
+                            {config.label}
+                          </dt>
+                          <dd className="text-2xl font-semibold text-slate-900">
+                            {config.value}
+                          </dd>
+                        </dl>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+        </div>
       </div>
 
       {/* Search and Filters */}
@@ -1033,6 +1074,15 @@ export default function Team() {
         columns={columns}
         defaultColumns={defaultColumns}
         onSave={handleSaveColumns}
+      />
+
+      {/* Stats Customization Modal */}
+      <ClientsStatsCustomizationModal
+        isOpen={isStatsCustomizeModalOpen}
+        onClose={() => setIsStatsCustomizeModalOpen(false)}
+        currentWidgets={statsWidgets}
+        defaultWidgets={defaultStatsWidgets}
+        onSave={handleSaveStatsWidgets}
       />
 
       {/* Team Creation Modal */}
