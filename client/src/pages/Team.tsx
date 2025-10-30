@@ -342,11 +342,11 @@ export default function Team() {
                   Create and manage your direct team assignments to collaborate more effectively.
                 </p>
                 <div className="flex justify-center gap-3">
-                  <Button variant="outline" disabled>
+                  <Button variant="outline" disabled data-testid="build-team-btn">
                     <UserPlus className="w-4 h-4 mr-2" />
                     Build Team
                   </Button>
-                  <Button variant="outline" disabled>
+                  <Button variant="outline" disabled data-testid="manage-team-assignments-btn">
                     Manage Team Assignments
                   </Button>
                 </div>
