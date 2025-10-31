@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { storage } from './storage';
 import { log } from './vite';
+import { sendEmail, buildMergeFieldData, processMergeFields } from './email-service';
 
 // Import conflict detection helper - we'll export this from routes
 export let detectConflictsForEvent: ((event: any, orgId: string, userId: string) => Promise<number>) | null = null;
@@ -350,4 +351,96 @@ export function startScheduledTasks() {
   */
   
   // log('[CRON] Billing automation scheduled - will run daily at 3am');
+  
+  // Process scheduled emails every 5 minutes
+  cron.schedule('*/5 * * * *', async () => {
+    try {
+      log('[CRON] Checking for pending scheduled emails...');
+      
+      // Get all pending scheduled emails that are due
+      const pendingEmails = await storage.getPendingScheduledEmails();
+      
+      if (pendingEmails.length === 0) {
+        return; // No emails to send
+      }
+      
+      log(`[CRON] Found ${pendingEmails.length} scheduled emails to send`);
+      
+      for (const scheduledEmail of pendingEmails) {
+        try {
+          // Build merge field data if we have contactId
+          let mergeFieldData = {};
+          if (scheduledEmail.recipientContactId) {
+            mergeFieldData = await buildMergeFieldData({
+              contactId: scheduledEmail.recipientContactId,
+              senderId: scheduledEmail.senderId,
+              orgId: scheduledEmail.orgId,
+            });
+          }
+          
+          // Process merge fields in subject and body
+          const processedSubject = processMergeFields(scheduledEmail.subject, mergeFieldData);
+          const processedBody = processMergeFields(scheduledEmail.body, mergeFieldData);
+          
+          // Send the email
+          await sendEmail({
+            to: scheduledEmail.recipientEmail,
+            subject: processedSubject,
+            body: processedBody,
+            orgId: scheduledEmail.orgId,
+            fromName: scheduledEmail.senderName,
+            fromEmail: scheduledEmail.senderEmail,
+          });
+          
+          // Mark as sent in scheduled_emails
+          await storage.markScheduledEmailSent(scheduledEmail.id, new Date());
+          
+          // Create email history record
+          await storage.createEmailHistory({
+            orgId: scheduledEmail.orgId,
+            senderId: scheduledEmail.senderId,
+            senderName: scheduledEmail.senderName,
+            senderEmail: scheduledEmail.senderEmail,
+            recipientContactId: scheduledEmail.recipientContactId || undefined,
+            recipientEmail: scheduledEmail.recipientEmail,
+            recipientName: scheduledEmail.recipientName || undefined,
+            subject: processedSubject,
+            body: processedBody,
+            templateId: scheduledEmail.templateId || undefined,
+            status: 'sent',
+            sentAt: new Date(),
+          });
+          
+          log(`[CRON] Successfully sent scheduled email ${scheduledEmail.id} to ${scheduledEmail.recipientEmail}`);
+        } catch (error: any) {
+          log(`[CRON] Error sending scheduled email ${scheduledEmail.id}: ${error.message}`);
+          
+          // Mark as failed
+          await storage.markScheduledEmailFailed(scheduledEmail.id, error.message || 'Unknown error');
+          
+          // Create failed email history record
+          await storage.createEmailHistory({
+            orgId: scheduledEmail.orgId,
+            senderId: scheduledEmail.senderId,
+            senderName: scheduledEmail.senderName,
+            senderEmail: scheduledEmail.senderEmail,
+            recipientContactId: scheduledEmail.recipientContactId || undefined,
+            recipientEmail: scheduledEmail.recipientEmail,
+            recipientName: scheduledEmail.recipientName || undefined,
+            subject: scheduledEmail.subject,
+            body: scheduledEmail.body,
+            templateId: scheduledEmail.templateId || undefined,
+            status: 'failed',
+            errorMessage: error.message || 'Unknown error',
+          });
+        }
+      }
+      
+      log(`[CRON] Scheduled email processing complete. Sent ${pendingEmails.length} emails.`);
+    } catch (error) {
+      log(`[CRON] Error in scheduled email processing: ${error}`);
+    }
+  });
+  
+  log('[CRON] Scheduled email processor initialized - will run every 5 minutes');
 }
