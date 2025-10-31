@@ -1081,7 +1081,7 @@ export default function PersonProfile() {
     });
   };
 
-  const getContactTypeDisplay = (type: string) => {
+  const getContactTypeDisplay = (type: string, clientCategory?: string | null) => {
     switch (type) {
       case "tenant":
         return "Tenant";
@@ -1091,6 +1091,11 @@ export default function PersonProfile() {
         return "Vendor";
       case "emergency_contact":
         return "Emergency Contact";
+      case "client":
+        if (clientCategory) {
+          return `Client (${clientCategory.charAt(0).toUpperCase() + clientCategory.slice(1)})`;
+        }
+        return "Client";
       default:
         return type;
     }
@@ -1106,6 +1111,8 @@ export default function PersonProfile() {
         return "outline";
       case "emergency_contact":
         return "destructive";
+      case "client":
+        return "outline";
       default:
         return "outline";
     }
@@ -1193,7 +1200,7 @@ export default function PersonProfile() {
               </div>
               <div className="flex items-center space-x-4 flex-wrap">
                 <Badge variant={getContactTypeColor((person as any)?.type)}>
-                  {getContactTypeDisplay((person as any)?.type)}
+                  {getContactTypeDisplay((person as any)?.type, (person as any)?.clientCategory)}
                 </Badge>
                 {(person as any)?.email && (
                   <div 

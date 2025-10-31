@@ -425,9 +425,18 @@ export default function People() {
         return "secondary";
       case "emergency_contact":
         return "destructive";
+      case "client":
+        return "outline";
       default:
         return "default";
     }
+  };
+
+  const formatContactType = (type: string, clientCategory?: string | null) => {
+    if (type === "client" && clientCategory) {
+      return `Client (${clientCategory.charAt(0).toUpperCase() + clientCategory.slice(1)})`;
+    }
+    return type.replace('_', ' ');
   };
 
   const getPropertyName = (propertyId: number | null) => {
@@ -631,6 +640,8 @@ export default function People() {
           email: contact.email,
           phone: contact.phone,
           type: contact.type,
+          clientCategory: contact.clientCategory,
+          accountId: contact.accountId,
           isActive: contact.isActive,
           properties: [],
           contactIds: [] // Track all contact IDs in this group for selection
@@ -1134,7 +1145,7 @@ export default function People() {
                           onClick={() => setLocation(`/person-profile/${group.id}`)}
                         >
                           <Badge variant={getTypeColor(group.type)}>
-                            {group.type.replace('_', ' ')}
+                            {formatContactType(group.type, group.clientCategory)}
                           </Badge>
                         </TableCell>
                       )}
