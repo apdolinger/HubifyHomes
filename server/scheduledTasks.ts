@@ -4,6 +4,7 @@ import { log } from './vite';
 import { sendEmail, buildMergeFieldData, processMergeFields } from './email-service';
 import { generateInvoicePDF } from './invoiceUtils';
 import { generateInvoiceEmailHTML, sendGenericEmail } from './emailUtils';
+import { chargeInvoice } from './stripe';
 
 // Import conflict detection helper - we'll export this from routes
 export let detectConflictsForEvent: ((event: any, orgId: string, userId: string) => Promise<number>) | null = null;
@@ -362,6 +363,35 @@ export function startScheduledTasks() {
                 }
               } else {
                 log(`[CRON] Warning: Client ${client.firstName} ${client.lastName} has no email address, invoice created but not sent`);
+              }
+              
+              // Auto-charge if enabled
+              if (client.autoChargeInvoices) {
+                try {
+                  // Get client's default payment method
+                  const paymentMethods = await storage.getClientPaymentMethods(client.id);
+                  const defaultPaymentMethod = paymentMethods.find(pm => pm.isDefault);
+                  
+                  if (defaultPaymentMethod) {
+                    log(`[CRON] Auto-charging invoice ${invoice.invoiceNumber} for ${client.firstName} ${client.lastName} using payment method ending in ${defaultPaymentMethod.last4}`);
+                    
+                    const result = await chargeInvoice(
+                      invoice.id,
+                      org.id,
+                      client.id,
+                      defaultPaymentMethod.stripePaymentMethodId,
+                      invoice.amountCents,
+                      `Automated billing charge for invoice ${invoice.invoiceNumber}`
+                    );
+                    
+                    log(`[CRON] Auto-charge initiated for invoice ${invoice.invoiceNumber}, PaymentIntent: ${result.paymentIntentId}, Status: ${result.status}`);
+                  } else {
+                    log(`[CRON] Auto-charge skipped for invoice ${invoice.invoiceNumber}: No default payment method found for client ${client.firstName} ${client.lastName}`);
+                  }
+                } catch (error) {
+                  log(`[CRON] Error auto-charging invoice ${invoice.invoiceNumber}: ${error}`);
+                  // Don't fail the entire billing automation if one charge fails
+                }
               }
             } catch (error) {
               log(`[CRON] Error processing client ${client.id}: ${error}`);

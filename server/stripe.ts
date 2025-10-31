@@ -699,3 +699,65 @@ export async function detachPaymentMethod(
     orgStripe.accountId ? { stripeAccount: orgStripe.accountId } : undefined
   );
 }
+
+/**
+ * Charge an invoice using a client's payment method
+ * Creates a PaymentIntent which will be confirmed automatically
+ * Webhooks will handle updating the invoice status
+ */
+export async function chargeInvoice(
+  invoiceId: string,
+  orgId: string,
+  clientId: string,
+  paymentMethodId: string,
+  amountCents: number,
+  description?: string
+): Promise<{ paymentIntentId: string; status: string }> {
+  const orgStripe = await getOrgStripe(orgId);
+  if (!orgStripe) {
+    throw new Error("Organization Stripe account not configured");
+  }
+
+  // Get client for customer creation
+  const client = await storage.getClient(clientId);
+  if (!client) {
+    throw new Error("Client not found");
+  }
+
+  // Ensure customer exists
+  const customerId = await ensureStripeCustomerForClient(
+    orgId,
+    clientId,
+    client.email,
+    `${client.firstName || ''} ${client.lastName || ''}`.trim()
+  );
+
+  // Create PaymentIntent
+  const paymentIntent = await orgStripe.stripe.paymentIntents.create({
+    amount: amountCents,
+    currency: 'usd',
+    customer: customerId,
+    payment_method: paymentMethodId,
+    off_session: true, // Charging without customer present
+    confirm: true, // Immediately attempt to confirm
+    metadata: {
+      invoiceId,
+      clientId,
+      orgId,
+    },
+    description: description || `Invoice charge`,
+  }, orgStripe.accountId ? { stripeAccount: orgStripe.accountId } : undefined);
+
+  // Update invoice with Stripe payment intent ID
+  await storage.updateClientInvoice(invoiceId, {
+    stripePaymentIntentId: paymentIntent.id,
+    stripeCustomerId: customerId,
+  });
+
+  console.log(`Created PaymentIntent ${paymentIntent.id} for invoice ${invoiceId}, status: ${paymentIntent.status}`);
+
+  return {
+    paymentIntentId: paymentIntent.id,
+    status: paymentIntent.status,
+  };
+}
