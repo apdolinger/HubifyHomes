@@ -2,6 +2,8 @@ import cron from 'node-cron';
 import { storage } from './storage';
 import { log } from './vite';
 import { sendEmail, buildMergeFieldData, processMergeFields } from './email-service';
+import { generateInvoicePDF } from './invoiceUtils';
+import { generateInvoiceEmailHTML, sendGenericEmail } from './emailUtils';
 
 // Import conflict detection helper - we'll export this from routes
 export let detectConflictsForEvent: ((event: any, orgId: string, userId: string) => Promise<number>) | null = null;
@@ -312,25 +314,52 @@ export function startScheduledTasks() {
               
               // Send email to client
               if (client.email) {
-                const mailService = new MailService();
-                await mailService.sendInvoiceEmail({
-                  to: client.email,
-                  subject: `Invoice ${invoice.invoiceNumber} from ${org.name}`,
+                // Generate invoice email HTML
+                const htmlContent = generateInvoiceEmailHTML({
                   invoiceNumber: invoice.invoiceNumber,
-                  amountCents: invoice.amountCents,
-                  dueDate: invoice.dueDate!,
-                  customMessage: 'This is an automated billing invoice based on your billing schedule.',
-                  pdfBuffer,
+                  invoiceDate: invoice.issuedAt || new Date(),
+                  dueDate: invoice.dueDate,
+                  total: invoice.amountCents,
+                  amountDue: invoice.amountCents,
+                  currency: invoice.currency,
+                  clientName: `${client.firstName} ${client.lastName}`,
                   organizationName: org.name,
+                  organizationBranding: org.branding || {},
+                  notes: 'This is an automated billing invoice based on your billing schedule.',
                 });
                 
-                // Update invoice as sent
-                await storage.updateClientInvoice(invoice.id, {
-                  sentAt: new Date()
-                });
+                // Send email with PDF attachment
+                const sgMail = (await import('@sendgrid/mail')).default;
+                const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
                 
-                totalInvoicesCreated++;
-                log(`[CRON] Successfully created and sent automated invoice ${invoice.invoiceNumber} to ${client.email}`);
+                if (SENDGRID_API_KEY) {
+                  sgMail.setApiKey(SENDGRID_API_KEY);
+                  
+                  await sgMail.send({
+                    to: client.email,
+                    from: process.env.SUPPORT_EMAIL_FROM || 'noreply@hubify.app',
+                    subject: `Invoice ${invoice.invoiceNumber} from ${org.name}`,
+                    html: htmlContent,
+                    attachments: [
+                      {
+                        content: pdfBuffer.toString('base64'),
+                        filename: `invoice-${invoice.invoiceNumber}.pdf`,
+                        type: 'application/pdf',
+                        disposition: 'attachment',
+                      },
+                    ],
+                  });
+                  
+                  // Update invoice as sent
+                  await storage.updateClientInvoice(invoice.id, {
+                    sentAt: new Date()
+                  });
+                  
+                  totalInvoicesCreated++;
+                  log(`[CRON] Successfully created and sent automated invoice ${invoice.invoiceNumber} to ${client.email}`);
+                } else {
+                  log(`[CRON] Warning: SENDGRID_API_KEY not configured, invoice created but not sent`);
+                }
               } else {
                 log(`[CRON] Warning: Client ${client.firstName} ${client.lastName} has no email address, invoice created but not sent`);
               }
