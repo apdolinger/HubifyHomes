@@ -639,6 +639,7 @@ export default function PersonProfile() {
       email: "",
       phone: "",
       type: "tenant",
+      clientCategory: undefined,
       propertyId: undefined,
       notes: "",
     },
@@ -2213,7 +2214,7 @@ export default function PersonProfile() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Type</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue />
@@ -2239,7 +2240,7 @@ export default function PersonProfile() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Client Category</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value || undefined}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select category..." />
