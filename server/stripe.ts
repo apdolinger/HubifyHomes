@@ -396,6 +396,9 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent,
     paymentError: null,
   });
 
+  // Send notification email about successful payment
+  await sendPaymentSuccessNotification(invoiceId, paymentIntent.amount);
+
   console.log(`Invoice ${invoiceId} payment succeeded via ${paymentIntent.id}`);
 }
 
@@ -556,6 +559,134 @@ async function sendPaymentFailureNotification(invoiceId: string, errorMessage: s
     console.log(`Payment failure notification sent to ${client.email} for invoice ${invoiceId}`);
   } catch (error) {
     console.error(`Error sending payment failure notification for invoice ${invoiceId}:`, error);
+    // Don't throw - email failure shouldn't break webhook processing
+  }
+}
+
+async function sendPaymentSuccessNotification(invoiceId: string, amountCents: number) {
+  try {
+    // Get invoice details
+    const invoice = await storage.getClientInvoice(invoiceId);
+    if (!invoice) {
+      console.warn(`Invoice ${invoiceId} not found for payment success notification`);
+      return;
+    }
+
+    // Get client details
+    const client = await storage.getClient(invoice.clientId);
+    if (!client) {
+      console.warn(`Client not found for invoice ${invoiceId}`);
+      return;
+    }
+
+    // Get organization details
+    const org = await storage.getOrg(invoice.orgId);
+    if (!org) {
+      console.warn(`Organization not found for invoice ${invoiceId}`);
+      return;
+    }
+
+    // Check client billing prefs for email receipts
+    const billingPrefs = await storage.getClientBillingPrefs(client.id);
+    if (!billingPrefs || !billingPrefs.emailReceipts) {
+      console.log(`Email receipts disabled for client ${client.id}, skipping payment success notification`);
+      return;
+    }
+
+    // Import SendGrid
+    const sgMail = (await import("@sendgrid/mail")).default;
+    const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
+    const supportEmailFrom = process.env.SUPPORT_EMAIL_FROM || "noreply@hubify.app";
+
+    if (!SENDGRID_API_KEY) {
+      console.warn("SENDGRID_API_KEY not configured, skipping email notification");
+      return;
+    }
+
+    sgMail.setApiKey(SENDGRID_API_KEY);
+
+    // Format amount
+    const amountFormatted = `$${(amountCents / 100).toFixed(2)}`;
+
+    // Build email HTML
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Successful</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+    .header { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); padding: 40px 20px; text-align: center; color: white; }
+    .content { padding: 40px 30px; }
+    .amount { background-color: #f0fdf4; border-left: 4px solid #22c55e; border-radius: 6px; padding: 20px; margin: 25px 0; text-align: center; }
+    .amount-value { font-size: 32px; font-weight: bold; color: #16a34a; margin: 0; }
+    .details { background-color: #f9fafb; border-radius: 8px; padding: 20px; margin: 25px 0; }
+    .detail-row { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; }
+    .detail-label { color: #666666; }
+    .detail-value { color: #000000; font-weight: 600; }
+    .footer { background-color: #f9fafb; padding: 20px; text-align: center; color: #666666; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 style="margin: 0; font-size: 28px;">Payment Received</h1>
+      <p style="margin: 10px 0 0 0; opacity: 0.9;">Thank you for your payment!</p>
+    </div>
+    
+    <div class="content">
+      <p>Dear ${client.firstName || ''} ${client.lastName || ''},</p>
+      
+      <p>We've successfully received your payment for invoice <strong>${invoice.invoiceNumber || invoiceId}</strong>.</p>
+      
+      <div class="amount">
+        <p style="margin: 0 0 5px 0; color: #666; font-size: 14px;">Amount Paid</p>
+        <p class="amount-value">${amountFormatted}</p>
+      </div>
+      
+      <div class="details">
+        <div class="detail-row">
+          <span class="detail-label">Invoice Number:</span>
+          <span class="detail-value">${invoice.invoiceNumber || invoiceId}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Payment Date:</span>
+          <span class="detail-value">${new Date().toLocaleDateString()}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Status:</span>
+          <span class="detail-value" style="color: #22c55e;">Paid</span>
+        </div>
+      </div>
+      
+      <p>Your payment has been processed successfully and your invoice is now marked as paid.</p>
+      
+      <p>If you have any questions about this payment, please don't hesitate to contact us.</p>
+    </div>
+    
+    <div class="footer">
+      <p>${org.name}<br/>
+      This is an automated notification. Please do not reply to this email.</p>
+    </div>
+  </div>
+</body>
+</html>
+    `;
+
+    const msg = {
+      to: client.email,
+      from: supportEmailFrom,
+      subject: `Payment Received - Invoice ${invoice.invoiceNumber || invoiceId}`,
+      html: htmlContent,
+    };
+
+    await sgMail.send(msg);
+    console.log(`Payment success notification sent to ${client.email} for invoice ${invoiceId}`);
+  } catch (error) {
+    console.error(`Error sending payment success notification for invoice ${invoiceId}:`, error);
     // Don't throw - email failure shouldn't break webhook processing
   }
 }

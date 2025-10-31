@@ -365,8 +365,11 @@ export function startScheduledTasks() {
               }
               
               // Auto-charge if enabled
-              if (client.autoChargeInvoices) {
-                try {
+              try {
+                // Get client billing preferences to check if auto-charge is enabled
+                const billingPrefs = await storage.getClientBillingPrefs(client.id);
+                
+                if (billingPrefs && billingPrefs.autoChargeInvoices) {
                   // Get client's default payment method
                   const paymentMethods = await storage.getClientPaymentMethods(client.id);
                   const defaultPaymentMethod = paymentMethods.find(pm => pm.isDefault);
@@ -387,10 +390,10 @@ export function startScheduledTasks() {
                   } else {
                     log(`[CRON] Auto-charge skipped for invoice ${invoice.invoiceNumber}: No default payment method found for client ${client.firstName} ${client.lastName}`);
                   }
-                } catch (error) {
-                  log(`[CRON] Error auto-charging invoice ${invoice.invoiceNumber}: ${error}`);
-                  // Don't fail the entire billing automation if one charge fails
                 }
+              } catch (error) {
+                log(`[CRON] Error auto-charging invoice ${invoice.invoiceNumber}: ${error}`);
+                // Don't fail the entire billing automation if one charge fails
               }
             } catch (error) {
               log(`[CRON] Error processing client ${client.id}: ${error}`);
