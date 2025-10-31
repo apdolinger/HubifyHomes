@@ -37,13 +37,15 @@ import {
   Plus,
   Trash2,
   CalendarIcon,
-  MessageSquare
+  MessageSquare,
+  Settings
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import ClientsStatsCustomizationModal, { StatsWidget } from "@/components/ClientsStatsCustomizationModal";
 
 const editMemberSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -80,6 +82,34 @@ export default function TeamMemberProfile() {
   const memberId = params.id;
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isOOOModalOpen, setIsOOOModalOpen] = useState(false);
+  const [isStatsCustomizeModalOpen, setIsStatsCustomizeModalOpen] = useState(false);
+
+  // Default stats widgets configuration
+  const defaultStatsWidgets: StatsWidget[] = [
+    { id: 'completedTasks', name: 'Completed Tasks', description: 'Show completed tasks count', enabled: true, order: 1 },
+    { id: 'activeTasks', name: 'Active Tasks', description: 'Show active tasks count', enabled: true, order: 2 },
+    { id: 'managedProperties', name: 'Properties Managed', description: 'Show managed properties count', enabled: true, order: 3 },
+    { id: 'completionRate', name: 'Completion Rate', description: 'Show task completion rate', enabled: true, order: 4 },
+  ];
+
+  // Load stats widgets configuration from localStorage
+  const [statsWidgets, setStatsWidgets] = useState<StatsWidget[]>(() => {
+    const saved = localStorage.getItem('teamMemberProfileStatsWidgets');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return defaultStatsWidgets;
+      }
+    }
+    return defaultStatsWidgets;
+  });
+
+  // Save stats widgets configuration to localStorage
+  const handleSaveStatsWidgets = (newWidgets: StatsWidget[]) => {
+    setStatsWidgets(newWidgets);
+    localStorage.setItem('teamMemberProfileStatsWidgets', JSON.stringify(newWidgets));
+  };
 
   // Get current user for authorization
   const { data: currentUser } = useQuery({
@@ -444,94 +474,94 @@ export default function TeamMemberProfile() {
       </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                  <CheckSquare className="w-4 h-4 text-green-600" />
-                </div>
-              </div>
-              <div className="ml-4">
-                <dl>
-                  <dt className="text-sm font-medium text-slate-500 truncate">
-                    Completed Tasks
-                  </dt>
-                  <dd className="text-2xl font-semibold text-slate-900" data-testid="completed-tasks">
-                    {taskStats?.completed || 0}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-slate-900">Stats Overview</h2>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsStatsCustomizeModalOpen(true)}
+            data-testid="customize-team-member-stats-btn"
+          >
+            <Settings className="w-4 h-4" />
+          </Button>
+        </div>
+        <div className={`grid grid-cols-1 gap-6 ${
+          statsWidgets.filter(w => w.enabled).length === 1 ? 'md:grid-cols-1 max-w-sm' :
+          statsWidgets.filter(w => w.enabled).length === 2 ? 'md:grid-cols-2' :
+          statsWidgets.filter(w => w.enabled).length === 3 ? 'md:grid-cols-3' :
+          statsWidgets.filter(w => w.enabled).length === 4 ? 'md:grid-cols-4' :
+          'md:grid-cols-5'
+        }`}>
+          {statsWidgets
+            .filter(widget => widget.enabled)
+            .sort((a, b) => a.order - b.order)
+            .map((widget) => {
+              const widgetConfigs = {
+                completedTasks: {
+                  bgColor: 'bg-green-100',
+                  iconColor: 'text-green-600',
+                  label: 'Completed Tasks',
+                  value: taskStats?.completed || 0,
+                  icon: CheckSquare,
+                  testId: 'completed-tasks'
+                },
+                activeTasks: {
+                  bgColor: 'bg-yellow-100',
+                  iconColor: 'text-yellow-600',
+                  label: 'Active Tasks',
+                  value: taskStats?.active || 0,
+                  icon: Clock,
+                  testId: 'active-tasks'
+                },
+                managedProperties: {
+                  bgColor: 'bg-blue-100',
+                  iconColor: 'text-blue-600',
+                  label: 'Properties Managed',
+                  value: managedProperties.length,
+                  icon: Building,
+                  testId: 'managed-properties'
+                },
+                completionRate: {
+                  bgColor: 'bg-purple-100',
+                  iconColor: 'text-purple-600',
+                  label: 'Completion Rate',
+                  value: `${taskStats?.completionRate || 0}%`,
+                  icon: TrendingUp,
+                  testId: 'completion-rate'
+                }
+              };
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
-                  <Clock className="w-4 h-4 text-yellow-600" />
-                </div>
-              </div>
-              <div className="ml-4">
-                <dl>
-                  <dt className="text-sm font-medium text-slate-500 truncate">
-                    Active Tasks
-                  </dt>
-                  <dd className="text-2xl font-semibold text-slate-900" data-testid="active-tasks">
-                    {taskStats?.active || 0}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              const config = widgetConfigs[widget.id as keyof typeof widgetConfigs];
+              if (!config) return null;
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                  <Building className="w-4 h-4 text-blue-600" />
-                </div>
-              </div>
-              <div className="ml-4">
-                <dl>
-                  <dt className="text-sm font-medium text-slate-500 truncate">
-                    Properties Managed
-                  </dt>
-                  <dd className="text-2xl font-semibold text-slate-900" data-testid="managed-properties">
-                    {managedProperties.length}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              const IconComponent = config.icon;
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                  <TrendingUp className="w-4 h-4 text-purple-600" />
-                </div>
-              </div>
-              <div className="ml-4">
-                <dl>
-                  <dt className="text-sm font-medium text-slate-500 truncate">
-                    Completion Rate
-                  </dt>
-                  <dd className="text-2xl font-semibold text-slate-900" data-testid="completion-rate">
-                    {taskStats?.completionRate || 0}%
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              return (
+                <Card key={widget.id}>
+                  <CardContent className="p-6">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <div className={`w-8 h-8 ${config.bgColor} rounded-full flex items-center justify-center`}>
+                          <IconComponent className={`w-4 h-4 ${config.iconColor}`} />
+                        </div>
+                      </div>
+                      <div className="ml-4">
+                        <dl>
+                          <dt className="text-sm font-medium text-slate-500 truncate">
+                            {config.label}
+                          </dt>
+                          <dd className="text-2xl font-semibold text-slate-900" data-testid={config.testId}>
+                            {config.value}
+                          </dd>
+                        </dl>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+        </div>
       </div>
 
       {/* Detailed Information Tabs */}
@@ -1110,6 +1140,15 @@ export default function TeamMemberProfile() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Stats Customization Modal */}
+      <ClientsStatsCustomizationModal
+        isOpen={isStatsCustomizeModalOpen}
+        onClose={() => setIsStatsCustomizeModalOpen(false)}
+        currentWidgets={statsWidgets}
+        defaultWidgets={defaultStatsWidgets}
+        onSave={handleSaveStatsWidgets}
+      />
     </main>
   );
 }
