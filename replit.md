@@ -8,6 +8,12 @@ Preferred communication style: Simple, everyday language.
 
 ## System Architecture
 
+### Data Model: Contact-Client Relationship
+- **Contacts Table**: Universal contact management (vendors, tenants, owners, emergency contacts, and clients). Primary entity for PersonProfile pages.
+- **Clients Table**: Billing-specific data for contacts designated as clients (contact.type='client'). Stores billing configuration, payment methods, and invoice preferences.
+- **Relationship**: `clients.contact_id` links to `contacts.id` for unified person management. `client_payment_methods.added_by_contact_id` tracks which contact added each payment method for audit trail.
+- **Architecture Note**: PersonProfile loads from contacts; billing features query associated client record when contact.type='client'.
+
 ### UI/UX
 - **Framework**: React 18 with TypeScript.
 - **UI Components**: Radix UI primitives with shadcn/ui.
@@ -32,6 +38,7 @@ Preferred communication style: Simple, everyday language.
 - **Email System**: Full-featured email communication system with template management, 11 merge fields, scheduling, and delivery tracking. Templates auto-populate subject and body. All emails tracked in email history with status badges. Automated cron job for scheduled emails. Admin template management.
 - **Admin Customization**: Centralized Customization tab for Custom Fields and Supply Settings. Admin search functionality for notes across all system entities.
 - **Invoice Management**: Three-tier system with object storage, webhook-driven payment tracking, automatic status updates, HTML email notifications, on-demand PDF generation with branding, configurable billing workflows, consolidated invoice batching, and client-level billing schedules. Role-based access control restricts billing features (tab visibility and configuration) to admin and supervisor roles only.
+- **Payment Method Collection (Sprint 1)**: Admin-only Stripe integration for collecting client payment methods (cards via Stripe Elements, ACH via Financial Connections). Stores only payment_method_id tokens (PCI-compliant SAQ-A). Includes SetupIntent flow, webhook handlers (setup_intent.succeeded, payment_method.detached), default payment method selection, and auto-charge preferences. All endpoints enforce admin/supervisor RBAC with Zod validation.
 - **Forms System**: Multi-tenant forms with complex field types, property-specific assignments, client submissions, and advanced profile matching.
 - **Hubify Portal**: Client-facing portal with role-based access and admin preview mode.
 - **Super Admin Control Panel**: Internal dashboard for platform management, including organizations, users, reports, communication, revenue, feature flags, monitoring, and compliance.
