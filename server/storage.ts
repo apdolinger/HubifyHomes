@@ -10,6 +10,8 @@ import {
   platformInvoices,
   clientInvoices,
   clients,
+  clientPaymentMethods,
+  clientBillingPrefs,
   recurringBillingSchedules,
   billingSubmissions,
   portalUsers,
@@ -91,6 +93,10 @@ import {
   type InsertClientInvoice,
   type Client,
   type InsertClient,
+  type ClientPaymentMethod,
+  type InsertClientPaymentMethod,
+  type ClientBillingPref,
+  type InsertClientBillingPref,
   type RecurringBillingSchedule,
   type InsertRecurringBillingSchedule,
   type BillingSubmission,
@@ -263,6 +269,19 @@ export interface IStorage {
   getClient(id: string): Promise<Client | undefined>;
   createClient(client: InsertClient): Promise<Client>;
   updateClient(id: string, client: Partial<InsertClient>): Promise<Client>;
+  
+  // Client payment method operations
+  getClientPaymentMethods(clientId: string): Promise<ClientPaymentMethod[]>;
+  getClientPaymentMethod(id: string): Promise<ClientPaymentMethod | undefined>;
+  getClientPaymentMethodByStripeId(stripePaymentMethodId: string): Promise<ClientPaymentMethod | undefined>;
+  createClientPaymentMethod(paymentMethod: InsertClientPaymentMethod): Promise<ClientPaymentMethod>;
+  updateClientPaymentMethod(id: string, updates: Partial<InsertClientPaymentMethod>): Promise<ClientPaymentMethod>;
+  deleteClientPaymentMethod(id: string): Promise<void>;
+  setDefaultPaymentMethod(clientId: string, paymentMethodId: string): Promise<void>;
+  
+  // Client billing preference operations
+  getClientBillingPref(clientId: string): Promise<ClientBillingPref | undefined>;
+  upsertClientBillingPref(pref: InsertClientBillingPref): Promise<ClientBillingPref>;
   
   // Recurring billing schedule operations
   createRecurringSchedule(schedule: InsertRecurringBillingSchedule): Promise<RecurringBillingSchedule>;
@@ -1083,6 +1102,89 @@ export class DatabaseStorage implements IStorage {
       .where(eq(clients.id, id))
       .returning();
     return client;
+  }
+
+  // Client payment method operations
+  async getClientPaymentMethods(clientId: string): Promise<ClientPaymentMethod[]> {
+    return await db
+      .select()
+      .from(clientPaymentMethods)
+      .where(eq(clientPaymentMethods.clientId, clientId))
+      .orderBy(desc(clientPaymentMethods.isDefault), clientPaymentMethods.createdAt);
+  }
+
+  async getClientPaymentMethod(id: string): Promise<ClientPaymentMethod | undefined> {
+    const [paymentMethod] = await db
+      .select()
+      .from(clientPaymentMethods)
+      .where(eq(clientPaymentMethods.id, id));
+    return paymentMethod;
+  }
+
+  async getClientPaymentMethodByStripeId(stripePaymentMethodId: string): Promise<ClientPaymentMethod | undefined> {
+    const [paymentMethod] = await db
+      .select()
+      .from(clientPaymentMethods)
+      .where(eq(clientPaymentMethods.stripePaymentMethodId, stripePaymentMethodId));
+    return paymentMethod;
+  }
+
+  async createClientPaymentMethod(paymentMethodData: InsertClientPaymentMethod): Promise<ClientPaymentMethod> {
+    const [paymentMethod] = await db
+      .insert(clientPaymentMethods)
+      .values(paymentMethodData)
+      .returning();
+    return paymentMethod;
+  }
+
+  async updateClientPaymentMethod(id: string, updates: Partial<InsertClientPaymentMethod>): Promise<ClientPaymentMethod> {
+    const [paymentMethod] = await db
+      .update(clientPaymentMethods)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(clientPaymentMethods.id, id))
+      .returning();
+    return paymentMethod;
+  }
+
+  async deleteClientPaymentMethod(id: string): Promise<void> {
+    await db
+      .delete(clientPaymentMethods)
+      .where(eq(clientPaymentMethods.id, id));
+  }
+
+  async setDefaultPaymentMethod(clientId: string, paymentMethodId: string): Promise<void> {
+    // First, set all payment methods for this client to non-default
+    await db
+      .update(clientPaymentMethods)
+      .set({ isDefault: false, updatedAt: new Date() })
+      .where(eq(clientPaymentMethods.clientId, clientId));
+    
+    // Then set the specified payment method as default
+    await db
+      .update(clientPaymentMethods)
+      .set({ isDefault: true, updatedAt: new Date() })
+      .where(eq(clientPaymentMethods.id, paymentMethodId));
+  }
+
+  // Client billing preference operations
+  async getClientBillingPref(clientId: string): Promise<ClientBillingPref | undefined> {
+    const [pref] = await db
+      .select()
+      .from(clientBillingPrefs)
+      .where(eq(clientBillingPrefs.clientId, clientId));
+    return pref;
+  }
+
+  async upsertClientBillingPref(prefData: InsertClientBillingPref): Promise<ClientBillingPref> {
+    const [pref] = await db
+      .insert(clientBillingPrefs)
+      .values(prefData)
+      .onConflictDoUpdate({
+        target: clientBillingPrefs.clientId,
+        set: { ...prefData, updatedAt: new Date() },
+      })
+      .returning();
+    return pref;
   }
 
   // Recurring billing schedule operations

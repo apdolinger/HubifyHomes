@@ -51,6 +51,7 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
 import { AlertBanner, AlertBannerRef } from "@/components/AlertBanner";
 import { EmailCompositionModal } from "@/components/EmailCompositionModal";
+import { PaymentMethodCollectionModal } from "@/components/PaymentMethodCollectionModal";
 import type { EmailHistory } from "@shared/schema";
 import { format } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -101,6 +102,7 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isAddingSchedule, setIsAddingSchedule] = useState(false);
+  const [isAddingPaymentMethod, setIsAddingPaymentMethod] = useState(false);
 
   // Billing configuration state
   const [billingEnabled, setBillingEnabled] = useState(false);
@@ -138,6 +140,54 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
   const { data: clientInvoices, isLoading: invoicesLoading } = useQuery({
     queryKey: [`/api/clients/${personId}/invoices`],
     enabled: !!personId && billingEnabled,
+  });
+
+  // Fetch payment methods
+  const { data: paymentMethods, isLoading: paymentMethodsLoading } = useQuery({
+    queryKey: ['/api/clients', personId, 'payment-methods'],
+    enabled: !!personId && billingEnabled,
+  });
+
+  // Delete payment method mutation
+  const deletePaymentMethodMutation = useMutation({
+    mutationFn: async (paymentMethodId: string) => {
+      return apiRequest("DELETE", `/api/payment-methods/${paymentMethodId}`, null);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/clients', personId, 'payment-methods'] });
+      toast({
+        title: "Payment method removed",
+        description: "The payment method has been removed successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to remove payment method",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Set default payment method mutation
+  const setDefaultPaymentMethodMutation = useMutation({
+    mutationFn: async (paymentMethodId: string) => {
+      return apiRequest("POST", `/api/clients/${personId}/payment-methods/${paymentMethodId}/set-default`, null);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/clients', personId, 'payment-methods'] });
+      toast({
+        title: "Default payment method updated",
+        description: "The default payment method has been set successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to set default payment method",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   // Update billing settings mutation
@@ -524,6 +574,94 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
         </Card>
       )}
 
+      {/* Payment Methods Card */}
+      {billingEnabled && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center">
+                <DollarSign className="w-5 h-5 mr-2" />
+                Payment Methods
+              </CardTitle>
+              <Button
+                size="sm"
+                onClick={() => setIsAddingPaymentMethod(true)}
+                data-testid="button-add-payment-method"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Payment Method
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {paymentMethodsLoading ? (
+              <p className="text-center text-slate-500">Loading payment methods...</p>
+            ) : !paymentMethods || (paymentMethods as any[]).length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-slate-500 mb-2">No payment methods on file</p>
+                <p className="text-sm text-slate-400">Add a card or bank account to enable automated invoice payments</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {(paymentMethods as any[]).map((pm: any) => (
+                  <div 
+                    key={pm.id} 
+                    className="flex items-center justify-between p-3 bg-slate-50 rounded-lg" 
+                    data-testid={`payment-method-${pm.id}`}
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">
+                          {pm.paymentMethodType === 'card' 
+                            ? `${pm.brand?.toUpperCase()} •••• ${pm.last4}` 
+                            : `Bank Account •••• ${pm.last4}`}
+                        </p>
+                        {pm.isDefault && (
+                          <Badge variant="default" className="text-xs">Default</Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-slate-500">
+                        {pm.paymentMethodType === 'card' && pm.expMonth && pm.expYear
+                          ? `Expires ${pm.expMonth}/${pm.expYear}`
+                          : pm.paymentMethodType === 'us_bank_account' 
+                            ? pm.bankName 
+                            : ''}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      {!pm.isDefault && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setDefaultPaymentMethodMutation.mutate(pm.id)}
+                          disabled={setDefaultPaymentMethodMutation.isPending}
+                          data-testid={`button-set-default-${pm.id}`}
+                        >
+                          Set Default
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (confirm('Are you sure you want to remove this payment method?')) {
+                            deletePaymentMethodMutation.mutate(pm.id);
+                          }
+                        }}
+                        disabled={deletePaymentMethodMutation.isPending}
+                        data-testid={`button-remove-${pm.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Recent Invoices Card */}
       {billingEnabled && (
         <Card>
@@ -560,6 +698,14 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
           </CardContent>
         </Card>
       )}
+
+      {/* Payment Method Collection Modal */}
+      <PaymentMethodCollectionModal
+        open={isAddingPaymentMethod}
+        onClose={() => setIsAddingPaymentMethod(false)}
+        clientId={personId}
+        clientName={`${person?.firstName || ''} ${person?.lastName || ''}`.trim() || 'Client'}
+      />
     </div>
   );
 }

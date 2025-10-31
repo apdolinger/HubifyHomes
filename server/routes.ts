@@ -61,6 +61,7 @@ import {
   insertClientInvoiceSchema,
   insertRecurringBillingScheduleSchema,
   insertBillingSubmissionSchema,
+  insertClientBillingPrefSchema,
   insertSupportRequestSchema,
   insertEmailTemplateSchema,
   insertOrgEmailTemplateSchema,
@@ -83,6 +84,7 @@ import {
   tierAllowsPremiumProperties
 } from "@shared/schema";
 import { z } from "zod";
+import { createSetupIntentForClient, detachPaymentMethod } from "./stripe";
 import { db } from "./db";
 import { eq, lt, and } from "drizzle-orm";
 import sgMail from "@sendgrid/mail";
@@ -10029,6 +10031,230 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting recurring schedule:", error);
       res.status(500).json({ message: "Failed to delete recurring schedule" });
+    }
+  });
+
+  // Client Payment Method endpoints
+  app.post("/api/clients/:clientId/setup-intent", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      // RBAC: Only admins and supervisors can manage payment methods
+      const userRole = (user as any)?.claims?.role ?? (user as any)?.role;
+      if (userRole !== 'admin' && userRole !== 'supervisor') {
+        return res.status(403).json({ message: "Access denied. Admin or supervisor role required." });
+      }
+
+      const { clientId } = req.params;
+      const client = await storage.getClient(clientId);
+      
+      if (!client || client.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      // Validate payment method types
+      const validatedData = z.object({
+        paymentMethodTypes: z.array(z.enum(['card', 'us_bank_account'])).default(['card', 'us_bank_account'])
+      }).parse({ paymentMethodTypes: req.body.paymentMethodTypes });
+
+      const setupIntent = await createSetupIntentForClient(
+        user.orgId,
+        clientId,
+        client.email,
+        validatedData.paymentMethodTypes
+      );
+
+      res.json(setupIntent);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating setup intent:", error);
+      res.status(500).json({ message: "Failed to create setup intent" });
+    }
+  });
+
+  app.get("/api/clients/:clientId/payment-methods", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      // RBAC: Only admins and supervisors can view payment methods
+      const userRole = (user as any)?.claims?.role ?? (user as any)?.role;
+      if (userRole !== 'admin' && userRole !== 'supervisor') {
+        return res.status(403).json({ message: "Access denied. Admin or supervisor role required." });
+      }
+
+      const { clientId } = req.params;
+      const client = await storage.getClient(clientId);
+      
+      if (!client || client.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      const paymentMethods = await storage.getClientPaymentMethods(clientId);
+      res.json(paymentMethods);
+    } catch (error) {
+      console.error("Error fetching payment methods:", error);
+      res.status(500).json({ message: "Failed to fetch payment methods" });
+    }
+  });
+
+  app.post("/api/clients/:clientId/payment-methods/:paymentMethodId/set-default", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      // RBAC: Only admins and supervisors can set default payment method
+      const userRole = (user as any)?.claims?.role ?? (user as any)?.role;
+      if (userRole !== 'admin' && userRole !== 'supervisor') {
+        return res.status(403).json({ message: "Access denied. Admin or supervisor role required." });
+      }
+
+      const { clientId, paymentMethodId } = req.params;
+      const client = await storage.getClient(clientId);
+      
+      if (!client || client.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      // Verify payment method belongs to this client
+      const paymentMethod = await storage.getClientPaymentMethod(paymentMethodId);
+      if (!paymentMethod || paymentMethod.clientId !== clientId) {
+        return res.status(404).json({ message: "Payment method not found" });
+      }
+
+      await storage.setDefaultPaymentMethod(clientId, paymentMethodId);
+      res.json({ message: "Default payment method updated" });
+    } catch (error) {
+      console.error("Error setting default payment method:", error);
+      res.status(500).json({ message: "Failed to set default payment method" });
+    }
+  });
+
+  app.delete("/api/payment-methods/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      // RBAC: Only admins and supervisors can delete payment methods
+      const userRole = (user as any)?.claims?.role ?? (user as any)?.role;
+      if (userRole !== 'admin' && userRole !== 'supervisor') {
+        return res.status(403).json({ message: "Access denied. Admin or supervisor role required." });
+      }
+
+      const { id } = req.params;
+      const paymentMethod = await storage.getClientPaymentMethod(id);
+      
+      if (!paymentMethod) {
+        return res.status(404).json({ message: "Payment method not found" });
+      }
+
+      // Verify client belongs to user's org
+      const client = await storage.getClient(paymentMethod.clientId);
+      if (!client || client.orgId !== user.orgId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Detach from Stripe
+      await detachPaymentMethod(user.orgId, paymentMethod.stripePaymentMethodId);
+      
+      // Delete from database
+      await storage.deleteClientPaymentMethod(id);
+      
+      res.json({ message: "Payment method deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting payment method:", error);
+      res.status(500).json({ message: "Failed to delete payment method" });
+    }
+  });
+
+  // Client Billing Preferences endpoints
+  app.get("/api/clients/:clientId/billing-prefs", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      // RBAC: Only admins and supervisors can view billing preferences
+      const userRole = (user as any)?.claims?.role ?? (user as any)?.role;
+      if (userRole !== 'admin' && userRole !== 'supervisor') {
+        return res.status(403).json({ message: "Access denied. Admin or supervisor role required." });
+      }
+
+      const { clientId } = req.params;
+      const client = await storage.getClient(clientId);
+      
+      if (!client || client.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      const prefs = await storage.getClientBillingPref(clientId);
+      
+      // Return default preferences if none exist
+      if (!prefs) {
+        return res.json({
+          clientId,
+          orgId: user.orgId,
+          autoChargeInvoices: true,
+          autoChargeTiming: 'on_due',
+          retryStrategy: [3, 5, 7],
+          emailReceipts: true,
+          notifyFailedPayment: true,
+        });
+      }
+
+      res.json(prefs);
+    } catch (error) {
+      console.error("Error fetching billing preferences:", error);
+      res.status(500).json({ message: "Failed to fetch billing preferences" });
+    }
+  });
+
+  app.put("/api/clients/:clientId/billing-prefs", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      // RBAC: Only admins and supervisors can update billing preferences
+      const userRole = (user as any)?.claims?.role ?? (user as any)?.role;
+      if (userRole !== 'admin' && userRole !== 'supervisor') {
+        return res.status(403).json({ message: "Access denied. Admin or supervisor role required." });
+      }
+
+      const { clientId } = req.params;
+      const client = await storage.getClient(clientId);
+      
+      if (!client || client.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      const validatedData = insertClientBillingPrefSchema.parse({
+        ...req.body,
+        clientId,
+        orgId: user.orgId,
+      });
+
+      const prefs = await storage.upsertClientBillingPref(validatedData);
+      res.json(prefs);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error updating billing preferences:", error);
+      res.status(500).json({ message: "Failed to update billing preferences" });
     }
   });
 

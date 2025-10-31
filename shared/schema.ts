@@ -200,6 +200,12 @@ export const clientInvoices = pgTable("client_invoices", {
   paymentError: text("payment_error"), // Decline reason or error message
   stripePaymentIntentId: varchar("stripe_payment_intent_id"),
   
+  // Auto-charge tracking
+  autoChargeAttemptedAt: timestamp("auto_charge_attempted_at"),
+  attemptNumber: integer("attempt_number").default(0),
+  lastAttemptError: text("last_attempt_error"),
+  paidViaPaymentMethodId: uuid("paid_via_payment_method_id"),
+  
   // Dates
   dueDate: timestamp("due_date"),
   issuedAt: timestamp("issued_at"),
@@ -333,6 +339,53 @@ export const clients = pgTable("clients", {
 }, (table) => ({
   uniqueOrgEmail: unique().on(table.orgId, table.email),
 }));
+
+// Client payment methods - Stripe payment method tokens for auto-charging
+export const clientPaymentMethods = pgTable("client_payment_methods", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clientId: uuid("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  
+  // Stripe payment method
+  stripePaymentMethodId: varchar("stripe_payment_method_id").notNull(),
+  type: varchar("type").$type<"card"|"us_bank_account">().notNull(),
+  
+  // Display metadata
+  brand: varchar("brand"), // "Visa", "Mastercard", or bank name
+  last4: varchar("last4").notNull(),
+  expMonth: integer("exp_month"), // For cards
+  expYear: integer("exp_year"), // For cards
+  
+  // Status and default
+  isDefault: boolean("is_default").notNull().default(false),
+  status: varchar("status").$type<"active"|"requires_verification"|"inactive">().notNull().default("active"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("client_payment_methods_client_idx").on(table.clientId),
+  index("client_payment_methods_stripe_pm_idx").on(table.stripePaymentMethodId),
+]);
+
+// Client billing preferences - Auto-charge settings and policies
+export const clientBillingPrefs = pgTable("client_billing_prefs", {
+  clientId: uuid("client_id").primaryKey().references(() => clients.id, { onDelete: "cascade" }),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  
+  // Auto-charge settings
+  autoChargeInvoices: boolean("auto_charge_invoices").notNull().default(true),
+  autoChargeTiming: varchar("auto_charge_timing").$type<"on_issue"|"on_due"|"1_day_after"|"3_days_after">().notNull().default("on_due"),
+  
+  // Retry strategy (JSON array of days to retry: [3, 5, 7])
+  retryStrategy: jsonb("retry_strategy").$type<number[]>().default([3, 5, 7]),
+  
+  // Notification preferences
+  emailReceipts: boolean("email_receipts").notNull().default(true),
+  notifyFailedPayment: boolean("notify_failed_payment").notNull().default(true),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
 
 // Recurring billing schedules - for scheduled recurring charges
 export const recurringBillingSchedules = pgTable("recurring_billing_schedules", {
@@ -2108,6 +2161,17 @@ export const insertBillingSubmissionSchema = createInsertSchema(billingSubmissio
   updatedAt: true,
 });
 
+export const insertClientPaymentMethodSchema = createInsertSchema(clientPaymentMethods).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertClientBillingPrefSchema = createInsertSchema(clientBillingPrefs).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertPortalUserSchema = createInsertSchema(portalUsers).omit({
   id: true,
   createdAt: true,
@@ -2294,6 +2358,10 @@ export type InsertRecurringBillingSchedule = z.infer<typeof insertRecurringBilli
 export type RecurringBillingSchedule = typeof recurringBillingSchedules.$inferSelect;
 export type InsertBillingSubmission = z.infer<typeof insertBillingSubmissionSchema>;
 export type BillingSubmission = typeof billingSubmissions.$inferSelect;
+export type InsertClientPaymentMethod = z.infer<typeof insertClientPaymentMethodSchema>;
+export type ClientPaymentMethod = typeof clientPaymentMethods.$inferSelect;
+export type InsertClientBillingPref = z.infer<typeof insertClientBillingPrefSchema>;
+export type ClientBillingPref = typeof clientBillingPrefs.$inferSelect;
 export type InsertPortalUser = z.infer<typeof insertPortalUserSchema>;
 export type PortalUser = typeof portalUsers.$inferSelect;
 export type InsertPortalUserProperty = z.infer<typeof insertPortalUserPropertySchema>;

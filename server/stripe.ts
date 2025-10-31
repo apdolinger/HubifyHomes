@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { nanoid } from "nanoid";
 import { storage } from "./storage";
 
 // Master Stripe instance for billing organizations (Hubify's Stripe account)
@@ -263,6 +264,78 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   });
 }
 
+// Handle setup_intent.succeeded to save payment method
+async function handleSetupIntentSucceeded(setupIntent: Stripe.SetupIntent, orgId: string) {
+  const paymentMethodId = setupIntent.payment_method;
+  if (!paymentMethodId || typeof paymentMethodId !== 'string') {
+    console.log('No payment method attached to setup intent');
+    return;
+  }
+
+  const clientId = setupIntent.metadata?.clientId;
+  if (!clientId) {
+    console.log('No clientId in setup intent metadata');
+    return;
+  }
+
+  try {
+    // Get the Stripe instance for this org
+    const orgStripeConnection = await getOrgStripe(orgId);
+    if (!orgStripeConnection) {
+      console.error('Organization Stripe connection not found');
+      return;
+    }
+
+    // Retrieve full payment method details from Stripe
+    const paymentMethod = await orgStripeConnection.stripe.paymentMethods.retrieve(paymentMethodId);
+
+    // Determine if this should be the default payment method
+    const existingPaymentMethods = await storage.getClientPaymentMethods(clientId);
+    const isFirst = existingPaymentMethods.length === 0;
+
+    // Save payment method to database
+    await storage.createClientPaymentMethod({
+      id: nanoid(),
+      orgId,
+      clientId,
+      stripePaymentMethodId: paymentMethod.id,
+      paymentMethodType: paymentMethod.type,
+      last4: paymentMethod.type === 'card' 
+        ? paymentMethod.card?.last4 || null
+        : paymentMethod.type === 'us_bank_account'
+          ? paymentMethod.us_bank_account?.last4 || null
+          : null,
+      brand: paymentMethod.type === 'card' ? paymentMethod.card?.brand || null : null,
+      expMonth: paymentMethod.type === 'card' ? paymentMethod.card?.exp_month || null : null,
+      expYear: paymentMethod.type === 'card' ? paymentMethod.card?.exp_year || null : null,
+      bankName: paymentMethod.type === 'us_bank_account' 
+        ? paymentMethod.us_bank_account?.bank_name || null 
+        : null,
+      isDefault: isFirst, // First payment method is default
+    });
+
+    console.log(`Payment method ${paymentMethod.id} saved for client ${clientId}`);
+  } catch (error) {
+    console.error('Error saving payment method:', error);
+    throw error;
+  }
+}
+
+// Handle payment_method.detached to remove payment method
+async function handlePaymentMethodDetached(paymentMethod: Stripe.PaymentMethod, orgId: string) {
+  try {
+    // Find and delete the payment method from our database
+    const dbPaymentMethod = await storage.getClientPaymentMethodByStripeId(paymentMethod.id);
+    if (dbPaymentMethod) {
+      await storage.deleteClientPaymentMethod(dbPaymentMethod.id);
+      console.log(`Payment method ${paymentMethod.id} removed from database`);
+    }
+  } catch (error) {
+    console.error('Error removing payment method:', error);
+    throw error;
+  }
+}
+
 // Organization-level webhook handler for client invoice payments
 export async function handleOrgWebhook(event: Stripe.Event, orgId: string) {
   // Record the webhook event
@@ -286,6 +359,14 @@ export async function handleOrgWebhook(event: Stripe.Event, orgId: string) {
       
       case "charge.refunded":
         await handleChargeRefunded(event.data.object as Stripe.Charge, orgId);
+        break;
+      
+      case "setup_intent.succeeded":
+        await handleSetupIntentSucceeded(event.data.object as Stripe.SetupIntent, orgId);
+        break;
+      
+      case "payment_method.detached":
+        await handlePaymentMethodDetached(event.data.object as Stripe.PaymentMethod, orgId);
         break;
     }
 
@@ -475,4 +556,143 @@ async function sendPaymentFailureNotification(invoiceId: string, errorMessage: s
     console.error(`Error sending payment failure notification for invoice ${invoiceId}:`, error);
     // Don't throw - email failure shouldn't break webhook processing
   }
+}
+
+// Client payment method collection functions
+
+/**
+ * Ensure a Stripe customer exists for the client
+ * Creates a new customer if one doesn't exist, or returns existing customer ID
+ */
+export async function ensureStripeCustomerForClient(
+  orgId: string,
+  clientId: string,
+  clientEmail: string,
+  clientName?: string
+): Promise<string> {
+  const orgStripe = await getOrgStripe(orgId);
+  if (!orgStripe) {
+    throw new Error("Organization Stripe account not configured");
+  }
+
+  // Check if client already has a Stripe customer ID
+  const client = await storage.getClient(clientId);
+  if (!client) {
+    throw new Error("Client not found");
+  }
+
+  // Check existing invoices for stripe customer ID
+  const existingInvoices = await storage.getClientInvoicesByClient(clientId);
+  const existingCustomerId = existingInvoices.find(inv => inv.stripeCustomerId)?.stripeCustomerId;
+
+  if (existingCustomerId) {
+    return existingCustomerId;
+  }
+
+  // Create new Stripe customer
+  const customer = await orgStripe.stripe.customers.create({
+    email: clientEmail,
+    name: clientName || `${client.firstName || ''} ${client.lastName || ''}`.trim() || clientEmail,
+    metadata: {
+      clientId,
+      orgId,
+    },
+  }, orgStripe.accountId ? { stripeAccount: orgStripe.accountId } : undefined);
+
+  return customer.id;
+}
+
+/**
+ * Create a SetupIntent for collecting payment methods
+ * Returns client_secret for Stripe Elements
+ */
+export async function createSetupIntentForClient(
+  orgId: string,
+  clientId: string,
+  clientEmail: string,
+  paymentMethodTypes: ('card' | 'us_bank_account')[] = ['card', 'us_bank_account']
+): Promise<{ clientSecret: string; setupIntentId: string }> {
+  const orgStripe = await getOrgStripe(orgId);
+  if (!orgStripe) {
+    throw new Error("Organization Stripe account not configured");
+  }
+
+  // Ensure customer exists
+  const customerId = await ensureStripeCustomerForClient(orgId, clientId, clientEmail);
+
+  // Create SetupIntent
+  const setupIntent = await orgStripe.stripe.setupIntents.create({
+    customer: customerId,
+    payment_method_types: paymentMethodTypes,
+    usage: 'off_session', // For future payments
+    metadata: {
+      clientId,
+      orgId,
+    },
+  }, orgStripe.accountId ? { stripeAccount: orgStripe.accountId } : undefined);
+
+  return {
+    clientSecret: setupIntent.client_secret!,
+    setupIntentId: setupIntent.id,
+  };
+}
+
+/**
+ * Retrieve payment method details from Stripe
+ */
+export async function getPaymentMethodDetails(
+  orgId: string,
+  paymentMethodId: string
+): Promise<{
+  type: 'card' | 'us_bank_account';
+  brand?: string;
+  last4: string;
+  expMonth?: number;
+  expYear?: number;
+}> {
+  const orgStripe = await getOrgStripe(orgId);
+  if (!orgStripe) {
+    throw new Error("Organization Stripe account not configured");
+  }
+
+  const paymentMethod = await orgStripe.stripe.paymentMethods.retrieve(
+    paymentMethodId,
+    orgStripe.accountId ? { stripeAccount: orgStripe.accountId } : undefined
+  );
+
+  if (paymentMethod.type === 'card' && paymentMethod.card) {
+    return {
+      type: 'card',
+      brand: paymentMethod.card.brand,
+      last4: paymentMethod.card.last4,
+      expMonth: paymentMethod.card.exp_month,
+      expYear: paymentMethod.card.exp_year,
+    };
+  } else if (paymentMethod.type === 'us_bank_account' && paymentMethod.us_bank_account) {
+    return {
+      type: 'us_bank_account',
+      brand: paymentMethod.us_bank_account.bank_name || 'Bank',
+      last4: paymentMethod.us_bank_account.last4,
+    };
+  }
+
+  throw new Error(`Unsupported payment method type: ${paymentMethod.type}`);
+}
+
+/**
+ * Detach a payment method from Stripe customer
+ */
+export async function detachPaymentMethod(
+  orgId: string,
+  paymentMethodId: string
+): Promise<void> {
+  const orgStripe = await getOrgStripe(orgId);
+  if (!orgStripe) {
+    throw new Error("Organization Stripe account not configured");
+  }
+
+  await orgStripe.stripe.paymentMethods.detach(
+    paymentMethodId,
+    orgStripe.accountId ? { stripeAccount: orgStripe.accountId } : undefined
+  );
 }
