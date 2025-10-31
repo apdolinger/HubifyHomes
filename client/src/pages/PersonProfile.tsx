@@ -577,7 +577,9 @@ export default function PersonProfile() {
   const personId = params.id;
   
   // Check if user has billing permissions (admin or supervisor)
-  const hasBillingPermissions = (user as any)?.role === 'admin' || (user as any)?.role === 'supervisor';
+  // OIDC claims take precedence over default user role
+  const userRole = (user as any)?.claims?.role ?? (user as any)?.role;
+  const hasBillingPermissions = userRole === 'admin' || userRole === 'supervisor';
   
   // Link property modal state
   const [isLinkPropertyModalOpen, setIsLinkPropertyModalOpen] = useState(false);
