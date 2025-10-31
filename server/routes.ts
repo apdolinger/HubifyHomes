@@ -11004,6 +11004,335 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Email template routes
+  app.get("/api/email-templates", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+      
+      const templates = await storage.getOrgEmailTemplates(orgId);
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching email templates:", error);
+      res.status(500).json({ message: "Failed to fetch email templates" });
+    }
+  });
+
+  app.get("/api/email-templates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+      
+      const id = parseInt(req.params.id);
+      const template = await storage.getOrgEmailTemplate(id, orgId);
+      
+      if (!template) {
+        return res.status(404).json({ message: "Email template not found" });
+      }
+      
+      res.json(template);
+    } catch (error) {
+      console.error("Error fetching email template:", error);
+      res.status(500).json({ message: "Failed to fetch email template" });
+    }
+  });
+
+  app.post("/api/email-templates", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+      
+      const validatedData = insertOrgEmailTemplateSchema.parse({
+        ...req.body,
+        orgId,
+      });
+      
+      const template = await storage.createOrgEmailTemplate(validatedData);
+      res.status(201).json(template);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid template data", errors: error.errors });
+      }
+      console.error("Error creating email template:", error);
+      res.status(500).json({ message: "Failed to create email template" });
+    }
+  });
+
+  app.patch("/api/email-templates/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+      
+      const id = parseInt(req.params.id);
+      const template = await storage.updateOrgEmailTemplate(id, orgId, req.body);
+      res.json(template);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("not found")) {
+        return res.status(404).json({ message: "Email template not found" });
+      }
+      console.error("Error updating email template:", error);
+      res.status(500).json({ message: "Failed to update email template" });
+    }
+  });
+
+  app.delete("/api/email-templates/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+      
+      const id = parseInt(req.params.id);
+      await storage.deleteOrgEmailTemplate(id, orgId);
+      res.json({ message: "Email template deleted successfully" });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("not found")) {
+        return res.status(404).json({ message: "Email template not found" });
+      }
+      console.error("Error deleting email template:", error);
+      res.status(500).json({ message: "Failed to delete email template" });
+    }
+  });
+
+  // Advanced email sending route
+  app.post("/api/send-email-advanced", isAuthenticated, async (req: any, res) => {
+    try {
+      const { processMergeFields, buildMergeFieldData, sendEmail } = await import('./email-service');
+      
+      const orgId = req.user?.claims?.orgId;
+      const userId = req.user?.claims?.sub || req.user?.id;
+      
+      if (!orgId || !userId) {
+        return res.status(400).json({ message: "Organization ID or User ID not found" });
+      }
+      
+      const {
+        recipientEmail,
+        recipientName,
+        recipientContactId,
+        subject,
+        body,
+        templateId,
+        scheduledFor,
+        mergeFieldData = {},
+        propertyId,
+      } = req.body;
+      
+      if (!recipientEmail) {
+        return res.status(400).json({ message: "Recipient email is required" });
+      }
+      
+      let finalSubject = subject;
+      let finalBody = body;
+      
+      // Load template if provided
+      if (templateId) {
+        const template = await storage.getOrgEmailTemplate(templateId, orgId);
+        if (!template) {
+          return res.status(404).json({ message: "Email template not found" });
+        }
+        finalSubject = template.subject;
+        finalBody = template.body;
+      }
+      
+      if (!finalSubject || !finalBody) {
+        return res.status(400).json({ message: "Subject and body are required" });
+      }
+      
+      // Build merge field data
+      const mergeData = await buildMergeFieldData({
+        contactId: recipientContactId,
+        propertyId,
+        senderId: userId,
+        orgId,
+        additionalData: mergeFieldData,
+      });
+      
+      // Process merge fields in subject and body
+      finalSubject = processMergeFields(finalSubject, mergeData);
+      finalBody = processMergeFields(finalBody, mergeData);
+      
+      // Get sender info
+      const sender = await storage.getUser(userId);
+      const senderName = sender ? [sender.firstName, sender.lastName].filter(Boolean).join(' ') || sender.email : undefined;
+      const senderEmail = sender?.email || undefined;
+      
+      // If scheduling, create scheduled email record
+      if (scheduledFor) {
+        const scheduledDate = new Date(scheduledFor);
+        if (isNaN(scheduledDate.getTime())) {
+          return res.status(400).json({ message: "Invalid scheduled date" });
+        }
+        
+        // Create scheduled email
+        await storage.createScheduledEmail({
+          orgId,
+          senderId: userId,
+          senderName: senderName || 'Unknown',
+          senderEmail: senderEmail || '',
+          recipientContactId: recipientContactId || null,
+          recipientEmail,
+          recipientName: recipientName || null,
+          subject: finalSubject,
+          body: finalBody,
+          templateId: templateId || null,
+          scheduledFor: scheduledDate,
+          status: "pending",
+        });
+        
+        // Create email history record with scheduled status
+        await storage.createEmailHistory({
+          orgId,
+          senderId: userId,
+          senderName: senderName || 'Unknown',
+          senderEmail: senderEmail || '',
+          recipientContactId: recipientContactId || null,
+          recipientEmail,
+          recipientName: recipientName || null,
+          subject: finalSubject,
+          body: finalBody,
+          templateId: templateId || null,
+          status: "scheduled",
+          scheduledFor: scheduledDate,
+          sentAt: null,
+          errorMessage: null,
+        });
+        
+        return res.json({ message: "Email scheduled successfully", scheduledFor: scheduledDate });
+      }
+      
+      // Send immediately
+      await sendEmail({
+        to: recipientEmail,
+        subject: finalSubject,
+        body: finalBody,
+        orgId,
+        fromName: senderName,
+        fromEmail: senderEmail,
+      });
+      
+      // Create email history record
+      await storage.createEmailHistory({
+        orgId,
+        senderId: userId,
+        senderName: senderName || 'Unknown',
+        senderEmail: senderEmail || '',
+        recipientContactId: recipientContactId || null,
+        recipientEmail,
+        recipientName: recipientName || null,
+        subject: finalSubject,
+        body: finalBody,
+        templateId: templateId || null,
+        status: "sent",
+        scheduledFor: null,
+        sentAt: new Date(),
+        errorMessage: null,
+      });
+      
+      res.json({ message: "Email sent successfully" });
+    } catch (error: any) {
+      console.error("Error sending email:", error);
+      
+      // Try to log failed send to email history
+      try {
+        const orgId = req.user?.claims?.orgId;
+        const userId = req.user?.claims?.sub || req.user?.id;
+        const sender = await storage.getUser(userId);
+        const senderName = sender ? [sender.firstName, sender.lastName].filter(Boolean).join(' ') || sender.email : 'Unknown';
+        const senderEmail = sender?.email || '';
+        
+        await storage.createEmailHistory({
+          orgId,
+          senderId: userId,
+          senderName,
+          senderEmail,
+          recipientContactId: req.body.recipientContactId || null,
+          recipientEmail: req.body.recipientEmail,
+          recipientName: req.body.recipientName || null,
+          subject: req.body.subject || 'Email send failed',
+          body: req.body.body || '',
+          templateId: req.body.templateId || null,
+          status: "failed",
+          scheduledFor: null,
+          sentAt: null,
+          errorMessage: error.message || 'Unknown error',
+        });
+      } catch (historyError) {
+        console.error("Error logging failed email to history:", historyError);
+      }
+      
+      res.status(500).json({ message: error.message || "Failed to send email" });
+    }
+  });
+
+  // Email history routes
+  app.get("/api/contacts/:id/email-history", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+      
+      const contactId = parseInt(req.params.id);
+      const history = await storage.getEmailHistory(orgId, contactId);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching email history:", error);
+      res.status(500).json({ message: "Failed to fetch email history" });
+    }
+  });
+
+  // Scheduled emails routes
+  app.get("/api/scheduled-emails", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+      
+      const status = req.query.status as "pending"|"sent"|"failed"|"cancelled"|undefined;
+      const scheduledEmails = await storage.getScheduledEmails(orgId, status);
+      res.json(scheduledEmails);
+    } catch (error) {
+      console.error("Error fetching scheduled emails:", error);
+      res.status(500).json({ message: "Failed to fetch scheduled emails" });
+    }
+  });
+
+  app.patch("/api/scheduled-emails/:id/cancel", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+      
+      const id = parseInt(req.params.id);
+      const scheduledEmail = await storage.getScheduledEmail(id, orgId);
+      
+      if (!scheduledEmail) {
+        return res.status(404).json({ message: "Scheduled email not found" });
+      }
+      
+      if (scheduledEmail.status !== "pending") {
+        return res.status(400).json({ message: "Only pending emails can be cancelled" });
+      }
+      
+      const updated = await storage.updateScheduledEmail(id, orgId, { status: "cancelled" });
+      res.json({ message: "Scheduled email cancelled successfully", email: updated });
+    } catch (error) {
+      console.error("Error cancelling scheduled email:", error);
+      res.status(500).json({ message: "Failed to cancel scheduled email" });
+    }
+  });
+
   // Register the conflict detector for scheduled tasks
   const { setConflictDetector } = await import('./scheduledTasks');
   setConflictDetector(detectAndCreateEventConflicts);
