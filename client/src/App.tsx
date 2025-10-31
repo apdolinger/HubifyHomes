@@ -27,6 +27,7 @@ import HubifyConsole from "@/pages/HubifyConsole";
 import AdminClientPortal from "@/pages/AdminClientPortal";
 import AdminClientPortalProperty from "@/pages/AdminClientPortalProperty";
 import AdminNoteSearch from "@/pages/AdminNoteSearch";
+import AdminEmailTemplates from "@/pages/AdminEmailTemplates";
 import Admin from "@/pages/Admin";
 import Account from "@/pages/Account";
 import SuperAdmin from "@/pages/SuperAdmin";
@@ -147,6 +148,7 @@ function Router() {
           <Route path="/admin/import" component={ImportManager} />
           <Route path="/admin/vendors" component={Vendors} />
           <Route path="/admin/notes/search" component={AdminNoteSearch} />
+          <Route path="/admin/email-templates" component={AdminEmailTemplates} />
           
           {/* Billing Routes */}
           <Route path="/billing" component={Billing} />

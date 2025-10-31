@@ -249,7 +249,6 @@ export default function Admin() {
   const initialTab = urlParams.get('tab') || 'forms';
   
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [isNewTemplateDialogOpen, setIsNewTemplateDialogOpen] = useState(false);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isNewCommunityDialogOpen, setIsNewCommunityDialogOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<any>(null);
@@ -801,22 +800,6 @@ export default function Admin() {
     return null;
   }
 
-  // Mock data for templates
-  const emailTemplates = [
-    { id: 1, name: "New Client Welcome", subject: "Welcome to Nestive Property Management", type: "client", lastModified: "2 days ago" },
-    { id: 2, name: "Team Member Invitation", subject: "Join Our Property Management Team", type: "team", lastModified: "1 week ago" },
-    { id: 3, name: "Property Report Summary", subject: "Monthly Property Report - {PropertyAddress}", type: "report", lastModified: "3 days ago" },
-    { id: 4, name: "Task Notification", subject: "New Task Assigned: {TaskTitle}", type: "task", lastModified: "5 days ago" },
-    { id: 5, name: "Payment Reminder", subject: "Payment Due for {PropertyAddress}", type: "billing", lastModified: "1 day ago" },
-  ];
-
-  const taskTemplates = [
-    { id: 1, name: "New Property Onboarding", tasks: 8, category: "onboarding", lastUsed: "Yesterday" },
-    { id: 2, name: "Pool Inspection Checklist", tasks: 12, category: "inspection", lastUsed: "3 days ago" },
-    { id: 3, name: "Emergency Visit Protocol", tasks: 6, category: "emergency", lastUsed: "1 week ago" },
-    { id: 4, name: "Vendor Visit Tasks", tasks: 5, category: "vendor", lastUsed: "2 days ago" },
-  ];
-
   return (
     <main className="max-w-7xl mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -1261,141 +1244,50 @@ export default function Admin() {
 
         {/* Email & Message Templates Tab */}
         <TabsContent value="templates" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xl font-semibold">Email & Message Templates</h3>
-              <p className="text-slate-600">Configure reusable templates for communication</p>
-            </div>
-            <Dialog open={isNewTemplateDialogOpen} onOpenChange={setIsNewTemplateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Template
+          <div>
+            <h3 className="text-xl font-semibold">Email & Message Templates</h3>
+            <p className="text-slate-600 mb-6">Configure reusable templates for communication</p>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Mail className="w-5 h-5 mr-2" />
+                Email Templates
+              </CardTitle>
+              <CardDescription>
+                Create and manage email templates with merge fields for client communication
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-slate-600 mb-4">
+                Email templates allow you to create reusable messages with personalized merge fields like recipient name, property details, and more.
+              </p>
+              <Link href="/admin/email-templates">
+                <Button data-testid="button-manage-email-templates">
+                  <Mail className="w-4 h-4 mr-2" />
+                  Manage Email Templates
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Create New Email Template</DialogTitle>
-                  <DialogDescription>
-                    Create a reusable template with smart tags like ClientName, PropertyAddress
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="templateName">Template Name</Label>
-                    <Input id="templateName" placeholder="e.g., New Client Welcome" />
-                  </div>
-                  <div>
-                    <Label htmlFor="templateType">Template Type</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="client">Client Communication</SelectItem>
-                        <SelectItem value="team">Team Communication</SelectItem>
-                        <SelectItem value="report">Reports</SelectItem>
-                        <SelectItem value="task">Task Notifications</SelectItem>
-                        <SelectItem value="billing">Billing & Payments</SelectItem>
-                        <SelectItem value="emergency">Emergency Alerts</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="subject">Subject Line</Label>
-                    <Input id="subject" placeholder="Use ClientName, PropertyAddress, TaskTitle etc." />
-                  </div>
-                  <div>
-                    <Label htmlFor="body">Message Body</Label>
-                    <Textarea id="body" rows={6} placeholder="Dear ClientName, Welcome to our property management services..." />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsNewTemplateDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={() => {
-                    setIsNewTemplateDialogOpen(false);
-                    toast({
-                      title: "Template Created",
-                      description: "Email template has been saved successfully.",
-                    });
-                  }}>
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Template
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
+              </Link>
+            </CardContent>
+          </Card>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Mail className="w-5 h-5 mr-2" />
-                  Email Templates
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {emailTemplates.map((template) => (
-                    <div key={template.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex-1">
-                        <h4 className="font-medium">{template.name}</h4>
-                        <p className="text-sm text-slate-500">{template.subject}</p>
-                        <p className="text-xs text-slate-400">Modified {template.lastModified}</p>
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button variant="outline" size="sm">
-                          <Edit className="w-3 h-3" />
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <Copy className="w-3 h-3" />
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <FileText className="w-5 h-5 mr-2" />
-                  Task Templates
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {taskTemplates.map((template) => (
-                    <div key={template.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex-1">
-                        <h4 className="font-medium">{template.name}</h4>
-                        <p className="text-sm text-slate-500">{template.tasks} tasks • {template.category}</p>
-                        <p className="text-xs text-slate-400">Last used {template.lastUsed}</p>
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button variant="outline" size="sm">
-                          <Edit className="w-3 h-3" />
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <Copy className="w-3 h-3" />
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <FileText className="w-5 h-5 mr-2" />
+                Task Templates
+              </CardTitle>
+              <CardDescription>
+                Coming soon - Create reusable task checklists and workflows
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-slate-500">
+                Task templates will allow you to save common task sequences and checklists for quick reuse.
+              </p>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Billing Tab */}
