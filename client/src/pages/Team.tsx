@@ -39,6 +39,7 @@ const createTeamSchema = z.object({
   name: z.string().min(1, "Team name is required"),
   description: z.string().optional(),
   memberIds: z.array(z.string()).min(1, "At least one team member is required"),
+  teamLeadId: z.string().optional(),
 });
 
 type CreateTeamForm = z.infer<typeof createTeamSchema>;
@@ -244,6 +245,7 @@ export default function Team() {
       name: "",
       description: "",
       memberIds: [],
+      teamLeadId: "",
     },
   });
 
@@ -260,7 +262,7 @@ export default function Team() {
       if (currentUser?.id) {
         await apiRequest("POST", `/api/teams/${team.id}/members`, {
           userId: currentUser.id,
-          role: "member",
+          role: currentUser.id === data.teamLeadId ? "lead" : "member",
         });
       }
       
@@ -270,7 +272,7 @@ export default function Team() {
         if (memberId !== currentUser?.id) {
           await apiRequest("POST", `/api/teams/${team.id}/members`, {
             userId: memberId,
-            role: "member",
+            role: memberId === data.teamLeadId ? "lead" : "member",
           });
         }
       }
@@ -342,6 +344,28 @@ export default function Team() {
       toast({
         title: "Error",
         description: error.message || "Failed to remove team member. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation for updating team member role
+  const updateTeamMemberRoleMutation = useMutation({
+    mutationFn: async ({ teamId, userId, role }: { teamId: string; userId: string; role: 'lead' | 'member' }) => {
+      return apiRequest("PATCH", `/api/teams/${teamId}/members/${userId}/role`, { role });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/teams"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/users/${currentUser?.id}/teams`] });
+      toast({
+        title: "Role updated",
+        description: "Team member role has been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update team member role. Please try again.",
         variant: "destructive",
       });
     },
@@ -554,40 +578,50 @@ export default function Team() {
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {userTeams.map((team: any) => (
-                      <Card key={team.id} data-testid={`team-card-${team.id}`}>
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-base">{team.name}</CardTitle>
-                          {team.description && (
-                            <p className="text-sm text-slate-500 mt-1">{team.description}</p>
-                          )}
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-slate-600">Members</span>
-                              <Badge variant="secondary">{team.memberCount || 0}</Badge>
-                            </div>
-                            {team.members && team.members.length > 0 && (
-                              <div className="flex -space-x-2 mt-2">
-                                {team.members.slice(0, 5).map((member: any) => (
-                                  <Avatar key={member.userId} className="h-8 w-8 border-2 border-white">
-                                    <AvatarFallback className="text-xs">
-                                      {getUserInitials(member.firstName || '', member.lastName || '')}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                ))}
-                                {team.members.length > 5 && (
-                                  <div className="h-8 w-8 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center">
-                                    <span className="text-xs text-slate-600">+{team.members.length - 5}</span>
-                                  </div>
-                                )}
-                              </div>
+                    {userTeams.map((team: any) => {
+                      const teamLead = team.members?.find((m: any) => m.role === 'lead');
+                      return (
+                        <Card key={team.id} data-testid={`team-card-${team.id}`}>
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-base">{team.name}</CardTitle>
+                            {team.description && (
+                              <p className="text-sm text-slate-500 mt-1">{team.description}</p>
                             )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-slate-600">Members</span>
+                                <Badge variant="secondary">{team.memberCount || 0}</Badge>
+                              </div>
+                              {teamLead && (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <ShieldCheck className="w-4 h-4 text-blue-600" />
+                                  <span className="text-slate-600">Lead:</span>
+                                  <span className="font-medium">{teamLead.firstName} {teamLead.lastName}</span>
+                                </div>
+                              )}
+                              {team.members && team.members.length > 0 && (
+                                <div className="flex -space-x-2 mt-2">
+                                  {team.members.slice(0, 5).map((member: any) => (
+                                    <Avatar key={member.userId} className={`h-8 w-8 border-2 ${member.role === 'lead' ? 'border-blue-600' : 'border-white'}`}>
+                                      <AvatarFallback className="text-xs">
+                                        {getUserInitials(member.firstName || '', member.lastName || '')}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                  ))}
+                                  {team.members.length > 5 && (
+                                    <div className="h-8 w-8 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center">
+                                      <span className="text-xs text-slate-600">+{team.members.length - 5}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -1186,6 +1220,45 @@ export default function Team() {
                 )}
               />
               
+              <FormField
+                control={teamCreationForm.control}
+                name="teamLeadId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Team Lead (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-team-lead">
+                          <SelectValue placeholder="Select a team lead" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {teamCreationForm.watch("memberIds")?.length > 0 ? (
+                          teamMembers
+                            .filter((member: any) => 
+                              member.isActive && 
+                              teamCreationForm.watch("memberIds")?.includes(member.id)
+                            )
+                            .map((member: any) => (
+                              <SelectItem key={member.id} value={member.id}>
+                                {member.firstName} {member.lastName}
+                              </SelectItem>
+                            ))
+                        ) : (
+                          <SelectItem value="" disabled>
+                            Select team members first
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                    <p className="text-xs text-slate-500 mt-1">
+                      Choose a team lead from the selected members
+                    </p>
+                  </FormItem>
+                )}
+              />
+              
               <DialogFooter>
                 <Button
                   type="button"
@@ -1274,25 +1347,66 @@ export default function Team() {
                                       {getUserInitials(member.firstName || '', member.lastName || '')}
                                     </AvatarFallback>
                                   </Avatar>
-                                  <div>
-                                    <p className="text-sm font-medium">
-                                      {member.firstName} {member.lastName}
-                                    </p>
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <p className="text-sm font-medium">
+                                        {member.firstName} {member.lastName}
+                                      </p>
+                                      {member.role === 'lead' && (
+                                        <Badge variant="default" className="text-xs flex items-center gap-1">
+                                          <ShieldCheck className="w-3 h-3" />
+                                          Team Lead
+                                        </Badge>
+                                      )}
+                                    </div>
                                     <p className="text-xs text-slate-500">{member.email}</p>
                                   </div>
                                 </div>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeTeamMemberMutation.mutate({ 
-                                    teamId: team.id, 
-                                    userId: member.userId 
-                                  })}
-                                  disabled={removeTeamMemberMutation.isPending}
-                                  data-testid={`remove-member-${team.id}-${member.userId}`}
-                                >
-                                  Remove
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                  {member.role === 'lead' ? (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => updateTeamMemberRoleMutation.mutate({ 
+                                        teamId: team.id, 
+                                        userId: member.userId,
+                                        role: 'member'
+                                      })}
+                                      disabled={updateTeamMemberRoleMutation.isPending}
+                                      data-testid={`demote-member-${team.id}-${member.userId}`}
+                                    >
+                                      <UserCog className="w-3 h-3 mr-1" />
+                                      Demote
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => updateTeamMemberRoleMutation.mutate({ 
+                                        teamId: team.id, 
+                                        userId: member.userId,
+                                        role: 'lead'
+                                      })}
+                                      disabled={updateTeamMemberRoleMutation.isPending}
+                                      data-testid={`promote-member-${team.id}-${member.userId}`}
+                                    >
+                                      <ShieldCheck className="w-3 h-3 mr-1" />
+                                      Make Lead
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeTeamMemberMutation.mutate({ 
+                                      teamId: team.id, 
+                                      userId: member.userId 
+                                    })}
+                                    disabled={removeTeamMemberMutation.isPending}
+                                    data-testid={`remove-member-${team.id}-${member.userId}`}
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
                               </div>
                             ))}
                           </div>
