@@ -350,6 +350,7 @@ export default function Team() {
   });
 
   // Mutation for updating team member role
+  // Backend automatically demotes existing leads when promoting a new one
   const updateTeamMemberRoleMutation = useMutation({
     mutationFn: async ({ teamId, userId, role }: { teamId: string; userId: string; role: 'lead' | 'member' }) => {
       return apiRequest("PATCH", `/api/teams/${teamId}/members/${userId}/role`, { role });

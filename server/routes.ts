@@ -1318,6 +1318,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid role. Must be 'lead' or 'member'" });
       }
 
+      // If promoting to lead, first demote all current leads in the team
+      if (role === 'lead') {
+        const team = await storage.getTeamById(teamId);
+        if (team?.members) {
+          for (const member of team.members) {
+            if (member.role === 'lead' && member.userId !== userId) {
+              await storage.updateTeamMemberRole(teamId, member.userId, 'member');
+            }
+          }
+        }
+      }
+
       const updatedMember = await storage.updateTeamMemberRole(teamId, userId, role);
       res.json(updatedMember);
     } catch (error) {
