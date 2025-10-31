@@ -61,6 +61,8 @@ export const orgs = pgTable("orgs", {
   supplyTypes: jsonb("supply_types").$type<string[]>().default(["lightbulb", "filter", "paint", "battery", "cleaning", "hardware", "electrical", "plumbing", "hvac", "other"]), // Customizable supply type categories
   supplyUnits: jsonb("supply_units").$type<string[]>().default(["piece", "gallon", "quart", "liter", "bottle", "box", "pack", "roll", "tube", "bag"]), // Customizable supply unit options
   defaultHourlyRateCents: integer("default_hourly_rate_cents"), // Organization-level default hourly rate (prepopulates client billing settings)
+  invoiceTemplateId: varchar("invoice_template_id").$type<"modern"|"minimal"|"classic"|"compact"|"bold">().default("modern"), // Selected invoice template
+  invoiceTemplatePrefs: jsonb("invoice_template_prefs").$type<Record<string, any>>().default({}), // Template-specific customization overrides
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
