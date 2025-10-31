@@ -312,6 +312,7 @@ export const quickbooksSyncLogs = pgTable("quickbooks_sync_logs", {
 export const clients = pgTable("clients", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  contactId: integer("contact_id").references(() => contacts.id, { onDelete: "cascade" }), // Link to contact record
   email: varchar("email").notNull(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
@@ -338,6 +339,7 @@ export const clients = pgTable("clients", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
   uniqueOrgEmail: unique().on(table.orgId, table.email),
+  contactIdIdx: index("clients_contact_id_idx").on(table.contactId),
 }));
 
 // Client payment methods - Stripe payment method tokens for auto-charging
@@ -345,6 +347,7 @@ export const clientPaymentMethods = pgTable("client_payment_methods", {
   id: uuid("id").primaryKey().defaultRandom(),
   clientId: uuid("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
   orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  addedByContactId: integer("added_by_contact_id").references(() => contacts.id), // Track which contact added this method
   
   // Stripe payment method
   stripePaymentMethodId: varchar("stripe_payment_method_id").notNull(),
@@ -365,6 +368,7 @@ export const clientPaymentMethods = pgTable("client_payment_methods", {
 }, (table) => [
   index("client_payment_methods_client_idx").on(table.clientId),
   index("client_payment_methods_stripe_pm_idx").on(table.stripePaymentMethodId),
+  index("client_payment_methods_added_by_idx").on(table.addedByContactId),
 ]);
 
 // Client billing preferences - Auto-charge settings and policies
