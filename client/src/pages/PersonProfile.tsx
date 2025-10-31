@@ -124,12 +124,17 @@ function BillingSettingsTab({ person, personId, orgId }: { person: any; personId
     enabled: !!orgId,
   });
 
-  // Prepopulate hourly rate with org default when hourly billing is enabled and rate is empty
+  // Prepopulate hourly rate with org default when hourly billing is enabled and client has no saved rate
   useEffect(() => {
-    if (billingTypes.hourlyTime && !defaultHourlyRate && org?.defaultHourlyRateCents) {
+    if (
+      billingTypes.hourlyTime && 
+      !clientRecord?.defaultHourlyRateCents && 
+      !defaultHourlyRate && 
+      org?.defaultHourlyRateCents
+    ) {
       setDefaultHourlyRate((org.defaultHourlyRateCents / 100).toFixed(2));
     }
-  }, [billingTypes.hourlyTime, org?.defaultHourlyRateCents]);
+  }, [billingTypes.hourlyTime, org?.defaultHourlyRateCents, clientRecord, defaultHourlyRate]);
 
   // Fetch client record for this contact (bridge between contacts and clients tables)
   const { data: clientRecord, isLoading: clientLoading } = useQuery({
