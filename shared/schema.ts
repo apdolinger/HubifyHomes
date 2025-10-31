@@ -1002,6 +1002,7 @@ export const timeEntries = pgTable("time_entries", {
 // Contacts/People table
 export const contacts = pgTable("contacts", {
   id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
   accountId: varchar("account_id"), // External account/reference ID for company tracking
   firstName: varchar("first_name").notNull(),
   lastName: varchar("last_name").notNull(),
