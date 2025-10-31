@@ -11346,6 +11346,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/scheduled-emails/:id/reschedule", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+      
+      const id = parseInt(req.params.id);
+      const { scheduledFor } = req.body;
+      
+      if (!scheduledFor) {
+        return res.status(400).json({ message: "New scheduled time is required" });
+      }
+      
+      const scheduledEmail = await storage.getScheduledEmail(id, orgId);
+      
+      if (!scheduledEmail) {
+        return res.status(404).json({ message: "Scheduled email not found" });
+      }
+      
+      if (scheduledEmail.status !== "pending") {
+        return res.status(400).json({ message: "Only pending emails can be rescheduled" });
+      }
+      
+      const newScheduledDate = new Date(scheduledFor);
+      if (newScheduledDate <= new Date()) {
+        return res.status(400).json({ message: "Scheduled time must be in the future" });
+      }
+      
+      const updated = await storage.updateScheduledEmail(id, orgId, { scheduledFor: newScheduledDate.toISOString() });
+      res.json({ message: "Scheduled email rescheduled successfully", email: updated });
+    } catch (error) {
+      console.error("Error rescheduling scheduled email:", error);
+      res.status(500).json({ message: "Failed to reschedule scheduled email" });
+    }
+  });
+
   // Register the conflict detector for scheduled tasks
   const { setConflictDetector } = await import('./scheduledTasks');
   setConflictDetector(detectAndCreateEventConflicts);
