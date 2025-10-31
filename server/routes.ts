@@ -10101,25 +10101,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
       if (!user?.orgId) {
+        console.log("[CLIENT-BRIDGE] User not authenticated");
         return res.status(401).json({ message: "User not authenticated" });
       }
 
       const contactId = parseInt(req.params.contactId);
       if (isNaN(contactId)) {
+        console.log("[CLIENT-BRIDGE] Invalid contact ID:", req.params.contactId);
         return res.status(400).json({ message: "Invalid contact ID" });
       }
 
       // Get the contact to verify it belongs to this org
       const contact = await storage.getContact(contactId);
+      console.log(`[CLIENT-BRIDGE] Contact ${contactId} lookup:`, {
+        exists: !!contact,
+        contactOrgId: contact?.orgId,
+        userOrgId: user.orgId,
+        contactType: contact?.type,
+        match: contact?.orgId === user.orgId
+      });
+      
       if (!contact || contact.orgId !== user.orgId) {
         return res.status(404).json({ message: "Contact not found" });
       }
 
       // Try to get existing client record
       let client = await storage.getClientByContactId(contactId);
+      console.log(`[CLIENT-BRIDGE] Existing client for contact ${contactId}:`, !!client);
 
       // If no client exists and this is a client-type contact, create one
       if (!client && contact.type === 'client') {
+        console.log(`[CLIENT-BRIDGE] Creating new client for contact ${contactId}`);
         client = await storage.createClientForContact(
           contactId,
           user.orgId,
@@ -10127,15 +10139,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           contact.firstName || undefined,
           contact.lastName || undefined
         );
+        console.log(`[CLIENT-BRIDGE] Client created:`, !!client);
       }
 
       if (!client) {
+        console.log(`[CLIENT-BRIDGE] No client record - contact type is '${contact.type}'`);
         return res.status(404).json({ message: "No client record found for this contact" });
       }
 
       res.json(client);
     } catch (error) {
-      console.error("Error fetching client for contact:", error);
+      console.error("[CLIENT-BRIDGE] Error fetching client for contact:", error);
       res.status(500).json({ message: "Failed to fetch client record" });
     }
   });

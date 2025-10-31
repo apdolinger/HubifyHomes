@@ -632,7 +632,39 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
                 </Button>
                 <Button
                   size="sm"
-                  onClick={() => setIsAddingPaymentMethod(true)}
+                  onClick={async () => {
+                    // Check if contact is marked as a client
+                    if (person?.type !== 'client') {
+                      toast({
+                        title: "Contact not set as client",
+                        description: "Please change this contact's type to 'Client' in the Profile tab before adding payment methods.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+
+                    // If clientId doesn't exist, manually fetch to trigger lazy creation
+                    if (!clientId) {
+                      try {
+                        const response = await apiRequest('GET', `/api/contacts/${personId}/client`);
+                        const data = await response.json();
+                        
+                        // Manually update the query cache
+                        queryClient.setQueryData([`/api/contacts/${personId}/client`], data);
+                        
+                        // Open the modal
+                        setIsAddingPaymentMethod(true);
+                      } catch (error: any) {
+                        toast({
+                          title: "Unable to open payment form",
+                          description: error.message || "Failed to initialize client billing. Please ensure this contact is marked as a client.",
+                          variant: "destructive",
+                        });
+                      }
+                    } else {
+                      setIsAddingPaymentMethod(true);
+                    }
+                  }}
                   data-testid="button-add-payment-method"
                 >
                   <Plus className="w-4 h-4 mr-2" />
