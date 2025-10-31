@@ -950,7 +950,8 @@ export const contacts = pgTable("contacts", {
   lastName: varchar("last_name").notNull(),
   email: varchar("email"),
   phone: varchar("phone"),
-  type: varchar("type").notNull(), // tenant, owner, vendor, emergency_contact
+  type: varchar("type").notNull(), // tenant, owner, vendor, emergency_contact, client
+  clientCategory: varchar("client_category"), // primary, secondary (only used when type is 'client')
   propertyId: integer("property_id").references(() => properties.id),
   isActive: boolean("is_active").notNull().default(true),
   notes: text("notes"),

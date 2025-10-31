@@ -55,9 +55,18 @@ const editContactSchema = z.object({
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().optional(),
-  type: z.enum(["tenant", "owner", "vendor", "emergency_contact"]),
+  type: z.enum(["tenant", "owner", "vendor", "emergency_contact", "client"]),
+  clientCategory: z.enum(["primary", "secondary"]).optional(),
   propertyId: z.number().optional(),
   notes: z.string().optional(),
+}).refine((data) => {
+  if (data.type === "client" && !data.clientCategory) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Client category is required for client type",
+  path: ["clientCategory"],
 });
 
 // Form schema for creating new property
@@ -2121,6 +2130,7 @@ export default function PersonProfile() {
                           <SelectItem value="owner">Owner</SelectItem>
                           <SelectItem value="vendor">Vendor</SelectItem>
                           <SelectItem value="emergency_contact">Emergency Contact</SelectItem>
+                          <SelectItem value="client">Client</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -2128,33 +2138,57 @@ export default function PersonProfile() {
                   )}
                 />
                 
-                <FormField
-                  control={editForm.control}
-                  name="propertyId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Property</FormLabel>
-                      <Select 
-                        onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
-                        value={field.value?.toString()}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select property..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {(properties as any[])?.map((property: any) => (
-                            <SelectItem key={property.id} value={property.id.toString()}>
-                              {property.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {editForm.watch("type") === "client" ? (
+                  <FormField
+                    control={editForm.control}
+                    name="clientCategory"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Client Category</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select category..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="primary">Primary</SelectItem>
+                            <SelectItem value="secondary">Secondary</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  <FormField
+                    control={editForm.control}
+                    name="propertyId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Property</FormLabel>
+                        <Select 
+                          onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
+                          value={field.value?.toString()}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select property..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {(properties as any[])?.map((property: any) => (
+                              <SelectItem key={property.id} value={property.id.toString()}>
+                                {property.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
               </div>
               
               <FormField
