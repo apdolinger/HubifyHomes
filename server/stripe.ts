@@ -19,10 +19,10 @@ export function getMasterStripe(): Stripe {
 }
 
 // Create a Stripe instance for a specific organization using their connected account
-export async function getOrgStripe(orgId: string): Promise<{ stripe: Stripe; accountId?: string } | null> {
+export async function getOrgStripe(orgId: string): Promise<{ stripe: Stripe; accountId?: string; publishableKey: string } | null> {
   const connection = await storage.getOrgStripeConnection(orgId);
   
-  if (!connection || !connection.isActive) {
+  if (!connection || !connection.isActive || !connection.stripePublishableKey) {
     return null;
   }
 
@@ -35,6 +35,7 @@ export async function getOrgStripe(orgId: string): Promise<{ stripe: Stripe; acc
     return {
       stripe: masterStripe,
       accountId: connection.stripeAccountId,
+      publishableKey: connection.stripePublishableKey,
     };
   }
 
@@ -44,6 +45,7 @@ export async function getOrgStripe(orgId: string): Promise<{ stripe: Stripe; acc
       stripe: new Stripe(connection.stripeSecretKey, {
         apiVersion: "2024-11-20.acacia",
       }),
+      publishableKey: connection.stripePublishableKey,
     };
   }
 
@@ -604,14 +606,14 @@ export async function ensureStripeCustomerForClient(
 
 /**
  * Create a SetupIntent for collecting payment methods
- * Returns client_secret for Stripe Elements
+ * Returns client_secret and publishable key for Stripe Elements
  */
 export async function createSetupIntentForClient(
   orgId: string,
   clientId: string,
   clientEmail: string,
   paymentMethodTypes: ('card' | 'us_bank_account')[] = ['card', 'us_bank_account']
-): Promise<{ clientSecret: string; setupIntentId: string }> {
+): Promise<{ clientSecret: string; setupIntentId: string; publishableKey: string }> {
   const orgStripe = await getOrgStripe(orgId);
   if (!orgStripe) {
     throw new Error("Organization Stripe account not configured");
@@ -634,6 +636,7 @@ export async function createSetupIntentForClient(
   return {
     clientSecret: setupIntent.client_secret!,
     setupIntentId: setupIntent.id,
+    publishableKey: orgStripe.publishableKey,
   };
 }
 

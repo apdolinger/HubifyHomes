@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { loadStripe } from "@stripe/stripe-js";
+import { useState, useMemo } from "react";
+import { loadStripe, Stripe } from "@stripe/stripe-js";
 import {
   Elements,
   PaymentElement,
@@ -20,8 +20,6 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CreditCard, Building2 } from "lucide-react";
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "");
 
 interface PaymentMethodCollectionModalProps {
   open: boolean;
@@ -134,6 +132,14 @@ export function PaymentMethodCollectionModal({
     enabled: open,
   });
 
+  // Create Stripe instance dynamically using the publishable key from the setup intent
+  const stripePromise = useMemo(() => {
+    if (setupIntent?.publishableKey) {
+      return loadStripe(setupIntent.publishableKey);
+    }
+    return null;
+  }, [setupIntent?.publishableKey]);
+
   const handleSuccess = () => {
     // Invalidate payment methods cache
     queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'payment-methods'] });
@@ -185,7 +191,7 @@ export function PaymentMethodCollectionModal({
             <div className="flex justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : setupIntent?.clientSecret ? (
+          ) : setupIntent?.clientSecret && setupIntent?.publishableKey && stripePromise ? (
             <Elements
               stripe={stripePromise}
               options={{
@@ -206,7 +212,9 @@ export function PaymentMethodCollectionModal({
             </Elements>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
-              Failed to initialize payment form. Please try again.
+              {!setupIntent?.publishableKey 
+                ? "Stripe configuration missing. Please contact your administrator."
+                : "Failed to initialize payment form. Please try again."}
             </div>
           )}
         </div>
