@@ -6,7 +6,7 @@ import { z } from "zod";
 import { useAuth } from "@/hooks/useAuth";
 import { useTaskModal } from "@/contexts/TaskModalContext";
 import { useToast } from "@/hooks/use-toast";
-import { useLocation, useParams } from "wouter";
+import { useLocation, useParams, Link as RouterLink } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -1503,25 +1503,27 @@ export default function PersonProfile() {
               {relatedTasks?.length > 0 ? (
                 <div className="space-y-4">
                   {relatedTasks.map((task: any) => (
-                    <div key={task.id} className="flex items-center space-x-3 p-3 bg-slate-50 rounded-lg">
-                      <div className="flex-shrink-0">
-                        <div className={`w-3 h-3 rounded-full ${
-                          task.status === 'completed' ? 'bg-green-500' : 
-                          task.status === 'in_progress' ? 'bg-yellow-500' : 'bg-slate-400'
-                        }`}></div>
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium">{task.title}</p>
-                        <p className="text-sm text-slate-500">{task.description}</p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <Calendar className="w-3 h-3 text-slate-400" />
-                          <span className="text-xs text-slate-600">
-                            {task.dueDate ? formatDate(task.dueDate) : 'No due date'}
-                          </span>
+                    <RouterLink key={task.id} href={`/task-profile/${task.id}`} data-testid={`task-item-${task.id}`}>
+                      <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer">
+                        <div className="flex-shrink-0">
+                          <div className={`w-3 h-3 rounded-full ${
+                            task.status === 'completed' ? 'bg-green-500' : 
+                            task.status === 'in_progress' ? 'bg-yellow-500' : 'bg-slate-400'
+                          }`}></div>
                         </div>
+                        <div className="flex-1">
+                          <p className="font-medium">{task.title}</p>
+                          <p className="text-sm text-slate-500">{task.description}</p>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <Calendar className="w-3 h-3 text-slate-400" />
+                            <span className="text-xs text-slate-600">
+                              {task.dueDate ? formatDate(task.dueDate) : 'No due date'}
+                            </span>
+                          </div>
+                        </div>
+                        <Badge variant="outline">{task.priority}</Badge>
                       </div>
-                      <Badge variant="outline">{task.priority}</Badge>
-                    </div>
+                    </RouterLink>
                   ))}
                 </div>
               ) : (
