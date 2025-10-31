@@ -99,7 +99,7 @@ type EditContactFormData = z.infer<typeof editContactSchema>;
 type PropertyFormData = z.infer<typeof propertySchema>;
 
 // Billing Settings Component
-function BillingSettingsTab({ person, personId }: { person: any; personId: string }) {
+function BillingSettingsTab({ person, personId, orgId }: { person: any; personId: string; orgId: string }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isAddingSchedule, setIsAddingSchedule] = useState(false);
@@ -117,6 +117,19 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
   const [billingWorkflow, setBillingWorkflow] = useState("review");
   const [defaultHourlyRate, setDefaultHourlyRate] = useState("");
   const [invoiceDeliveryMethod, setInvoiceDeliveryMethod] = useState("email");
+
+  // Fetch organization data for default hourly rate
+  const { data: org } = useQuery({
+    queryKey: [`/api/organizations/${orgId}`],
+    enabled: !!orgId,
+  });
+
+  // Prepopulate hourly rate with org default when hourly billing is enabled and rate is empty
+  useEffect(() => {
+    if (billingTypes.hourlyTime && !defaultHourlyRate && org?.defaultHourlyRateCents) {
+      setDefaultHourlyRate((org.defaultHourlyRateCents / 100).toFixed(2));
+    }
+  }, [billingTypes.hourlyTime, org?.defaultHourlyRateCents]);
 
   // Fetch client record for this contact (bridge between contacts and clients tables)
   const { data: clientRecord, isLoading: clientLoading } = useQuery({
@@ -1751,7 +1764,7 @@ export default function PersonProfile() {
         
         {hasBillingPermissions && (
           <TabsContent value="billing">
-            <BillingSettingsTab person={person as any} personId={personId} />
+            <BillingSettingsTab person={person as any} personId={personId} orgId={user?.orgId || ''} />
           </TabsContent>
         )}
         

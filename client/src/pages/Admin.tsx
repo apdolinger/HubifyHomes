@@ -240,6 +240,103 @@ function SupplySettingsManager({ orgId }: { orgId: string }) {
   );
 }
 
+// Billing Settings Manager Component
+function BillingSettingsManager({ orgId }: { orgId: string }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [hourlyRate, setHourlyRate] = useState("");
+
+  const { data: org, isLoading } = useQuery({
+    queryKey: [`/api/organizations/${orgId}`],
+    enabled: !!orgId,
+  });
+
+  // Set initial hourly rate value
+  useEffect(() => {
+    if (org?.defaultHourlyRateCents) {
+      setHourlyRate((org.defaultHourlyRateCents / 100).toFixed(2));
+    }
+  }, [org]);
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: { defaultHourlyRateCents: number | null }) => {
+      return apiRequest("PATCH", `/api/organizations/${orgId}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/organizations/${orgId}`] });
+      toast({
+        title: "Settings updated",
+        description: "Default billing settings have been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update settings",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSave = () => {
+    const rate = hourlyRate.trim() ? parseFloat(hourlyRate) : null;
+    if (rate !== null && (isNaN(rate) || rate < 0)) {
+      toast({
+        title: "Invalid hourly rate",
+        description: "Please enter a valid hourly rate (or leave empty to clear)",
+        variant: "destructive",
+      });
+      return;
+    }
+    updateMutation.mutate({
+      defaultHourlyRateCents: rate !== null ? Math.round(rate * 100) : null,
+    });
+  };
+
+  if (isLoading) {
+    return <div className="text-sm text-slate-500">Loading settings...</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h4 className="font-medium mb-2">Default Hourly Rate</h4>
+        <p className="text-sm text-slate-600 mb-4">
+          Set a default hourly rate that will auto-populate when enabling hourly billing for new clients. 
+          Individual clients can still override this rate.
+        </p>
+        <div className="flex gap-2 max-w-md">
+          <div className="relative flex-1">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              value={hourlyRate}
+              onChange={(e) => setHourlyRate(e.target.value)}
+              className="pl-7"
+              data-testid="input-default-hourly-rate"
+            />
+          </div>
+          <Button
+            onClick={handleSave}
+            disabled={updateMutation.isPending}
+            data-testid="button-save-hourly-rate"
+          >
+            {updateMutation.isPending ? "Saving..." : "Save"}
+          </Button>
+        </div>
+        {org?.defaultHourlyRateCents && (
+          <p className="text-sm text-slate-500 mt-2">
+            Current default: ${(org.defaultHourlyRateCents / 100).toFixed(2)}/hour
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Admin() {
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -1411,12 +1508,15 @@ export default function Admin() {
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="custom-fields" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="custom-fields" data-testid="tab-custom-fields">
                     Custom Fields
                   </TabsTrigger>
                   <TabsTrigger value="supply-settings" data-testid="tab-supply-settings">
                     Supply Settings
+                  </TabsTrigger>
+                  <TabsTrigger value="billing-settings" data-testid="tab-billing-settings">
+                    Billing Settings
                   </TabsTrigger>
                 </TabsList>
                 
@@ -1433,6 +1533,18 @@ export default function Admin() {
                       </p>
                     </div>
                     {user?.orgId && <SupplySettingsManager orgId={user.orgId} />}
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="billing-settings" className="space-y-6 mt-6">
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-semibold">Default Billing Settings</h3>
+                      <p className="text-sm text-slate-600">
+                        Configure organization-wide default values for client billing
+                      </p>
+                    </div>
+                    {user?.orgId && <BillingSettingsManager orgId={user.orgId} />}
                   </div>
                 </TabsContent>
               </Tabs>
