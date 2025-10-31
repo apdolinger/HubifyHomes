@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { FileText, Upload, Download, Plus, Users } from "lucide-react";
 import { format } from "date-fns";
+import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
 
 type ClientInvoice = {
   id: string;
@@ -50,8 +51,15 @@ export default function OrgClientInvoices() {
     dueDate: "",
   });
 
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
+
   const { data: clients = [] } = useQuery({
     queryKey: ['/api/people'],
+    enabled: isAuthenticated && !!orgId,
+  });
+
+  const { data: customFields = [] } = useQuery<any[]>({
+    queryKey: ["/api/custom-fields", "invoice"],
     enabled: isAuthenticated && !!orgId,
   });
 
@@ -69,6 +77,7 @@ export default function OrgClientInvoices() {
       const response = await apiRequest("POST", `/api/orgs/${orgId}/clients/${data.clientId}/invoices`, {
         ...data,
         amount: parseFloat(data.amount),
+        customFieldValues,
       });
       return response.json();
     },
@@ -84,6 +93,7 @@ export default function OrgClientInvoices() {
         description: "",
         dueDate: "",
       });
+      setCustomFieldValues({});
       toast({
         title: "Invoice Created",
         description: "The client invoice has been created successfully.",
@@ -407,6 +417,18 @@ export default function OrgClientInvoices() {
                   data-testid="textarea-description"
                 />
               </div>
+
+              {customFields.length > 0 && (
+                <div className="pt-4 border-t">
+                  <h4 className="font-medium mb-3">Custom Fields</h4>
+                  <CustomFieldsRenderer
+                    fields={customFields}
+                    values={customFieldValues}
+                    onChange={setCustomFieldValues}
+                    mode="edit"
+                  />
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
