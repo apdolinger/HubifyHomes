@@ -49,6 +49,14 @@ interface InvoiceData {
   
   // Attachments
   attachments?: Array<{url: string, filename: string, category?: 'before' | 'after' | null}>;
+  
+  // Custom fields
+  customFieldValues?: Record<string, any>;
+  customFields?: Array<{
+    fieldKey: string;
+    fieldName: string;
+    fieldType: string;
+  }>;
 }
 
 export async function generateInvoicePDFToResponse(invoiceData: InvoiceData, res: Response) {
@@ -1070,13 +1078,19 @@ export async function generateInvoicePDFWithTemplate(
   invoice: any, 
   client: any, 
   org: any,
-  templateId: string = 'modern'
+  templateId: string = 'modern',
+  customFields?: Array<{fieldKey: string; fieldName: string; fieldType: string}>
 ): Promise<Buffer> {
   return new Promise(async (resolve, reject) => {
     try {
       const template = getInvoiceTemplate(templateId);
       const primaryColor = org.branding?.primaryColor || '#667eea';
       const secondaryColor = org.branding?.secondaryColor || '#764ba2';
+      
+      // Attach custom fields to invoice object for PDF rendering
+      if (customFields) {
+        invoice.customFields = customFields;
+      }
       
       const doc = new PDFDocument({ 
         margin: template.spacing.marginY,
@@ -1250,6 +1264,35 @@ export async function generateInvoicePDFWithTemplate(
       }
       
       doc.y = datesY + 60;
+      
+      // CUSTOM FIELDS SECTION (if any)
+      if (invoice.customFieldValues && Object.keys(invoice.customFieldValues).length > 0) {
+        const customFieldsY = doc.y;
+        doc.fontSize(10)
+           .fillColor('#666666')
+           .text('Additional Information:', template.spacing.marginX, customFieldsY);
+        
+        doc.y = customFieldsY + 20;
+        let cfY = doc.y;
+        
+        // Get custom field definitions to display proper labels
+        const cfDefs = invoice.customFields || [];
+        const cfValues = invoice.customFieldValues || {};
+        
+        for (const cf of cfDefs) {
+          const value = cfValues[cf.fieldKey];
+          if (value !== undefined && value !== null && value !== '') {
+            doc.fontSize(9)
+               .fillColor('#333333')
+               .text(`${cf.fieldName}:`, template.spacing.marginX, cfY, { continued: true })
+               .fillColor('#000000')
+               .text(` ${value}`, { width: 300 });
+            cfY += 18;
+          }
+        }
+        
+        doc.y = cfY + 15;
+      }
       
       // TABLE SECTION
       const tableTop = doc.y;

@@ -9406,6 +9406,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         total: submission.amountCents
       }));
 
+      // Fetch custom fields for invoice entity type
+      const customFields = await storage.getCustomFields(orgId, "invoice");
+
       const invoiceData = {
         invoiceNumber: invoice.invoiceNumber || `INV-${invoice.id.slice(0, 8)}`,
         invoiceDate: invoice.invoiceDate || invoice.createdAt || new Date(),
@@ -9439,6 +9442,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         secondaryColor: org.branding?.secondaryColor,
         
         attachments: (invoice as any).attachments || undefined,
+        
+        customFieldValues: invoice.customFieldValues || {},
+        customFields: customFields.map(cf => ({
+          fieldKey: cf.fieldKey,
+          fieldName: cf.fieldName,
+          fieldType: cf.fieldType
+        })),
       };
 
       const { generateInvoicePDFToResponse } = await import('./invoiceUtils.js');
@@ -10980,8 +10990,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(storage.eq(storage.billingSubmissions.id, id));
 
       // Step 3: Generate PDF with organization's selected template
+      const customFields = await storage.getCustomFields(user.orgId, "invoice");
       const { generateInvoicePDFWithTemplate } = await import('./invoiceUtils.js');
-      const pdfBuffer = await generateInvoicePDFWithTemplate(invoice, client, org, org.invoiceTemplateId || 'modern');
+      const pdfBuffer = await generateInvoicePDFWithTemplate(
+        invoice, 
+        client, 
+        org, 
+        org.invoiceTemplateId || 'modern',
+        customFields.map(cf => ({
+          fieldKey: cf.fieldKey,
+          fieldName: cf.fieldName,
+          fieldType: cf.fieldType
+        }))
+      );
       
       // Store PDF in object storage
       const pdfKey = `invoices/org/${org.id}/clients/${client.id}/${invoice.id}.pdf`;
@@ -11198,8 +11219,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Step 3: Generate PDF and send email with organization's selected template
       try {
+        const customFields = await storage.getCustomFields(orgId, "invoice");
         const { generateInvoicePDFWithTemplate } = await import('./invoiceUtils.js');
-        const pdfBuffer = await generateInvoicePDFWithTemplate(invoice, client, org, org.invoiceTemplateId || 'modern');
+        const pdfBuffer = await generateInvoicePDFWithTemplate(
+          invoice, 
+          client, 
+          org, 
+          org.invoiceTemplateId || 'modern',
+          customFields.map(cf => ({
+            fieldKey: cf.fieldKey,
+            fieldName: cf.fieldName,
+            fieldType: cf.fieldType
+          }))
+        );
 
         // Store PDF in object storage
         const pdfKey = `invoices/org/${org.id}/clients/${client.id}/${invoice.id}.pdf`;
