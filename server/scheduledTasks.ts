@@ -81,7 +81,8 @@ export function startScheduledTasks() {
           const allTasks = await storage.getTasks();
           
           // Get all properties for this org to identify org's tasks
-          const orgProperties = await storage.getProperties(org.id);
+          const allProperties = await storage.getProperties(true);
+          const orgProperties = allProperties.filter((p: any) => p.orgId === org.id);
           const orgPropertyIds = new Set(orgProperties.map((p: any) => p.id));
           
           // Filter to only this org's tasks (tasks assigned to org properties) and not archived
@@ -112,7 +113,7 @@ export function startScheduledTasks() {
             
             if (shouldArchive) {
               try {
-                await storage.archiveTask(task.id);
+                await storage.archiveTask(task.id, 'system-auto-archiver');
                 orgArchivedCount++;
               } catch (error) {
                 log(`[CRON] Error archiving task ${task.id}: ${error}`);
@@ -137,9 +138,7 @@ export function startScheduledTasks() {
   
   log('[CRON] Task archiving scheduled - will run daily at 4am');
 
-  // TODO: Re-enable billing automation after fixing email imports
   // Run billing automation daily at 3am
-  /* TEMPORARILY DISABLED - NEEDS EMAIL IMPORT FIX
   cron.schedule('0 3 * * *', async () => {
     try {
       log('[CRON] Starting automated billing invoice generation...');
@@ -407,9 +406,8 @@ export function startScheduledTasks() {
       log(`[CRON] Error in scheduled billing automation: ${error}`);
     }
   });
-  */
   
-  // log('[CRON] Billing automation scheduled - will run daily at 3am');
+  log('[CRON] Billing automation scheduled - will run daily at 3am');
   
   // Process scheduled emails every 5 minutes
   cron.schedule('*/5 * * * *', async () => {
