@@ -1235,7 +1235,11 @@ export default function PersonProfile() {
               <Plus className="w-4 h-4 mr-2" />
               Add Alert
             </Button>
-            <Button onClick={openTaskModal} className="bg-primary hover:bg-primary/90">
+            <Button 
+              onClick={() => openTaskModal({ contactId: parseInt(personId as string) })} 
+              className="bg-primary hover:bg-primary/90"
+              data-testid="button-add-task"
+            >
               <Plus className="w-4 h-4 mr-2" />
               Add Task
             </Button>

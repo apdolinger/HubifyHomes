@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -79,6 +79,12 @@ export default function QuickAddTaskModal({ isOpen, onClose, initialData }: Quic
   const { data: contacts } = useQuery({
     queryKey: ["/api/contacts"],
     enabled: isOpen,
+  });
+  
+  // Fetch contact's linked properties when contactId is provided
+  const { data: contactLinkedProperties } = useQuery({
+    queryKey: [`/api/contacts/${initialData?.contactId}/properties`],
+    enabled: isOpen && !!initialData?.contactId,
   });
   
   // Fetch custom fields for tasks
@@ -230,6 +236,24 @@ export default function QuickAddTaskModal({ isOpen, onClose, initialData }: Quic
     return rule.toString().replace('RRULE:', '');
   };
 
+  // Filter properties based on contact's linked properties when contactId is provided
+  const filteredProperties = React.useMemo(() => {
+    if (!properties || !Array.isArray(properties)) return [];
+    
+    // If contactId is provided and we have linked properties, filter to show only those
+    if (initialData?.contactId && contactLinkedProperties && Array.isArray(contactLinkedProperties)) {
+      const linkedPropertyIds = contactLinkedProperties.map((lp: any) => lp.property?.id).filter(Boolean);
+      
+      // If contact has linked properties, show only those
+      if (linkedPropertyIds.length > 0) {
+        return (properties as any[]).filter((p: any) => linkedPropertyIds.includes(p.id));
+      }
+    }
+    
+    // Otherwise show all properties
+    return properties as any[];
+  }, [properties, initialData?.contactId, contactLinkedProperties]);
+
   const onSubmit = (data: TaskFormData) => {
     // Validate required custom fields
     const requiredFields = customFields.filter(f => f.required);
@@ -302,7 +326,7 @@ export default function QuickAddTaskModal({ isOpen, onClose, initialData }: Quic
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {properties?.map((property: any) => (
+                      {filteredProperties?.map((property: any) => (
                         <SelectItem key={property.id} value={property.id.toString()}>
                           {property.name}
                         </SelectItem>
@@ -330,7 +354,7 @@ export default function QuickAddTaskModal({ isOpen, onClose, initialData }: Quic
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {contacts?.map((contact: any) => (
+                      {Array.isArray(contacts) && contacts.map((contact: any) => (
                         <SelectItem key={contact.id} value={contact.id.toString()}>
                           {contact.firstName} {contact.lastName}
                         </SelectItem>
