@@ -63,6 +63,7 @@ import {
   insertBillingSubmissionSchema,
   insertSupportRequestSchema,
   insertEmailTemplateSchema,
+  insertOrgEmailTemplateSchema,
   insertCustomFieldSchema,
   updateCustomFieldSchema,
   type Form,
@@ -333,7 +334,18 @@ const isAdmin = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = req.user as any;
     
-    if (user?.role !== 'admin' && user?.role !== 'supervisor' && user?.role !== 'super_admin') {
+    console.log('[AUTH] isAdmin middleware check:', {
+      userId: user?.id || user?.claims?.sub,
+      userRole: user?.role,
+      userClaimsRole: user?.claims?.role,
+      hasUser: !!user,
+    });
+    
+    // Check both user.role (for super admin) and user.claims.role (for OIDC users)
+    const role = user?.role || user?.claims?.role;
+    
+    if (role !== 'admin' && role !== 'supervisor' && role !== 'super_admin') {
+      console.log('[AUTH] isAdmin check failed - insufficient role:', role);
       await AuditLogger.log({
         req,
         action: "unauthorized_admin_access",
@@ -346,6 +358,7 @@ const isAdmin = async (req: Request, res: Response, next: NextFunction) => {
       return res.status(403).json({ message: "Admin access required" });
     }
     
+    console.log('[AUTH] isAdmin check passed for role:', role);
     next();
   } catch (error) {
     console.error("Error in isAdmin middleware:", error);

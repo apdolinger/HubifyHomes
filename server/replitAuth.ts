@@ -51,7 +51,7 @@ function updateUserSession(
 async function upsertUser(
   claims: any,
 ) {
-  await storage.upsertUser({
+  const userData = {
     id: claims["sub"],
     email: claims["email"],
     firstName: claims["first_name"],
@@ -59,7 +59,16 @@ async function upsertUser(
     profileImageUrl: claims["profile_image_url"],
     role: claims["role"] || "staff",
     orgId: claims["orgId"] || claims["org_id"],
+  };
+  
+  console.log('[OIDC] Upserting user with data:', {
+    id: userData.id,
+    email: userData.email,
+    role: userData.role,
+    orgId: userData.orgId,
   });
+  
+  await storage.upsertUser(userData);
 }
 
 export async function setupAuth(app: Express) {
@@ -89,11 +98,24 @@ export async function setupAuth(app: Express) {
         // Add orgId and role from database to session claims
         user.claims.orgId = dbUser.orgId;
         user.claims.role = dbUser.role;
+        console.log('[OIDC] User session claims updated:', {
+          sub: claims["sub"],
+          orgId: user.claims.orgId,
+          role: user.claims.role,
+        });
+      } else {
+        console.log('[OIDC] Warning: User not found in database after upsert:', claims["sub"]);
       }
     } catch (error) {
       console.error('[OIDC] Error upserting user:', error);
       // Continue anyway - user session will still work with just claims
     }
+    
+    console.log('[OIDC] Final user object for session:', {
+      id: user.id,
+      claimsRole: user.claims.role,
+      claimsOrgId: user.claims.orgId,
+    });
     
     verified(null, user);
   };
