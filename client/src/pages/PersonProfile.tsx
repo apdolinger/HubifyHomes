@@ -590,7 +590,7 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
 }
 
 export default function PersonProfile() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const { openTaskModal } = useTaskModal();
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
@@ -600,6 +600,9 @@ export default function PersonProfile() {
   
   // Get person ID from URL path params
   const personId = params.id;
+  
+  // Check if user has billing permissions (admin or supervisor)
+  const hasBillingPermissions = user?.role === 'admin' || user?.role === 'supervisor';
   
   // Link property modal state
   const [isLinkPropertyModalOpen, setIsLinkPropertyModalOpen] = useState(false);
@@ -1483,9 +1486,9 @@ export default function PersonProfile() {
 
       {/* Tabs Section */}
       <Tabs defaultValue="tasks" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className={`grid w-full ${hasBillingPermissions ? 'grid-cols-5' : 'grid-cols-4'}`}>
           <TabsTrigger value="tasks">Tasks</TabsTrigger>
-          <TabsTrigger value="billing">Billing Info</TabsTrigger>
+          {hasBillingPermissions && <TabsTrigger value="billing">Billing Info</TabsTrigger>}
           <TabsTrigger value="custom-fields">Custom Fields</TabsTrigger>
           <TabsTrigger value="notes">Notes</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
@@ -1541,9 +1544,11 @@ export default function PersonProfile() {
           </Card>
         </TabsContent>
         
-        <TabsContent value="billing">
-          <BillingSettingsTab person={person as any} personId={personId} />
-        </TabsContent>
+        {hasBillingPermissions && (
+          <TabsContent value="billing">
+            <BillingSettingsTab person={person as any} personId={personId} />
+          </TabsContent>
+        )}
         
         <TabsContent value="custom-fields">
           <Card>
