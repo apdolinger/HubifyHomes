@@ -600,23 +600,23 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => {
+                  onClick={async () => {
                     if (!clientId) return;
-                    apiRequest(`/api/clients/${clientId}/payment-link`, {
-                      method: 'POST',
-                    }).then((data: any) => {
-                      navigator.clipboard.writeText(data.paymentUrl);
+                    try {
+                      const response = await apiRequest('POST', `/api/clients/${clientId}/payment-link`);
+                      const data = await response.json();
+                      await navigator.clipboard.writeText(data.paymentUrl);
                       toast({
                         title: "Payment link copied",
                         description: "Share this link with the client to collect payment information securely.",
                       });
-                    }).catch((error) => {
+                    } catch (error: any) {
                       toast({
                         title: "Failed to generate link",
-                        description: error.message,
+                        description: error.message || "Unable to create payment collection link",
                         variant: "destructive",
                       });
-                    });
+                    }
                   }}
                   data-testid="button-generate-payment-link"
                 >
