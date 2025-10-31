@@ -1012,6 +1012,7 @@ export default function PersonProfile() {
         email: (person as any).email || "",
         phone: (person as any).phone || "",
         type: (person as any).type || "tenant",
+        clientCategory: (person as any).clientCategory || undefined,
         propertyId: (person as any).propertyId || undefined,
         notes: (person as any).notes || "",
       });
