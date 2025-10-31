@@ -67,6 +67,9 @@ import {
   calendarReportTemplates,
   supportRequests,
   emailTemplates,
+  orgEmailTemplates,
+  emailHistory,
+  scheduledEmails,
   customFields,
   type User,
   type UpsertUser,
@@ -198,6 +201,12 @@ import {
   type InsertSupportRequest,
   type EmailTemplate,
   type InsertEmailTemplate,
+  type OrgEmailTemplate,
+  type InsertOrgEmailTemplate,
+  type EmailHistory,
+  type InsertEmailHistory,
+  type ScheduledEmail,
+  type InsertScheduledEmail,
   type CustomField,
   type InsertCustomField,
 } from "@shared/schema";
@@ -670,6 +679,27 @@ export interface IStorage {
   
   // Admin note search
   searchAllNotes(orgId: string, searchQuery: string): Promise<any[]>;
+  
+  // Organization email template operations
+  getOrgEmailTemplates(orgId: string): Promise<OrgEmailTemplate[]>;
+  getOrgEmailTemplate(id: number, orgId: string): Promise<OrgEmailTemplate | undefined>;
+  createOrgEmailTemplate(template: InsertOrgEmailTemplate): Promise<OrgEmailTemplate>;
+  updateOrgEmailTemplate(id: number, orgId: string, template: Partial<InsertOrgEmailTemplate>): Promise<OrgEmailTemplate>;
+  deleteOrgEmailTemplate(id: number, orgId: string): Promise<void>;
+  
+  // Email history operations
+  getEmailHistory(orgId: string, contactId?: number): Promise<EmailHistory[]>;
+  getEmailHistoryItem(id: number, orgId: string): Promise<EmailHistory | undefined>;
+  createEmailHistory(history: InsertEmailHistory): Promise<EmailHistory>;
+  
+  // Scheduled email operations
+  getScheduledEmails(orgId: string, status?: "pending"|"sent"|"failed"|"cancelled"): Promise<ScheduledEmail[]>;
+  getScheduledEmail(id: number, orgId: string): Promise<ScheduledEmail | undefined>;
+  createScheduledEmail(email: InsertScheduledEmail): Promise<ScheduledEmail>;
+  updateScheduledEmail(id: number, orgId: string, email: Partial<InsertScheduledEmail>): Promise<ScheduledEmail>;
+  getPendingScheduledEmails(): Promise<ScheduledEmail[]>;
+  markScheduledEmailSent(id: number, sentAt: Date): Promise<ScheduledEmail>;
+  markScheduledEmailFailed(id: number, errorMessage: string): Promise<ScheduledEmail>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -5561,6 +5591,159 @@ export class DatabaseStorage implements IStorage {
     
     // Return top 100 results
     return results.slice(0, 100);
+  }
+  
+  // Organization email template operations
+  async getOrgEmailTemplates(orgId: string): Promise<OrgEmailTemplate[]> {
+    return await db
+      .select()
+      .from(orgEmailTemplates)
+      .where(and(
+        eq(orgEmailTemplates.orgId, orgId),
+        eq(orgEmailTemplates.isActive, true)
+      ))
+      .orderBy(orgEmailTemplates.name);
+  }
+
+  async getOrgEmailTemplate(id: number, orgId: string): Promise<OrgEmailTemplate | undefined> {
+    const [template] = await db
+      .select()
+      .from(orgEmailTemplates)
+      .where(and(
+        eq(orgEmailTemplates.id, id),
+        eq(orgEmailTemplates.orgId, orgId),
+        eq(orgEmailTemplates.isActive, true)
+      ));
+    return template;
+  }
+
+  async createOrgEmailTemplate(template: InsertOrgEmailTemplate): Promise<OrgEmailTemplate> {
+    const [created] = await db.insert(orgEmailTemplates).values(template).returning();
+    return created;
+  }
+
+  async updateOrgEmailTemplate(id: number, orgId: string, templateData: Partial<InsertOrgEmailTemplate>): Promise<OrgEmailTemplate> {
+    const [updated] = await db
+      .update(orgEmailTemplates)
+      .set({ ...templateData, updatedAt: new Date() })
+      .where(and(
+        eq(orgEmailTemplates.id, id),
+        eq(orgEmailTemplates.orgId, orgId)
+      ))
+      .returning();
+    return updated;
+  }
+
+  async deleteOrgEmailTemplate(id: number, orgId: string): Promise<void> {
+    await db
+      .update(orgEmailTemplates)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(and(
+        eq(orgEmailTemplates.id, id),
+        eq(orgEmailTemplates.orgId, orgId)
+      ));
+  }
+  
+  // Email history operations
+  async getEmailHistory(orgId: string, contactId?: number): Promise<EmailHistory[]> {
+    const conditions = [eq(emailHistory.orgId, orgId)];
+    if (contactId) {
+      conditions.push(eq(emailHistory.recipientContactId, contactId));
+    }
+    
+    return await db
+      .select()
+      .from(emailHistory)
+      .where(and(...conditions))
+      .orderBy(desc(emailHistory.createdAt));
+  }
+
+  async getEmailHistoryItem(id: number, orgId: string): Promise<EmailHistory | undefined> {
+    const [item] = await db
+      .select()
+      .from(emailHistory)
+      .where(and(
+        eq(emailHistory.id, id),
+        eq(emailHistory.orgId, orgId)
+      ));
+    return item;
+  }
+
+  async createEmailHistory(history: InsertEmailHistory): Promise<EmailHistory> {
+    const [created] = await db.insert(emailHistory).values(history).returning();
+    return created;
+  }
+  
+  // Scheduled email operations
+  async getScheduledEmails(orgId: string, status?: "pending"|"sent"|"failed"|"cancelled"): Promise<ScheduledEmail[]> {
+    const conditions = [eq(scheduledEmails.orgId, orgId)];
+    if (status) {
+      conditions.push(eq(scheduledEmails.status, status));
+    }
+    
+    return await db
+      .select()
+      .from(scheduledEmails)
+      .where(and(...conditions))
+      .orderBy(scheduledEmails.scheduledFor);
+  }
+
+  async getScheduledEmail(id: number, orgId: string): Promise<ScheduledEmail | undefined> {
+    const [email] = await db
+      .select()
+      .from(scheduledEmails)
+      .where(and(
+        eq(scheduledEmails.id, id),
+        eq(scheduledEmails.orgId, orgId)
+      ));
+    return email;
+  }
+
+  async createScheduledEmail(email: InsertScheduledEmail): Promise<ScheduledEmail> {
+    const [created] = await db.insert(scheduledEmails).values(email).returning();
+    return created;
+  }
+
+  async updateScheduledEmail(id: number, orgId: string, emailData: Partial<InsertScheduledEmail>): Promise<ScheduledEmail> {
+    const [updated] = await db
+      .update(scheduledEmails)
+      .set(emailData)
+      .where(and(
+        eq(scheduledEmails.id, id),
+        eq(scheduledEmails.orgId, orgId)
+      ))
+      .returning();
+    return updated;
+  }
+
+  async getPendingScheduledEmails(): Promise<ScheduledEmail[]> {
+    const now = new Date();
+    return await db
+      .select()
+      .from(scheduledEmails)
+      .where(and(
+        eq(scheduledEmails.status, "pending"),
+        sql`${scheduledEmails.scheduledFor} <= ${now}`
+      ))
+      .orderBy(scheduledEmails.scheduledFor);
+  }
+
+  async markScheduledEmailSent(id: number, sentAt: Date): Promise<ScheduledEmail> {
+    const [updated] = await db
+      .update(scheduledEmails)
+      .set({ status: "sent", sentAt })
+      .where(eq(scheduledEmails.id, id))
+      .returning();
+    return updated;
+  }
+
+  async markScheduledEmailFailed(id: number, errorMessage: string): Promise<ScheduledEmail> {
+    const [updated] = await db
+      .update(scheduledEmails)
+      .set({ status: "failed", errorMessage })
+      .where(eq(scheduledEmails.id, id))
+      .returning();
+    return updated;
   }
 }
 
