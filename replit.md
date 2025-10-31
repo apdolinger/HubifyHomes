@@ -9,9 +9,10 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### Data Model: Contact-Client Relationship
-- **Contacts Table**: Universal contact management (vendors, tenants, owners, emergency contacts, and clients). Primary entity for PersonProfile pages.
+- **Contacts Table**: Universal contact management (vendors, tenants, owners, emergency contacts, and clients). Primary entity for PersonProfile pages. Multi-tenant with required `orgId` for organization scoping.
 - **Clients Table**: Billing-specific data for contacts designated as clients (contact.type='client'). Stores billing configuration, payment methods, and invoice preferences.
 - **Relationship**: `clients.contact_id` links to `contacts.id` for unified person management. `client_payment_methods.added_by_contact_id` tracks which contact added each payment method for audit trail.
+- **Contact-Client Bridge**: GET `/api/contacts/:contactId/client` endpoint provides lazy client creation when contact.type='client', with automatic orgId validation for security.
 - **Architecture Note**: PersonProfile loads from contacts; billing features query associated client record when contact.type='client'.
 
 ### UI/UX
@@ -26,7 +27,7 @@ Preferred communication style: Simple, everyday language.
 - **Backend Runtime**: Node.js with Express.js (TypeScript, ES modules).
 - **API**: RESTful endpoints.
 - **Authentication**: Replit Auth via OpenID Connect, session management (Express sessions with PostgreSQL store). Hybrid authentication for Super Admin (username/password) and regular users (OIDC). Invitation-based authentication for Hubify Portal.
-- **Multi-Tenancy**: Organization-based for clients, properties, forms, and submissions.
+- **Multi-Tenancy**: Organization-based for all entities including contacts, clients, properties, forms, and submissions. Enforced at database level with required orgId foreign keys.
 - **Property Management**: Supports various property types, multi-unit management, manager assignment, status tracking, room management, tier-based restrictions, custom fields, and property-specific task lists. Includes secure storage for property access control, warranty/servicing tracking, and purchasing link management. Comprehensive property reporting (Supplies, Devices, Fixtures, Surface Links, Shopping List) with search, summary stats, grouping, CSV export, and priority indicators.
 - **Vehicle Management**: Complete lifecycle tracking with photos, maintenance records, and task integration, including maintenance alerts and integrated task creation.
 - **Community Document Management**: Secure document storage for communities with two classification types (Community-Wide, Residential-Based) and robust security features (organization-level access, signed URLs, multi-tenant isolation).
@@ -38,7 +39,13 @@ Preferred communication style: Simple, everyday language.
 - **Email System**: Full-featured email communication system with template management, 11 merge fields, scheduling, and delivery tracking. Templates auto-populate subject and body. All emails tracked in email history with status badges. Automated cron job for scheduled emails. Admin template management.
 - **Admin Customization**: Centralized Customization tab for Custom Fields and Supply Settings. Admin search functionality for notes across all system entities.
 - **Invoice Management**: Three-tier system with object storage, webhook-driven payment tracking, automatic status updates, HTML email notifications, on-demand PDF generation with branding, configurable billing workflows, consolidated invoice batching, and client-level billing schedules. Role-based access control restricts billing features (tab visibility and configuration) to admin and supervisor roles only.
-- **Payment Method Collection (Sprint 1)**: Admin-only Stripe integration for collecting client payment methods (cards via Stripe Elements, ACH via Financial Connections). Stores only payment_method_id tokens (PCI-compliant SAQ-A). Includes SetupIntent flow, webhook handlers (setup_intent.succeeded, payment_method.detached), default payment method selection, and auto-charge preferences. All endpoints enforce admin/supervisor RBAC with Zod validation.
+- **Payment Method Collection (Sprint 1 - Complete)**: Admin-only Stripe integration for collecting client payment methods (cards via Stripe Elements, ACH via Financial Connections). Stores only payment_method_id tokens (PCI-compliant SAQ-A). Features include:
+  - Dynamic Stripe initialization using org-specific publishable keys from `org_stripe_connections`
+  - Contact-client bridge with lazy client creation via GET `/api/contacts/:contactId/client`
+  - SetupIntent flow with webhook handlers (setup_intent.succeeded, payment_method.detached)
+  - Default payment method selection and auto-charge preferences
+  - All endpoints enforce admin/supervisor RBAC with Zod validation
+  - Graceful error handling when Stripe is not configured
 - **Forms System**: Multi-tenant forms with complex field types, property-specific assignments, client submissions, and advanced profile matching.
 - **Hubify Portal**: Client-facing portal with role-based access and admin preview mode.
 - **Super Admin Control Panel**: Internal dashboard for platform management, including organizations, users, reports, communication, revenue, feature flags, monitoring, and compliance.
