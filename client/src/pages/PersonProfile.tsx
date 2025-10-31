@@ -1673,220 +1673,220 @@ export default function PersonProfile() {
         </TabsContent>
       </Tabs>
 
-      {/* Scheduled Emails Section */}
+      {/* Email Details Section */}
       <Card className="mb-8 mt-8">
         <CardHeader>
           <CardTitle className="flex items-center">
-            <Clock className="w-5 h-5 mr-2" />
-            Scheduled Emails
-            {emailHistory && emailHistory.filter((e) => e.status === "pending").length > 0 && (
-              <span className="ml-2 text-sm text-slate-500">
-                ({emailHistory.filter((e) => e.status === "pending").length})
-              </span>
-            )}
+            <Mail className="w-5 h-5 mr-2" />
+            Email Details
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {emailHistoryLoading ? (
-            <div className="space-y-3" data-testid="scheduled-emails-loading">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : !emailHistory || emailHistory.filter((e) => e.status === "pending").length === 0 ? (
-            <div className="text-center py-8 text-slate-500" data-testid="scheduled-emails-empty">
-              <Clock className="w-12 h-12 mx-auto mb-3 text-slate-400" />
-              <p className="text-sm">No scheduled emails for this contact</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Scheduled For</TableHead>
-                    <TableHead>Sender</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {emailHistory
-                    .filter((email) => email.status === "pending")
-                    .map((email) => {
-                      const truncatedSubject =
-                        email.subject.length > 60
-                          ? email.subject.substring(0, 60) + "..."
-                          : email.subject;
+          <Tabs defaultValue="history" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="history">
+                Email History
+                {emailHistory && emailHistory.filter((e) => e.status !== "scheduled").length > 0 && (
+                  <span className="ml-2 text-sm">({emailHistory.filter((e) => e.status !== "scheduled").length})</span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="scheduled">
+                Scheduled Emails
+                {emailHistory && emailHistory.filter((e) => e.status === "scheduled").length > 0 && (
+                  <span className="ml-2 text-sm">({emailHistory.filter((e) => e.status === "scheduled").length})</span>
+                )}
+              </TabsTrigger>
+            </TabsList>
 
-                      return (
-                        <TableRow key={email.id} data-testid={`scheduled-email-row-${email.id}`}>
-                          <TableCell
-                            className="font-medium cursor-pointer hover:text-primary transition-colors"
-                            onClick={() => {
-                              setSelectedEmailHistory(email);
-                              setIsEmailHistoryModalOpen(true);
-                            }}
-                            data-testid={`text-scheduled-subject-${email.id}`}
-                            title={email.subject}
-                          >
-                            {truncatedSubject}
-                          </TableCell>
-                          <TableCell data-testid={`text-scheduled-date-${email.id}`}>
-                            {email.scheduledFor
-                              ? format(new Date(email.scheduledFor), "MMM d, yyyy 'at' h:mm a")
-                              : "—"}
-                          </TableCell>
-                          <TableCell data-testid={`text-scheduled-sender-${email.id}`}>
-                            {email.senderName}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end space-x-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setEmailToReschedule(email);
-                                  if (email.scheduledFor) {
-                                    const date = new Date(email.scheduledFor);
-                                    setNewScheduledDate(date.toISOString().split("T")[0]);
-                                    setNewScheduledTime(
-                                      date.toTimeString().substring(0, 5)
-                                    );
+            <TabsContent value="history">
+              {emailHistoryLoading ? (
+                <div className="space-y-3" data-testid="email-history-loading">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ) : !emailHistory || emailHistory.filter((e) => e.status !== "scheduled").length === 0 ? (
+                <div className="text-center py-8 text-slate-500" data-testid="email-history-empty">
+                  <Mail className="w-12 h-12 mx-auto mb-3 text-slate-400" />
+                  <p className="text-sm">No emails sent to this contact yet</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[100px]">Status</TableHead>
+                        <TableHead>Subject</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Sender</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {emailHistory
+                        .filter((email) => email.status !== "scheduled")
+                        .map((email) => {
+                          const truncatedSubject =
+                            email.subject.length > 60
+                              ? email.subject.substring(0, 60) + "..."
+                              : email.subject;
+
+                          const dateToShow = email.sentAt;
+
+                          return (
+                            <TableRow key={email.id} data-testid={`email-history-row-${email.id}`}>
+                              <TableCell>
+                                <Badge
+                                  variant={
+                                    email.status === "sent" ? "default" : "destructive"
                                   }
-                                  setIsRescheduleModalOpen(true);
+                                  className={
+                                    email.status === "sent"
+                                      ? "bg-green-500 hover:bg-green-600"
+                                      : ""
+                                  }
+                                  data-testid={`badge-status-${email.id}`}
+                                >
+                                  {email.status === "sent" ? "Sent" : "Failed"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell
+                                className="font-medium cursor-pointer hover:text-primary transition-colors"
+                                onClick={() => {
+                                  setSelectedEmailHistory(email);
+                                  setIsEmailHistoryModalOpen(true);
                                 }}
-                                data-testid={`button-reschedule-${email.id}`}
+                                data-testid={`text-subject-${email.id}`}
+                                title={email.subject}
                               >
-                                <Calendar className="w-4 h-4 mr-1" />
-                                Reschedule
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                onClick={() => cancelScheduledEmailMutation.mutate(email.id)}
-                                disabled={cancelScheduledEmailMutation.isPending}
-                                data-testid={`button-cancel-${email.id}`}
+                                {truncatedSubject}
+                              </TableCell>
+                              <TableCell data-testid={`text-date-${email.id}`}>
+                                {dateToShow
+                                  ? format(new Date(dateToShow), "MMM d, yyyy 'at' h:mm a")
+                                  : "—"}
+                              </TableCell>
+                              <TableCell data-testid={`text-sender-${email.id}`}>
+                                {email.senderName}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSelectedEmailHistory(email);
+                                    setIsEmailHistoryModalOpen(true);
+                                  }}
+                                  data-testid={`button-view-${email.id}`}
+                                >
+                                  <Eye className="w-4 h-4 mr-1" />
+                                  View
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="scheduled">
+              {emailHistoryLoading ? (
+                <div className="space-y-3" data-testid="scheduled-emails-loading">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ) : !emailHistory || emailHistory.filter((e) => e.status === "scheduled").length === 0 ? (
+                <div className="text-center py-8 text-slate-500" data-testid="scheduled-emails-empty">
+                  <Clock className="w-12 h-12 mx-auto mb-3 text-slate-400" />
+                  <p className="text-sm">No scheduled emails for this contact</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Subject</TableHead>
+                        <TableHead>Scheduled For</TableHead>
+                        <TableHead>Sender</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {emailHistory
+                        .filter((email) => email.status === "scheduled")
+                        .map((email) => {
+                          const truncatedSubject =
+                            email.subject.length > 60
+                              ? email.subject.substring(0, 60) + "..."
+                              : email.subject;
+
+                          return (
+                            <TableRow key={email.id} data-testid={`scheduled-email-row-${email.id}`}>
+                              <TableCell
+                                className="font-medium cursor-pointer hover:text-primary transition-colors"
+                                onClick={() => {
+                                  setSelectedEmailHistory(email);
+                                  setIsEmailHistoryModalOpen(true);
+                                }}
+                                data-testid={`text-scheduled-subject-${email.id}`}
+                                title={email.subject}
                               >
-                                <Trash2 className="w-4 h-4 mr-1" />
-                                Cancel
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Email History Section */}
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Inbox className="w-5 h-5 mr-2" />
-            Email History
-            {emailHistory && emailHistory.filter((e) => e.status !== "pending").length > 0 && (
-              <span className="ml-2 text-sm text-slate-500">
-                ({emailHistory.filter((e) => e.status !== "pending").length})
-              </span>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {emailHistoryLoading ? (
-            <div className="space-y-3" data-testid="email-history-loading">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : !emailHistory || emailHistory.filter((e) => e.status !== "pending").length === 0 ? (
-            <div className="text-center py-8 text-slate-500" data-testid="email-history-empty">
-              <Mail className="w-12 h-12 mx-auto mb-3 text-slate-400" />
-              <p className="text-sm">No emails sent to this contact yet</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[100px]">Status</TableHead>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Sender</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {emailHistory
-                    .filter((email) => email.status !== "pending")
-                    .map((email) => {
-                      const truncatedSubject =
-                        email.subject.length > 60
-                          ? email.subject.substring(0, 60) + "..."
-                          : email.subject;
-
-                      const dateToShow = email.sentAt;
-
-                      return (
-                        <TableRow key={email.id} data-testid={`email-history-row-${email.id}`}>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                email.status === "sent" ? "default" : "destructive"
-                              }
-                              className={
-                                email.status === "sent"
-                                  ? "bg-green-500 hover:bg-green-600"
-                                  : ""
-                              }
-                              data-testid={`badge-status-${email.id}`}
-                            >
-                              {email.status === "sent" ? "Sent" : "Failed"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell
-                            className="font-medium cursor-pointer hover:text-primary transition-colors"
-                            onClick={() => {
-                              setSelectedEmailHistory(email);
-                              setIsEmailHistoryModalOpen(true);
-                            }}
-                            data-testid={`text-subject-${email.id}`}
-                            title={email.subject}
-                          >
-                            {truncatedSubject}
-                          </TableCell>
-                          <TableCell data-testid={`text-date-${email.id}`}>
-                            {dateToShow
-                              ? format(new Date(dateToShow), "MMM d, yyyy 'at' h:mm a")
-                              : "—"}
-                          </TableCell>
-                          <TableCell data-testid={`text-sender-${email.id}`}>
-                            {email.senderName}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedEmailHistory(email);
-                                setIsEmailHistoryModalOpen(true);
-                              }}
-                              data-testid={`button-view-${email.id}`}
-                            >
-                              <Eye className="w-4 h-4 mr-1" />
-                              View
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                                {truncatedSubject}
+                              </TableCell>
+                              <TableCell data-testid={`text-scheduled-date-${email.id}`}>
+                                {email.scheduledFor
+                                  ? format(new Date(email.scheduledFor), "MMM d, yyyy 'at' h:mm a")
+                                  : "—"}
+                              </TableCell>
+                              <TableCell data-testid={`text-scheduled-sender-${email.id}`}>
+                                {email.senderName}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end space-x-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setEmailToReschedule(email);
+                                      if (email.scheduledFor) {
+                                        const date = new Date(email.scheduledFor);
+                                        setNewScheduledDate(date.toISOString().split("T")[0]);
+                                        setNewScheduledTime(
+                                          date.toTimeString().substring(0, 5)
+                                        );
+                                      }
+                                      setIsRescheduleModalOpen(true);
+                                    }}
+                                    data-testid={`button-reschedule-${email.id}`}
+                                  >
+                                    <Calendar className="w-4 h-4 mr-1" />
+                                    Reschedule
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    onClick={() => cancelScheduledEmailMutation.mutate(email.id)}
+                                    disabled={cancelScheduledEmailMutation.isPending}
+                                    data-testid={`button-cancel-${email.id}`}
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-1" />
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
