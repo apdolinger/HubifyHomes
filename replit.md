@@ -8,6 +8,24 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### Client Contact Type with Categories (October 31, 2025)
+Added "Client" as a new contact type with primary/secondary category support to distinguish between different client relationships.
+
+**Implementation**:
+1. Added `clientCategory` varchar column to contacts table (nullable)
+2. Updated frontend schemas in People.tsx and PersonProfile.tsx with Zod validation refinements
+3. Validation requires category selection when type is "client" (error: "Client category is required for client type")
+4. Conditional UI in add/edit modals shows client category dropdown when type is "client"
+5. Enhanced display logic with formatContactType/getContactTypeDisplay functions
+6. Badges show "Client (Primary)" or "Client (Secondary)" in table and profile views
+7. Fixed groupedContacts memoization to include clientCategory and accountId fields
+
+**Technical Details**:
+- Database: `contacts.clientCategory` stores "primary" or "secondary"
+- Backend: Field propagated through storage layer and API routes
+- Frontend: Badge variant "outline" for client type, conditional rendering in forms
+- Display: Capitalized category labels with parenthetical notation
+
 ### Team Management Fix (October 2025)
 Fixed critical bug where teams created successfully on the backend but didn't appear in the "My Teams" section of the UI.
 
