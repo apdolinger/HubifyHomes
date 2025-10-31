@@ -1,0 +1,201 @@
+The Plan (Recommended Defaults)
+
+Where do clients add payment methods?
+	•	Both:
+	1.	Client Portal → Billing (self-service; primary path)
+	2.	Internal App → Person Profile → Billing tab (admin-assisted path using the same secure Stripe Element, never free-text fields)
+
+Who can add/manage methods?
+	•	Client self-service (preferred).
+	•	Admins/Supervisors can initiate a secure, hosted collection flow (Stripe Payment Element / Financial Connections modal) and hand the device to the client or send a one-time link. No verbal entry over the phone.
+
+Payment methods supported
+	•	Credit/Debit Cards (Stripe Payment Element)
+	•	ACH Bank Debit (Stripe Financial Connections for instant verification; fall back to micro-deposits when needed)
+
+Storage model (multi-method, future-proof)
+
+Create a separate table instead of single columns on clients:
+
+client_payment_methods
+	•	id (uuid)
+	•	client_id (fk)
+	•	stripe_payment_method_id (string, e.g., pm_123)
+	•	type ('card' | 'us_bank_account')
+	•	brand (e.g., “Visa” or bank name if available)
+	•	last4 (string)
+	•	exp_month (int, nullable)
+	•	exp_year (int, nullable)
+	•	is_default (bool; only one true per client)
+	•	status ('active' | 'requires_verification' | 'inactive')
+	•	created_at, updated_at
+
+client_billing_prefs
+	•	client_id (fk)
+	•	auto_charge_invoices (bool, default true)
+	•	auto_charge_timing ('on_issue' | 'on_due' | 'X_days_after_issue'), default on_due
+	•	retry_strategy (json; e.g., days 3/5/7)
+	•	email_receipts (bool, default true)
+	•	notify_failed_payment (bool, default true)
+
+Rationale: multiple payment methods per client, easy default switching, and future support for wallets or SEPA if you ever need it.
+
+⸻
+
+UX Flows
+
+A) Client Portal → Add Payment Method
+	1.	Client opens Billing → Payment Methods → “Add”.
+	2.	Toggle: (•) Card | ( ) Bank (ACH).
+	3.	Card shows Stripe Payment Element (embedded).
+ACH shows Financial Connections bank login (embedded).
+	4.	On submit, create a Setup Intent (so the method can be reused) and confirm on the frontend.
+	5.	Save the returned payment_method.id to client_payment_methods, mark as active.
+	6.	If this is their first method, set is_default = true.
+	7.	Toast: “Saved. We’ll use this for future invoices.”
+
+Compliance: Card/bank data never hits Hubify servers; you store tokens + display metadata only.
+
+B) Admin-Assisted (Internal App → Person Profile → Billing)
+	•	Same UI component (reuse!).
+	•	Admin clicks “Collect Payment Method” → opens embedded Payment Element/Financial Connections.
+	•	If the client isn’t present, admin clicks “Send secure add-payment link” (Stripe-hosted onboarding link, expiring token).
+	•	Never display plain inputs; never type numbers into Hubify fields.
+
+C) Set Default / Remove
+	•	List methods → “Make Default” (PATCH: set one to true, others to false).
+	•	“Delete” marks inactive and detaches in Stripe (if not referenced by open invoices/subscriptions).
+
+⸻
+
+Invoicing & Charging Logic
+
+Default behavior (recommended)
+	•	Auto-charge enabled: charge on due date against the client’s default method.
+	•	Dunning/retries if fails: Day 3 → Day 5 → Day 7 (configurable in retry_strategy).
+	•	Send receipt on success; failure notice with “update payment method” link.
+
+How it works with Stripe Connect
+	•	Each org links a connected account.
+	•	When creating PaymentIntents:
+	•	customer: the client’s Stripe Customer (per org)
+	•	payment_method: the saved pm_…
+	•	on_behalf_of: connected account id
+	•	application_fee_amount: Hubify’s platform fee (if applicable)
+	•	transfer_data[destination]: connected account id
+
+This keeps payouts, refunds, chargebacks isolated per org while Hubify collects fees compliantly.
+
+⸻
+
+Stripe Objects & API You’ll Use
+
+Create/Attach Customer (per client, per org)
+	•	Ensure you have stripeCustomerId for the client in the connected account context.
+	•	If not present, create: stripe.customers.create({ name, email })
+
+Collect payment method (frontend)
+	•	Setup Intent (recommended):
+	•	Backend: stripe.setupIntents.create({ customer, usage: 'off_session' })
+	•	Frontend: stripe.confirmSetup({ elements, clientSecret })
+	•	Result → setup_intent.payment_method
+
+Store method
+	•	Save payment_method.id, plus display metadata (brand/last4/expiry).
+	•	(Optional) stripe.paymentMethods.retrieve(pmId) to enrich brand/last4 if not in event.
+
+Charge an invoice
+	•	Use Stripe Billing invoices or your own invoice records + PaymentIntents.
+	•	For auto-charge:
+	•	Create PaymentIntent with customer, payment_method, off_session: true, confirm: true
+	•	Handle requires_action failures with email to update method.
+
+⸻
+
+Webhooks You Should Handle
+
+At the platform server (and/or per connected account, depending on your design):
+	•	setup_intent.succeeded → mark method active, flip is_default if first.
+	•	payment_method.detached → mark local record inactive.
+	•	invoice.payment_succeeded → mark Hubify invoice paid, send receipt.
+	•	invoice.payment_failed / payment_intent.payment_failed → schedule retry, notify client.
+	•	charge.refunded → reflect in Hubify invoice/ledger.
+	•	customer.updated → sync brand/last4 changes (rare, but nice).
+
+Store webhook delivery logs and idempotency keys.
+
+⸻
+
+Permissions & Security
+	•	RBAC: Only org Admin/Supervisor can view/manage a client’s methods internally.
+	•	Mask all display data: •••• 4242, •••• ••1234 for bank last4.
+	•	No screenshots of full data (obvious but worth stating).
+	•	2FA for any user with billing permissions.
+	•	SAQ-A scope (Payment Element/Financial Connections keep you out of heavy PCI).
+
+⸻
+
+Schema Diffs (Summary)
+
+clients
+	•	Keep existing stripeCustomerId.
+	•	Do not add card/bank columns here.
+
+client_payment_methods (new)
+	•	As specified above.
+
+client_billing_prefs (new)
+	•	As specified above.
+
+invoices (already present)
+	•	Add: auto_charge_attempted_at, attempt_number, last_attempt_error (nullable), paid_via_payment_method_id (nullable).
+
+⸻
+
+Admin Settings (Org-Level)
+	•	Payments Provider: Stripe (default)
+	•	Accept ACH: on/off (default on)
+	•	Require auto-charge: on/off (default on)
+	•	Dunning policy: editable 3-step schedule
+	•	Platform fee: % or fixed (if you take application fees)
+
+⸻
+
+Edge Cases & How We Handle Them
+	•	Card requires 3DS (SCA): first save uses Setup Intent with on-session confirmation. Future charges are off-session; if 3DS is required again, invoice is marked “action required” and client gets a link to complete authentication.
+	•	ACH pending/returns: show status “Pending (3–5 business days).” If returned (NSF), mark invoice “failed,” trigger retry or manual follow-up.
+	•	Expired card: Stripe emits upcoming-expiring signals; email the client 30 days prior with a secure update link.
+	•	Switch default method: immediate effect on next attempts.
+
+⸻
+
+Implementation Sequence (1–2 sprints)
+
+Sprint 1
+	1.	DB migrations (client_payment_methods, client_billing_prefs).
+	2.	Portal Billing UI + embedded Payment Element (card) and Financial Connections (ACH).
+	3.	Setup Intent backend endpoints.
+	4.	Save methods & set default logic.
+	5.	Webhooks: setup_intent.succeeded, payment_method.detached.
+	6.	Internal App Billing tab reuse of the same component.
+
+Sprint 2
+	1.	Auto-charge engine (cron/queue on due date).
+	2.	Dunning/retries + notifications.
+	3.	Invoice ledger updates from invoice.payment_succeeded/failed.
+	4.	Admin org settings UI for payments + dunning.
+	5.	Expiring card reminders.
+
+⸻
+
+Copy you can drop into the UI
+
+Portal → Billing → Payment Methods
+	•	“Add a payment method. Your details are encrypted and processed by Stripe. Hubify never stores your full card or bank numbers.”
+	•	“Save 2% on fees when you pay via bank (ACH).”
+
+Failure email subject
+	•	“Payment failed for Invoice #{{number}} — update your payment method”
+
+Success receipt
+	•	“Thanks! We received your payment of {{amount}} for Invoice #{{number}}.”
