@@ -360,7 +360,7 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
                     <div>
                       <Label className="text-sm text-slate-600 mb-1 block">Day of Week</Label>
                       <Select
-                        value={billingDay?.toString() || ""}
+                        value={billingDay?.toString()}
                         onValueChange={(value) => setBillingDay(parseInt(value))}
                         disabled={!isEditingBilling}
                       >
@@ -387,7 +387,7 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
                     <div>
                       <Label className="text-sm text-slate-600 mb-1 block">Day of Month</Label>
                       <Select
-                        value={billingDay?.toString() || ""}
+                        value={billingDay?.toString()}
                         onValueChange={(value) => setBillingDay(parseInt(value))}
                         disabled={!isEditingBilling}
                       >
