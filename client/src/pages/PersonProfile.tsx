@@ -100,7 +100,6 @@ type PropertyFormData = z.infer<typeof propertySchema>;
 function BillingSettingsTab({ person, personId }: { person: any; personId: string }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [isEditingBilling, setIsEditingBilling] = useState(false);
   const [isAddingSchedule, setIsAddingSchedule] = useState(false);
 
   // Billing configuration state
@@ -126,7 +125,6 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
       setBillingWorkflow(person.billingWorkflow || "review");
       setDefaultHourlyRate(person.defaultHourlyRateCents ? (person.defaultHourlyRateCents / 100).toFixed(2) : "");
       setInvoiceDeliveryMethod(person.invoiceDeliveryMethod || "email");
-      setIsEditingBilling(false);
     }
   }, [personId, person]);
 
@@ -149,7 +147,6 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/contacts/${personId}`] });
-      setIsEditingBilling(false);
       toast({
         title: "Billing settings updated",
         description: "Billing configuration has been saved successfully.",
@@ -211,7 +208,6 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
     setBillingWorkflow(person?.billingWorkflow || "review");
     setDefaultHourlyRate(person?.defaultHourlyRateCents ? (person.defaultHourlyRateCents / 100).toFixed(2) : "");
     setInvoiceDeliveryMethod(person?.invoiceDeliveryMethod || "email");
-    setIsEditingBilling(false);
   };
 
   return (
@@ -224,17 +220,7 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
               <DollarSign className="w-5 h-5 mr-2" />
               Billing Configuration
             </CardTitle>
-            {!isEditingBilling ? (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setIsEditingBilling(true)}
-                data-testid="button-edit-billing"
-              >
-                <Edit className="w-4 h-4 mr-2" />
-                Edit Settings
-              </Button>
-            ) : (
+            {billingEnabled && (
               <div className="flex gap-2">
                 <Button
                   size="sm"
