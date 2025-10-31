@@ -881,7 +881,10 @@ export async function chargeInvoice(
     `${client.firstName || ''} ${client.lastName || ''}`.trim()
   );
 
-  // Create PaymentIntent
+  // Create PaymentIntent with idempotency key to prevent duplicates
+  // Use invoiceId as the idempotency key: ensures one PaymentIntent per invoice
+  const idempotencyKey = `pi-invoice-${invoiceId}`;
+  
   const paymentIntent = await orgStripe.stripe.paymentIntents.create({
     amount: amountCents,
     currency: 'usd',
@@ -895,7 +898,10 @@ export async function chargeInvoice(
       orgId,
     },
     description: description || `Invoice charge`,
-  }, orgStripe.accountId ? { stripeAccount: orgStripe.accountId } : undefined);
+  }, {
+    ...( orgStripe.accountId ? { stripeAccount: orgStripe.accountId } : {}),
+    idempotencyKey, // Stripe's native idempotency protection
+  });
 
   // Update invoice with Stripe payment intent ID
   await storage.updateClientInvoice(invoiceId, {

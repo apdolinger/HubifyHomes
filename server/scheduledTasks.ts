@@ -108,8 +108,25 @@ export async function runBillingAutomation(): Promise<{
             pendingSubmissions.map((s: any) => storage.authorizeBillingSubmission(s.id, systemUserId))
           );
           
-          // Create consolidated invoice
+          // Create consolidated invoice with idempotency
           const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+          
+          // Generate idempotency key: ensures one invoice per day per client per frequency
+          const year = today.getFullYear();
+          const month = String(today.getMonth() + 1).padStart(2, '0');
+          const day = String(today.getDate()).padStart(2, '0');
+          const idempotencyKey = `inv-auto-${year}${month}${day}-${client.id}-${client.invoiceFrequency}`;
+          
+          // Check if invoice with this idempotency key already exists
+          const existingInvoices = await storage.getClientInvoices(client.id);
+          const duplicateInvoice = existingInvoices.find((inv: any) => 
+            inv.metadata?.idempotencyKey === idempotencyKey
+          );
+          
+          if (duplicateInvoice) {
+            log(`[BILLING] Skipping invoice creation for ${client.firstName} ${client.lastName}: Invoice already exists with idempotency key ${idempotencyKey} (${duplicateInvoice.invoiceNumber})`);
+            continue;
+          }
           
           // Consolidate line items, notes, and attachments
           const allLineItems: any[] = [];
@@ -160,6 +177,7 @@ export async function runBillingAutomation(): Promise<{
               submissionIds: pendingSubmissions.map((s: any) => s.id),
               authorizedBy: systemUserId,
               generatedAt: new Date().toISOString(),
+              idempotencyKey, // Store for duplicate detection
             },
           });
           
