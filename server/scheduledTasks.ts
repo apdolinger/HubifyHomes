@@ -13,6 +13,260 @@ export function setConflictDetector(detector: (event: any, orgId: string, userId
   detectConflictsForEvent = detector;
 }
 
+/**
+ * Run billing automation manually or via cron job
+ * Generates consolidated invoices for clients based on billing schedules
+ * and optionally auto-charges their default payment methods
+ * 
+ * @returns Summary of billing run (invoices created, charged, failed, errors)
+ */
+export async function runBillingAutomation(): Promise<{
+  invoicesCreated: number;
+  invoicesCharged: number;
+  invoicesFailed: number;
+  errors: Array<{ clientId: string; clientName: string; error: string }>;
+  summary: string;
+}> {
+  const startTime = Date.now();
+  log('[BILLING] Starting automated billing invoice generation...');
+  
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  const dayOfMonth = today.getDate();
+  
+  const billingAutomationEnabled = process.env.BILLING_AUTOMATION_ENABLED === 'true';
+  
+  // Get all clients with auto-send enabled
+  const allOrgs = await storage.getOrgs();
+  let totalInvoicesCreated = 0;
+  let totalInvoicesCharged = 0;
+  let totalInvoicesFailed = 0;
+  const errors: Array<{ clientId: string; clientName: string; error: string }> = [];
+  
+  for (const org of allOrgs) {
+    try {
+      // Get all clients for this org with auto-send enabled
+      const clients = await storage.getClients(org.id);
+      
+      for (const client of clients) {
+        try {
+          // Skip if auto-send is not enabled
+          if (!client.autoSendInvoices) {
+            continue;
+          }
+          
+          // Skip if no billing frequency is set
+          if (!client.invoiceFrequency || client.invoiceFrequency === 'manual') {
+            continue;
+          }
+          
+          // Check if invoice should be generated today based on frequency
+          let shouldGenerateInvoice = false;
+          
+          if (client.invoiceFrequency === 'weekly') {
+            // Weekly billing on specified day of week
+            shouldGenerateInvoice = client.billingDay !== null && dayOfWeek === client.billingDay;
+          } else if (client.invoiceFrequency === 'biweekly') {
+            // Bi-weekly billing on specified day of week
+            if (client.billingDay !== null && dayOfWeek === client.billingDay) {
+              // Check if it's been at least 13 days since last invoice
+              if (client.lastInvoiceDate) {
+                const daysSinceLastInvoice = Math.floor(
+                  (today.getTime() - new Date(client.lastInvoiceDate).getTime()) / (1000 * 60 * 60 * 24)
+                );
+                shouldGenerateInvoice = daysSinceLastInvoice >= 13;
+              } else {
+                // First invoice
+                shouldGenerateInvoice = true;
+              }
+            }
+          } else if (client.invoiceFrequency === 'monthly') {
+            // Monthly billing on specified day of month
+            shouldGenerateInvoice = client.billingDayOfMonth !== null && dayOfMonth === client.billingDayOfMonth;
+          }
+          
+          if (!shouldGenerateInvoice) {
+            continue;
+          }
+          
+          // Get all pending billing submissions for this client
+          const allSubmissions = await storage.getBillingSubmissions(org.id);
+          const pendingSubmissions = allSubmissions.filter(
+            (s: any) => s.clientId === client.id && s.status === 'pending'
+          );
+          
+          if (pendingSubmissions.length === 0) {
+            log(`[BILLING] No pending submissions for client ${client.firstName} ${client.lastName} (${client.id})`);
+            continue;
+          }
+          
+          log(`[BILLING] Generating consolidated invoice for ${client.firstName} ${client.lastName} with ${pendingSubmissions.length} submissions`);
+          
+          // Authorize all pending submissions
+          const systemUserId = 'system-auto-billing';
+          await Promise.all(
+            pendingSubmissions.map((s: any) => storage.authorizeBillingSubmission(s.id, systemUserId))
+          );
+          
+          // Create consolidated invoice
+          const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+          
+          // Consolidate line items, notes, and attachments
+          const allLineItems: any[] = [];
+          const allNotes: string[] = [];
+          const allAttachments: any[] = [];
+          let totalAmountCents = 0;
+          
+          pendingSubmissions.forEach((submission: any) => {
+            const submissionLineItems = (submission.lineItems || []).map((item: any) => ({
+              description: item.description,
+              quantity: item.quantity,
+              unitAmountCents: item.rateCents,
+              totalCents: item.amountCents
+            }));
+            
+            allLineItems.push(...submissionLineItems);
+            
+            if (submission.notes) {
+              allNotes.push(`[${submission.description}]: ${submission.notes}`);
+            }
+            
+            if (submission.attachments && Array.isArray(submission.attachments)) {
+              allAttachments.push(...submission.attachments);
+            }
+            
+            totalAmountCents += submission.amountCents;
+          });
+          
+          const consolidatedDescription = `Automated consolidated invoice for ${pendingSubmissions.length} submission(s):\n` + 
+            pendingSubmissions.map((s: any, i: number) => `${i + 1}. ${s.description}`).join('\n');
+          
+          const consolidatedNotes = allNotes.length > 0 ? allNotes.join('\n\n') : undefined;
+          
+          const invoice = await storage.createClientInvoice({
+            orgId: org.id,
+            clientId: client.id,
+            source: 'automated',
+            invoiceNumber,
+            amountCents: totalAmountCents,
+            currency: 'usd',
+            status: 'open',
+            description: consolidatedDescription,
+            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            issuedAt: new Date(),
+            lineItems: allLineItems,
+            attachments: allAttachments,
+            metadata: {
+              submissionIds: pendingSubmissions.map((s: any) => s.id),
+              authorizedBy: systemUserId,
+              generatedAt: new Date().toISOString(),
+            },
+          });
+          
+          totalInvoicesCreated++;
+          
+          // Update client's last invoice date
+          await storage.updateClient(client.id, { lastInvoiceDate: new Date() });
+          
+          // Mark submissions as invoiced
+          await Promise.all(
+            pendingSubmissions.map((s: any) => 
+              storage.updateBillingSubmission(s.id, { status: 'invoiced', invoiceId: invoice.id })
+            )
+          );
+          
+          log(`[BILLING] Created invoice ${invoice.invoiceNumber} for $${(totalAmountCents / 100).toFixed(2)}`);
+          
+          // Send invoice email if client has an email
+          if (client.email) {
+            const pdfBuffer = await generateInvoicePDF(invoice, client, org);
+            const htmlContent = generateInvoiceEmailHTML(invoice, client, org);
+            
+            await sendGenericEmail({
+              to: client.email,
+              subject: `Invoice ${invoice.invoiceNumber} from ${org.name}`,
+              htmlContent,
+              attachments: [{
+                filename: `${invoice.invoiceNumber}.pdf`,
+                content: pdfBuffer,
+                contentType: 'application/pdf',
+              }],
+            });
+            
+            log(`[BILLING] Sent invoice ${invoice.invoiceNumber} to ${client.email}`);
+          } else {
+            log(`[BILLING] Warning: Client ${client.firstName} ${client.lastName} has no email address, invoice created but not sent`);
+          }
+          
+          // Auto-charge if enabled (and billing automation is enabled)
+          if (billingAutomationEnabled) {
+            try {
+              // Get client billing preferences to check if auto-charge is enabled
+              const billingPrefs = await storage.getClientBillingPrefs(client.id);
+              
+              if (billingPrefs && billingPrefs.autoChargeInvoices) {
+                // Get client's default payment method
+                const paymentMethods = await storage.getClientPaymentMethods(client.id);
+                const defaultPaymentMethod = paymentMethods.find(pm => pm.isDefault);
+                
+                if (defaultPaymentMethod) {
+                  log(`[BILLING] Auto-charging invoice ${invoice.invoiceNumber} for ${client.firstName} ${client.lastName} using payment method ending in ${defaultPaymentMethod.last4}`);
+                  
+                  const result = await chargeInvoice(
+                    invoice.id,
+                    org.id,
+                    client.id,
+                    defaultPaymentMethod.stripePaymentMethodId,
+                    invoice.amountCents,
+                    `Automated billing charge for invoice ${invoice.invoiceNumber}`
+                  );
+                  
+                  log(`[BILLING] Auto-charge initiated for invoice ${invoice.invoiceNumber}, PaymentIntent: ${result.paymentIntentId}, Status: ${result.status}`);
+                  totalInvoicesCharged++;
+                } else {
+                  log(`[BILLING] Auto-charge skipped for invoice ${invoice.invoiceNumber}: No default payment method found for client ${client.firstName} ${client.lastName}`);
+                }
+              }
+            } catch (error) {
+              log(`[BILLING] Error auto-charging invoice ${invoice.invoiceNumber}: ${error}`);
+              totalInvoicesFailed++;
+              errors.push({
+                clientId: client.id,
+                clientName: `${client.firstName} ${client.lastName}`,
+                error: `Auto-charge failed: ${error}`,
+              });
+              // Don't fail the entire billing automation if one charge fails
+            }
+          } else {
+            log(`[BILLING] Auto-charge disabled globally (BILLING_AUTOMATION_ENABLED=${process.env.BILLING_AUTOMATION_ENABLED})`);
+          }
+        } catch (error) {
+          log(`[BILLING] Error processing client ${client.id}: ${error}`);
+          errors.push({
+            clientId: client.id,
+            clientName: `${client.firstName || ''} ${client.lastName || ''}`.trim() || client.email,
+            error: String(error),
+          });
+        }
+      }
+    } catch (error) {
+      log(`[BILLING] Error processing org ${org.id}: ${error}`);
+    }
+  }
+  
+  const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+  const summary = `Automated billing complete in ${duration}s. Created: ${totalInvoicesCreated}, Charged: ${totalInvoicesCharged}, Failed: ${totalInvoicesFailed}`;
+  log(`[BILLING] ${summary}`);
+  
+  return {
+    invoicesCreated: totalInvoicesCreated,
+    invoicesCharged: totalInvoicesCharged,
+    invoicesFailed: totalInvoicesFailed,
+    errors,
+    summary,
+  };
+}
+
 export function startScheduledTasks() {
   // Run conflict scan every 12 hours (at 2am and 2pm)
   cron.schedule('0 2,14 * * *', async () => {

@@ -1019,6 +1019,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Manual billing automation trigger (Admin or Super Admin only)
+  app.post('/api/admin/run-billing-automation', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      const superAdmin = (req.session as any).superAdmin;
+      
+      // Check if user is admin/supervisor or super admin
+      const userRole = (user as any)?.claims?.role ?? (user as any)?.role;
+      const isSuperAdmin = superAdmin?.authenticated;
+      const isAdmin = userRole === 'admin' || userRole === 'supervisor';
+      
+      if (!isAdmin && !isSuperAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin, supervisor, or super admin role required." });
+      }
+
+      // Import and run billing automation
+      const { runBillingAutomation } = await import("./scheduledTasks");
+      const result = await runBillingAutomation();
+      
+      res.json({
+        success: true,
+        ...result,
+      });
+    } catch (error) {
+      console.error("Error running billing automation:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to run billing automation",
+        error: String(error),
+      });
+    }
+  });
+
   // Auth routes
   app.get('/api/auth/user', async (req: any, res) => {
     try {
