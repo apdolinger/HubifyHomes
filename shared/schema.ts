@@ -228,6 +228,7 @@ export const clientInvoices = pgTable("client_invoices", {
   }>>().default([]),
   metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
   attachments: jsonb("attachments").$type<PhotoAttachment[]>().default([]),
+  customFieldValues: jsonb("custom_field_values").$type<Record<string, any>>().default({}),
   
   // Creator tracking
   createdBy: varchar("created_by").references(() => users.id),
@@ -1059,7 +1060,7 @@ export const contactProperties = pgTable("contact_properties", {
 export const customFields = pgTable("custom_fields", {
   id: serial("id").primaryKey(),
   orgId: uuid("org_id").references(() => orgs.id).notNull(),
-  entityType: varchar("entity_type").$type<"task"|"property"|"contact">().notNull(), // Which entity this field applies to
+  entityType: varchar("entity_type").$type<"task"|"property"|"contact"|"invoice">().notNull(), // Which entity this field applies to
   fieldName: varchar("field_name").notNull(), // Display label for the field
   fieldKey: varchar("field_key").notNull(), // Unique key for storing values (auto-generated from fieldName)
   fieldType: varchar("field_type").$type<"text"|"textarea"|"number"|"date"|"select"|"multiselect"|"checkbox">().notNull(),
