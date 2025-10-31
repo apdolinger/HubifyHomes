@@ -608,6 +608,10 @@ export default function PersonProfile() {
   const [emailSubject, setEmailSubject] = useState("");
   const [emailMessage, setEmailMessage] = useState("");
 
+  // Custom fields editing state
+  const [isEditingCustomFields, setIsEditingCustomFields] = useState(false);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
+
   // Edit form
   const editForm = useForm<EditContactFormData>({
     resolver: zodResolver(editContactSchema),
@@ -690,7 +694,12 @@ export default function PersonProfile() {
     enabled: isAuthenticated,
   });
 
-
+  // Sync custom field values when person data loads
+  useEffect(() => {
+    if (person) {
+      setCustomFieldValues((person as any)?.customFieldValues || {});
+    }
+  }, [person]);
 
   const relatedTasks = (tasks as any[] || []).filter((task: any) => 
     task.propertyId === (person as any)?.propertyId
@@ -800,6 +809,42 @@ export default function PersonProfile() {
       toast({
         title: "Error",
         description: "Failed to set primary property. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Save custom fields mutation
+  const saveCustomFieldsMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("PATCH", `/api/contacts/${personId}`, {
+        customFieldValues,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/contacts/${personId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      setIsEditingCustomFields(false);
+      toast({
+        title: "Custom fields updated",
+        description: "Custom field values have been saved successfully.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to save custom fields. Please try again.",
         variant: "destructive",
       });
     },
@@ -1362,9 +1407,10 @@ export default function PersonProfile() {
 
       {/* Tabs Section */}
       <Tabs defaultValue="tasks" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="tasks">Tasks</TabsTrigger>
           <TabsTrigger value="billing">Billing Info</TabsTrigger>
+          <TabsTrigger value="custom-fields">Custom Fields</TabsTrigger>
           <TabsTrigger value="notes">Notes</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
@@ -1421,46 +1467,92 @@ export default function PersonProfile() {
           <BillingSettingsTab person={person as any} personId={personId} />
         </TabsContent>
         
+        <TabsContent value="custom-fields">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <Settings className="w-5 h-5 mr-2" />
+                  Custom Fields
+                </div>
+                {customFields.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant={isEditingCustomFields ? "outline" : "default"}
+                    onClick={() => {
+                      if (isEditingCustomFields) {
+                        // Save changes
+                        saveCustomFieldsMutation.mutate();
+                      } else {
+                        setIsEditingCustomFields(true);
+                      }
+                    }}
+                    disabled={saveCustomFieldsMutation.isPending}
+                    data-testid="button-edit-custom-fields"
+                  >
+                    <Edit className="w-4 h-4 mr-1" />
+                    {isEditingCustomFields ? (saveCustomFieldsMutation.isPending ? "Saving..." : "Save Changes") : "Edit"}
+                  </Button>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {customFields.length > 0 ? (
+                <div className="space-y-4">
+                  <CustomFieldsRenderer
+                    fields={customFields}
+                    values={customFieldValues}
+                    onChange={setCustomFieldValues}
+                    mode={isEditingCustomFields ? "edit" : "view"}
+                  />
+                  {isEditingCustomFields && (
+                    <div className="flex justify-end space-x-2 pt-4 border-t">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setCustomFieldValues((person as any)?.customFieldValues || {});
+                          setIsEditingCustomFields(false);
+                        }}
+                        data-testid="button-cancel-custom-fields"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-slate-500">
+                  <Settings className="w-12 h-12 mx-auto mb-4 text-slate-400" />
+                  <h3 className="text-lg font-medium mb-2">No Custom Fields</h3>
+                  <p className="mb-4">No custom fields have been configured for clients.</p>
+                  <p className="text-sm">Admins can add custom fields in the Admin → Customization section.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
         <TabsContent value="notes">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
                 <FileText className="w-5 h-5 mr-2" />
-                Notes & Custom Fields
+                Notes
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-6">
-                <div>
-                  <label className="text-sm font-medium text-slate-700 mb-2 block">
-                    General Notes
-                  </label>
-                  <Textarea
-                    placeholder="Add any notes about this person..."
-                    rows={4}
-                    className="resize-none"
-                    defaultValue={(person as any)?.notes || ""}
-                    disabled
-                  />
-                </div>
-                
-                {/* Custom Fields Display */}
-                {customFields.length > 0 && (person as any)?.customFieldValues && Object.keys((person as any).customFieldValues).length > 0 && (
-                  <div className="border-t pt-4">
-                    <CustomFieldsRenderer
-                      fields={customFields}
-                      values={(person as any).customFieldValues || {}}
-                      onChange={() => {}}
-                      mode="view"
-                    />
-                  </div>
-                )}
-                
-                {customFields.length > 0 && (!((person as any)?.customFieldValues) || Object.keys((person as any).customFieldValues || {}).length === 0) && (
-                  <div className="border-t pt-4">
-                    <p className="text-sm text-slate-500">No custom field values set for this client.</p>
-                  </div>
-                )}
+              <div>
+                <label className="text-sm font-medium text-slate-700 mb-2 block">
+                  General Notes
+                </label>
+                <Textarea
+                  placeholder="Add any notes about this person..."
+                  rows={6}
+                  className="resize-none"
+                  defaultValue={(person as any)?.notes || ""}
+                  disabled
+                />
               </div>
             </CardContent>
           </Card>
