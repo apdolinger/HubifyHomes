@@ -42,13 +42,19 @@ import {
   Star,
   MoreVertical,
   Trash2,
-  TrendingUp
+  TrendingUp,
+  Eye,
+  Inbox
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
 import { AlertBanner, AlertBannerRef } from "@/components/AlertBanner";
 import { EmailCompositionModal } from "@/components/EmailCompositionModal";
+import type { EmailHistory } from "@shared/schema";
+import { format } from "date-fns";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Form schema for editing contact
 const editContactSchema = z.object({
@@ -616,6 +622,10 @@ export default function PersonProfile() {
   // Email composition modal state
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
 
+  // Email history modal state
+  const [isEmailHistoryModalOpen, setIsEmailHistoryModalOpen] = useState(false);
+  const [selectedEmailHistory, setSelectedEmailHistory] = useState<EmailHistory | null>(null);
+
   // Custom fields editing state
   const [isEditingCustomFields, setIsEditingCustomFields] = useState(false);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
@@ -691,6 +701,12 @@ export default function PersonProfile() {
   });
 
   const linkedProperties = (contactProperties as any[]) || [];
+
+  // Fetch email history
+  const { data: emailHistory, isLoading: emailHistoryLoading } = useQuery<EmailHistory[]>({
+    queryKey: [`/api/contacts/${personId}/email-history`],
+    enabled: isAuthenticated && !!personId,
+  });
 
   // Fetch custom fields for clients
   const { data: customFields = [] } = useQuery<any[]>({
@@ -1378,6 +1394,119 @@ export default function PersonProfile() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Email History Section */}
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Inbox className="w-5 h-5 mr-2" />
+            Email History
+            {emailHistory && emailHistory.length > 0 && (
+              <span className="ml-2 text-sm text-slate-500">({emailHistory.length})</span>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {emailHistoryLoading ? (
+            <div className="space-y-3" data-testid="email-history-loading">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : !emailHistory || emailHistory.length === 0 ? (
+            <div className="text-center py-8 text-slate-500" data-testid="email-history-empty">
+              <Mail className="w-12 h-12 mx-auto mb-3 text-slate-400" />
+              <p className="text-sm">No emails sent to this contact yet</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[100px]">Status</TableHead>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Sender</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {emailHistory.map((email) => {
+                    const truncatedSubject = email.subject.length > 60 
+                      ? email.subject.substring(0, 60) + "..." 
+                      : email.subject;
+                    
+                    const dateToShow = email.status === "scheduled" 
+                      ? email.scheduledFor 
+                      : email.sentAt;
+                    
+                    return (
+                      <TableRow key={email.id} data-testid={`email-history-row-${email.id}`}>
+                        <TableCell>
+                          <Badge 
+                            variant={
+                              email.status === "sent" 
+                                ? "default" 
+                                : email.status === "scheduled" 
+                                  ? "secondary" 
+                                  : "destructive"
+                            }
+                            className={
+                              email.status === "sent" 
+                                ? "bg-green-500 hover:bg-green-600" 
+                                : email.status === "scheduled" 
+                                  ? "bg-blue-500 hover:bg-blue-600 text-white" 
+                                  : ""
+                            }
+                            data-testid={`badge-status-${email.id}`}
+                          >
+                            {email.status === "sent" 
+                              ? "Sent" 
+                              : email.status === "scheduled" 
+                                ? "Scheduled" 
+                                : "Failed"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell 
+                          className="font-medium cursor-pointer hover:text-primary transition-colors"
+                          onClick={() => {
+                            setSelectedEmailHistory(email);
+                            setIsEmailHistoryModalOpen(true);
+                          }}
+                          data-testid={`text-subject-${email.id}`}
+                          title={email.subject}
+                        >
+                          {truncatedSubject}
+                        </TableCell>
+                        <TableCell data-testid={`text-date-${email.id}`}>
+                          {dateToShow ? format(new Date(dateToShow), "MMM d, yyyy 'at' h:mm a") : "—"}
+                        </TableCell>
+                        <TableCell data-testid={`text-sender-${email.id}`}>
+                          {email.senderName}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedEmailHistory(email);
+                              setIsEmailHistoryModalOpen(true);
+                            }}
+                            data-testid={`button-view-${email.id}`}
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            View
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Tabs Section */}
       <Tabs defaultValue="tasks" className="w-full">
@@ -2191,6 +2320,121 @@ export default function PersonProfile() {
         recipientName={`${(person as any)?.firstName || ""} ${(person as any)?.lastName || ""}`.trim()}
         recipientContactId={personId}
       />
+
+      {/* Email History View Modal */}
+      <Dialog open={isEmailHistoryModalOpen} onOpenChange={setIsEmailHistoryModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Email Details</DialogTitle>
+            <DialogDescription>
+              View complete email information
+            </DialogDescription>
+          </DialogHeader>
+          {selectedEmailHistory && (
+            <div className="space-y-4">
+              {/* Status Banner */}
+              <div className="flex items-center space-x-3">
+                <Badge 
+                  variant={
+                    selectedEmailHistory.status === "sent" 
+                      ? "default" 
+                      : selectedEmailHistory.status === "scheduled" 
+                        ? "secondary" 
+                        : "destructive"
+                  }
+                  className={
+                    selectedEmailHistory.status === "sent" 
+                      ? "bg-green-500 hover:bg-green-600" 
+                      : selectedEmailHistory.status === "scheduled" 
+                        ? "bg-blue-500 hover:bg-blue-600 text-white" 
+                        : ""
+                  }
+                  data-testid="modal-badge-status"
+                >
+                  {selectedEmailHistory.status === "sent" 
+                    ? "Sent" 
+                    : selectedEmailHistory.status === "scheduled" 
+                      ? "Scheduled" 
+                      : "Failed"}
+                </Badge>
+                <span className="text-sm text-slate-500" data-testid="modal-text-date">
+                  {selectedEmailHistory.status === "scheduled" && selectedEmailHistory.scheduledFor
+                    ? `Scheduled for ${format(new Date(selectedEmailHistory.scheduledFor), "MMM d, yyyy 'at' h:mm a")}`
+                    : selectedEmailHistory.sentAt
+                      ? `Sent on ${format(new Date(selectedEmailHistory.sentAt), "MMM d, yyyy 'at' h:mm a")}`
+                      : "Date unknown"}
+                </span>
+              </div>
+
+              {/* Error Message (if failed) */}
+              {selectedEmailHistory.status === "failed" && selectedEmailHistory.errorMessage && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3" data-testid="modal-error-message">
+                  <p className="text-sm font-semibold text-red-900 mb-1">Error</p>
+                  <p className="text-sm text-red-700">{selectedEmailHistory.errorMessage}</p>
+                </div>
+              )}
+
+              {/* Sender & Recipient Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-semibold text-slate-700">From</Label>
+                  <p className="text-sm text-slate-900 mt-1" data-testid="modal-text-sender">
+                    {selectedEmailHistory.senderName}
+                  </p>
+                  <p className="text-xs text-slate-500">{selectedEmailHistory.senderEmail}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-semibold text-slate-700">To</Label>
+                  <p className="text-sm text-slate-900 mt-1" data-testid="modal-text-recipient">
+                    {selectedEmailHistory.recipientName || selectedEmailHistory.recipientEmail}
+                  </p>
+                  <p className="text-xs text-slate-500">{selectedEmailHistory.recipientEmail}</p>
+                </div>
+              </div>
+
+              {/* Template Info (if used) */}
+              {selectedEmailHistory.templateId && (
+                <div>
+                  <Label className="text-sm font-semibold text-slate-700">Template Used</Label>
+                  <p className="text-sm text-slate-900 mt-1" data-testid="modal-text-template">
+                    Template ID: {selectedEmailHistory.templateId}
+                  </p>
+                </div>
+              )}
+
+              {/* Subject */}
+              <div>
+                <Label className="text-sm font-semibold text-slate-700">Subject</Label>
+                <p className="text-sm text-slate-900 mt-1" data-testid="modal-text-subject">
+                  {selectedEmailHistory.subject}
+                </p>
+              </div>
+
+              {/* Body */}
+              <div>
+                <Label className="text-sm font-semibold text-slate-700">Message</Label>
+                <div 
+                  className="mt-1 p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 whitespace-pre-wrap"
+                  data-testid="modal-text-body"
+                  dangerouslySetInnerHTML={{ __html: selectedEmailHistory.body }}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsEmailHistoryModalOpen(false);
+                setSelectedEmailHistory(null);
+              }}
+              data-testid="modal-button-close"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
