@@ -73,6 +73,7 @@ import {
   emailHistory,
   scheduledEmails,
   customFields,
+  paymentCollectionTokens,
   type User,
   type UpsertUser,
   type Team,
@@ -215,9 +216,12 @@ import {
   type InsertScheduledEmail,
   type CustomField,
   type InsertCustomField,
+  type PaymentCollectionToken,
+  type InsertPaymentCollectionToken,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, like, count, sql, inArray, isNotNull } from "drizzle-orm";
+import { nanoid } from "nanoid";
 
 export interface IStorage {
   // User operations - required for Replit Auth
@@ -1125,6 +1129,47 @@ export class DatabaseStorage implements IStorage {
   async createClient(clientData: InsertClient): Promise<Client> {
     const [client] = await db.insert(clients).values(clientData).returning();
     return client;
+  }
+
+  // Payment collection token operations
+  async createPaymentCollectionToken(
+    clientId: string,
+    orgId: string,
+    createdByUserId: string,
+    expiresInHours: number = 72
+  ): Promise<PaymentCollectionToken> {
+    const token = nanoid(32);
+    const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000);
+
+    const [collectionToken] = await db
+      .insert(paymentCollectionTokens)
+      .values({
+        clientId,
+        orgId,
+        token,
+        createdByUserId,
+        expiresAt,
+      })
+      .returning();
+    return collectionToken;
+  }
+
+  async getPaymentCollectionToken(token: string): Promise<PaymentCollectionToken | null> {
+    const [collectionToken] = await db
+      .select()
+      .from(paymentCollectionTokens)
+      .where(eq(paymentCollectionTokens.token, token));
+    return collectionToken || null;
+  }
+
+  async markPaymentCollectionTokenUsed(tokenId: string): Promise<void> {
+    await db
+      .update(paymentCollectionTokens)
+      .set({
+        isUsed: true,
+        usedAt: new Date(),
+      })
+      .where(eq(paymentCollectionTokens.id, tokenId));
   }
 
   async updateClient(id: string, clientData: Partial<InsertClient>): Promise<Client> {

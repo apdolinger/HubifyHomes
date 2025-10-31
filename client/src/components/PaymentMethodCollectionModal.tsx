@@ -26,6 +26,8 @@ interface PaymentMethodCollectionModalProps {
   onClose: () => void;
   clientId: string;
   clientName: string;
+  onSuccess?: () => void;
+  paymentToken?: string;
 }
 
 interface SetupIntentResponse {
@@ -107,26 +109,42 @@ function PaymentMethodForm({
   );
 }
 
-export function PaymentMethodCollectionModal({
+export default function PaymentMethodCollectionModal({
   open,
   onClose,
   clientId,
   clientName,
+  onSuccess: onSuccessProp,
+  paymentToken,
 }: PaymentMethodCollectionModalProps) {
   const { toast } = useToast();
   const [paymentMethodType, setPaymentMethodType] = useState<'card' | 'us_bank_account'>('card');
 
-  // Create setup intent when modal opens
+  // Create setup intent when modal opens - use token-based endpoint if token is provided
   const { data: setupIntent, isLoading: isLoadingSetupIntent } = useQuery<SetupIntentResponse>({
-    queryKey: ['/api/clients', clientId, 'setup-intent', paymentMethodType],
+    queryKey: paymentToken 
+      ? ['/api/payment-collection', paymentToken, 'setup-intent', paymentMethodType]
+      : ['/api/clients', clientId, 'setup-intent', paymentMethodType],
     queryFn: async () => {
-      const response = await apiRequest(
-        'POST',
-        `/api/clients/${clientId}/setup-intent`,
-        { 
+      const endpoint = paymentToken
+        ? `/api/payment-collection/${paymentToken}/setup-intent`
+        : `/api/clients/${clientId}/setup-intent`;
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: paymentToken ? 'omit' : 'include',
+        body: JSON.stringify({ 
           paymentMethodTypes: paymentMethodType === 'card' ? ['card'] : ['us_bank_account'] 
-        }
-      );
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create setup intent');
+      }
+
       return response.json() as Promise<SetupIntentResponse>;
     },
     enabled: open,
@@ -141,8 +159,16 @@ export function PaymentMethodCollectionModal({
   }, [setupIntent?.publishableKey]);
 
   const handleSuccess = () => {
-    // Invalidate payment methods cache
-    queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'payment-methods'] });
+    // Invalidate payment methods cache (only for authenticated admin flow)
+    if (!paymentToken) {
+      queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'payment-methods'] });
+    }
+    
+    // Call the custom onSuccess handler if provided (for public flow)
+    if (onSuccessProp) {
+      onSuccessProp();
+    }
+    
     onClose();
   };
 

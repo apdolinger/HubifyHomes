@@ -37,6 +37,7 @@ import {
   Search,
   RefreshCw,
   Link,
+  Link2,
   ChevronLeft,
   ChevronRight,
   Star,
@@ -51,7 +52,7 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
 import { AlertBanner, AlertBannerRef } from "@/components/AlertBanner";
 import { EmailCompositionModal } from "@/components/EmailCompositionModal";
-import { PaymentMethodCollectionModal } from "@/components/PaymentMethodCollectionModal";
+import PaymentMethodCollectionModal from "@/components/PaymentMethodCollectionModal";
 import type { EmailHistory } from "@shared/schema";
 import { format } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -595,14 +596,42 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
                 <DollarSign className="w-5 h-5 mr-2" />
                 Payment Methods
               </CardTitle>
-              <Button
-                size="sm"
-                onClick={() => setIsAddingPaymentMethod(true)}
-                data-testid="button-add-payment-method"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Payment Method
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (!clientId) return;
+                    apiRequest(`/api/clients/${clientId}/payment-link`, {
+                      method: 'POST',
+                    }).then((data: any) => {
+                      navigator.clipboard.writeText(data.paymentUrl);
+                      toast({
+                        title: "Payment link copied",
+                        description: "Share this link with the client to collect payment information securely.",
+                      });
+                    }).catch((error) => {
+                      toast({
+                        title: "Failed to generate link",
+                        description: error.message,
+                        variant: "destructive",
+                      });
+                    });
+                  }}
+                  data-testid="button-generate-payment-link"
+                >
+                  <Link2 className="w-4 h-4 mr-2" />
+                  Generate Payment Link
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setIsAddingPaymentMethod(true)}
+                  data-testid="button-add-payment-method"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Payment Method
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>

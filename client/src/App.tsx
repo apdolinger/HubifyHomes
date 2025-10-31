@@ -42,6 +42,7 @@ import ImportManager from "@/pages/ImportManager";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfService from "@/pages/TermsOfService";
 import Billing from "@/pages/Billing";
+import PaymentCollectionPage from "@/pages/PaymentCollectionPage";
 import Navigation from "@/components/Navigation";
 import QuickSearchModal from "@/components/QuickSearchModal";
 import QuickAddTaskModal from "@/components/QuickAddTaskModal";
@@ -75,6 +76,7 @@ function Router() {
       <Route path="/privacy" component={PrivacyPolicy} />
       <Route path="/terms" component={TermsOfService} />
       <Route path="/super-admin/login" component={SuperAdminLogin} />
+      <Route path="/payment-collection/:token" component={PaymentCollectionPage} />
       
       {isLoading ? (
         <Route>

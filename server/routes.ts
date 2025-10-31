@@ -10078,7 +10078,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get the contact to verify it belongs to this org
       const contact = await storage.getContact(contactId);
+      console.log('[DEBUG] GET /api/contacts/:contactId/client - contactId:', contactId, 'contact:', contact, 'userOrgId:', user.orgId);
       if (!contact || contact.orgId !== user.orgId) {
+        console.log('[DEBUG] Contact not found or orgId mismatch. contact.orgId:', contact?.orgId, 'user.orgId:', user.orgId);
         return res.status(404).json({ message: "Contact not found" });
       }
 
@@ -10104,6 +10106,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching client for contact:", error);
       res.status(500).json({ message: "Failed to fetch client record" });
+    }
+  });
+
+  // Payment collection token endpoints
+  app.post("/api/clients/:clientId/payment-link", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      // RBAC: Only admins and supervisors can generate payment links
+      const userRole = (user as any)?.claims?.role ?? (user as any)?.role;
+      if (userRole !== 'admin' && userRole !== 'supervisor') {
+        return res.status(403).json({ message: "Access denied. Admin or supervisor role required." });
+      }
+
+      const { clientId } = req.params;
+      const client = await storage.getClient(clientId);
+      
+      if (!client || client.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      // Create payment collection token (expires in 72 hours by default)
+      const token = await storage.createPaymentCollectionToken(
+        clientId,
+        user.orgId,
+        user.id,
+        72
+      );
+
+      // Generate the full URL for the client
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const paymentUrl = `${baseUrl}/payment-collection/${token.token}`;
+
+      res.json({
+        token: token.token,
+        paymentUrl,
+        expiresAt: token.expiresAt,
+      });
+    } catch (error) {
+      console.error("Error creating payment link:", error);
+      res.status(500).json({ message: "Failed to create payment link" });
+    }
+  });
+
+  // Public endpoint to validate payment collection token and get client info
+  app.get("/api/payment-collection/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      
+      const collectionToken = await storage.getPaymentCollectionToken(token);
+      
+      if (!collectionToken) {
+        return res.status(404).json({ message: "Invalid or expired payment link" });
+      }
+
+      // Check if token is expired
+      if (new Date() > collectionToken.expiresAt) {
+        return res.status(410).json({ message: "This payment link has expired" });
+      }
+
+      // Check if token has been used
+      if (collectionToken.isUsed) {
+        return res.status(410).json({ message: "This payment link has already been used" });
+      }
+
+      // Get client information
+      const client = await storage.getClient(collectionToken.clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      // Return client info (without sensitive internal data like orgId)
+      res.json({
+        clientId: client.id,
+        firstName: client.firstName,
+        lastName: client.lastName,
+        email: client.email,
+      });
+    } catch (error) {
+      console.error("Error validating payment collection token:", error);
+      res.status(500).json({ message: "Failed to validate payment link" });
+    }
+  });
+
+  // Public endpoint to create setup intent using payment collection token
+  app.post("/api/payment-collection/:token/setup-intent", async (req, res) => {
+    try {
+      const { token } = req.params;
+      
+      const collectionToken = await storage.getPaymentCollectionToken(token);
+      
+      if (!collectionToken) {
+        return res.status(404).json({ message: "Invalid or expired payment link" });
+      }
+
+      // Check if token is expired
+      if (new Date() > collectionToken.expiresAt) {
+        return res.status(410).json({ message: "This payment link has expired" });
+      }
+
+      // Check if token has been used
+      if (collectionToken.isUsed) {
+        return res.status(410).json({ message: "This payment link has already been used" });
+      }
+
+      // Get client information
+      const client = await storage.getClient(collectionToken.clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      // Validate payment method types
+      const validatedData = z.object({
+        paymentMethodTypes: z.array(z.enum(['card', 'us_bank_account'])).default(['card', 'us_bank_account'])
+      }).parse({ paymentMethodTypes: req.body.paymentMethodTypes });
+
+      // Create setup intent for the client
+      const setupIntent = await createSetupIntentForClient(
+        client.orgId,
+        client.id,
+        client.email,
+        validatedData.paymentMethodTypes
+      );
+
+      // Mark token as used after successful setup intent creation
+      await storage.markPaymentCollectionTokenUsed(collectionToken.id);
+
+      res.json(setupIntent);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating setup intent via token:", error);
+      res.status(500).json({ message: "Failed to create setup intent" });
     }
   });
 

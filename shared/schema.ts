@@ -371,6 +371,26 @@ export const clientPaymentMethods = pgTable("client_payment_methods", {
   index("client_payment_methods_added_by_idx").on(table.addedByContactId),
 ]);
 
+// Payment collection tokens - Secure one-time links for clients to add payment methods
+export const paymentCollectionTokens = pgTable("payment_collection_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clientId: uuid("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  token: varchar("token").notNull().unique(),
+  
+  // Token metadata
+  createdByUserId: varchar("created_by_user_id").references(() => users.id),
+  isUsed: boolean("is_used").notNull().default(false),
+  usedAt: timestamp("used_at"),
+  expiresAt: timestamp("expires_at").notNull(),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("payment_collection_tokens_client_idx").on(table.clientId),
+  index("payment_collection_tokens_token_idx").on(table.token),
+  index("payment_collection_tokens_expires_idx").on(table.expiresAt),
+]);
+
 // Client billing preferences - Auto-charge settings and policies
 export const clientBillingPrefs = pgTable("client_billing_prefs", {
   clientId: uuid("client_id").primaryKey().references(() => clients.id, { onDelete: "cascade" }),
@@ -2073,6 +2093,16 @@ export const insertMessageMentionSchema = createInsertSchema(messageMentions).om
   createdAt: true,
   isRead: true,
 });
+
+export const insertPaymentCollectionTokenSchema = createInsertSchema(paymentCollectionTokens).omit({
+  id: true,
+  createdAt: true,
+  isUsed: true,
+  usedAt: true,
+});
+
+export type InsertPaymentCollectionToken = z.infer<typeof insertPaymentCollectionTokenSchema>;
+export type PaymentCollectionToken = typeof paymentCollectionTokens.$inferSelect;
 
 export const insertUserNotificationPreferencesSchema = createInsertSchema(userNotificationPreferences).omit({
   createdAt: true,
