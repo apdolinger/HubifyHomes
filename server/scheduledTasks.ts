@@ -138,10 +138,13 @@ export function startScheduledTasks() {
   
   log('[CRON] Task archiving scheduled - will run daily at 4am');
 
-  // Run billing automation daily at 3am
-  cron.schedule('0 3 * * *', async () => {
-    try {
-      log('[CRON] Starting automated billing invoice generation...');
+  // Run billing automation daily at 3am (only if BILLING_AUTOMATION_ENABLED is true)
+  const billingAutomationEnabled = process.env.BILLING_AUTOMATION_ENABLED === 'true';
+  
+  if (billingAutomationEnabled) {
+    cron.schedule('0 3 * * *', async () => {
+      try {
+        log('[CRON] Starting automated billing invoice generation...');
       
       const today = new Date();
       const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
@@ -364,12 +367,15 @@ export function startScheduledTasks() {
                 log(`[CRON] Warning: Client ${client.firstName} ${client.lastName} has no email address, invoice created but not sent`);
               }
               
-              // Auto-charge if enabled
-              try {
-                // Get client billing preferences to check if auto-charge is enabled
-                const billingPrefs = await storage.getClientBillingPrefs(client.id);
-                
-                if (billingPrefs && billingPrefs.autoChargeInvoices) {
+              // Auto-charge if enabled (and billing automation is enabled)
+              const billingAutomationEnabled = process.env.BILLING_AUTOMATION_ENABLED === 'true';
+              
+              if (billingAutomationEnabled) {
+                try {
+                  // Get client billing preferences to check if auto-charge is enabled
+                  const billingPrefs = await storage.getClientBillingPrefs(client.id);
+                  
+                  if (billingPrefs && billingPrefs.autoChargeInvoices) {
                   // Get client's default payment method
                   const paymentMethods = await storage.getClientPaymentMethods(client.id);
                   const defaultPaymentMethod = paymentMethods.find(pm => pm.isDefault);
@@ -390,10 +396,13 @@ export function startScheduledTasks() {
                   } else {
                     log(`[CRON] Auto-charge skipped for invoice ${invoice.invoiceNumber}: No default payment method found for client ${client.firstName} ${client.lastName}`);
                   }
+                  }
+                } catch (error) {
+                  log(`[CRON] Error auto-charging invoice ${invoice.invoiceNumber}: ${error}`);
+                  // Don't fail the entire billing automation if one charge fails
                 }
-              } catch (error) {
-                log(`[CRON] Error auto-charging invoice ${invoice.invoiceNumber}: ${error}`);
-                // Don't fail the entire billing automation if one charge fails
+              } else {
+                log(`[CRON] Auto-charge disabled globally (BILLING_AUTOMATION_ENABLED=${process.env.BILLING_AUTOMATION_ENABLED})`);
               }
             } catch (error) {
               log(`[CRON] Error processing client ${client.id}: ${error}`);
@@ -408,9 +417,12 @@ export function startScheduledTasks() {
     } catch (error) {
       log(`[CRON] Error in scheduled billing automation: ${error}`);
     }
-  });
-  
-  log('[CRON] Billing automation scheduled - will run daily at 3am');
+    });
+    
+    log('[CRON] Billing automation scheduled - will run daily at 3am');
+  } else {
+    log('[CRON] Billing automation DISABLED (BILLING_AUTOMATION_ENABLED not set to "true")');
+  }
   
   // Process scheduled emails every 5 minutes
   cron.schedule('*/5 * * * *', async () => {
