@@ -6962,6 +6962,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get organization invoice template settings
+  app.get("/api/organizations/:orgId/invoice-template", isAuthenticated, async (req, res) => {
+    try {
+      const orgId = req.params.orgId;
+      
+      // Verify user belongs to org
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const org = await storage.getOrg(orgId);
+      
+      if (!org) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+
+      res.json({
+        invoiceTemplateId: org.invoiceTemplateId || 'modern',
+        invoiceTemplatePrefs: org.invoiceTemplatePrefs || {},
+      });
+    } catch (error) {
+      console.error("Error fetching invoice template:", error);
+      res.status(500).json({ message: "Failed to fetch invoice template" });
+    }
+  });
+
+  // Update organization invoice template
+  app.patch("/api/organizations/:orgId/invoice-template", isAuthenticated, async (req, res) => {
+    try {
+      const orgId = req.params.orgId;
+      
+      // Verify user belongs to org and is admin/supervisor
+      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const userRole = (req.user as any)?.claims?.role ?? (req.user as any)?.role;
+      if (userRole !== 'admin' && userRole !== 'supervisor') {
+        return res.status(403).json({ message: "Only admins and supervisors can update invoice templates" });
+      }
+      
+      const org = await storage.getOrg(orgId);
+      
+      if (!org) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+
+      const { invoiceTemplateId, invoiceTemplatePrefs } = req.body;
+      
+      // Validate template ID
+      const validTemplates = ['modern', 'minimal', 'classic', 'compact', 'bold'];
+      if (invoiceTemplateId && !validTemplates.includes(invoiceTemplateId)) {
+        return res.status(400).json({ message: "Invalid invoice template ID" });
+      }
+      
+      // Update organization
+      const updatedOrg = await storage.updateOrg(orgId, {
+        invoiceTemplateId: invoiceTemplateId || org.invoiceTemplateId,
+        invoiceTemplatePrefs: invoiceTemplatePrefs || org.invoiceTemplatePrefs,
+      });
+
+      res.json({
+        invoiceTemplateId: updatedOrg.invoiceTemplateId,
+        invoiceTemplatePrefs: updatedOrg.invoiceTemplatePrefs,
+      });
+    } catch (error) {
+      console.error("Error updating invoice template:", error);
+      res.status(500).json({ message: "Failed to update invoice template" });
+    }
+  });
+
   app.get("/api/orgs/:orgId/subscription", isAuthenticated, async (req, res) => {
     try {
       const orgId = req.params.orgId;
@@ -10908,8 +10979,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .where(storage.eq(storage.billingSubmissions.id, id));
 
-      // Step 3: Generate PDF
-      const pdfBuffer = await generateInvoicePDF(invoice, client, org);
+      // Step 3: Generate PDF with organization's selected template
+      const { generateInvoicePDFWithTemplate } = await import('./invoiceUtils.js');
+      const pdfBuffer = await generateInvoicePDFWithTemplate(invoice, client, org, org.invoiceTemplateId || 'modern');
       
       // Store PDF in object storage
       const pdfKey = `invoices/org/${org.id}/clients/${client.id}/${invoice.id}.pdf`;
@@ -11124,9 +11196,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastInvoiceDate: new Date()
       });
 
-      // Step 3: Generate PDF and send email
+      // Step 3: Generate PDF and send email with organization's selected template
       try {
-        const pdfBuffer = await generateInvoicePDF(invoice, client, org);
+        const { generateInvoicePDFWithTemplate } = await import('./invoiceUtils.js');
+        const pdfBuffer = await generateInvoicePDFWithTemplate(invoice, client, org, org.invoiceTemplateId || 'modern');
 
         // Store PDF in object storage
         const pdfKey = `invoices/org/${org.id}/clients/${client.id}/${invoice.id}.pdf`;

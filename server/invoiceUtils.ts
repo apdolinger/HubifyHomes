@@ -1,5 +1,6 @@
 import PDFDocument from "pdfkit";
 import type { Response } from "express";
+import { getInvoiceTemplate } from './invoiceTemplates.js';
 
 interface InvoiceLineItem {
   description: string;
@@ -1057,6 +1058,303 @@ export async function generateInvoicePDF(invoice: any, client: any, org: any): P
          );
       
       // Finalize the PDF
+      doc.end();
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+// Template-aware PDF generation function
+export async function generateInvoicePDFWithTemplate(
+  invoice: any, 
+  client: any, 
+  org: any,
+  templateId: string = 'modern'
+): Promise<Buffer> {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const template = getInvoiceTemplate(templateId);
+      const primaryColor = org.branding?.primaryColor || '#667eea';
+      const secondaryColor = org.branding?.secondaryColor || '#764ba2';
+      
+      const doc = new PDFDocument({ 
+        margin: template.spacing.marginY,
+        size: 'LETTER'
+      });
+      
+      const buffers: Buffer[] = [];
+      doc.on('data', buffers.push.bind(buffers));
+      doc.on('end', () => resolve(Buffer.concat(buffers)));
+      doc.on('error', reject);
+      
+      // HEADER SECTION
+      if (template.header.useGradient) {
+        const gradient = doc.linearGradient(0, 0, doc.page.width, 0);
+        gradient.stop(0, primaryColor);
+        gradient.stop(1, secondaryColor);
+        doc.rect(0, 0, doc.page.width, template.header.height).fill(gradient);
+      } else if (templateId === 'classic') {
+        doc.rect(0, 0, doc.page.width, template.header.height).fill('#f8f9fa');
+      }
+      
+      // Logo
+      if (org.branding?.logo) {
+        try {
+          const logoResponse = await fetch(org.branding.logo);
+          if (logoResponse.ok) {
+            const logoBuffer = Buffer.from(await logoResponse.arrayBuffer());
+            let logoX = template.spacing.marginX;
+            
+            if (template.header.logoPosition === 'center') {
+              logoX = (doc.page.width - template.header.logoMaxWidth) / 2;
+            } else if (template.header.logoPosition === 'right') {
+              logoX = doc.page.width - template.header.logoMaxWidth - template.spacing.marginX;
+            }
+            
+            doc.image(logoBuffer, logoX, 30, { 
+              width: template.header.logoMaxWidth,
+              height: template.header.logoMaxHeight,
+              fit: [template.header.logoMaxWidth, template.header.logoMaxHeight]
+            });
+          }
+        } catch (error) {
+          console.error("Error loading logo:", error);
+        }
+      }
+      
+      // Invoice title
+      const titleColor = template.header.titleColor === 'white' ? '#ffffff' : 
+                        template.header.titleColor === 'dark' ? '#000000' : primaryColor;
+      
+      let titleX = doc.page.width - 200;
+      let titleAlign: 'left' | 'right' | 'center' = 'right';
+      
+      if (template.header.titlePosition === 'left') {
+        titleX = template.spacing.marginX;
+        titleAlign = 'left';
+      } else if (template.header.titlePosition === 'center') {
+        titleX = template.spacing.marginX;
+        titleAlign = 'center';
+      }
+      
+      doc.fontSize(template.header.titleFontSize)
+         .fillColor(titleColor)
+         .text('INVOICE', titleX, 45, { 
+           align: titleAlign,
+           width: template.header.titlePosition === 'center' ? doc.page.width - 2 * template.spacing.marginX : 150
+         });
+      
+      doc.fontSize(template.header.numberFontSize)
+         .text(`#${invoice.invoiceNumber}`, titleX, 75, {
+           align: titleAlign,
+           width: template.header.titlePosition === 'center' ? doc.page.width - 2 * template.spacing.marginX : 150
+         });
+      
+      // DETAILS SECTION
+      doc.y = template.header.height + template.spacing.sectionGap;
+      
+      if (template.details.layout === 'side-by-side') {
+        const leftColumn = template.spacing.marginX;
+        const rightColumn = doc.page.width / 2 + 25;
+        const detailsY = doc.y;
+        
+        // FROM section
+        doc.fontSize(template.details.labelFontSize)
+           .fillColor(template.details.labelColor)
+           .text('FROM:', leftColumn, detailsY);
+        
+        doc.fontSize(template.details.valueFontSize)
+           .fillColor(template.details.valueColor)
+           .text(org.name, leftColumn, detailsY + 15, { width: 220 });
+        
+        let orgY = detailsY + 30;
+        if (org.address) {
+          doc.fontSize(template.details.labelFontSize)
+             .fillColor(template.details.labelColor)
+             .text(org.address, leftColumn, orgY, { width: 220 });
+          orgY += template.details.spacing;
+        }
+        if (org.email) {
+          doc.text(org.email, leftColumn, orgY, { width: 220 });
+          orgY += 15;
+        }
+        if (org.phone) {
+          doc.text(org.phone, leftColumn, orgY, { width: 220 });
+        }
+        
+        // BILL TO section
+        doc.fontSize(template.details.labelFontSize)
+           .fillColor(template.details.labelColor)
+           .text('BILL TO:', rightColumn, detailsY);
+        
+        const clientName = `${client.firstName || ''} ${client.lastName || ''}`.trim();
+        doc.fontSize(template.details.valueFontSize)
+           .fillColor(template.details.valueColor)
+           .text(clientName, rightColumn, detailsY + 15, { width: 220 });
+        
+        let clientY = detailsY + 30;
+        if (client.address) {
+          doc.fontSize(template.details.labelFontSize)
+             .fillColor(template.details.labelColor)
+             .text(client.address, rightColumn, clientY, { width: 220 });
+          clientY += template.details.spacing;
+        }
+        if (client.email) {
+          doc.text(client.email, rightColumn, clientY, { width: 220 });
+          clientY += 15;
+        }
+        if (client.phone) {
+          doc.text(client.phone, rightColumn, clientY, { width: 220 });
+        }
+        
+        doc.y = Math.max(orgY, clientY) + template.spacing.sectionGap;
+      } else {
+        // Stacked layout
+        const centerX = template.spacing.marginX;
+        doc.fontSize(template.details.labelFontSize)
+           .fillColor(template.details.labelColor)
+           .text('FROM:', centerX, doc.y);
+        
+        doc.fontSize(template.details.valueFontSize)
+           .fillColor(template.details.valueColor)
+           .text(org.name, centerX, doc.y + 15, { width: doc.page.width - 2 * template.spacing.marginX });
+        
+        doc.y += template.details.spacing + 30;
+        
+        doc.fontSize(template.details.labelFontSize)
+           .fillColor(template.details.labelColor)
+           .text('BILL TO:', centerX, doc.y);
+        
+        const clientName = `${client.firstName || ''} ${client.lastName || ''}`.trim();
+        doc.fontSize(template.details.valueFontSize)
+           .fillColor(template.details.valueColor)
+           .text(clientName, centerX, doc.y + 15, { width: doc.page.width - 2 * template.spacing.marginX });
+        
+        doc.y += template.spacing.sectionGap + 20;
+      }
+      
+      // Invoice dates
+      const datesY = doc.y;
+      doc.fontSize(template.details.labelFontSize)
+         .fillColor(template.details.labelColor)
+         .text('Invoice Date:', template.spacing.marginX, datesY)
+         .fillColor(template.details.valueColor)
+         .text(new Date(invoice.issuedAt).toLocaleDateString(), template.spacing.marginX + 100, datesY);
+      
+      if (invoice.dueDate) {
+        doc.fillColor(template.details.labelColor)
+           .text('Due Date:', template.spacing.marginX, datesY + 20)
+           .fillColor(template.details.valueColor)
+           .text(new Date(invoice.dueDate).toLocaleDateString(), template.spacing.marginX + 100, datesY + 20);
+      }
+      
+      doc.y = datesY + 60;
+      
+      // TABLE SECTION
+      const tableTop = doc.y;
+      const descriptionX = template.spacing.marginX;
+      const quantityX = doc.page.width - 300;
+      const priceX = doc.page.width - 200;
+      const totalX = doc.page.width - 100;
+      
+      // Table header
+      const headerBg = template.table.headerBgColor === 'primary' ? primaryColor :
+                      template.table.headerBgColor === 'dark' ? '#333333' : '#f0f0f0';
+      const headerText = template.table.headerTextColor === 'white' ? '#ffffff' : '#333333';
+      
+      doc.fontSize(template.table.fontSize)
+         .fillColor(headerText)
+         .rect(template.spacing.marginX, tableTop, doc.page.width - 2 * template.spacing.marginX, 25)
+         .fill(headerBg);
+      
+      doc.fillColor(headerText)
+         .text('DESCRIPTION', descriptionX + template.table.cellPadding, tableTop + 8, { width: 200 })
+         .text('QTY', quantityX, tableTop + 8, { width: 50, align: 'right' })
+         .text('PRICE', priceX, tableTop + 8, { width: 80, align: 'right' })
+         .text('TOTAL', totalX, tableTop + 8, { width: 80, align: 'right' });
+      
+      // Table rows
+      let itemY = tableTop + 35;
+      doc.fillColor('#000000');
+      
+      const lineItems = invoice.lineItems || [];
+      for (let i = 0; i < lineItems.length; i++) {
+        const item = lineItems[i];
+        
+        if (itemY > 700) {
+          doc.addPage();
+          itemY = 50;
+        }
+        
+        if (template.table.alternatingRows && i % 2 === 1) {
+          doc.rect(template.spacing.marginX, itemY - 5, doc.page.width - 2 * template.spacing.marginX, 30)
+             .fill(template.table.alternateRowColor);
+        }
+        
+        doc.fontSize(template.table.fontSize)
+           .fillColor('#000000')
+           .text(item.description, descriptionX, itemY, { width: quantityX - descriptionX - 20 })
+           .text(item.quantity.toString(), quantityX, itemY, { width: 50, align: 'right' })
+           .text(formatCurrency(item.unitPrice, invoice.currency || 'usd'), priceX, itemY, { width: 80, align: 'right' })
+           .text(formatCurrency(item.total, invoice.currency || 'usd'), totalX, itemY, { width: 80, align: 'right' });
+        
+        if (template.table.rowBorders) {
+          doc.strokeColor('#e0e0e0')
+             .lineWidth(0.5)
+             .moveTo(template.spacing.marginX, itemY + 25)
+             .lineTo(doc.page.width - template.spacing.marginX, itemY + 25)
+             .stroke();
+        }
+        
+        itemY += 30;
+      }
+      
+      // TOTALS SECTION
+      const totalsX = template.totals.position === 'full-width' ? template.spacing.marginX : doc.page.width - 250;
+      let totalsY = itemY + template.spacing.sectionGap;
+      
+      if (template.totals.boxed && template.totals.boxColor) {
+        const boxWidth = template.totals.position === 'full-width' ? doc.page.width - 2 * template.spacing.marginX : 200;
+        doc.rect(totalsX, totalsY - 10, boxWidth, 100)
+           .fill(template.totals.boxColor);
+      }
+      
+      doc.fontSize(template.totals.subtotalFontSize)
+         .fillColor(template.totals.labelColor)
+         .text('Subtotal:', totalsX, totalsY)
+         .fillColor(template.totals.valueColor)
+         .text(formatCurrency(invoice.amountCents, invoice.currency || 'usd'), totalsX + 100, totalsY, { 
+           align: 'right',
+           width: 100
+         });
+      
+      totalsY += 25;
+      
+      doc.fontSize(template.totals.totalFontSize)
+         .fillColor('#000000')
+         .font('Helvetica-Bold')
+         .text('Total:', totalsX, totalsY)
+         .text(formatCurrency(invoice.amountCents, invoice.currency || 'usd'), totalsX + 100, totalsY, { 
+           align: 'right',
+           width: 100
+         });
+      
+      // Footer
+      const footerY = doc.page.height - 50;
+      doc.fontSize(8)
+         .font('Helvetica')
+         .fillColor('#999999')
+         .text(
+           `Thank you for your business! | ${org.name}`,
+           template.spacing.marginX,
+           footerY,
+           { 
+             align: 'center',
+             width: doc.page.width - 2 * template.spacing.marginX
+           }
+         );
+      
       doc.end();
     } catch (error) {
       reject(error);

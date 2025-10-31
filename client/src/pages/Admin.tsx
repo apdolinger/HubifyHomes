@@ -240,6 +240,132 @@ function SupplySettingsManager({ orgId }: { orgId: string }) {
   );
 }
 
+// Invoice Template Selector Component
+function InvoiceTemplateSelector({ orgId }: { orgId: string }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("modern");
+
+  const templates = [
+    {
+      id: "modern",
+      name: "Modern",
+      description: "Clean design with gradient header and side-by-side layout. Professional and contemporary.",
+      icon: "✨",
+    },
+    {
+      id: "minimal",
+      name: "Minimal",
+      description: "Ultra-clean design with minimal colors and maximum white space. Simple and elegant.",
+      icon: "🎨",
+    },
+    {
+      id: "classic",
+      name: "Classic",
+      description: "Traditional invoice layout with borders and structured sections. Timeless and formal.",
+      icon: "📄",
+    },
+    {
+      id: "compact",
+      name: "Compact",
+      description: "Space-efficient layout perfect for detailed invoices. Maximum information density.",
+      icon: "📋",
+    },
+    {
+      id: "bold",
+      name: "Bold",
+      description: "Eye-catching design with strong colors and large typography. Makes a statement.",
+      icon: "💥",
+    },
+  ];
+
+  const { data: templateSettings, isLoading } = useQuery({
+    queryKey: [`/api/organizations/${orgId}/invoice-template`],
+    enabled: !!orgId,
+  });
+
+  useEffect(() => {
+    if (templateSettings?.invoiceTemplateId) {
+      setSelectedTemplate(templateSettings.invoiceTemplateId);
+    }
+  }, [templateSettings]);
+
+  const updateMutation = useMutation({
+    mutationFn: async (templateId: string) => {
+      return apiRequest("PATCH", `/api/organizations/${orgId}/invoice-template`, {
+        invoiceTemplateId: templateId,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/organizations/${orgId}/invoice-template`] });
+      toast({
+        title: "Template updated",
+        description: "Invoice template has been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update template",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleTemplateSelect = (templateId: string) => {
+    setSelectedTemplate(templateId);
+    updateMutation.mutate(templateId);
+  };
+
+  if (isLoading) {
+    return <div className="text-sm text-slate-500">Loading invoice templates...</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h4 className="font-medium mb-2">Invoice Template</h4>
+        <p className="text-sm text-slate-600 mb-4">
+          Choose a professional invoice layout for your organization. All future invoices will use this template.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {templates.map((template) => (
+          <button
+            key={template.id}
+            onClick={() => handleTemplateSelect(template.id)}
+            disabled={updateMutation.isPending}
+            className={`p-4 border-2 rounded-lg text-left transition-all hover:shadow-md ${
+              selectedTemplate === template.id
+                ? "border-blue-500 bg-blue-50"
+                : "border-slate-200 hover:border-slate-300"
+            }`}
+            data-testid={`template-${template.id}`}
+          >
+            <div className="flex items-start justify-between mb-2">
+              <span className="text-2xl">{template.icon}</span>
+              {selectedTemplate === template.id && (
+                <CheckCircle className="w-5 h-5 text-blue-500" />
+              )}
+            </div>
+            <h5 className="font-semibold text-slate-900 mb-1">{template.name}</h5>
+            <p className="text-xs text-slate-600">{template.description}</p>
+          </button>
+        ))}
+      </div>
+
+      {selectedTemplate && (
+        <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <p className="text-sm text-blue-800">
+            <strong>Selected:</strong> {templates.find(t => t.id === selectedTemplate)?.name} template
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Billing Settings Manager Component
 function BillingSettingsManager({ orgId }: { orgId: string }) {
   const { toast } = useToast();
@@ -298,7 +424,8 @@ function BillingSettingsManager({ orgId }: { orgId: string }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Default Hourly Rate Section */}
       <div>
         <h4 className="font-medium mb-2">Default Hourly Rate</h4>
         <p className="text-sm text-slate-600 mb-4">
@@ -332,6 +459,11 @@ function BillingSettingsManager({ orgId }: { orgId: string }) {
             Current default: ${(org.defaultHourlyRateCents / 100).toFixed(2)}/hour
           </p>
         )}
+      </div>
+      
+      {/* Invoice Template Section */}
+      <div className="pt-6 border-t">
+        <InvoiceTemplateSelector orgId={orgId} />
       </div>
     </div>
   );
