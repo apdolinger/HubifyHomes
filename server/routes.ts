@@ -10078,9 +10078,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get the contact to verify it belongs to this org
       const contact = await storage.getContact(contactId);
-      console.log('[DEBUG] GET /api/contacts/:contactId/client - contactId:', contactId, 'contact:', contact, 'userOrgId:', user.orgId);
       if (!contact || contact.orgId !== user.orgId) {
-        console.log('[DEBUG] Contact not found or orgId mismatch. contact.orgId:', contact?.orgId, 'user.orgId:', user.orgId);
         return res.status(404).json({ message: "Contact not found" });
       }
 

@@ -39,13 +39,20 @@ Preferred communication style: Simple, everyday language.
 - **Email System**: Full-featured email communication system with template management, 11 merge fields, scheduling, and delivery tracking. Templates auto-populate subject and body. All emails tracked in email history with status badges. Automated cron job for scheduled emails. Admin template management.
 - **Admin Customization**: Centralized Customization tab for Custom Fields and Supply Settings. Admin search functionality for notes across all system entities.
 - **Invoice Management**: Three-tier system with object storage, webhook-driven payment tracking, automatic status updates, HTML email notifications, on-demand PDF generation with branding, configurable billing workflows, consolidated invoice batching, and client-level billing schedules. Role-based access control restricts billing features (tab visibility and configuration) to admin and supervisor roles only.
-- **Payment Method Collection (Sprint 1 - Complete)**: Admin-only Stripe integration for collecting client payment methods (cards via Stripe Elements, ACH via Financial Connections). Stores only payment_method_id tokens (PCI-compliant SAQ-A). Features include:
+- **Payment Method Collection**: Complete two-flow Stripe integration for collecting client payment methods (cards via Stripe Elements, ACH via Financial Connections). Stores only payment_method_id tokens (PCI-compliant SAQ-A). Features include:
+  - **Admin-Authenticated Flow**: Admins can add payment methods directly from client profiles via PaymentMethodCollectionModal
+  - **Client Self-Service Flow**: Secure tokenized links allow clients to add payment methods without authentication
+    - Admins generate one-time-use payment collection links (72-hour expiration)
+    - Public endpoint validates tokens and provides unauthenticated payment method addition
+    - Tokens automatically marked as used after successful setup intent creation
+    - No sensitive data (orgId) exposed in public responses
   - Dynamic Stripe initialization using org-specific publishable keys from `org_stripe_connections`
   - Contact-client bridge with lazy client creation via GET `/api/contacts/:contactId/client`
   - SetupIntent flow with webhook handlers (setup_intent.succeeded, payment_method.detached)
   - Default payment method selection and auto-charge preferences
-  - All endpoints enforce admin/supervisor RBAC with Zod validation
+  - All admin endpoints enforce admin/supervisor RBAC with Zod validation
   - Graceful error handling when Stripe is not configured
+  - Payment collection tokens table for secure token management
 - **Forms System**: Multi-tenant forms with complex field types, property-specific assignments, client submissions, and advanced profile matching.
 - **Hubify Portal**: Client-facing portal with role-based access and admin preview mode.
 - **Super Admin Control Panel**: Internal dashboard for platform management, including organizations, users, reports, communication, revenue, feature flags, monitoring, and compliance.
