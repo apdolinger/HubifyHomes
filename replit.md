@@ -21,7 +21,7 @@ Preferred communication style: Simple, everyday language.
 - **Styling**: Tailwind CSS with a custom design system.
 - **State Management**: TanStack React Query.
 - **Forms**: React Hook Form with Zod validation.
-- **Design Decisions**: Modern UI, gradient backgrounds, role-specific cards, responsive layouts, global keyboard shortcuts, and a centralized Support modal. Features customizable tables and stats widgets (column show/hide, drag-to-reorder) with persistence via localStorage. Interactive dashboard-style stats cards. Streamlined client detail page layout.
+- **Design Decisions**: Modern UI, gradient backgrounds, role-specific cards, responsive layouts, global keyboard shortcuts, and a centralized Support modal. Features customizable tables and stats widgets (column show/hide, drag-to-reorder) with persistence via localStorage on Dashboard, Teams page, and TeamMemberProfile pages. Interactive dashboard-style stats cards. Streamlined client detail page layout.
 
 ### Technical Implementations
 - **Backend Runtime**: Node.js with Express.js (TypeScript, ES modules).
