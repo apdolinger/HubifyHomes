@@ -267,7 +267,9 @@ export interface IStorage {
   // Client operations
   getClients(orgId: string): Promise<Client[]>;
   getClient(id: string): Promise<Client | undefined>;
+  getClientByContactId(contactId: number): Promise<Client | undefined>;
   createClient(client: InsertClient): Promise<Client>;
+  createClientForContact(contactId: number, orgId: string, email: string, firstName?: string, lastName?: string): Promise<Client>;
   updateClient(id: string, client: Partial<InsertClient>): Promise<Client>;
   
   // Client payment method operations
@@ -1087,6 +1089,36 @@ export class DatabaseStorage implements IStorage {
 
   async getClient(id: string): Promise<Client | undefined> {
     const [client] = await db.select().from(clients).where(eq(clients.id, id));
+    return client;
+  }
+
+  async getClientByContactId(contactId: number): Promise<Client | undefined> {
+    const [client] = await db
+      .select()
+      .from(clients)
+      .where(eq(clients.contactId, contactId));
+    return client;
+  }
+
+  async createClientForContact(
+    contactId: number,
+    orgId: string,
+    email: string,
+    firstName?: string,
+    lastName?: string
+  ): Promise<Client> {
+    const [client] = await db
+      .insert(clients)
+      .values({
+        contactId,
+        orgId,
+        email,
+        firstName,
+        lastName,
+        isActive: true,
+        billingEnabled: false,
+      })
+      .returning();
     return client;
   }
 
