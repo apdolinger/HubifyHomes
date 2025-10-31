@@ -117,35 +117,43 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
   const [defaultHourlyRate, setDefaultHourlyRate] = useState("");
   const [invoiceDeliveryMethod, setInvoiceDeliveryMethod] = useState("email");
 
-  // Rehydrate state when person or personId changes (critical for preventing wrong data saves)
+  // Fetch client record for this contact (bridge between contacts and clients tables)
+  const { data: clientRecord, isLoading: clientLoading } = useQuery({
+    queryKey: [`/api/contacts/${personId}/client`],
+    enabled: !!personId && person?.type === 'client',
+  });
+
+  const clientId = clientRecord?.id;
+
+  // Rehydrate state from client record when available
   useEffect(() => {
-    if (person) {
-      setBillingEnabled(person.billingEnabled || false);
-      setBillingTypes(person.billingTypes || { recurringCharges: false, hourlyTime: false, taskBased: false });
-      setInvoiceFrequency(person.invoiceFrequency || "monthly");
-      setBillingDay(person.billingDay || null);
-      setBillingWorkflow(person.billingWorkflow || "review");
-      setDefaultHourlyRate(person.defaultHourlyRateCents ? (person.defaultHourlyRateCents / 100).toFixed(2) : "");
-      setInvoiceDeliveryMethod(person.invoiceDeliveryMethod || "email");
+    if (clientRecord) {
+      setBillingEnabled(clientRecord.billingEnabled || false);
+      setBillingTypes(clientRecord.billingTypes || { recurringCharges: false, hourlyTime: false, taskBased: false });
+      setInvoiceFrequency(clientRecord.invoiceFrequency || "monthly");
+      setBillingDay(clientRecord.billingDay || null);
+      setBillingWorkflow(clientRecord.billingWorkflow || "review");
+      setDefaultHourlyRate(clientRecord.defaultHourlyRateCents ? (clientRecord.defaultHourlyRateCents / 100).toFixed(2) : "");
+      setInvoiceDeliveryMethod(clientRecord.invoiceDeliveryMethod || "email");
     }
-  }, [personId, person]);
+  }, [clientRecord]);
 
   // Fetch recurring schedules
   const { data: recurringSchedules, isLoading: schedulesLoading } = useQuery({
-    queryKey: [`/api/clients/${personId}/recurring-schedules`],
-    enabled: !!personId && billingEnabled,
+    queryKey: [`/api/clients/${clientId}/recurring-schedules`],
+    enabled: !!clientId && billingEnabled,
   });
 
   // Fetch client invoices
   const { data: clientInvoices, isLoading: invoicesLoading } = useQuery({
-    queryKey: [`/api/clients/${personId}/invoices`],
-    enabled: !!personId && billingEnabled,
+    queryKey: [`/api/clients/${clientId}/invoices`],
+    enabled: !!clientId && billingEnabled,
   });
 
   // Fetch payment methods
   const { data: paymentMethods, isLoading: paymentMethodsLoading } = useQuery({
-    queryKey: ['/api/clients', personId, 'payment-methods'],
-    enabled: !!personId && billingEnabled,
+    queryKey: ['/api/clients', clientId, 'payment-methods'],
+    enabled: !!clientId && billingEnabled,
   });
 
   // Delete payment method mutation
@@ -154,7 +162,7 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
       return apiRequest("DELETE", `/api/payment-methods/${paymentMethodId}`, null);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/clients', personId, 'payment-methods'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'payment-methods'] });
       toast({
         title: "Payment method removed",
         description: "The payment method has been removed successfully.",
@@ -172,10 +180,11 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
   // Set default payment method mutation
   const setDefaultPaymentMethodMutation = useMutation({
     mutationFn: async (paymentMethodId: string) => {
-      return apiRequest("POST", `/api/clients/${personId}/payment-methods/${paymentMethodId}/set-default`, null);
+      if (!clientId) throw new Error("Client ID not available");
+      return apiRequest("POST", `/api/clients/${clientId}/payment-methods/${paymentMethodId}/set-default`, null);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/clients', personId, 'payment-methods'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'payment-methods'] });
       toast({
         title: "Default payment method updated",
         description: "The default payment method has been set successfully.",
@@ -193,10 +202,11 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
   // Update billing settings mutation
   const updateBillingMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest("PATCH", `/api/contacts/${personId}`, data);
+      if (!clientId) throw new Error("Client ID not available");
+      return apiRequest("PATCH", `/api/clients/${clientId}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/contacts/${personId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/contacts/${personId}/client`] });
       toast({
         title: "Billing settings updated",
         description: "Billing configuration has been saved successfully.",
@@ -251,13 +261,15 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
   };
 
   const handleCancelEdit = () => {
-    setBillingEnabled(person?.billingEnabled || false);
-    setBillingTypes(person?.billingTypes || { recurringCharges: false, hourlyTime: false, taskBased: false });
-    setInvoiceFrequency(person?.invoiceFrequency || "monthly");
-    setBillingDay(person?.billingDay || null);
-    setBillingWorkflow(person?.billingWorkflow || "review");
-    setDefaultHourlyRate(person?.defaultHourlyRateCents ? (person.defaultHourlyRateCents / 100).toFixed(2) : "");
-    setInvoiceDeliveryMethod(person?.invoiceDeliveryMethod || "email");
+    if (clientRecord) {
+      setBillingEnabled(clientRecord.billingEnabled || false);
+      setBillingTypes(clientRecord.billingTypes || { recurringCharges: false, hourlyTime: false, taskBased: false });
+      setInvoiceFrequency(clientRecord.invoiceFrequency || "monthly");
+      setBillingDay(clientRecord.billingDay || null);
+      setBillingWorkflow(clientRecord.billingWorkflow || "review");
+      setDefaultHourlyRate(clientRecord.defaultHourlyRateCents ? (clientRecord.defaultHourlyRateCents / 100).toFixed(2) : "");
+      setInvoiceDeliveryMethod(clientRecord.invoiceDeliveryMethod || "email");
+    }
   };
 
   return (
@@ -700,12 +712,14 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
       )}
 
       {/* Payment Method Collection Modal */}
-      <PaymentMethodCollectionModal
-        open={isAddingPaymentMethod}
-        onClose={() => setIsAddingPaymentMethod(false)}
-        clientId={personId}
-        clientName={`${person?.firstName || ''} ${person?.lastName || ''}`.trim() || 'Client'}
-      />
+      {clientId && (
+        <PaymentMethodCollectionModal
+          open={isAddingPaymentMethod}
+          onClose={() => setIsAddingPaymentMethod(false)}
+          clientId={clientId}
+          clientName={`${person?.firstName || ''} ${person?.lastName || ''}`.trim() || 'Client'}
+        />
+      )}
     </div>
   );
 }

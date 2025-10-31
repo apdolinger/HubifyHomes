@@ -10034,6 +10034,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update client billing settings
+  app.patch("/api/clients/:clientId", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      // RBAC: Only admins and supervisors can update client billing settings
+      const userRole = (user as any)?.claims?.role ?? (user as any)?.role;
+      if (userRole !== 'admin' && userRole !== 'supervisor') {
+        return res.status(403).json({ message: "Access denied. Admin or supervisor role required." });
+      }
+
+      const { clientId } = req.params;
+      const client = await storage.getClient(clientId);
+      
+      if (!client || client.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      const updated = await storage.updateClient(clientId, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating client:", error);
+      res.status(500).json({ message: "Failed to update client" });
+    }
+  });
+
   // Contact-to-Client bridge endpoint
   app.get("/api/contacts/:contactId/client", isAuthenticated, async (req: any, res) => {
     try {
