@@ -601,7 +601,14 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
                   size="sm"
                   variant="outline"
                   onClick={async () => {
-                    if (!clientId) return;
+                    if (!clientId) {
+                      toast({
+                        title: "Unable to generate link",
+                        description: "Client record not found. Please ensure billing is properly configured.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
                     try {
                       const response = await apiRequest('POST', `/api/clients/${clientId}/payment-link`);
                       const data = await response.json();
