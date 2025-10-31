@@ -2608,6 +2608,111 @@ export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit
 export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
 export type EmailTemplate = typeof emailTemplates.$inferSelect;
 
+// Organization Email Templates - For client communication
+export const orgEmailTemplates = pgTable("org_email_templates", {
+  id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  name: varchar("name").notNull(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  
+  // Available merge fields that can be used in this template
+  availableMergeFields: jsonb("available_merge_fields").$type<string[]>().default([
+    "firstName", "lastName", "fullName", "email", "phone",
+    "propertyName", "propertyAddress", "propertyCity",
+    "senderName", "senderEmail", "organizationName"
+  ]),
+  
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertOrgEmailTemplateSchema = createInsertSchema(orgEmailTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertOrgEmailTemplate = z.infer<typeof insertOrgEmailTemplateSchema>;
+export type OrgEmailTemplate = typeof orgEmailTemplates.$inferSelect;
+
+// Email History - Track all sent emails
+export const emailHistory = pgTable("email_history", {
+  id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  
+  // Sender (user who sent the email)
+  senderId: text("sender_id").notNull(), // Replit Auth sub
+  senderName: varchar("sender_name").notNull(),
+  senderEmail: varchar("sender_email").notNull(),
+  
+  // Recipient (contact)
+  recipientContactId: integer("recipient_contact_id").references(() => contacts.id),
+  recipientEmail: varchar("recipient_email").notNull(),
+  recipientName: varchar("recipient_name"),
+  
+  // Email content
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  
+  // Template used (if any)
+  templateId: integer("template_id").references(() => orgEmailTemplates.id),
+  
+  // Status tracking
+  status: varchar("status").$type<"sent"|"failed"|"scheduled">().notNull().default("sent"),
+  scheduledFor: timestamp("scheduled_for"),
+  sentAt: timestamp("sent_at"),
+  errorMessage: text("error_message"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertEmailHistorySchema = createInsertSchema(emailHistory).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertEmailHistory = z.infer<typeof insertEmailHistorySchema>;
+export type EmailHistory = typeof emailHistory.$inferSelect;
+
+// Scheduled Emails - Queue for emails to be sent later
+export const scheduledEmails = pgTable("scheduled_emails", {
+  id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  
+  // Sender
+  senderId: text("sender_id").notNull(),
+  senderName: varchar("sender_name").notNull(),
+  senderEmail: varchar("sender_email").notNull(),
+  
+  // Recipient
+  recipientContactId: integer("recipient_contact_id").references(() => contacts.id),
+  recipientEmail: varchar("recipient_email").notNull(),
+  recipientName: varchar("recipient_name"),
+  
+  // Email content
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  
+  // Template used (if any)
+  templateId: integer("template_id").references(() => orgEmailTemplates.id),
+  
+  // Scheduling
+  scheduledFor: timestamp("scheduled_for").notNull(),
+  status: varchar("status").$type<"pending"|"sent"|"failed"|"cancelled">().notNull().default("pending"),
+  
+  sentAt: timestamp("sent_at"),
+  errorMessage: text("error_message"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertScheduledEmailSchema = createInsertSchema(scheduledEmails).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertScheduledEmail = z.infer<typeof insertScheduledEmailSchema>;
+export type ScheduledEmail = typeof scheduledEmails.$inferSelect;
+
 // Custom Fields insert schema - fieldKey is provided by server but will be regenerated to avoid collisions
 export const insertCustomFieldSchema = createInsertSchema(customFields).omit({
   id: true,
