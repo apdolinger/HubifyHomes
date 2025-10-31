@@ -255,7 +255,6 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
                 type="checkbox"
                 checked={billingEnabled}
                 onChange={(e) => setBillingEnabled(e.target.checked)}
-                disabled={!isEditingBilling}
                 className="sr-only peer"
                 data-testid="input-billing-enabled"
               />
@@ -275,7 +274,6 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
                       id="recurring-charges"
                       checked={billingTypes.recurringCharges}
                       onChange={(e) => setBillingTypes({ ...billingTypes, recurringCharges: e.target.checked })}
-                      disabled={!isEditingBilling}
                       className="w-4 h-4"
                       data-testid="checkbox-recurring-charges"
                     />
@@ -289,7 +287,6 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
                       id="hourly-time"
                       checked={billingTypes.hourlyTime}
                       onChange={(e) => setBillingTypes({ ...billingTypes, hourlyTime: e.target.checked })}
-                      disabled={!isEditingBilling}
                       className="w-4 h-4"
                       data-testid="checkbox-hourly-time"
                     />
@@ -303,7 +300,6 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
                       id="task-based"
                       checked={billingTypes.taskBased}
                       onChange={(e) => setBillingTypes({ ...billingTypes, taskBased: e.target.checked })}
-                      disabled={!isEditingBilling}
                       className="w-4 h-4"
                       data-testid="checkbox-task-based"
                     />
@@ -328,7 +324,6 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
                         setBillingDay(null);
                       }
                     }}
-                    disabled={!isEditingBilling}
                   >
                     <SelectTrigger id="invoice-frequency" data-testid="select-invoice-frequency">
                       <SelectValue />
@@ -348,7 +343,6 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
                       <Select
                         value={billingDay?.toString()}
                         onValueChange={(value) => setBillingDay(parseInt(value))}
-                        disabled={!isEditingBilling}
                       >
                         <SelectTrigger data-testid="select-billing-day-week">
                           <SelectValue placeholder="Select day" />
@@ -375,7 +369,6 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
                       <Select
                         value={billingDay?.toString()}
                         onValueChange={(value) => setBillingDay(parseInt(value))}
-                        disabled={!isEditingBilling}
                       >
                         <SelectTrigger data-testid="select-billing-day-month">
                           <SelectValue placeholder="Select day" />
@@ -416,7 +409,6 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
                       value="auto"
                       checked={billingWorkflow === "auto"}
                       onChange={(e) => setBillingWorkflow(e.target.value)}
-                      disabled={!isEditingBilling}
                       className="w-4 h-4"
                       data-testid="radio-workflow-auto"
                     />
@@ -432,7 +424,6 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
                       value="review"
                       checked={billingWorkflow === "review"}
                       onChange={(e) => setBillingWorkflow(e.target.value)}
-                      disabled={!isEditingBilling}
                       className="w-4 h-4"
                       data-testid="radio-workflow-review"
                     />
@@ -458,7 +449,6 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
                       min="0"
                       value={defaultHourlyRate}
                       onChange={(e) => setDefaultHourlyRate(e.target.value)}
-                      disabled={!isEditingBilling}
                       className="pl-7"
                       placeholder="0.00"
                       data-testid="input-hourly-rate"
@@ -475,7 +465,6 @@ function BillingSettingsTab({ person, personId }: { person: any; personId: strin
                 <Select
                   value={invoiceDeliveryMethod}
                   onValueChange={setInvoiceDeliveryMethod}
-                  disabled={!isEditingBilling}
                 >
                   <SelectTrigger id="delivery-method" data-testid="select-delivery-method">
                     <SelectValue />
@@ -588,7 +577,7 @@ export default function PersonProfile() {
   const personId = params.id;
   
   // Check if user has billing permissions (admin or supervisor)
-  const hasBillingPermissions = user?.role === 'admin' || user?.role === 'supervisor';
+  const hasBillingPermissions = (user as any)?.role === 'admin' || (user as any)?.role === 'supervisor';
   
   // Link property modal state
   const [isLinkPropertyModalOpen, setIsLinkPropertyModalOpen] = useState(false);
