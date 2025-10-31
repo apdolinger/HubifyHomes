@@ -10034,6 +10034,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Contact-to-Client bridge endpoint
+  app.get("/api/contacts/:contactId/client", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user?.claims?.sub || req.user?.id);
+      if (!user?.orgId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const contactId = parseInt(req.params.contactId);
+      if (isNaN(contactId)) {
+        return res.status(400).json({ message: "Invalid contact ID" });
+      }
+
+      // Get the contact to verify it belongs to this org
+      const contact = await storage.getContact(contactId);
+      if (!contact || contact.orgId !== user.orgId) {
+        return res.status(404).json({ message: "Contact not found" });
+      }
+
+      // Try to get existing client record
+      let client = await storage.getClientByContactId(contactId);
+
+      // If no client exists and this is a client-type contact, create one
+      if (!client && contact.type === 'client') {
+        client = await storage.createClientForContact(
+          contactId,
+          user.orgId,
+          contact.email,
+          contact.firstName || undefined,
+          contact.lastName || undefined
+        );
+      }
+
+      if (!client) {
+        return res.status(404).json({ message: "No client record found for this contact" });
+      }
+
+      res.json(client);
+    } catch (error) {
+      console.error("Error fetching client for contact:", error);
+      res.status(500).json({ message: "Failed to fetch client record" });
+    }
+  });
+
   // Client Payment Method endpoints
   app.post("/api/clients/:clientId/setup-intent", isAuthenticated, async (req: any, res) => {
     try {
