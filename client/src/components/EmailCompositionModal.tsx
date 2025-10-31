@@ -234,15 +234,14 @@ export function EmailCompositionModal({
           <div>
             <Label htmlFor="template">Email Template (Optional)</Label>
             <Select
-              value={selectedTemplateId}
+              value={selectedTemplateId || undefined}
               onValueChange={handleTemplateSelect}
               disabled={templatesLoading}
             >
               <SelectTrigger id="template" data-testid="select-email-template">
-                <SelectValue placeholder="Select a template..." />
+                <SelectValue placeholder="Select a template or start blank..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None (Blank Email)</SelectItem>
                 {templates?.map((template) => (
                   <SelectItem key={template.id} value={template.id.toString()}>
                     {template.name}
