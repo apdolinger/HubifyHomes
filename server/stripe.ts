@@ -2,6 +2,24 @@ import Stripe from "stripe";
 import { nanoid } from "nanoid";
 import { storage } from "./storage";
 
+/**
+ * Stripe Configuration
+ * 
+ * Environment-specific setup:
+ * - Test mode: Use keys starting with sk_test_/pk_test_ and test webhook secrets
+ * - Live mode: Use keys starting with sk_live_/pk_live_ and live webhook secrets
+ * 
+ * Required environment variables:
+ * - STRIPE_SECRET_KEY: Master Stripe secret key (test or live)
+ * - STRIPE_WEBHOOK_SECRET: Master webhook secret for subscription events
+ * - STRIPE_ORG_WEBHOOK_SECRET: Organization-level webhook secret (or per-org via STRIPE_ORG_WEBHOOK_SECRET_${orgId})
+ * 
+ * Per-organization Stripe connections are stored in org_stripe_connections table with:
+ * - stripePublishableKey (for frontend)
+ * - stripeSecretKey (for backend, encrypted in production)
+ * - accountType: "direct" (own keys) or "connect" (Stripe Connect)
+ */
+
 // Master Stripe instance for billing organizations (Hubify's Stripe account)
 let masterStripe: Stripe | null = null;
 
