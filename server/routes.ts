@@ -67,6 +67,7 @@ import {
   insertOrgEmailTemplateSchema,
   insertCustomFieldSchema,
   updateCustomFieldSchema,
+  insertManagementNoteSchema,
   type Form,
   contacts,
   properties,
@@ -80,6 +81,7 @@ import {
   ignoredDuplicates,
   duplicateHistory,
   customFields,
+  managementNotes,
   isPremiumPropertyType,
   tierAllowsPremiumProperties
 } from "@shared/schema";
@@ -1963,6 +1965,172 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting out-of-office period:", error);
       res.status(500).json({ message: "Failed to delete out-of-office period" });
+    }
+  });
+
+  // Management notes routes
+  app.get("/api/users/:id/management-notes", isAuthenticated, async (req, res) => {
+    try {
+      const targetUserId = req.params.id;
+      const currentUserId = (req.user as any)?.claims?.sub;
+      const currentUser = await storage.getUser(currentUserId);
+      
+      if (!currentUser) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Get the target user to check supervisor relationship
+      const targetUser = await storage.getUser(targetUserId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Permission check: HR permissions OR admin/supervisor role OR is the user's supervisor
+      const role = currentUser.role;
+      const hasHrPermissions = currentUser.hasHrPermissions;
+      const isSupervisor = targetUser.supervisorId === currentUserId;
+      const isAdminOrSupervisorRole = role === 'admin' || role === 'supervisor';
+      
+      if (!hasHrPermissions && !isAdminOrSupervisorRole && !isSupervisor) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const notes = await storage.getManagementNotes(targetUserId);
+      res.json(notes);
+    } catch (error) {
+      console.error("Error fetching management notes:", error);
+      res.status(500).json({ message: "Failed to fetch management notes" });
+    }
+  });
+
+  app.post("/api/users/:id/management-notes", isAuthenticated, async (req, res) => {
+    try {
+      const targetUserId = req.params.id;
+      const currentUserId = (req.user as any)?.claims?.sub;
+      const currentUser = await storage.getUser(currentUserId);
+      
+      if (!currentUser) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Get the target user to check supervisor relationship
+      const targetUser = await storage.getUser(targetUserId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Permission check: HR permissions OR admin/supervisor role OR is the user's supervisor
+      const role = currentUser.role;
+      const hasHrPermissions = currentUser.hasHrPermissions;
+      const isSupervisor = targetUser.supervisorId === currentUserId;
+      const isAdminOrSupervisorRole = role === 'admin' || role === 'supervisor';
+      
+      if (!hasHrPermissions && !isAdminOrSupervisorRole && !isSupervisor) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      // Validate with insertManagementNoteSchema and set authorId and orgId
+      const validatedData = insertManagementNoteSchema.parse({
+        ...req.body,
+        userId: targetUserId,
+        authorId: currentUserId,
+        orgId: currentUser.orgId,
+      });
+
+      const note = await storage.createManagementNote(validatedData);
+      res.status(201).json(note);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating management note:", error);
+      res.status(500).json({ message: "Failed to create management note" });
+    }
+  });
+
+  app.patch("/api/management-notes/:id", isAuthenticated, async (req, res) => {
+    try {
+      const noteId = parseInt(req.params.id);
+      if (isNaN(noteId)) {
+        return res.status(400).json({ message: 'Invalid ID' });
+      }
+
+      const currentUserId = (req.user as any)?.claims?.sub;
+      const currentUser = await storage.getUser(currentUserId);
+      
+      if (!currentUser) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Validate request body has noteText
+      if (!req.body.noteText || typeof req.body.noteText !== 'string') {
+        return res.status(400).json({ message: "noteText is required" });
+      }
+
+      // Get the note from database to check authorization
+      const noteResult = await db
+        .select()
+        .from(managementNotes)
+        .where(eq(managementNotes.id, noteId))
+        .limit(1);
+      
+      if (!noteResult || noteResult.length === 0) {
+        return res.status(404).json({ message: "Management note not found" });
+      }
+
+      const note = noteResult[0];
+      
+      // Permission check: Must be the original author OR an admin
+      const isAdmin = currentUser.role === 'admin';
+      const isAuthor = note.authorId === currentUserId;
+      
+      if (!isAuthor && !isAdmin) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+
+      const updatedNote = await storage.updateManagementNote(noteId, req.body.noteText);
+      res.json(updatedNote);
+    } catch (error) {
+      console.error("Error updating management note:", error);
+      res.status(500).json({ message: "Failed to update management note" });
+    }
+  });
+
+  app.patch("/api/users/:id/hr-permissions", isAuthenticated, async (req, res) => {
+    try {
+      const targetUserId = req.params.id;
+      const currentUserId = (req.user as any)?.claims?.sub;
+      const currentUser = await storage.getUser(currentUserId);
+      
+      if (!currentUser) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Permission check: Admin only
+      if (currentUser.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Validate request body has hasHrPermissions boolean
+      if (typeof req.body.hasHrPermissions !== 'boolean') {
+        return res.status(400).json({ message: "hasHrPermissions must be a boolean" });
+      }
+
+      // Get the target user
+      const targetUser = await storage.getUser(targetUserId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Update the user's HR permissions
+      const updatedUser = await storage.updateUser(targetUserId, {
+        hasHrPermissions: req.body.hasHrPermissions,
+      });
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating HR permissions:", error);
+      res.status(500).json({ message: "Failed to update HR permissions" });
     }
   });
 

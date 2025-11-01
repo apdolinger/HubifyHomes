@@ -1977,6 +1977,16 @@ export const insertUserSchema = createInsertSchema(users).omit({
   updatedAt: true,
 });
 
+export const insertManagementNoteSchema = createInsertSchema(managementNotes).omit({
+  id: true,
+  isEdited: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type ManagementNote = typeof managementNotes.$inferSelect;
+export type InsertManagementNote = z.infer<typeof insertManagementNoteSchema>;
+
 export const insertOutOfOfficePeriodSchema = createInsertSchema(outOfOfficePeriods).omit({
   id: true,
   createdAt: true,

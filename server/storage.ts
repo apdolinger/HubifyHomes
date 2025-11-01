@@ -3,6 +3,7 @@ import {
   outOfOfficePeriods,
   teams,
   teamMembers,
+  managementNotes,
   orgs,
   orgSubscriptions,
   orgStripeConnections,
@@ -218,6 +219,8 @@ import {
   type InsertCustomField,
   type PaymentCollectionToken,
   type InsertPaymentCollectionToken,
+  type ManagementNote,
+  type InsertManagementNote,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, like, count, sql, inArray, isNotNull } from "drizzle-orm";
@@ -268,6 +271,11 @@ export interface IStorage {
   upsertOrgSubscription(subscription: InsertOrgSubscription): Promise<OrgSubscription>;
   getOrgSupplySettings(id: string): Promise<{ supplyTypes: string[]; supplyUnits: string[] } | undefined>;
   updateOrgSupplySettings(id: string, settings: { supplyTypes?: string[]; supplyUnits?: string[] }): Promise<{ supplyTypes: string[]; supplyUnits: string[] } | undefined>;
+  
+  // Management notes operations
+  getManagementNotes(userId: string): Promise<(ManagementNote & { author: User })[]>;
+  createManagementNote(note: InsertManagementNote): Promise<ManagementNote>;
+  updateManagementNote(id: number, noteText: string): Promise<ManagementNote>;
   
   // Client operations
   getClients(orgId: string): Promise<Client[]>;
@@ -1088,6 +1096,42 @@ export class DatabaseStorage implements IStorage {
       supplyTypes: org.supplyTypes as string[] || [],
       supplyUnits: org.supplyUnits as string[] || [],
     };
+  }
+
+  // Management notes operations
+  async getManagementNotes(userId: string): Promise<(ManagementNote & { author: User })[]> {
+    const notes = await db
+      .select({
+        note: managementNotes,
+        author: users,
+      })
+      .from(managementNotes)
+      .leftJoin(users, eq(managementNotes.authorId, users.id))
+      .where(eq(managementNotes.userId, userId))
+      .orderBy(desc(managementNotes.createdAt));
+    
+    return notes.map(n => ({ ...n.note, author: n.author! }));
+  }
+
+  async createManagementNote(note: InsertManagementNote): Promise<ManagementNote> {
+    const [created] = await db
+      .insert(managementNotes)
+      .values(note)
+      .returning();
+    return created;
+  }
+
+  async updateManagementNote(id: number, noteText: string): Promise<ManagementNote> {
+    const [updated] = await db
+      .update(managementNotes)
+      .set({ 
+        noteText,
+        isEdited: true,
+        updatedAt: new Date(),
+      })
+      .where(eq(managementNotes.id, id))
+      .returning();
+    return updated;
   }
 
   // Client operations
