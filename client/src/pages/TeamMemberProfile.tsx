@@ -129,9 +129,17 @@ export default function TeamMemberProfile() {
     enabled: isAuthenticated && !!memberId,
   });
 
-  // Show error toast for OOO queries
+  // Show error toast for OOO queries (but not for 403/permission errors)
   useEffect(() => {
-    if (oooError || activeOOOError) {
+    const hasNonPermissionError = (error: any) => {
+      // Don't show toast for 403 errors (different organization access)
+      if (error && (error.status === 403 || error.message?.includes('Insufficient permissions'))) {
+        return false;
+      }
+      return !!error;
+    };
+
+    if (hasNonPermissionError(oooError) || hasNonPermissionError(activeOOOError)) {
       toast({
         title: "Error",
         description: "Failed to load out-of-office periods. Please try again.",
