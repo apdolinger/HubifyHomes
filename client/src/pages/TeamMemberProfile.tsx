@@ -642,7 +642,6 @@ export default function TeamMemberProfile() {
           <TabsTrigger value="messages">Messages</TabsTrigger>
           {canViewPerformance && (
             <TabsTrigger value="performance" data-testid="tab-performance">
-              <Award className="w-4 h-4 mr-2" />
               Performance
             </TabsTrigger>
           )}
