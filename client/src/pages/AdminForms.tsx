@@ -8,7 +8,6 @@ import FormBuilder from "@/components/FormBuilder";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { 
-  Eye, 
   Trash2, 
   FileText, 
   Calendar,
@@ -146,14 +145,6 @@ export default function AdminForms() {
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => window.open(`/forms/${form.formKey}`, '_blank')}
-                          data-testid="view-form-btn"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
                         {form.embedEnabled && (
                           <Button 
                             variant="ghost" 
