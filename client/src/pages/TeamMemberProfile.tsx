@@ -575,117 +575,6 @@ export default function TeamMemberProfile() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            {/* Out-of-Office Status */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    Out-of-Office
-                  </div>
-                  {activeOOO && (
-                    <Badge variant="default" className="bg-yellow-500">
-                      Currently Out
-                    </Badge>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-slate-600 mb-4">
-                  Set your out-of-office periods. Tasks assigned during these times will notify your supervisor.
-                </p>
-                
-                {/* Loading state */}
-                {(oooLoading || activeOOOLoading) && (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  </div>
-                )}
-                
-                {/* Show active period */}
-                {!oooLoading && !activeOOOLoading && activeOOO && (
-                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-sm font-medium text-slate-900">Active Period</p>
-                    <p className="text-xs text-slate-600 mt-1">
-                      {format(new Date(activeOOO.startDate), "MMM d, yyyy")} - {format(new Date(activeOOO.endDate), "MMM d, yyyy")}
-                    </p>
-                    {activeOOO.reason && (
-                      <p className="text-xs text-slate-600 mt-1 italic">{activeOOO.reason}</p>
-                    )}
-                  </div>
-                )}
-                
-                {/* List of upcoming periods */}
-                {!oooLoading && !activeOOOLoading && oooPeriods.length > 0 && (
-                  <div className="space-y-2 mb-4">
-                    <p className="text-sm font-medium text-slate-700">Scheduled Periods</p>
-                    {oooPeriods
-                      .filter((period: any) => new Date(period.endDate) >= new Date())
-                      .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-                      .slice(0, 3)
-                      .map((period: any) => (
-                        <div key={period.id} className="flex items-center justify-between p-2 bg-slate-50 rounded">
-                          <div className="flex-1">
-                            <p className="text-xs text-slate-900">
-                              {format(new Date(period.startDate), "MMM d")} - {format(new Date(period.endDate), "MMM d, yyyy")}
-                            </p>
-                            {period.reason && (
-                              <p className="text-xs text-slate-500 truncate">{period.reason}</p>
-                            )}
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteOOO(period.id)}
-                            data-testid={`delete-ooo-${period.id}`}
-                            disabled={deleteOOOMutation.isPending}
-                          >
-                            <Trash2 className="w-3 h-3 text-red-500" />
-                          </Button>
-                        </div>
-                      ))}
-                  </div>
-                )}
-                
-                {!oooLoading && !activeOOOLoading && (
-                  <Button 
-                    className="w-full" 
-                    onClick={() => setIsOOOModalOpen(true)}
-                    data-testid="add-ooo-btn"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Out-of-Office Period
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Quick Stats Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Activity className="w-4 h-4 mr-2" />
-                  Activity Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">Tasks Completed</span>
-                  <span className="font-semibold">{taskStats?.completed || 0}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">Active Tasks</span>
-                  <span className="font-semibold">{taskStats?.active || 0}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">Properties Managed</span>
-                  <span className="font-semibold">{managedProperties.length}</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Basic Information */}
             <Card>
@@ -929,6 +818,91 @@ export default function TeamMemberProfile() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Out-of-Office Section */}
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Calendar className="w-4 h-4 mr-2" />
+              Out-of-Office
+            </div>
+            {activeOOO && (
+              <Badge variant="default" className="bg-yellow-500">
+                Currently Out
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-slate-600 mb-4">
+            Set your out-of-office periods. Tasks assigned during these times will notify your supervisor.
+          </p>
+          
+          {/* Loading state */}
+          {(oooLoading || activeOOOLoading) && (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          )}
+          
+          {/* Show active period */}
+          {!oooLoading && !activeOOOLoading && activeOOO && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm font-medium text-slate-900">Active Period</p>
+              <p className="text-xs text-slate-600 mt-1">
+                {format(new Date(activeOOO.startDate), "MMM d, yyyy")} - {format(new Date(activeOOO.endDate), "MMM d, yyyy")}
+              </p>
+              {activeOOO.reason && (
+                <p className="text-xs text-slate-600 mt-1 italic">{activeOOO.reason}</p>
+              )}
+            </div>
+          )}
+          
+          {/* List of upcoming periods */}
+          {!oooLoading && !activeOOOLoading && oooPeriods.length > 0 && (
+            <div className="space-y-2 mb-4">
+              <p className="text-sm font-medium text-slate-700">Scheduled Periods</p>
+              {oooPeriods
+                .filter((period: any) => new Date(period.endDate) >= new Date())
+                .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+                .slice(0, 3)
+                .map((period: any) => (
+                  <div key={period.id} className="flex items-center justify-between p-2 bg-slate-50 rounded">
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-900">
+                        {format(new Date(period.startDate), "MMM d")} - {format(new Date(period.endDate), "MMM d, yyyy")}
+                      </p>
+                      {period.reason && (
+                        <p className="text-xs text-slate-500 truncate">{period.reason}</p>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteOOO(period.id)}
+                      data-testid={`delete-ooo-${period.id}`}
+                      disabled={deleteOOOMutation.isPending}
+                    >
+                      <Trash2 className="w-3 h-3 text-red-500" />
+                    </Button>
+                  </div>
+                ))}
+            </div>
+          )}
+          
+          {!oooLoading && !activeOOOLoading && (
+            <Button 
+              className="w-full" 
+              onClick={() => setIsOOOModalOpen(true)}
+              data-testid="add-ooo-btn"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Out-of-Office Period
+            </Button>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Edit Member Modal */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
