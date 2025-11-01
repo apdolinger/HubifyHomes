@@ -14,7 +14,8 @@ import {
   Calendar,
   Users,
   Code,
-  Link
+  Link,
+  Pencil
 } from "lucide-react";
 
 export default function AdminForms() {
@@ -168,6 +169,16 @@ export default function AdminForms() {
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
+                        <RouterLink href={`/admin/forms/${form.id}`}>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            data-testid={`edit-form-btn-${form.id}`}
+                            title="Edit form"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                        </RouterLink>
                         {form.slug && (
                           <Button 
                             variant="ghost" 
