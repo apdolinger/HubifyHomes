@@ -1338,6 +1338,174 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Send email to entire team
+  app.post("/api/teams/send-email", isAuthenticated, async (req: any, res) => {
+    try {
+      const { processMergeFields, buildMergeFieldData, sendEmail } = await import('./email-service');
+      
+      const orgId = req.user?.claims?.orgId;
+      const userId = req.user?.claims?.sub || req.user?.id;
+      
+      if (!orgId || !userId) {
+        return res.status(400).json({ message: "Organization ID or User ID not found" });
+      }
+
+      const { teamId, subject, body, templateId } = req.body;
+
+      if (!teamId) {
+        return res.status(400).json({ message: "Team ID is required" });
+      }
+
+      // Get team and verify it belongs to the organization
+      const team = await storage.getTeamById(teamId);
+      if (!team) {
+        return res.status(404).json({ message: "Team not found" });
+      }
+
+      if (team.orgId !== orgId) {
+        return res.status(403).json({ message: "Access denied to this team" });
+      }
+
+      let finalSubject = subject;
+      let finalBody = body;
+
+      // Load template if provided
+      if (templateId) {
+        const template = await storage.getOrgEmailTemplate(templateId, orgId);
+        if (!template) {
+          return res.status(404).json({ message: "Email template not found" });
+        }
+        finalSubject = template.subject;
+        finalBody = template.body;
+      }
+
+      if (!finalSubject || !finalBody) {
+        return res.status(400).json({ message: "Subject and body are required" });
+      }
+
+      // Get all team members
+      const teamMembers = team.members || [];
+      if (teamMembers.length === 0) {
+        return res.status(400).json({ message: "Team has no members" });
+      }
+
+      const successCount = {value: 0};
+      const failedRecipients: string[] = [];
+
+      // Send email to each team member
+      for (const member of teamMembers) {
+        try {
+          if (!member.email) {
+            failedRecipients.push(`${member.firstName} ${member.lastName} (no email)`);
+            continue;
+          }
+
+          // Build merge field data for this member
+          const mergeData = await buildMergeFieldData({
+            senderId: userId,
+            orgId,
+            additionalData: {
+              firstName: member.firstName || '',
+              lastName: member.lastName || '',
+              fullName: `${member.firstName || ''} ${member.lastName || ''}`.trim(),
+              email: member.email,
+              teamName: team.name,
+            },
+          });
+
+          // Process merge fields
+          const processedSubject = processMergeFields(finalSubject, mergeData);
+          const processedBody = processMergeFields(finalBody, mergeData);
+
+          // Send email immediately
+          await sendEmail({
+            recipientEmail: member.email,
+            recipientName: `${member.firstName} ${member.lastName}`,
+            subject: processedSubject,
+            body: processedBody,
+            orgId,
+            senderId: userId,
+          });
+
+          successCount.value++;
+        } catch (memberError: any) {
+          console.error(`Error sending email to ${member.email}:`, memberError);
+          failedRecipients.push(`${member.firstName} ${member.lastName} (${member.email})`);
+        }
+      }
+
+      if (successCount.value === 0) {
+        return res.status(500).json({ 
+          message: "Failed to send email to any team members",
+          failedRecipients 
+        });
+      }
+
+      res.json({ 
+        message: `Email sent to ${successCount.value} of ${teamMembers.length} team members`,
+        successCount: successCount.value,
+        totalMembers: teamMembers.length,
+        failedRecipients: failedRecipients.length > 0 ? failedRecipients : undefined
+      });
+    } catch (error: any) {
+      console.error("Error sending team email:", error);
+      res.status(500).json({ message: error.message || "Failed to send team email" });
+    }
+  });
+
+  // Send SMS to entire team (placeholder)
+  app.post("/api/teams/send-sms", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId;
+      
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID not found" });
+      }
+
+      const { teamId, message } = req.body;
+
+      if (!teamId || !message) {
+        return res.status(400).json({ message: "Team ID and message are required" });
+      }
+
+      // Get team and verify it belongs to the organization
+      const team = await storage.getTeamById(teamId);
+      if (!team) {
+        return res.status(404).json({ message: "Team not found" });
+      }
+
+      if (team.orgId !== orgId) {
+        return res.status(403).json({ message: "Access denied to this team" });
+      }
+
+      // Get all team members
+      const teamMembers = team.members || [];
+      if (teamMembers.length === 0) {
+        return res.status(400).json({ message: "Team has no members" });
+      }
+
+      // Check if any members have phone numbers
+      const membersWithPhone = teamMembers.filter((m: any) => m.phone);
+      
+      if (membersWithPhone.length === 0) {
+        return res.status(400).json({ 
+          message: "No team members have phone numbers configured. SMS messaging requires phone numbers to be added to user profiles."
+        });
+      }
+
+      // TODO: Implement Twilio SMS sending when phone numbers are added to users table
+      // For now, return a not implemented response
+      res.status(501).json({ 
+        message: "SMS functionality is not yet implemented. Please use email communication or add phone number support to the users table.",
+        membersWithPhone: membersWithPhone.length,
+        totalMembers: teamMembers.length
+      });
+    } catch (error: any) {
+      console.error("Error sending team SMS:", error);
+      res.status(500).json({ message: error.message || "Failed to send team SMS" });
+    }
+  });
+
   // Portal authentication middleware
   const isPortalAuthenticated = async (req: any, res: Response, next: NextFunction) => {
     const token = req.headers.authorization?.replace('Bearer ', '');
