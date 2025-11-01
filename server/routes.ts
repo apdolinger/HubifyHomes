@@ -1768,12 +1768,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Authorization: users can view their own, admins/supervisors can view anyone in their org
-      const isAdmin = currentUser.role === 'admin' || currentUser.role === 'supervisor';
-      const isSelfQuery = userId === currentUserId;
+      // Authorization: users can view anyone in their organization
       const sameOrg = currentUser.orgId === targetUser.orgId;
 
-      if (!isSelfQuery && (!isAdmin || !sameOrg)) {
+      if (!sameOrg) {
         return res.status(403).json({ message: "Insufficient permissions" });
       }
 
@@ -1791,17 +1789,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentUserId = (req.user as any)?.claims?.sub;
       const currentUser = await storage.getUser(currentUserId);
 
-      // Authorization: users can view their own, admins/supervisors can view anyone in their org
+      // Authorization: users can view anyone in their organization
       const targetUser = await storage.getUser(userId);
       if (!targetUser) {
         return res.status(404).json({ message: "User not found" });
       }
 
-      const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'supervisor';
-      const isSelfQuery = userId === currentUserId;
       const sameOrg = currentUser?.orgId === targetUser.orgId;
 
-      if (!isSelfQuery && (!isAdmin || !sameOrg)) {
+      if (!sameOrg) {
         return res.status(403).json({ message: "Insufficient permissions" });
       }
 
