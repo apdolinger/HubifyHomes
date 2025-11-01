@@ -439,6 +439,41 @@ function generateFormHTML(form: any, isEmbed: boolean): string {
             </select>
           </div>
         `;
+      case 'multiselect':
+        const multioptions = (field.options || []).map((opt: string) => 
+          `<option value="${opt}">${opt}</option>`
+        ).join('');
+        return `
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">${field.label}${field.required ? ' *' : ''}</label>
+            ${field.description ? `<p class="text-sm text-gray-600 mb-2">${field.description}</p>` : ''}
+            <select name="${fieldId}" ${required} multiple class="${inputClass}" size="4">
+              ${multioptions}
+            </select>
+            <p class="text-xs text-gray-500 mt-1">Hold Ctrl (Cmd on Mac) to select multiple options</p>
+          </div>
+        `;
+      case 'file':
+        return `
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">${field.label}${field.required ? ' *' : ''}</label>
+            ${field.description ? `<p class="text-sm text-gray-600 mb-2">${field.description}</p>` : ''}
+            <input type="file" name="${fieldId}" ${required} 
+                   class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+          </div>
+        `;
+      case 'signature':
+        return `
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">${field.label}${field.required ? ' *' : ''}</label>
+            ${field.description ? `<p class="text-sm text-gray-600 mb-2">${field.description}</p>` : ''}
+            <div class="border-2 border-gray-300 rounded-md p-2">
+              <canvas id="${fieldId}-canvas" width="500" height="150" class="w-full border border-gray-200 rounded cursor-crosshair"></canvas>
+              <button type="button" onclick="clearSignature('${fieldId}')" class="mt-2 text-sm text-blue-600 hover:text-blue-800">Clear Signature</button>
+              <input type="hidden" name="${fieldId}" id="${fieldId}-input" ${required}>
+            </div>
+          </div>
+        `;
       case 'checkbox':
         return `
           <div class="mb-4">
@@ -478,14 +513,14 @@ function generateFormHTML(form: any, isEmbed: boolean): string {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${form.name}</title>
+      <title>${form.form_title || form.formTitle || 'Form'}</title>
       <script src="https://cdn.tailwindcss.com"></script>
     </head>
     <body class="bg-gray-50">
       ${headerHTML}
       <div class="container mx-auto px-4 py-8 max-w-2xl">
         <div class="bg-white rounded-lg shadow-md p-6">
-          <h2 class="text-2xl font-bold text-gray-900 mb-2">${form.name}</h2>
+          <h2 class="text-2xl font-bold text-gray-900 mb-2">${form.form_title || form.formTitle || 'Form'}</h2>
           ${form.description ? `<p class="text-gray-600 mb-6">${form.description}</p>` : ''}
           
           <form id="hubify-form" onsubmit="submitForm(event)">
@@ -507,6 +542,47 @@ function generateFormHTML(form: any, isEmbed: boolean): string {
       </div>
       
       <script>
+        // Initialize signature canvases
+        document.addEventListener('DOMContentLoaded', function() {
+          const canvases = document.querySelectorAll('canvas[id$="-canvas"]');
+          canvases.forEach(canvas => {
+            const ctx = canvas.getContext('2d');
+            let drawing = false;
+            
+            canvas.addEventListener('mousedown', (e) => {
+              drawing = true;
+              const rect = canvas.getBoundingClientRect();
+              ctx.beginPath();
+              ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+            });
+            
+            canvas.addEventListener('mousemove', (e) => {
+              if (drawing) {
+                const rect = canvas.getBoundingClientRect();
+                ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+                ctx.stroke();
+                updateSignatureInput(canvas.id.replace('-canvas', ''));
+              }
+            });
+            
+            canvas.addEventListener('mouseup', () => drawing = false);
+            canvas.addEventListener('mouseout', () => drawing = false);
+          });
+        });
+        
+        function clearSignature(fieldId) {
+          const canvas = document.getElementById(fieldId + '-canvas');
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          document.getElementById(fieldId + '-input').value = '';
+        }
+        
+        function updateSignatureInput(fieldId) {
+          const canvas = document.getElementById(fieldId + '-canvas');
+          const input = document.getElementById(fieldId + '-input');
+          input.value = canvas.toDataURL();
+        }
+        
         async function submitForm(event) {
           event.preventDefault();
           const form = event.target;
@@ -519,14 +595,10 @@ function generateFormHTML(form: any, isEmbed: boolean): string {
           
           try {
             const formData = new FormData(form);
-            const data = Object.fromEntries(formData.entries());
             
-            const response = await fetch('/forms/${form.formKey}/submit', {
+            const response = await fetch('/forms/${form.slug}/submit', {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(data),
+              body: formData,
             });
             
             if (response.ok) {
@@ -659,12 +731,30 @@ async function onFormSubmit(formData: any, formSchema: any, storage: any) {
 // Helper functions for context-specific data handling
 async function upsertPerson(formData: any, storage: any): Promise<number | null> {
   try {
+    // Handle "Full Name" field by finding any field value that contains a space
+    let firstName = formData.firstName || formData.first_name;
+    let lastName = formData.lastName || formData.last_name;
+    
+    // Check for "Full Name" field (field-X format from forms)
+    for (const [key, value] of Object.entries(formData)) {
+      if (typeof value === 'string' && value.includes(' ') && key.startsWith('field-') && !firstName) {
+        const parts = value.trim().split(/\s+/);
+        firstName = parts[0];
+        lastName = parts.slice(1).join(' ') || parts[0]; // Use first name as last name if no space
+        break;
+      }
+    }
+    
+    // Default fallback to "Unknown" if still no name
+    if (!firstName) firstName = 'Unknown';
+    if (!lastName) lastName = '';
+    
     const personData = {
-      firstName: formData.firstName || formData.first_name,
-      lastName: formData.lastName || formData.last_name,
-      email: formData.email,
-      phone: formData.phone || formData.phoneNumber,
-      notes: formData.notes,
+      firstName,
+      lastName,
+      email: formData.email || formData[Object.keys(formData).find(k => k.includes('email') || k.includes('Email')) || ''],
+      phone: formData.phone || formData.phoneNumber || formData[Object.keys(formData).find(k => k.includes('phone') || k.includes('Phone')) || ''],
+      notes: formData.notes || formData[Object.keys(formData).find(k => k.includes('notes') || k.includes('Notes')) || ''],
       type: 'client',
       isActive: true,
       orgId: '00000000-0000-0000-0000-000000000001' // Default org for now
@@ -6861,15 +6951,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Configure multer for form submissions (handles files and multipart data)
+  const formSubmissionUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB limit
+    }
+  }).any(); // Accept any field as file or data
+
   // Form submission with profile matching logic
-  app.post("/forms/:slug/submit", async (req, res) => {
+  app.post("/forms/:slug/submit", formSubmissionUpload, async (req, res) => {
     try {
       const form = await storage.getFormBySlug(req.params.slug);
       if (!form) {
         return res.status(404).json({ message: "Form not found" });
       }
 
-      const submissionData = req.body;
+      // Combine req.body (text fields) and req.files (uploaded files)
+      const submissionData: any = { ...req.body };
+      
+      // Handle uploaded files
+      if (req.files && Array.isArray(req.files)) {
+        for (const file of req.files) {
+          submissionData[file.fieldname] = {
+            filename: file.originalname,
+            mimetype: file.mimetype,
+            size: file.size,
+            buffer: file.buffer
+          };
+        }
+      }
       const formSettings = form.settings as any;
       let profileId = null;
 
@@ -6878,7 +6989,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Handle profile matching and creation if form has mapping
       if (formSettings?.matchExistingBy && formSettings?.fieldMapping) {
-        const identifier = formSchema.matchExistingBy;
+        const identifier = formSettings.matchExistingBy;
         const matchKey = identifier === 'email' ? submissionData.email : submissionData.phone;
 
         if (matchKey) {
@@ -6897,7 +7008,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (existingContact) {
             // Update existing profile with new data
             const updateData: any = {};
-            Object.entries(formSchema.fieldMapping).forEach(([formFieldId, profileField]) => {
+            Object.entries(formSettings.fieldMapping).forEach(([formFieldId, profileField]) => {
               if (submissionData[formFieldId] && profileField !== 'none') {
                 updateData[profileField] = submissionData[formFieldId];
               }
@@ -6913,7 +7024,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               orgId: form.orgId
             };
             
-            Object.entries(formSchema.fieldMapping).forEach(([formFieldId, profileField]) => {
+            Object.entries(formSettings.fieldMapping).forEach(([formFieldId, profileField]) => {
               if (submissionData[formFieldId] && profileField !== 'none') {
                 newProfileData[profileField] = submissionData[formFieldId];
               }
@@ -6956,9 +7067,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Form submission processed: formId=${form.id}, profileId=${profileId}, timestamp=${Date.now()}`);
 
       // TODO: Implement automation triggers if needed
-      if (formSchema?.triggerAutomation) {
-        console.log(`Automation triggered for form: ${formSchema.slug}`);
-        // triggerAutomation(formSchema.slug, submissionData);
+      if (formSettings?.triggerAutomation) {
+        console.log(`Automation triggered for form: ${form.slug}`);
+        // triggerAutomation(form.slug, submissionData);
       }
 
       res.json({ message: "Form submitted successfully" });
