@@ -485,55 +485,6 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Form Configuration */}
           <div className="lg:col-span-1 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Settings className="w-4 h-4 mr-2" />
-                  Quick Settings
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label>Multiple Submissions</Label>
-                  <Switch
-                    checked={formSchema.allowMultipleSubmissions}
-                    onCheckedChange={(checked) => 
-                      updateFormSchema({ allowMultipleSubmissions: checked })
-                    }
-                  />
-                </div>
-
-                <div>
-                  <Label>Match Existing Contacts By</Label>
-                  <Select
-                    value={formSchema.matchExistingBy}
-                    onValueChange={(value: 'email' | 'phone' | 'none') =>
-                      updateFormSchema({ matchExistingBy: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="email">Email Address</SelectItem>
-                      <SelectItem value="phone">Phone Number</SelectItem>
-                      <SelectItem value="none">Always Create New</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <Label>Trigger Automation</Label>
-                  <Switch
-                    checked={formSchema.triggerAutomation}
-                    onCheckedChange={(checked) => 
-                      updateFormSchema({ triggerAutomation: checked })
-                    }
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Available Fields */}
             <Card>
               <CardHeader>
