@@ -23,6 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { 
   Users, 
@@ -492,6 +493,30 @@ export default function Admin() {
   const { data: properties = [] } = useQuery({
     queryKey: ['/api/properties'],
     staleTime: 30000,
+  });
+
+  // Fetch all users in the organization for HR permissions management
+  const { data: orgUsers = [], refetch: refetchUsers } = useQuery({
+    queryKey: ['/api/users'],
+    enabled: !!user?.orgId,
+  });
+
+  // Mutation to toggle HR permissions
+  const toggleHrPermissionsMutation = useMutation({
+    mutationFn: async ({ userId, hasHrPermissions }: { userId: string; hasHrPermissions: boolean }) => {
+      return await apiRequest('PATCH', `/api/users/${userId}/hr-permissions`, { hasHrPermissions });
+    },
+    onSuccess: () => {
+      refetchUsers();
+      toast({ title: "Permissions updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error updating permissions",
+        description: error.message || "Failed to update permissions",
+        variant: "destructive",
+      });
+    },
   });
 
   // Property report generation function
@@ -1784,6 +1809,61 @@ export default function Admin() {
               </CardContent>
             </Card>
           </div>
+
+          {/* User Permissions Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>User Permissions</CardTitle>
+              <CardDescription>
+                Manage individual user permissions. HR permissions allow users to view and manage employee performance data and notes.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {orgUsers.length === 0 ? (
+                <div className="text-center py-8 text-slate-500">
+                  <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>No users found in your organization</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead className="text-center">HR Permissions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {orgUsers.map((orgUser: any) => (
+                      <TableRow key={orgUser.id}>
+                        <TableCell>{orgUser.firstName} {orgUser.lastName}</TableCell>
+                        <TableCell>{orgUser.email}</TableCell>
+                        <TableCell>
+                          <Badge variant={orgUser.role === 'admin' ? 'default' : 'secondary'}>
+                            {orgUser.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Checkbox
+                            checked={orgUser.hasHrPermissions || false}
+                            onCheckedChange={(checked) => {
+                              toggleHrPermissionsMutation.mutate({
+                                userId: orgUser.id,
+                                hasHrPermissions: checked as boolean,
+                              });
+                            }}
+                            data-testid={`hr-permission-checkbox-${orgUser.id}`}
+                            disabled={toggleHrPermissionsMutation.isPending}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* System Alerts Tab */}
