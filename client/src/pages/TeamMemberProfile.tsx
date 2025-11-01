@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { useParams, useLocation } from "wouter";
+import { useParams, useLocation, Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -772,18 +772,24 @@ export default function TeamMemberProfile() {
               {managedProperties.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {managedProperties.map((property: any) => (
-                    <div key={property.id} className="p-4 border border-slate-200 rounded-lg">
-                      <h3 className="text-sm font-medium text-slate-900">{property.name}</h3>
-                      <p className="text-sm text-slate-600 mt-1">
-                        {property.address1}, {property.city}, {property.state}
-                      </p>
-                      <div className="flex items-center justify-between mt-3">
-                        <Badge variant="outline">{property.type}</Badge>
-                        <Badge variant={property.status === 'occupied' ? 'default' : 'secondary'}>
-                          {property.status}
-                        </Badge>
+                    <Link 
+                      key={property.id} 
+                      href={`/property-profile/${property.id}`}
+                      data-testid={`property-card-${property.id}`}
+                    >
+                      <div className="p-4 border border-slate-200 rounded-lg hover:border-slate-300 hover:shadow-md transition-all cursor-pointer">
+                        <h3 className="text-sm font-medium text-slate-900">{property.name}</h3>
+                        <p className="text-sm text-slate-600 mt-1">
+                          {property.address1}, {property.city}, {property.state}
+                        </p>
+                        <div className="flex items-center justify-between mt-3">
+                          <Badge variant="outline">{property.type}</Badge>
+                          <Badge variant={property.status === 'occupied' ? 'default' : 'secondary'}>
+                            {property.status}
+                          </Badge>
+                        </div>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               ) : (
