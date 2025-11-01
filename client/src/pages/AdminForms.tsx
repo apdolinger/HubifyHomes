@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import FormBuilder from "@/components/FormBuilder";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
+import { Link as RouterLink } from "wouter";
 import { 
   Trash2, 
   FileText, 
@@ -134,9 +135,13 @@ export default function AdminForms() {
                   <TableRow key={form.id}>
                     <TableCell>
                       <div>
-                        <div className="font-medium">{form.title}</div>
-                        {form.description && (
-                          <div className="text-sm text-gray-500">{form.description}</div>
+                        <RouterLink href={`/admin/forms/${form.id}`}>
+                          <div className="font-medium text-blue-600 hover:text-blue-800 cursor-pointer hover:underline" data-testid={`form-title-${form.id}`}>
+                            {form.formTitle || form.form_title || 'Untitled Form'}
+                          </div>
+                        </RouterLink>
+                        {(form.settings?.internalDescription || form.description) && (
+                          <div className="text-sm text-gray-500">{form.settings?.internalDescription || form.description}</div>
                         )}
                       </div>
                     </TableCell>

@@ -28,6 +28,8 @@ import AdminClientPortal from "@/pages/AdminClientPortal";
 import AdminClientPortalProperty from "@/pages/AdminClientPortalProperty";
 import AdminNoteSearch from "@/pages/AdminNoteSearch";
 import AdminEmailTemplates from "@/pages/AdminEmailTemplates";
+import AdminForms from "@/pages/AdminForms";
+import FormEdit from "@/pages/FormEdit";
 import Admin from "@/pages/Admin";
 import Account from "@/pages/Account";
 import SuperAdmin from "@/pages/SuperAdmin";
@@ -151,6 +153,8 @@ function Router() {
           <Route path="/admin/vendors" component={Vendors} />
           <Route path="/admin/notes/search" component={AdminNoteSearch} />
           <Route path="/admin/email-templates" component={AdminEmailTemplates} />
+          <Route path="/admin/forms/:id" component={FormEdit} />
+          <Route path="/admin/forms" component={AdminForms} />
           
           {/* Billing Routes */}
           <Route path="/billing" component={Billing} />
