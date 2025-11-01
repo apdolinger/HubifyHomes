@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -60,9 +61,8 @@ export default function Team() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [isMyTeamExpanded, setIsMyTeamExpanded] = useState(true);
-  const [isOrgTeamsExpanded, setIsOrgTeamsExpanded] = useState(true);
   const [isStatsCustomizeModalOpen, setIsStatsCustomizeModalOpen] = useState(false);
+  const [activeTeamsTab, setActiveTeamsTab] = useState("my-teams");
 
   // Default stats widgets configuration
   const defaultStatsWidgets: StatsWidget[] = [
@@ -177,16 +177,6 @@ export default function Team() {
     queryKey: ["/api/teams"],
     enabled: isAuthenticated,
   });
-
-  // Debug logging for Organization Teams
-  useEffect(() => {
-    console.log('[Team Page] Organization Teams Data:', {
-      allTeams,
-      allTeamsLength: allTeams?.length ?? 0,
-      allTeamsLoading,
-      isAuthenticated
-    });
-  }, [allTeams, allTeamsLoading, isAuthenticated]);
 
   // Fetch active OOO periods for all team members
   const { data: activeOOOPeriods = {} } = useQuery({
@@ -514,250 +504,217 @@ export default function Team() {
         </div>
       </div>
 
-      {/* My Team Section - Collapsible */}
+      {/* Teams Section - Tabbed Interface */}
       <Card className="mb-8">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>My Team</CardTitle>
-              <p className="text-sm text-slate-600 mt-1">
-                Team members assigned to you or those you work closely with
-              </p>
+        <Tabs value={activeTeamsTab} onValueChange={setActiveTeamsTab}>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Teams</CardTitle>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsMyTeamExpanded(!isMyTeamExpanded)}
-              data-testid="toggle-my-team-btn"
-            >
-              {isMyTeamExpanded ? (
-                <ChevronUp className="w-4 h-4" />
-              ) : (
-                <ChevronDown className="w-4 h-4" />
-              )}
-            </Button>
-          </div>
-        </CardHeader>
-        {isMyTeamExpanded && (
-          <CardContent>
-            <div className="space-y-4">
-              {teamsLoading ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                  <p className="text-sm text-slate-500 mt-2">Loading teams...</p>
-                </div>
-              ) : userTeams.length === 0 ? (
-                /* Empty state - Build your team */
-                <div className="text-center py-8">
-                  <UserPlus className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-slate-900 mb-2">Build Your Team</h3>
-                  <p className="text-slate-600 mb-4">
-                    Create and manage your direct team assignments to collaborate more effectively.
-                  </p>
-                  <div className="flex justify-center gap-3">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setIsTeamCreationModalOpen(true)}
-                      data-testid="build-team-btn"
-                    >
-                      <UserPlus className="w-4 h-4 mr-2" />
-                      Build Team
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setIsTeamAssignmentsModalOpen(true)}
-                      data-testid="manage-team-assignments-btn"
-                    >
-                      Manage Team Assignments
-                    </Button>
+            <TabsList className="mt-4">
+              <TabsTrigger value="my-teams" data-testid="my-teams-tab">My Teams</TabsTrigger>
+              <TabsTrigger value="organization-teams" data-testid="organization-teams-tab">Organization Teams</TabsTrigger>
+            </TabsList>
+          </CardHeader>
+          
+          {/* My Teams Tab */}
+          <TabsContent value="my-teams">
+            <CardContent>
+              <div className="space-y-4">
+                {teamsLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                    <p className="text-sm text-slate-500 mt-2">Loading teams...</p>
                   </div>
-                </div>
-              ) : (
-                /* Display teams */
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <p className="text-sm text-slate-600">
-                      You are a member of {userTeams.length} team{userTeams.length !== 1 ? 's' : ''}
+                ) : userTeams.length === 0 ? (
+                  /* Empty state - Build your team */
+                  <div className="text-center py-8">
+                    <UserPlus className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-slate-900 mb-2">Build Your Team</h3>
+                    <p className="text-slate-600 mb-4">
+                      Create and manage your direct team assignments to collaborate more effectively.
                     </p>
-                    <Button 
-                      size="sm"
-                      onClick={() => setIsTeamCreationModalOpen(true)}
-                      data-testid="add-team-btn"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Team
-                    </Button>
+                    <div className="flex justify-center gap-3">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setIsTeamCreationModalOpen(true)}
+                        data-testid="build-team-btn"
+                      >
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Build Team
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setIsTeamAssignmentsModalOpen(true)}
+                        data-testid="manage-team-assignments-btn"
+                      >
+                        Manage Team Assignments
+                      </Button>
+                    </div>
                   </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {userTeams.map((team: any) => {
-                      const teamLead = team.members?.find((m: any) => m.role === 'lead');
-                      return (
-                        <Card key={team.id} data-testid={`team-card-${team.id}`}>
-                          <CardHeader className="pb-3">
-                            <CardTitle className="text-base">{team.name}</CardTitle>
-                            {team.description && (
-                              <p className="text-sm text-slate-500 mt-1">{team.description}</p>
-                            )}
-                          </CardHeader>
-                          <CardContent>
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-slate-600">Members</span>
-                                <Badge variant="secondary">{team.memberCount || 0}</Badge>
+                ) : (
+                  /* Display teams */
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center mb-4">
+                      <p className="text-sm text-slate-600">
+                        You are a member of {userTeams.length} team{userTeams.length !== 1 ? 's' : ''}
+                      </p>
+                      <Button 
+                        size="sm"
+                        onClick={() => setIsTeamCreationModalOpen(true)}
+                        data-testid="add-team-btn"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Team
+                      </Button>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {userTeams.map((team: any) => {
+                        const teamLead = team.members?.find((m: any) => m.role === 'lead');
+                        return (
+                          <Card key={team.id} data-testid={`team-card-${team.id}`}>
+                            <CardHeader className="pb-3">
+                              <CardTitle className="text-base">{team.name}</CardTitle>
+                              {team.description && (
+                                <p className="text-sm text-slate-500 mt-1">{team.description}</p>
+                              )}
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-slate-600">Members</span>
+                                  <Badge variant="secondary">{team.memberCount || 0}</Badge>
+                                </div>
+                                {teamLead && (
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <ShieldCheck className="w-4 h-4 text-blue-600" />
+                                    <span className="text-slate-600">Lead:</span>
+                                    <span className="font-medium">{teamLead.firstName} {teamLead.lastName}</span>
+                                  </div>
+                                )}
+                                {team.members && team.members.length > 0 && (
+                                  <div className="flex -space-x-2 mt-2">
+                                    {team.members.slice(0, 5).map((member: any) => (
+                                      <Avatar key={member.userId} className={`h-8 w-8 border-2 ${member.role === 'lead' ? 'border-blue-600' : 'border-white'}`}>
+                                        <AvatarFallback className="text-xs">
+                                          {getUserInitials(member.firstName || '', member.lastName || '')}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                    ))}
+                                    {team.members.length > 5 && (
+                                      <div className="h-8 w-8 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center">
+                                        <span className="text-xs text-slate-600">+{team.members.length - 5}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
-                              {teamLead && (
-                                <div className="flex items-center gap-2 text-sm">
-                                  <ShieldCheck className="w-4 h-4 text-blue-600" />
-                                  <span className="text-slate-600">Lead:</span>
-                                  <span className="font-medium">{teamLead.firstName} {teamLead.lastName}</span>
-                                </div>
-                              )}
-                              {team.members && team.members.length > 0 && (
-                                <div className="flex -space-x-2 mt-2">
-                                  {team.members.slice(0, 5).map((member: any) => (
-                                    <Avatar key={member.userId} className={`h-8 w-8 border-2 ${member.role === 'lead' ? 'border-blue-600' : 'border-white'}`}>
-                                      <AvatarFallback className="text-xs">
-                                        {getUserInitials(member.firstName || '', member.lastName || '')}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                  ))}
-                                  {team.members.length > 5 && (
-                                    <div className="h-8 w-8 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center">
-                                      <span className="text-xs text-slate-600">+{team.members.length - 5}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        )}
-      </Card>
+                )}
+              </div>
+            </CardContent>
+          </TabsContent>
 
-      {/* Organization Teams Section - Collapsible */}
-      <Card className="mb-8">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Organization Teams</CardTitle>
-              <p className="text-sm text-slate-600 mt-1">
-                All teams in your organization
-              </p>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsOrgTeamsExpanded(!isOrgTeamsExpanded)}
-              data-testid="toggle-org-teams-btn"
-            >
-              {isOrgTeamsExpanded ? (
-                <ChevronUp className="w-4 h-4" />
-              ) : (
-                <ChevronDown className="w-4 h-4" />
-              )}
-            </Button>
-          </div>
-        </CardHeader>
-        {isOrgTeamsExpanded && (
-          <CardContent>
-            <div className="space-y-4">
-              {allTeamsLoading ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                  <p className="text-sm text-slate-500 mt-2">Loading teams...</p>
-                </div>
-              ) : allTeams.length === 0 ? (
-                /* Empty state - No teams */
-                <div className="text-center py-8">
-                  <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-slate-900 mb-2">No Teams Yet</h3>
-                  <p className="text-slate-600 mb-4">
-                    Start creating teams to organize your workforce.
-                  </p>
-                  <Button 
-                    onClick={() => setIsTeamCreationModalOpen(true)}
-                    data-testid="create-first-team-btn"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create First Team
-                  </Button>
-                </div>
-              ) : (
-                /* Display all teams */
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <p className="text-sm text-slate-600">
-                      {allTeams.length} team{allTeams.length !== 1 ? 's' : ''} in your organization
+          {/* Organization Teams Tab */}
+          <TabsContent value="organization-teams">
+            <CardContent>
+              <div className="space-y-4">
+                {allTeamsLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                    <p className="text-sm text-slate-500 mt-2">Loading teams...</p>
+                  </div>
+                ) : allTeams.length === 0 ? (
+                  /* Empty state - No teams */
+                  <div className="text-center py-8">
+                    <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-slate-900 mb-2">No Teams Yet</h3>
+                    <p className="text-slate-600 mb-4">
+                      Start creating teams to organize your workforce.
                     </p>
                     <Button 
-                      size="sm"
                       onClick={() => setIsTeamCreationModalOpen(true)}
-                      data-testid="create-team-btn"
+                      data-testid="create-first-team-btn"
                     >
                       <Plus className="w-4 h-4 mr-2" />
-                      Create Team
+                      Create First Team
                     </Button>
                   </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {allTeams.map((team: any) => {
-                      const teamLead = team.members?.find((m: any) => m.role === 'lead');
-                      return (
-                        <Card key={team.id} data-testid={`org-team-card-${team.id}`}>
-                          <CardHeader className="pb-3">
-                            <CardTitle className="text-base">{team.name}</CardTitle>
-                            {team.description && (
-                              <p className="text-sm text-slate-500 mt-1">{team.description}</p>
-                            )}
-                          </CardHeader>
-                          <CardContent>
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-slate-600">Members</span>
-                                <Badge variant="secondary">{team.memberCount || 0}</Badge>
+                ) : (
+                  /* Display all teams */
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center mb-4">
+                      <p className="text-sm text-slate-600">
+                        {allTeams.length} team{allTeams.length !== 1 ? 's' : ''} in your organization
+                      </p>
+                      <Button 
+                        size="sm"
+                        onClick={() => setIsTeamCreationModalOpen(true)}
+                        data-testid="create-team-btn"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create Team
+                      </Button>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {allTeams.map((team: any) => {
+                        const teamLead = team.members?.find((m: any) => m.role === 'lead');
+                        return (
+                          <Card key={team.id} data-testid={`org-team-card-${team.id}`}>
+                            <CardHeader className="pb-3">
+                              <CardTitle className="text-base">{team.name}</CardTitle>
+                              {team.description && (
+                                <p className="text-sm text-slate-500 mt-1">{team.description}</p>
+                              )}
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-slate-600">Members</span>
+                                  <Badge variant="secondary">{team.memberCount || 0}</Badge>
+                                </div>
+                                {teamLead && (
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <ShieldCheck className="w-4 h-4 text-blue-600" />
+                                    <span className="text-slate-600">Lead:</span>
+                                    <span className="font-medium">{teamLead.firstName} {teamLead.lastName}</span>
+                                  </div>
+                                )}
+                                {team.members && team.members.length > 0 && (
+                                  <div className="flex -space-x-2 mt-2">
+                                    {team.members.slice(0, 5).map((member: any) => (
+                                      <Avatar key={member.userId} className={`h-8 w-8 border-2 ${member.role === 'lead' ? 'border-blue-600' : 'border-white'}`}>
+                                        <AvatarFallback className="text-xs">
+                                          {getUserInitials(member.firstName || '', member.lastName || '')}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                    ))}
+                                    {team.members.length > 5 && (
+                                      <div className="h-8 w-8 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center">
+                                        <span className="text-xs text-slate-600">+{team.members.length - 5}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
-                              {teamLead && (
-                                <div className="flex items-center gap-2 text-sm">
-                                  <ShieldCheck className="w-4 h-4 text-blue-600" />
-                                  <span className="text-slate-600">Lead:</span>
-                                  <span className="font-medium">{teamLead.firstName} {teamLead.lastName}</span>
-                                </div>
-                              )}
-                              {team.members && team.members.length > 0 && (
-                                <div className="flex -space-x-2 mt-2">
-                                  {team.members.slice(0, 5).map((member: any) => (
-                                    <Avatar key={member.userId} className={`h-8 w-8 border-2 ${member.role === 'lead' ? 'border-blue-600' : 'border-white'}`}>
-                                      <AvatarFallback className="text-xs">
-                                        {getUserInitials(member.firstName || '', member.lastName || '')}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                  ))}
-                                  {team.members.length > 5 && (
-                                    <div className="h-8 w-8 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center">
-                                      <span className="text-xs text-slate-600">+{team.members.length - 5}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        )}
+                )}
+              </div>
+            </CardContent>
+          </TabsContent>
+        </Tabs>
       </Card>
 
       {/* Team Stats */}
