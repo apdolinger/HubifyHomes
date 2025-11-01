@@ -12,7 +12,8 @@ import {
   FileText, 
   Calendar,
   Users,
-  Code
+  Code,
+  Link
 } from "lucide-react";
 
 export default function AdminForms() {
@@ -56,6 +57,23 @@ export default function AdminForms() {
     toast({
       title: "Copied!",
       description: "Embed code copied to clipboard",
+    });
+  };
+
+  const copyPublicLink = (slug: string) => {
+    if (!slug) {
+      toast({
+        title: "No Public Link",
+        description: "This form doesn't have a public URL yet.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const publicUrl = `${window.location.origin}/forms/${slug}`;
+    navigator.clipboard.writeText(publicUrl);
+    toast({
+      title: "Link Copied",
+      description: "Public form link copied to clipboard.",
     });
   };
 
@@ -145,12 +163,24 @@ export default function AdminForms() {
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
+                        {form.slug && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => copyPublicLink(form.slug)}
+                            data-testid="copy-link-btn"
+                            title="Copy public link"
+                          >
+                            <Link className="w-4 h-4" />
+                          </Button>
+                        )}
                         {form.embedEnabled && (
                           <Button 
                             variant="ghost" 
                             size="sm"
                             onClick={() => copyEmbedCode(form.formKey)}
                             data-testid="copy-embed-btn"
+                            title="Copy embed code"
                           >
                             <Code className="w-4 h-4" />
                           </Button>
@@ -160,6 +190,7 @@ export default function AdminForms() {
                           size="sm"
                           onClick={() => deleteFormMutation.mutate(form.id)}
                           data-testid="delete-form-btn"
+                          title="Delete form"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>

@@ -16,6 +16,8 @@ import {
   Save, 
   Eye, 
   ExternalLink,
+  Copy,
+  Link,
   Settings,
   User,
   Mail,
@@ -315,9 +317,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
   });
 
   const [showPreview, setShowPreview] = useState(false);
-  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [persistedSlug, setPersistedSlug] = useState(initialForm?.slug || '');
-  const [shouldOpenAfterSave, setShouldOpenAfterSave] = useState(false);
 
   // Generate slug from title
   const generateSlug = useCallback((title: string) => {
@@ -423,11 +423,6 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
       queryClient.invalidateQueries({ queryKey: ['/api/forms'] });
       onSave?.(formSchema);
       setPersistedSlug(formSchema.slug);
-      
-      if (shouldOpenAfterSave && formSchema.slug) {
-        setShouldOpenAfterSave(false);
-        window.open(`/forms/${formSchema.slug}`, '_blank');
-      }
     },
     onError: (error) => {
       toast({
@@ -436,7 +431,6 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
         variant: "destructive",
       });
       console.error('Save error:', error);
-      setShouldOpenAfterSave(false);
     }
   });
 
@@ -462,12 +456,13 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
     saveFormMutation.mutate(formSchema);
   };
 
-  const handleViewPublicForm = () => {
-    if (!persistedSlug) {
-      setShowUnsavedDialog(true);
-      return;
-    }
-    window.open(`/forms/${persistedSlug}`, '_blank');
+  const copyPublicLink = () => {
+    const publicUrl = `${window.location.origin}/forms/${persistedSlug}`;
+    navigator.clipboard.writeText(publicUrl);
+    toast({
+      title: "Link Copied",
+      description: "Public form link copied to clipboard.",
+    });
   };
 
   return (
@@ -482,10 +477,6 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
           <Button variant="outline" onClick={() => setShowPreview(true)} data-testid="button-preview">
             <Eye className="w-4 h-4 mr-2" />
             Preview
-          </Button>
-          <Button variant="outline" onClick={handleViewPublicForm} data-testid="button-view-public">
-            <ExternalLink className="w-4 h-4 mr-2" />
-            View Public Form
           </Button>
           <Button 
             onClick={handleSave}
@@ -504,6 +495,44 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
         formSchema={formSchema}
         updateFormSchema={updateFormSchema}
       />
+
+      {/* Public Link Section */}
+      {persistedSlug && (
+        <Card className="bg-blue-50 border-blue-200">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <Link className="w-5 h-5 text-blue-600" />
+                <div>
+                  <p className="text-sm font-medium text-slate-700">Public Form Link</p>
+                  <p className="text-sm text-slate-600 font-mono">
+                    {window.location.origin}/forms/{persistedSlug}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={copyPublicLink}
+                  data-testid="button-copy-public-link"
+                >
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copy Link
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(`/forms/${persistedSlug}`, '_blank')}
+                  data-testid="button-open-public-link"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -737,30 +766,6 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPreview(false)}>
               Close Preview
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Unsaved Form Dialog */}
-      <Dialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Form Not Saved</DialogTitle>
-            <DialogDescription>
-              This form hasn't been saved yet. Please save the form first to view it publicly.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowUnsavedDialog(false)} data-testid="button-cancel-unsaved">
-              Cancel
-            </Button>
-            <Button onClick={() => { 
-              setShowUnsavedDialog(false); 
-              setShouldOpenAfterSave(true);
-              handleSave(); 
-            }} data-testid="button-save-and-view">
-              Save & View
             </Button>
           </DialogFooter>
         </DialogContent>
