@@ -15,6 +15,7 @@ import {
   Trash2, 
   Save, 
   Eye, 
+  ExternalLink,
   Settings,
   User,
   Mail,
@@ -314,6 +315,9 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
   });
 
   const [showPreview, setShowPreview] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [persistedSlug, setPersistedSlug] = useState(initialForm?.slug || '');
+  const [shouldOpenAfterSave, setShouldOpenAfterSave] = useState(false);
 
   // Generate slug from title
   const generateSlug = useCallback((title: string) => {
@@ -418,6 +422,12 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
       });
       queryClient.invalidateQueries({ queryKey: ['/api/forms'] });
       onSave?.(formSchema);
+      setPersistedSlug(formSchema.slug);
+      
+      if (shouldOpenAfterSave && formSchema.slug) {
+        setShouldOpenAfterSave(false);
+        window.open(`/forms/${formSchema.slug}`, '_blank');
+      }
     },
     onError: (error) => {
       toast({
@@ -426,6 +436,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
         variant: "destructive",
       });
       console.error('Save error:', error);
+      setShouldOpenAfterSave(false);
     }
   });
 
@@ -451,6 +462,14 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
     saveFormMutation.mutate(formSchema);
   };
 
+  const handleViewPublicForm = () => {
+    if (!persistedSlug) {
+      setShowUnsavedDialog(true);
+      return;
+    }
+    window.open(`/forms/${persistedSlug}`, '_blank');
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
       {/* Form Header */}
@@ -460,14 +479,19 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
           <p className="text-slate-600">Create custom forms with smart field mapping and automated processing</p>
         </div>
         <div className="flex items-center space-x-3">
-          <Button variant="outline" onClick={() => setShowPreview(true)}>
+          <Button variant="outline" onClick={() => setShowPreview(true)} data-testid="button-preview">
             <Eye className="w-4 h-4 mr-2" />
             Preview
+          </Button>
+          <Button variant="outline" onClick={handleViewPublicForm} data-testid="button-view-public">
+            <ExternalLink className="w-4 h-4 mr-2" />
+            View Public Form
           </Button>
           <Button 
             onClick={handleSave}
             disabled={saveFormMutation.isPending}
             className="bg-primary hover:bg-primary/90"
+            data-testid="button-save-form"
           >
             <Save className="w-4 h-4 mr-2" />
             {saveFormMutation.isPending ? 'Saving...' : 'Save Form'}
@@ -713,6 +737,30 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPreview(false)}>
               Close Preview
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unsaved Form Dialog */}
+      <Dialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Form Not Saved</DialogTitle>
+            <DialogDescription>
+              This form hasn't been saved yet. Please save the form first to view it publicly.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUnsavedDialog(false)} data-testid="button-cancel-unsaved">
+              Cancel
+            </Button>
+            <Button onClick={() => { 
+              setShowUnsavedDialog(false); 
+              setShouldOpenAfterSave(true);
+              handleSave(); 
+            }} data-testid="button-save-and-view">
+              Save & View
             </Button>
           </DialogFooter>
         </DialogContent>
