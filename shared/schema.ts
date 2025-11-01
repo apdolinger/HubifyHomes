@@ -571,6 +571,7 @@ export const users = pgTable("users", {
   tier: varchar("tier").notNull().default("basic"), // basic, standard, premium
   supervisorId: varchar("supervisor_id").references(() => users.id), // Reports to this supervisor
   isAdminAccount: boolean("is_admin_account").notNull().default(false), // For least privilege: separate admin accounts
+  hasHrPermissions: boolean("has_hr_permissions").notNull().default(false), // Can view/edit HR-related sections
   isActive: boolean("is_active").notNull().default(true),
   lastActiveAt: timestamp("last_active_at"),
   iCalFeedToken: varchar("ical_feed_token"), // Secret token for personal iCal feed subscription
@@ -621,6 +622,23 @@ export const teamMembers = pgTable("team_members", {
   index("team_members_team_idx").on(table.teamId),
   index("team_members_user_idx").on(table.userId),
   unique("team_members_unique").on(table.teamId, table.userId),
+]);
+
+// Management notes for employee performance tracking
+export const managementNotes = pgTable("management_notes", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(), // Employee the note is about
+  authorId: varchar("author_id").references(() => users.id).notNull(), // Who wrote the note
+  orgId: uuid("org_id").references(() => orgs.id, { onDelete: "cascade" }).notNull(),
+  noteText: text("note_text").notNull(),
+  isEdited: boolean("is_edited").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("management_notes_user_idx").on(table.userId),
+  index("management_notes_author_idx").on(table.authorId),
+  index("management_notes_org_idx").on(table.orgId),
+  index("management_notes_created_idx").on(table.createdAt),
 ]);
 
 // Communities table
