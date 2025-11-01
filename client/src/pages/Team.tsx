@@ -178,6 +178,16 @@ export default function Team() {
     enabled: isAuthenticated,
   });
 
+  // Debug logging for Organization Teams
+  useEffect(() => {
+    console.log('[Team Page] Organization Teams Data:', {
+      allTeams,
+      allTeamsLength: allTeams?.length ?? 0,
+      allTeamsLoading,
+      isAuthenticated
+    });
+  }, [allTeams, allTeamsLoading, isAuthenticated]);
+
   // Fetch active OOO periods for all team members
   const { data: activeOOOPeriods = {} } = useQuery({
     queryKey: ["/api/out-of-office/active-statuses"],
