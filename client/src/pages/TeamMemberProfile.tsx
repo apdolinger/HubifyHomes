@@ -177,13 +177,13 @@ export default function TeamMemberProfile() {
 
   // Fetch member's recent tasks
   const { data: recentTasks = [] } = useQuery({
-    queryKey: [`/api/tasks`, { assignedTo: memberId, limit: 10 }],
+    queryKey: [`/api/tasks?assignedTo=${memberId}&limit=10`],
     enabled: isAuthenticated && !!memberId,
   });
 
   // Fetch member's properties (if any are managed by them)
   const { data: managedProperties = [] } = useQuery({
-    queryKey: [`/api/properties`, { managerId: memberId }],
+    queryKey: [`/api/properties?managerId=${memberId}`],
     enabled: isAuthenticated && !!memberId,
   });
 
