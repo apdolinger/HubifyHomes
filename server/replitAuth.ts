@@ -93,8 +93,41 @@ export async function setupAuth(app: Express) {
       await upsertUser(claims);
       
       // Fetch user from database to get orgId and role
-      const dbUser = await storage.getUser(claims["sub"]);
+      let dbUser = await storage.getUser(claims["sub"]);
       if (dbUser) {
+        // If user doesn't have an orgId, assign them to a default organization (DEV ONLY)
+        if (!dbUser.orgId) {
+          // SECURITY: Only auto-assign users to organizations in development mode
+          // In production, users must be explicitly invited and assigned to an organization
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[OIDC] User has no orgId, assigning to default organization (DEV MODE)');
+            
+            // Get or create Test Organization (deterministic selection)
+            const orgs = await storage.getOrgs();
+            let defaultOrg = orgs.find(o => o.name === 'Test Organization');
+            
+            if (!defaultOrg) {
+              // Create Test Organization if it doesn't exist
+              defaultOrg = await storage.createOrg({
+                name: 'Test Organization',
+                contactEmail: dbUser.email || 'test@hubify.com',
+                tier: 'premium',
+                status: 'active'
+              });
+              console.log('[OIDC] Created Test Organization:', defaultOrg.id);
+            }
+            
+            // Update user with orgId
+            await storage.updateUser(dbUser.id, { orgId: defaultOrg.id });
+            dbUser = await storage.getUser(claims["sub"]);
+            console.log('[OIDC] User assigned to Test Organization:', defaultOrg.id);
+          } else {
+            // In production, log error and continue without orgId
+            // The user will need to be invited to an organization
+            console.error('[OIDC] Production user missing orgId - user must be invited to an organization:', claims["sub"]);
+          }
+        }
+        
         // Add orgId and role from database to session claims
         user.claims.orgId = dbUser.orgId;
         user.claims.role = dbUser.role;
