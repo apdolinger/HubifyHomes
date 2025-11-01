@@ -22,6 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
 import ClientsStatsCustomizationModal, { StatsWidget } from "@/components/ClientsStatsCustomizationModal";
+import { TeamCommunicationModal } from "@/components/TeamCommunicationModal";
 
 // Form schema for inviting team members
 const inviteTeamMemberSchema = z.object({
@@ -63,6 +64,12 @@ export default function Team() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isStatsCustomizeModalOpen, setIsStatsCustomizeModalOpen] = useState(false);
   const [activeTeamsTab, setActiveTeamsTab] = useState("my-teams");
+  const [isCommunicationModalOpen, setIsCommunicationModalOpen] = useState(false);
+  const [selectedTeamForCommunication, setSelectedTeamForCommunication] = useState<{
+    id: string;
+    name: string;
+    memberCount: number;
+  } | null>(null);
 
   // Default stats widgets configuration
   const defaultStatsWidgets: StatsWidget[] = [
@@ -137,6 +144,16 @@ export default function Team() {
     return sortDirection === "asc" 
       ? <ArrowUp className="w-4 h-4 text-blue-600" />
       : <ArrowDown className="w-4 h-4 text-blue-600" />;
+  };
+
+  // Handle team card click - open communication modal
+  const handleTeamCardClick = (team: any) => {
+    setSelectedTeamForCommunication({
+      id: team.id,
+      name: team.name,
+      memberCount: team.memberCount || team.members?.length || 0,
+    });
+    setIsCommunicationModalOpen(true);
   };
 
   // Redirect if not authenticated
@@ -573,7 +590,12 @@ export default function Team() {
                       {userTeams.map((team: any) => {
                         const teamLead = team.members?.find((m: any) => m.role === 'lead');
                         return (
-                          <Card key={team.id} data-testid={`team-card-${team.id}`}>
+                          <Card 
+                            key={team.id} 
+                            data-testid={`team-card-${team.id}`}
+                            className="cursor-pointer hover:shadow-lg transition-shadow"
+                            onClick={() => handleTeamCardClick(team)}
+                          >
                             <CardHeader className="pb-3">
                               <CardTitle className="text-base">{team.name}</CardTitle>
                               {team.description && (
@@ -667,7 +689,12 @@ export default function Team() {
                       {allTeams.map((team: any) => {
                         const teamLead = team.members?.find((m: any) => m.role === 'lead');
                         return (
-                          <Card key={team.id} data-testid={`org-team-card-${team.id}`}>
+                          <Card 
+                            key={team.id} 
+                            data-testid={`org-team-card-${team.id}`}
+                            className="cursor-pointer hover:shadow-lg transition-shadow"
+                            onClick={() => handleTeamCardClick(team)}
+                          >
                             <CardHeader className="pb-3">
                               <CardTitle className="text-base">{team.name}</CardTitle>
                               {team.description && (
@@ -1573,6 +1600,20 @@ export default function Team() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Team Communication Modal */}
+      {selectedTeamForCommunication && (
+        <TeamCommunicationModal
+          isOpen={isCommunicationModalOpen}
+          onClose={() => {
+            setIsCommunicationModalOpen(false);
+            setSelectedTeamForCommunication(null);
+          }}
+          teamId={selectedTeamForCommunication.id}
+          teamName={selectedTeamForCommunication.name}
+          memberCount={selectedTeamForCommunication.memberCount}
+        />
+      )}
     </main>
   );
 }
