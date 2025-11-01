@@ -649,43 +649,108 @@ export default function TeamMemberProfile() {
               <CardTitle>Task History</CardTitle>
             </CardHeader>
             <CardContent>
-              {recentTasks.length > 0 ? (
-                <div className="space-y-4">
-                  {recentTasks.map((task: any) => (
-                    <div key={task.id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
-                      <div className="flex-1">
-                        <h3 className="text-sm font-medium text-slate-900">{task.title}</h3>
-                        <p className="text-sm text-slate-600 mt-1">{task.description}</p>
-                        <div className="flex items-center space-x-4 mt-2 text-xs text-slate-500">
-                          {task.property && (
-                            <span className="flex items-center">
-                              <Building className="w-3 h-3 mr-1" />
-                              {task.property.name}
-                            </span>
-                          )}
-                          <span className="flex items-center">
-                            <Calendar className="w-3 h-3 mr-1" />
-                            {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "No due date"}
-                          </span>
+              {(() => {
+                const ninetyDaysAgo = new Date();
+                ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+                
+                // Filter tasks within 90 days
+                const filteredTasks = recentTasks.filter((task: any) => {
+                  const taskDate = task.completedAt 
+                    ? new Date(task.completedAt) 
+                    : task.updatedAt 
+                    ? new Date(task.updatedAt) 
+                    : new Date(task.createdAt);
+                  return taskDate >= ninetyDaysAgo;
+                });
+
+                // Sort tasks: first by due date (for non-completed), then by completion date
+                const sortedTasks = [...filteredTasks].sort((a: any, b: any) => {
+                  const aCompleted = a.status === 'completed' || a.status === 'archived';
+                  const bCompleted = b.status === 'completed' || b.status === 'archived';
+                  
+                  // Both completed: sort by completion date (newest first)
+                  if (aCompleted && bCompleted) {
+                    const aDate = new Date(a.completedAt || a.updatedAt || a.createdAt).getTime();
+                    const bDate = new Date(b.completedAt || b.updatedAt || b.createdAt).getTime();
+                    return bDate - aDate;
+                  }
+                  
+                  // Both not completed: sort by due date (newest first)
+                  if (!aCompleted && !bCompleted) {
+                    const aDue = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+                    const bDue = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+                    return bDue - aDue;
+                  }
+                  
+                  // Not completed tasks come before completed tasks
+                  return aCompleted ? 1 : -1;
+                });
+
+                return sortedTasks.length > 0 ? (
+                  <div className="space-y-4">
+                    {sortedTasks.map((task: any) => {
+                      const isClickable = task.status !== 'completed' && task.status !== 'archived';
+                      
+                      return (
+                        <div
+                          key={task.id}
+                          className={`flex items-center justify-between p-4 border border-slate-200 rounded-lg ${
+                            isClickable 
+                              ? 'cursor-pointer hover:bg-slate-50 hover:border-slate-300 transition-colors' 
+                              : ''
+                          }`}
+                          onClick={() => {
+                            if (isClickable) {
+                              setLocation(`/task-profile/${task.id}`);
+                            }
+                          }}
+                          data-testid={`task-item-${task.id}`}
+                        >
+                          <div className="flex-1">
+                            <h3 className="text-sm font-medium text-slate-900">{task.title}</h3>
+                            {task.description && (
+                              <p className="text-sm text-slate-600 mt-1 line-clamp-2">{task.description}</p>
+                            )}
+                            <div className="flex items-center space-x-4 mt-2 text-xs text-slate-500">
+                              {task.property && (
+                                <span className="flex items-center">
+                                  <Building className="w-3 h-3 mr-1" />
+                                  {task.property.name}
+                                </span>
+                              )}
+                              <span className="flex items-center">
+                                <Calendar className="w-3 h-3 mr-1" />
+                                {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "No due date"}
+                              </span>
+                              {task.completedAt && (
+                                <span className="flex items-center text-green-600">
+                                  <CheckSquare className="w-3 h-3 mr-1" />
+                                  Completed {new Date(task.completedAt).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <Badge variant={getTaskStatusColor(task.status)}>
+                              {task.status}
+                            </Badge>
+                            {task.priority && (
+                              <Badge variant="outline">
+                                {task.priority}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <Badge variant={getTaskStatusColor(task.status)}>
-                          {task.status}
-                        </Badge>
-                        <Badge variant="outline">
-                          {task.priority}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-sm text-slate-500">
-                  <CheckSquare className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-                  No tasks assigned to this member
-                </div>
-              )}
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-sm text-slate-500">
+                    <CheckSquare className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+                    No tasks assigned to this member in the last 90 days
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </TabsContent>
