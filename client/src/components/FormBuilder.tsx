@@ -258,7 +258,7 @@ const FormSettingsPanel: React.FC<FormSettingsPanelProps> = ({
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
             <Label>Allow Multiple Submissions</Label>
             <Switch
               checked={formSchema.allowMultipleSubmissions}
@@ -266,7 +266,7 @@ const FormSettingsPanel: React.FC<FormSettingsPanelProps> = ({
             />
           </div>
           
-          <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
             <Label>Trigger Automation</Label>
             <Switch
               checked={formSchema.triggerAutomation || false}
