@@ -235,6 +235,7 @@ export interface IStorage {
     completedTasks: number;
     activeTasks: number;
     overdueTasks: number;
+    completionRate: number;
   }>;
   
   // Out-of-office operations
@@ -788,6 +789,7 @@ export class DatabaseStorage implements IStorage {
     completedTasks: number;
     activeTasks: number;
     overdueTasks: number;
+    completionRate: number;
   }> {
     // Get all tasks assigned to this user
     const allTasks = await db.select().from(tasks).where(eq(tasks.assignedToId, userId));
@@ -801,11 +803,17 @@ export class DatabaseStorage implements IStorage {
       task.status !== 'completed'
     ).length;
 
+    // Calculate completion rate as percentage (0-100)
+    const completionRate = totalTasks > 0 
+      ? Math.round((completedTasks / totalTasks) * 100) 
+      : 0;
+
     return {
       totalTasks,
       completedTasks,
       activeTasks,
-      overdueTasks
+      overdueTasks,
+      completionRate
     };
   }
 
