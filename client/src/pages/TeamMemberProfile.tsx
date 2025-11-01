@@ -83,6 +83,9 @@ export default function TeamMemberProfile() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isOOOModalOpen, setIsOOOModalOpen] = useState(false);
   const [isStatsCustomizeModalOpen, setIsStatsCustomizeModalOpen] = useState(false);
+  const [isAddingNote, setIsAddingNote] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
+  const [noteText, setNoteText] = useState("");
 
   // Default stats widgets configuration
   const defaultStatsWidgets: StatsWidget[] = [
@@ -115,6 +118,26 @@ export default function TeamMemberProfile() {
   const { data: currentUser } = useQuery({
     queryKey: ["/api/auth/user"],
     enabled: isAuthenticated,
+  });
+
+  // Fetch team member details
+  const { data: member, isLoading: memberLoading } = useQuery({
+    queryKey: [`/api/users/${memberId}`],
+    enabled: isAuthenticated && !!memberId,
+  });
+
+  // Compute permission check for viewing Performance tab
+  const canViewPerformance = currentUser && member && (
+    currentUser.hasHrPermissions === true ||
+    currentUser.role === 'admin' ||
+    currentUser.role === 'supervisor' ||
+    currentUser.id === member.supervisorId
+  );
+
+  // Fetch management notes for the member
+  const { data: managementNotes = [], refetch: refetchNotes } = useQuery({
+    queryKey: [`/api/users/${memberId}/management-notes`],
+    enabled: isAuthenticated && !!memberId && !!canViewPerformance,
   });
 
   // Fetch out-of-office periods for this member
@@ -162,12 +185,6 @@ export default function TeamMemberProfile() {
       return;
     }
   }, [isAuthenticated, isLoading, toast]);
-
-  // Fetch team member details
-  const { data: member, isLoading: memberLoading } = useQuery({
-    queryKey: [`/api/users/${memberId}`],
-    enabled: isAuthenticated && !!memberId,
-  });
 
   // Fetch member's task statistics
   const { data: taskStats } = useQuery({
@@ -328,6 +345,50 @@ export default function TeamMemberProfile() {
       deleteOOOMutation.mutate(id);
     }
   };
+
+  // Create management note mutation
+  const createNoteMutation = useMutation({
+    mutationFn: async (text: string) => {
+      return await apiRequest("POST", `/api/users/${memberId}/management-notes`, {
+        noteText: text,
+      });
+    },
+    onSuccess: () => {
+      refetchNotes();
+      setIsAddingNote(false);
+      setNoteText("");
+      toast({ title: "Note added successfully" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create note",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update management note mutation
+  const updateNoteMutation = useMutation({
+    mutationFn: async ({ id, text }: { id: number; text: string }) => {
+      return await apiRequest("PATCH", `/api/management-notes/${id}`, {
+        noteText: text,
+      });
+    },
+    onSuccess: () => {
+      refetchNotes();
+      setEditingNoteId(null);
+      setNoteText("");
+      toast({ title: "Note updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update note",
+        variant: "destructive",
+      });
+    },
+  });
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -574,12 +635,17 @@ export default function TeamMemberProfile() {
 
       {/* Detailed Information Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className={`grid w-full ${canViewPerformance ? 'grid-cols-5' : 'grid-cols-4'}`}>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="tasks">Tasks</TabsTrigger>
           <TabsTrigger value="properties">Properties</TabsTrigger>
           <TabsTrigger value="messages">Messages</TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
+          {canViewPerformance && (
+            <TabsTrigger value="performance" data-testid="tab-performance">
+              <Award className="w-4 h-4 mr-2" />
+              Performance
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -895,6 +961,159 @@ export default function TeamMemberProfile() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Management Notes Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <MessageSquare className="w-4 h-4 mr-2" />
+                  Management Notes
+                </div>
+                {!isAddingNote && (
+                  <Button 
+                    size="sm" 
+                    onClick={() => {
+                      setIsAddingNote(true);
+                      setNoteText("");
+                    }}
+                    data-testid="add-note-btn"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Note
+                  </Button>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {/* Add Note Form */}
+              {isAddingNote && (
+                <div className="mb-4 p-4 border border-slate-200 rounded-lg bg-slate-50">
+                  <Textarea
+                    placeholder="Enter management note..."
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value)}
+                    className="mb-3"
+                    rows={4}
+                    data-testid="note-textarea"
+                  />
+                  <div className="flex justify-end space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setIsAddingNote(false);
+                        setNoteText("");
+                      }}
+                      data-testid="cancel-note-btn"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => createNoteMutation.mutate(noteText)}
+                      disabled={!noteText.trim() || createNoteMutation.isPending}
+                      data-testid="save-note-btn"
+                    >
+                      {createNoteMutation.isPending ? "Saving..." : "Save"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Notes List */}
+              {managementNotes.length > 0 ? (
+                <div className="space-y-3">
+                  {managementNotes.map((note: any) => (
+                    <div 
+                      key={note.id} 
+                      className="p-4 border border-slate-200 rounded-lg bg-white"
+                      data-testid={`note-${note.id}`}
+                    >
+                      {editingNoteId === note.id ? (
+                        <div>
+                          <Textarea
+                            value={noteText}
+                            onChange={(e) => setNoteText(e.target.value)}
+                            className="mb-3"
+                            rows={4}
+                            data-testid={`edit-note-textarea-${note.id}`}
+                          />
+                          <div className="flex justify-end space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setEditingNoteId(null);
+                                setNoteText("");
+                              }}
+                              data-testid={`cancel-edit-note-${note.id}`}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => updateNoteMutation.mutate({ id: note.id, text: noteText })}
+                              disabled={!noteText.trim() || updateNoteMutation.isPending}
+                              data-testid={`save-edit-note-${note.id}`}
+                            >
+                              {updateNoteMutation.isPending ? "Saving..." : "Save"}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start space-x-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback>
+                              {getUserInitials(note.author.firstName, note.author.lastName)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-sm font-medium text-slate-900">
+                                {note.author.firstName} {note.author.lastName}
+                              </p>
+                              <div className="flex items-center space-x-2">
+                                <p className="text-xs text-slate-500">
+                                  {formatTimeAgo(note.createdAt)}
+                                </p>
+                                {(currentUser?.id === note.authorId || currentUser?.role === 'admin') && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditingNoteId(note.id);
+                                      setNoteText(note.noteText);
+                                    }}
+                                    data-testid={`edit-note-btn-${note.id}`}
+                                  >
+                                    <Edit className="w-3 h-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                              {note.noteText}
+                            </p>
+                            {note.isEdited && (
+                              <p className="text-xs text-slate-400 mt-1">(edited)</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                !isAddingNote && (
+                  <div className="text-center py-8 text-sm text-slate-500">
+                    <MessageSquare className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+                    No management notes yet
+                  </div>
+                )
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
