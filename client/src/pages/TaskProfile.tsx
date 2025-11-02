@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -59,7 +59,8 @@ import {
   Settings,
   AlertTriangle,
   Info,
-  XCircle
+  XCircle,
+  Star
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -455,6 +456,23 @@ export default function TaskProfile() {
     queryKey: ["/api/rooms/property", (task as any)?.propertyId],
     enabled: isAuthenticated && !!(task as any)?.propertyId,
   });
+
+  // Fetch property vendors for the property associated with this task (for sorting in vendor dropdown)
+  const { data: propertyVendors = [] } = useQuery({
+    queryKey: [`/api/properties/${editForm.propertyId}/vendors`],
+    enabled: isAuthenticated && !!editForm.propertyId,
+  });
+
+  // Create a sorted vendors list with preferred vendors (property vendors) first
+  const sortedVendors = useMemo(() => {
+    if (!vendors || vendors.length === 0) return [];
+    
+    const preferredVendorIds = new Set((propertyVendors as any[]).map((pv: any) => pv.vendorId));
+    const preferred = vendors.filter((v: any) => preferredVendorIds.has(v.id));
+    const others = vendors.filter((v: any) => !preferredVendorIds.has(v.id));
+    
+    return [...preferred, ...others];
+  }, [vendors, propertyVendors]);
 
   // Fetch contact details if task has contactId (to get accountId)
   const taskContactId = (task as any)?.contactId;
@@ -1932,18 +1950,28 @@ export default function TaskProfile() {
                                 <span>No vendor</span>
                               </div>
                             </SelectItem>
-                            {vendors.length > 0 ? (
-                              vendors.map((vendor: any) => (
-                                <SelectItem key={vendor.id} value={vendor.id.toString()}>
-                                  <div className="flex items-center space-x-2">
-                                    <Building className="w-4 h-4 text-slate-500" />
-                                    <div>
-                                      <div className="font-medium">{vendor.firstName} {vendor.lastName}</div>
-                                      {vendor.vendorType && <div className="text-xs text-slate-500">{vendor.vendorType}</div>}
+                            {sortedVendors.length > 0 ? (
+                              sortedVendors.map((vendor: any) => {
+                                const isPreferred = (propertyVendors as any[]).some((pv: any) => pv.vendorId === vendor.id);
+                                return (
+                                  <SelectItem key={vendor.id} value={vendor.id.toString()}>
+                                    <div className="flex items-center space-x-2">
+                                      {isPreferred ? (
+                                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                                      ) : (
+                                        <Building className="w-4 h-4 text-slate-500" />
+                                      )}
+                                      <div>
+                                        <div className="font-medium flex items-center gap-1">
+                                          {vendor.firstName} {vendor.lastName}
+                                          {isPreferred && <span className="text-xs text-yellow-600 dark:text-yellow-500">(Preferred)</span>}
+                                        </div>
+                                        {vendor.vendorType && <div className="text-xs text-slate-500">{vendor.vendorType}</div>}
+                                      </div>
                                     </div>
-                                  </div>
-                                </SelectItem>
-                              ))
+                                  </SelectItem>
+                                );
+                              })
                             ) : (
                               <SelectItem value="no-vendors" disabled>
                                 <span className="text-slate-400">No vendors available</span>
