@@ -9,14 +9,14 @@ import { Upload, FileText, Check } from 'lucide-react';
 
 interface ConditionalFormFieldProps {
   field: {
-    id: number;
+    id: number | string;
     label: string;
     type: string;
     required: boolean;
     options?: string[];
     conditions?: {
-      showIf?: { fieldId: number; operator: 'equals' | 'not_equals' | 'contains'; value: string }[];
-      hideIf?: { fieldId: number; operator: 'equals' | 'not_equals' | 'contains'; value: string }[];
+      showIf?: { fieldId: number | string; operator: 'equals' | 'not_equals' | 'contains'; value: string }[];
+      hideIf?: { fieldId: number | string; operator: 'equals' | 'not_equals' | 'contains'; value: string }[];
     };
     validation?: {
       minLength?: number;
@@ -27,7 +27,7 @@ interface ConditionalFormFieldProps {
     };
   };
   formData: Record<string, any>;
-  onChange: (fieldId: number, value: any) => void;
+  onChange: (fieldId: number | string, value: any) => void;
   control: any;
 }
 

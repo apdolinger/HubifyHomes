@@ -43,7 +43,7 @@ import { FormContext } from '@/../../shared/schema';
  */
 
 interface FieldCondition {
-  fieldId: string;
+  fieldId: string | number;
   operator: 'equals' | 'not_equals' | 'contains';
   value: string;
 }
@@ -536,7 +536,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
     internalDescription: initialForm?.internalDescription || '',
     exteriorDescription: initialForm?.exteriorDescription || '',
     slug: initialForm?.slug || '',
-    contexts: initialForm?.contexts ? (Array.isArray(initialForm.contexts) ? initialForm.contexts : [initialForm.context || 'people']) : ['people'],
+    contexts: initialForm?.contexts ? (Array.isArray(initialForm.contexts) ? initialForm.contexts : ['people']) : ['people'],
     fields: initialForm?.fields || [],
     allowMultipleSubmissions: initialForm?.allowMultipleSubmissions || false,
     matchExistingBy: initialForm?.matchExistingBy || 'email',
@@ -922,7 +922,6 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
                                     <Switch
                                       checked={field.required}
                                       onCheckedChange={(checked) => updateField(index, { required: checked })}
-                                      size="sm"
                                     />
                                     <span className="text-xs text-slate-500">Required</span>
                                     <Button
