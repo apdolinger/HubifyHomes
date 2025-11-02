@@ -25,7 +25,10 @@ import {
   ArrowLeft,
   FileText,
   CheckSquare,
-  Wrench
+  Wrench,
+  Users,
+  Plus,
+  Trash2
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -49,12 +52,22 @@ const editVendorSchema = z.object({
   path: ["vendorTypeOther"],
 });
 
+const employeeSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  title: z.string().optional(),
+  email: z.string().email("Invalid email").optional().or(z.literal("")),
+  phone: z.string().optional(),
+  businessNotes: z.string().optional(),
+});
+
 export default function VendorProfile() {
   const { id } = useParams<{ id: string }>();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<any>(null);
 
   const { data: vendor, isLoading: vendorLoading } = useQuery({
     queryKey: ["/api/contacts", id],
@@ -83,6 +96,15 @@ export default function VendorProfile() {
     enabled: !!id && isAuthenticated,
   });
 
+  const { data: employees, isLoading: employeesLoading } = useQuery({
+    queryKey: ["/api/vendors", id, "employees"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/vendors/${id}/employees`);
+      return response.json();
+    },
+    enabled: !!id && isAuthenticated && vendor?.vendorCategory === 'organization',
+  });
+
   const editForm = useForm({
     resolver: zodResolver(editVendorSchema),
     defaultValues: {
@@ -94,6 +116,17 @@ export default function VendorProfile() {
       vendorType: "",
       vendorTypeOther: "",
       notes: "",
+    },
+  });
+
+  const employeeForm = useForm({
+    resolver: zodResolver(employeeSchema),
+    defaultValues: {
+      name: "",
+      title: "",
+      email: "",
+      phone: "",
+      businessNotes: "",
     },
   });
 
@@ -149,6 +182,149 @@ export default function VendorProfile() {
 
   const handleUpdateVendor = (data: z.infer<typeof editVendorSchema>) => {
     updateVendorMutation.mutate(data);
+  };
+
+  const createEmployeeMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof employeeSchema>) => {
+      const response = await apiRequest("POST", "/api/vendor-employees", {
+        ...data,
+        vendorId: parseInt(id || "0"),
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors", id, "employees"] });
+      toast({
+        title: "Employee Added",
+        description: "Employee has been added successfully.",
+      });
+      setIsEmployeeModalOpen(false);
+      employeeForm.reset();
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to add employee. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateEmployeeMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof employeeSchema> & { id: number }) => {
+      const { id: employeeId, ...updateData } = data;
+      const response = await apiRequest("PATCH", `/api/vendor-employees/${employeeId}`, updateData);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors", id, "employees"] });
+      toast({
+        title: "Employee Updated",
+        description: "Employee information has been updated successfully.",
+      });
+      setIsEmployeeModalOpen(false);
+      setEditingEmployee(null);
+      employeeForm.reset();
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to update employee. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteEmployeeMutation = useMutation({
+    mutationFn: async (employeeId: number) => {
+      const response = await apiRequest("DELETE", `/api/vendor-employees/${employeeId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors", id, "employees"] });
+      toast({
+        title: "Employee Deleted",
+        description: "Employee has been removed successfully.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to delete employee. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAddEmployee = () => {
+    setEditingEmployee(null);
+    employeeForm.reset({
+      name: "",
+      title: "",
+      email: "",
+      phone: "",
+      businessNotes: "",
+    });
+    setIsEmployeeModalOpen(true);
+  };
+
+  const handleEditEmployee = (employee: any) => {
+    setEditingEmployee(employee);
+    employeeForm.reset({
+      name: employee.name,
+      title: employee.title || "",
+      email: employee.email || "",
+      phone: employee.phone || "",
+      businessNotes: employee.businessNotes || "",
+    });
+    setIsEmployeeModalOpen(true);
+  };
+
+  const handleDeleteEmployee = (employeeId: number) => {
+    if (confirm("Are you sure you want to delete this employee?")) {
+      deleteEmployeeMutation.mutate(employeeId);
+    }
+  };
+
+  const handleSaveEmployee = (data: z.infer<typeof employeeSchema>) => {
+    if (editingEmployee) {
+      updateEmployeeMutation.mutate({ ...data, id: editingEmployee.id });
+    } else {
+      createEmployeeMutation.mutate(data);
+    }
   };
 
   useEffect(() => {
@@ -288,7 +464,7 @@ export default function VendorProfile() {
           <Card>
             <Tabs defaultValue="properties" className="w-full">
               <CardHeader className="pb-2">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className={`grid w-full ${vendor.vendorCategory === 'organization' ? 'grid-cols-3' : 'grid-cols-2'}`}>
                   <TabsTrigger value="properties" className="flex items-center gap-2">
                     <Building className="w-4 h-4" />
                     Properties ({properties?.length || 0})
@@ -297,6 +473,12 @@ export default function VendorProfile() {
                     <CheckSquare className="w-4 h-4" />
                     Tasks ({vendorTasks.length})
                   </TabsTrigger>
+                  {vendor.vendorCategory === 'organization' && (
+                    <TabsTrigger value="employees" className="flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      Employees ({employees?.length || 0})
+                    </TabsTrigger>
+                  )}
                 </TabsList>
               </CardHeader>
               <CardContent>
@@ -360,6 +542,109 @@ export default function VendorProfile() {
                     </div>
                   )}
                 </TabsContent>
+                {vendor.vendorCategory === 'organization' && (
+                  <TabsContent value="employees" className="mt-0">
+                    <div className="space-y-4">
+                      <div className="flex justify-end">
+                        <Button
+                          onClick={handleAddEmployee}
+                          size="sm"
+                          data-testid="button-add-employee"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Employee
+                        </Button>
+                      </div>
+                      {employeesLoading ? (
+                        <div className="flex justify-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        </div>
+                      ) : employees && employees.length > 0 ? (
+                        <div className="space-y-2">
+                          {employees.map((employee: any) => (
+                            <div
+                              key={employee.id}
+                              className="flex items-start justify-between p-4 border rounded-lg hover:bg-slate-50 transition-colors"
+                              data-testid={`employee-card-${employee.id}`}
+                            >
+                              <div className="flex items-start gap-3 flex-1">
+                                <Avatar className="h-10 w-10">
+                                  <AvatarFallback className="bg-gradient-to-br from-green-500 to-blue-600 text-white">
+                                    {employee.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <p className="font-medium" data-testid={`employee-name-${employee.id}`}>
+                                      {employee.name}
+                                    </p>
+                                    {employee.title && (
+                                      <Badge variant="outline" className="text-xs">
+                                        {employee.title}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="space-y-1">
+                                    {employee.email && (
+                                      <div className="flex items-center gap-2 text-sm text-slate-600">
+                                        <Mail className="w-3 h-3" />
+                                        <a href={`mailto:${employee.email}`} className="hover:text-blue-600 hover:underline">
+                                          {employee.email}
+                                        </a>
+                                      </div>
+                                    )}
+                                    {employee.phone && (
+                                      <div className="flex items-center gap-2 text-sm text-slate-600">
+                                        <Phone className="w-3 h-3" />
+                                        <a href={`tel:${employee.phone}`} className="hover:text-green-600 hover:underline">
+                                          {employee.phone}
+                                        </a>
+                                      </div>
+                                    )}
+                                    {employee.businessNotes && (
+                                      <div className="mt-2 p-2 bg-slate-50 rounded text-sm text-slate-700 border-l-2 border-slate-300">
+                                        <p className="text-xs text-slate-500 font-medium mb-1">Business Notes:</p>
+                                        <p className="whitespace-pre-wrap">{employee.businessNotes}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex gap-2 ml-4">
+                                <Button
+                                  onClick={() => handleEditEmployee(employee)}
+                                  size="sm"
+                                  variant="outline"
+                                  data-testid={`button-edit-employee-${employee.id}`}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  onClick={() => handleDeleteEmployee(employee.id)}
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  data-testid={`button-delete-employee-${employee.id}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                          <p className="text-slate-600 text-sm mb-4">No employees added yet</p>
+                          <Button onClick={handleAddEmployee} variant="outline" size="sm">
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add First Employee
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+                )}
               </CardContent>
             </Tabs>
           </Card>
@@ -540,6 +825,106 @@ export default function VendorProfile() {
                 </Button>
                 <Button type="submit">
                   Update Vendor
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEmployeeModalOpen} onOpenChange={setIsEmployeeModalOpen}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingEmployee ? "Edit Employee" : "Add Employee"}
+            </DialogTitle>
+          </DialogHeader>
+          <Form {...employeeForm}>
+            <form onSubmit={employeeForm.handleSubmit(handleSaveEmployee)} className="space-y-4">
+              <FormField
+                control={employeeForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name *</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-employee-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={employeeForm.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Title/Position</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="e.g., Service Manager" data-testid="input-employee-title" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={employeeForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input {...field} type="email" data-testid="input-employee-email" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={employeeForm.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-employee-phone" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={employeeForm.control}
+                name="businessNotes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Business Notes</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        rows={3}
+                        placeholder="Internal notes about this employee's role, responsibilities, or business context..."
+                        data-testid="input-employee-notes"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsEmployeeModalOpen(false);
+                    setEditingEmployee(null);
+                  }}
+                  data-testid="button-cancel-employee"
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" data-testid="button-save-employee">
+                  {editingEmployee ? "Update" : "Add"} Employee
                 </Button>
               </DialogFooter>
             </form>
