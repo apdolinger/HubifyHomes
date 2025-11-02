@@ -21,10 +21,12 @@ import {
   Edit,
   Trash2,
   Search,
-  AlertCircle
+  AlertCircle,
+  Settings
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
 
 const vendorSchema = z.object({
   accountId: z.string().nullable().optional(),
@@ -49,6 +51,73 @@ export default function Vendors() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [vendorToDelete, setVendorToDelete] = useState<any>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isCustomizeModalOpen, setIsCustomizeModalOpen] = useState(false);
+
+  // Default column configuration for vendors table
+  const defaultColumns: ColumnConfig[] = [
+    { id: 'name', label: 'Name', visible: true, required: true },
+    { id: 'email', label: 'Email', visible: true },
+    { id: 'phone', label: 'Phone', visible: true },
+    { id: 'accountId', label: 'Account ID', visible: true },
+    { id: 'actions', label: 'Actions', visible: true, required: true },
+  ];
+
+  // Merge saved columns with defaults to ensure new columns appear while preserving order
+  const mergeColumns = (saved: ColumnConfig[], defaults: ColumnConfig[]): ColumnConfig[] => {
+    const defaultsMap = new Map(defaults.map(col => [col.id, col]));
+    const savedIds = new Set(saved.map(col => col.id));
+    
+    // Start with saved columns, updating their properties from defaults
+    const mergedColumns = saved.map(savedCol => {
+      const defaultCol = defaultsMap.get(savedCol.id);
+      if (defaultCol) {
+        // Preserve saved visibility unless it's a required column
+        return {
+          ...defaultCol,
+          visible: defaultCol.required ? true : savedCol.visible,
+        };
+      }
+      // Keep saved column even if not in defaults (backwards compatibility)
+      return savedCol;
+    });
+    
+    // Append any new columns from defaults that aren't in saved
+    defaults.forEach(defaultCol => {
+      if (!savedIds.has(defaultCol.id)) {
+        mergedColumns.push(defaultCol);
+      }
+    });
+    
+    return mergedColumns;
+  };
+
+  // Load column configuration from localStorage with window guard
+  const [columns, setColumns] = useState<ColumnConfig[]>(() => {
+    if (typeof window === 'undefined') return defaultColumns;
+    
+    try {
+      const saved = localStorage.getItem('vendorsTableColumns');
+      if (saved) {
+        const parsedColumns = JSON.parse(saved);
+        return mergeColumns(parsedColumns, defaultColumns);
+      }
+    } catch (error) {
+      console.warn('Failed to load vendors table columns from localStorage:', error);
+    }
+    return defaultColumns;
+  });
+
+  // Save column configuration to localStorage
+  const handleSaveColumns = (newColumns: ColumnConfig[]) => {
+    setColumns(newColumns);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('vendorsTableColumns', JSON.stringify(newColumns));
+      } catch (error) {
+        console.warn('Failed to save vendors table columns to localStorage:', error);
+      }
+    }
+  };
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -345,6 +414,24 @@ export default function Vendors() {
 
       {/* Vendors Table */}
       <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Vendors</CardTitle>
+            <div className="flex items-center gap-3">
+              <div className="text-sm text-slate-600">
+                {filteredVendors.length} vendor{filteredVendors.length !== 1 ? 's' : ''}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsCustomizeModalOpen(true)}
+                data-testid="customize-vendors-table-btn"
+              >
+                <Settings className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
         <CardContent className="p-0">
           {contactsLoading ? (
             <div className="text-center py-12">
@@ -356,70 +443,94 @@ export default function Vendors() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Account ID</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    {columns.filter(col => col.visible).map(col => (
+                      <TableHead 
+                        key={col.id} 
+                        className={col.id === 'actions' ? 'text-right' : ''}
+                      >
+                        {col.label}
+                      </TableHead>
+                    ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredVendors.map((vendor: any) => (
                     <TableRow key={vendor.id} data-testid={`vendor-row-${vendor.id}`}>
-                      <TableCell className="font-medium">
-                        {vendor.firstName} {vendor.lastName}
-                      </TableCell>
-                      <TableCell>
-                        {vendor.email ? (
-                          <div className="flex items-center gap-2">
-                            <Mail className="w-4 h-4 text-slate-400" />
-                            <a href={`mailto:${vendor.email}`} className="text-blue-600 hover:underline">
-                              {vendor.email}
-                            </a>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">No email</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {vendor.phone ? (
-                          <div className="flex items-center gap-2">
-                            <Phone className="w-4 h-4 text-slate-400" />
-                            <a href={`tel:${vendor.phone}`} className="text-blue-600 hover:underline">
-                              {vendor.phone}
-                            </a>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">No phone</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {vendor.accountId ? (
-                          <Badge variant="outline">{vendor.accountId}</Badge>
-                        ) : (
-                          <span className="text-slate-400">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditVendor(vendor)}
-                            data-testid={`button-edit-vendor-${vendor.id}`}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteVendor(vendor)}
-                            data-testid={`button-delete-vendor-${vendor.id}`}
-                          >
-                            <Trash2 className="w-4 h-4 text-red-600" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                      {columns.filter(col => col.visible).map(col => {
+                        switch (col.id) {
+                          case 'name':
+                            return (
+                              <TableCell key={col.id} className="font-medium">
+                                {vendor.firstName} {vendor.lastName}
+                              </TableCell>
+                            );
+                          case 'email':
+                            return (
+                              <TableCell key={col.id}>
+                                {vendor.email ? (
+                                  <div className="flex items-center gap-2">
+                                    <Mail className="w-4 h-4 text-slate-400" />
+                                    <a href={`mailto:${vendor.email}`} className="text-blue-600 hover:underline">
+                                      {vendor.email}
+                                    </a>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400">No email</span>
+                                )}
+                              </TableCell>
+                            );
+                          case 'phone':
+                            return (
+                              <TableCell key={col.id}>
+                                {vendor.phone ? (
+                                  <div className="flex items-center gap-2">
+                                    <Phone className="w-4 h-4 text-slate-400" />
+                                    <a href={`tel:${vendor.phone}`} className="text-blue-600 hover:underline">
+                                      {vendor.phone}
+                                    </a>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400">No phone</span>
+                                )}
+                              </TableCell>
+                            );
+                          case 'accountId':
+                            return (
+                              <TableCell key={col.id}>
+                                {vendor.accountId ? (
+                                  <Badge variant="outline">{vendor.accountId}</Badge>
+                                ) : (
+                                  <span className="text-slate-400">-</span>
+                                )}
+                              </TableCell>
+                            );
+                          case 'actions':
+                            return (
+                              <TableCell key={col.id} className="text-right">
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditVendor(vendor)}
+                                    data-testid={`button-edit-vendor-${vendor.id}`}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteVendor(vendor)}
+                                    data-testid={`button-delete-vendor-${vendor.id}`}
+                                  >
+                                    <Trash2 className="w-4 h-4 text-red-600" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            );
+                          default:
+                            return null;
+                        }
+                      })}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -703,6 +814,15 @@ export default function Vendors() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Table Customization Modal */}
+      <TableCustomizationModal
+        isOpen={isCustomizeModalOpen}
+        onClose={() => setIsCustomizeModalOpen(false)}
+        columns={columns}
+        defaultColumns={defaultColumns}
+        onSave={handleSaveColumns}
+      />
     </main>
   );
 }
