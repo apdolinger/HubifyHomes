@@ -385,6 +385,11 @@ export default function PropertyProfile() {
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [notesValue, setNotesValue] = useState("");
   
+  // Vendor modal state
+  const [isAddVendorModalOpen, setIsAddVendorModalOpen] = useState(false);
+  const [selectedVendorId, setSelectedVendorId] = useState<string>("");
+  const [vendorNotes, setVendorNotes] = useState("");
+  
   // Get property ID from URL path parameters
   const params = useParams();
   const propertyId = params.id;
@@ -494,6 +499,19 @@ export default function PropertyProfile() {
   const { data: propertyContacts = [], isLoading: contactsLoading, refetch: refetchContacts } = useQuery({
     queryKey: [`/api/properties/${propertyId}/contacts`],
     enabled: isAuthenticated && !!propertyId,
+  });
+
+  // Get property vendors
+  const { data: propertyVendors = [], isLoading: vendorsLoading, refetch: refetchVendors } = useQuery({
+    queryKey: [`/api/properties/${propertyId}/vendors`],
+    enabled: isAuthenticated && !!propertyId,
+  });
+
+  // Get all vendors
+  const { data: allVendors = [] } = useQuery({
+    queryKey: ["/api/contacts"],
+    enabled: isAuthenticated,
+    select: (data: any[]) => data.filter((contact: any) => contact.type === 'vendor'),
   });
 
   // Get communities
@@ -1146,6 +1164,75 @@ export default function PropertyProfile() {
     onError: (error) => {
       toast({
         title: "Failed to delete access item",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Vendor mutations
+  const addPropertyVendorMutation = useMutation({
+    mutationFn: async ({ vendorId, notes }: { vendorId: string; notes: string }) => {
+      return await apiRequest("POST", `/api/properties/${propertyId}/vendors`, {
+        vendorId: parseInt(vendorId),
+        notes
+      });
+    },
+    onSuccess: () => {
+      refetchVendors();
+      setIsAddVendorModalOpen(false);
+      setSelectedVendorId("");
+      setVendorNotes("");
+      toast({
+        title: "Vendor added",
+        description: "Vendor has been added to this property.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Failed to add vendor",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const removePropertyVendorMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("DELETE", `/api/property-vendors/${id}`);
+    },
+    onSuccess: () => {
+      refetchVendors();
+      toast({
+        title: "Vendor removed",
+        description: "Vendor has been removed from this property.",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Failed to remove vendor",
         description: error.message,
         variant: "destructive",
       });
@@ -3263,12 +3350,13 @@ export default function PropertyProfile() {
 
         {/* Tabs for detailed information */}
         <Tabs defaultValue="tasks" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-8">
+          <TabsList className="grid w-full grid-cols-9">
             <TabsTrigger value="tasks">Tasks</TabsTrigger>
             <TabsTrigger value="contacts">Residents</TabsTrigger>
             <TabsTrigger value="rooms">Rooms</TabsTrigger>
             <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
             <TabsTrigger value="community">Community</TabsTrigger>
+            <TabsTrigger value="vendors">Vendors</TabsTrigger>
             <TabsTrigger value="access">Access</TabsTrigger>
             <TabsTrigger value="custom">Custom Fields</TabsTrigger>
             <TabsTrigger value="notes">Notes</TabsTrigger>
@@ -5201,6 +5289,95 @@ export default function PropertyProfile() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          <TabsContent value="vendors">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <CardTitle>Preferred Vendors</CardTitle>
+                <Button
+                  onClick={() => {
+                    setSelectedVendorId("");
+                    setVendorNotes("");
+                    setIsAddVendorModalOpen(true);
+                  }}
+                  data-testid="button-add-vendor"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Vendor
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {vendorsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <RefreshCw className="w-6 h-6 animate-spin text-slate-400" />
+                  </div>
+                ) : propertyVendors.length > 0 ? (
+                  <div className="space-y-3">
+                    {propertyVendors.map((propertyVendor: any) => {
+                      const vendor = propertyVendor.vendor;
+                      const vendorName = vendor.company || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || 'Unnamed Vendor';
+                      
+                      return (
+                        <Card key={propertyVendor.id} className="bg-slate-50 dark:bg-slate-800/50" data-testid={`vendor-card-${propertyVendor.id}`}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1 space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <Wrench className="w-4 h-4 text-slate-500" />
+                                  <div className="font-medium text-slate-900 dark:text-slate-100" data-testid={`vendor-name-${propertyVendor.id}`}>
+                                    {vendorName}
+                                  </div>
+                                </div>
+                                {vendor.vendorType && (
+                                  <div className="text-sm text-slate-600 dark:text-slate-400" data-testid={`vendor-type-${propertyVendor.id}`}>
+                                    <span className="font-medium">Type:</span> {vendor.vendorType}
+                                  </div>
+                                )}
+                                {propertyVendor.notes && (
+                                  <div className="text-sm text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-900 px-3 py-2 rounded border" data-testid={`vendor-notes-${propertyVendor.id}`}>
+                                    {propertyVendor.notes}
+                                  </div>
+                                )}
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (confirm(`Are you sure you want to remove ${vendorName} from this property?`)) {
+                                    removePropertyVendorMutation.mutate(propertyVendor.id);
+                                  }
+                                }}
+                                data-testid={`button-remove-vendor-${propertyVendor.id}`}
+                              >
+                                <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Wrench className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                    <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">No preferred vendors</h3>
+                    <p className="text-slate-600 dark:text-slate-400 mb-4">Add vendors who service this property for easy reference.</p>
+                    <Button
+                      onClick={() => {
+                        setSelectedVendorId("");
+                        setVendorNotes("");
+                        setIsAddVendorModalOpen(true);
+                      }}
+                      data-testid="button-add-first-vendor"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add First Vendor
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="access">
@@ -8752,6 +8929,98 @@ export default function PropertyProfile() {
             </DialogContent>
           </Dialog>
         )}
+
+        {/* Add Vendor Modal */}
+        <Dialog open={isAddVendorModalOpen} onOpenChange={setIsAddVendorModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add Vendor to Property</DialogTitle>
+              <DialogDescription>
+                Select a vendor from your vendor list to associate with this property.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="vendor-select">Vendor *</Label>
+                <Select
+                  value={selectedVendorId}
+                  onValueChange={setSelectedVendorId}
+                >
+                  <SelectTrigger data-testid="select-vendor">
+                    <SelectValue placeholder="Select a vendor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allVendors.map((vendor: any) => {
+                      const vendorName = vendor.company || `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || 'Unnamed Vendor';
+                      return (
+                        <SelectItem key={vendor.id} value={vendor.id.toString()}>
+                          {vendorName}
+                          {vendor.vendorType && ` - ${vendor.vendorType}`}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="vendor-notes">Notes (Optional)</Label>
+                <Textarea
+                  id="vendor-notes"
+                  value={vendorNotes}
+                  onChange={(e) => setVendorNotes(e.target.value)}
+                  placeholder="Add any notes about this vendor for this property..."
+                  rows={4}
+                  data-testid="textarea-vendor-notes"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsAddVendorModalOpen(false);
+                  setSelectedVendorId("");
+                  setVendorNotes("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!selectedVendorId) {
+                    toast({
+                      title: "No vendor selected",
+                      description: "Please select a vendor to add.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  addPropertyVendorMutation.mutate({
+                    vendorId: selectedVendorId,
+                    notes: vendorNotes
+                  });
+                }}
+                disabled={addPropertyVendorMutation.isPending || !selectedVendorId}
+                data-testid="button-save-vendor"
+              >
+                {addPropertyVendorMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Vendor
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Property Reports Modal */}
         <PropertyReportsModal 
