@@ -41,6 +41,7 @@ import {
   timeEntries,
   contacts,
   contactProperties,
+  vendorEmployees,
   alerts,
   systemAlerts,
   systemAlertAcknowledgements,
@@ -155,6 +156,8 @@ import {
   type InsertTimeEntry,
   type Contact,
   type InsertContact,
+  type VendorEmployee,
+  type InsertVendorEmployee,
   type ContactProperty,
   type InsertContactProperty,
   type Alert,
@@ -3100,6 +3103,50 @@ export class DatabaseStorage implements IStorage {
 
   async deleteContact(id: number): Promise<void> {
     await db.update(contacts).set({ isActive: false }).where(eq(contacts.id, id));
+  }
+
+  // Vendor Employee operations
+  async getVendorEmployees(vendorId: number): Promise<VendorEmployee[]> {
+    return await db
+      .select()
+      .from(vendorEmployees)
+      .where(and(eq(vendorEmployees.vendorId, vendorId), eq(vendorEmployees.isActive, true)))
+      .orderBy(vendorEmployees.firstName, vendorEmployees.lastName);
+  }
+
+  async getVendorEmployee(id: number): Promise<VendorEmployee | undefined> {
+    const [employee] = await db.select().from(vendorEmployees).where(eq(vendorEmployees.id, id));
+    return employee;
+  }
+
+  async createVendorEmployee(employee: InsertVendorEmployee, userId: string | null): Promise<VendorEmployee> {
+    const [newEmployee] = await db.insert(vendorEmployees).values(employee).returning();
+    
+    // Log activity only if we have a valid userId
+    if (userId) {
+      await this.logActivity({
+        userId: userId,
+        action: "vendor_employee_created",
+        entityType: "vendor_employee",
+        entityId: newEmployee.id.toString(),
+        description: `Added employee "${newEmployee.firstName} ${newEmployee.lastName}" to vendor`,
+      });
+    }
+    
+    return newEmployee;
+  }
+
+  async updateVendorEmployee(id: number, employee: Partial<InsertVendorEmployee>): Promise<VendorEmployee> {
+    const [updatedEmployee] = await db
+      .update(vendorEmployees)
+      .set({ ...employee, updatedAt: new Date() })
+      .where(eq(vendorEmployees.id, id))
+      .returning();
+    return updatedEmployee;
+  }
+
+  async deleteVendorEmployee(id: number): Promise<void> {
+    await db.update(vendorEmployees).set({ isActive: false }).where(eq(vendorEmployees.id, id));
   }
 
   // Alert operations
