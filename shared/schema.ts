@@ -1077,6 +1077,25 @@ export const contactProperties = pgTable("contact_properties", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Vendor Employees table - track employees for vendor organizations
+export const vendorEmployees = pgTable("vendor_employees", {
+  id: serial("id").primaryKey(),
+  vendorId: integer("vendor_id").references(() => contacts.id, { onDelete: "cascade" }).notNull(), // References vendor in contacts table
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  firstName: varchar("first_name").notNull(),
+  lastName: varchar("last_name").notNull(),
+  position: varchar("position"), // Job title/role
+  email: varchar("email"),
+  phone: varchar("phone"),
+  notes: text("notes"), // Organization's notes about this employee
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("vendor_employees_vendor_idx").on(table.vendorId),
+  index("vendor_employees_org_idx").on(table.orgId),
+]);
+
 // Custom Fields table - user-defined fields for tasks, properties, and contacts
 export const customFields = pgTable("custom_fields", {
   id: serial("id").primaryKey(),
@@ -2367,6 +2386,17 @@ export const insertContactPropertySchema = createInsertSchema(contactProperties)
   updatedAt: true,
 });
 
+export const insertVendorEmployeeSchema = createInsertSchema(vendorEmployees).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  email: z.string().email("Invalid email address").optional().or(z.literal("")),
+  phone: z.string().optional().or(z.literal("")),
+  position: z.string().optional().or(z.literal("")),
+  notes: z.string().optional().or(z.literal("")),
+});
+
 export const insertCalendarSchema = createInsertSchema(calendars).omit({
   id: true,
   createdAt: true,
@@ -2467,6 +2497,8 @@ export type InsertContact = z.infer<typeof insertContactSchema>;
 export type Contact = typeof contacts.$inferSelect;
 export type InsertContactProperty = z.infer<typeof insertContactPropertySchema>;
 export type ContactProperty = typeof contactProperties.$inferSelect;
+export type InsertVendorEmployee = z.infer<typeof insertVendorEmployeeSchema>;
+export type VendorEmployee = typeof vendorEmployees.$inferSelect;
 export type InsertAlert = z.infer<typeof insertAlertSchema>;
 export type Alert = typeof alerts.$inferSelect;
 export type InsertTeamMessage = z.infer<typeof insertTeamMessageSchema>;
