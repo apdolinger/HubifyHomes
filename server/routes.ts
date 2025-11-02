@@ -3348,14 +3348,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Property-Vendor relationship routes
-  app.get("/api/properties/:propertyId/vendors", isAuthenticated, async (req, res) => {
+  app.get("/api/properties/:propertyId/vendors", isAuthenticated, async (req: any, res) => {
     try {
       const propertyId = parseInt(req.params.propertyId);
       if (isNaN(propertyId)) {
         return res.status(400).json({ message: 'Invalid property ID' });
       }
       
-      const vendors = await storage.getPropertyVendors(propertyId);
+      const orgId = req.user.orgId || "00000000-0000-0000-0000-000000000000";
+      const vendors = await storage.getPropertyVendors(propertyId, orgId);
       res.json(vendors);
     } catch (error) {
       console.error("Error fetching property vendors:", error);
@@ -3385,14 +3386,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/property-vendors/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/property-vendors/:id", isAuthenticated, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: 'Invalid property vendor ID' });
       }
 
-      await storage.removePropertyVendor(id);
+      const orgId = req.user.orgId || "00000000-0000-0000-0000-000000000000";
+      await storage.removePropertyVendor(id, orgId);
       res.json({ message: 'Property vendor removed successfully' });
     } catch (error) {
       console.error('Error removing property vendor:', error);

@@ -3493,42 +3493,88 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Property-Vendor relationship operations
-  async getPropertyVendors(propertyId: number): Promise<any[]> {
-    const vendors = await db
-      .select({
-        id: propertyVendors.id,
-        propertyId: propertyVendors.propertyId,
-        vendorId: propertyVendors.vendorId,
-        notes: propertyVendors.notes,
-        createdAt: propertyVendors.createdAt,
-        vendor: {
-          id: contacts.id,
-          firstName: contacts.firstName,
-          lastName: contacts.lastName,
-          company: contacts.company,
-          email: contacts.email,
-          phone: contacts.phone,
-          category: contacts.category,
-          type: contacts.type,
-          vendorType: contacts.vendorType,
-          vendorTypeOther: contacts.vendorTypeOther,
-        }
-      })
+  async getPropertyVendors(propertyId: number, orgId: string): Promise<any[]> {
+    // First, get the property vendor associations
+    const pvList = await db
+      .select()
       .from(propertyVendors)
-      .leftJoin(contacts, eq(propertyVendors.vendorId, contacts.id))
-      .where(eq(propertyVendors.propertyId, propertyId))
+      .where(
+        and(
+          eq(propertyVendors.propertyId, propertyId),
+          eq(propertyVendors.orgId, orgId)
+        )
+      )
       .orderBy(propertyVendors.createdAt);
     
-    return vendors;
+    // Then fetch the vendor details for each, ensuring vendor belongs to same org
+    const results = [];
+    for (const pv of pvList) {
+      const [vendor] = await db
+        .select()
+        .from(contacts)
+        .where(
+          and(
+            eq(contacts.id, pv.vendorId),
+            eq(contacts.orgId, orgId) // Ensure vendor belongs to same org
+          )
+        )
+        .limit(1);
+      
+      results.push({
+        id: pv.id,
+        propertyId: pv.propertyId,
+        vendorId: pv.vendorId,
+        orgId: pv.orgId,
+        notes: pv.notes,
+        createdAt: pv.createdAt,
+        vendor: vendor || null
+      });
+    }
+    
+    return results;
   }
 
   async addPropertyVendor(propertyId: number, vendorId: number, orgId: string, notes?: string): Promise<any> {
+    // First, validate that the property belongs to the requester's org
+    const [property] = await db
+      .select()
+      .from(properties)
+      .where(
+        and(
+          eq(properties.id, propertyId),
+          eq(properties.orgId, orgId)
+        )
+      )
+      .limit(1);
+    
+    if (!property) {
+      throw new Error('Property not found or does not belong to your organization');
+    }
+    
+    // Then validate that the vendor belongs to the same org and is actually a vendor
+    const [vendor] = await db
+      .select()
+      .from(contacts)
+      .where(
+        and(
+          eq(contacts.id, vendorId),
+          eq(contacts.orgId, orgId),
+          eq(contacts.type, 'vendor')
+        )
+      )
+      .limit(1);
+    
+    if (!vendor) {
+      throw new Error('Vendor not found or does not belong to your organization');
+    }
+    
+    // Use the property's orgId to ensure consistency
     const [newPropertyVendor] = await db
       .insert(propertyVendors)
       .values({
         propertyId,
         vendorId,
-        orgId,
+        orgId: property.orgId, // Use property's orgId for consistency
         notes,
       })
       .returning();
@@ -3536,8 +3582,13 @@ export class DatabaseStorage implements IStorage {
     return newPropertyVendor;
   }
 
-  async removePropertyVendor(id: number): Promise<void> {
-    await db.delete(propertyVendors).where(eq(propertyVendors.id, id));
+  async removePropertyVendor(id: number, orgId: string): Promise<void> {
+    await db.delete(propertyVendors).where(
+      and(
+        eq(propertyVendors.id, id),
+        eq(propertyVendors.orgId, orgId)
+      )
+    );
   }
 
   // Team message operations
