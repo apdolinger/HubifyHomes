@@ -5180,7 +5180,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/contacts", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const validatedData = insertContactSchema.parse(req.body);
+      const orgId = req.user.orgId || "00000000-0000-0000-0000-000000000000";
+      const validatedData = insertContactSchema.parse({ ...req.body, orgId });
       const contact = await storage.createContact(validatedData, userId);
       res.status(201).json(contact);
     } catch (error) {
