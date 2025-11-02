@@ -29,7 +29,14 @@ import {
   Upload,
   Type,
   GitBranch,
-  X
+  X,
+  AlignLeft,
+  List,
+  Circle,
+  Clock,
+  PenTool,
+  Heading2,
+  Hash
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -76,6 +83,24 @@ interface FormSchema {
   triggerAutomation?: boolean;
 }
 
+// General Fields - Form Field Library (not tied to Hubify system)
+const GeneralFields: FormFieldOption[] = [
+  { label: 'Short Text', type: 'text', required: false, profileFieldKey: 'general_text', icon: <Type className="w-4 h-4" />, placeholder: 'Enter text' },
+  { label: 'Paragraph Text', type: 'textarea', required: false, profileFieldKey: 'general_paragraph', icon: <AlignLeft className="w-4 h-4" />, placeholder: 'Enter detailed response' },
+  { label: 'Dropdown', type: 'select', required: false, profileFieldKey: 'general_dropdown', icon: <List className="w-4 h-4" />, options: ['Option 1', 'Option 2', 'Option 3'] },
+  { label: 'Checkbox Group', type: 'checkbox', required: false, profileFieldKey: 'general_checkbox', icon: <CheckSquare className="w-4 h-4" />, options: ['Choice 1', 'Choice 2', 'Choice 3'] },
+  { label: 'Radio Buttons', type: 'radio', required: false, profileFieldKey: 'general_radio', icon: <Circle className="w-4 h-4" />, options: ['Yes', 'No'] },
+  { label: 'Date Picker', type: 'date', required: false, profileFieldKey: 'general_date', icon: <Calendar className="w-4 h-4" /> },
+  { label: 'Date & Time Picker', type: 'datetime', required: false, profileFieldKey: 'general_datetime', icon: <Clock className="w-4 h-4" /> },
+  { label: 'Number Field', type: 'number', required: false, profileFieldKey: 'general_number', icon: <Hash className="w-4 h-4" />, placeholder: 'Enter number' },
+  { label: 'Email', type: 'email', required: false, profileFieldKey: 'general_email', icon: <Mail className="w-4 h-4" />, placeholder: 'email@example.com' },
+  { label: 'Phone', type: 'tel', required: false, profileFieldKey: 'general_phone', icon: <Phone className="w-4 h-4" />, placeholder: '(555) 123-4567' },
+  { label: 'File Upload', type: 'file', required: false, profileFieldKey: 'general_file', icon: <Upload className="w-4 h-4" /> },
+  { label: 'Signature', type: 'signature', required: false, profileFieldKey: 'general_signature', icon: <PenTool className="w-4 h-4" /> },
+  { label: 'Section Header', type: 'heading', required: false, profileFieldKey: 'general_heading', icon: <Heading2 className="w-4 h-4" />, placeholder: 'Section Title' },
+];
+
+// System-Linked Fields - Hubify Fields (tied to database entities)
 const PeopleFields: FormFieldOption[] = [
   { label: 'First Name', type: 'text', required: true, profileFieldKey: 'firstName', icon: <User className="w-4 h-4" /> },
   { label: 'Last Name', type: 'text', required: true, profileFieldKey: 'lastName', icon: <User className="w-4 h-4" /> },
