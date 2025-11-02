@@ -3080,13 +3080,18 @@ export class DatabaseStorage implements IStorage {
     
     // Log activity only if we have a valid userId
     if (userId) {
-      await this.logActivity({
-        userId: userId,
-        action: "contact_created",
-        entityType: "contact",
-        entityId: newContact.id.toString(),
-        description: `Added contact "${newContact.firstName} ${newContact.lastName}"`,
-      });
+      try {
+        await this.logActivity({
+          userId: userId,
+          action: "contact_created",
+          entityType: "contact",
+          entityId: newContact.id.toString(),
+          description: `Added contact "${newContact.firstName} ${newContact.lastName}"`,
+        });
+      } catch (error) {
+        // Gracefully handle activity logging errors (e.g., missing user in test scenarios)
+        console.warn('[ACTIVITY LOG] Failed to log activity for contact creation:', error);
+      }
     }
     
     return newContact;

@@ -2391,10 +2391,13 @@ export const insertVendorEmployeeSchema = createInsertSchema(vendorEmployees).om
   createdAt: true,
   updatedAt: true,
 }).extend({
-  email: z.string().email("Invalid email address").optional().or(z.literal("")),
-  phone: z.string().optional().or(z.literal("")),
-  position: z.string().optional().or(z.literal("")),
-  notes: z.string().optional().or(z.literal("")),
+  email: z.string().transform(v => v || undefined).optional().refine(
+    (val) => !val || z.string().email().safeParse(val).success,
+    { message: "Invalid email address" }
+  ),
+  position: z.string().transform(v => v || undefined).optional(),
+  phone: z.string().transform(v => v || undefined).optional(),
+  notes: z.string().transform(v => v || undefined).optional(),
 });
 
 export const insertCalendarSchema = createInsertSchema(calendars).omit({

@@ -53,11 +53,12 @@ const editVendorSchema = z.object({
 });
 
 const employeeSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  title: z.string().optional(),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  position: z.string().optional(),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().optional(),
-  businessNotes: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 export default function VendorProfile() {
@@ -122,11 +123,12 @@ export default function VendorProfile() {
   const employeeForm = useForm({
     resolver: zodResolver(employeeSchema),
     defaultValues: {
-      name: "",
-      title: "",
+      firstName: "",
+      lastName: "",
+      position: "",
       email: "",
       phone: "",
-      businessNotes: "",
+      notes: "",
     },
   });
 
@@ -292,11 +294,12 @@ export default function VendorProfile() {
   const handleAddEmployee = () => {
     setEditingEmployee(null);
     employeeForm.reset({
-      name: "",
-      title: "",
+      firstName: "",
+      lastName: "",
+      position: "",
       email: "",
       phone: "",
-      businessNotes: "",
+      notes: "",
     });
     setIsEmployeeModalOpen(true);
   };
@@ -304,11 +307,12 @@ export default function VendorProfile() {
   const handleEditEmployee = (employee: any) => {
     setEditingEmployee(employee);
     employeeForm.reset({
-      name: employee.name,
-      title: employee.title || "",
+      firstName: employee.firstName,
+      lastName: employee.lastName,
+      position: employee.position || "",
       email: employee.email || "",
       phone: employee.phone || "",
-      businessNotes: employee.businessNotes || "",
+      notes: employee.notes || "",
     });
     setIsEmployeeModalOpen(true);
   };
@@ -570,17 +574,17 @@ export default function VendorProfile() {
                               <div className="flex items-start gap-3 flex-1">
                                 <Avatar className="h-10 w-10">
                                   <AvatarFallback className="bg-gradient-to-br from-green-500 to-blue-600 text-white">
-                                    {employee.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                                    {employee.firstName[0]}{employee.lastName[0]}
                                   </AvatarFallback>
                                 </Avatar>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 mb-1">
                                     <p className="font-medium" data-testid={`employee-name-${employee.id}`}>
-                                      {employee.name}
+                                      {employee.firstName} {employee.lastName}
                                     </p>
-                                    {employee.title && (
+                                    {employee.position && (
                                       <Badge variant="outline" className="text-xs">
-                                        {employee.title}
+                                        {employee.position}
                                       </Badge>
                                     )}
                                   </div>
@@ -601,10 +605,10 @@ export default function VendorProfile() {
                                         </a>
                                       </div>
                                     )}
-                                    {employee.businessNotes && (
+                                    {employee.notes && (
                                       <div className="mt-2 p-2 bg-slate-50 rounded text-sm text-slate-700 border-l-2 border-slate-300">
-                                        <p className="text-xs text-slate-500 font-medium mb-1">Business Notes:</p>
-                                        <p className="whitespace-pre-wrap">{employee.businessNotes}</p>
+                                        <p className="text-xs text-slate-500 font-medium mb-1">Notes:</p>
+                                        <p className="whitespace-pre-wrap">{employee.notes}</p>
                                       </div>
                                     )}
                                   </div>
@@ -843,12 +847,12 @@ export default function VendorProfile() {
             <form onSubmit={employeeForm.handleSubmit(handleSaveEmployee)} className="space-y-4">
               <FormField
                 control={employeeForm.control}
-                name="name"
+                name="firstName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Name *</FormLabel>
+                    <FormLabel>First Name *</FormLabel>
                     <FormControl>
-                      <Input {...field} data-testid="input-employee-name" />
+                      <Input {...field} data-testid="input-employee-firstname" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -856,12 +860,25 @@ export default function VendorProfile() {
               />
               <FormField
                 control={employeeForm.control}
-                name="title"
+                name="lastName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Last Name *</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-employee-lastname" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={employeeForm.control}
+                name="position"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Title/Position</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="e.g., Service Manager" data-testid="input-employee-title" />
+                      <Input {...field} placeholder="e.g., Service Manager" data-testid="input-employee-position" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -895,10 +912,10 @@ export default function VendorProfile() {
               />
               <FormField
                 control={employeeForm.control}
-                name="businessNotes"
+                name="notes"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Business Notes</FormLabel>
+                    <FormLabel>Notes</FormLabel>
                     <FormControl>
                       <Textarea
                         {...field}

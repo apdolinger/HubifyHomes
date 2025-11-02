@@ -90,10 +90,13 @@ export async function setupAuth(app: Express) {
     updateUserSession(user, tokens);
     
     try {
+      console.log('[OIDC] Attempting to upsert user:', claims["sub"]);
       await upsertUser(claims);
+      console.log('[OIDC] User upserted successfully');
       
       // Fetch user from database to get orgId and role
       let dbUser = await storage.getUser(claims["sub"]);
+      console.log('[OIDC] Fetched user from database:', dbUser ? 'found' : 'not found');
       if (dbUser) {
         // If user doesn't have an orgId, assign them to a default organization (DEV ONLY)
         if (!dbUser.orgId) {
@@ -137,10 +140,12 @@ export async function setupAuth(app: Express) {
           role: user.claims.role,
         });
       } else {
-        console.log('[OIDC] Warning: User not found in database after upsert:', claims["sub"]);
+        console.error('[OIDC] ERROR: User not found in database after upsert:', claims["sub"]);
+        console.error('[OIDC] This should not happen - upsertUser should have created the user');
       }
     } catch (error) {
-      console.error('[OIDC] Error upserting user:', error);
+      console.error('[OIDC] CRITICAL ERROR upserting user:', error);
+      console.error('[OIDC] User claims:', JSON.stringify(claims, null, 2));
       // Continue anyway - user session will still work with just claims
     }
     
