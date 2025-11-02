@@ -46,6 +46,7 @@ import {
   insertTaskSchema,
   insertTimeEntrySchema,
   insertContactSchema,
+  insertVendorEmployeeSchema,
   insertAlertSchema,
   insertSystemAlertSchema,
   insertTeamMessageSchema,
@@ -5341,6 +5342,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting contact:', error);
       res.status(500).json({ message: 'Failed to delete contact' });
+    }
+  });
+
+  // Vendor Employee routes
+  app.get("/api/vendors/:vendorId/employees", isAuthenticated, async (req, res) => {
+    try {
+      const vendorId = parseInt(req.params.vendorId);
+      if (isNaN(vendorId)) {
+        return res.status(400).json({ message: "Invalid vendor ID" });
+      }
+
+      const employees = await storage.getVendorEmployees(vendorId);
+      res.json(employees);
+    } catch (error) {
+      console.error("Error fetching vendor employees:", error);
+      res.status(500).json({ message: "Failed to fetch vendor employees" });
+    }
+  });
+
+  app.get("/api/vendor-employees/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid employee ID" });
+      }
+
+      const employee = await storage.getVendorEmployee(id);
+      if (!employee) {
+        return res.status(404).json({ message: "Employee not found" });
+      }
+      res.json(employee);
+    } catch (error) {
+      console.error("Error fetching vendor employee:", error);
+      res.status(500).json({ message: "Failed to fetch vendor employee" });
+    }
+  });
+
+  app.post("/api/vendor-employees", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const orgId = req.user.orgId || "00000000-0000-0000-0000-000000000000";
+      const validatedData = insertVendorEmployeeSchema.parse({ ...req.body, orgId });
+      const employee = await storage.createVendorEmployee(validatedData, userId);
+      res.status(201).json(employee);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating vendor employee:", error);
+      res.status(500).json({ message: "Failed to create vendor employee" });
+    }
+  });
+
+  app.patch("/api/vendor-employees/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid employee ID" });
+      }
+
+      const updateData = insertVendorEmployeeSchema.partial().parse(req.body);
+      const employee = await storage.updateVendorEmployee(id, updateData);
+      res.json(employee);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error updating vendor employee:", error);
+      res.status(500).json({ message: "Failed to update vendor employee" });
+    }
+  });
+
+  app.delete("/api/vendor-employees/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid employee ID" });
+      }
+
+      await storage.deleteVendorEmployee(id);
+      res.json({ message: "Employee deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting vendor employee:", error);
+      res.status(500).json({ message: "Failed to delete vendor employee" });
     }
   });
 
