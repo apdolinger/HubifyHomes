@@ -147,6 +147,7 @@ export default function TaskProfile() {
     billingAmount: "",
     roomId: "none",
     clientId: "",
+    vendorId: "",
     tags: "",
     customFieldValues: {} as Record<string, any>
   });
@@ -445,6 +446,9 @@ export default function TaskProfile() {
     queryKey: ["/api/contacts"],
     enabled: isAuthenticated,
   });
+
+  // Fetch vendors for task assignment
+  const vendors = (contacts as any[])?.filter((c: any) => c.type === 'vendor') || [];
 
   // Fetch rooms for the property associated with this task
   const { data: rooms } = useQuery({
@@ -749,6 +753,7 @@ export default function TaskProfile() {
         billingAmount: (task as any).billingAmount || "",
         roomId: (task as any).roomId?.toString() || "none",
         clientId: (task as any).contactId?.toString() || "",
+        vendorId: (task as any).vendorId?.toString() || "",
         tags: (task as any).tags || "",
         customFieldValues: (task as any).customFieldValues || {}
       });
@@ -787,6 +792,7 @@ export default function TaskProfile() {
       propertyId: editForm.propertyId ? parseInt(editForm.propertyId) : null,
       roomId: editForm.roomId && editForm.roomId !== "none" ? parseInt(editForm.roomId) : null,
       contactId: editForm.clientId ? parseInt(editForm.clientId) : null,
+      vendorId: editForm.vendorId ? parseInt(editForm.vendorId) : null,
       billedSeparately: editForm.billedSeparately,
       billingAmount: editForm.billingAmount,
       attachments: photoAttachments,
@@ -1891,6 +1897,62 @@ export default function TaskProfile() {
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Checkbox
+                        id="vendor-needed"
+                        checked={!!editForm.vendorId && editForm.vendorId !== "none"}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setEditForm({ ...editForm, vendorId: vendors.length > 0 ? vendors[0].id.toString() : "" });
+                          } else {
+                            setEditForm({ ...editForm, vendorId: "" });
+                          }
+                        }}
+                        data-testid="checkbox-vendor-needed"
+                      />
+                      <Label htmlFor="vendor-needed" className="cursor-pointer">Vendor Needed</Label>
+                    </div>
+                    {editForm.vendorId && editForm.vendorId !== "" && editForm.vendorId !== "none" && (
+                      <div>
+                        <Label htmlFor="edit-vendor">Select Vendor</Label>
+                        <Select 
+                          value={editForm.vendorId}
+                          onValueChange={(value) => setEditForm({ ...editForm, vendorId: value })}
+                        >
+                          <SelectTrigger data-testid="select-vendor">
+                            <SelectValue placeholder="Select vendor..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">
+                              <div className="flex items-center space-x-2">
+                                <X className="w-4 h-4 text-slate-400" />
+                                <span>No vendor</span>
+                              </div>
+                            </SelectItem>
+                            {vendors.length > 0 ? (
+                              vendors.map((vendor: any) => (
+                                <SelectItem key={vendor.id} value={vendor.id.toString()}>
+                                  <div className="flex items-center space-x-2">
+                                    <Building className="w-4 h-4 text-slate-500" />
+                                    <div>
+                                      <div className="font-medium">{vendor.firstName} {vendor.lastName}</div>
+                                      {vendor.vendorType && <div className="text-xs text-slate-500">{vendor.vendorType}</div>}
+                                    </div>
+                                  </div>
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value="no-vendors" disabled>
+                                <span className="text-slate-400">No vendors available</span>
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">

@@ -996,6 +996,7 @@ export const tasks = pgTable("tasks", {
   propertyId: integer("property_id").references(() => properties.id),
   roomId: integer("room_id").references(() => rooms.id),
   contactId: integer("contact_id").references(() => contacts.id),
+  vendorId: integer("vendor_id").references(() => contacts.id), // References vendor in contacts table
   clientId: uuid("client_id").references(() => clients.id), // Billable client reference for billing submissions
   assignedToId: varchar("assigned_to_id").references(() => users.id),
   assignedById: varchar("assigned_by_id").references(() => users.id),
