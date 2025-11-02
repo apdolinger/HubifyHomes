@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { 
   GripVertical, 
   Plus, 
@@ -36,7 +37,8 @@ import {
   Clock,
   PenTool,
   Heading2,
-  Hash
+  Hash,
+  ChevronDown
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -598,8 +600,24 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
 
     const { source, destination } = result;
 
-    if (source.droppableId === 'available-fields' && destination.droppableId === 'form-fields') {
-      // Add field from available to form
+    // Only allow dropping into form-fields
+    if (destination.droppableId !== 'form-fields') return;
+
+    if (source.droppableId === 'general-fields' && destination.droppableId === 'form-fields') {
+      // Add general field from library to form
+      const fieldToAdd = GeneralFields[source.index];
+      const newField = {
+        ...fieldToAdd,
+        id: `field-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        profileFieldKey: `${fieldToAdd.profileFieldKey}_${Date.now()}` // Make unique
+      };
+      
+      const newFields = [...formSchema.fields];
+      newFields.splice(destination.index, 0, newField);
+      
+      setFormSchema(prev => ({ ...prev, fields: newFields }));
+    } else if (source.droppableId === 'available-fields' && destination.droppableId === 'form-fields') {
+      // Add system-linked field to form
       const fieldToAdd = getAvailableFields(formSchema.contexts)[source.index];
       const newField = {
         ...fieldToAdd,
@@ -790,59 +808,125 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Form Configuration */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Available Fields */}
+          <div className="lg:col-span-1 space-y-4">
+            {/* Form Field Library - General Fields */}
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Available Fields
-                </CardTitle>
-                <p className="text-sm text-gray-600 mt-1">
-                  {formSchema.contexts.length > 0 
-                    ? `Showing fields for: ${formSchema.contexts.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ')}`
-                    : 'Select contexts above to see available fields'
-                  }
-                </p>
-              </CardHeader>
-              <CardContent>
-                <Droppable droppableId="available-fields" isDropDisabled={true}>
-                  {(provided) => (
-                    <div
-                      {...provided.droppableProps}
-                      ref={provided.innerRef}
-                      className="space-y-2"
-                    >
-                      {getAvailableFields(formSchema.contexts).map((field, index) => (
-                        <Draggable
-                          key={field.profileFieldKey}
-                          draggableId={`available-${field.profileFieldKey}`}
-                          index={index}
-                        >
-                          {(provided, snapshot) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              className={`flex items-center p-3 border rounded-lg cursor-move hover:bg-slate-50 ${
-                                snapshot.isDragging ? 'bg-blue-50 border-blue-200' : 'bg-white'
-                              }`}
-                            >
-                              <GripVertical className="w-4 h-4 text-slate-400 mr-2" />
-                              {field.icon}
-                              <span className="ml-2 text-sm font-medium">{field.label}</span>
-                              <Badge variant="outline" className="ml-auto text-xs">
-                                {field.type}
-                              </Badge>
-                            </div>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
+              <Collapsible defaultOpen={true}>
+                <CardHeader className="pb-3">
+                  <CollapsibleTrigger className="flex items-center justify-between w-full hover:opacity-70 transition-opacity">
+                    <div>
+                      <CardTitle className="flex items-center text-base">
+                        <FileText className="w-4 h-4 mr-2" />
+                        Form Field Library
+                      </CardTitle>
+                      <p className="text-xs text-gray-600 mt-1 text-left">General-purpose form inputs</p>
                     </div>
-                  )}
-                </Droppable>
-              </CardContent>
+                    <ChevronDown className="w-4 h-4 text-gray-500" />
+                  </CollapsibleTrigger>
+                </CardHeader>
+                <CollapsibleContent>
+                  <CardContent className="pt-0">
+                    <Droppable droppableId="general-fields" isDropDisabled={true}>
+                      {(provided) => (
+                        <div
+                          {...provided.droppableProps}
+                          ref={provided.innerRef}
+                          className="space-y-2"
+                        >
+                          {GeneralFields.map((field, index) => (
+                            <Draggable
+                              key={`general-${field.profileFieldKey}`}
+                              draggableId={`general-${field.profileFieldKey}`}
+                              index={index}
+                            >
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  className={`flex items-center p-2.5 border rounded-lg cursor-move hover:bg-slate-50 ${
+                                    snapshot.isDragging ? 'bg-blue-50 border-blue-200' : 'bg-white'
+                                  }`}
+                                >
+                                  <GripVertical className="w-4 h-4 text-slate-400 mr-2" />
+                                  {field.icon}
+                                  <span className="ml-2 text-sm font-medium">{field.label}</span>
+                                  <Badge variant="outline" className="ml-auto text-xs">
+                                    {field.type}
+                                  </Badge>
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </div>
+                      )}
+                    </Droppable>
+                  </CardContent>
+                </CollapsibleContent>
+              </Collapsible>
+            </Card>
+
+            {/* System-Linked Fields - Hubify Fields */}
+            <Card>
+              <Collapsible defaultOpen={true}>
+                <CardHeader className="pb-3">
+                  <CollapsibleTrigger className="flex items-center justify-between w-full hover:opacity-70 transition-opacity">
+                    <div>
+                      <CardTitle className="flex items-center text-base">
+                        <Link className="w-4 h-4 mr-2" />
+                        System-Linked Fields
+                      </CardTitle>
+                      <p className="text-xs text-gray-600 mt-1 text-left">
+                        {formSchema.contexts.length > 0 
+                          ? `${formSchema.contexts.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ')} fields`
+                          : 'Select contexts above'}
+                      </p>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-gray-500" />
+                  </CollapsibleTrigger>
+                </CardHeader>
+                <CollapsibleContent>
+                  <CardContent className="pt-0">
+                    <Droppable droppableId="available-fields" isDropDisabled={true}>
+                      {(provided) => (
+                        <div
+                          {...provided.droppableProps}
+                          ref={provided.innerRef}
+                          className="space-y-2"
+                        >
+                          {getAvailableFields(formSchema.contexts).map((field, index) => (
+                            <Draggable
+                              key={`system-${field.profileFieldKey}`}
+                              draggableId={`system-${field.profileFieldKey}`}
+                              index={index + GeneralFields.length}
+                            >
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  className={`flex items-center p-2.5 border rounded-lg cursor-move hover:bg-slate-50 ${
+                                    snapshot.isDragging ? 'bg-blue-50 border-blue-200' : 'bg-white'
+                                  }`}
+                                >
+                                  <GripVertical className="w-4 h-4 text-slate-400 mr-2" />
+                                  {field.icon}
+                                  <span className="ml-2 text-sm font-medium">{field.label}</span>
+                                  <Badge variant="outline" className="ml-auto text-xs">
+                                    {field.type}
+                                  </Badge>
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </div>
+                      )}
+                    </Droppable>
+                  </CardContent>
+                </CollapsibleContent>
+              </Collapsible>
             </Card>
           </div>
 
