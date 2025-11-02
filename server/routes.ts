@@ -3347,6 +3347,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Property-Vendor relationship routes
+  app.get("/api/properties/:propertyId/vendors", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.propertyId);
+      if (isNaN(propertyId)) {
+        return res.status(400).json({ message: 'Invalid property ID' });
+      }
+      
+      const vendors = await storage.getPropertyVendors(propertyId);
+      res.json(vendors);
+    } catch (error) {
+      console.error("Error fetching property vendors:", error);
+      res.status(500).json({ message: "Failed to fetch property vendors" });
+    }
+  });
+
+  app.post("/api/properties/:propertyId/vendors", isAuthenticated, async (req: any, res) => {
+    try {
+      const propertyId = parseInt(req.params.propertyId);
+      if (isNaN(propertyId)) {
+        return res.status(400).json({ message: 'Invalid property ID' });
+      }
+
+      const orgId = req.user.orgId || "00000000-0000-0000-0000-000000000000";
+      const { vendorId, notes } = req.body;
+
+      if (!vendorId || isNaN(parseInt(vendorId))) {
+        return res.status(400).json({ message: 'Invalid vendor ID' });
+      }
+
+      const propertyVendor = await storage.addPropertyVendor(propertyId, parseInt(vendorId), orgId, notes);
+      res.status(201).json(propertyVendor);
+    } catch (error) {
+      console.error("Error adding property vendor:", error);
+      res.status(500).json({ message: "Failed to add property vendor" });
+    }
+  });
+
+  app.delete("/api/property-vendors/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid property vendor ID' });
+      }
+
+      await storage.removePropertyVendor(id);
+      res.json({ message: 'Property vendor removed successfully' });
+    } catch (error) {
+      console.error('Error removing property vendor:', error);
+      res.status(500).json({ message: 'Failed to remove property vendor' });
+    }
+  });
+
   // Room routes
   app.get("/api/properties/:propertyId/rooms", isAuthenticated, async (req, res) => {
     try {
