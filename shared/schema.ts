@@ -1097,6 +1097,22 @@ export const vendorEmployees = pgTable("vendor_employees", {
   index("vendor_employees_org_idx").on(table.orgId),
 ]);
 
+// Property Vendors junction table - track preferred vendors for each property
+export const propertyVendors = pgTable("property_vendors", {
+  id: serial("id").primaryKey(),
+  propertyId: integer("property_id").references(() => properties.id, { onDelete: "cascade" }).notNull(),
+  vendorId: integer("vendor_id").references(() => contacts.id, { onDelete: "cascade" }).notNull(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  notes: text("notes"), // Special instructions or preferences for this vendor on this property
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("property_vendors_property_idx").on(table.propertyId),
+  index("property_vendors_vendor_idx").on(table.vendorId),
+  index("property_vendors_org_idx").on(table.orgId),
+  unique("property_vendors_unique").on(table.propertyId, table.vendorId), // Prevent duplicate vendor assignments
+]);
+
 // Custom Fields table - user-defined fields for tasks, properties, and contacts
 export const customFields = pgTable("custom_fields", {
   id: serial("id").primaryKey(),
@@ -2400,6 +2416,17 @@ export const insertVendorEmployeeSchema = createInsertSchema(vendorEmployees).om
   phone: z.string().transform(v => v || undefined).optional(),
   notes: z.string().transform(v => v || undefined).optional(),
 });
+
+export const insertPropertyVendorSchema = createInsertSchema(propertyVendors).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  notes: z.string().transform(v => v || undefined).optional(),
+});
+
+export type InsertPropertyVendor = z.infer<typeof insertPropertyVendorSchema>;
+export type SelectPropertyVendor = typeof propertyVendors.$inferSelect;
 
 export const insertCalendarSchema = createInsertSchema(calendars).omit({
   id: true,
