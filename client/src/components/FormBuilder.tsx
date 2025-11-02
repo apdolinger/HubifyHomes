@@ -27,7 +27,9 @@ import {
   FileText,
   CheckSquare,
   Upload,
-  Type
+  Type,
+  GitBranch,
+  X
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -40,6 +42,12 @@ import { FormContext } from '@/../../shared/schema';
  * Outcome: Submissions either create or update a profile, based on mapped fields.
  */
 
+interface FieldCondition {
+  fieldId: string;
+  operator: 'equals' | 'not_equals' | 'contains';
+  value: string;
+}
+
 interface FormFieldOption {
   label: string;
   description?: string;
@@ -49,6 +57,10 @@ interface FormFieldOption {
   icon?: React.ReactNode;
   options?: string[]; // for select/checkbox fields
   placeholder?: string;
+  conditions?: {
+    showIf?: FieldCondition[];
+    hideIf?: FieldCondition[];
+  };
 }
 
 interface FormSchema {
@@ -137,6 +149,221 @@ interface FormSettingsPanelProps {
   formSchema: FormSchema;
   updateFormSchema: (updates: Partial<FormSchema>) => void;
 }
+
+// Conditional Logic Editor Component
+interface ConditionalLogicEditorProps {
+  fieldIndex: number;
+  field: FormFieldOption;
+  allFields: FormFieldOption[];
+  onUpdateField: (index: number, updates: Partial<FormFieldOption>) => void;
+}
+
+const ConditionalLogicEditor: React.FC<ConditionalLogicEditorProps> = ({
+  fieldIndex,
+  field,
+  allFields,
+  onUpdateField
+}) => {
+  const [showDialog, setShowDialog] = useState(false);
+  const [conditionType, setConditionType] = useState<'showIf' | 'hideIf'>('showIf');
+  const [selectedFieldId, setSelectedFieldId] = useState('');
+  const [operator, setOperator] = useState<'equals' | 'not_equals' | 'contains'>('equals');
+  const [value, setValue] = useState('');
+
+  // Get other fields (excluding current field)
+  const availableFields = allFields.filter((_, idx) => idx !== fieldIndex);
+
+  const addCondition = () => {
+    if (!selectedFieldId || !value) return;
+
+    const newCondition: FieldCondition = {
+      fieldId: selectedFieldId,
+      operator,
+      value
+    };
+
+    const currentConditions = field.conditions || { showIf: [], hideIf: [] };
+    const updatedConditions = {
+      ...currentConditions,
+      [conditionType]: [...(currentConditions[conditionType] || []), newCondition]
+    };
+
+    onUpdateField(fieldIndex, { conditions: updatedConditions });
+    
+    // Reset form
+    setSelectedFieldId('');
+    setValue('');
+    setShowDialog(false);
+  };
+
+  const removeCondition = (type: 'showIf' | 'hideIf', index: number) => {
+    const currentConditions = field.conditions || { showIf: [], hideIf: [] };
+    const updatedConditions = {
+      ...currentConditions,
+      [type]: currentConditions[type]?.filter((_, i) => i !== index) || []
+    };
+    onUpdateField(fieldIndex, { conditions: updatedConditions });
+  };
+
+  const hasConditions = (field.conditions?.showIf?.length || 0) + (field.conditions?.hideIf?.length || 0) > 0;
+
+  return (
+    <div className="mt-3 pt-3 border-t">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <GitBranch className="w-4 h-4 text-slate-500" />
+          <span className="text-xs font-medium text-slate-700">Conditional Logic</span>
+          {hasConditions && (
+            <Badge variant="secondary" className="text-xs">
+              {(field.conditions?.showIf?.length || 0) + (field.conditions?.hideIf?.length || 0)} rules
+            </Badge>
+          )}
+        </div>
+        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+          <DialogTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              data-testid={`add-condition-btn-${fieldIndex}`}
+            >
+              <Plus className="w-3 h-3 mr-1" />
+              Add Rule
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add Conditional Logic Rule</DialogTitle>
+              <DialogDescription>
+                Control when this field is shown or hidden based on other field values
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Rule Type</Label>
+                <Select value={conditionType} onValueChange={(v: 'showIf' | 'hideIf') => setConditionType(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="showIf">Show this field if...</SelectItem>
+                    <SelectItem value="hideIf">Hide this field if...</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>When Field</Label>
+                <Select value={selectedFieldId} onValueChange={setSelectedFieldId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a field" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableFields.map((f, idx) => (
+                      <SelectItem key={idx} value={f.profileFieldKey}>
+                        {f.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Operator</Label>
+                <Select value={operator} onValueChange={(v: 'equals' | 'not_equals' | 'contains') => setOperator(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="equals">Equals</SelectItem>
+                    <SelectItem value="not_equals">Does not equal</SelectItem>
+                    <SelectItem value="contains">Contains</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Value</Label>
+                <Input
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  placeholder="Enter comparison value"
+                  data-testid="condition-value-input"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowDialog(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={addCondition}
+                disabled={!selectedFieldId || !value}
+                data-testid="save-condition-btn"
+              >
+                Add Rule
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Display existing conditions */}
+      {hasConditions && (
+        <div className="space-y-2">
+          {field.conditions?.showIf?.map((condition, idx) => {
+            const relatedField = allFields.find(f => f.profileFieldKey === condition.fieldId);
+            return (
+              <div key={`show-${idx}`} className="flex items-center justify-between p-2 bg-green-50 border border-green-200 rounded text-xs">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="bg-green-100 text-green-800">Show</Badge>
+                  <span>
+                    when <strong>{relatedField?.label || condition.fieldId}</strong> {' '}
+                    {condition.operator.replace('_', ' ')} {' '}
+                    <strong>{condition.value}</strong>
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeCondition('showIf', idx)}
+                  className="h-6 w-6 p-0"
+                  data-testid={`remove-show-condition-${idx}`}
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+            );
+          })}
+          {field.conditions?.hideIf?.map((condition, idx) => {
+            const relatedField = allFields.find(f => f.profileFieldKey === condition.fieldId);
+            return (
+              <div key={`hide-${idx}`} className="flex items-center justify-between p-2 bg-red-50 border border-red-200 rounded text-xs">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="bg-red-100 text-red-800">Hide</Badge>
+                  <span>
+                    when <strong>{relatedField?.label || condition.fieldId}</strong> {' '}
+                    {condition.operator.replace('_', ' ')} {' '}
+                    <strong>{condition.value}</strong>
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeCondition('hideIf', idx)}
+                  className="h-6 w-6 p-0"
+                  data-testid={`remove-hide-condition-${idx}`}
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const FormSettingsPanel: React.FC<FormSettingsPanelProps> = ({
   formSchema,
@@ -401,7 +628,8 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
             type: field.type,
             required: field.required,
             options: field.options,
-            profileFieldKey: field.profileFieldKey
+            profileFieldKey: field.profileFieldKey,
+            conditions: field.conditions
           })),
           allowMultipleSubmissions: formData.allowMultipleSubmissions,
           matchExistingBy: formData.matchExistingBy,
@@ -679,6 +907,14 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
                                             </Badge>
                                           </div>
                                         </div>
+                                        
+                                        {/* Conditional Logic Section */}
+                                        <ConditionalLogicEditor
+                                          fieldIndex={index}
+                                          field={field}
+                                          allFields={formSchema.fields}
+                                          onUpdateField={updateField}
+                                        />
                                       </div>
                                     </div>
                                   </div>
