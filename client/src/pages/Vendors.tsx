@@ -24,7 +24,8 @@ import {
   Trash2,
   Search,
   AlertCircle,
-  Settings
+  Settings,
+  Download
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -336,6 +337,43 @@ export default function Vendors() {
     }
   };
 
+  const handleExportCSV = () => {
+    if (!vendors || vendors.length === 0) {
+      toast({
+        title: "No Data",
+        description: "There are no vendors to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Generate CSV content
+    let csvContent = "First Name,Last Name,Category,Type,Email,Phone,Notes\n";
+    filteredVendors.forEach((vendor: any) => {
+      const vendorType = vendor.vendorType === 'Other' && vendor.vendorTypeOther 
+        ? vendor.vendorTypeOther 
+        : vendor.vendorType || 'N/A';
+      const category = vendor.vendorCategory === 'organization' ? 'Organization' : 'Individual';
+      csvContent += `"${vendor.firstName || ''}","${vendor.lastName || ''}","${category}","${vendorType}","${vendor.email || ''}","${vendor.phone || ''}","${(vendor.notes || '').replace(/"/g, '""')}"\n`;
+    });
+
+    // Create and download the CSV file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `vendors_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+      title: "Export Successful",
+      description: `Exported ${filteredVendors.length} vendor${filteredVendors.length !== 1 ? 's' : ''} to CSV.`,
+    });
+  };
+
   // Filter vendors by search query
   const filteredVendors = vendors.filter((vendor: any) => {
     if (!searchQuery) return true;
@@ -370,7 +408,15 @@ export default function Vendors() {
               Manage service providers and vendor contacts
             </p>
           </div>
-          <div className="mt-4 sm:mt-0">
+          <div className="mt-4 sm:mt-0 flex gap-2">
+            <Button 
+              variant="outline"
+              onClick={handleExportCSV}
+              data-testid="button-export-vendors"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export CSV
+            </Button>
             <Button 
               onClick={() => setIsAddModalOpen(true)}
               data-testid="button-add-vendor"
