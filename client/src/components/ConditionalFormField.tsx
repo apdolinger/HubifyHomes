@@ -14,6 +14,7 @@ interface ConditionalFormFieldProps {
     type: string;
     required: boolean;
     options?: string[];
+    allowOther?: boolean;
     conditions?: {
       showIf?: { fieldId: number | string; operator: 'equals' | 'not_equals' | 'contains'; value: string }[];
       hideIf?: { fieldId: number | string; operator: 'equals' | 'not_equals' | 'contains'; value: string }[];
@@ -35,6 +36,20 @@ export function ConditionalFormField({ field, formData, onChange, control }: Con
   const [isVisible, setIsVisible] = useState(true);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [signatureData, setSignatureData] = useState<string>('');
+  const [otherText, setOtherText] = useState<string>('');
+
+  // Initialize otherText from formData if value starts with "Other:"
+  useEffect(() => {
+    const currentValue = formData[field.id];
+    if (typeof currentValue === 'string' && currentValue.startsWith('Other: ')) {
+      setOtherText(currentValue.replace('Other: ', ''));
+    } else if (Array.isArray(currentValue)) {
+      const otherValue = currentValue.find((v: string) => v.startsWith('Other: '));
+      if (otherValue) {
+        setOtherText(otherValue.replace('Other: ', ''));
+      }
+    }
+  }, [field.id, formData]);
 
   // Check conditional visibility
   useEffect(() => {
@@ -194,31 +209,126 @@ export function ConditionalFormField({ field, formData, onChange, control }: Con
           <FormField
             control={control}
             name={field.id.toString()}
-            render={({ field: formField }) => (
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  {field.label} {field.required && <span className="text-red-500">*</span>}
-                </label>
-                <Select
-                  value={formField.value}
-                  onValueChange={(value) => {
-                    formField.onChange(value);
-                    onChange(field.id, value);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={`Select ${field.label}`} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {field.options?.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            render={({ field: formField }) => {
+              // Normalize value: if it starts with "Other:", map to "__other__"
+              const displayValue = formField.value?.startsWith?.('Other: ') ? '__other__' : formField.value;
+              const showOtherInput = displayValue === '__other__';
+              
+              return (
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium mb-1">
+                    {field.label} {field.required && <span className="text-red-500">*</span>}
+                  </label>
+                  <Select
+                    value={displayValue}
+                    onValueChange={(value) => {
+                      if (value === '__other__') {
+                        formField.onChange('__other__');
+                        onChange(field.id, '__other__');
+                      } else {
+                        formField.onChange(value);
+                        onChange(field.id, value);
+                        setOtherText('');
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={`Select ${field.label}`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {field.options?.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                      {field.allowOther && (
+                        <SelectItem value="__other__">Other</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {field.allowOther && showOtherInput && (
+                    <Input
+                      placeholder="Please specify..."
+                      value={otherText}
+                      onChange={(e) => {
+                        setOtherText(e.target.value);
+                        const newValue = e.target.value ? `Other: ${e.target.value}` : '__other__';
+                        formField.onChange(newValue);
+                        onChange(field.id, newValue);
+                      }}
+                      className="mt-2"
+                    />
+                  )}
+                </div>
+              );
+            }}
+          />
+        );
+
+      case 'radio':
+        return (
+          <FormField
+            control={control}
+            name={field.id.toString()}
+            render={({ field: formField }) => {
+              const isOtherSelected = formField.value === '__other__' || formField.value?.startsWith?.('Other: ');
+              
+              return (
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium">
+                    {field.label} {field.required && <span className="text-red-500">*</span>}
+                  </label>
+                  {field.options?.map((option) => (
+                    <div key={option} className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        name={field.id.toString()}
+                        value={option}
+                        checked={formField.value === option}
+                        onChange={(e) => {
+                          formField.onChange(e.target.value);
+                          onChange(field.id, e.target.value);
+                          setOtherText('');
+                        }}
+                        className="w-4 h-4"
+                      />
+                      <label className="text-sm cursor-pointer">{option}</label>
+                    </div>
+                  ))}
+                  {field.allowOther && (
+                    <>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          name={field.id.toString()}
+                          value="__other__"
+                          checked={isOtherSelected}
+                          onChange={(e) => {
+                            formField.onChange('__other__');
+                            onChange(field.id, '__other__');
+                          }}
+                          className="w-4 h-4"
+                        />
+                        <label className="text-sm cursor-pointer">Other</label>
+                      </div>
+                      {isOtherSelected && (
+                        <Input
+                          placeholder="Please specify..."
+                          value={otherText}
+                          onChange={(e) => {
+                            setOtherText(e.target.value);
+                            const newValue = e.target.value ? `Other: ${e.target.value}` : '__other__';
+                            formField.onChange(newValue);
+                            onChange(field.id, newValue);
+                          }}
+                          className="ml-6"
+                        />
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            }}
           />
         );
 
@@ -227,32 +337,81 @@ export function ConditionalFormField({ field, formData, onChange, control }: Con
           <FormField
             control={control}
             name={field.id.toString()}
-            render={({ field: formField }) => (
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">
-                  {field.label} {field.required && <span className="text-red-500">*</span>}
-                </label>
-                {field.options?.map((option) => (
-                  <div key={option} className="flex items-center space-x-2">
-                    <Checkbox
-                      checked={formField.value?.includes(option)}
-                      onCheckedChange={(checked) => {
-                        const currentValues = formField.value || [];
-                        let newValues;
-                        if (checked) {
-                          newValues = [...currentValues, option];
-                        } else {
-                          newValues = currentValues.filter((v: string) => v !== option);
-                        }
-                        formField.onChange(newValues);
-                        onChange(field.id, newValues);
-                      }}
-                    />
-                    <label className="text-sm">{option}</label>
-                  </div>
-                ))}
-              </div>
-            )}
+            render={({ field: formField }) => {
+              // Check if "Other" is selected (either "__other__" sentinel or "Other: text")
+              const hasOtherValue = formField.value?.some((v: string) => v === '__other__' || v?.startsWith?.('Other: '));
+              
+              return (
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium">
+                    {field.label} {field.required && <span className="text-red-500">*</span>}
+                  </label>
+                  {field.options?.map((option) => (
+                    <div key={option} className="flex items-center space-x-2">
+                      <Checkbox
+                        checked={formField.value?.includes(option)}
+                        onCheckedChange={(checked) => {
+                          const currentValues = formField.value || [];
+                          let newValues;
+                          if (checked) {
+                            newValues = [...currentValues, option];
+                          } else {
+                            newValues = currentValues.filter((v: string) => v !== option);
+                          }
+                          formField.onChange(newValues);
+                          onChange(field.id, newValues);
+                        }}
+                      />
+                      <label className="text-sm">{option}</label>
+                    </div>
+                  ))}
+                  {field.allowOther && (
+                    <>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          checked={hasOtherValue}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              // Add "__other__" as placeholder
+                              const currentValues = (formField.value || []).filter((v: string) => !v.startsWith('Other: '));
+                              const newValues = [...currentValues, '__other__'];
+                              formField.onChange(newValues);
+                              onChange(field.id, newValues);
+                            } else {
+                              // Remove all "Other" values
+                              const newValues = (formField.value || []).filter((v: string) => v !== '__other__' && !v.startsWith('Other: '));
+                              setOtherText('');
+                              formField.onChange(newValues);
+                              onChange(field.id, newValues);
+                            }
+                          }}
+                        />
+                        <label className="text-sm">Other</label>
+                      </div>
+                      {hasOtherValue && (
+                        <Input
+                          placeholder="Please specify..."
+                          value={otherText}
+                          onChange={(e) => {
+                            setOtherText(e.target.value);
+                            // Remove "__other__" sentinel and any existing "Other: " values
+                            const baseValues = (formField.value || []).filter(
+                              (v: string) => v !== '__other__' && !v.startsWith('Other: ')
+                            );
+                            const newValues = e.target.value 
+                              ? [...baseValues, `Other: ${e.target.value}`]
+                              : [...baseValues, '__other__']; // Keep sentinel if no text yet
+                            formField.onChange(newValues);
+                            onChange(field.id, newValues);
+                          }}
+                          className="ml-6"
+                        />
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            }}
           />
         );
 

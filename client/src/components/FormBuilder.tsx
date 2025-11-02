@@ -65,6 +65,7 @@ interface FormFieldOption {
   profileFieldKey: string; // maps to DB field on the person profile
   icon?: React.ReactNode;
   options?: string[]; // for select/checkbox fields
+  allowOther?: boolean; // allow "Other" option with text input
   placeholder?: string;
   conditions?: {
     showIf?: FieldCondition[];
@@ -671,6 +672,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
             type: field.type,
             required: field.required,
             options: field.options,
+            allowOther: field.allowOther,
             profileFieldKey: field.profileFieldKey,
             conditions: field.conditions
           })),
@@ -1005,16 +1007,68 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
                                           />
                                         </div>
                                         
-                                        {/* Field Type and Profile Mapping */}
-                                        <div className="flex items-center justify-between">
-                                          <div className="flex items-center space-x-2">
-                                            <Badge variant="outline" className="text-xs">
-                                              Type: {field.type}
-                                            </Badge>
-                                            <Badge variant="secondary" className="text-xs">
-                                              Maps to: {field.profileFieldKey}
-                                            </Badge>
+                                        {/* Options Management (for select, radio, checkbox fields) */}
+                                        {(field.type === 'select' || field.type === 'radio' || field.type === 'checkbox') && (
+                                          <div className="space-y-2">
+                                            <Label className="text-xs text-slate-600">Options</Label>
+                                            <div className="space-y-2">
+                                              {(field.options || ['Option 1']).map((option, optIndex) => (
+                                                <div key={optIndex} className="flex items-center space-x-2">
+                                                  <Input
+                                                    value={option}
+                                                    onChange={(e) => {
+                                                      const newOptions = [...(field.options || [])];
+                                                      newOptions[optIndex] = e.target.value;
+                                                      updateField(index, { options: newOptions });
+                                                    }}
+                                                    placeholder={`Option ${optIndex + 1}`}
+                                                    className="text-sm"
+                                                  />
+                                                  {(field.options?.length || 0) > 1 && (
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      onClick={() => {
+                                                        const newOptions = (field.options || []).filter((_, i) => i !== optIndex);
+                                                        updateField(index, { options: newOptions });
+                                                      }}
+                                                      className="text-red-600 hover:text-red-800"
+                                                    >
+                                                      <X className="w-4 h-4" />
+                                                    </Button>
+                                                  )}
+                                                </div>
+                                              ))}
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                  const newOptions = [...(field.options || []), `Option ${(field.options?.length || 0) + 1}`];
+                                                  updateField(index, { options: newOptions });
+                                                }}
+                                                className="w-full"
+                                              >
+                                                <Plus className="w-4 h-4 mr-2" />
+                                                Add Option
+                                              </Button>
+                                            </div>
+                                            
+                                            {/* Allow Other Option Toggle */}
+                                            <div className="flex items-center justify-between pt-2">
+                                              <Label className="text-xs text-slate-600">Allow "Other" option</Label>
+                                              <Switch
+                                                checked={field.allowOther || false}
+                                                onCheckedChange={(checked) => updateField(index, { allowOther: checked })}
+                                              />
+                                            </div>
                                           </div>
+                                        )}
+                                        
+                                        {/* Field Type Badge */}
+                                        <div className="flex items-center justify-between">
+                                          <Badge variant="outline" className="text-xs">
+                                            Type: {field.type}
+                                          </Badge>
                                         </div>
                                         
                                         {/* Conditional Logic Section */}
