@@ -41,6 +41,7 @@ import {
   timeEntries,
   contacts,
   contactProperties,
+  propertyVendors,
   vendorEmployees,
   alerts,
   systemAlerts,
@@ -499,6 +500,11 @@ export interface IStorage {
   setPrimaryProperty(contactId: number, propertyId: number): Promise<void>;
   setPrimaryContactForProperty(propertyId: number, contactId: number): Promise<void>;
   bulkMoveContactsToProperty(contactIds: number[], oldPropertyId: number, newPropertyId: number): Promise<void>;
+  
+  // Property-Vendor relationship operations
+  getPropertyVendors(propertyId: number): Promise<any[]>;
+  addPropertyVendor(propertyId: number, vendorId: number, orgId: string, notes?: string): Promise<any>;
+  removePropertyVendor(id: number): Promise<void>;
   
   // Alert operations
   getAlerts(orgId: string, filters?: { type?: string; entityId?: number; isActive?: boolean }): Promise<Alert[]>;
@@ -3484,6 +3490,54 @@ export class DatabaseStorage implements IStorage {
       }
       // If they already have a relationship with the new property, keep the existing one
     }
+  }
+
+  // Property-Vendor relationship operations
+  async getPropertyVendors(propertyId: number): Promise<any[]> {
+    const vendors = await db
+      .select({
+        id: propertyVendors.id,
+        propertyId: propertyVendors.propertyId,
+        vendorId: propertyVendors.vendorId,
+        notes: propertyVendors.notes,
+        createdAt: propertyVendors.createdAt,
+        vendor: {
+          id: contacts.id,
+          firstName: contacts.firstName,
+          lastName: contacts.lastName,
+          company: contacts.company,
+          email: contacts.email,
+          phone: contacts.phone,
+          category: contacts.category,
+          type: contacts.type,
+          vendorType: contacts.vendorType,
+          vendorTypeOther: contacts.vendorTypeOther,
+        }
+      })
+      .from(propertyVendors)
+      .leftJoin(contacts, eq(propertyVendors.vendorId, contacts.id))
+      .where(eq(propertyVendors.propertyId, propertyId))
+      .orderBy(propertyVendors.createdAt);
+    
+    return vendors;
+  }
+
+  async addPropertyVendor(propertyId: number, vendorId: number, orgId: string, notes?: string): Promise<any> {
+    const [newPropertyVendor] = await db
+      .insert(propertyVendors)
+      .values({
+        propertyId,
+        vendorId,
+        orgId,
+        notes,
+      })
+      .returning();
+
+    return newPropertyVendor;
+  }
+
+  async removePropertyVendor(id: number): Promise<void> {
+    await db.delete(propertyVendors).where(eq(propertyVendors.id, id));
   }
 
   // Team message operations
