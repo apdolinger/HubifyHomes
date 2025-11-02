@@ -1052,6 +1052,9 @@ export const contacts = pgTable("contacts", {
   phone: varchar("phone"),
   type: varchar("type").notNull(), // tenant, owner, vendor, emergency_contact, client
   clientCategory: varchar("client_category"), // primary, secondary (only used when type is 'client')
+  vendorCategory: varchar("vendor_category").$type<"organization"|"individual">(), // organization, individual (only used when type is 'vendor')
+  vendorType: varchar("vendor_type"), // HVAC, Electrician, Security, Other (only used when type is 'vendor')
+  vendorTypeOther: varchar("vendor_type_other"), // Custom vendor type when vendorType is 'Other'
   propertyId: integer("property_id").references(() => properties.id),
   isActive: boolean("is_active").notNull().default(true),
   notes: text("notes"),

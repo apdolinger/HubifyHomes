@@ -21,6 +21,7 @@ import TeamMemberProfile from "@/pages/TeamMemberProfile";
 import People from "@/pages/People";
 import PersonProfile from "@/pages/PersonProfile";
 import Vendors from "@/pages/Vendors";
+import VendorProfile from "@/pages/VendorProfile";
 import DuplicatesManagement from "@/pages/DuplicatesManagement";
 import TeamMessages from "@/pages/TeamMessages";
 import HubifyConsole from "@/pages/HubifyConsole";
@@ -151,6 +152,7 @@ function Router() {
           {/* Admin Routes */}
           <Route path="/admin/import" component={ImportManager} />
           <Route path="/admin/vendors" component={Vendors} />
+          <Route path="/admin/vendors/:id" component={VendorProfile} />
           <Route path="/admin/notes/search" component={AdminNoteSearch} />
           <Route path="/admin/email-templates" component={AdminEmailTemplates} />
           <Route path="/admin/forms/:id" component={FormEdit} />

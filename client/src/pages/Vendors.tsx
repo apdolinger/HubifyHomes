@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { Link as RouterLink } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Building, 
   Plus, 
@@ -29,13 +31,23 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
 
 const vendorSchema = z.object({
-  accountId: z.string().nullable().optional(),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email address").optional().or(z.literal("")),
   phone: z.string().optional(),
   type: z.literal("vendor"),
+  vendorCategory: z.enum(["organization", "individual"], { required_error: "Category is required" }),
+  vendorType: z.string().min(1, "Type is required"),
+  vendorTypeOther: z.string().optional(),
   notes: z.string().optional(),
+}).refine((data) => {
+  if (data.vendorType === "Other" && !data.vendorTypeOther) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Please specify the vendor type",
+  path: ["vendorTypeOther"],
 });
 
 type VendorFormData = z.infer<typeof vendorSchema>;
@@ -56,9 +68,10 @@ export default function Vendors() {
   // Default column configuration for vendors table
   const defaultColumns: ColumnConfig[] = [
     { id: 'name', label: 'Name', visible: true, required: true },
+    { id: 'category', label: 'Category', visible: true },
+    { id: 'type', label: 'Type', visible: true },
     { id: 'email', label: 'Email', visible: true },
     { id: 'phone', label: 'Phone', visible: true },
-    { id: 'accountId', label: 'Account ID', visible: true },
     { id: 'actions', label: 'Actions', visible: true, required: true },
   ];
 
@@ -151,12 +164,14 @@ export default function Vendors() {
   const addForm = useForm<VendorFormData>({
     resolver: zodResolver(vendorSchema),
     defaultValues: {
-      accountId: "",
       firstName: "",
       lastName: "",
       email: "",
       phone: "",
       type: "vendor",
+      vendorCategory: "organization",
+      vendorType: "",
+      vendorTypeOther: "",
       notes: "",
     },
   });
@@ -165,12 +180,14 @@ export default function Vendors() {
   const editForm = useForm<VendorFormData>({
     resolver: zodResolver(vendorSchema),
     defaultValues: {
-      accountId: "",
       firstName: "",
       lastName: "",
       email: "",
       phone: "",
       type: "vendor",
+      vendorCategory: "organization",
+      vendorType: "",
+      vendorTypeOther: "",
       notes: "",
     },
   });
@@ -283,22 +300,20 @@ export default function Vendors() {
   });
 
   const handleAddVendor = (data: VendorFormData) => {
-    const cleanedData = {
-      ...data,
-      accountId: data.accountId?.trim() === "" ? null : data.accountId?.trim() || null,
-    };
-    createVendorMutation.mutate(cleanedData);
+    createVendorMutation.mutate(data);
   };
 
   const handleEditVendor = (vendor: any) => {
     setSelectedVendor(vendor);
     editForm.reset({
-      accountId: vendor.accountId || "",
       firstName: vendor.firstName,
       lastName: vendor.lastName,
       email: vendor.email || "",
       phone: vendor.phone || "",
       type: "vendor",
+      vendorCategory: vendor.vendorCategory || "organization",
+      vendorType: vendor.vendorType || "",
+      vendorTypeOther: vendor.vendorTypeOther || "",
       notes: vendor.notes || "",
     });
     setIsEditModalOpen(true);
@@ -306,11 +321,7 @@ export default function Vendors() {
 
   const handleUpdateVendor = (data: VendorFormData) => {
     if (selectedVendor) {
-      const cleanedData = {
-        ...data,
-        accountId: data.accountId?.trim() === "" ? null : data.accountId?.trim() || null,
-      };
-      updateVendorMutation.mutate({ id: selectedVendor.id, data: cleanedData });
+      updateVendorMutation.mutate({ id: selectedVendor.id, data });
     }
   };
 
@@ -461,7 +472,11 @@ export default function Vendors() {
                           case 'name':
                             return (
                               <TableCell key={col.id} className="font-medium">
-                                {vendor.firstName} {vendor.lastName}
+                                <RouterLink href={`/admin/vendors/${vendor.id}`}>
+                                  <span className="text-blue-600 hover:underline cursor-pointer">
+                                    {vendor.firstName} {vendor.lastName}
+                                  </span>
+                                </RouterLink>
                               </TableCell>
                             );
                           case 'email':
@@ -494,11 +509,27 @@ export default function Vendors() {
                                 )}
                               </TableCell>
                             );
-                          case 'accountId':
+                          case 'category':
                             return (
                               <TableCell key={col.id}>
-                                {vendor.accountId ? (
-                                  <Badge variant="outline">{vendor.accountId}</Badge>
+                                {vendor.vendorCategory ? (
+                                  <Badge variant="secondary">
+                                    {vendor.vendorCategory === 'organization' ? 'Organization' : 'Individual'}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-slate-400">-</span>
+                                )}
+                              </TableCell>
+                            );
+                          case 'type':
+                            return (
+                              <TableCell key={col.id}>
+                                {vendor.vendorType ? (
+                                  <Badge variant="outline">
+                                    {vendor.vendorType === 'Other' && vendor.vendorTypeOther 
+                                      ? vendor.vendorTypeOther 
+                                      : vendor.vendorType}
+                                  </Badge>
                                 ) : (
                                   <span className="text-slate-400">-</span>
                                 )}
@@ -620,17 +651,63 @@ export default function Vendors() {
               />
               <FormField
                 control={addForm.control}
-                name="accountId"
+                name="vendorCategory"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Account ID</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} data-testid="input-account-id" />
-                    </FormControl>
+                    <FormLabel>Category *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-vendor-category">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="organization">Organization</SelectItem>
+                        <SelectItem value="individual">Individual</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+              <FormField
+                control={addForm.control}
+                name="vendorType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Type *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-vendor-type">
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="HVAC">HVAC</SelectItem>
+                        <SelectItem value="Electrician">Electrician</SelectItem>
+                        <SelectItem value="Security">Security</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {addForm.watch("vendorType") === "Other" && (
+                <FormField
+                  control={addForm.control}
+                  name="vendorTypeOther"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Specify Type *</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g., Landscaping, Plumbing" data-testid="input-vendor-type-other" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
               <FormField
                 control={addForm.control}
                 name="notes"
@@ -719,17 +796,63 @@ export default function Vendors() {
               />
               <FormField
                 control={editForm.control}
-                name="accountId"
+                name="vendorCategory"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Account ID</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} data-testid="input-edit-account-id" />
-                    </FormControl>
+                    <FormLabel>Category *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-vendor-category">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="organization">Organization</SelectItem>
+                        <SelectItem value="individual">Individual</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+              <FormField
+                control={editForm.control}
+                name="vendorType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Type *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-vendor-type">
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="HVAC">HVAC</SelectItem>
+                        <SelectItem value="Electrician">Electrician</SelectItem>
+                        <SelectItem value="Security">Security</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {editForm.watch("vendorType") === "Other" && (
+                <FormField
+                  control={editForm.control}
+                  name="vendorTypeOther"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Specify Type *</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g., Landscaping, Plumbing" data-testid="input-edit-vendor-type-other" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
               <FormField
                 control={editForm.control}
                 name="notes"
