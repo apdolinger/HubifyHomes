@@ -231,6 +231,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, like, count, sql, inArray, isNotNull } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { nanoid } from "nanoid";
 
 export interface IStorage {
@@ -2597,6 +2598,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTask(id: number): Promise<Task | undefined> {
+    const vendorContacts = alias(contacts, 'vendorContacts');
+    
     const [task] = await db.select({
       id: tasks.id,
       title: tasks.title,
@@ -2652,6 +2655,16 @@ export class DatabaseStorage implements IStorage {
         phone: contacts.phone,
         type: contacts.type,
       },
+      vendor: {
+        id: vendorContacts.id,
+        firstName: vendorContacts.firstName,
+        lastName: vendorContacts.lastName,
+        email: vendorContacts.email,
+        phone: vendorContacts.phone,
+        type: vendorContacts.type,
+        vendorType: vendorContacts.vendorType,
+        vendorCategory: vendorContacts.vendorCategory,
+      },
       assignedUser: {
         id: users.id,
         firstName: users.firstName,
@@ -2663,6 +2676,7 @@ export class DatabaseStorage implements IStorage {
     .from(tasks)
     .leftJoin(properties, eq(tasks.propertyId, properties.id))
     .leftJoin(contacts, eq(tasks.contactId, contacts.id))
+    .leftJoin(vendorContacts, eq(tasks.vendorId, vendorContacts.id))
     .leftJoin(users, eq(tasks.assignedToId, users.id))
     .where(eq(tasks.id, id));
     return task;
@@ -2687,6 +2701,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateTask(id: number, task: Partial<InsertTask>): Promise<Task> {
+    const vendorContacts = alias(contacts, 'vendorContacts');
+    
     // First update the task
     await db
       .update(tasks)
@@ -2746,6 +2762,16 @@ export class DatabaseStorage implements IStorage {
         phone: contacts.phone,
         type: contacts.type,
       },
+      vendor: {
+        id: vendorContacts.id,
+        firstName: vendorContacts.firstName,
+        lastName: vendorContacts.lastName,
+        email: vendorContacts.email,
+        phone: vendorContacts.phone,
+        type: vendorContacts.type,
+        vendorType: vendorContacts.vendorType,
+        vendorCategory: vendorContacts.vendorCategory,
+      },
       assignedUser: {
         id: users.id,
         firstName: users.firstName,
@@ -2757,6 +2783,7 @@ export class DatabaseStorage implements IStorage {
     .from(tasks)
     .leftJoin(properties, eq(tasks.propertyId, properties.id))
     .leftJoin(contacts, eq(tasks.contactId, contacts.id))
+    .leftJoin(vendorContacts, eq(tasks.vendorId, vendorContacts.id))
     .leftJoin(users, eq(tasks.assignedToId, users.id))
     .where(eq(tasks.id, id));
     

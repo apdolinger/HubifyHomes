@@ -60,7 +60,8 @@ import {
   AlertTriangle,
   Info,
   XCircle,
-  Star
+  Star,
+  Wrench
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -2475,8 +2476,12 @@ export default function TaskProfile() {
                 </CardContent>
               </Card>
 
-              {/* Property and Owner Information - moved up below description */}
-              <div className={`grid gap-6 ${(task as any).property && (task as any).contact ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+              {/* Property, Owner, and Vendor Information - moved up below description */}
+              <div className={`grid gap-6 ${
+                ((task as any).property ? 1 : 0) + ((task as any).contact ? 1 : 0) + ((task as any).vendor ? 1 : 0) > 1 
+                  ? 'grid-cols-1 md:grid-cols-2' 
+                  : 'grid-cols-1'
+              }`}>
                 {(task as any).property && (
                   <Card>
                     <CardHeader>
@@ -2493,6 +2498,7 @@ export default function TaskProfile() {
                             variant="link"
                             className="p-0 h-auto font-medium text-blue-600 hover:text-blue-800"
                             onClick={() => navigate(`/property-profile?id=${(task as any).property.id}`)}
+                            data-testid="link-task-property"
                           >
                             {(task as any).property.name}
                           </Button>
@@ -2542,6 +2548,7 @@ export default function TaskProfile() {
                             variant="link"
                             className="p-0 h-auto font-medium text-blue-600 hover:text-blue-800"
                             onClick={() => navigate(`/person-profile?id=${(task as any).contact.id}`)}
+                            data-testid="link-task-owner"
                           >
                             {(task as any).contact.firstName} {(task as any).contact.lastName}
                           </Button>
@@ -2572,6 +2579,60 @@ export default function TaskProfile() {
                             {(task as any).contact.type}
                           </Badge>
                         </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {(task as any).vendor && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <Wrench className="w-5 h-5 mr-2" />
+                        Vendor Information
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div>
+                          <Label className="text-sm font-medium text-slate-500">Vendor</Label>
+                          <Button
+                            variant="link"
+                            className="p-0 h-auto font-medium text-blue-600 hover:text-blue-800"
+                            onClick={() => navigate(`/person-profile/${(task as any).vendor.id}`)}
+                            data-testid="link-task-vendor"
+                          >
+                            {(task as any).vendor.firstName} {(task as any).vendor.lastName}
+                          </Button>
+                        </div>
+                        {(task as any).vendor.vendorType && (
+                          <div>
+                            <Label className="text-sm font-medium text-slate-500">Type</Label>
+                            <Badge variant="secondary" className="capitalize text-xs">
+                              {(task as any).vendor.vendorType}
+                            </Badge>
+                          </div>
+                        )}
+                        {(task as any).vendor.email && (
+                          <div>
+                            <Label className="text-sm font-medium text-slate-500">Email</Label>
+                            <p className="text-slate-700 text-sm">
+                              <a href={`mailto:${(task as any).vendor.email}`} className="text-blue-600 hover:text-blue-800">
+                                {(task as any).vendor.email}
+                              </a>
+                            </p>
+                          </div>
+                        )}
+                        {(task as any).vendor.phone && (
+                          <div>
+                            <Label className="text-sm font-medium text-slate-500">Phone</Label>
+                            <p className="text-slate-700 text-sm">
+                              <a href={`tel:${(task as any).vendor.phone}`} className="text-blue-600 hover:text-blue-800">
+                                {(task as any).vendor.phone}
+                              </a>
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
