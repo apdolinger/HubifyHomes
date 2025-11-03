@@ -2311,6 +2311,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Super Admin: Get all vendors across all organizations with rating statistics
+  app.get("/api/super-admin/vendors-report", isAuthenticated, isSuperAdmin, requireMFA, requireAllowedIP, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      
+      const vendorsData = await storage.getAllVendorsForSuperAdmin();
+      
+      await AuditLogger.log({
+        req,
+        action: "view_vendors_report",
+        actionType: "read",
+        resource: "super_admin",
+        severity: "info",
+        success: true,
+      });
+      
+      res.json(vendorsData);
+    } catch (error) {
+      console.error("Error fetching super admin vendors report:", error);
+      
+      await AuditLogger.log({
+        req,
+        action: "view_vendors_report",
+        actionType: "read",
+        resource: "super_admin",
+        severity: "critical",
+        success: false,
+        errorMessage: error instanceof Error ? error.message : "Unknown error",
+      });
+      
+      res.status(500).json({ message: "Failed to fetch vendors report" });
+    }
+  });
+
   // Super Admin Security & Compliance API Endpoints
   
   // Get audit logs

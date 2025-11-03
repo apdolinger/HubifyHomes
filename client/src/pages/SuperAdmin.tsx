@@ -72,7 +72,8 @@ import {
   FileCode,
   Headphones,
   ExternalLink,
-  Paperclip
+  Paperclip,
+  Star
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -1603,6 +1604,194 @@ function CommunitiesReport() {
   );
 }
 
+// Vendors Report Component
+function VendorsReport() {
+  const { data: vendorsData, isLoading, error } = useQuery({
+    queryKey: ['/api/super-admin/vendors-report'],
+    enabled: true,
+  });
+
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 bg-red-50 text-red-700 rounded-lg">
+        Error loading vendors report: {error.message}
+      </div>
+    );
+  }
+
+  const vendorsList = (vendorsData as any[]) || [];
+  const filteredVendors = vendorsList.filter((vendor: any) =>
+    vendor.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    vendor.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    vendor.vendorType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    vendor.organizationName?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const downloadCSV = () => {
+    if (!vendorsList || vendorsList.length === 0) return;
+
+    const headers = [
+      'Vendor Name',
+      'Company',
+      'Email',
+      'Phone',
+      'Vendor Type',
+      'Category',
+      'Organization',
+      'Task Count',
+      'Average Rating',
+      'Total Ratings',
+      'Created Date'
+    ];
+
+    const csvData = [
+      headers,
+      ...vendorsList.map((vendor: any) => [
+        vendor.fullName || '',
+        vendor.companyName || '',
+        vendor.email || '',
+        vendor.phone || '',
+        vendor.vendorType || '',
+        vendor.vendorCategory || '',
+        vendor.organizationName || 'Unknown',
+        vendor.taskCount || 0,
+        vendor.averageRating || 'N/A',
+        vendor.ratingCount || 0,
+        vendor.createdAt ? new Date(vendor.createdAt).toLocaleDateString() : 'N/A'
+      ])
+    ];
+
+    const csvContent = csvData.map(row => row.map(field => `"${field}"`).join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `vendors-report-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
+
+  const renderStars = (rating: number | null, count: number) => {
+    if (rating === null || count === 0) {
+      return <span className="text-gray-400 text-sm">No ratings</span>;
+    }
+    
+    return (
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <Star 
+            key={star}
+            className={`w-4 h-4 ${star <= Math.round(rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+          />
+        ))}
+        <span className="text-sm text-gray-600 ml-1">
+          ({rating.toFixed(1)})
+        </span>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <Input
+            placeholder="Search vendors..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-64"
+            data-testid="input-search-vendors"
+          />
+          <Badge variant="outline" className="px-3 py-1">
+            {filteredVendors.length} vendors
+          </Badge>
+        </div>
+        <Button onClick={downloadCSV} variant="outline" size="sm" data-testid="button-export-vendors-csv">
+          <Download className="w-4 h-4 mr-2" />
+          Export CSV
+        </Button>
+      </div>
+
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Vendor Name</TableHead>
+              <TableHead>Contact Info</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Organization</TableHead>
+              <TableHead>Tasks</TableHead>
+              <TableHead>Satisfaction Rating</TableHead>
+              <TableHead>Created</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredVendors.map((vendor: any) => (
+              <TableRow key={vendor.id}>
+                <TableCell className="font-medium">
+                  <div>
+                    <div>{vendor.displayName}</div>
+                    {vendor.companyName && vendor.displayName === vendor.fullName && (
+                      <div className="text-sm text-gray-500">{vendor.companyName}</div>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="text-sm">
+                    {vendor.email && <div className="text-gray-700">{vendor.email}</div>}
+                    {vendor.phone && <div className="text-gray-500">{vendor.phone}</div>}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  {vendor.vendorType && (
+                    <Badge variant="outline">{vendor.vendorType}</Badge>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <div className="text-sm max-w-xs truncate" title={vendor.organizationName}>
+                    {vendor.organizationName}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Badge variant="secondary">
+                    {vendor.taskCount || 0} tasks
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  {renderStars(vendor.averageRating, vendor.ratingCount)}
+                </TableCell>
+                <TableCell className="text-sm text-gray-500">
+                  {vendor.createdAt ? new Date(vendor.createdAt).toLocaleDateString() : 'N/A'}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      {filteredVendors.length === 0 && vendorsList && vendorsList.length > 0 && (
+        <div className="text-center py-8 text-gray-500">
+          No vendors match your search criteria.
+        </div>
+      )}
+
+      {(!vendorsList || vendorsList.length === 0) && !isLoading && (
+        <div className="text-center py-8 text-gray-500">
+          No vendors found in the database.
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SuperAdmin() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -1910,6 +2099,21 @@ export default function SuperAdmin() {
               </CardHeader>
               <CardContent>
                 <CommunitiesReport />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Users className="w-5 h-5 mr-2" />
+                  Vendors Report
+                </CardTitle>
+                <p className="text-sm text-gray-600">
+                  Comprehensive view of all vendors across all organizations with satisfaction ratings
+                </p>
+              </CardHeader>
+              <CardContent>
+                <VendorsReport />
               </CardContent>
             </Card>
           </div>

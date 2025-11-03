@@ -351,6 +351,7 @@ export interface IStorage {
   updateCommunity(id: number, community: Partial<InsertCommunity>): Promise<Community>;
   deleteCommunity(id: number): Promise<void>;
   getAllCommunitiesForSuperAdmin(): Promise<any[]>;
+  getAllVendorsForSuperAdmin(): Promise<any[]>;
   
   // Document template operations
   getDocumentTemplates(orgId: string): Promise<DocumentTemplate[]>;
@@ -1749,6 +1750,63 @@ export class DatabaseStorage implements IStorage {
           fullAddress: [community.address1, community.city, community.state, community.zip]
             .filter(Boolean)
             .join(', ') || 'No Address'
+        };
+      })
+    );
+    
+    return enhancedResults;
+  }
+
+  async getAllVendorsForSuperAdmin(): Promise<any[]> {
+    const allVendors = await db
+      .select({
+        id: contacts.id,
+        accountId: contacts.accountId,
+        firstName: contacts.firstName,
+        lastName: contacts.lastName,
+        email: contacts.email,
+        phone: contacts.phone,
+        vendorType: contacts.vendorType,
+        vendorCategory: contacts.vendorCategory,
+        companyName: contacts.companyName,
+        orgId: contacts.orgId,
+        orgName: orgs.name,
+        createdAt: contacts.createdAt,
+      })
+      .from(contacts)
+      .leftJoin(orgs, eq(contacts.orgId, orgs.id))
+      .where(eq(contacts.type, 'vendor'))
+      .orderBy(desc(contacts.createdAt));
+
+    const enhancedResults = await Promise.all(
+      allVendors.map(async (vendor) => {
+        const taskStats = await db
+          .select({ 
+            taskCount: sql<number>`count(*)`,
+            avgRating: sql<number>`avg(${tasks.vendorSatisfactionRating})`,
+            ratingCount: sql<number>`count(${tasks.vendorSatisfactionRating})`
+          })
+          .from(tasks)
+          .where(
+            and(
+              eq(tasks.vendorId, vendor.accountId),
+              eq(tasks.vendorNeeded, true)
+            )
+          );
+
+        const stats = taskStats[0];
+        const avgRating = stats?.avgRating ? parseFloat(parseFloat(stats.avgRating as any).toFixed(1)) : null;
+        const taskCount = stats?.taskCount ? parseInt(stats.taskCount as any, 10) : 0;
+        const ratingCount = stats?.ratingCount ? parseInt(stats.ratingCount as any, 10) : 0;
+
+        return {
+          ...vendor,
+          fullName: `${vendor.firstName} ${vendor.lastName}`,
+          displayName: vendor.companyName || `${vendor.firstName} ${vendor.lastName}`,
+          taskCount,
+          averageRating: avgRating,
+          ratingCount,
+          organizationName: vendor.orgName || 'Unknown Organization'
         };
       })
     );
