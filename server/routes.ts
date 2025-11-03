@@ -3559,6 +3559,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/properties/:targetPropertyId/copy-vendors/:sourcePropertyId", isAuthenticated, async (req: any, res) => {
+    try {
+      const targetPropertyId = parseInt(req.params.targetPropertyId);
+      const sourcePropertyId = parseInt(req.params.sourcePropertyId);
+      
+      if (isNaN(targetPropertyId) || isNaN(sourcePropertyId)) {
+        return res.status(400).json({ message: 'Invalid property ID' });
+      }
+
+      const orgId = req.user.orgId || "00000000-0000-0000-0000-000000000000";
+      const copiedCount = await storage.copyPropertyVendors(sourcePropertyId, targetPropertyId, orgId);
+      
+      res.json({ 
+        message: `Successfully copied ${copiedCount} vendor(s) to the property`,
+        count: copiedCount 
+      });
+    } catch (error: any) {
+      console.error('Error copying property vendors:', error);
+      res.status(500).json({ message: error.message || 'Failed to copy vendors' });
+    }
+  });
+
   // Room routes
   app.get("/api/properties/:propertyId/rooms", isAuthenticated, async (req, res) => {
     try {

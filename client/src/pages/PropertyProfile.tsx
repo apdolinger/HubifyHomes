@@ -389,6 +389,8 @@ export default function PropertyProfile() {
   const [isAddVendorModalOpen, setIsAddVendorModalOpen] = useState(false);
   const [selectedVendorId, setSelectedVendorId] = useState<string>("");
   const [vendorNotes, setVendorNotes] = useState("");
+  const [isCopyVendorsModalOpen, setIsCopyVendorsModalOpen] = useState(false);
+  const [sourcePropertyIdForCopy, setSourcePropertyIdForCopy] = useState<string>("");
   
   // Get property ID from URL path parameters
   const params = useParams();
@@ -1233,6 +1235,39 @@ export default function PropertyProfile() {
       }
       toast({
         title: "Failed to remove vendor",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const copyPropertyVendorsMutation = useMutation({
+    mutationFn: async ({ sourcePropertyId, targetPropertyId }: { sourcePropertyId: number; targetPropertyId: number }) => {
+      return await apiRequest("POST", `/api/properties/${targetPropertyId}/copy-vendors/${sourcePropertyId}`, {});
+    },
+    onSuccess: (data) => {
+      refetchVendors();
+      setIsCopyVendorsModalOpen(false);
+      setSourcePropertyIdForCopy("");
+      toast({
+        title: "Vendors copied",
+        description: data.message || `Successfully copied vendors to this property.`,
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Failed to copy vendors",
         description: error.message,
         variant: "destructive",
       });
@@ -5295,17 +5330,30 @@ export default function PropertyProfile() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                 <CardTitle>Preferred Vendors</CardTitle>
-                <Button
-                  onClick={() => {
-                    setSelectedVendorId("");
-                    setVendorNotes("");
-                    setIsAddVendorModalOpen(true);
-                  }}
-                  data-testid="button-add-vendor"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Vendor
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSourcePropertyIdForCopy("");
+                      setIsCopyVendorsModalOpen(true);
+                    }}
+                    data-testid="button-copy-vendors"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Copy from Template
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setSelectedVendorId("");
+                      setVendorNotes("");
+                      setIsAddVendorModalOpen(true);
+                    }}
+                    data-testid="button-add-vendor"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Vendor
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {vendorsLoading ? (
@@ -9015,6 +9063,86 @@ export default function PropertyProfile() {
                   <>
                     <Plus className="w-4 h-4 mr-2" />
                     Add Vendor
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Copy Vendors Modal */}
+        <Dialog open={isCopyVendorsModalOpen} onOpenChange={setIsCopyVendorsModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Copy Vendors from Template Property</DialogTitle>
+              <DialogDescription>
+                Select a property to copy its preferred vendors to this property. This is useful when a client purchases another property and wants to use the same vendors.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="source-property">Template Property</Label>
+                <Select
+                  value={sourcePropertyIdForCopy}
+                  onValueChange={setSourcePropertyIdForCopy}
+                >
+                  <SelectTrigger id="source-property" data-testid="select-source-property">
+                    <SelectValue placeholder="Select a property" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allProperties
+                      .filter((p: any) => p.id?.toString() !== propertyId)
+                      .map((prop: any) => (
+                        <SelectItem key={prop.id} value={prop.id.toString()}>
+                          {prop.name || prop.address1 || `Property ${prop.id}`}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-slate-500">
+                  Vendors from the selected property will be added to this property. Duplicates will be skipped.
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsCopyVendorsModalOpen(false);
+                  setSourcePropertyIdForCopy("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!sourcePropertyIdForCopy) {
+                    toast({
+                      title: "No property selected",
+                      description: "Please select a property to copy vendors from.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  copyPropertyVendorsMutation.mutate({
+                    sourcePropertyId: parseInt(sourcePropertyIdForCopy),
+                    targetPropertyId: parseInt(propertyId)
+                  });
+                }}
+                disabled={copyPropertyVendorsMutation.isPending || !sourcePropertyIdForCopy}
+                data-testid="button-confirm-copy-vendors"
+              >
+                {copyPropertyVendorsMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Copying...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Copy Vendors
                   </>
                 )}
               </Button>

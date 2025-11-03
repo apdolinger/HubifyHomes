@@ -517,6 +517,7 @@ export interface IStorage {
   getPropertyVendors(propertyId: number): Promise<any[]>;
   addPropertyVendor(propertyId: number, vendorId: number, orgId: string, notes?: string): Promise<any>;
   removePropertyVendor(id: number): Promise<void>;
+  copyPropertyVendors(sourcePropertyId: number, targetPropertyId: number, orgId: string): Promise<number>;
   
   // Alert operations
   getAlerts(orgId: string, filters?: { type?: string; entityId?: number; isActive?: boolean }): Promise<Alert[]>;
@@ -3771,6 +3772,86 @@ export class DatabaseStorage implements IStorage {
         eq(propertyVendors.orgId, orgId)
       )
     );
+  }
+
+  async copyPropertyVendors(sourcePropertyId: number, targetPropertyId: number, orgId: string): Promise<number> {
+    // Validate both properties belong to the org
+    const [sourceProperty] = await db
+      .select()
+      .from(properties)
+      .where(
+        and(
+          eq(properties.id, sourcePropertyId),
+          eq(properties.orgId, orgId)
+        )
+      )
+      .limit(1);
+    
+    if (!sourceProperty) {
+      throw new Error('Source property not found or does not belong to your organization');
+    }
+
+    const [targetProperty] = await db
+      .select()
+      .from(properties)
+      .where(
+        and(
+          eq(properties.id, targetPropertyId),
+          eq(properties.orgId, orgId)
+        )
+      )
+      .limit(1);
+    
+    if (!targetProperty) {
+      throw new Error('Target property not found or does not belong to your organization');
+    }
+
+    // Get all vendors from source property
+    const sourceVendors = await db
+      .select()
+      .from(propertyVendors)
+      .where(
+        and(
+          eq(propertyVendors.propertyId, sourcePropertyId),
+          eq(propertyVendors.orgId, orgId)
+        )
+      );
+
+    if (sourceVendors.length === 0) {
+      return 0;
+    }
+
+    // Get existing vendor IDs in target to avoid duplicates
+    const existingTargetVendors = await db
+      .select({ vendorId: propertyVendors.vendorId })
+      .from(propertyVendors)
+      .where(
+        and(
+          eq(propertyVendors.propertyId, targetPropertyId),
+          eq(propertyVendors.orgId, orgId)
+        )
+      );
+    
+    const existingVendorIds = new Set(existingTargetVendors.map(v => v.vendorId));
+
+    // Filter out vendors that already exist in target
+    const vendorsToAdd = sourceVendors.filter(v => !existingVendorIds.has(v.vendorId));
+
+    if (vendorsToAdd.length === 0) {
+      return 0;
+    }
+
+    // Insert vendors into target property
+    const newVendors = vendorsToAdd.map(v => ({
+      propertyId: targetPropertyId,
+      vendorId: v.vendorId,
+      orgId: orgId,
+      notes: v.notes,
+    }));
+
+    await db.insert(propertyVendors).values(newVendors);
+
+    return newVendors.length;
   }
 
   // Team message operations

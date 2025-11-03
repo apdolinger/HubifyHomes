@@ -130,6 +130,8 @@ function VendorInformationCard({ task, onUpdate }: { task: any; onUpdate: () => 
   const { toast } = useToast();
   const [location, navigate] = useLocation();
   const [isEditing, setIsEditing] = useState(false);
+  const [vendorSearchOpen, setVendorSearchOpen] = useState(false);
+  const [vendorSearchValue, setVendorSearchValue] = useState("");
   const [editForm, setEditForm] = useState({
     vendorId: task.vendorId || "",
     vendorNotes: task.vendorNotes || "",
@@ -140,6 +142,19 @@ function VendorInformationCard({ task, onUpdate }: { task: any; onUpdate: () => 
     queryKey: ['/api/contacts'],
     select: (data: any[]) => data.filter((c: any) => c.type === 'vendor'),
   });
+
+  const { data: propertyVendors = [] } = useQuery({
+    queryKey: [`/api/properties/${task.propertyId}/vendors`],
+    enabled: !!task.propertyId,
+  });
+
+  const sortedVendors = useMemo(() => {
+    if (!Array.isArray(vendors) || !Array.isArray(propertyVendors)) return vendors;
+    const preferredVendorIds = new Set((propertyVendors as any[]).map((pv: any) => pv.vendorId));
+    const preferred = vendors.filter((v: any) => preferredVendorIds.has(v.id));
+    const others = vendors.filter((v: any) => !preferredVendorIds.has(v.id));
+    return [...preferred, ...others];
+  }, [vendors, propertyVendors]);
 
   const updateTaskMutation = useMutation({
     mutationFn: async (updates: any) => {
@@ -231,22 +246,97 @@ function VendorInformationCard({ task, onUpdate }: { task: any; onUpdate: () => 
           <div className="space-y-4">
             <div>
               <Label htmlFor="vendor-select">Select Vendor</Label>
-              <Select
-                value={editForm.vendorId?.toString() || "none"}
-                onValueChange={(value) => setEditForm({ ...editForm, vendorId: value === "none" ? "" : value })}
-              >
-                <SelectTrigger id="vendor-select" data-testid="select-vendor">
-                  <SelectValue placeholder="Select a vendor..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No vendor</SelectItem>
-                  {vendors.map((vendor: any) => (
-                    <SelectItem key={vendor.id} value={vendor.id.toString()}>
-                      {vendor.firstName} {vendor.lastName} {vendor.vendorType && `(${vendor.vendorType})`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={vendorSearchOpen} onOpenChange={setVendorSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={vendorSearchOpen}
+                    className="w-full justify-between h-auto min-h-[40px]"
+                    data-testid="button-select-vendor-card"
+                  >
+                    {editForm.vendorId ? (
+                      <div className="flex items-center gap-2 text-left">
+                        {(() => {
+                          const selectedVendor = sortedVendors.find((v: any) => v.id.toString() === editForm.vendorId);
+                          if (!selectedVendor) return <span className="text-slate-500">Select vendor...</span>;
+                          const isPreferred = (propertyVendors as any[]).some((pv: any) => pv.vendorId === selectedVendor.id);
+                          return (
+                            <>
+                              {isPreferred ? (
+                                <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 shrink-0" />
+                              ) : (
+                                <Wrench className="w-4 h-4 text-slate-500 shrink-0" />
+                              )}
+                              <div className="flex flex-col items-start">
+                                <span className="truncate font-medium">
+                                  {selectedVendor.firstName} {selectedVendor.lastName}
+                                  {isPreferred && <span className="text-xs text-yellow-600 ml-1">(Preferred)</span>}
+                                </span>
+                                {selectedVendor.vendorType && (
+                                  <span className="text-xs text-slate-500">{selectedVendor.vendorType}</span>
+                                )}
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    ) : (
+                      <span className="text-slate-500">Select vendor...</span>
+                    )}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[320px] p-0">
+                  <Command>
+                    <CommandInput 
+                      placeholder="Search vendors..." 
+                      value={vendorSearchValue}
+                      onValueChange={setVendorSearchValue}
+                    />
+                    <CommandEmpty>No vendors found</CommandEmpty>
+                    <CommandGroup className="max-h-[300px] overflow-y-auto">
+                      <CommandItem
+                        value="none"
+                        onSelect={() => {
+                          setEditForm({ ...editForm, vendorId: "" });
+                          setVendorSearchOpen(false);
+                        }}
+                      >
+                        <X className="w-4 h-4 mr-2 text-slate-400" />
+                        <span className="text-slate-600">No vendor</span>
+                      </CommandItem>
+                      {sortedVendors.map((vendor: any) => {
+                        const isPreferred = (propertyVendors as any[]).some((pv: any) => pv.vendorId === vendor.id);
+                        const vendorName = `${vendor.firstName} ${vendor.lastName}`;
+                        return (
+                          <CommandItem
+                            key={vendor.id}
+                            value={`${vendorName} ${vendor.vendorType || ''}`}
+                            onSelect={() => {
+                              setEditForm({ ...editForm, vendorId: vendor.id.toString() });
+                              setVendorSearchOpen(false);
+                            }}
+                          >
+                            {isPreferred ? (
+                              <Star className="w-4 h-4 mr-2 text-yellow-500 fill-yellow-500" />
+                            ) : (
+                              <Wrench className="w-4 h-4 mr-2 text-slate-500" />
+                            )}
+                            <div className="flex flex-col">
+                              <div className="font-medium flex items-center gap-1">
+                                {vendorName}
+                                {isPreferred && <span className="text-xs text-yellow-600">(Preferred)</span>}
+                              </div>
+                              {vendor.vendorType && <div className="text-xs text-slate-500">{vendor.vendorType}</div>}
+                            </div>
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div>
@@ -422,6 +512,8 @@ export default function TaskProfile() {
   const [contactSearchValue, setContactSearchValue] = useState("");
   const [clientSearchOpenEditModal, setClientSearchOpenEditModal] = useState(false);
   const [clientSearchValueEditModal, setClientSearchValueEditModal] = useState("");
+  const [vendorSearchOpenEditModal, setVendorSearchOpenEditModal] = useState(false);
+  const [vendorSearchValueEditModal, setVendorSearchValueEditModal] = useState("");
   const [isNewPropertyModalOpen, setIsNewPropertyModalOpen] = useState(false);
   const [isNewContactModalOpen, setIsNewContactModalOpen] = useState(false);
   const [newPropertyForm, setNewPropertyForm] = useState({
@@ -2171,49 +2263,97 @@ export default function TaskProfile() {
                     {editForm.vendorNeeded && (
                       <div>
                         <Label htmlFor="edit-vendor">Select Vendor</Label>
-                        <Select 
-                          value={editForm.vendorId}
-                          onValueChange={(value) => setEditForm({ ...editForm, vendorId: value })}
-                        >
-                          <SelectTrigger data-testid="select-vendor">
-                            <SelectValue placeholder="Select vendor..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">
-                              <div className="flex items-center space-x-2">
-                                <X className="w-4 h-4 text-slate-400" />
-                                <span>No vendor</span>
-                              </div>
-                            </SelectItem>
-                            {sortedVendors.length > 0 ? (
-                              sortedVendors.map((vendor: any) => {
-                                const isPreferred = (propertyVendors as any[]).some((pv: any) => pv.vendorId === vendor.id);
-                                return (
-                                  <SelectItem key={vendor.id} value={vendor.id.toString()}>
-                                    <div className="flex items-center space-x-2">
+                        <Popover open={vendorSearchOpenEditModal} onOpenChange={setVendorSearchOpenEditModal}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={vendorSearchOpenEditModal}
+                              className="w-full justify-between h-auto min-h-[40px]"
+                              data-testid="button-select-vendor-edit"
+                            >
+                              {editForm.vendorId && editForm.vendorId !== "none" ? (
+                                <div className="flex items-center gap-2 text-left">
+                                  {(() => {
+                                    const selectedVendor = sortedVendors.find((v: any) => v.id.toString() === editForm.vendorId);
+                                    if (!selectedVendor) return <span className="text-slate-500">Select vendor...</span>;
+                                    const isPreferred = (propertyVendors as any[]).some((pv: any) => pv.vendorId === selectedVendor.id);
+                                    return (
+                                      <>
+                                        {isPreferred ? (
+                                          <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 shrink-0" />
+                                        ) : (
+                                          <Wrench className="w-4 h-4 text-slate-500 shrink-0" />
+                                        )}
+                                        <div className="flex flex-col items-start">
+                                          <span className="truncate font-medium">
+                                            {selectedVendor.firstName} {selectedVendor.lastName}
+                                            {isPreferred && <span className="text-xs text-yellow-600 dark:text-yellow-500 ml-1">(Preferred)</span>}
+                                          </span>
+                                          {selectedVendor.vendorType && (
+                                            <span className="text-xs text-slate-500">{selectedVendor.vendorType}</span>
+                                          )}
+                                        </div>
+                                      </>
+                                    );
+                                  })()}
+                                </div>
+                              ) : (
+                                <span className="text-slate-500">Select vendor...</span>
+                              )}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[320px] p-0">
+                            <Command>
+                              <CommandInput 
+                                placeholder="Search vendors..." 
+                                value={vendorSearchValueEditModal}
+                                onValueChange={setVendorSearchValueEditModal}
+                              />
+                              <CommandEmpty>No vendors found</CommandEmpty>
+                              <CommandGroup className="max-h-[300px] overflow-y-auto">
+                                <CommandItem
+                                  value="none"
+                                  onSelect={() => {
+                                    setEditForm({ ...editForm, vendorId: "" });
+                                    setVendorSearchOpenEditModal(false);
+                                  }}
+                                >
+                                  <X className="w-4 h-4 mr-2 text-slate-400" />
+                                  <span className="text-slate-600">No vendor</span>
+                                </CommandItem>
+                                {sortedVendors.map((vendor: any) => {
+                                  const isPreferred = (propertyVendors as any[]).some((pv: any) => pv.vendorId === vendor.id);
+                                  const vendorName = `${vendor.firstName} ${vendor.lastName}`;
+                                  return (
+                                    <CommandItem
+                                      key={vendor.id}
+                                      value={`${vendorName} ${vendor.vendorType || ''}`}
+                                      onSelect={() => {
+                                        setEditForm({ ...editForm, vendorId: vendor.id.toString() });
+                                        setVendorSearchOpenEditModal(false);
+                                      }}
+                                    >
                                       {isPreferred ? (
-                                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                                        <Star className="w-4 h-4 mr-2 text-yellow-500 fill-yellow-500" />
                                       ) : (
-                                        <Building className="w-4 h-4 text-slate-500" />
+                                        <Wrench className="w-4 h-4 mr-2 text-slate-500" />
                                       )}
-                                      <div>
+                                      <div className="flex flex-col">
                                         <div className="font-medium flex items-center gap-1">
-                                          {vendor.firstName} {vendor.lastName}
+                                          {vendorName}
                                           {isPreferred && <span className="text-xs text-yellow-600 dark:text-yellow-500">(Preferred)</span>}
                                         </div>
                                         {vendor.vendorType && <div className="text-xs text-slate-500">{vendor.vendorType}</div>}
                                       </div>
-                                    </div>
-                                  </SelectItem>
-                                );
-                              })
-                            ) : (
-                              <SelectItem value="no-vendors" disabled>
-                                <span className="text-slate-400">No vendors available</span>
-                              </SelectItem>
-                            )}
-                          </SelectContent>
-                        </Select>
+                                    </CommandItem>
+                                  );
+                                })}
+                              </CommandGroup>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     )}
                   </div>
