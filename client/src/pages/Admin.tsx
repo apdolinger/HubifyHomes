@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
@@ -55,8 +55,12 @@ import {
   AlertCircle,
   Search,
   Filter,
-  X as XIcon
+  X as XIcon,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown
 } from "lucide-react";
+import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
 
 // Supply Settings Manager Component
 function SupplySettingsManager({ orgId }: { orgId: string }) {
@@ -784,6 +788,45 @@ export default function Admin() {
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const queryClient = useQueryClient();
 
+  // Communities table state
+  type CommunitySortField = 'name' | 'address1' | 'city' | 'state' | 'propertyCount' | 'isActive';
+  const [communitySearchQuery, setCommunitySearchQuery] = useState("");
+  const [communitySortField, setCommunitySortField] = useState<CommunitySortField>('name');
+  const [communitySortDirection, setCommunitySortDirection] = useState<'asc' | 'desc'>('asc');
+  const [isCustomizeCommunitiesModalOpen, setIsCustomizeCommunitiesModalOpen] = useState(false);
+
+  // Default column configuration for Communities table
+  const defaultCommunityColumns: ColumnConfig[] = [
+    { id: 'name', label: 'Community Name', visible: true, required: true },
+    { id: 'address1', label: 'Address', visible: true },
+    { id: 'city', label: 'City', visible: true },
+    { id: 'state', label: 'State', visible: true },
+    { id: 'propertyCount', label: 'Properties', visible: true },
+    { id: 'isActive', label: 'Status', visible: true },
+  ];
+
+  // Load column configuration from localStorage
+  const [communityColumns, setCommunityColumns] = useState<ColumnConfig[]>(() => {
+    const saved = localStorage.getItem('communityTableColumns');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return defaultCommunityColumns;
+      }
+    }
+    return defaultCommunityColumns;
+  });
+
+  // Save column configuration to localStorage
+  const handleSaveCommunityColumns = (newColumns: ColumnConfig[]) => {
+    setCommunityColumns(newColumns);
+    localStorage.setItem('communityTableColumns', JSON.stringify(newColumns));
+  };
+
+  // Get visible columns
+  const visibleCommunityColumns = communityColumns.filter(col => col.visible);
+
   // Fetch properties for the property selector
   const { data: properties = [] } = useQuery({
     queryKey: ['/api/properties'],
@@ -1234,6 +1277,78 @@ export default function Admin() {
   const { data: communities = [], isLoading: isCommunitiesLoading } = useQuery({
     queryKey: ["/api/communities"],
   });
+
+  // Helper function to handle community sorting
+  const handleCommunitySort = (field: CommunitySortField) => {
+    if (communitySortField === field) {
+      setCommunitySortDirection(communitySortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setCommunitySortField(field);
+      setCommunitySortDirection('asc');
+    }
+  };
+
+  // Helper function to get sort icon for community columns
+  const getCommunitySortIcon = (field: CommunitySortField) => {
+    if (communitySortField !== field) {
+      return <ArrowUpDown className="w-4 h-4 ml-2" />;
+    }
+    return communitySortDirection === 'asc' 
+      ? <ArrowUp className="w-4 h-4 ml-2" />
+      : <ArrowDown className="w-4 h-4 ml-2" />;
+  };
+
+  // Filter and sort communities
+  const filteredAndSortedCommunities = useMemo(() => {
+    if (!communities || !Array.isArray(communities)) return [];
+    
+    let filtered = [...communities] as any[];
+    
+    // Apply search filter
+    if (communitySearchQuery) {
+      const query = communitySearchQuery.toLowerCase();
+      filtered = filtered.filter(community => 
+        community.name?.toLowerCase().includes(query) ||
+        community.address1?.toLowerCase().includes(query) ||
+        community.city?.toLowerCase().includes(query) ||
+        community.state?.toLowerCase().includes(query)
+      );
+    }
+    
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aValue = a[communitySortField];
+      let bValue = b[communitySortField];
+      
+      // Handle property count (numeric)
+      if (communitySortField === 'propertyCount') {
+        aValue = aValue || 0;
+        bValue = bValue || 0;
+      }
+      
+      // Handle boolean (isActive)
+      if (communitySortField === 'isActive') {
+        aValue = aValue ? 1 : 0;
+        bValue = bValue ? 1 : 0;
+      }
+      
+      // Handle strings
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return communitySortDirection === 'asc' 
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
+      
+      // Handle numbers
+      if (communitySortDirection === 'asc') {
+        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+      } else {
+        return bValue < aValue ? -1 : bValue > aValue ? 1 : 0;
+      }
+    });
+    
+    return filtered;
+  }, [communities, communitySearchQuery, communitySortField, communitySortDirection]);
 
   // Fetch document templates
   const { data: documentTemplates = [], isLoading: isTemplatesLoading } = useQuery({
@@ -2026,102 +2141,145 @@ export default function Admin() {
               <h3 className="text-xl font-semibold">Communities Management</h3>
               <p className="text-slate-600">Manage HOAs, communities, and property associations</p>
             </div>
-            <Button onClick={() => setIsNewCommunityDialogOpen(true)}>
+            <Button onClick={() => setIsNewCommunityDialogOpen(true)} data-testid="button-add-community">
               <Plus className="w-4 h-4 mr-2" />
               Add New Community
             </Button>
           </div>
 
+          {/* Search Bar */}
           <Card>
             <CardContent className="pt-6">
-              <div className="space-y-4">
-                {/* Communities List */}
-                {isCommunitiesLoading ? (
-                  <div className="space-y-3">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="animate-pulse p-4 border rounded-lg">
-                        <div className="h-4 bg-slate-200 rounded w-1/3 mb-2"></div>
-                        <div className="h-3 bg-slate-200 rounded w-1/2 mb-1"></div>
-                        <div className="h-3 bg-slate-200 rounded w-2/3"></div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {communities.map((community: any) => (
-                      <div key={community.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex-1">
-                          <div className="flex items-start space-x-4">
-                            <div className="flex-1">
-                              <h4 className="font-medium">{community.name}</h4>
-                              {(community.address1 || community.city) && (
-                                <p className="text-sm text-slate-500 flex items-center mt-1">
-                                  <MapPin className="w-3 h-3 mr-1" />
-                                  {[community.address1, community.city, community.state, community.zip]
-                                    .filter(Boolean)
-                                    .join(', ')}
-                                </p>
-                              )}
-                              {community.notes && (
-                                <p className="text-xs text-slate-400 mt-1">{community.notes}</p>
-                              )}
-                            </div>
-                            <div className="text-right text-sm text-slate-500">
-                              <p>{community.propertyCount || 0} Properties</p>
-                              <p>{community.isActive ? 'Active' : 'Inactive'}</p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex space-x-2">
-                          <Button variant="outline" size="sm">
-                            <Eye className="w-3 h-3" />
-                          </Button>
-                          <Button variant="outline" size="sm">
-                            <Edit className="w-3 h-3" />
-                          </Button>
-                          <Button variant="outline" size="sm">
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                    
-                    {communities.length === 0 && (
-                      <div className="text-center py-8">
-                        <Building className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                        <h4 className="font-medium text-slate-900 mb-2">No Communities Yet</h4>
-                        <p className="text-slate-500 mb-4">Create your first community to get started</p>
-                        <Button onClick={() => setIsNewCommunityDialogOpen(true)}>
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add Community
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="border-t pt-4 mt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-4 bg-slate-50 rounded-lg">
-                      <h5 className="font-medium text-slate-900">Total Communities</h5>
-                      <p className="text-2xl font-bold text-blue-600 mt-1">{communities.length}</p>
-                      <p className="text-xs text-slate-500 mt-1">Active organizations</p>
-                    </div>
-                    <div className="p-4 bg-slate-50 rounded-lg">
-                      <h5 className="font-medium text-slate-900">Properties Managed</h5>
-                      <p className="text-2xl font-bold text-green-600 mt-1">{communities.reduce((sum, c) => sum + (c.propertyCount || 0), 0)}</p>
-                      <p className="text-xs text-slate-500 mt-1">Across all communities</p>
-                    </div>
-                    <div className="p-4 bg-slate-50 rounded-lg">
-                      <h5 className="font-medium text-slate-900">Active HOAs</h5>
-                      <p className="text-2xl font-bold text-purple-600 mt-1">{communities.filter(c => c.isActive).length}</p>
-                      <p className="text-xs text-slate-500 mt-1">With management contracts</p>
-                    </div>
-                  </div>
-                </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Input
+                  placeholder="Search communities by name, address, city, or state..."
+                  value={communitySearchQuery}
+                  onChange={(e) => setCommunitySearchQuery(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-search-communities"
+                />
               </div>
             </CardContent>
           </Card>
+
+          {/* Communities Table */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Communities List ({filteredAndSortedCommunities.length} {filteredAndSortedCommunities.length === 1 ? 'community' : 'communities'})</CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsCustomizeCommunitiesModalOpen(true)}
+                data-testid="button-customize-communities-table"
+              >
+                <Settings className="w-4 h-4" />
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {isCommunitiesLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : filteredAndSortedCommunities.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {visibleCommunityColumns.map((column) => (
+                        <TableHead 
+                          key={column.id}
+                          className="cursor-pointer hover:bg-slate-50" 
+                          onClick={() => handleCommunitySort(column.id as CommunitySortField)}
+                        >
+                          <div className="flex items-center">
+                            {column.label}
+                            {getCommunitySortIcon(column.id as CommunitySortField)}
+                          </div>
+                        </TableHead>
+                      ))}
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredAndSortedCommunities.map((community: any) => (
+                      <TableRow key={community.id} data-testid={`row-community-${community.id}`}>
+                        {visibleCommunityColumns.map((column) => (
+                          <TableCell key={column.id} className={column.id === 'name' ? 'font-medium' : ''}>
+                            {column.id === 'name' && community.name}
+                            {column.id === 'address1' && community.address1}
+                            {column.id === 'city' && community.city}
+                            {column.id === 'state' && community.state}
+                            {column.id === 'propertyCount' && (community.propertyCount || 0)}
+                            {column.id === 'isActive' && (
+                              <Badge variant={community.isActive ? 'default' : 'secondary'}>
+                                {community.isActive ? 'Active' : 'Inactive'}
+                              </Badge>
+                            )}
+                          </TableCell>
+                        ))}
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <Button variant="outline" size="sm" data-testid={`button-view-community-${community.id}`}>
+                              <Eye className="w-3 h-3" />
+                            </Button>
+                            <Button variant="outline" size="sm" data-testid={`button-edit-community-${community.id}`}>
+                              <Edit className="w-3 h-3" />
+                            </Button>
+                            <Button variant="outline" size="sm" data-testid={`button-delete-community-${community.id}`}>
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8">
+                  <Building className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                  <h4 className="font-medium text-slate-900 mb-2">
+                    {communitySearchQuery ? 'No communities found' : 'No Communities Yet'}
+                  </h4>
+                  <p className="text-slate-500 mb-4">
+                    {communitySearchQuery 
+                      ? 'Try adjusting your search criteria' 
+                      : 'Create your first community to get started'}
+                  </p>
+                  {!communitySearchQuery && (
+                    <Button onClick={() => setIsNewCommunityDialogOpen(true)}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Community
+                    </Button>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Summary Statistics */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card>
+              <CardContent className="pt-6">
+                <h5 className="font-medium text-slate-900">Total Communities</h5>
+                <p className="text-2xl font-bold text-blue-600 mt-1">{communities.length}</p>
+                <p className="text-xs text-slate-500 mt-1">Active organizations</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <h5 className="font-medium text-slate-900">Properties Managed</h5>
+                <p className="text-2xl font-bold text-green-600 mt-1">{communities.reduce((sum: number, c: any) => sum + (c.propertyCount || 0), 0)}</p>
+                <p className="text-xs text-slate-500 mt-1">Across all communities</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <h5 className="font-medium text-slate-900">Active HOAs</h5>
+                <p className="text-2xl font-bold text-purple-600 mt-1">{communities.filter((c: any) => c.isActive).length}</p>
+                <p className="text-xs text-slate-500 mt-1">With management contracts</p>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* Customization Tab */}
@@ -3169,6 +3327,15 @@ export default function Admin() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Table Customization Modal for Communities */}
+      <TableCustomizationModal
+        isOpen={isCustomizeCommunitiesModalOpen}
+        onClose={() => setIsCustomizeCommunitiesModalOpen(false)}
+        columns={communityColumns}
+        defaultColumns={defaultCommunityColumns}
+        onSave={handleSaveCommunityColumns}
+      />
     </main>
   );
 }
