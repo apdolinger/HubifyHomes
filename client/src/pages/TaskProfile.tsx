@@ -125,6 +125,240 @@ function CascadedClientAlertsDisplay({ taskId }: { taskId: string }) {
   );
 }
 
+// Vendor Information Card Component
+function VendorInformationCard({ task, onUpdate }: { task: any; onUpdate: () => void }) {
+  const { toast } = useToast();
+  const [location, navigate] = useLocation();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    vendorId: task.vendorId || "",
+    vendorNotes: task.vendorNotes || "",
+    vendorSatisfactionRating: task.vendorSatisfactionRating || null,
+  });
+
+  const { data: vendors = [] } = useQuery({
+    queryKey: ['/api/contacts'],
+    select: (data: any[]) => data.filter((c: any) => c.type === 'vendor'),
+  });
+
+  const updateTaskMutation = useMutation({
+    mutationFn: async (updates: any) => {
+      return await apiRequest('PATCH', `/api/tasks/${task.id}`, updates);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Vendor information updated",
+        description: "Changes saved successfully",
+      });
+      setIsEditing(false);
+      onUpdate();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update vendor information",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSave = () => {
+    updateTaskMutation.mutate({
+      vendorId: editForm.vendorId || null,
+      vendorNotes: editForm.vendorNotes,
+      vendorSatisfactionRating: editForm.vendorSatisfactionRating,
+    });
+  };
+
+  const handleCancel = () => {
+    setEditForm({
+      vendorId: task.vendorId || "",
+      vendorNotes: task.vendorNotes || "",
+      vendorSatisfactionRating: task.vendorSatisfactionRating || null,
+    });
+    setIsEditing(false);
+  };
+
+  const renderStars = (rating: number | null, isEditable: boolean = false) => {
+    return (
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            onClick={() => isEditable && setEditForm({ ...editForm, vendorSatisfactionRating: star })}
+            className={`${isEditable ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-default'}`}
+            disabled={!isEditable}
+            data-testid={`star-${star}`}
+          >
+            <Star
+              className={`w-5 h-5 ${
+                rating && star <= rating
+                  ? 'fill-yellow-400 text-yellow-400'
+                  : 'fill-transparent text-slate-300'
+              }`}
+            />
+          </button>
+        ))}
+        {rating && <span className="ml-2 text-sm text-slate-600">({rating}/5)</span>}
+      </div>
+    );
+  };
+
+  return (
+    <Card data-testid="vendor-information-card">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center">
+            <Wrench className="w-5 h-5 mr-2" />
+            Vendor Information
+          </CardTitle>
+          {!isEditing && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsEditing(true)}
+              data-testid="button-edit-vendor"
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Edit
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isEditing ? (
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="vendor-select">Select Vendor</Label>
+              <Select
+                value={editForm.vendorId?.toString() || "none"}
+                onValueChange={(value) => setEditForm({ ...editForm, vendorId: value === "none" ? "" : value })}
+              >
+                <SelectTrigger id="vendor-select" data-testid="select-vendor">
+                  <SelectValue placeholder="Select a vendor..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No vendor</SelectItem>
+                  {vendors.map((vendor: any) => (
+                    <SelectItem key={vendor.id} value={vendor.id.toString()}>
+                      {vendor.firstName} {vendor.lastName} {vendor.vendorType && `(${vendor.vendorType})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="vendor-notes">Vendor Notes</Label>
+              <Textarea
+                id="vendor-notes"
+                placeholder="Add notes about vendor work, estimates, or details..."
+                value={editForm.vendorNotes}
+                onChange={(e) => setEditForm({ ...editForm, vendorNotes: e.target.value })}
+                rows={4}
+                data-testid="textarea-vendor-notes"
+              />
+            </div>
+
+            <div>
+              <Label>Vendor Satisfaction Rating</Label>
+              <div className="mt-2">
+                {renderStars(editForm.vendorSatisfactionRating, true)}
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Rate the vendor's work quality and professionalism</p>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                onClick={handleSave}
+                disabled={updateTaskMutation.isPending}
+                data-testid="button-save-vendor"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {updateTaskMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleCancel}
+                disabled={updateTaskMutation.isPending}
+                data-testid="button-cancel-vendor"
+              >
+                <X className="w-4 h-4 mr-2" />
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {task.vendor ? (
+              <>
+                <div>
+                  <Label className="text-sm font-medium text-slate-500">Vendor</Label>
+                  <Button
+                    variant="link"
+                    className="p-0 h-auto font-medium text-blue-600 hover:text-blue-800"
+                    onClick={() => navigate(`/person-profile/${task.vendor.id}`)}
+                    data-testid="link-task-vendor"
+                  >
+                    {task.vendor.firstName} {task.vendor.lastName}
+                  </Button>
+                </div>
+                {task.vendor.vendorType && (
+                  <div>
+                    <Label className="text-sm font-medium text-slate-500">Type</Label>
+                    <Badge variant="secondary" className="capitalize text-xs">
+                      {task.vendor.vendorType}
+                    </Badge>
+                  </div>
+                )}
+                {task.vendor.email && (
+                  <div>
+                    <Label className="text-sm font-medium text-slate-500">Email</Label>
+                    <p className="text-slate-700 text-sm">
+                      <a href={`mailto:${task.vendor.email}`} className="text-blue-600 hover:text-blue-800">
+                        {task.vendor.email}
+                      </a>
+                    </p>
+                  </div>
+                )}
+                {task.vendor.phone && (
+                  <div>
+                    <Label className="text-sm font-medium text-slate-500">Phone</Label>
+                    <p className="text-slate-700 text-sm">
+                      <a href={`tel:${task.vendor.phone}`} className="text-blue-600 hover:text-blue-800">
+                        {task.vendor.phone}
+                      </a>
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-sm text-slate-500 italic">No vendor assigned yet</div>
+            )}
+
+            {task.vendorNotes && (
+              <div>
+                <Label className="text-sm font-medium text-slate-500">Notes</Label>
+                <p className="text-slate-700 text-sm whitespace-pre-wrap">{task.vendorNotes}</p>
+              </div>
+            )}
+
+            {task.vendorSatisfactionRating && (
+              <div>
+                <Label className="text-sm font-medium text-slate-500">Satisfaction Rating</Label>
+                <div className="mt-1">
+                  {renderStars(task.vendorSatisfactionRating, false)}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function TaskProfile() {
   const { isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
@@ -150,6 +384,7 @@ export default function TaskProfile() {
     roomId: "none",
     clientId: "",
     vendorId: "",
+    vendorNeeded: false,
     tags: "",
     customFieldValues: {} as Record<string, any>
   });
@@ -371,7 +606,7 @@ export default function TaskProfile() {
   }, [isAuthenticated, isLoading, toast]);
 
   // Fetch task details
-  const { data: task, isLoading: taskLoading } = useQuery({
+  const { data: task, isLoading: taskLoading, refetch } = useQuery({
     queryKey: [`/api/tasks/${taskId}`],
     enabled: isAuthenticated && !!taskId,
   });
@@ -406,6 +641,8 @@ export default function TaskProfile() {
         billingAmount: task.billingAmount?.toString() || "",
         roomId: task.roomId?.toString() || "none",
         clientId: task.clientId || "",
+        vendorId: task.vendorId?.toString() || "",
+        vendorNeeded: task.vendorNeeded || false,
         tags: task.tags || "",
         customFieldValues: task.customFieldValues || {}
       });
@@ -812,6 +1049,7 @@ export default function TaskProfile() {
       roomId: editForm.roomId && editForm.roomId !== "none" ? parseInt(editForm.roomId) : null,
       contactId: editForm.clientId ? parseInt(editForm.clientId) : null,
       vendorId: editForm.vendorId ? parseInt(editForm.vendorId) : null,
+      vendorNeeded: editForm.vendorNeeded,
       billedSeparately: editForm.billedSeparately,
       billingAmount: editForm.billingAmount,
       attachments: photoAttachments,
@@ -1922,19 +2160,15 @@ export default function TaskProfile() {
                     <div className="flex items-center space-x-2 mb-2">
                       <Checkbox
                         id="vendor-needed"
-                        checked={!!editForm.vendorId && editForm.vendorId !== "none"}
+                        checked={editForm.vendorNeeded}
                         onCheckedChange={(checked) => {
-                          if (checked) {
-                            setEditForm({ ...editForm, vendorId: vendors.length > 0 ? vendors[0].id.toString() : "" });
-                          } else {
-                            setEditForm({ ...editForm, vendorId: "" });
-                          }
+                          setEditForm({ ...editForm, vendorNeeded: !!checked });
                         }}
                         data-testid="checkbox-vendor-needed"
                       />
                       <Label htmlFor="vendor-needed" className="cursor-pointer">Vendor Needed</Label>
                     </div>
-                    {editForm.vendorId && editForm.vendorId !== "" && editForm.vendorId !== "none" && (
+                    {editForm.vendorNeeded && (
                       <div>
                         <Label htmlFor="edit-vendor">Select Vendor</Label>
                         <Select 
@@ -2584,59 +2818,7 @@ export default function TaskProfile() {
                   </Card>
                 )}
 
-                {(task as any).vendor && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center">
-                        <Wrench className="w-5 h-5 mr-2" />
-                        Vendor Information
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <div>
-                          <Label className="text-sm font-medium text-slate-500">Vendor</Label>
-                          <Button
-                            variant="link"
-                            className="p-0 h-auto font-medium text-blue-600 hover:text-blue-800"
-                            onClick={() => navigate(`/person-profile/${(task as any).vendor.id}`)}
-                            data-testid="link-task-vendor"
-                          >
-                            {(task as any).vendor.firstName} {(task as any).vendor.lastName}
-                          </Button>
-                        </div>
-                        {(task as any).vendor.vendorType && (
-                          <div>
-                            <Label className="text-sm font-medium text-slate-500">Type</Label>
-                            <Badge variant="secondary" className="capitalize text-xs">
-                              {(task as any).vendor.vendorType}
-                            </Badge>
-                          </div>
-                        )}
-                        {(task as any).vendor.email && (
-                          <div>
-                            <Label className="text-sm font-medium text-slate-500">Email</Label>
-                            <p className="text-slate-700 text-sm">
-                              <a href={`mailto:${(task as any).vendor.email}`} className="text-blue-600 hover:text-blue-800">
-                                {(task as any).vendor.email}
-                              </a>
-                            </p>
-                          </div>
-                        )}
-                        {(task as any).vendor.phone && (
-                          <div>
-                            <Label className="text-sm font-medium text-slate-500">Phone</Label>
-                            <p className="text-slate-700 text-sm">
-                              <a href={`tel:${(task as any).vendor.phone}`} className="text-blue-600 hover:text-blue-800">
-                                {(task as any).vendor.phone}
-                              </a>
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                {(task as any).vendorNeeded && <VendorInformationCard task={task as any} onUpdate={refetch} />}
               </div>
 
               {/* Enhanced Checklist / Subtasks */}
