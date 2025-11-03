@@ -2205,7 +2205,13 @@ export default function Admin() {
                       <TableRow key={community.id} data-testid={`row-community-${community.id}`}>
                         {visibleCommunityColumns.map((column) => (
                           <TableCell key={column.id} className={column.id === 'name' ? 'font-medium' : ''}>
-                            {column.id === 'name' && community.name}
+                            {column.id === 'name' && (
+                              <Link href={`/communities/${community.id}`}>
+                                <span className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer" data-testid={`link-community-${community.id}`}>
+                                  {community.name}
+                                </span>
+                              </Link>
+                            )}
                             {column.id === 'address1' && community.address1}
                             {column.id === 'city' && community.city}
                             {column.id === 'state' && community.state}
