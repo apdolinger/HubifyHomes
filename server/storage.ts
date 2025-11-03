@@ -4028,7 +4028,7 @@ export class DatabaseStorage implements IStorage {
   async getFormsWithFields(): Promise<any[]> {
     const formsData = await db.select().from(forms).orderBy(desc(forms.createdAt));
     
-    // Get fields for each form
+    // Get fields and submission count for each form
     const formsWithFields = await Promise.all(formsData.map(async (form) => {
       const fields = await db
         .select()
@@ -4036,9 +4036,16 @@ export class DatabaseStorage implements IStorage {
         .where(eq(formFields.formId, form.id))
         .orderBy(formFields.sortOrder);
       
+      // Get submission count
+      const submissions = await db
+        .select()
+        .from(formSubmissions)
+        .where(eq(formSubmissions.formId, form.id));
+      
       return {
         ...form,
-        fields
+        fields,
+        submissionCount: submissions.length
       };
     }));
     
