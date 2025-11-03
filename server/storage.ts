@@ -576,6 +576,7 @@ export interface IStorage {
   createForm(form: any): Promise<any>;
   createFormFields(formId: number, fields: any[]): Promise<void>;
   deleteForm(formId: number, userId: string): Promise<void>;
+  updateForm(formId: number, data: Partial<{formTitle: string; slug: string; description: string; isActive: boolean; embedEnabled: boolean; contexts: string[];}>): Promise<any>;
   createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission>;
   getFormSubmissionsWithFields(formId: number): Promise<any[]>;
   
@@ -4091,6 +4092,15 @@ export class DatabaseStorage implements IStorage {
     await db.delete(formSubmissions).where(eq(formSubmissions.formId, formId));
     // Delete the form
     await db.delete(forms).where(eq(forms.id, formId));
+  }
+
+  async updateForm(formId: number, data: any): Promise<any> {
+    const [updatedForm] = await db
+      .update(forms)
+      .set(data)
+      .where(eq(forms.id, formId))
+      .returning();
+    return updatedForm;
   }
 
   async createFormSubmission(submissionData: any): Promise<any> {

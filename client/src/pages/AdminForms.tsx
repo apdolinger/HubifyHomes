@@ -444,6 +444,7 @@ export default function AdminForms() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Form Title</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Submissions</TableHead>
                   <TableHead>Embed</TableHead>
@@ -464,6 +465,17 @@ export default function AdminForms() {
                           <div className="text-sm text-gray-500">{form.settings?.internalDescription || form.description}</div>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      {(form.isActive !== false) ? (
+                        <Badge variant="outline" className="bg-green-50 text-green-700" data-testid={`status-badge-${form.id}`}>
+                          Active
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-gray-50 text-gray-700" data-testid={`status-badge-${form.id}`}>
+                          Inactive
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center text-sm text-gray-500">

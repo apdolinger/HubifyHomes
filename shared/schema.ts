@@ -1360,6 +1360,9 @@ export const forms = pgTable("forms", {
   formTitle: text("form_title").notNull(),
   slug: text("slug").notNull().unique(),
   contexts: text("contexts").array().notNull(), // ['people', 'property', 'task']
+  description: text("description"), // Internal description/notes
+  isActive: boolean("is_active").notNull().default(true), // Enable/disable form
+  embedEnabled: boolean("embed_enabled").notNull().default(false), // Allow embedding
   createdAt: timestamp("created_at").defaultNow(),
 });
 

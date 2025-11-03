@@ -7164,6 +7164,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/forms/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const formId = parseInt(req.params.id);
+      const userId = (req.user as any).claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Update form data
+      const updateData: any = {};
+      if (req.body.formTitle !== undefined) updateData.formTitle = req.body.formTitle;
+      if (req.body.slug !== undefined) updateData.slug = req.body.slug;
+      if (req.body.description !== undefined) updateData.description = req.body.description;
+      if (req.body.isActive !== undefined) updateData.isActive = req.body.isActive;
+      if (req.body.embedEnabled !== undefined) updateData.embedEnabled = req.body.embedEnabled;
+      if (req.body.contexts !== undefined) updateData.contexts = req.body.contexts;
+
+      const updatedForm = await storage.updateForm(formId, updateData);
+      res.json(updatedForm);
+    } catch (error) {
+      console.error("Error updating form:", error);
+      res.status(500).json({ message: "Failed to update form" });
+    }
+  });
+
   app.get("/api/forms/:id/submissions", isAuthenticated, async (req: any, res) => {
     try {
       const formId = parseInt(req.params.id);
