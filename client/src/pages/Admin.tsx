@@ -530,6 +530,33 @@ function DocumentTemplatesManager() {
     },
   });
 
+  const duplicateTemplateMutation = useMutation({
+    mutationFn: async (template: any) => {
+      const duplicateData = {
+        name: `Copy of ${template.name}`,
+        description: template.description,
+        documentType: template.documentType,
+        fileName: template.fileName,
+        fileUrl: template.fileUrl,
+      };
+      return apiRequest("POST", "/api/document-templates", duplicateData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/document-templates"] });
+      toast({
+        title: "Template Duplicated",
+        description: "A copy of the template has been created successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to duplicate template",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -614,18 +641,30 @@ function DocumentTemplatesManager() {
                   )}
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (confirm('Are you sure you want to delete this template?')) {
-                    deleteTemplateMutation.mutate(template.id);
-                  }
-                }}
-                data-testid={`button-delete-template-${template.id}`}
-              >
-                <Trash2 className="w-4 h-4 text-red-500" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => duplicateTemplateMutation.mutate(template)}
+                  data-testid={`button-duplicate-template-${template.id}`}
+                  title="Duplicate template"
+                >
+                  <Copy className="w-4 h-4 text-blue-500" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (confirm('Are you sure you want to delete this template?')) {
+                      deleteTemplateMutation.mutate(template.id);
+                    }
+                  }}
+                  data-testid={`button-delete-template-${template.id}`}
+                  title="Delete template"
+                >
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                </Button>
+              </div>
             </div>
           ))}
         </div>
