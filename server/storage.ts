@@ -577,6 +577,7 @@ export interface IStorage {
   createFormFields(formId: number, fields: any[]): Promise<void>;
   deleteForm(formId: number, userId: string): Promise<void>;
   createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission>;
+  getFormSubmissionsWithFields(formId: number): Promise<any[]>;
   
   // Property Portal Settings operations
   getPropertyPortalSettings(orgId: string, propertyId: number): Promise<PropertyPortalSettings[]>;
@@ -4091,6 +4092,36 @@ export class DatabaseStorage implements IStorage {
       .values(submissionData)
       .returning();
     return submission;
+  }
+
+  async getFormSubmissionsWithFields(formId: number): Promise<any[]> {
+    const [form] = await db
+      .select()
+      .from(forms)
+      .where(eq(forms.id, formId))
+      .limit(1);
+    
+    if (!form) {
+      return [];
+    }
+
+    const fields = await db
+      .select()
+      .from(formFields)
+      .where(eq(formFields.formId, formId))
+      .orderBy(formFields.sortOrder);
+
+    const submissions = await db
+      .select()
+      .from(formSubmissions)
+      .where(eq(formSubmissions.formId, formId))
+      .orderBy(desc(formSubmissions.submittedAt));
+
+    return submissions.map(submission => ({
+      ...submission,
+      form,
+      fields,
+    }));
   }
 
   // Vehicle operations

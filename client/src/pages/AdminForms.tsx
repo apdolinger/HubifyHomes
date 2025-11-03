@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import FormBuilder from "@/components/FormBuilder";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
@@ -15,11 +18,173 @@ import {
   Users,
   Code,
   Link,
-  Pencil
+  Pencil,
+  Eye,
+  Download
 } from "lucide-react";
+
+interface FormSubmissionsViewerProps {
+  formId: number;
+  formTitle: string;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+function FormSubmissionsViewer({ formId, formTitle, isOpen, onClose }: FormSubmissionsViewerProps) {
+  const { toast } = useToast();
+  
+  const { data: submissions = [], isLoading, error } = useQuery({
+    queryKey: ["/api/forms", formId, "submissions"],
+    queryFn: async () => {
+      const response = await fetch(`/api/forms/${formId}/submissions`);
+      if (!response.ok) throw new Error("Failed to fetch submissions");
+      return response.json();
+    },
+    enabled: isOpen,
+  });
+
+  // Show error toast if there's an error
+  if (error) {
+    toast({
+      title: "Error",
+      description: "Failed to load form submissions. Please try again.",
+      variant: "destructive",
+    });
+  }
+
+  const formatFieldValue = (value: any, fieldType: string) => {
+    if (value === null || value === undefined || value === '') {
+      return <span className="text-slate-400">—</span>;
+    }
+    
+    if (fieldType === 'checkbox') {
+      return value ? <Badge variant="secondary">Yes</Badge> : <Badge variant="outline">No</Badge>;
+    }
+    
+    if (Array.isArray(value)) {
+      return (
+        <div className="flex flex-wrap gap-1">
+          {value.map((v, i) => (
+            <Badge key={i} variant="outline">{v}</Badge>
+          ))}
+        </div>
+      );
+    }
+    
+    if (fieldType === 'date' && value) {
+      return new Date(value).toLocaleDateString();
+    }
+    
+    return String(value);
+  };
+
+  const exportToCSV = () => {
+    if (submissions.length === 0) return;
+    
+    const fields = submissions[0]?.fields || [];
+    const headers = ['Submission Date', ...fields.map((f: any) => f.label)];
+    
+    const rows = submissions.map((sub: any) => {
+      const fieldValues = fields.map((field: any) => {
+        const value = sub.data?.[`field-${field.id}`] || '';
+        if (Array.isArray(value)) return value.join('; ');
+        return value;
+      });
+      return [new Date(sub.submittedAt).toLocaleString(), ...fieldValues];
+    });
+    
+    const csv = [headers, ...rows].map(row => 
+      row.map((cell: any) => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+    ).join('\n');
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${formTitle.replace(/[^a-z0-9]/gi, '_')}_submissions.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-6xl max-h-[90vh]">
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle>{formTitle} - Submissions</DialogTitle>
+              <DialogDescription>
+                {submissions.length} submission{submissions.length !== 1 ? 's' : ''}
+              </DialogDescription>
+            </div>
+            {submissions.length > 0 && (
+              <Button
+                onClick={exportToCSV}
+                size="sm"
+                variant="outline"
+                data-testid="button-export-csv"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export CSV
+              </Button>
+            )}
+          </div>
+        </DialogHeader>
+        
+        <ScrollArea className="h-[calc(90vh-120px)]">
+          {isLoading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            </div>
+          ) : submissions.length === 0 ? (
+            <div className="text-center py-12">
+              <FileText className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+              <p className="text-slate-500">No submissions yet</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {submissions.map((submission: any) => {
+                const fields = submission.fields || [];
+                return (
+                  <Card key={submission.id}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-slate-500">
+                          <Calendar className="w-3 h-3 inline mr-1" />
+                          {new Date(submission.submittedAt).toLocaleString()}
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {fields.map((field: any) => {
+                          const fieldId = `field-${field.id}`;
+                          const value = submission.data?.[fieldId];
+                          return (
+                            <div key={field.id} className="space-y-1">
+                              <div className="text-sm font-medium text-slate-700">{field.label}</div>
+                              <div className="text-sm text-slate-900">
+                                {formatFieldValue(value, field.type)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function AdminForms() {
   const { toast } = useToast();
+  const [viewingSubmissions, setViewingSubmissions] = useState<{ formId: number; formTitle: string } | null>(null);
 
   const { data: forms = [], isLoading } = useQuery({
     queryKey: ["/api/forms"],
@@ -27,9 +192,7 @@ export default function AdminForms() {
 
   const deleteFormMutation = useMutation({
     mutationFn: async (formId: number) => {
-      return apiRequest(`/api/forms/${formId}`, {
-        method: "DELETE",
-      });
+      return apiRequest("DELETE", `/api/forms/${formId}`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/forms"] });
@@ -114,7 +277,7 @@ export default function AdminForms() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {forms.length === 0 ? (
+          {(forms as any[]).length === 0 ? (
             <div className="text-center py-12">
               <FileText className="w-12 h-12 mx-auto mb-4 text-gray-400" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No forms yet</h3>
@@ -132,7 +295,7 @@ export default function AdminForms() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {forms.map((form: any) => (
+                {(forms as any[]).map((form: any) => (
                   <TableRow key={form.id}>
                     <TableCell>
                       <div>
@@ -169,6 +332,15 @@ export default function AdminForms() {
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => setViewingSubmissions({ formId: form.id, formTitle: form.formTitle || form.form_title || 'Untitled Form' })}
+                          data-testid={`view-submissions-btn-${form.id}`}
+                          title="View submissions"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
                         <RouterLink href={`/admin/forms/${form.id}`}>
                           <Button 
                             variant="ghost" 
@@ -219,6 +391,16 @@ export default function AdminForms() {
           )}
         </CardContent>
       </Card>
+
+      {/* Submissions Viewer Dialog */}
+      {viewingSubmissions && (
+        <FormSubmissionsViewer
+          formId={viewingSubmissions.formId}
+          formTitle={viewingSubmissions.formTitle}
+          isOpen={!!viewingSubmissions}
+          onClose={() => setViewingSubmissions(null)}
+        />
+      )}
     </div>
   );
 }

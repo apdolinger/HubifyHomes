@@ -7164,6 +7164,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/forms/:id/submissions", isAuthenticated, async (req: any, res) => {
+    try {
+      const formId = parseInt(req.params.id);
+      const submissions = await storage.getFormSubmissionsWithFields(formId);
+      res.json(submissions);
+    } catch (error) {
+      console.error("Error fetching form submissions:", error);
+      res.status(500).json({ message: "Failed to fetch form submissions" });
+    }
+  });
+
   // Public form routes (no authentication required)
   app.get("/forms/:slug", async (req, res) => {
     try {
