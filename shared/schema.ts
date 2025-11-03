@@ -1016,6 +1016,9 @@ export const tasks = pgTable("tasks", {
   roomId: integer("room_id").references(() => rooms.id),
   contactId: integer("contact_id").references(() => contacts.id),
   vendorId: integer("vendor_id").references(() => contacts.id), // References vendor in contacts table
+  vendorNeeded: boolean("vendor_needed").notNull().default(false), // Toggle to show/hide vendor section
+  vendorSatisfactionRating: integer("vendor_satisfaction_rating"), // 1-5 stars rating for vendor work
+  vendorNotes: text("vendor_notes"), // Notes about vendor work, estimates, or details
   clientId: uuid("client_id").references(() => clients.id), // Billable client reference for billing submissions
   assignedToId: varchar("assigned_to_id").references(() => users.id),
   assignedById: varchar("assigned_by_id").references(() => users.id),
