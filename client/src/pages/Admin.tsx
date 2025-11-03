@@ -481,6 +481,7 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isNewCommunityDialogOpen, setIsNewCommunityDialogOpen] = useState(false);
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState<number[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<any>(null);
   const [includeNotes, setIncludeNotes] = useState(true);
   const [includeTasks, setIncludeTasks] = useState(true);
@@ -773,19 +774,38 @@ export default function Admin() {
     queryKey: ["/api/communities"],
   });
 
+  // Fetch document templates
+  const { data: documentTemplates = [], isLoading: isTemplatesLoading } = useQuery({
+    queryKey: ["/api/document-templates"],
+  });
+
   // Create community mutation  
   const createCommunityMutation = useMutation({
     mutationFn: async (communityData: any) => {
       const response = await apiRequest("POST", "/api/communities", communityData);
-      return response.json();
+      const community = await response.json();
+      
+      // Link selected templates to the new community
+      if (selectedTemplateIds.length > 0) {
+        await Promise.all(
+          selectedTemplateIds.map((templateId) =>
+            apiRequest("POST", `/api/communities/${community.id}/link-template/${templateId}`, {})
+          )
+        );
+      }
+      
+      return community;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/communities"] });
       setIsNewCommunityDialogOpen(false);
+      setSelectedTemplateIds([]);
       communityForm.reset();
       toast({
         title: "Community Created",
-        description: "The community has been created successfully.",
+        description: selectedTemplateIds.length > 0 
+          ? `The community has been created successfully with ${selectedTemplateIds.length} document(s) linked.`
+          : "The community has been created successfully.",
       });
     },
     onError: (error: any) => {
@@ -2600,35 +2620,79 @@ export default function Admin() {
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <h4 className="font-medium text-blue-900 mb-2">Document Management</h4>
                     <p className="text-sm text-blue-700">
-                      Document upload functionality will be available after creating the community. 
-                      You'll be able to upload HOA declarations, bylaws, FAQ sheets, and welcome packets.
+                      Select existing document templates to link to this community, or upload new documents after creation.
                     </p>
                   </div>
 
-                  <div className="space-y-3">
-                    <div className="flex items-center p-3 border border-gray-200 rounded">
-                      <FileText className="w-5 h-5 text-gray-400 mr-3" />
-                      <div>
-                        <p className="font-medium text-sm">HOA Declaration & Bylaws</p>
-                        <p className="text-xs text-gray-500">Upload after community creation</p>
-                      </div>
+                  {isTemplatesLoading ? (
+                    <div className="text-center text-gray-500 py-8">Loading templates...</div>
+                  ) : documentTemplates.length === 0 ? (
+                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                      <p className="text-sm text-gray-600">
+                        No document templates available. You can create templates in the Admin panel under the "Document Templates" section,
+                        then link them to communities during creation to avoid re-uploading the same documents.
+                      </p>
                     </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Available Document Templates</Label>
+                      <div className="border rounded-lg divide-y max-h-60 overflow-y-auto">
+                        {documentTemplates.map((template: any) => (
+                          <div
+                            key={template.id}
+                            className="flex items-center p-3 hover:bg-gray-50 cursor-pointer"
+                            onClick={() => {
+                              setSelectedTemplateIds(prev =>
+                                prev.includes(template.id)
+                                  ? prev.filter(id => id !== template.id)
+                                  : [...prev, template.id]
+                              );
+                            }}
+                          >
+                            <Checkbox
+                              checked={selectedTemplateIds.includes(template.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedTemplateIds([...selectedTemplateIds, template.id]);
+                                } else {
+                                  setSelectedTemplateIds(selectedTemplateIds.filter(id => id !== template.id));
+                                }
+                              }}
+                              className="mr-3"
+                              data-testid={`checkbox-template-${template.id}`}
+                            />
+                            <FileText className="w-5 h-5 text-blue-500 mr-3" />
+                            <div className="flex-1">
+                              <p className="font-medium text-sm">{template.name}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge variant="outline" className="text-xs">
+                                  {template.documentType}
+                                </Badge>
+                                <p className="text-xs text-gray-500">{template.fileName}</p>
+                              </div>
+                              {template.description && (
+                                <p className="text-xs text-gray-600 mt-1">{template.description}</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {selectedTemplateIds.length > 0 && (
+                        <div className="p-3 bg-green-50 border border-green-200 rounded-lg mt-3">
+                          <p className="text-sm text-green-800">
+                            <CheckCircle className="w-4 h-4 inline mr-1" />
+                            {selectedTemplateIds.length} template{selectedTemplateIds.length > 1 ? 's' : ''} selected
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                    <div className="flex items-center p-3 border border-gray-200 rounded">
-                      <FileText className="w-5 h-5 text-gray-400 mr-3" />
-                      <div>
-                        <p className="font-medium text-sm">Community FAQ Sheet</p>
-                        <p className="text-xs text-gray-500">Upload after community creation</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center p-3 border border-gray-200 rounded">
-                      <FileText className="w-5 h-5 text-gray-400 mr-3" />
-                      <div>
-                        <p className="font-medium text-sm">Welcome Packet</p>
-                        <p className="text-xs text-gray-500">Upload after community creation</p>
-                      </div>
-                    </div>
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg mt-4">
+                    <p className="text-xs text-gray-600">
+                      <strong>Note:</strong> Additional documents can be uploaded to the community after creation via the Communities page.
+                    </p>
                   </div>
                 </TabsContent>
               </Tabs>
