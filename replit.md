@@ -54,7 +54,7 @@ Preferred communication style: Simple, everyday language.
   - All admin endpoints enforce admin/supervisor RBAC with Zod validation
   - Graceful error handling when Stripe is not configured
   - Payment collection tokens table for secure token management
-- **Forms System**: Multi-tenant forms with complex field types, property-specific assignments, client submissions, and advanced profile matching.
+- **Forms System**: Multi-tenant forms with complex field types, property-specific assignments, client submissions, advanced profile matching, and submissions viewer. Admin form submissions interface displays all submission answers in a dialog with field-type-aware formatting (checkbox badges, date formatting, multiselect arrays), CSV export functionality, and empty/loading states. Each form has a "View Submissions" button that opens a modal showing all submissions with their field answers organized by field label.
 - **Hubify Portal**: Client-facing portal with role-based access and admin preview mode.
 - **Super Admin Control Panel**: Internal dashboard for platform management, including organizations, users, reports, communication, revenue, feature flags, monitoring, and compliance.
 - **Branding System**: Tier-based branding policy enforcement.
