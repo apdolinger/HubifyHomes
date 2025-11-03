@@ -470,6 +470,261 @@ function BillingSettingsManager({ orgId }: { orgId: string }) {
   );
 }
 
+// Document Templates Manager Component
+function DocumentTemplatesManager() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [newTemplate, setNewTemplate] = useState({
+    name: "",
+    description: "",
+    documentType: "",
+    fileName: "",
+    fileUrl: "",
+  });
+  const [isUploading, setIsUploading] = useState(false);
+
+  const { data: templates = [], isLoading } = useQuery({
+    queryKey: ["/api/document-templates"],
+  });
+
+  const createTemplateMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return apiRequest("POST", "/api/document-templates", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/document-templates"] });
+      setIsUploadDialogOpen(false);
+      setNewTemplate({ name: "", description: "", documentType: "", fileName: "", fileUrl: "" });
+      toast({
+        title: "Template Created",
+        description: "The document template has been created successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create template",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("DELETE", `/api/document-templates/${id}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/document-templates"] });
+      toast({
+        title: "Template Deleted",
+        description: "The document template has been deleted successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete template",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      // In a real implementation, this would upload to object storage
+      // For now, we'll just set a placeholder URL
+      const mockFileUrl = `/documents/templates/${file.name}`;
+      setNewTemplate(prev => ({
+        ...prev,
+        fileName: file.name,
+        fileUrl: mockFileUrl,
+      }));
+      toast({
+        title: "File Ready",
+        description: "File is ready to be saved as a template.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Upload Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleCreateTemplate = () => {
+    if (!newTemplate.name || !newTemplate.documentType || !newTemplate.fileName) {
+      toast({
+        title: "Missing Fields",
+        description: "Please provide a name, document type, and upload a file.",
+        variant: "destructive",
+      });
+      return;
+    }
+    createTemplateMutation.mutate(newTemplate);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <p className="text-sm text-slate-600">
+          {templates.length} template{templates.length !== 1 ? 's' : ''} available
+        </p>
+        <Button 
+          onClick={() => setIsUploadDialogOpen(true)}
+          size="sm"
+          data-testid="button-add-template"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Add Template
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="text-center py-8 text-slate-500">Loading templates...</div>
+      ) : templates.length === 0 ? (
+        <div className="text-center py-8 text-slate-500 border border-dashed rounded-lg">
+          <FileText className="w-12 h-12 mx-auto text-slate-300 mb-2" />
+          <p>No document templates yet</p>
+          <p className="text-xs mt-1">Create your first template to get started</p>
+        </div>
+      ) : (
+        <div className="border rounded-lg divide-y">
+          {templates.map((template: any) => (
+            <div key={template.id} className="p-4 flex items-start justify-between hover:bg-slate-50">
+              <div className="flex items-start gap-3 flex-1">
+                <FileText className="w-5 h-5 text-blue-500 mt-0.5" />
+                <div className="flex-1">
+                  <h4 className="font-medium">{template.name}</h4>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge variant="outline" className="text-xs">
+                      {template.documentType}
+                    </Badge>
+                    <span className="text-xs text-slate-500">{template.fileName}</span>
+                  </div>
+                  {template.description && (
+                    <p className="text-sm text-slate-600 mt-1">{template.description}</p>
+                  )}
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (confirm('Are you sure you want to delete this template?')) {
+                    deleteTemplateMutation.mutate(template.id);
+                  }
+                }}
+                data-testid={`button-delete-template-${template.id}`}
+              >
+                <Trash2 className="w-4 h-4 text-red-500" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Upload Dialog */}
+      <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Document Template</DialogTitle>
+            <DialogDescription>
+              Upload a document that can be reused across multiple communities
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label>Template Name *</Label>
+              <Input
+                placeholder="e.g., Standard HOA Declaration"
+                value={newTemplate.name}
+                onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })}
+                data-testid="input-template-name"
+              />
+            </div>
+
+            <div>
+              <Label>Document Type *</Label>
+              <Select
+                value={newTemplate.documentType}
+                onValueChange={(value) => setNewTemplate({ ...newTemplate, documentType: value })}
+              >
+                <SelectTrigger data-testid="select-document-type">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="hoa-declaration">HOA Declaration</SelectItem>
+                  <SelectItem value="bylaws">Bylaws</SelectItem>
+                  <SelectItem value="faq">FAQ Sheet</SelectItem>
+                  <SelectItem value="welcome-packet">Welcome Packet</SelectItem>
+                  <SelectItem value="rules-regulations">Rules & Regulations</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Description (Optional)</Label>
+              <Textarea
+                placeholder="Brief description of this document..."
+                value={newTemplate.description}
+                onChange={(e) => setNewTemplate({ ...newTemplate, description: e.target.value })}
+                rows={2}
+                data-testid="input-template-description"
+              />
+            </div>
+
+            <div>
+              <Label>Upload File *</Label>
+              <Input
+                type="file"
+                accept=".pdf,.doc,.docx"
+                onChange={handleFileUpload}
+                disabled={isUploading}
+                data-testid="input-template-file"
+              />
+              {newTemplate.fileName && (
+                <p className="text-xs text-green-600 mt-1">
+                  <CheckCircle className="w-3 h-3 inline mr-1" />
+                  {newTemplate.fileName}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsUploadDialogOpen(false);
+                setNewTemplate({ name: "", description: "", documentType: "", fileName: "", fileUrl: "" });
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateTemplate}
+              disabled={createTemplateMutation.isPending || isUploading}
+              data-testid="button-create-template"
+            >
+              {createTemplateMutation.isPending ? "Creating..." : "Create Template"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 export default function Admin() {
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -1543,6 +1798,25 @@ export default function Admin() {
                   Manage Email Templates
                 </Button>
               </Link>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <FileText className="w-5 h-5 mr-2" />
+                Document Templates
+              </CardTitle>
+              <CardDescription>
+                Create reusable community documents to avoid re-uploading the same files
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-slate-600 mb-4">
+                Document templates allow you to upload community documents once and reuse them across multiple communities. 
+                Perfect for standard HOA declarations, bylaws, or welcome packets that apply to many properties.
+              </p>
+              <DocumentTemplatesManager />
             </CardContent>
           </Card>
 
