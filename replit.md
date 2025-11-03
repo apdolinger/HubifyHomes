@@ -18,7 +18,7 @@ The frontend uses React 18 with TypeScript, Radix UI primitives, shadcn/ui, and 
 The backend is built with Node.js and Express.js, offering RESTful API endpoints. Authentication uses Replit Auth via OpenID Connect, with hybrid authentication for Super Admin and regular users, and invitation-based authentication for the Hubify Portal. Multi-tenancy is enforced at the database level.
 
 Key features include:
-- **Property Management**: Supports various property types, multi-unit management, manager assignment, status tracking, room management, tier-based restrictions, custom fields, and property-specific task lists. Includes secure storage for access control, warranty tracking, and purchasing link management. Comprehensive property reporting and preferred vendor associations.
+- **Property Management**: Supports various property types, multi-unit management, manager assignment, status tracking, room management, tier-based restrictions, custom fields, and property-specific task lists. Includes secure storage for access control, warranty tracking, and purchasing link management. Comprehensive property reporting and preferred vendor associations with template-based replication and searchable vendor selection.
 - **Vehicle Management**: Complete lifecycle tracking, maintenance records, and task integration.
 - **Community Document Management**: Secure document storage with classification, security features, and a Document Template Library for reuse across communities.
 - **Task Management**: Priority levels, status tracking, assignment, property and vendor association, due dates, recurring tasks, photo categorization, comments, bulk creation, templates, and custom fields. Enhanced vendor assignment with notes and satisfaction ratings.
