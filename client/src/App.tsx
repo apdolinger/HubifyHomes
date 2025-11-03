@@ -14,6 +14,7 @@ import Tasks from "@/pages/Tasks";
 import TaskProfile from "@/pages/TaskProfile";
 import Properties from "@/pages/Properties";
 import PropertyProfile from "@/pages/PropertyProfile";
+import CommunityProfile from "@/pages/CommunityProfile";
 import Calendar from "@/pages/Calendar";
 import TimeTracking from "@/pages/TimeTracking";
 import Team from "@/pages/Team";
@@ -134,6 +135,7 @@ function Router() {
           <Route path="/task-profile/:id" component={TaskProfile} />
           <Route path="/properties" component={Properties} />
           <Route path="/property-profile/:id" component={PropertyProfile} />
+          <Route path="/communities/:id" component={CommunityProfile} />
           <Route path="/calendar" component={Calendar} />
           <Route path="/time-tracking" component={TimeTracking} />
           <Route path="/team" component={Team} />
