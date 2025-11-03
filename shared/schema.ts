@@ -675,6 +675,23 @@ export const communities = pgTable("communities", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Document Templates table - Reusable documents that can be linked to multiple communities
+export const documentTemplates = pgTable("document_templates", {
+  id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  name: varchar("name").notNull(), // Template name (e.g., "Standard HOA Declaration", "Welcome Packet 2024")
+  description: text("description"), // Optional description of the document
+  documentType: varchar("document_type").notNull(), // 'hoa_declarations', 'ccrs_bylaws', 'community_faq', 'welcome_packet', 'other'
+  fileUrl: varchar("file_url").notNull(),
+  fileName: varchar("file_name").notNull(),
+  uploadedBy: varchar("uploaded_by").references(() => users.id).notNull(),
+  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+  isActive: boolean("is_active").notNull().default(true), // Can be deactivated without deleting
+}, (table) => [
+  index("document_templates_org_idx").on(table.orgId),
+  index("document_templates_type_idx").on(table.documentType),
+]);
+
 // Community Documents table
 export const communityDocuments = pgTable("community_documents", {
   id: serial("id").primaryKey(),
@@ -686,9 +703,11 @@ export const communityDocuments = pgTable("community_documents", {
   fileName: varchar("file_name").notNull(),
   uploadedBy: varchar("uploaded_by").references(() => users.id).notNull(),
   uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+  templateId: integer("template_id").references(() => documentTemplates.id, { onDelete: "set null" }), // Link to template if document was created from a template
 }, (table) => [
   index("community_docs_community_idx").on(table.communityId),
   index("community_docs_property_idx").on(table.propertyId),
+  index("community_docs_template_idx").on(table.templateId),
 ]);
 
 // System Alerts table - for system-wide or targeted user alerts (blocking modal)
@@ -2079,6 +2098,11 @@ export const insertCommunitySchema = createInsertSchema(communities).omit({
   updatedAt: true,
 });
 
+export const insertDocumentTemplateSchema = createInsertSchema(documentTemplates).omit({
+  id: true,
+  uploadedAt: true,
+});
+
 export const insertCommunityDocumentSchema = createInsertSchema(communityDocuments).omit({
   id: true,
   uploadedAt: true,
@@ -2508,6 +2532,8 @@ export type InsertPortalInvitation = z.infer<typeof insertPortalInvitationSchema
 export type PortalInvitation = typeof portalInvitations.$inferSelect;
 export type InsertCommunity = z.infer<typeof insertCommunitySchema>;
 export type Community = typeof communities.$inferSelect;
+export type InsertDocumentTemplate = z.infer<typeof insertDocumentTemplateSchema>;
+export type DocumentTemplate = typeof documentTemplates.$inferSelect;
 export type InsertCommunityDocument = z.infer<typeof insertCommunityDocumentSchema>;
 export type CommunityDocument = typeof communityDocuments.$inferSelect;
 export type InsertSystemAlert = z.infer<typeof insertSystemAlertSchema>;
