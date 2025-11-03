@@ -20,6 +20,7 @@ import {
   portalSessions,
   portalInvitations,
   communities,
+  documentTemplates,
   communityDocuments,
   properties,
   rooms,
@@ -115,6 +116,8 @@ import {
   type InsertPortalInvitation,
   type Community,
   type InsertCommunity,
+  type DocumentTemplate,
+  type InsertDocumentTemplate,
   type CommunityDocument,
   type InsertCommunityDocument,
   type Property,
@@ -348,11 +351,18 @@ export interface IStorage {
   deleteCommunity(id: number): Promise<void>;
   getAllCommunitiesForSuperAdmin(): Promise<any[]>;
   
+  // Document template operations
+  getDocumentTemplates(orgId: string): Promise<DocumentTemplate[]>;
+  createDocumentTemplate(template: InsertDocumentTemplate): Promise<DocumentTemplate>;
+  updateDocumentTemplate(id: number, orgId: string, updates: Partial<InsertDocumentTemplate>): Promise<DocumentTemplate>;
+  deleteDocumentTemplate(id: number, orgId: string): Promise<void>;
+  
   // Community Documents operations
   getCommunityDocuments(communityId: number): Promise<CommunityDocument[]>;
   getCommunityDocument(id: number): Promise<CommunityDocument | undefined>;
   createCommunityDocument(doc: InsertCommunityDocument): Promise<CommunityDocument>;
   deleteCommunityDocument(id: number): Promise<void>;
+  linkTemplateToCommunity(templateId: number, communityId: number, userId: string): Promise<CommunityDocument>;
   
   // Property operations
   getProperties(includeInactive?: boolean): Promise<Property[]>;
@@ -1779,6 +1789,85 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCommunity(id: number): Promise<void> {
     await db.delete(communities).where(eq(communities.id, id));
+  }
+
+  // Document Template operations
+  async getDocumentTemplates(orgId: string): Promise<DocumentTemplate[]> {
+    return await db
+      .select()
+      .from(documentTemplates)
+      .where(
+        and(
+          eq(documentTemplates.orgId, orgId),
+          eq(documentTemplates.isActive, true)
+        )
+      )
+      .orderBy(documentTemplates.documentType, documentTemplates.name);
+  }
+
+  async createDocumentTemplate(template: InsertDocumentTemplate): Promise<DocumentTemplate> {
+    const [newTemplate] = await db
+      .insert(documentTemplates)
+      .values(template)
+      .returning();
+    return newTemplate;
+  }
+
+  async updateDocumentTemplate(id: number, orgId: string, updates: Partial<InsertDocumentTemplate>): Promise<DocumentTemplate> {
+    const [updatedTemplate] = await db
+      .update(documentTemplates)
+      .set(updates)
+      .where(
+        and(
+          eq(documentTemplates.id, id),
+          eq(documentTemplates.orgId, orgId)
+        )
+      )
+      .returning();
+    return updatedTemplate;
+  }
+
+  async deleteDocumentTemplate(id: number, orgId: string): Promise<void> {
+    // Soft delete by setting isActive to false
+    await db
+      .update(documentTemplates)
+      .set({ isActive: false })
+      .where(
+        and(
+          eq(documentTemplates.id, id),
+          eq(documentTemplates.orgId, orgId)
+        )
+      );
+  }
+
+  async linkTemplateToCommunity(templateId: number, communityId: number, userId: string): Promise<CommunityDocument> {
+    // First get the template
+    const [template] = await db
+      .select()
+      .from(documentTemplates)
+      .where(eq(documentTemplates.id, templateId))
+      .limit(1);
+    
+    if (!template) {
+      throw new Error('Template not found');
+    }
+
+    // Create a community document from the template
+    const [communityDoc] = await db
+      .insert(communityDocuments)
+      .values({
+        communityId,
+        propertyId: null, // Community-wide document
+        documentType: template.documentType,
+        classification: 'community-wide',
+        fileUrl: template.fileUrl,
+        fileName: template.fileName,
+        uploadedBy: userId,
+        templateId: templateId,
+      })
+      .returning();
+
+    return communityDoc;
   }
 
   // Community Documents operations
