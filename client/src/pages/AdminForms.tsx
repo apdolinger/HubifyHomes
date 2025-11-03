@@ -530,17 +530,15 @@ export default function AdminForms() {
                             <Link className="w-4 h-4" />
                           </Button>
                         )}
-                        {form.embedEnabled && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => copyEmbedCode(form.formKey)}
-                            data-testid="copy-embed-btn"
-                            title="Copy embed code"
-                          >
-                            <Code className="w-4 h-4" />
-                          </Button>
-                        )}
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => copyEmbedCode(form.formKey)}
+                          data-testid="copy-embed-btn"
+                          title="Copy embed code"
+                        >
+                          <Code className="w-4 h-4" />
+                        </Button>
                         <Button 
                           variant="ghost" 
                           size="sm"
