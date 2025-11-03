@@ -20,7 +20,8 @@ import {
   Link,
   Pencil,
   Eye,
-  Download
+  Download,
+  Printer
 } from "lucide-react";
 
 interface FormSubmissionsViewerProps {
@@ -106,6 +107,150 @@ function FormSubmissionsViewer({ formId, formTitle, isOpen, onClose }: FormSubmi
     URL.revokeObjectURL(url);
   };
 
+  const handlePrint = () => {
+    if (submissions.length === 0) return;
+    
+    const fields = submissions[0]?.fields || [];
+    
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({
+        title: "Print Blocked",
+        description: "Please allow pop-ups to print",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const escapeHtml = (text: string): string => {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    };
+    
+    const getPlainTextValue = (value: any, fieldType: string): string => {
+      if (value === null || value === undefined || value === '') return '—';
+      if (fieldType === 'checkbox') return value ? 'Yes' : 'No';
+      if (Array.isArray(value)) return value.join(', ');
+      if (fieldType === 'date' && value) return new Date(value).toLocaleDateString();
+      return String(value);
+    };
+    
+    const submissionsHTML = submissions.map((submission: any, index: number) => {
+      const fieldsHTML = fields.map((field: any) => {
+        const fieldId = `field-${field.id}`;
+        const value = submission.data?.[fieldId];
+        const plainTextValue = getPlainTextValue(value, field.type);
+        return `
+          <tr>
+            <td class="field-label">${escapeHtml(field.label)}</td>
+            <td class="field-value">${escapeHtml(plainTextValue)}</td>
+          </tr>
+        `;
+      }).join('');
+      
+      return `
+        <div class="submission">
+          <div class="submission-header">
+            <strong>Submission ${index + 1}</strong>
+            <span>${escapeHtml(new Date(submission.submittedAt).toLocaleString())}</span>
+          </div>
+          <table class="fields-table">
+            ${fieldsHTML}
+          </table>
+        </div>
+      `;
+    }).join('');
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${escapeHtml(formTitle)} - Submissions</title>
+          <style>
+            @media print {
+              @page { margin: 1cm; }
+              .submission { page-break-inside: avoid; }
+            }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+              margin: 0;
+              padding: 20px;
+              color: #1e293b;
+            }
+            h1 {
+              font-size: 24px;
+              margin-bottom: 8px;
+              color: #0f172a;
+            }
+            .subtitle {
+              color: #64748b;
+              margin-bottom: 30px;
+              font-size: 14px;
+            }
+            .submission {
+              margin-bottom: 30px;
+              border: 1px solid #e2e8f0;
+              border-radius: 8px;
+              overflow: hidden;
+              page-break-inside: avoid;
+            }
+            .submission-header {
+              background: #f8fafc;
+              padding: 12px 16px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              border-bottom: 1px solid #e2e8f0;
+            }
+            .submission-header strong {
+              color: #0f172a;
+            }
+            .submission-header span {
+              color: #64748b;
+              font-size: 14px;
+            }
+            .fields-table {
+              width: 100%;
+              border-collapse: collapse;
+            }
+            .fields-table tr {
+              border-bottom: 1px solid #f1f5f9;
+            }
+            .fields-table tr:last-child {
+              border-bottom: none;
+            }
+            .field-label {
+              font-weight: 600;
+              padding: 12px 16px;
+              width: 35%;
+              color: #475569;
+              vertical-align: top;
+              font-size: 14px;
+            }
+            .field-value {
+              padding: 12px 16px;
+              color: #1e293b;
+              font-size: 14px;
+            }
+          </style>
+        </head>
+        <body>
+          <h1>${escapeHtml(formTitle)}</h1>
+          <div class="subtitle">${submissions.length} submission${submissions.length !== 1 ? 's' : ''}</div>
+          ${submissionsHTML}
+        </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl max-h-[90vh]">
@@ -118,15 +263,26 @@ function FormSubmissionsViewer({ formId, formTitle, isOpen, onClose }: FormSubmi
               </DialogDescription>
             </div>
             {submissions.length > 0 && (
-              <Button
-                onClick={exportToCSV}
-                size="sm"
-                variant="outline"
-                data-testid="button-export-csv"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Export CSV
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handlePrint}
+                  size="sm"
+                  variant="outline"
+                  data-testid="button-print-submissions"
+                >
+                  <Printer className="w-4 h-4 mr-2" />
+                  Print
+                </Button>
+                <Button
+                  onClick={exportToCSV}
+                  size="sm"
+                  variant="outline"
+                  data-testid="button-export-csv"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Export CSV
+                </Button>
+              </div>
             )}
           </div>
         </DialogHeader>
