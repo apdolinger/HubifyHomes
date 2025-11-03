@@ -2909,6 +2909,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Document Template routes
+  app.get("/api/document-templates", isAuthenticated, async (req: any, res) => {
+    try {
+      const userOrgId = req.user.claims.orgId || req.user.orgId;
+      const templates = await storage.getDocumentTemplates(userOrgId);
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching document templates:", error);
+      res.status(500).json({ message: "Failed to fetch document templates" });
+    }
+  });
+
+  app.post("/api/document-templates", isAuthenticated, async (req: any, res) => {
+    try {
+      const userOrgId = req.user.claims.orgId || req.user.orgId;
+      const userId = req.user.claims.sub;
+      const userRole = req.user.claims.role;
+
+      // Only admins can create document templates
+      if (userRole !== "admin" && userRole !== "supervisor") {
+        return res.status(403).json({ message: "Only admins and supervisors can create document templates" });
+      }
+
+      const { name, description, documentType, fileUrl, fileName } = req.body;
+
+      // Validate required fields
+      if (!name || !documentType || !fileUrl || !fileName) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const template = await storage.createDocumentTemplate({
+        orgId: userOrgId,
+        name,
+        description: description || null,
+        documentType,
+        fileUrl,
+        fileName,
+        uploadedBy: userId,
+      });
+
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Error creating document template:", error);
+      res.status(500).json({ message: "Failed to create document template" });
+    }
+  });
+
+  app.patch("/api/document-templates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid template ID' });
+      }
+
+      const userOrgId = req.user.claims.orgId || req.user.orgId;
+      const userRole = req.user.claims.role;
+
+      // Only admins can update document templates
+      if (userRole !== "admin" && userRole !== "supervisor") {
+        return res.status(403).json({ message: "Only admins and supervisors can update document templates" });
+      }
+
+      const { name, description, documentType, isActive } = req.body;
+
+      const updatedTemplate = await storage.updateDocumentTemplate(id, userOrgId, {
+        name,
+        description,
+        documentType,
+        isActive,
+      });
+
+      res.json(updatedTemplate);
+    } catch (error) {
+      console.error("Error updating document template:", error);
+      res.status(500).json({ message: "Failed to update document template" });
+    }
+  });
+
+  app.delete("/api/document-templates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid template ID' });
+      }
+
+      const userOrgId = req.user.claims.orgId || req.user.orgId;
+      const userRole = req.user.claims.role;
+
+      // Only admins can delete document templates
+      if (userRole !== "admin" && userRole !== "supervisor") {
+        return res.status(403).json({ message: "Only admins and supervisors can delete document templates" });
+      }
+
+      await storage.deleteDocumentTemplate(id, userOrgId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting document template:", error);
+      res.status(500).json({ message: "Failed to delete document template" });
+    }
+  });
+
+  app.post("/api/communities/:communityId/link-template/:templateId", isAuthenticated, async (req: any, res) => {
+    try {
+      const communityId = parseInt(req.params.communityId);
+      const templateId = parseInt(req.params.templateId);
+
+      if (isNaN(communityId)) {
+        return res.status(400).json({ message: 'Invalid community ID' });
+      }
+      if (isNaN(templateId)) {
+        return res.status(400).json({ message: 'Invalid template ID' });
+      }
+
+      const userId = req.user.claims.sub;
+
+      const communityDoc = await storage.linkTemplateToCommunity(templateId, communityId, userId);
+      res.status(201).json(communityDoc);
+    } catch (error) {
+      console.error("Error linking template to community:", error);
+      res.status(500).json({ message: "Failed to link template to community", error: error.message });
+    }
+  });
+
   // Community documents routes
   app.post("/api/communities/:id/documents/upload-url", isAuthenticated, async (req, res) => {
     try {
