@@ -1339,14 +1339,6 @@ export default function Admin() {
           </p>
         </div>
         <div className="flex items-center space-x-3">
-          {(user as any)?.role === 'admin' && (
-            <Link href="/super-admin">
-              <Button className="bg-red-600 hover:bg-red-700">
-                <Shield className="w-4 h-4 mr-2" />
-                Account
-              </Button>
-            </Link>
-          )}
           <Badge variant="secondary" className="px-3 py-1">
             <Shield className="w-4 h-4 mr-1" />
             {(user as any)?.role === 'admin' ? 'Admin' : 'Manager'} Access
