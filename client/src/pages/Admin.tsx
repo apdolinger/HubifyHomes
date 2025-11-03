@@ -932,6 +932,173 @@ export default function Admin() {
     return csvContent;
   };
 
+  // Export all properties summary
+  const exportAllPropertiesSummary = async () => {
+    try {
+      const response = await fetch('/api/properties');
+      const properties = await response.json();
+      
+      let csvContent = 'Properties Summary Report\n';
+      csvContent += `Generated on: ${new Date().toLocaleDateString()}\n\n`;
+      csvContent += 'Name,Address Line 1,Address Line 2,City,State,Zip,Type,Status,Bedrooms,Bathrooms,Square Footage\n';
+      
+      properties.forEach((prop: any) => {
+        csvContent += `"${prop.name || 'N/A'}","${prop.address1 || 'N/A'}","${prop.address2 || ''}",${prop.city || 'N/A'},${prop.state || 'N/A'},${prop.zip || 'N/A'},${prop.type || 'N/A'},${prop.status || 'N/A'},${prop.bedrooms || 'N/A'},${prop.bathrooms || 'N/A'},${prop.squareFootage || 'N/A'}\n`;
+      });
+      
+      downloadCSV(csvContent, `Properties_Summary_${new Date().toISOString().split('T')[0]}.csv`);
+      toast({ title: "Export Complete", description: `Exported ${properties.length} properties` });
+    } catch (error) {
+      toast({ title: "Export Failed", description: "Could not export properties", variant: "destructive" });
+    }
+  };
+
+  // Export active tasks report
+  const exportActiveTasksReport = async () => {
+    try {
+      const response = await fetch('/api/tasks');
+      const tasks = await response.json();
+      const activeTasks = tasks.filter((t: any) => t.status !== 'completed' && t.status !== 'cancelled');
+      
+      let csvContent = 'Active Tasks Report\n';
+      csvContent += `Generated on: ${new Date().toLocaleDateString()}\n\n`;
+      csvContent += 'Title,Property,Status,Priority,Due Date,Assigned To,Description\n';
+      
+      activeTasks.forEach((task: any) => {
+        const propertyName = task.property?.name || 'N/A';
+        const assignedTo = task.assignedUser ? `${task.assignedUser.firstName} ${task.assignedUser.lastName}` : 'Unassigned';
+        csvContent += `"${task.title}","${propertyName}",${task.status || 'N/A'},${task.priority || 'N/A'},${task.dueDate || 'N/A'},"${assignedTo}","${task.description || 'N/A'}"\n`;
+      });
+      
+      downloadCSV(csvContent, `Active_Tasks_${new Date().toISOString().split('T')[0]}.csv`);
+      toast({ title: "Export Complete", description: `Exported ${activeTasks.length} active tasks` });
+    } catch (error) {
+      toast({ title: "Export Failed", description: "Could not export tasks", variant: "destructive" });
+    }
+  };
+
+  // Export contact directory
+  const exportContactDirectory = async () => {
+    try {
+      const response = await fetch('/api/contacts');
+      const contacts = await response.json();
+      
+      let csvContent = 'Contact Directory\n';
+      csvContent += `Generated on: ${new Date().toLocaleDateString()}\n\n`;
+      csvContent += 'First Name,Last Name,Type,Email,Phone,Mobile,Address Line 1,Address Line 2,City,State,Zip,Company,Notes\n';
+      
+      contacts.forEach((contact: any) => {
+        csvContent += `"${contact.firstName || ''}","${contact.lastName || ''}",${contact.type || 'N/A'},${contact.email || 'N/A'},${contact.phone || 'N/A'},${contact.mobile || 'N/A'},"${contact.address1 || ''}","${contact.address2 || ''}",${contact.city || 'N/A'},${contact.state || 'N/A'},${contact.zip || 'N/A'},"${contact.companyName || 'N/A'}","${contact.notes || 'N/A'}"\n`;
+      });
+      
+      downloadCSV(csvContent, `Contact_Directory_${new Date().toISOString().split('T')[0]}.csv`);
+      toast({ title: "Export Complete", description: `Exported ${contacts.length} contacts` });
+    } catch (error) {
+      toast({ title: "Export Failed", description: "Could not export contacts", variant: "destructive" });
+    }
+  };
+
+  // Export billing summary
+  const exportBillingSummary = async () => {
+    try {
+      const response = await fetch('/api/invoices');
+      const invoices = await response.json();
+      
+      let csvContent = 'Billing Summary Report\n';
+      csvContent += `Generated on: ${new Date().toLocaleDateString()}\n\n`;
+      csvContent += 'Invoice Number,Client,Date,Due Date,Amount,Status,Payment Method\n';
+      
+      invoices.forEach((invoice: any) => {
+        const clientName = invoice.client ? `${invoice.client.firstName} ${invoice.client.lastName}` : 'N/A';
+        const amount = invoice.totalAmount ? `$${(invoice.totalAmount / 100).toFixed(2)}` : '$0.00';
+        csvContent += `${invoice.invoiceNumber || 'N/A'},"${clientName}",${invoice.invoiceDate || 'N/A'},${invoice.dueDate || 'N/A'},${amount},${invoice.status || 'N/A'},${invoice.paymentMethod || 'N/A'}\n`;
+      });
+      
+      downloadCSV(csvContent, `Billing_Summary_${new Date().toISOString().split('T')[0]}.csv`);
+      toast({ title: "Export Complete", description: `Exported ${invoices.length} invoices` });
+    } catch (error) {
+      toast({ title: "Export Failed", description: "Could not export billing data", variant: "destructive" });
+    }
+  };
+
+  // Export properties data
+  const exportPropertiesData = async () => {
+    try {
+      const response = await fetch('/api/properties');
+      const properties = await response.json();
+      
+      let csvContent = 'Properties Data Export\n';
+      csvContent += `Generated on: ${new Date().toLocaleDateString()}\n\n`;
+      csvContent += 'Name,Address Line 1,Address Line 2,City,State,Zip,Type,Status,Bedrooms,Bathrooms,Square Footage,Year Built,Lot Size,HOA Fee,Property Tax,Manager,Notes\n';
+      
+      properties.forEach((prop: any) => {
+        csvContent += `"${prop.name || 'N/A'}","${prop.address1 || ''}","${prop.address2 || ''}",${prop.city || 'N/A'},${prop.state || 'N/A'},${prop.zip || 'N/A'},${prop.type || 'N/A'},${prop.status || 'N/A'},${prop.bedrooms || 'N/A'},${prop.bathrooms || 'N/A'},${prop.squareFootage || 'N/A'},${prop.yearBuilt || 'N/A'},${prop.lotSize || 'N/A'},${prop.hoaFee || 'N/A'},${prop.propertyTax || 'N/A'},"${prop.manager || 'N/A'}","${prop.notes || 'N/A'}"\n`;
+      });
+      
+      downloadCSV(csvContent, `Properties_Export_${new Date().toISOString().split('T')[0]}.csv`);
+      toast({ title: "Export Complete", description: `Exported ${properties.length} properties` });
+    } catch (error) {
+      toast({ title: "Export Failed", description: "Could not export properties", variant: "destructive" });
+    }
+  };
+
+  // Export clients data
+  const exportClientsData = async () => {
+    try {
+      const response = await fetch('/api/contacts');
+      const contacts = await response.json();
+      const clients = contacts.filter((c: any) => c.type === 'client' || c.type === 'owner' || c.type === 'tenant');
+      
+      let csvContent = 'Clients Data Export\n';
+      csvContent += `Generated on: ${new Date().toLocaleDateString()}\n\n`;
+      csvContent += 'First Name,Last Name,Type,Email,Phone,Mobile,Address Line 1,Address Line 2,City,State,Zip,Company,Client Category,Notes\n';
+      
+      clients.forEach((client: any) => {
+        csvContent += `"${client.firstName || ''}","${client.lastName || ''}",${client.type || 'N/A'},${client.email || 'N/A'},${client.phone || 'N/A'},${client.mobile || 'N/A'},"${client.address1 || ''}","${client.address2 || ''}",${client.city || 'N/A'},${client.state || 'N/A'},${client.zip || 'N/A'},"${client.companyName || 'N/A'}","${client.clientCategory || 'N/A'}","${client.notes || 'N/A'}"\n`;
+      });
+      
+      downloadCSV(csvContent, `Clients_Export_${new Date().toISOString().split('T')[0]}.csv`);
+      toast({ title: "Export Complete", description: `Exported ${clients.length} clients` });
+    } catch (error) {
+      toast({ title: "Export Failed", description: "Could not export clients", variant: "destructive" });
+    }
+  };
+
+  // Export vendors data
+  const exportVendorsData = async () => {
+    try {
+      const response = await fetch('/api/contacts');
+      const contacts = await response.json();
+      const vendors = contacts.filter((c: any) => c.type === 'vendor');
+      
+      let csvContent = 'Vendors Data Export\n';
+      csvContent += `Generated on: ${new Date().toLocaleDateString()}\n\n`;
+      csvContent += 'First Name,Last Name,Company,Vendor Type,Category,Email,Phone,Mobile,Address Line 1,Address Line 2,City,State,Zip,Website,Notes\n';
+      
+      vendors.forEach((vendor: any) => {
+        csvContent += `"${vendor.firstName || ''}","${vendor.lastName || ''}","${vendor.companyName || 'N/A'}",${vendor.vendorType || 'N/A'},${vendor.vendorCategory || 'N/A'},${vendor.email || 'N/A'},${vendor.phone || 'N/A'},${vendor.mobile || 'N/A'},"${vendor.address1 || ''}","${vendor.address2 || ''}",${vendor.city || 'N/A'},${vendor.state || 'N/A'},${vendor.zip || 'N/A'},${vendor.website || 'N/A'},"${vendor.notes || 'N/A'}"\n`;
+      });
+      
+      downloadCSV(csvContent, `Vendors_Export_${new Date().toISOString().split('T')[0]}.csv`);
+      toast({ title: "Export Complete", description: `Exported ${vendors.length} vendors` });
+    } catch (error) {
+      toast({ title: "Export Failed", description: "Could not export vendors", variant: "destructive" });
+    }
+  };
+
+  // Helper function to download CSV
+  const downloadCSV = (content: string, filename: string) => {
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // PropertySelector component
   const PropertySelector = ({ onPropertyChange }: { onPropertyChange: (property: any) => void }) => {
     return (
@@ -1386,18 +1553,14 @@ export default function Admin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-11">
+        <TabsList className="grid w-full grid-cols-10">
           <TabsTrigger value="forms" className="flex items-center gap-2">
             <FileText className="w-4 h-4" />
             Forms
           </TabsTrigger>
           <TabsTrigger value="data" className="flex items-center gap-2">
             <Database className="w-4 h-4" />
-            Data Management
-          </TabsTrigger>
-          <TabsTrigger value="reports" className="flex items-center gap-2">
-            <Download className="w-4 h-4" />
-            Reports
+            Data
           </TabsTrigger>
           <TabsTrigger value="billing" className="flex items-center gap-2">
             <DollarSign className="w-4 h-4" />
@@ -1468,7 +1631,12 @@ export default function Admin() {
                     <Upload className="w-4 h-4 mr-2" />
                     Bulk Import
                   </Button>
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={exportPropertiesData}
+                    data-testid="button-export-properties"
+                  >
                     <Download className="w-4 h-4 mr-2" />
                     Export Data
                   </Button>
@@ -1546,7 +1714,12 @@ export default function Admin() {
                       Manage Duplicates
                     </Button>
                   </Link>
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={exportClientsData}
+                    data-testid="button-export-clients"
+                  >
                     <Download className="w-4 h-4 mr-2" />
                     Export Clients
                   </Button>
@@ -1577,7 +1750,12 @@ export default function Admin() {
                     <Plus className="w-4 h-4 mr-2" />
                     Add New Vendor
                   </Button>
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={exportVendorsData}
+                    data-testid="button-export-vendors"
+                  >
                     <Download className="w-4 h-4 mr-2" />
                     Export Vendors
                   </Button>
@@ -1624,181 +1802,148 @@ export default function Admin() {
             </Card>
           </div>
 
-          {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <Home className="h-8 w-8 text-blue-600" />
-                  <div className="ml-4">
-                    <p className="text-2xl font-bold">16</p>
-                    <p className="text-gray-600">Total Properties</p>
+          {/* Reports Section */}
+          <div className="mt-8">
+            <h3 className="text-xl font-semibold mb-4">Reports & Analytics</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Property Report Generator */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Building className="w-5 h-5" />
+                    Property Report Generator
+                  </CardTitle>
+                  <CardDescription>
+                    Generate comprehensive reports for any property including all details, tasks, contacts, and notes
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label htmlFor="property-select">Select Property</Label>
+                    <PropertySelector onPropertyChange={setSelectedProperty} />
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <Users className="h-8 w-8 text-green-600" />
-                  <div className="ml-4">
-                    <p className="text-2xl font-bold">42</p>
-                    <p className="text-gray-600">Total Contacts</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <Shield className="h-8 w-8 text-purple-600" />
-                  <div className="ml-4">
-                    <p className="text-2xl font-bold">8</p>
-                    <p className="text-gray-600">Team Members</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <Copy className="h-8 w-8 text-orange-600" />
-                  <div className="ml-4">
-                    <p className="text-2xl font-bold">3</p>
-                    <p className="text-gray-600">Potential Duplicates</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
 
-        {/* Reports Tab */}
-        <TabsContent value="reports" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xl font-semibold">Comprehensive Reports</h3>
-              <p className="text-slate-600">Generate detailed reports for properties and data analysis</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Property Report Generator */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building className="w-5 h-5" />
-                  Property Report Generator
-                </CardTitle>
-                <CardDescription>
-                  Generate comprehensive reports for any property including all details, tasks, contacts, and notes
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="property-select">Select Property</Label>
-                  <PropertySelector onPropertyChange={setSelectedProperty} />
-                </div>
-
-                {selectedProperty && (
-                  <div className="space-y-3">
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                      <div className="font-medium">{selectedProperty.name || 'Unnamed Property'}</div>
-                      <div className="text-sm text-slate-600">{selectedProperty.address || 'No address'}</div>
-                    </div>
-
+                  {selectedProperty && (
                     <div className="space-y-3">
-                      <h4 className="font-medium">Report Options</h4>
-                      
-                      <div className="flex items-center space-x-2">
-                        <Switch 
-                          id="include-notes" 
-                          checked={includeNotes} 
-                          onCheckedChange={setIncludeNotes}
-                        />
-                        <Label htmlFor="include-notes">Include Property Notes</Label>
+                      <div className="p-3 bg-slate-50 rounded-lg">
+                        <div className="font-medium">{selectedProperty.name || 'Unnamed Property'}</div>
+                        <div className="text-sm text-slate-600">{selectedProperty.address || 'No address'}</div>
                       </div>
 
-                      <div className="flex items-center space-x-2">
-                        <Switch 
-                          id="include-tasks" 
-                          checked={includeTasks} 
-                          onCheckedChange={setIncludeTasks}
-                        />
-                        <Label htmlFor="include-tasks">Include Tasks & History</Label>
+                      <div className="space-y-3">
+                        <h4 className="font-medium">Report Options</h4>
+                        
+                        <div className="flex items-center space-x-2">
+                          <Switch 
+                            id="include-notes" 
+                            checked={includeNotes} 
+                            onCheckedChange={setIncludeNotes}
+                          />
+                          <Label htmlFor="include-notes">Include Property Notes</Label>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Switch 
+                            id="include-tasks" 
+                            checked={includeTasks} 
+                            onCheckedChange={setIncludeTasks}
+                          />
+                          <Label htmlFor="include-tasks">Include Tasks & History</Label>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Switch 
+                            id="include-contacts" 
+                            checked={includeContacts} 
+                            onCheckedChange={setIncludeContacts}
+                          />
+                          <Label htmlFor="include-contacts">Include Contacts & Owners</Label>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Switch 
+                            id="include-rooms" 
+                            checked={includeRooms} 
+                            onCheckedChange={setIncludeRooms}
+                          />
+                          <Label htmlFor="include-rooms">Include Rooms & Supplies</Label>
+                        </div>
                       </div>
 
-                      <div className="flex items-center space-x-2">
-                        <Switch 
-                          id="include-contacts" 
-                          checked={includeContacts} 
-                          onCheckedChange={setIncludeContacts}
-                        />
-                        <Label htmlFor="include-contacts">Include Contacts & Owners</Label>
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        <Switch 
-                          id="include-rooms" 
-                          checked={includeRooms} 
-                          onCheckedChange={setIncludeRooms}
-                        />
-                        <Label htmlFor="include-rooms">Include Rooms & Supplies</Label>
-                      </div>
+                      <Button 
+                        onClick={() => generatePropertyReport(selectedProperty)}
+                        disabled={isGeneratingReport}
+                        className="w-full"
+                        data-testid="button-generate-property-report"
+                      >
+                        {isGeneratingReport ? (
+                          <>
+                            <Download className="w-4 h-4 mr-2 animate-pulse" />
+                            Generating Report...
+                          </>
+                        ) : (
+                          <>
+                            <Download className="w-4 h-4 mr-2" />
+                            Generate Property Report
+                          </>
+                        )}
+                      </Button>
                     </div>
+                  )}
+                </CardContent>
+              </Card>
 
-                    <Button 
-                      onClick={() => generatePropertyReport(selectedProperty)}
-                      disabled={isGeneratingReport}
-                      className="w-full"
-                    >
-                      {isGeneratingReport ? (
-                        <>
-                          <Download className="w-4 h-4 mr-2 animate-pulse" />
-                          Generating Report...
-                        </>
-                      ) : (
-                        <>
-                          <Download className="w-4 h-4 mr-2" />
-                          Generate Property Report
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Quick Reports */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
-                  Quick Reports
-                </CardTitle>
-                <CardDescription>
-                  Pre-configured reports for common needs
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button variant="outline" className="w-full justify-start">
-                  <Download className="w-4 h-4 mr-2" />
-                  All Properties Summary
-                </Button>
-                <Button variant="outline" className="w-full justify-start">
-                  <Download className="w-4 h-4 mr-2" />
-                  Active Tasks Report
-                </Button>
-                <Button variant="outline" className="w-full justify-start">
-                  <Download className="w-4 h-4 mr-2" />
-                  Contact Directory
-                </Button>
-                <Button variant="outline" className="w-full justify-start">
-                  <Download className="w-4 h-4 mr-2" />
-                  Billing Summary
-                </Button>
-              </CardContent>
-            </Card>
+              {/* Quick Reports */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Quick Reports
+                  </CardTitle>
+                  <CardDescription>
+                    Pre-configured reports for common needs
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={exportAllPropertiesSummary}
+                    data-testid="button-export-properties-summary"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    All Properties Summary
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={exportActiveTasksReport}
+                    data-testid="button-export-tasks-report"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Active Tasks Report
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={exportContactDirectory}
+                    data-testid="button-export-contact-directory"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Contact Directory
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={exportBillingSummary}
+                    data-testid="button-export-billing-summary"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Billing Summary
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </TabsContent>
 
