@@ -2385,12 +2385,12 @@ export default function Admin() {
 
               <Tabs defaultValue="profile" className="w-full">
                 <TabsList className="grid w-full grid-cols-6">
-                  <TabsTrigger value="profile">🏘️ Profile</TabsTrigger>
-                  <TabsTrigger value="rules">🧾 Rules</TabsTrigger>
-                  <TabsTrigger value="schedule">📅 Schedule</TabsTrigger>
-                  <TabsTrigger value="financial">💵 Financial</TabsTrigger>
-                  <TabsTrigger value="amenities">🛠️ Amenities</TabsTrigger>
-                  <TabsTrigger value="documents">📝 Documents</TabsTrigger>
+                  <TabsTrigger value="profile">Profile</TabsTrigger>
+                  <TabsTrigger value="rules">Rules</TabsTrigger>
+                  <TabsTrigger value="schedule">Schedule</TabsTrigger>
+                  <TabsTrigger value="financial">Financial</TabsTrigger>
+                  <TabsTrigger value="amenities">Amenities</TabsTrigger>
+                  <TabsTrigger value="documents">Documents</TabsTrigger>
                 </TabsList>
 
                 {/* Community Profile Tab */}
