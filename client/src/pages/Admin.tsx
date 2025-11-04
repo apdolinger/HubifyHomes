@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import AdminForms from "./AdminForms";
 import SupportModal from "@/components/SupportModal";
 import Billing from "./Billing";
@@ -771,6 +771,7 @@ function DocumentTemplatesManager() {
 export default function Admin() {
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
   
   // Check URL query parameters for initial tab
   const urlParams = new URLSearchParams(window.location.search);
@@ -1104,6 +1105,30 @@ export default function Admin() {
       toast({ title: "Export Complete", description: `Exported ${clients.length} clients` });
     } catch (error) {
       toast({ title: "Export Failed", description: "Could not export clients", variant: "destructive" });
+    }
+  };
+
+  // Export communities data
+  const exportCommunitiesData = async () => {
+    try {
+      const response = await fetch('/api/communities');
+      const communities = await response.json();
+      
+      let csvContent = 'Communities Data Export\n';
+      csvContent += `Generated on: ${new Date().toLocaleDateString()}\n\n`;
+      csvContent += 'Name,Address Line 1,Address Line 2,City,State,Zip,Status,Property Count,Notes\n';
+      
+      communities.forEach((community: any) => {
+        const address1 = community.address1 || '';
+        const address2 = community.address2 || '';
+        const status = community.isActive ? 'Active' : 'Inactive';
+        csvContent += `"${community.name || ''}","${address1}","${address2}",${community.city || 'N/A'},${community.state || 'N/A'},${community.zip || 'N/A'},${status},${community.propertyCount || 0},"${community.notes || ''}"\n`;
+      });
+      
+      downloadCSV(csvContent, `Communities_Export_${new Date().toISOString().split('T')[0]}.csv`);
+      toast({ title: "Export Complete", description: `Exported ${communities.length} communities` });
+    } catch (error) {
+      toast({ title: "Export Failed", description: "Could not export communities", variant: "destructive" });
     }
   };
 
@@ -1738,14 +1763,21 @@ export default function Admin() {
                       View All Properties
                     </Button>
                   </Link>
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => setLocation("/properties")}
+                    data-testid="button-add-property"
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Add New Property
                   </Button>
-                  <Button variant="outline" className="w-full justify-start">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Bulk Import
-                  </Button>
+                  <Link href="/admin/import?type=properties">
+                    <Button variant="outline" className="w-full justify-start">
+                      <Upload className="w-4 h-4 mr-2" />
+                      Bulk Import
+                    </Button>
+                  </Link>
                   <Button 
                     variant="outline" 
                     className="w-full justify-start"
@@ -1783,16 +1815,27 @@ export default function Admin() {
                   <Button 
                     variant="outline" 
                     className="w-full justify-start"
-                    onClick={() => setActiveTab("communities")}
+                    onClick={() => {
+                      setActiveTab("communities");
+                      setIsNewCommunityDialogOpen(true);
+                    }}
+                    data-testid="button-add-community"
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Add New Community
                   </Button>
-                  <Button variant="outline" className="w-full justify-start">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Bulk Import
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start">
+                  <Link href="/admin/import?type=communities">
+                    <Button variant="outline" className="w-full justify-start">
+                      <Upload className="w-4 h-4 mr-2" />
+                      Bulk Import
+                    </Button>
+                  </Link>
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={exportCommunitiesData}
+                    data-testid="button-export-communities"
+                  >
                     <Download className="w-4 h-4 mr-2" />
                     Export Data
                   </Button>
@@ -1819,7 +1862,12 @@ export default function Admin() {
                       View All Clients
                     </Button>
                   </Link>
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => setLocation("/people")}
+                    data-testid="button-add-client"
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Add New Client
                   </Button>
@@ -1861,7 +1909,12 @@ export default function Admin() {
                       View All Vendors
                     </Button>
                   </Link>
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => setLocation("/admin/vendors")}
+                    data-testid="button-add-vendor"
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Add New Vendor
                   </Button>
@@ -1900,15 +1953,30 @@ export default function Admin() {
                       View Team Members
                     </Button>
                   </Link>
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => setLocation("/team")}
+                    data-testid="button-invite-team-member"
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Invite Team Member
                   </Button>
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => setActiveTab("roles")}
+                    data-testid="button-manage-permissions"
+                  >
                     <Settings className="w-4 h-4 mr-2" />
                     Manage Permissions
                   </Button>
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => setActiveTab("roles")}
+                    data-testid="button-role-settings"
+                  >
                     <Shield className="w-4 h-4 mr-2" />
                     Role Settings
                   </Button>
