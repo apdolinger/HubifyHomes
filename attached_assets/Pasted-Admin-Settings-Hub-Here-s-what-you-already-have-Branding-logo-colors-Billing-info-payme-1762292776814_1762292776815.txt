@@ -1,0 +1,78 @@
+Admin Settings Hub).
+
+Here’s what you already have:
+✅ Branding (logo, colors)
+✅ Billing info & payment method
+✅ Invoices
+✅ Subscription tier (upgrade/downgrade/delete)
+✅ Permissions limited to Admin
+
+Below is a list of additional elements that would complete this area, balancing user experience, scalability, and compliance:
+
+⸻
+
+🧭 1. Company Profile
+	•	Company name, address, phone, website
+	•	Time zone & default currency
+	•	Primary contact person
+	•	Industry type or specialization (for analytics or feature tuning)
+
+⸻
+
+🧑‍💻 2. User Management
+	•	Add/remove users & assign roles (Admin, Manager, Field Tech, Viewer)
+	•	Reset passwords & manage 2FA
+	•	Define role-based access (e.g., who can edit checklists, who can see billing)
+
+⸻
+
+🧩 3. Integrations & API Keys
+	•	Connect email providers (SendGrid, Gmail)
+	•	Connect SMS providers (Twilio)
+	•	API key generation for custom integrations
+	•	Webhook setup (for alerts or external CRMs)
+
+⸻
+
+🧾 4. Notification Settings
+	•	Toggle what types of notifications are sent (billing, reports, errors, new requests)
+	•	Choose delivery channels (email, SMS, in-app)
+	•	Add secondary notification recipients (e.g., accountant)
+
+⸻
+
+📦 5. Data Management
+	•	Export data (properties, reports, clients)
+	•	Request account data copy (GDPR/CCPA compliance)
+	•	Delete account/data permanently with confirmation
+	•	Backups & restore options (if available in Pro tier)
+
+⸻
+
+⚙️ 6. System Preferences
+	•	Default property checklist templates
+	•	Default time format, units (e.g., °F/°C, miles/km)
+	•	Custom report footer text or disclaimer
+	•	Control whether Hubify logo appears on reports
+
+⸻
+
+🧠 7. Help & Support
+	•	Submit a ticket / live chat link
+	•	Access to Hubify Knowledge Base or onboarding guide
+	•	API documentation link (if you open integrations later)
+
+⸻
+
+🔒 8. Security & Compliance
+	•	Two-Factor Authentication toggle
+	•	Session/device management
+	•	Role activity logs (who changed what, when)
+	•	Audit logs for billing or plan changes
+
+⸻
+
+📊 9. Usage Analytics
+	•	See current usage: number of properties, reports generated, active users
+	•	Upgrade suggestions when near tier limits
+	•	Summary of recent account activity
