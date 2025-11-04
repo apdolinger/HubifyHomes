@@ -1739,6 +1739,12 @@ export default function Admin() {
           </p>
         </div>
         <div className="flex items-center space-x-3">
+          <Link href="/account">
+            <Button variant="outline" data-testid="button-account-settings">
+              <Settings className="w-4 h-4 mr-2" />
+              Account Settings
+            </Button>
+          </Link>
           <Badge variant="secondary" className="px-3 py-1">
             <Shield className="w-4 h-4 mr-1" />
             {(user as any)?.role === 'admin' ? 'Admin' : 'Manager'} Access
