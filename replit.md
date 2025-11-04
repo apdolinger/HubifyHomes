@@ -39,6 +39,7 @@ Key features include:
 - **Time Tracking**: Dedicated tracking for billable and non-billable time with role-based editing.
 - **Support Ticket System**: Internal system for user requests.
 - **System Alerts**: Organization-level alert system with severity, targeting, and acknowledgement.
+- **Account Settings**: Comprehensive organization configuration interface with Company Profile management (address, phone, website, timezone, currency, primary contact, industry) and Integrations tab featuring secure API key management with hashed storage, one-time display, and revocation capabilities. Placeholder UI for third-party integrations (SendGrid, Twilio) prepared for Replit integration system.
 
 ### System Design Choices
 The database is PostgreSQL with Drizzle ORM (Better SQLite3 for local development). Schema management uses Drizzle Kit. The architecture is multi-tenant and organization-scoped, using UUID-based primary keys and JSONB for advanced form field definitions.
