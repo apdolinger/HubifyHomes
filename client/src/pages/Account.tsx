@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,6 +17,8 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { 
   ArrowLeft,
   Shield,
@@ -41,14 +46,44 @@ import {
   User,
   Zap,
   Database,
-  Activity
+  Activity,
+  Key,
+  Copy,
+  Info,
+  Globe,
+  XCircle
 } from "lucide-react";
+
+// Organization form schema
+const orgFormSchema = z.object({
+  name: z.string().min(1, "Company name is required"),
+  address1: z.string().optional(),
+  address2: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zip: z.string().optional(),
+  country: z.string().optional(),
+  phone: z.string().optional(),
+  website: z.string().optional(),
+  timezone: z.string().optional(),
+  currency: z.string().optional(),
+  primaryContact: z.string().optional(),
+  industry: z.string().optional(),
+});
+
+type OrgFormData = z.infer<typeof orgFormSchema>;
 
 export default function Account() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("account-info");
   const [isEditingInfo, setIsEditingInfo] = useState(false);
+  const [createApiKeyDialogOpen, setCreateApiKeyDialogOpen] = useState(false);
+  const [newApiKeyName, setNewApiKeyName] = useState("");
+  const [generatedApiKey, setGeneratedApiKey] = useState<string | null>(null);
+  const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
+
+  const orgId = (user as any)?.orgId;
 
   // Redirect to home if not authenticated or not admin
   useEffect(() => {
@@ -65,6 +100,168 @@ export default function Account() {
     }
   }, [isAuthenticated, isLoading, user, toast]);
 
+  // Fetch organization data
+  const { data: org, isLoading: isLoadingOrg } = useQuery<any>({
+    queryKey: ['/api/orgs', orgId],
+    enabled: !!orgId && isAuthenticated,
+  });
+
+  // Fetch API keys
+  const { data: apiKeys = [], isLoading: isLoadingApiKeys } = useQuery<any[]>({
+    queryKey: ['/api/orgs', orgId, 'api-keys'],
+    enabled: !!orgId && isAuthenticated && activeTab === 'integrations',
+  });
+
+  // Form for organization info
+  const form = useForm<OrgFormData>({
+    resolver: zodResolver(orgFormSchema),
+    defaultValues: {
+      name: "",
+      address1: "",
+      address2: "",
+      city: "",
+      state: "",
+      zip: "",
+      country: "USA",
+      phone: "",
+      website: "",
+      timezone: "America/New_York",
+      currency: "USD",
+      primaryContact: "",
+      industry: "",
+    },
+  });
+
+  // Update form when org data loads
+  useEffect(() => {
+    if (org) {
+      form.reset({
+        name: org.name || "",
+        address1: org.address1 || "",
+        address2: org.address2 || "",
+        city: org.city || "",
+        state: org.state || "",
+        zip: org.zip || "",
+        country: org.country || "USA",
+        phone: org.phone || "",
+        website: org.website || "",
+        timezone: org.timezone || "America/New_York",
+        currency: org.currency || "USD",
+        primaryContact: org.primaryContact || "",
+        industry: org.industry || "",
+      });
+    }
+  }, [org, form]);
+
+  // Update organization mutation
+  const updateOrgMutation = useMutation({
+    mutationFn: async (data: OrgFormData) => {
+      const response = await fetch(`/api/orgs/${orgId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to update organization');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/orgs', orgId] });
+      setIsEditingInfo(false);
+      toast({
+        title: "Success",
+        description: "Organization information updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update organization",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create API key mutation
+  const createApiKeyMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const response = await fetch(`/api/orgs/${orgId}/api-keys`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to create API key');
+      }
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/orgs', orgId, 'api-keys'] });
+      setGeneratedApiKey(data.plainKey);
+      setShowApiKeyDialog(true);
+      setCreateApiKeyDialogOpen(false);
+      setNewApiKeyName("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create API key",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Revoke API key mutation
+  const revokeApiKeyMutation = useMutation({
+    mutationFn: async (keyId: number) => {
+      const response = await fetch(`/api/orgs/${orgId}/api-keys/${keyId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to revoke API key');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/orgs', orgId, 'api-keys'] });
+      toast({
+        title: "Success",
+        description: "API key revoked successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to revoke API key",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (data: OrgFormData) => {
+    updateOrgMutation.mutate(data);
+  };
+
+  const handleCopyApiKey = () => {
+    if (generatedApiKey) {
+      navigator.clipboard.writeText(generatedApiKey);
+      toast({
+        title: "Copied",
+        description: "API key copied to clipboard",
+      });
+    }
+  };
+
+  const handleRevokeKey = (keyId: number, keyName: string) => {
+    if (confirm(`Are you sure you want to revoke the API key "${keyName}"? This action cannot be undone.`)) {
+      revokeApiKeyMutation.mutate(keyId);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -76,20 +273,6 @@ export default function Account() {
   if (!isAuthenticated || (user as any)?.role !== 'admin') {
     return null;
   }
-
-  // Mock data - in real app this would come from API
-  const accountInfo = {
-    companyName: "Sterling Property Management",
-    logo: null,
-    address: "123 Business Ave, Suite 400",
-    city: "Miami",
-    state: "FL",
-    zipCode: "33101",
-    businessPhone: "(305) 555-0123",
-    businessEmail: "info@sterlingpm.com",
-    billingContact: "Andrew Dolinger",
-    billingEmail: "billing@sterlingpm.com"
-  };
 
   const subscriptionInfo = {
     plan: "Professional Tier",
@@ -128,18 +311,19 @@ export default function Account() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-11">
-          <TabsTrigger value="account-info">Account Info</TabsTrigger>
-          <TabsTrigger value="billing">Billing</TabsTrigger>
-          <TabsTrigger value="forms">Forms</TabsTrigger>
-          <TabsTrigger value="custom-fields">Custom Fields</TabsTrigger>
-          <TabsTrigger value="email-templates">Email Templates</TabsTrigger>
-          <TabsTrigger value="task-templates">Task Templates</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="team-roles">Team & Roles</TabsTrigger>
-          <TabsTrigger value="automation">Automation</TabsTrigger>
-          <TabsTrigger value="audit-log">Audit Log</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-12">
+          <TabsTrigger value="account-info" data-testid="tab-account-info">Account Info</TabsTrigger>
+          <TabsTrigger value="billing" data-testid="tab-billing">Billing</TabsTrigger>
+          <TabsTrigger value="forms" data-testid="tab-forms">Forms</TabsTrigger>
+          <TabsTrigger value="custom-fields" data-testid="tab-custom-fields">Custom Fields</TabsTrigger>
+          <TabsTrigger value="email-templates" data-testid="tab-email-templates">Email Templates</TabsTrigger>
+          <TabsTrigger value="task-templates" data-testid="tab-task-templates">Task Templates</TabsTrigger>
+          <TabsTrigger value="reports" data-testid="tab-reports">Reports</TabsTrigger>
+          <TabsTrigger value="notifications" data-testid="tab-notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="team-roles" data-testid="tab-team-roles">Team & Roles</TabsTrigger>
+          <TabsTrigger value="automation" data-testid="tab-automation">Automation</TabsTrigger>
+          <TabsTrigger value="audit-log" data-testid="tab-audit-log">Audit Log</TabsTrigger>
+          <TabsTrigger value="integrations" data-testid="tab-integrations">Integrations</TabsTrigger>
         </TabsList>
 
         {/* Account Information Tab */}
@@ -153,120 +337,319 @@ export default function Account() {
                     Account Information
                   </CardTitle>
                 </div>
-                <Button
-                  variant={isEditingInfo ? "outline" : "default"}
-                  onClick={() => setIsEditingInfo(!isEditingInfo)}
-                >
-                  {isEditingInfo ? "Cancel" : "Edit"}
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="companyName">Company Name</Label>
-                    <Input
-                      id="companyName"
-                      value={accountInfo.companyName}
-                      disabled={!isEditingInfo}
-                      className={!isEditingInfo ? "bg-slate-50" : ""}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="address">Business Address</Label>
-                    <Input
-                      id="address"
-                      value={accountInfo.address}
-                      disabled={!isEditingInfo}
-                      className={!isEditingInfo ? "bg-slate-50" : ""}
-                    />
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <Label htmlFor="city">City</Label>
-                      <Input
-                        id="city"
-                        value={accountInfo.city}
-                        disabled={!isEditingInfo}
-                        className={!isEditingInfo ? "bg-slate-50" : ""}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="state">State</Label>
-                      <Input
-                        id="state"
-                        value={accountInfo.state}
-                        disabled={!isEditingInfo}
-                        className={!isEditingInfo ? "bg-slate-50" : ""}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="zipCode">ZIP Code</Label>
-                      <Input
-                        id="zipCode"
-                        value={accountInfo.zipCode}
-                        disabled={!isEditingInfo}
-                        className={!isEditingInfo ? "bg-slate-50" : ""}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="businessPhone">Business Phone</Label>
-                    <Input
-                      id="businessPhone"
-                      value={accountInfo.businessPhone}
-                      disabled={!isEditingInfo}
-                      className={!isEditingInfo ? "bg-slate-50" : ""}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="businessEmail">Business Email</Label>
-                    <Input
-                      id="businessEmail"
-                      value={accountInfo.businessEmail}
-                      disabled={!isEditingInfo}
-                      className={!isEditingInfo ? "bg-slate-50" : ""}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="billingContact">Billing Contact</Label>
-                    <Input
-                      id="billingContact"
-                      value={accountInfo.billingContact}
-                      disabled={!isEditingInfo}
-                      className={!isEditingInfo ? "bg-slate-50" : ""}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="billingEmail">Billing Email</Label>
-                    <Input
-                      id="billingEmail"
-                      value={accountInfo.billingEmail}
-                      disabled={!isEditingInfo}
-                      className={!isEditingInfo ? "bg-slate-50" : ""}
-                    />
-                  </div>
-                </div>
-              </div>
-              {isEditingInfo && (
-                <div className="flex justify-end space-x-2 pt-4 border-t">
-                  <Button variant="outline" onClick={() => setIsEditingInfo(false)}>
+                {!isEditingInfo ? (
+                  <Button
+                    onClick={() => setIsEditingInfo(true)}
+                    data-testid="button-edit-account"
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edit
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsEditingInfo(false);
+                      form.reset();
+                    }}
+                    data-testid="button-cancel-edit"
+                  >
                     Cancel
                   </Button>
-                  <Button onClick={() => {
-                    setIsEditingInfo(false);
-                    toast({
-                      title: "Account Updated",
-                      description: "Your account information has been saved successfully.",
-                    });
-                  }}>
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Changes
-                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isLoadingOrg ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
+              ) : (
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Company Name *</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  disabled={!isEditingInfo}
+                                  className={!isEditingInfo ? "bg-slate-50" : ""}
+                                  data-testid="input-company-name"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="address1"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Address Line 1</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  disabled={!isEditingInfo}
+                                  className={!isEditingInfo ? "bg-slate-50" : ""}
+                                  data-testid="input-address1"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="address2"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Address Line 2</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  disabled={!isEditingInfo}
+                                  className={!isEditingInfo ? "bg-slate-50" : ""}
+                                  data-testid="input-address2"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="grid grid-cols-6 gap-2">
+                          <div className="col-span-3">
+                            <FormField
+                              control={form.control}
+                              name="city"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>City</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      disabled={!isEditingInfo}
+                                      className={!isEditingInfo ? "bg-slate-50" : ""}
+                                      data-testid="input-city"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          <div className="col-span-1">
+                            <FormField
+                              control={form.control}
+                              name="state"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>State</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      disabled={!isEditingInfo}
+                                      className={!isEditingInfo ? "bg-slate-50" : ""}
+                                      data-testid="input-state"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <FormField
+                              control={form.control}
+                              name="zip"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>ZIP</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      disabled={!isEditingInfo}
+                                      className={!isEditingInfo ? "bg-slate-50" : ""}
+                                      data-testid="input-zip"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+                        <FormField
+                          control={form.control}
+                          name="country"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Country</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  disabled={!isEditingInfo}
+                                  className={!isEditingInfo ? "bg-slate-50" : ""}
+                                  data-testid="input-country"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <div className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="phone"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Business Phone</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  disabled={!isEditingInfo}
+                                  className={!isEditingInfo ? "bg-slate-50" : ""}
+                                  data-testid="input-phone"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="website"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Website</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  disabled={!isEditingInfo}
+                                  className={!isEditingInfo ? "bg-slate-50" : ""}
+                                  data-testid="input-website"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="primaryContact"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Primary Contact</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  disabled={!isEditingInfo}
+                                  className={!isEditingInfo ? "bg-slate-50" : ""}
+                                  data-testid="input-primary-contact"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="industry"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Industry</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  disabled={!isEditingInfo}
+                                  className={!isEditingInfo ? "bg-slate-50" : ""}
+                                  placeholder="e.g., Property Management"
+                                  data-testid="input-industry"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="timezone"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Timezone</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  disabled={!isEditingInfo}
+                                  className={!isEditingInfo ? "bg-slate-50" : ""}
+                                  data-testid="input-timezone"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="currency"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Currency</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  disabled={!isEditingInfo}
+                                  className={!isEditingInfo ? "bg-slate-50" : ""}
+                                  data-testid="input-currency"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+                    {isEditingInfo && (
+                      <div className="flex justify-end space-x-2 pt-4 border-t">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setIsEditingInfo(false);
+                            form.reset();
+                          }}
+                          data-testid="button-cancel-save"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="submit"
+                          disabled={updateOrgMutation.isPending}
+                          data-testid="button-save-account"
+                        >
+                          {updateOrgMutation.isPending ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-4 h-4 mr-2" />
+                              Save Changes
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </form>
+                </Form>
               )}
             </CardContent>
           </Card>
@@ -760,7 +1143,7 @@ export default function Account() {
                   <div className="text-sm text-slate-600">
                     System activity log - read only
                   </div>
-                  <Button size="sm" variant="outline">
+                  <Button size="sm" variant="outline" data-testid="button-export-log">
                     <Download className="w-4 h-4 mr-2" />
                     Export Log
                   </Button>
@@ -795,6 +1178,171 @@ export default function Account() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Integrations Tab */}
+        <TabsContent value="integrations">
+          <div className="space-y-6">
+            {/* API Keys Section */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center">
+                      <Key className="w-5 h-5 mr-2" />
+                      API Keys
+                    </CardTitle>
+                    <CardDescription className="mt-1">
+                      Manage API keys for programmatic access to your organization's data
+                    </CardDescription>
+                  </div>
+                  <Button 
+                    onClick={() => setCreateApiKeyDialogOpen(true)}
+                    data-testid="button-create-api-key"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create API Key
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLoadingApiKeys ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : apiKeys.length === 0 ? (
+                  <div className="text-center py-12 text-slate-500">
+                    <Key className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+                    <p>No API keys created yet</p>
+                    <p className="text-sm mt-2">Create an API key to enable programmatic access</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Key Prefix</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead>Last Used</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {apiKeys.map((key: any) => (
+                        <TableRow key={key.id} data-testid={`row-api-key-${key.id}`}>
+                          <TableCell className="font-medium" data-testid={`text-key-name-${key.id}`}>
+                            {key.name}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm" data-testid={`text-key-prefix-${key.id}`}>
+                            {key.keyPrefix}...
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-600" data-testid={`text-key-created-${key.id}`}>
+                            {new Date(key.createdAt).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-600" data-testid={`text-key-last-used-${key.id}`}>
+                            {key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleDateString() : 'Never'}
+                          </TableCell>
+                          <TableCell data-testid={`status-api-key-${key.id}`}>
+                            {key.isActive ? (
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                Active
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                Revoked
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {key.isActive && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRevokeKey(key.id, key.name)}
+                                data-testid={`button-revoke-key-${key.id}`}
+                              >
+                                <XCircle className="w-4 h-4 text-red-600" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Third-party Services Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Globe className="w-5 h-5 mr-2" />
+                  Third-Party Services
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  Connect external services to enhance your platform capabilities
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Alert className="mb-6">
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    These integrations are managed through Replit's secure integration system, which handles authentication and API key management automatically.
+                  </AlertDescription>
+                </Alert>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* SendGrid Card */}
+                  <div className="border rounded-lg p-6 relative">
+                    <div className="absolute top-4 right-4">
+                      <Badge variant="secondary">Coming Soon</Badge>
+                    </div>
+                    <div className="flex items-start space-x-4">
+                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <Mail className="w-6 h-6 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-lg">SendGrid</h3>
+                        <p className="text-sm text-slate-600 mt-1">
+                          Send transactional and marketing emails
+                        </p>
+                        <div className="mt-4">
+                          <Button variant="outline" size="sm" disabled data-testid="button-connect-sendgrid">
+                            Connect
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Twilio Card */}
+                  <div className="border rounded-lg p-6 relative">
+                    <div className="absolute top-4 right-4">
+                      <Badge variant="secondary">Coming Soon</Badge>
+                    </div>
+                    <div className="flex items-start space-x-4">
+                      <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                        <Phone className="w-6 h-6 text-red-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-lg">Twilio</h3>
+                        <p className="text-sm text-slate-600 mt-1">
+                          Send SMS notifications and alerts
+                        </p>
+                        <div className="mt-4">
+                          <Button variant="outline" size="sm" disabled data-testid="button-connect-twilio">
+                            Connect
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* Reports Tab */}
@@ -834,6 +1382,119 @@ export default function Account() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Create API Key Dialog */}
+      <Dialog open={createApiKeyDialogOpen} onOpenChange={setCreateApiKeyDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create API Key</DialogTitle>
+            <DialogDescription>
+              Generate a new API key for programmatic access to your organization's data.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="apiKeyName">API Key Name *</Label>
+              <Input
+                id="apiKeyName"
+                value={newApiKeyName}
+                onChange={(e) => setNewApiKeyName(e.target.value)}
+                placeholder="e.g., Production API, Mobile App"
+                data-testid="input-api-key-name"
+              />
+              <p className="text-sm text-slate-500 mt-1">
+                Give your API key a descriptive name to identify its purpose
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCreateApiKeyDialogOpen(false);
+                setNewApiKeyName("");
+              }}
+              data-testid="button-cancel-create-key"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (newApiKeyName.trim()) {
+                  createApiKeyMutation.mutate(newApiKeyName.trim());
+                } else {
+                  toast({
+                    title: "Validation Error",
+                    description: "Please enter a name for the API key",
+                    variant: "destructive",
+                  });
+                }
+              }}
+              disabled={createApiKeyMutation.isPending || !newApiKeyName.trim()}
+              data-testid="button-confirm-create-key"
+            >
+              {createApiKeyMutation.isPending ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Creating...
+                </>
+              ) : (
+                "Create API Key"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Show Generated API Key Dialog */}
+      <Dialog open={showApiKeyDialog} onOpenChange={setShowApiKeyDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>API Key Created Successfully</DialogTitle>
+            <DialogDescription>
+              Copy your API key now. For security reasons, you won't be able to see it again.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Store this key securely. It provides full access to your organization's data.
+              </AlertDescription>
+            </Alert>
+            <div>
+              <Label>Your API Key</Label>
+              <div className="flex items-center space-x-2 mt-2">
+                <Input
+                  value={generatedApiKey || ""}
+                  readOnly
+                  className="font-mono text-sm"
+                  data-testid="text-generated-api-key"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleCopyApiKey}
+                  data-testid="button-copy-api-key"
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                setShowApiKeyDialog(false);
+                setGeneratedApiKey(null);
+              }}
+              data-testid="button-close-api-key-dialog"
+            >
+              I've Saved My Key
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
