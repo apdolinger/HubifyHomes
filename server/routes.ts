@@ -2277,6 +2277,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/communities/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid community ID' });
+      }
+
+      const community = await storage.getCommunity(id);
+      if (!community) {
+        return res.status(404).json({ message: 'Community not found' });
+      }
+
+      res.json(community);
+    } catch (error) {
+      console.error("Error fetching community:", error);
+      res.status(500).json({ message: "Failed to fetch community" });
+    }
+  });
+
+  app.get("/api/communities/:id/properties", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid community ID' });
+      }
+
+      // Get all properties filtered by community ID
+      const allProperties = await storage.getProperties();
+      const communityProperties = allProperties.filter((p: any) => p.communityId === id);
+      
+      res.json(communityProperties);
+    } catch (error) {
+      console.error("Error fetching community properties:", error);
+      res.status(500).json({ message: "Failed to fetch properties" });
+    }
+  });
+
   // Super Admin: Get all communities across all organizations  
   app.get("/api/super-admin/communities-report", isAuthenticated, isSuperAdmin, requireMFA, requireAllowedIP, async (req, res) => {
     try {
