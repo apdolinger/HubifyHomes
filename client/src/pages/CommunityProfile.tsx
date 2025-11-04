@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -6,6 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { 
   Building, 
   MapPin, 
@@ -18,12 +24,16 @@ import {
   XCircle
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { insertCommunitySchema, type InsertCommunity } from "@shared/schema";
 
 export default function CommunityProfile() {
   const { id } = useParams();
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const { data: community, isLoading } = useQuery({
     queryKey: [`/api/communities/${id}`],
@@ -39,6 +49,96 @@ export default function CommunityProfile() {
     queryKey: [`/api/communities/${id}/documents`],
     enabled: !!id,
   });
+
+  const form = useForm<InsertCommunity>({
+    resolver: zodResolver(insertCommunitySchema),
+    defaultValues: {
+      name: "",
+      address1: "",
+      address2: "",
+      city: "",
+      state: "",
+      zip: "",
+      imageUrl: "",
+      managerId: null,
+      hoaPresidentId: null,
+      isActive: true,
+      notes: "",
+      gateCode: "",
+      propertyManagerName: "",
+      emergencyContact: "",
+      hoaMailingAddress: "",
+      rentalRestrictions: "",
+      petPolicy: "",
+      parkingRules: "",
+      noiseRestrictions: "",
+      vendorAccessProcedures: "",
+      trashRecyclingPickup: "",
+      bulkTrash: "",
+      landscapeMaintenance: "",
+      communityEvents: "",
+    },
+  });
+
+  // Update mutation
+  const updateMutation = useMutation({
+    mutationFn: async (data: InsertCommunity) => {
+      return apiRequest("PATCH", `/api/communities/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/communities/${id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/communities"] });
+      toast({
+        title: "Success",
+        description: "Community updated successfully",
+      });
+      setIsEditModalOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update community",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Populate form when editing
+  const handleEdit = () => {
+    if (community) {
+      form.reset({
+        name: community.name || "",
+        address1: community.address1 || "",
+        address2: community.address2 || "",
+        city: community.city || "",
+        state: community.state || "",
+        zip: community.zip || "",
+        imageUrl: community.imageUrl || "",
+        managerId: community.managerId || null,
+        hoaPresidentId: community.hoaPresidentId || null,
+        isActive: community.isActive ?? true,
+        notes: community.notes || "",
+        gateCode: community.gateCode || "",
+        propertyManagerName: community.propertyManagerName || "",
+        emergencyContact: community.emergencyContact || "",
+        hoaMailingAddress: community.hoaMailingAddress || "",
+        rentalRestrictions: community.rentalRestrictions || "",
+        petPolicy: community.petPolicy || "",
+        parkingRules: community.parkingRules || "",
+        noiseRestrictions: community.noiseRestrictions || "",
+        vendorAccessProcedures: community.vendorAccessProcedures || "",
+        trashRecyclingPickup: community.trashRecyclingPickup || "",
+        bulkTrash: community.bulkTrash || "",
+        landscapeMaintenance: community.landscapeMaintenance || "",
+        communityEvents: community.communityEvents || "",
+      });
+      setIsEditModalOpen(true);
+    }
+  };
+
+  const onSubmit = (data: InsertCommunity) => {
+    updateMutation.mutate(data);
+  };
 
   if (isLoading) {
     return (
@@ -88,7 +188,7 @@ export default function CommunityProfile() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" data-testid="button-edit-community">
+            <Button variant="outline" onClick={handleEdit} data-testid="button-edit-community">
               <Edit className="w-4 h-4 mr-2" />
               Edit
             </Button>
@@ -407,6 +507,366 @@ export default function CommunityProfile() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Edit Community Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Community</DialogTitle>
+            <DialogDescription>
+              Update community information, rules, and schedules
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <Tabs defaultValue="basic" className="w-full">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="basic">Basic Info</TabsTrigger>
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="rules">Rules</TabsTrigger>
+                  <TabsTrigger value="schedule">Schedule</TabsTrigger>
+                </TabsList>
+
+                {/* Basic Info Tab */}
+                <TabsContent value="basic" className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Community Name *</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-community-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="address1"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Address Line 1</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="address2"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Address Line 2</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="city"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>City</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="state"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>State</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="zip"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>ZIP Code</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="isActive"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Active Status</FormLabel>
+                          <p className="text-sm text-slate-500">
+                            Is this community currently active?
+                          </p>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-is-active"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Notes</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} value={field.value || ""} rows={3} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+
+                {/* Overview Tab */}
+                <TabsContent value="overview" className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="gateCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Gate Code</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ""} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="propertyManagerName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Property Manager Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ""} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="emergencyContact"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Emergency Contact</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ""} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="hoaMailingAddress"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>HOA Mailing Address</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} value={field.value || ""} rows={3} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+
+                {/* Rules Tab */}
+                <TabsContent value="rules" className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="rentalRestrictions"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Rental Restrictions</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} value={field.value || ""} rows={3} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="petPolicy"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Pet Policy</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} value={field.value || ""} rows={3} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="parkingRules"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Parking Rules</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} value={field.value || ""} rows={3} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="noiseRestrictions"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Noise Restrictions</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} value={field.value || ""} rows={3} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="vendorAccessProcedures"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Vendor Access Procedures</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} value={field.value || ""} rows={3} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+
+                {/* Schedule Tab */}
+                <TabsContent value="schedule" className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="trashRecyclingPickup"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Trash & Recycling Pickup</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ""} placeholder="e.g., Monday/Thursday" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="bulkTrash"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Bulk Trash Pickup</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ""} placeholder="e.g., First Monday of month" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="landscapeMaintenance"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Landscape Maintenance</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ""} placeholder="e.g., Tuesdays" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="communityEvents"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Community Events</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} value={field.value || ""} rows={4} placeholder="List upcoming community events..." />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+              </Tabs>
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsEditModalOpen(false)}
+                  data-testid="button-cancel-edit"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={updateMutation.isPending}
+                  data-testid="button-save-community"
+                >
+                  {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
