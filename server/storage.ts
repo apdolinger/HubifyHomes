@@ -78,6 +78,7 @@ import {
   scheduledEmails,
   customFields,
   paymentCollectionTokens,
+  apiKeys,
   type User,
   type UpsertUser,
   type Team,
@@ -228,6 +229,8 @@ import {
   type InsertPaymentCollectionToken,
   type ManagementNote,
   type InsertManagementNote,
+  type ApiKey,
+  type InsertApiKey,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, like, count, sql, inArray, isNotNull } from "drizzle-orm";
@@ -1207,6 +1210,13 @@ export class DatabaseStorage implements IStorage {
     return client;
   }
 
+  // API key operations
+  getApiKeys(orgId: string): Promise<ApiKey[]>;
+  createApiKey(name: string, orgId: string): Promise<{ apiKey: ApiKey; plainKey: string }>;
+  revokeApiKey(id: number, orgId: string): Promise<void>;
+  verifyApiKey(key: string): Promise<{ orgId: string; keyId: number } | null>;
+  updateApiKeyLastUsed(id: number): Promise<void>;
+  
   // Payment collection token operations
   async createPaymentCollectionToken(
     clientId: string,
@@ -1246,6 +1256,70 @@ export class DatabaseStorage implements IStorage {
         usedAt: new Date(),
       })
       .where(eq(paymentCollectionTokens.id, tokenId));
+  }
+
+  async getApiKeys(orgId: string): Promise<ApiKey[]> {
+    return await db
+      .select()
+      .from(apiKeys)
+      .where(eq(apiKeys.orgId, orgId))
+      .orderBy(desc(apiKeys.createdAt));
+  }
+
+  async createApiKey(name: string, orgId: string): Promise<{ apiKey: ApiKey; plainKey: string }> {
+    const bcrypt = await import("bcryptjs");
+    const plainKey = `hbfy_${nanoid(32)}`;
+    const keyPrefix = plainKey.substring(0, 13); // "hbfy_" + first 8 chars
+    const hashedKey = await bcrypt.hash(plainKey, 10);
+
+    const [apiKey] = await db
+      .insert(apiKeys)
+      .values({
+        orgId,
+        name,
+        keyPrefix,
+        hashedKey,
+        isActive: true,
+      })
+      .returning();
+
+    return { apiKey, plainKey };
+  }
+
+  async revokeApiKey(id: number, orgId: string): Promise<void> {
+    await db
+      .update(apiKeys)
+      .set({ isActive: false })
+      .where(and(eq(apiKeys.id, id), eq(apiKeys.orgId, orgId)));
+  }
+
+  async verifyApiKey(key: string): Promise<{ orgId: string; keyId: number } | null> {
+    const bcrypt = await import("bcryptjs");
+    const keyPrefix = key.substring(0, 13);
+    
+    const keys = await db
+      .select()
+      .from(apiKeys)
+      .where(and(
+        eq(apiKeys.keyPrefix, keyPrefix),
+        eq(apiKeys.isActive, true)
+      ));
+
+    for (const apiKey of keys) {
+      const isValid = await bcrypt.compare(key, apiKey.hashedKey);
+      if (isValid) {
+        return { orgId: apiKey.orgId, keyId: apiKey.id };
+      }
+    }
+
+    return null;
+  }
+
+  async updateApiKeyLastUsed(id: number): Promise<void> {
+    await db
+      .update(apiKeys)
+      .set({ lastUsedAt: new Date() })
+      .where(eq(apiKeys.id, id));
   }
 
   async updateClient(id: string, clientData: Partial<InsertClient>): Promise<Client> {

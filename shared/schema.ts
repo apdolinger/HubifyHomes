@@ -63,6 +63,21 @@ export const orgs = pgTable("orgs", {
   defaultHourlyRateCents: integer("default_hourly_rate_cents"), // Organization-level default hourly rate (prepopulates client billing settings)
   invoiceTemplateId: varchar("invoice_template_id").$type<"modern"|"minimal"|"classic"|"compact"|"bold">().default("modern"), // Selected invoice template
   invoiceTemplatePrefs: jsonb("invoice_template_prefs").$type<Record<string, any>>().default({}), // Template-specific customization overrides
+  
+  // Company Profile fields
+  address1: varchar("address_1"),
+  address2: varchar("address_2"),
+  city: varchar("city"),
+  state: varchar("state"),
+  zip: varchar("zip"),
+  country: varchar("country").default("USA"),
+  phone: varchar("phone"),
+  website: varchar("website"),
+  timezone: varchar("timezone").default("America/New_York"),
+  currency: varchar("currency").default("USD"),
+  primaryContact: varchar("primary_contact"), // Name of primary contact person
+  industry: varchar("industry"), // Type of business (e.g., "Property Management", "HOA Management")
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -2970,3 +2985,23 @@ export const updateCustomFieldSchema = insertCustomFieldSchema.omit({
   orgId: true,
   fieldKey: true,
 }).partial();
+
+// API Keys - For custom Hubify API access
+export const apiKeys = pgTable("api_keys", {
+  id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  name: varchar("name").notNull(), // User-friendly name (e.g., "Production API", "Mobile App")
+  keyPrefix: varchar("key_prefix").notNull(), // First 8 chars shown to user (e.g., "hbfy_12ab")
+  hashedKey: varchar("hashed_key").notNull(), // Bcrypt hash of full API key
+  lastUsedAt: timestamp("last_used_at"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertApiKeySchema = createInsertSchema(apiKeys).omit({
+  id: true,
+  createdAt: true,
+  lastUsedAt: true,
+});
+export type InsertApiKey = z.infer<typeof insertApiKeySchema>;
+export type ApiKey = typeof apiKeys.$inferSelect;

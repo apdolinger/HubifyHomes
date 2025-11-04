@@ -7746,6 +7746,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updates.cancelledTaskRetentionDays = days;
       }
       
+      // Allow updating company profile fields
+      const profileFields = ['address1', 'address2', 'city', 'state', 'zip', 'country', 
+        'phone', 'website', 'timezone', 'currency', 'primaryContact', 'industry'];
+      profileFields.forEach(field => {
+        if (req.body.hasOwnProperty(field)) {
+          updates[field] = req.body[field];
+        }
+      });
+      
       const updatedOrg = await storage.updateOrg(orgId, updates);
 
       res.json(updatedOrg);
@@ -7809,6 +7818,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating organization branding:", error);
       res.status(500).json({ message: "Failed to update organization branding" });
+    }
+  });
+
+  // API Key routes
+  app.get("/api/orgs/:orgId/api-keys", isAuthenticated, async (req, res) => {
+    try {
+      const orgId = req.params.orgId;
+      const userOrgId = req.user?.claims?.orgId;
+      const userRole = req.user?.claims?.role;
+      
+      if (userOrgId !== orgId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      if (userRole !== "admin") {
+        return res.status(403).json({ message: "Only admins can manage API keys" });
+      }
+      
+      const apiKeys = await storage.getApiKeys(orgId);
+      res.json(apiKeys);
+    } catch (error) {
+      console.error("Error fetching API keys:", error);
+      res.status(500).json({ message: "Failed to fetch API keys" });
+    }
+  });
+
+  app.post("/api/orgs/:orgId/api-keys", isAuthenticated, async (req, res) => {
+    try {
+      const orgId = req.params.orgId;
+      const userOrgId = req.user?.claims?.orgId;
+      const userRole = req.user?.claims?.role;
+      
+      if (userOrgId !== orgId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      if (userRole !== "admin") {
+        return res.status(403).json({ message: "Only admins can create API keys" });
+      }
+      
+      const { name } = req.body;
+      
+      if (!name || typeof name !== 'string') {
+        return res.status(400).json({ message: "Name is required" });
+      }
+      
+      const { apiKey, plainKey } = await storage.createApiKey(name, orgId);
+      
+      // Return the plain key only once (it will never be shown again)
+      res.json({ ...apiKey, plainKey });
+    } catch (error) {
+      console.error("Error creating API key:", error);
+      res.status(500).json({ message: "Failed to create API key" });
+    }
+  });
+
+  app.delete("/api/orgs/:orgId/api-keys/:keyId", isAuthenticated, async (req, res) => {
+    try {
+      const orgId = req.params.orgId;
+      const keyId = parseInt(req.params.keyId);
+      const userOrgId = req.user?.claims?.orgId;
+      const userRole = req.user?.claims?.role;
+      
+      if (userOrgId !== orgId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      if (userRole !== "admin") {
+        return res.status(403).json({ message: "Only admins can revoke API keys" });
+      }
+      
+      await storage.revokeApiKey(keyId, orgId);
+      res.json({ message: "API key revoked successfully" });
+    } catch (error) {
+      console.error("Error revoking API key:", error);
+      res.status(500).json({ message: "Failed to revoke API key" });
     }
   });
 
