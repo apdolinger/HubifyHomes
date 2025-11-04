@@ -76,6 +76,7 @@ type OrgFormData = z.infer<typeof orgFormSchema>;
 export default function Account() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("account-info");
   const [isEditingInfo, setIsEditingInfo] = useState(false);
   const [createApiKeyDialogOpen, setCreateApiKeyDialogOpen] = useState(false);
@@ -108,8 +109,8 @@ export default function Account() {
 
   // Fetch API keys
   const { data: apiKeys = [], isLoading: isLoadingApiKeys } = useQuery<any[]>({
-    queryKey: ['/api/orgs', orgId, 'api-keys'],
-    enabled: !!orgId && isAuthenticated && activeTab === 'integrations',
+    queryKey: [`/api/orgs/${orgId}/api-keys`],
+    enabled: !!orgId && isAuthenticated,
   });
 
   // Form for organization info
@@ -199,7 +200,7 @@ export default function Account() {
       return response.json();
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/orgs', orgId, 'api-keys'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}/api-keys`] });
       setGeneratedApiKey(data.plainKey);
       setShowApiKeyDialog(true);
       setCreateApiKeyDialogOpen(false);
@@ -227,7 +228,7 @@ export default function Account() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/orgs', orgId, 'api-keys'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}/api-keys`] });
       toast({
         title: "Success",
         description: "API key revoked successfully",
