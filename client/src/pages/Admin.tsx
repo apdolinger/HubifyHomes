@@ -58,9 +58,14 @@ import {
   X as XIcon,
   ArrowUp,
   ArrowDown,
-  ArrowUpDown
+  ArrowUpDown,
+  Check,
+  ChevronsUpDown
 } from "lucide-react";
 import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 // Supply Settings Manager Component
 function SupplySettingsManager({ orgId }: { orgId: string }) {
@@ -1167,27 +1172,76 @@ export default function Admin() {
     document.body.removeChild(link);
   };
 
-  // PropertySelector component
-  const PropertySelector = ({ onPropertyChange }: { onPropertyChange: (property: any) => void }) => {
+  // PropertySelector component - Searchable Combobox
+  const PropertySelector = ({ onPropertyChange, selectedProperty }: { onPropertyChange: (property: any) => void, selectedProperty: any }) => {
+    const [open, setOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
+
+    const filteredProperties = properties.filter((property: any) => {
+      const searchLower = searchQuery.toLowerCase();
+      const name = (property.name || '').toLowerCase();
+      const address = (property.address1 || '').toLowerCase();
+      const city = (property.city || '').toLowerCase();
+      return name.includes(searchLower) || address.includes(searchLower) || city.includes(searchLower);
+    });
+
     return (
-      <Select onValueChange={(value) => {
-        const property = properties.find(p => p.id.toString() === value);
-        onPropertyChange(property);
-      }}>
-        <SelectTrigger>
-          <SelectValue placeholder="Choose a property..." />
-        </SelectTrigger>
-        <SelectContent>
-          {properties.map((property: any) => (
-            <SelectItem key={property.id} value={property.id.toString()}>
-              <div className="flex flex-col">
-                <span className="font-medium">{property.name || 'Unnamed Property'}</span>
-                <span className="text-sm text-slate-500">{property.address || 'No address'}</span>
-              </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between"
+            data-testid="property-selector-trigger"
+          >
+            {selectedProperty
+              ? selectedProperty.name || 'Unnamed Property'
+              : "Choose a property..."}
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[500px] p-0">
+          <Command shouldFilter={false}>
+            <CommandInput 
+              placeholder="Search properties..." 
+              value={searchQuery}
+              onValueChange={setSearchQuery}
+              data-testid="property-search-input"
+            />
+            <CommandList>
+              <CommandEmpty>No property found.</CommandEmpty>
+              <CommandGroup>
+                {filteredProperties.map((property: any) => (
+                  <CommandItem
+                    key={property.id}
+                    value={`${property.name || 'Unnamed Property'} ${property.address1 || ''}`}
+                    onSelect={() => {
+                      onPropertyChange(property);
+                      setOpen(false);
+                      setSearchQuery("");
+                    }}
+                    data-testid={`property-option-${property.id}`}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        selectedProperty?.id === property.id ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    <div className="flex flex-col">
+                      <span className="font-medium">{property.name || 'Unnamed Property'}</span>
+                      <span className="text-sm text-slate-500">
+                        {[property.address1, property.city, property.state].filter(Boolean).join(', ') || 'No address'}
+                      </span>
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
     );
   };
 
@@ -2003,7 +2057,7 @@ export default function Admin() {
                 <CardContent className="space-y-4">
                   <div>
                     <Label htmlFor="property-select">Select Property</Label>
-                    <PropertySelector onPropertyChange={setSelectedProperty} />
+                    <PropertySelector onPropertyChange={setSelectedProperty} selectedProperty={selectedProperty} />
                   </div>
 
                   {selectedProperty && (
