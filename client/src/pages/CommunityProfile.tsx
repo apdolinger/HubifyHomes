@@ -59,6 +59,9 @@ export default function CommunityProfile() {
       city: "",
       state: "",
       zip: "",
+      phone: "",
+      email: "",
+      website: "",
       imageUrl: "",
       managerId: null,
       hoaPresidentId: null,
@@ -67,6 +70,8 @@ export default function CommunityProfile() {
       gateCode: "",
       propertyManagerName: "",
       emergencyContact: "",
+      emergencyContactPhone: "",
+      emergencyContactEmail: "",
       hoaMailingAddress: "",
       rentalRestrictions: "",
       petPolicy: "",
@@ -113,6 +118,9 @@ export default function CommunityProfile() {
         city: community.city || "",
         state: community.state || "",
         zip: community.zip || "",
+        phone: community.phone || "",
+        email: community.email || "",
+        website: community.website || "",
         imageUrl: community.imageUrl || "",
         managerId: community.managerId || null,
         hoaPresidentId: community.hoaPresidentId || null,
@@ -121,6 +129,8 @@ export default function CommunityProfile() {
         gateCode: community.gateCode || "",
         propertyManagerName: community.propertyManagerName || "",
         emergencyContact: community.emergencyContact || "",
+        emergencyContactPhone: community.emergencyContactPhone || "",
+        emergencyContactEmail: community.emergencyContactEmail || "",
         hoaMailingAddress: community.hoaMailingAddress || "",
         rentalRestrictions: community.rentalRestrictions || "",
         petPolicy: community.petPolicy || "",
@@ -294,6 +304,68 @@ export default function CommunityProfile() {
                             .join(', ')}
                         </p>
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Contact Information */}
+                {(community.phone || community.email || community.website) && (
+                  <div>
+                    <Label className="text-sm font-medium text-slate-600">Contact Information</Label>
+                    <div className="mt-2 space-y-1">
+                      {community.phone && (
+                        <p className="text-sm" data-testid="text-phone">
+                          <span className="text-slate-500">Phone:</span> {community.phone}
+                        </p>
+                      )}
+                      {community.email && (
+                        <p className="text-sm" data-testid="text-email">
+                          <span className="text-slate-500">Email:</span>{' '}
+                          <a href={`mailto:${community.email}`} className="text-blue-600 hover:underline">
+                            {community.email}
+                          </a>
+                        </p>
+                      )}
+                      {community.website && (
+                        <p className="text-sm" data-testid="text-website">
+                          <span className="text-slate-500">Website:</span>{' '}
+                          <a 
+                            href={community.website} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            {community.website}
+                          </a>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Emergency Contact */}
+                {(community.emergencyContact || community.emergencyContactPhone || community.emergencyContactEmail) && (
+                  <div>
+                    <Label className="text-sm font-medium text-slate-600">Emergency Contact</Label>
+                    <div className="mt-2 space-y-1">
+                      {community.emergencyContact && (
+                        <p className="text-sm" data-testid="text-emergency-contact">
+                          <span className="text-slate-500">Name:</span> {community.emergencyContact}
+                        </p>
+                      )}
+                      {community.emergencyContactPhone && (
+                        <p className="text-sm" data-testid="text-emergency-phone">
+                          <span className="text-slate-500">Phone:</span> {community.emergencyContactPhone}
+                        </p>
+                      )}
+                      {community.emergencyContactEmail && (
+                        <p className="text-sm" data-testid="text-emergency-email">
+                          <span className="text-slate-500">Email:</span>{' '}
+                          <a href={`mailto:${community.emergencyContactEmail}`} className="text-blue-600 hover:underline">
+                            {community.emergencyContactEmail}
+                          </a>
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -617,6 +689,50 @@ export default function CommunityProfile() {
                     />
                   </div>
 
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone Number</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ""} placeholder="(555) 123-4567" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ""} type="email" placeholder="info@community.com" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="website"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Website</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ""} placeholder="https://www.community.com" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
                   <FormField
                     control={form.control}
                     name="isActive"
@@ -689,14 +805,44 @@ export default function CommunityProfile() {
                     name="emergencyContact"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Emergency Contact</FormLabel>
+                        <FormLabel>Emergency Contact Name</FormLabel>
                         <FormControl>
-                          <Input {...field} value={field.value || ""} />
+                          <Input {...field} value={field.value || ""} placeholder="John Doe" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="emergencyContactPhone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Emergency Contact Phone</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ""} placeholder="(555) 123-4567" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="emergencyContactEmail"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Emergency Contact Email</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ""} type="email" placeholder="emergency@community.com" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
                   <FormField
                     control={form.control}

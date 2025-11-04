@@ -650,6 +650,9 @@ export const communities = pgTable("communities", {
   city: varchar("city"),
   state: varchar("state"),
   zip: varchar("zip"),
+  phone: varchar("phone"),
+  email: varchar("email"),
+  website: varchar("website"),
   imageUrl: varchar("image_url"),
   managerId: varchar("manager_id").references(() => users.id),
   hoaPresidentId: varchar("hoa_president_id").references(() => users.id),
@@ -659,6 +662,8 @@ export const communities = pgTable("communities", {
   gateCode: varchar("gate_code"),
   propertyManagerName: varchar("property_manager_name"),
   emergencyContact: varchar("emergency_contact"),
+  emergencyContactPhone: varchar("emergency_contact_phone"),
+  emergencyContactEmail: varchar("emergency_contact_email"),
   hoaMailingAddress: text("hoa_mailing_address"),
   // Rules section
   rentalRestrictions: text("rental_restrictions"),
