@@ -2210,7 +2210,7 @@ export default function Admin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-10">
+        <TabsList className="grid w-full grid-cols-11">
           <TabsTrigger value="forms" className="flex items-center gap-2">
             <FileText className="w-4 h-4" />
             Forms
@@ -2222,6 +2222,10 @@ export default function Admin() {
           <TabsTrigger value="billing" className="flex items-center gap-2">
             <DollarSign className="w-4 h-4" />
             Billing
+          </TabsTrigger>
+          <TabsTrigger value="billing-settings" className="flex items-center gap-2">
+            <Settings className="w-4 h-4" />
+            Billing Settings
           </TabsTrigger>
           <TabsTrigger value="communities" className="flex items-center gap-2">
             <Building className="w-4 h-4" />
@@ -2703,6 +2707,21 @@ export default function Admin() {
           <Billing embedded={true} />
         </TabsContent>
 
+        {/* Billing Settings Tab */}
+        <TabsContent value="billing-settings" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Billing Settings</CardTitle>
+              <CardDescription>
+                Configure organization-wide default values for client billing and invoices
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {user?.orgId && <BillingSettingsManager orgId={user.orgId} />}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Communities Tab */}
         <TabsContent value="communities" className="space-y-6">
           <div className="flex items-center justify-between">
@@ -2888,15 +2907,12 @@ export default function Admin() {
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="custom-fields" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="custom-fields" data-testid="tab-custom-fields">
                     Custom Fields
                   </TabsTrigger>
                   <TabsTrigger value="supply-settings" data-testid="tab-supply-settings">
                     Supply Settings
-                  </TabsTrigger>
-                  <TabsTrigger value="billing-settings" data-testid="tab-billing-settings">
-                    Billing Settings
                   </TabsTrigger>
                 </TabsList>
                 
@@ -2913,18 +2929,6 @@ export default function Admin() {
                       </p>
                     </div>
                     {user?.orgId && <SupplySettingsManager orgId={user.orgId} />}
-                  </div>
-                </TabsContent>
-                
-                <TabsContent value="billing-settings" className="space-y-6 mt-6">
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-lg font-semibold">Default Billing Settings</h3>
-                      <p className="text-sm text-slate-600">
-                        Configure organization-wide default values for client billing
-                      </p>
-                    </div>
-                    {user?.orgId && <BillingSettingsManager orgId={user.orgId} />}
                   </div>
                 </TabsContent>
               </Tabs>

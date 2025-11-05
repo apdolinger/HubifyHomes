@@ -83,6 +83,7 @@ export default function Account() {
   const [newApiKeyName, setNewApiKeyName] = useState("");
   const [generatedApiKey, setGeneratedApiKey] = useState<string | null>(null);
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
+  const [billingSettingsDialogOpen, setBillingSettingsDialogOpen] = useState(false);
 
   const orgId = (user as any)?.orgId;
 
@@ -706,6 +707,18 @@ export default function Account() {
                           Change Billing Cycle
                         </Button>
                       </div>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-slate-900 mb-3">Default Billing Settings</h4>
+                      <Button 
+                        className="w-full justify-start" 
+                        variant="outline"
+                        onClick={() => setBillingSettingsDialogOpen(true)}
+                        data-testid="button-billing-settings"
+                      >
+                        <Settings className="w-4 h-4 mr-2" />
+                        Configure Billing & Invoices
+                      </Button>
                     </div>
                     <div>
                       <h4 className="font-medium text-slate-900 mb-3">Billing History</h4>
@@ -1447,6 +1460,21 @@ export default function Account() {
         </DialogContent>
       </Dialog>
 
+      {/* Billing Settings Dialog */}
+      <Dialog open={billingSettingsDialogOpen} onOpenChange={setBillingSettingsDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Default Billing & Invoice Settings</DialogTitle>
+            <DialogDescription>
+              Configure organization-wide default values for client billing and invoice templates
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            {orgId && <BillingSettingsForm orgId={orgId} onClose={() => setBillingSettingsDialogOpen(false)} />}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Show Generated API Key Dialog */}
       <Dialog open={showApiKeyDialog} onOpenChange={setShowApiKeyDialog}>
         <DialogContent>
@@ -1925,5 +1953,178 @@ export function CustomFieldsSettings() {
         </DialogContent>
       </Dialog>
     </Card>
+  );
+}
+
+// Billing Settings Form Component
+function BillingSettingsForm({ orgId, onClose }: { orgId: string; onClose: () => void }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [hourlyRate, setHourlyRate] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("modern");
+
+  const { data: org, isLoading } = useQuery<any>({
+    queryKey: [`/api/orgs/${orgId}`],
+    enabled: !!orgId,
+  });
+
+  // Set initial values from org data
+  useEffect(() => {
+    if (org) {
+      if (org.defaultHourlyRateCents) {
+        setHourlyRate((org.defaultHourlyRateCents / 100).toFixed(2));
+      }
+      if (org.invoiceTemplateId) {
+        setSelectedTemplate(org.invoiceTemplateId);
+      }
+    }
+  }, [org]);
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: { defaultHourlyRateCents?: number | null; invoiceTemplateId?: string }) => {
+      return apiRequest("PATCH", `/api/orgs/${orgId}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/orgs`, orgId] });
+      toast({
+        title: "Settings updated",
+        description: "Billing settings have been updated successfully.",
+      });
+      onClose();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update settings",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSave = () => {
+    const rate = hourlyRate.trim() ? parseFloat(hourlyRate) : null;
+    if (rate !== null && (isNaN(rate) || rate < 0)) {
+      toast({
+        title: "Invalid hourly rate",
+        description: "Please enter a valid hourly rate (or leave empty to clear)",
+        variant: "destructive",
+      });
+      return;
+    }
+    updateMutation.mutate({
+      defaultHourlyRateCents: rate !== null ? Math.round(rate * 100) : null,
+      invoiceTemplateId: selectedTemplate,
+    });
+  };
+
+  if (isLoading) {
+    return <div className="text-sm text-slate-500">Loading settings...</div>;
+  }
+
+  const templates = [
+    { id: 'modern', name: 'Modern', description: 'Clean and contemporary design with bold typography' },
+    { id: 'minimal', name: 'Minimal', description: 'Simple and straightforward layout with essential details' },
+    { id: 'classic', name: 'Classic', description: 'Traditional invoice format with professional styling' },
+    { id: 'compact', name: 'Compact', description: 'Space-efficient design for detailed invoices' },
+    { id: 'bold', name: 'Bold', description: 'Eye-catching design with prominent branding' }
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Default Hourly Rate */}
+      <div>
+        <Label htmlFor="hourlyRate">Default Hourly Rate</Label>
+        <p className="text-sm text-slate-600 mb-3">
+          Set a default hourly rate that will auto-populate when enabling hourly billing for new clients. 
+          Individual clients can override this rate.
+        </p>
+        <div className="flex gap-2 max-w-md">
+          <div className="relative flex-1">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+            <Input
+              id="hourlyRate"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              value={hourlyRate}
+              onChange={(e) => setHourlyRate(e.target.value)}
+              className="pl-7"
+              data-testid="input-billing-hourly-rate"
+            />
+          </div>
+          <span className="flex items-center text-sm text-slate-500">/hour</span>
+        </div>
+        {org?.defaultHourlyRateCents && (
+          <p className="text-sm text-slate-500 mt-2">
+            Current default: ${(org.defaultHourlyRateCents / 100).toFixed(2)}/hour
+          </p>
+        )}
+      </div>
+
+      {/* Invoice Template Selector */}
+      <div className="pt-4 border-t">
+        <Label>Invoice Template</Label>
+        <p className="text-sm text-slate-600 mb-4">
+          Choose the default template for all client invoices
+        </p>
+        <div className="grid grid-cols-1 gap-3">
+          {templates.map((template) => (
+            <div
+              key={template.id}
+              onClick={() => setSelectedTemplate(template.id)}
+              className={`
+                p-4 rounded-lg border-2 cursor-pointer transition-all
+                ${selectedTemplate === template.id 
+                  ? 'border-blue-500 bg-blue-50' 
+                  : 'border-slate-200 hover:border-slate-300 bg-white'
+                }
+              `}
+              data-testid={`template-option-${template.id}`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-medium text-slate-900">{template.name}</h4>
+                  <p className="text-sm text-slate-600 mt-1">{template.description}</p>
+                </div>
+                {selectedTemplate === template.id && (
+                  <CheckCircle className="w-5 h-5 text-blue-500" />
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex justify-end gap-2 pt-4 border-t">
+        <Button
+          variant="outline"
+          onClick={onClose}
+          disabled={updateMutation.isPending}
+          data-testid="button-cancel-billing-settings"
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleSave}
+          disabled={updateMutation.isPending}
+          data-testid="button-save-billing-settings"
+        >
+          {updateMutation.isPending ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4 mr-2" />
+              Save Settings
+            </>
+          )}
+        </Button>
+      </div>
+    </div>
   );
 }
