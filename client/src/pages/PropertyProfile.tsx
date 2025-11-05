@@ -5194,115 +5194,154 @@ export default function PropertyProfile() {
                         </div>
                       </TabsContent>
 
-                      <TabsContent value="documents" className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <Card>
-                            <CardHeader>
-                              <CardTitle className="text-lg">Available Documents</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                              <p className="text-slate-600 mb-4">Community documents and resources</p>
-                              {documentsLoading ? (
-                                <div className="text-center py-8 text-slate-500">Loading documents...</div>
-                              ) : (
-                                <div className="space-y-2">
-                                  {["hoa_declarations", "ccrs_bylaws", "community_faq", "welcome_packet"].map((docType) => {
-                                    const docs = (communityDocuments as any[]).filter((d: any) => d.documentType === docType);
-                                    const communityWideDoc = docs.find((d: any) => d.classification === "community-wide" && !d.propertyId);
-                                    const residentialDocs = docs.filter((d: any) => d.classification === "residential-based" || d.propertyId);
-
-                                    const displayNames: Record<string, string> = {
-                                      hoa_declarations: "HOA Declarations",
-                                      ccrs_bylaws: "CC&Rs & Bylaws",
-                                      community_faq: "Community FAQ",
-                                      welcome_packet: "Welcome Packet",
-                                    };
-
-                                    return (
-                                      <div key={docType} className="border border-slate-200 rounded-lg">
-                                        <div className="flex items-center justify-between p-3">
-                                          <span className="text-slate-700 font-medium">{displayNames[docType]}</span>
-                                          {communityWideDoc ? (
-                                            <div className="flex items-center gap-2">
-                                              <a
-                                                href={`/api/download-document?path=${encodeURIComponent(communityWideDoc.fileUrl)}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-blue-600 hover:text-blue-700 text-sm flex items-center gap-1"
-                                                data-testid={`link-download-${docType}`}
-                                              >
-                                                <FileText className="w-4 h-4" />
-                                                {communityWideDoc.fileName}
-                                              </a>
-                                              {user?.role === "admin" && (
-                                                <Button
-                                                  variant="ghost"
-                                                  size="sm"
-                                                  onClick={() => deleteDocumentMutation.mutate(communityWideDoc.id)}
-                                                  data-testid={`button-delete-${docType}`}
-                                                >
-                                                  <Trash2 className="w-4 h-4 text-red-600" />
-                                                </Button>
-                                              )}
-                                            </div>
-                                          ) : (
-                                            <span className="text-slate-500 text-sm">Not available</span>
-                                          )}
+                      <TabsContent value="documents" className="space-y-6">
+                        {/* Community Documents (Inherited) */}
+                        <Card>
+                          <CardHeader>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                  <Building className="w-5 h-5 text-blue-600" />
+                                  Community Documents (Inherited)
+                                </CardTitle>
+                                <p className="text-sm text-slate-500 mt-1">Documents inherited from {community.name}</p>
+                              </div>
+                              <Badge variant="secondary" className="bg-blue-50 text-blue-700">Read-Only</Badge>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            {documentsLoading ? (
+                              <div className="text-center py-8 text-slate-500">Loading documents...</div>
+                            ) : (() => {
+                              const communityWideDocuments = (communityDocuments as any[]).filter(
+                                (d: any) => d.classification === "community-wide" && !d.propertyId
+                              );
+                              
+                              return communityWideDocuments.length > 0 ? (
+                                <div className="space-y-3">
+                                  {communityWideDocuments.map((doc: any) => (
+                                    <div key={doc.id} className="flex items-center justify-between p-4 border border-blue-100 bg-blue-50/50 rounded-lg hover:bg-blue-50 transition-colors">
+                                      <div className="flex items-center gap-3 flex-1">
+                                        <FileText className="w-5 h-5 text-blue-600" />
+                                        <div className="flex-1">
+                                          <a
+                                            href={`/api/download-document?path=${encodeURIComponent(doc.fileUrl)}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-700 hover:text-blue-800 font-medium hover:underline"
+                                            data-testid={`link-community-doc-${doc.id}`}
+                                          >
+                                            {doc.fileName}
+                                          </a>
+                                          <p className="text-xs text-slate-600 mt-0.5">
+                                            {doc.documentType?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                                          </p>
                                         </div>
-                                        {residentialDocs.length > 0 && (
-                                          <div className="border-t border-slate-200 px-3 py-2 bg-slate-50">
-                                            <p className="text-xs text-slate-600 mb-2">Property-specific documents:</p>
-                                            <div className="space-y-1">
-                                              {residentialDocs.map((doc: any) => (
-                                                <div key={doc.id} className="flex items-center justify-between text-sm">
-                                                  <a
-                                                    href={`/api/download-document?path=${encodeURIComponent(doc.fileUrl)}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                                                  >
-                                                    <FileText className="w-3 h-3" />
-                                                    {doc.fileName}
-                                                  </a>
-                                                  {user?.role === "admin" && (
-                                                    <Button
-                                                      variant="ghost"
-                                                      size="sm"
-                                                      onClick={() => deleteDocumentMutation.mutate(doc.id)}
-                                                    >
-                                                      <Trash2 className="w-3 h-3 text-red-600" />
-                                                    </Button>
-                                                  )}
-                                                </div>
-                                              ))}
-                                            </div>
-                                          </div>
-                                        )}
                                       </div>
-                                    );
-                                  })}
+                                      <Badge variant="outline" className="text-xs">Inherited</Badge>
+                                    </div>
+                                  ))}
                                 </div>
-                              )}
-                            </CardContent>
-                          </Card>
+                              ) : (
+                                <div className="text-center py-8">
+                                  <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                                  <p className="text-slate-500">No community-wide documents available</p>
+                                  <p className="text-xs text-slate-400 mt-1">Documents uploaded at the community level will appear here</p>
+                                </div>
+                              );
+                            })()}
+                          </CardContent>
+                        </Card>
 
-                          <Card>
-                            <CardHeader>
-                              <CardTitle className="text-lg">Document Upload</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <p className="text-slate-600 mb-4">Upload community documents for easy access</p>
+                        {/* Property-Specific Documents */}
+                        <Card>
+                          <CardHeader>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                  <Home className="w-5 h-5 text-green-600" />
+                                  Property-Specific Documents
+                                </CardTitle>
+                                <p className="text-sm text-slate-500 mt-1">Documents unique to this property</p>
+                              </div>
                               <Button 
                                 variant="outline"
+                                size="sm"
                                 onClick={() => setIsUploadDocumentDialogOpen(true)}
                                 data-testid="button-upload-documents"
                               >
                                 <Upload className="w-4 h-4 mr-2" />
-                                Upload Documents
+                                Upload Document
                               </Button>
-                            </CardContent>
-                          </Card>
-                        </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            {documentsLoading ? (
+                              <div className="text-center py-8 text-slate-500">Loading documents...</div>
+                            ) : (() => {
+                              const propertySpecificDocuments = (communityDocuments as any[]).filter(
+                                (d: any) => d.classification === "residential-based" || d.propertyId === (property as any)?.id
+                              );
+                              
+                              return propertySpecificDocuments.length > 0 ? (
+                                <div className="space-y-3">
+                                  {propertySpecificDocuments.map((doc: any) => (
+                                    <div key={doc.id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                                      <div className="flex items-center gap-3 flex-1">
+                                        <FileText className="w-5 h-5 text-green-600" />
+                                        <div className="flex-1">
+                                          <a
+                                            href={`/api/download-document?path=${encodeURIComponent(doc.fileUrl)}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-slate-900 hover:text-blue-600 font-medium hover:underline"
+                                            data-testid={`link-property-doc-${doc.id}`}
+                                          >
+                                            {doc.fileName}
+                                          </a>
+                                          <p className="text-xs text-slate-600 mt-0.5">
+                                            {doc.documentType?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        {user?.role === "admin" && (
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                              if (confirm('Are you sure you want to delete this document?')) {
+                                                deleteDocumentMutation.mutate(doc.id);
+                                              }
+                                            }}
+                                            data-testid={`button-delete-doc-${doc.id}`}
+                                          >
+                                            <Trash2 className="w-4 h-4 text-red-600" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-center py-8">
+                                  <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                                  <p className="text-slate-500">No property-specific documents yet</p>
+                                  <p className="text-xs text-slate-400 mt-1">Upload documents unique to this property</p>
+                                  <Button 
+                                    variant="outline"
+                                    className="mt-4"
+                                    onClick={() => setIsUploadDocumentDialogOpen(true)}
+                                    data-testid="button-upload-first-document"
+                                  >
+                                    <Upload className="w-4 h-4 mr-2" />
+                                    Upload First Document
+                                  </Button>
+                                </div>
+                              );
+                            })()}
+                          </CardContent>
+                        </Card>
                       </TabsContent>
                     </Tabs>
                   </div>
