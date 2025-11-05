@@ -2696,24 +2696,6 @@ export default function Admin() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <FileText className="w-5 h-5 mr-2" />
-                Document Templates
-              </CardTitle>
-              <CardDescription>
-                Create reusable community documents to avoid re-uploading the same files
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-slate-600 mb-4">
-                Document templates allow you to upload community documents once and reuse them across multiple communities. 
-                Perfect for standard HOA declarations, bylaws, or welcome packets that apply to many properties.
-              </p>
-              <DocumentTemplatesManager />
-            </CardContent>
-          </Card>
         </TabsContent>
 
         {/* Billing Tab */}
@@ -2873,6 +2855,26 @@ export default function Admin() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Community Documents Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <FileText className="w-5 h-5 mr-2" />
+                Community Documents
+              </CardTitle>
+              <CardDescription>
+                Create reusable community documents to avoid re-uploading the same files
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-slate-600 mb-4">
+                Document templates allow you to upload community documents once and reuse them across multiple communities. 
+                Perfect for standard HOA declarations, bylaws, or welcome packets that apply to many properties.
+              </p>
+              <DocumentTemplatesManager />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Customization Tab */}
