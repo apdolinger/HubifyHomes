@@ -1476,6 +1476,232 @@ function InvoicesTab() {
   );
 }
 
+// Default Hourly Rate Input Component
+function DefaultHourlyRateInput({ orgId }: { orgId: string }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [hourlyRate, setHourlyRate] = useState("");
+
+  const { data: org, isLoading } = useQuery({
+    queryKey: [`/api/orgs/${orgId}`],
+    enabled: !!orgId,
+  });
+
+  // Set initial hourly rate value
+  useEffect(() => {
+    if (org?.defaultHourlyRateCents) {
+      setHourlyRate((org.defaultHourlyRateCents / 100).toFixed(2));
+    }
+  }, [org]);
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: { defaultHourlyRateCents: number | null }) => {
+      return apiRequest("PATCH", `/api/orgs/${orgId}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}`] });
+      toast({
+        title: "Settings updated",
+        description: "Default hourly rate has been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update settings",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSave = () => {
+    const rate = hourlyRate.trim() ? parseFloat(hourlyRate) : null;
+    if (rate !== null && (isNaN(rate) || rate < 0)) {
+      toast({
+        title: "Invalid hourly rate",
+        description: "Please enter a valid hourly rate (or leave empty to clear)",
+        variant: "destructive",
+      });
+      return;
+    }
+    updateMutation.mutate({
+      defaultHourlyRateCents: rate !== null ? Math.round(rate * 100) : null,
+    });
+  };
+
+  if (isLoading) {
+    return <div className="text-sm text-slate-500">Loading settings...</div>;
+  }
+
+  return (
+    <div>
+      <h4 className="font-medium mb-2">Default Hourly Rate</h4>
+      <p className="text-sm text-slate-600 mb-4">
+        Set a default hourly rate that will auto-populate when enabling hourly billing for new clients. 
+        Individual clients can override this rate.
+      </p>
+      <div className="flex gap-2 max-w-md">
+        <div className="relative flex-1">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="0.00"
+            value={hourlyRate}
+            onChange={(e) => setHourlyRate(e.target.value)}
+            className="pl-7"
+            data-testid="input-default-hourly-rate"
+          />
+        </div>
+        <Button
+          onClick={handleSave}
+          disabled={updateMutation.isPending}
+          data-testid="button-save-hourly-rate"
+        >
+          {updateMutation.isPending ? "Saving..." : "Save"}
+        </Button>
+      </div>
+      {org?.defaultHourlyRateCents && (
+        <p className="text-sm text-slate-500 mt-2">
+          Current default: ${(org.defaultHourlyRateCents / 100).toFixed(2)}/hour
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Invoice Template Selector Component
+function InvoiceTemplateSelector({ orgId }: { orgId: string }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("modern");
+
+  const templates = [
+    {
+      id: "modern",
+      name: "Modern",
+      description: "Clean design with gradient header and side-by-side layout. Professional and contemporary.",
+      icon: "✨",
+    },
+    {
+      id: "minimal",
+      name: "Minimal",
+      description: "Ultra-clean design with minimal colors and maximum white space. Simple and elegant.",
+      icon: "🎨",
+    },
+    {
+      id: "classic",
+      name: "Classic",
+      description: "Traditional invoice layout with borders and structured sections. Timeless and formal.",
+      icon: "📄",
+    },
+    {
+      id: "compact",
+      name: "Compact",
+      description: "Space-efficient layout perfect for detailed invoices. Maximum information density.",
+      icon: "📋",
+    },
+    {
+      id: "bold",
+      name: "Bold",
+      description: "Eye-catching design with strong colors and large typography. Makes a statement.",
+      icon: "💥",
+    },
+  ];
+
+  const { data: org, isLoading } = useQuery({
+    queryKey: [`/api/orgs/${orgId}`],
+    enabled: !!orgId,
+  });
+
+  useEffect(() => {
+    if (org?.invoiceTemplateId) {
+      setSelectedTemplate(org.invoiceTemplateId);
+    }
+  }, [org]);
+
+  const updateMutation = useMutation({
+    mutationFn: async (templateId: string) => {
+      return apiRequest("PATCH", `/api/orgs/${orgId}`, {
+        invoiceTemplateId: templateId,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}`] });
+      toast({
+        title: "Template updated",
+        description: "Invoice template has been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update template",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleTemplateSelect = (templateId: string) => {
+    setSelectedTemplate(templateId);
+    updateMutation.mutate(templateId);
+  };
+
+  if (isLoading) {
+    return <div className="text-sm text-slate-500">Loading invoice templates...</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h4 className="font-medium mb-2">Invoice Template</h4>
+        <p className="text-sm text-slate-600 mb-4">
+          Choose a professional invoice layout for your organization. All future invoices will use this template.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {templates.map((template) => (
+          <div
+            key={template.id}
+            className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+              selectedTemplate === template.id
+                ? "border-blue-500 bg-blue-50"
+                : "border-slate-200 hover:border-slate-300"
+            }`}
+            onClick={() => handleTemplateSelect(template.id)}
+            data-testid={`template-${template.id}`}
+          >
+            <div className="flex items-start justify-between mb-2">
+              <span className="text-2xl">{template.icon}</span>
+              {selectedTemplate === template.id && (
+                <CheckCircle className="w-5 h-5 text-blue-500" />
+              )}
+            </div>
+            <h5 className="font-medium mb-1">{template.name}</h5>
+            <p className="text-sm text-slate-600">{template.description}</p>
+            <div className="mt-3 flex gap-2">
+              <Button
+                variant={selectedTemplate === template.id ? "default" : "outline"}
+                size="sm"
+                className="flex-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleTemplateSelect(template.id);
+                }}
+                data-testid={`button-select-${template.id}`}
+              >
+                {selectedTemplate === template.id ? "Selected" : "Select"}
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Settings Tab Component
 function SettingsTab() {
   const { user, isAuthenticated, isLoading: userLoading } = useAuth();
@@ -1569,6 +1795,21 @@ function SettingsTab() {
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Billing Settings</CardTitle>
+          <CardDescription>
+            Configure organization-wide default values for client billing and invoices
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-8">
+          <DefaultHourlyRateInput orgId={orgId} />
+          <div className="pt-6 border-t">
+            <InvoiceTemplateSelector orgId={orgId} />
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Billing Workflow Mode</CardTitle>

@@ -2701,18 +2701,6 @@ export default function Admin() {
         {/* Billing Tab */}
         <TabsContent value="billing" className="space-y-6">
           <Billing embedded={true} />
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Billing Settings</CardTitle>
-              <CardDescription>
-                Configure organization-wide default values for client billing and invoices
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {user?.orgId && <BillingSettingsManager orgId={user.orgId} />}
-            </CardContent>
-          </Card>
         </TabsContent>
 
         {/* Communities Tab */}
