@@ -1552,12 +1552,13 @@ export default function PropertyProfile() {
       propertyId?: number | null;
     }) => {
       // Step 1: Get upload URL
-      const { uploadUrl, fileUrl } = await apiRequest("POST", `/api/communities/${communityId}/documents/upload-url`, {
+      const uploadResponse = await apiRequest("POST", `/api/communities/${communityId}/documents/upload-url`, {
         fileName: file.name,
       });
+      const { uploadUrl, fileUrl } = await uploadResponse.json();
 
       // Step 2: Upload file to object storage
-      const uploadResponse = await fetch(uploadUrl, {
+      const storageUploadResponse = await fetch(uploadUrl, {
         method: "PUT",
         body: file,
         headers: {
@@ -1565,7 +1566,7 @@ export default function PropertyProfile() {
         },
       });
 
-      if (!uploadResponse.ok) {
+      if (!storageUploadResponse.ok) {
         throw new Error("Failed to upload file to storage");
       }
 

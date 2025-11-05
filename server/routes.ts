@@ -3197,6 +3197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!property) {
           return res.status(404).json({ message: "Property not found" });
         }
+        
         if (property.communityId !== communityId) {
           return res.status(403).json({ 
             message: "Property does not belong to this community" 
@@ -3347,6 +3348,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const { bucketName, objectName } = parseObjectPath(filePath as string);
+      
+      // Import object storage client
+      const { objectStorageClient } = await import("./objectStorage");
       const bucket = objectStorageClient.bucket(bucketName);
       const file = bucket.file(objectName);
 
