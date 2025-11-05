@@ -315,7 +315,13 @@ export default function AdminEmailTemplates() {
                     {filteredTemplates.map((template) => (
                       <TableRow key={template.id} data-testid={`row-template-${template.id}`}>
                         <TableCell className="font-medium" data-testid={`text-name-${template.id}`}>
-                          {template.name}
+                          <button
+                            onClick={() => setViewingTemplate(template)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline text-left"
+                            data-testid={`link-template-${template.id}`}
+                          >
+                            {template.name}
+                          </button>
                         </TableCell>
                         <TableCell className="max-w-xs text-slate-600 text-sm" data-testid={`text-description-${template.id}`}>
                           {template.description ? truncateText(template.description, 80) : <span className="text-slate-400 italic">No description</span>}
@@ -607,8 +613,24 @@ export default function AdminEmailTemplates() {
           )}
 
           <DialogFooter>
-            <Button onClick={() => setViewingTemplate(null)} data-testid="button-close-view">
+            <Button 
+              variant="outline"
+              onClick={() => setViewingTemplate(null)} 
+              data-testid="button-close-view"
+            >
               Close
+            </Button>
+            <Button
+              onClick={() => {
+                if (viewingTemplate) {
+                  handleEdit(viewingTemplate);
+                  setViewingTemplate(null);
+                }
+              }}
+              data-testid="button-edit-from-preview"
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Edit Template
             </Button>
           </DialogFooter>
         </DialogContent>
