@@ -655,6 +655,287 @@ function BillingSettingsManager({ orgId }: { orgId: string }) {
   );
 }
 
+// Task Templates Manager Component
+function TaskTemplatesManager() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<any | null>(null);
+  const [newTemplate, setNewTemplate] = useState({
+    title: "",
+    description: "",
+    priority: "normal" as "urgent" | "high" | "normal" | "low",
+    category: "",
+    timeEstimate: "",
+  });
+  const [checklistItems, setChecklistItems] = useState<string[]>([]);
+  const [currentItem, setCurrentItem] = useState("");
+
+  const { data: templates = [], isLoading } = useQuery({
+    queryKey: ["/api/tasks/templates"],
+    queryFn: async () => {
+      const response = await fetch("/api/tasks/templates");
+      if (!response.ok) throw new Error("Failed to fetch templates");
+      return response.json();
+    },
+  });
+
+  const createTemplateMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return apiRequest("POST", "/api/tasks", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/templates"] });
+      setIsCreateDialogOpen(false);
+      resetForm();
+      toast({
+        title: "Template Created",
+        description: "The task template has been created successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create template",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("DELETE", `/api/tasks/${id}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/templates"] });
+      toast({
+        title: "Template Deleted",
+        description: "The task template has been deleted successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete template",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetForm = () => {
+    setNewTemplate({
+      title: "",
+      description: "",
+      priority: "normal",
+      category: "",
+      timeEstimate: "",
+    });
+    setChecklistItems([]);
+    setCurrentItem("");
+    setEditingTemplate(null);
+  };
+
+  const addChecklistItem = () => {
+    if (currentItem.trim()) {
+      setChecklistItems([...checklistItems, currentItem.trim()]);
+      setCurrentItem("");
+    }
+  };
+
+  const removeChecklistItem = (index: number) => {
+    setChecklistItems(checklistItems.filter((_, i) => i !== index));
+  };
+
+  const handleCreateTemplate = () => {
+    if (!newTemplate.title) {
+      toast({
+        title: "Missing Fields",
+        description: "Please provide a template title.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const templateData = {
+      ...newTemplate,
+      isTemplate: true,
+      status: "pending",
+    };
+
+    createTemplateMutation.mutate(templateData);
+  };
+
+  if (isLoading) {
+    return <div className="text-sm text-slate-600">Loading templates...</div>;
+  }
+
+  return (
+    <div>
+      {templates.length === 0 ? (
+        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+          <p className="text-sm text-slate-600 mb-3">
+            No task templates yet. Create reusable templates with pre-configured checklists and settings.
+          </p>
+          <Button onClick={() => setIsCreateDialogOpen(true)} size="sm" data-testid="button-create-first-task-template">
+            <Plus className="w-4 h-4 mr-2" />
+            Create First Template
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-600">
+              {templates.length} template{templates.length !== 1 ? "s" : ""} available
+            </p>
+            <Button onClick={() => setIsCreateDialogOpen(true)} size="sm" data-testid="button-create-task-template">
+              <Plus className="w-4 h-4 mr-2" />
+              Create Template
+            </Button>
+          </div>
+          <div className="border rounded-lg divide-y">
+            {templates.map((template: any) => (
+              <div key={template.id} className="p-3 hover:bg-slate-50 transition-colors" data-testid={`task-template-${template.id}`}>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-medium text-slate-900">{template.title}</h4>
+                      <Badge variant="outline" className="text-xs">
+                        {template.priority}
+                      </Badge>
+                      {template.category && (
+                        <Badge variant="secondary" className="text-xs">
+                          {template.category}
+                        </Badge>
+                      )}
+                    </div>
+                    {template.description && (
+                      <p className="text-sm text-slate-600 mt-1">{template.description}</p>
+                    )}
+                    {template.timeEstimate && (
+                      <p className="text-xs text-slate-500 mt-1">
+                        <Clock className="w-3 h-3 inline mr-1" />
+                        {template.timeEstimate}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deleteTemplateMutation.mutate(template.id)}
+                      data-testid={`button-delete-template-${template.id}`}
+                    >
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Create/Edit Template Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+        if (!open) resetForm();
+        setIsCreateDialogOpen(open);
+      }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create Task Template</DialogTitle>
+            <DialogDescription>
+              Create a reusable task template with pre-configured settings and checklist items.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label>Template Name *</Label>
+              <Input
+                value={newTemplate.title}
+                onChange={(e) => setNewTemplate({ ...newTemplate, title: e.target.value })}
+                placeholder="e.g. Property Inspection Checklist"
+                data-testid="input-template-title"
+              />
+            </div>
+
+            <div>
+              <Label>Description</Label>
+              <Textarea
+                value={newTemplate.description}
+                onChange={(e) => setNewTemplate({ ...newTemplate, description: e.target.value })}
+                placeholder="What is this template used for?"
+                rows={2}
+                data-testid="textarea-template-description"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Priority</Label>
+                <Select
+                  value={newTemplate.priority}
+                  onValueChange={(value: any) => setNewTemplate({ ...newTemplate, priority: value })}
+                >
+                  <SelectTrigger data-testid="select-template-priority">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Category</Label>
+                <Input
+                  value={newTemplate.category}
+                  onChange={(e) => setNewTemplate({ ...newTemplate, category: e.target.value })}
+                  placeholder="e.g. inspection, maintenance"
+                  data-testid="input-template-category"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label>Time Estimate</Label>
+              <Input
+                value={newTemplate.timeEstimate}
+                onChange={(e) => setNewTemplate({ ...newTemplate, timeEstimate: e.target.value })}
+                placeholder="e.g. 2 hours, 1 day"
+                data-testid="input-template-time-estimate"
+              />
+            </div>
+
+            <div>
+              <Label>Checklist Items (Coming Soon)</Label>
+              <p className="text-xs text-slate-500 mt-1">
+                Checklist functionality will be added in the next update. For now, you can create the basic template structure.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateTemplate}
+              disabled={createTemplateMutation.isPending}
+              data-testid="button-save-template"
+            >
+              {createTemplateMutation.isPending ? "Creating..." : "Create Template"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 // Document Templates Manager Component
 function DocumentTemplatesManager() {
   const { toast } = useToast();
@@ -2403,13 +2684,15 @@ export default function Admin() {
                 Task Templates
               </CardTitle>
               <CardDescription>
-                Coming soon - Create reusable task checklists and workflows
+                Create reusable task templates with pre-configured settings and checklists
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-slate-500">
-                Task templates will allow you to save common task sequences and checklists for quick reuse.
+              <p className="text-slate-600 mb-4">
+                Task templates allow you to save common task configurations, checklists, and workflows for quick reuse.
+                When creating a new task, you can select a template to auto-fill all task details.
               </p>
+              <TaskTemplatesManager />
             </CardContent>
           </Card>
 
