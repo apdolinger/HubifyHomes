@@ -2210,7 +2210,7 @@ export default function Admin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-11">
+        <TabsList className="grid w-full grid-cols-10">
           <TabsTrigger value="forms" className="flex items-center gap-2">
             <FileText className="w-4 h-4" />
             Forms
@@ -2222,10 +2222,6 @@ export default function Admin() {
           <TabsTrigger value="billing" className="flex items-center gap-2">
             <DollarSign className="w-4 h-4" />
             Billing
-          </TabsTrigger>
-          <TabsTrigger value="billing-settings" className="flex items-center gap-2">
-            <Settings className="w-4 h-4" />
-            Billing Settings
           </TabsTrigger>
           <TabsTrigger value="communities" className="flex items-center gap-2">
             <Building className="w-4 h-4" />
@@ -2705,10 +2701,7 @@ export default function Admin() {
         {/* Billing Tab */}
         <TabsContent value="billing" className="space-y-6">
           <Billing embedded={true} />
-        </TabsContent>
-
-        {/* Billing Settings Tab */}
-        <TabsContent value="billing-settings" className="space-y-6">
+          
           <Card>
             <CardHeader>
               <CardTitle>Billing Settings</CardTitle>
