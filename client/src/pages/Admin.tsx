@@ -2400,6 +2400,23 @@ export default function Admin() {
             <CardHeader>
               <CardTitle className="flex items-center">
                 <FileText className="w-5 h-5 mr-2" />
+                Task Templates
+              </CardTitle>
+              <CardDescription>
+                Coming soon - Create reusable task checklists and workflows
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-slate-500">
+                Task templates will allow you to save common task sequences and checklists for quick reuse.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <FileText className="w-5 h-5 mr-2" />
                 Document Templates
               </CardTitle>
               <CardDescription>
@@ -2412,23 +2429,6 @@ export default function Admin() {
                 Perfect for standard HOA declarations, bylaws, or welcome packets that apply to many properties.
               </p>
               <DocumentTemplatesManager />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <FileText className="w-5 h-5 mr-2" />
-                Task Templates
-              </CardTitle>
-              <CardDescription>
-                Coming soon - Create reusable task checklists and workflows
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-slate-500">
-                Task templates will allow you to save common task sequences and checklists for quick reuse.
-              </p>
             </CardContent>
           </Card>
         </TabsContent>
