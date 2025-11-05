@@ -1482,8 +1482,8 @@ function DefaultHourlyRateInput({ orgId }: { orgId: string }) {
   const queryClient = useQueryClient();
   const [hourlyRate, setHourlyRate] = useState("");
 
-  const { data: org, isLoading } = useQuery({
-    queryKey: [`/api/orgs/${orgId}`],
+  const { data: org, isLoading } = useQuery<any>({
+    queryKey: [`/api/organizations/${orgId}`],
     enabled: !!orgId,
   });
 
@@ -1496,10 +1496,10 @@ function DefaultHourlyRateInput({ orgId }: { orgId: string }) {
 
   const updateMutation = useMutation({
     mutationFn: async (data: { defaultHourlyRateCents: number | null }) => {
-      return apiRequest("PATCH", `/api/orgs/${orgId}`, data);
+      return apiRequest("PATCH", `/api/organizations/${orgId}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/organizations/${orgId}`] });
       toast({
         title: "Settings updated",
         description: "Default hourly rate has been updated successfully.",
@@ -1610,8 +1610,8 @@ function InvoiceTemplateSelector({ orgId }: { orgId: string }) {
     },
   ];
 
-  const { data: org, isLoading } = useQuery({
-    queryKey: [`/api/orgs/${orgId}`],
+  const { data: org, isLoading } = useQuery<any>({
+    queryKey: [`/api/organizations/${orgId}`],
     enabled: !!orgId,
   });
 
@@ -1623,12 +1623,12 @@ function InvoiceTemplateSelector({ orgId }: { orgId: string }) {
 
   const updateMutation = useMutation({
     mutationFn: async (templateId: string) => {
-      return apiRequest("PATCH", `/api/orgs/${orgId}`, {
+      return apiRequest("PATCH", `/api/organizations/${orgId}/invoice-template`, {
         invoiceTemplateId: templateId,
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/organizations/${orgId}`] });
       toast({
         title: "Template updated",
         description: "Invoice template has been updated successfully.",
