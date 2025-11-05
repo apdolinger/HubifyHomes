@@ -43,6 +43,7 @@ const templateFormSchema = insertOrgEmailTemplateSchema.omit({
   name: z.string().min(1, "Name is required"),
   subject: z.string().min(1, "Subject is required"),
   body: z.string().min(1, "Body is required"),
+  description: z.string().optional(),
   isActive: z.boolean().default(true),
 });
 
@@ -73,6 +74,7 @@ export default function AdminEmailTemplates() {
       name: "",
       subject: "",
       body: "",
+      description: "",
       isActive: true,
     },
   });
@@ -151,6 +153,7 @@ export default function AdminEmailTemplates() {
       name: "",
       subject: "",
       body: "",
+      description: "",
       isActive: true,
     });
     setIsCreateModalOpen(true);
@@ -161,6 +164,7 @@ export default function AdminEmailTemplates() {
       name: template.name,
       subject: template.subject,
       body: template.body,
+      description: template.description || "",
       isActive: template.isActive,
     });
     setEditingTemplate(template);
@@ -291,6 +295,7 @@ export default function AdminEmailTemplates() {
                           <ArrowUpDown className="w-4 h-4" />
                         </button>
                       </TableHead>
+                      <TableHead>Description</TableHead>
                       <TableHead>Subject</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>
@@ -311,6 +316,9 @@ export default function AdminEmailTemplates() {
                       <TableRow key={template.id} data-testid={`row-template-${template.id}`}>
                         <TableCell className="font-medium" data-testid={`text-name-${template.id}`}>
                           {template.name}
+                        </TableCell>
+                        <TableCell className="max-w-xs text-slate-600 text-sm" data-testid={`text-description-${template.id}`}>
+                          {template.description ? truncateText(template.description, 80) : <span className="text-slate-400 italic">No description</span>}
                         </TableCell>
                         <TableCell className="max-w-md" data-testid={`text-subject-${template.id}`}>
                           {truncateText(template.subject, 100)}
@@ -403,6 +411,25 @@ export default function AdminEmailTemplates() {
                         placeholder="e.g. Welcome Email"
                         {...field}
                         data-testid="input-template-name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Internal note to describe the purpose of this template (e.g. 'Sent to new clients after onboarding')"
+                        rows={2}
+                        {...field}
+                        data-testid="textarea-template-description"
                       />
                     </FormControl>
                     <FormMessage />
@@ -532,6 +559,15 @@ export default function AdminEmailTemplates() {
 
           {viewingTemplate && (
             <div className="space-y-4">
+              {viewingTemplate.description && (
+                <div>
+                  <Label className="text-sm font-medium text-slate-700">Description</Label>
+                  <p className="mt-1 text-sm text-slate-600" data-testid="text-view-description">
+                    {viewingTemplate.description}
+                  </p>
+                </div>
+              )}
+
               <div>
                 <Label className="text-sm font-medium text-slate-700">Subject</Label>
                 <p className="mt-1 text-sm text-slate-900" data-testid="text-view-subject">

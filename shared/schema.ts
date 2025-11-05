@@ -2873,6 +2873,7 @@ export const orgEmailTemplates = pgTable("org_email_templates", {
   name: varchar("name").notNull(),
   subject: text("subject").notNull(),
   body: text("body").notNull(),
+  description: text("description"), // Internal documentation for template purpose
   
   // Available merge fields that can be used in this template
   availableMergeFields: jsonb("available_merge_fields").$type<string[]>().default([
