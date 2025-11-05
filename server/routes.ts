@@ -7901,9 +7901,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/organizations/:orgId/invoice-template", isAuthenticated, async (req, res) => {
     try {
       const orgId = req.params.orgId;
+      const userOrgId = req.user?.claims?.orgId || req.user?.orgId;
+      const userRole = req.user?.claims?.role || req.user?.role;
       
       // Verify user belongs to org
-      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+      if (userOrgId !== orgId && userRole !== "admin") {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -7927,13 +7929,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/organizations/:orgId/invoice-template", isAuthenticated, async (req, res) => {
     try {
       const orgId = req.params.orgId;
+      const userOrgId = req.user?.claims?.orgId || req.user?.orgId;
+      const userRole = req.user?.claims?.role || req.user?.role;
       
       // Verify user belongs to org and is admin/supervisor
-      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+      if (userOrgId !== orgId) {
         return res.status(403).json({ message: "Access denied" });
       }
       
-      const userRole = (req.user as any)?.claims?.role ?? (req.user as any)?.role;
       if (userRole !== 'admin' && userRole !== 'supervisor') {
         return res.status(403).json({ message: "Only admins and supervisors can update invoice templates" });
       }

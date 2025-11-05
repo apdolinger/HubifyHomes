@@ -250,11 +250,153 @@ function SupplySettingsManager({ orgId }: { orgId: string }) {
   );
 }
 
+// Invoice Template Preview Component
+function InvoiceTemplatePreview({ templateId }: { templateId: string }) {
+  const sampleData = {
+    invoiceNumber: "INV-2024-001",
+    date: "November 5, 2024",
+    dueDate: "December 5, 2024",
+    billTo: {
+      name: "Sample Client",
+      address: "123 Main Street",
+      city: "Miami, FL 33101"
+    },
+    items: [
+      { description: "Property Inspection", quantity: 1, rate: 150.00, amount: 150.00 },
+      { description: "Maintenance Service", quantity: 2, rate: 75.00, amount: 150.00 },
+      { description: "Consulting Fee", quantity: 1, rate: 200.00, amount: 200.00 }
+    ],
+    subtotal: 500.00,
+    tax: 35.00,
+    total: 535.00
+  };
+
+  const getTemplateStyles = (id: string) => {
+    const styles = {
+      modern: {
+        header: "bg-gradient-to-r from-blue-600 to-purple-600 text-white",
+        accent: "text-blue-600",
+        border: "border-blue-200"
+      },
+      minimal: {
+        header: "bg-gray-50 text-gray-900 border-b-2 border-gray-200",
+        accent: "text-gray-700",
+        border: "border-gray-100"
+      },
+      classic: {
+        header: "bg-slate-800 text-white border-4 border-slate-600",
+        accent: "text-slate-800",
+        border: "border-slate-300"
+      },
+      compact: {
+        header: "bg-emerald-700 text-white",
+        accent: "text-emerald-700",
+        border: "border-emerald-200"
+      },
+      bold: {
+        header: "bg-red-600 text-white",
+        accent: "text-red-600",
+        border: "border-red-300"
+      }
+    };
+    return styles[id as keyof typeof styles] || styles.modern;
+  };
+
+  const styles = getTemplateStyles(templateId);
+
+  return (
+    <div className="border-2 border-slate-200 rounded-lg overflow-hidden bg-white shadow-lg scale-90 origin-top">
+      {/* Header */}
+      <div className={`p-6 ${styles.header}`}>
+        <div className="flex justify-between items-start">
+          <div>
+            <h2 className="text-2xl font-bold mb-1">INVOICE</h2>
+            <p className="text-sm opacity-90">{sampleData.invoiceNumber}</p>
+          </div>
+          <div className="text-right">
+            <p className="font-semibold">Your Company Name</p>
+            <p className="text-sm opacity-90">123 Business Ave</p>
+            <p className="text-sm opacity-90">City, ST 12345</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="p-6 space-y-6">
+        {/* Dates and Bill To */}
+        <div className="grid grid-cols-2 gap-6">
+          <div>
+            <h3 className={`font-semibold mb-2 ${styles.accent}`}>Bill To:</h3>
+            <div className="text-sm">
+              <p className="font-medium">{sampleData.billTo.name}</p>
+              <p className="text-slate-600">{sampleData.billTo.address}</p>
+              <p className="text-slate-600">{sampleData.billTo.city}</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="mb-3">
+              <span className="text-slate-600 text-sm">Invoice Date: </span>
+              <span className="font-medium text-sm">{sampleData.date}</span>
+            </div>
+            <div>
+              <span className="text-slate-600 text-sm">Due Date: </span>
+              <span className="font-medium text-sm">{sampleData.dueDate}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Items Table */}
+        <div className={`border ${styles.border} rounded`}>
+          <table className="w-full">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="text-left p-3 text-sm font-semibold text-slate-700">Description</th>
+                <th className="text-right p-3 text-sm font-semibold text-slate-700">Qty</th>
+                <th className="text-right p-3 text-sm font-semibold text-slate-700">Rate</th>
+                <th className="text-right p-3 text-sm font-semibold text-slate-700">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sampleData.items.map((item, i) => (
+                <tr key={i} className="border-t border-slate-100">
+                  <td className="p-3 text-sm">{item.description}</td>
+                  <td className="p-3 text-sm text-right">{item.quantity}</td>
+                  <td className="p-3 text-sm text-right">${item.rate.toFixed(2)}</td>
+                  <td className="p-3 text-sm text-right font-medium">${item.amount.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Totals */}
+        <div className="flex justify-end">
+          <div className="w-64 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-600">Subtotal:</span>
+              <span className="font-medium">${sampleData.subtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-600">Tax (7%):</span>
+              <span className="font-medium">${sampleData.tax.toFixed(2)}</span>
+            </div>
+            <div className={`flex justify-between pt-2 border-t ${styles.border}`}>
+              <span className={`font-bold ${styles.accent}`}>Total:</span>
+              <span className={`font-bold text-lg ${styles.accent}`}>${sampleData.total.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Invoice Template Selector Component
 function InvoiceTemplateSelector({ orgId }: { orgId: string }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedTemplate, setSelectedTemplate] = useState<string>("modern");
+  const [previewTemplate, setPreviewTemplate] = useState<string | null>(null);
 
   const templates = [
     {
@@ -342,11 +484,9 @@ function InvoiceTemplateSelector({ orgId }: { orgId: string }) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {templates.map((template) => (
-          <button
+          <div
             key={template.id}
-            onClick={() => handleTemplateSelect(template.id)}
-            disabled={updateMutation.isPending}
-            className={`p-4 border-2 rounded-lg text-left transition-all hover:shadow-md ${
+            className={`p-4 border-2 rounded-lg transition-all ${
               selectedTemplate === template.id
                 ? "border-blue-500 bg-blue-50"
                 : "border-slate-200 hover:border-slate-300"
@@ -360,8 +500,29 @@ function InvoiceTemplateSelector({ orgId }: { orgId: string }) {
               )}
             </div>
             <h5 className="font-semibold text-slate-900 mb-1">{template.name}</h5>
-            <p className="text-xs text-slate-600">{template.description}</p>
-          </button>
+            <p className="text-xs text-slate-600 mb-3">{template.description}</p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setPreviewTemplate(template.id)}
+                className="flex-1"
+                data-testid={`button-preview-${template.id}`}
+              >
+                <Eye className="w-3 h-3 mr-1" />
+                Preview
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleTemplateSelect(template.id)}
+                disabled={updateMutation.isPending || selectedTemplate === template.id}
+                className="flex-1"
+                data-testid={`button-select-${template.id}`}
+              >
+                {selectedTemplate === template.id ? "Selected" : "Select"}
+              </Button>
+            </div>
+          </div>
         ))}
       </div>
 
@@ -372,6 +533,21 @@ function InvoiceTemplateSelector({ orgId }: { orgId: string }) {
           </p>
         </div>
       )}
+
+      {/* Preview Dialog */}
+      <Dialog open={!!previewTemplate} onOpenChange={() => setPreviewTemplate(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {templates.find(t => t.id === previewTemplate)?.name} Template Preview
+            </DialogTitle>
+            <DialogDescription>
+              Preview of how your invoices will look with this template
+            </DialogDescription>
+          </DialogHeader>
+          <InvoiceTemplatePreview templateId={previewTemplate || 'modern'} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
