@@ -5150,10 +5150,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/tasks/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/tasks/:id", isAuthenticated, async (req: any, res) => {
     try {
       const taskId = parseInt(req.params.id);
-      await storage.deleteTask(taskId);
+      const userId = req.user?.claims?.sub;
+      await storage.deleteTask(taskId, userId);
       res.json({ message: "Task deleted successfully" });
     } catch (error) {
       console.error("Error deleting task:", error);

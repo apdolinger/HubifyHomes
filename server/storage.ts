@@ -480,7 +480,7 @@ export interface IStorage {
   completeTask(taskId: number): Promise<Task>;
   archiveTask(taskId: number, userId: string): Promise<Task>;
   unarchiveTask(taskId: number, userId: string): Promise<Task>;
-  deleteTask(taskId: number): Promise<void>;
+  deleteTask(taskId: number, deletedByUserId?: string): Promise<void>;
   checkTaskConflicts(assignedUserId: string, dueDate: string, timeEstimate: string, excludeTaskId?: number): Promise<any[]>;
   getTaskChecklistItems(taskId: number): Promise<TaskChecklistItem[]>;
   
@@ -3074,15 +3074,15 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(taskComments.id, id), eq(taskComments.userId, userId)));
   }
 
-  async deleteTask(taskId: number): Promise<void> {
+  async deleteTask(taskId: number, deletedByUserId?: string): Promise<void> {
     const taskToDelete = await this.getTask(taskId);
     
     await db.delete(tasks).where(eq(tasks.id, taskId));
     
     // Log activity
-    if (taskToDelete) {
+    if (taskToDelete && deletedByUserId) {
       await this.logActivity({
-        userId: taskToDelete.assignedToId || "system",
+        userId: deletedByUserId,
         action: "task_deleted",
         entityType: "task",
         entityId: taskId.toString(),
