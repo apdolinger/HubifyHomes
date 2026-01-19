@@ -574,6 +574,27 @@ export const portalInvitations = pgTable("portal_invitations", {
   index("portal_invitations_email_idx").on(table.email),
 ]);
 
+// Password reset tokens for account recovery
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  token: varchar("token").notNull().unique(),
+  email: varchar("email").notNull(),
+  userType: varchar("user_type").$type<"portal_user"|"super_admin">().notNull(),
+  portalUserId: uuid("portal_user_id").references(() => portalUsers.id, { onDelete: "cascade" }),
+  orgId: uuid("org_id").references(() => orgs.id, { onDelete: "cascade" }),
+  isUsed: boolean("is_used").notNull().default(false),
+  usedAt: timestamp("used_at"),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("password_reset_token_idx").on(table.token),
+  index("password_reset_email_idx").on(table.email),
+  index("password_reset_expires_idx").on(table.expiresAt),
+]);
+
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type InsertPasswordResetToken = typeof passwordResetTokens.$inferInsert;
+
 // User storage table - required for Replit Auth (staff/admin users)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().notNull(),
