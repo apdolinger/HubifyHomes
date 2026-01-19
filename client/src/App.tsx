@@ -36,6 +36,11 @@ import Admin from "@/pages/Admin";
 import Account from "@/pages/Account";
 import SuperAdmin from "@/pages/SuperAdmin";
 import SuperAdminLogin from "@/pages/SuperAdminLogin";
+import PortalLogin from "@/pages/PortalLogin";
+import PortalRegister from "@/pages/PortalRegister";
+import PortalForgotPassword from "@/pages/PortalForgotPassword";
+import PortalResetPassword from "@/pages/PortalResetPassword";
+import Portal from "@/pages/Portal";
 import OrganizationProfile from "@/pages/OrganizationProfile";
 import AdminBilling from "@/pages/AdminBilling";
 import AdminInvoices from "@/pages/AdminInvoices";
@@ -81,6 +86,13 @@ function Router() {
       <Route path="/terms" component={TermsOfService} />
       <Route path="/super-admin/login" component={SuperAdminLogin} />
       <Route path="/payment-collection/:token" component={PaymentCollectionPage} />
+      
+      {/* Portal routes (separate auth system) */}
+      <Route path="/portal/login" component={PortalLogin} />
+      <Route path="/portal/register" component={PortalRegister} />
+      <Route path="/portal/forgot-password" component={PortalForgotPassword} />
+      <Route path="/portal/reset-password" component={PortalResetPassword} />
+      <Route path="/portal" component={Portal} />
       
       {isLoading ? (
         <Route>

@@ -79,6 +79,7 @@ import {
   customFields,
   paymentCollectionTokens,
   apiKeys,
+  passwordResetTokens,
   type User,
   type UpsertUser,
   type Team,
@@ -231,6 +232,8 @@ import {
   type InsertManagementNote,
   type ApiKey,
   type InsertApiKey,
+  type PasswordResetToken,
+  type InsertPasswordResetToken,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, like, count, sql, inArray, isNotNull } from "drizzle-orm";
@@ -761,6 +764,12 @@ export interface IStorage {
   getPendingScheduledEmails(): Promise<ScheduledEmail[]>;
   markScheduledEmailSent(id: number, sentAt: Date): Promise<ScheduledEmail>;
   markScheduledEmailFailed(id: number, errorMessage: string): Promise<ScheduledEmail>;
+  
+  // Password reset token operations
+  createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;
+  getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
+  markPasswordResetTokenUsed(token: string): Promise<void>;
+  invalidatePasswordResetTokensForEmail(email: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -6517,6 +6526,37 @@ export class DatabaseStorage implements IStorage {
       .where(eq(scheduledEmails.id, id))
       .returning();
     return updated;
+  }
+
+  // Password reset token operations
+  async createPasswordResetToken(tokenData: InsertPasswordResetToken): Promise<PasswordResetToken> {
+    const [token] = await db.insert(passwordResetTokens).values(tokenData).returning();
+    return token;
+  }
+
+  async getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
+    const [resetToken] = await db
+      .select()
+      .from(passwordResetTokens)
+      .where(eq(passwordResetTokens.token, token));
+    return resetToken;
+  }
+
+  async markPasswordResetTokenUsed(token: string): Promise<void> {
+    await db
+      .update(passwordResetTokens)
+      .set({ isUsed: true, usedAt: new Date() })
+      .where(eq(passwordResetTokens.token, token));
+  }
+
+  async invalidatePasswordResetTokensForEmail(email: string): Promise<void> {
+    await db
+      .update(passwordResetTokens)
+      .set({ isUsed: true })
+      .where(and(
+        eq(passwordResetTokens.email, email),
+        eq(passwordResetTokens.isUsed, false)
+      ));
   }
 }
 

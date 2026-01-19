@@ -124,6 +124,10 @@ export default function SuperAdminLogin() {
             </p>
           </div>
           
+          <p className="mt-4 text-xs text-slate-400 text-center">
+            Forgot your credentials? Contact the platform administrator.
+          </p>
+          
           <div className="mt-4 text-center">
             <Button
               variant="ghost"

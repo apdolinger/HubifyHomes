@@ -1745,6 +1745,155 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Password reset for portal users - Request reset
+  app.post('/api/portal/forgot-password', async (req, res) => {
+    try {
+      const { orgId, email } = req.body;
+
+      if (!orgId || !email) {
+        return res.status(400).json({ message: 'Organization ID and email are required' });
+      }
+
+      const user = await storage.getPortalUserByEmail(orgId, email.toLowerCase());
+      
+      // Always return success to prevent email enumeration
+      if (!user || !user.isActive) {
+        return res.json({ message: 'If an account exists with this email, you will receive a password reset link.' });
+      }
+
+      // Invalidate any existing reset tokens for this email
+      await storage.invalidatePasswordResetTokensForEmail(email.toLowerCase());
+
+      // Generate new reset token
+      const resetToken = nanoid(48);
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour expiry
+
+      await storage.createPasswordResetToken({
+        token: resetToken,
+        email: email.toLowerCase(),
+        userType: 'portal_user',
+        portalUserId: user.id,
+        orgId: orgId,
+        expiresAt,
+      });
+
+      // Get organization for branding
+      const org = await storage.getOrg(orgId);
+      const orgName = org?.name || 'Hubify';
+
+      // Send email with reset link
+      const resetUrl = `${process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : 'http://localhost:5000'}/portal/reset-password?token=${resetToken}`;
+      
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="UTF-8"></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #2563eb;">Password Reset Request</h2>
+            <p>Hello ${user.firstName || 'User'},</p>
+            <p>We received a request to reset your password for your ${orgName} portal account.</p>
+            <p>Click the button below to reset your password:</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${resetUrl}" style="background-color: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block;">Reset Password</a>
+            </div>
+            <p>This link will expire in 1 hour.</p>
+            <p>If you did not request a password reset, please ignore this email.</p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+            <p style="color: #666; font-size: 12px;">This email was sent by ${orgName}.</p>
+          </div>
+        </body>
+        </html>
+      `;
+
+      try {
+        const { sendGenericEmail } = await import('./emailUtils');
+        await sendGenericEmail({
+          to: email.toLowerCase(),
+          subject: `Password Reset Request - ${orgName}`,
+          htmlContent,
+        });
+      } catch (emailError) {
+        console.error('Failed to send password reset email:', emailError);
+        // Don't fail the request, token is still created
+      }
+
+      res.json({ message: 'If an account exists with this email, you will receive a password reset link.' });
+    } catch (error) {
+      console.error('Error requesting password reset:', error);
+      res.status(500).json({ message: 'Failed to process request' });
+    }
+  });
+
+  // Password reset for portal users - Verify token
+  app.get('/api/portal/reset-password/verify', async (req, res) => {
+    try {
+      const { token } = req.query;
+
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ valid: false, message: 'Token is required' });
+      }
+
+      const resetToken = await storage.getPasswordResetToken(token);
+
+      if (!resetToken) {
+        return res.json({ valid: false, message: 'Invalid or expired reset link' });
+      }
+
+      if (resetToken.isUsed) {
+        return res.json({ valid: false, message: 'This reset link has already been used' });
+      }
+
+      if (new Date(resetToken.expiresAt) < new Date()) {
+        return res.json({ valid: false, message: 'This reset link has expired' });
+      }
+
+      res.json({ valid: true, email: resetToken.email });
+    } catch (error) {
+      console.error('Error verifying reset token:', error);
+      res.status(500).json({ valid: false, message: 'Failed to verify token' });
+    }
+  });
+
+  // Password reset for portal users - Reset password
+  app.post('/api/portal/reset-password', async (req, res) => {
+    try {
+      const { token, newPassword } = req.body;
+
+      if (!token || !newPassword) {
+        return res.status(400).json({ message: 'Token and new password are required' });
+      }
+
+      if (newPassword.length < 8) {
+        return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+      }
+
+      const resetToken = await storage.getPasswordResetToken(token);
+
+      if (!resetToken || resetToken.isUsed || new Date(resetToken.expiresAt) < new Date()) {
+        return res.status(400).json({ message: 'Invalid or expired reset link' });
+      }
+
+      if (!resetToken.portalUserId) {
+        return res.status(400).json({ message: 'Invalid reset token' });
+      }
+
+      // Hash new password
+      const passwordHash = await bcrypt.hash(newPassword, 12);
+
+      // Update user's password
+      await storage.updatePortalUser(resetToken.portalUserId, { passwordHash });
+
+      // Mark token as used
+      await storage.markPasswordResetTokenUsed(token);
+
+      res.json({ message: 'Password has been reset successfully' });
+    } catch (error) {
+      console.error('Error resetting password:', error);
+      res.status(500).json({ message: 'Failed to reset password' });
+    }
+  });
+
   app.get('/api/portal/me', isPortalAuthenticated, async (req: any, res) => {
     try {
       const user = req.portalUser;
