@@ -40,6 +40,8 @@ Key features include:
 - **Support Ticket System**: Internal system for user requests.
 - **System Alerts**: Organization-level alert system with severity, targeting, and acknowledgement.
 - **Account Settings**: Comprehensive organization configuration interface with Company Profile management (address, phone, website, timezone, currency, primary contact, industry) and Integrations tab featuring secure API key management with hashed storage, one-time display, and revocation capabilities. Placeholder UI for third-party integrations (SendGrid, Twilio) prepared for Replit integration system.
+- **Inspection Checklists & Reports**: Full inspection workflow with DB-persisted checklist items (pass/fail/N/A per item), reusable Inspection Templates managed in Admin > Templates, per-task Inspection Checklist panel with apply-template button, printable Inspection Report page (/inspection-report/:taskId), and property-level Inspection History tab in PropertyProfile.
+- **In-App Notifications**: Real-time notification bell in navigation bar with unread badge, slide-over notification panel (mark-read on click, mark-all-read), notification types (task_assigned, task_overdue, inspection_due, invoice_due, general). Daily automated cron job creates overdue-task notifications at 8am. Expanded notification preference toggles in user settings.
 
 ### System Design Choices
 The database is PostgreSQL with Drizzle ORM (Better SQLite3 for local development). Schema management uses Drizzle Kit. The architecture is multi-tenant and organization-scoped, using UUID-based primary keys and JSONB for advanced form field definitions.

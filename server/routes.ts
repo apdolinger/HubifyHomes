@@ -6710,13 +6710,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       let prefs = await storage.getUserNotificationPreferences(userId);
       
-      // If no preferences exist, return defaults
       if (!prefs) {
         prefs = {
           userId,
           emailOnMention: true,
           emailOnReply: true,
           emailOnReaction: false,
+          emailOnBroadcast: true,
+          emailOnTaskAssigned: true,
+          emailOnTaskOverdue: true,
+          emailOnInspectionDue: true,
+          emailOnInvoiceDue: true,
+          inAppEnabled: true,
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -6732,13 +6737,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/notification-preferences", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { emailOnMention, emailOnReply, emailOnReaction } = req.body;
+      const {
+        emailOnMention, emailOnReply, emailOnReaction, emailOnBroadcast,
+        emailOnTaskAssigned, emailOnTaskOverdue, emailOnInspectionDue,
+        emailOnInvoiceDue, inAppEnabled
+      } = req.body;
       
       const prefs = await storage.upsertUserNotificationPreferences({
         userId,
         emailOnMention: emailOnMention !== undefined ? emailOnMention : true,
         emailOnReply: emailOnReply !== undefined ? emailOnReply : true,
         emailOnReaction: emailOnReaction !== undefined ? emailOnReaction : false,
+        emailOnBroadcast: emailOnBroadcast !== undefined ? emailOnBroadcast : true,
+        emailOnTaskAssigned: emailOnTaskAssigned !== undefined ? emailOnTaskAssigned : true,
+        emailOnTaskOverdue: emailOnTaskOverdue !== undefined ? emailOnTaskOverdue : true,
+        emailOnInspectionDue: emailOnInspectionDue !== undefined ? emailOnInspectionDue : true,
+        emailOnInvoiceDue: emailOnInvoiceDue !== undefined ? emailOnInvoiceDue : true,
+        inAppEnabled: inAppEnabled !== undefined ? inAppEnabled : true,
       });
       
       res.json(prefs);
@@ -13242,6 +13257,252 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching webhook deliveries:", error);
       res.status(500).json({ message: "Failed to fetch delivery log" });
+    }
+  });
+
+  // ============================================================
+  // Checklist Template Routes
+  // ============================================================
+
+  app.get("/api/checklist-templates", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (!orgId) return res.status(400).json({ message: "Organization not found" });
+      const templates = await storage.getChecklistTemplates(orgId);
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching checklist templates:", error);
+      res.status(500).json({ message: "Failed to fetch checklist templates" });
+    }
+  });
+
+  app.post("/api/checklist-templates", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!orgId) return res.status(400).json({ message: "Organization not found" });
+      const { name, description, category, items } = req.body;
+      if (!name || !category) return res.status(400).json({ message: "name and category are required" });
+      const template = await storage.createChecklistTemplate({
+        orgId,
+        name,
+        description: description || null,
+        category,
+        items: items || [],
+        isActive: true,
+        createdBy: userId,
+      });
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Error creating checklist template:", error);
+      res.status(500).json({ message: "Failed to create checklist template" });
+    }
+  });
+
+  app.patch("/api/checklist-templates/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (!orgId) return res.status(400).json({ message: "Organization not found" });
+      const { id } = req.params;
+      const { name, description, category, items, isActive } = req.body;
+      const template = await storage.updateChecklistTemplate(id, orgId, {
+        ...(name !== undefined && { name }),
+        ...(description !== undefined && { description }),
+        ...(category !== undefined && { category }),
+        ...(items !== undefined && { items }),
+        ...(isActive !== undefined && { isActive }),
+      });
+      res.json(template);
+    } catch (error) {
+      console.error("Error updating checklist template:", error);
+      res.status(500).json({ message: "Failed to update checklist template" });
+    }
+  });
+
+  app.delete("/api/checklist-templates/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (!orgId) return res.status(400).json({ message: "Organization not found" });
+      await storage.deleteChecklistTemplate(req.params.id, orgId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting checklist template:", error);
+      res.status(500).json({ message: "Failed to delete checklist template" });
+    }
+  });
+
+  // ============================================================
+  // Task Checklist Item Routes (inspection-enhanced)
+  // ============================================================
+
+  app.post("/api/tasks/:taskId/checklist-items", isAuthenticated, async (req: any, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId);
+      const { text, required, sortOrder } = req.body;
+      if (!text) return res.status(400).json({ message: "text is required" });
+      const item = await storage.createTaskChecklistItem({
+        taskId,
+        text,
+        required: required || false,
+        sortOrder: sortOrder || 0,
+      });
+      res.status(201).json(item);
+    } catch (error) {
+      console.error("Error creating checklist item:", error);
+      res.status(500).json({ message: "Failed to create checklist item" });
+    }
+  });
+
+  app.patch("/api/task-checklist-items/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const { text, completed, result, resultNote, photoUrl, required, notes, priority, sortOrder } = req.body;
+      const updates: Record<string, any> = {};
+      if (text !== undefined) updates.text = text;
+      if (required !== undefined) updates.required = required;
+      if (notes !== undefined) updates.notes = notes;
+      if (priority !== undefined) updates.priority = priority;
+      if (sortOrder !== undefined) updates.sortOrder = sortOrder;
+      if (result !== undefined) updates.result = result;
+      if (resultNote !== undefined) updates.resultNote = resultNote;
+      if (photoUrl !== undefined) updates.photoUrl = photoUrl;
+      if (completed !== undefined) {
+        updates.completed = completed;
+        updates.completedAt = completed ? new Date() : null;
+        updates.completedBy = completed ? userId : null;
+      }
+      const item = await storage.updateTaskChecklistItem(id, updates);
+      res.json(item);
+    } catch (error) {
+      console.error("Error updating checklist item:", error);
+      res.status(500).json({ message: "Failed to update checklist item" });
+    }
+  });
+
+  app.delete("/api/task-checklist-items/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      await storage.deleteTaskChecklistItem(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting checklist item:", error);
+      res.status(500).json({ message: "Failed to delete checklist item" });
+    }
+  });
+
+  // Apply a checklist template to a task (bulk-create items)
+  app.post("/api/tasks/:taskId/apply-checklist-template", isAuthenticated, async (req: any, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId);
+      const { templateId } = req.body;
+      if (!templateId) return res.status(400).json({ message: "templateId is required" });
+      const template = await storage.getChecklistTemplate(templateId);
+      if (!template) return res.status(404).json({ message: "Template not found" });
+      const items = (template.items as Array<{ text: string; required?: boolean; category?: string }>) || [];
+      const created = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = await storage.createTaskChecklistItem({
+          taskId,
+          text: items[i].text,
+          required: items[i].required || false,
+          sortOrder: i,
+        });
+        created.push(item);
+      }
+      res.status(201).json(created);
+    } catch (error) {
+      console.error("Error applying checklist template:", error);
+      res.status(500).json({ message: "Failed to apply checklist template" });
+    }
+  });
+
+  // GET /api/tasks/:id/inspection-report — full data for inspection report
+  app.get("/api/tasks/:id/inspection-report", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      const taskId = parseInt(req.params.id);
+      const task = await storage.getTask(taskId);
+      if (!task || (task as any).orgId !== orgId) return res.status(404).json({ message: "Task not found" });
+      const checklistItems = await storage.getTaskChecklistItems(taskId);
+      const passCount = checklistItems.filter((i: any) => i.result === "pass").length;
+      const failCount = checklistItems.filter((i: any) => i.result === "fail").length;
+      const naCount = checklistItems.filter((i: any) => i.result === "na").length;
+      const pendingCount = checklistItems.filter((i: any) => !i.result).length;
+      res.json({ task, checklistItems, summary: { passCount, failCount, naCount, pendingCount } });
+    } catch (error) {
+      console.error("Error fetching inspection report:", error);
+      res.status(500).json({ message: "Failed to fetch inspection report" });
+    }
+  });
+
+  // GET /api/properties/:id/inspection-history — past inspection tasks for a property
+  app.get("/api/properties/:id/inspection-history", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      const propertyId = parseInt(req.params.id);
+      // Get all tasks of category inspection for this property
+      const allTasks = await storage.getTasks(orgId);
+      const inspections = (allTasks as any[]).filter(
+        (t: any) => t.propertyId === propertyId && t.category === "inspection"
+      ).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      res.json(inspections);
+    } catch (error) {
+      console.error("Error fetching inspection history:", error);
+      res.status(500).json({ message: "Failed to fetch inspection history" });
+    }
+  });
+
+  // ============================================================
+  // In-App Notification Routes
+  // ============================================================
+
+  app.get("/api/notifications", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (!userId || !orgId) return res.status(400).json({ message: "User or org not found" });
+      const limit = parseInt(String(req.query.limit || "50"));
+      const notifs = await storage.getNotifications(userId, orgId, limit);
+      res.json(notifs);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
+  app.get("/api/notifications/unread-count", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (!userId || !orgId) return res.json({ count: 0 });
+      const count = await storage.getUnreadNotificationCount(userId, orgId);
+      res.json({ count });
+    } catch (error) {
+      res.json({ count: 0 });
+    }
+  });
+
+  app.patch("/api/notifications/:id/read", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      await storage.markNotificationRead(parseInt(req.params.id), userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error marking notification read:", error);
+      res.status(500).json({ message: "Failed to mark notification read" });
+    }
+  });
+
+  app.post("/api/notifications/read-all", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (!userId || !orgId) return res.status(400).json({ message: "User or org not found" });
+      await storage.markAllNotificationsRead(userId, orgId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error marking all notifications read:", error);
+      res.status(500).json({ message: "Failed to mark all notifications read" });
     }
   });
 

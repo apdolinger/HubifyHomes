@@ -62,7 +62,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, AlertTriangle, Info, XCircle } from "lucide-react";
+import { AlertCircle, AlertTriangle, Info, XCircle, ClipboardCheck } from "lucide-react";
 import { PropertyReportsModal } from "@/components/PropertyReportsModal";
 import { format, parseISO, differenceInDays, isValid } from "date-fns";
 
@@ -514,6 +514,12 @@ export default function PropertyProfile() {
     queryKey: ["/api/contacts"],
     enabled: isAuthenticated,
     select: (data: any[]) => data.filter((contact: any) => contact.type === 'vendor'),
+  });
+
+  // Inspection history for this property
+  const { data: inspectionHistory = [] } = useQuery<any[]>({
+    queryKey: [`/api/properties/${propertyId}/inspection-history`],
+    enabled: isAuthenticated && !!propertyId,
   });
 
   // Get communities
@@ -3386,7 +3392,7 @@ export default function PropertyProfile() {
 
         {/* Tabs for detailed information */}
         <Tabs defaultValue="tasks" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-9">
+          <TabsList className="grid w-full grid-cols-10">
             <TabsTrigger value="tasks">Tasks</TabsTrigger>
             <TabsTrigger value="contacts">Residents</TabsTrigger>
             <TabsTrigger value="rooms">Rooms</TabsTrigger>
@@ -3396,6 +3402,7 @@ export default function PropertyProfile() {
             <TabsTrigger value="access">Access</TabsTrigger>
             <TabsTrigger value="custom">Custom Fields</TabsTrigger>
             <TabsTrigger value="notes">Notes</TabsTrigger>
+            <TabsTrigger value="inspections">Inspections</TabsTrigger>
           </TabsList>
 
           <TabsContent value="tasks">
@@ -5714,6 +5721,64 @@ export default function PropertyProfile() {
                         </Button>
                       </div>
                     )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Inspection History Tab */}
+          <TabsContent value="inspections">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ClipboardCheck className="w-5 h-5 text-blue-600" />
+                  Inspection History
+                </CardTitle>
+                <p className="text-sm text-slate-500">All inspection tasks for this property, most recent first.</p>
+              </CardHeader>
+              <CardContent>
+                {(inspectionHistory as any[]).length === 0 ? (
+                  <div className="text-center py-10">
+                    <ClipboardCheck className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <p className="text-slate-500">No inspections have been performed on this property yet.</p>
+                    <p className="text-sm text-slate-400 mt-1">Create a task with the category set to "Inspection" to get started.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {(inspectionHistory as any[]).map((inspection: any) => {
+                      const statusColor = inspection.status === "completed" ? "text-green-600" : inspection.status === "in_progress" ? "text-blue-600" : "text-slate-500";
+                      return (
+                        <div key={inspection.id} className="flex items-start justify-between p-4 border rounded-lg hover:bg-slate-50 transition-colors">
+                          <div className="space-y-1">
+                            <p className="font-medium text-sm text-slate-900">{inspection.title}</p>
+                            {inspection.dueDate && (
+                              <p className="text-xs text-slate-500">
+                                Due: {new Date(inspection.dueDate).toLocaleDateString()}
+                              </p>
+                            )}
+                            {inspection.assignedToName && (
+                              <p className="text-xs text-slate-500">Assigned to: {inspection.assignedToName}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-medium capitalize ${statusColor}`}>
+                              {(inspection.status || "open").replace(/_/g, " ")}
+                            </span>
+                            <a href={`/inspection-report/${inspection.id}`} target="_blank" rel="noopener noreferrer">
+                              <Button variant="outline" size="sm" className="text-xs">
+                                View Report
+                              </Button>
+                            </a>
+                            <a href={`/task-profile/${inspection.id}`}>
+                              <Button variant="ghost" size="sm" className="text-xs">
+                                Open Task
+                              </Button>
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>

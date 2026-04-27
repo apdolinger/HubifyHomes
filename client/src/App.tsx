@@ -52,6 +52,7 @@ import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfService from "@/pages/TermsOfService";
 import Billing from "@/pages/Billing";
 import PaymentCollectionPage from "@/pages/PaymentCollectionPage";
+import InspectionReport from "@/pages/InspectionReport";
 import Navigation from "@/components/Navigation";
 import QuickSearchModal from "@/components/QuickSearchModal";
 import QuickAddTaskModal from "@/components/QuickAddTaskModal";
@@ -171,6 +172,9 @@ function Router() {
           <Route path="/admin/email-templates" component={AdminEmailTemplates} />
           <Route path="/admin/forms/:id" component={FormEdit} />
           <Route path="/admin/forms" component={AdminForms} />
+          
+          {/* Inspection Reports */}
+          <Route path="/inspection-report/:taskId" component={InspectionReport} />
           
           {/* Billing Routes */}
           <Route path="/billing" component={Billing} />

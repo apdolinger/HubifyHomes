@@ -61,7 +61,11 @@ import {
   Info,
   XCircle,
   Star,
-  Wrench
+  Wrench,
+  ClipboardCheck,
+  MinusCircle,
+  ExternalLink,
+  ChevronDown
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -537,6 +541,8 @@ export default function TaskProfile() {
   const [isTemplateConfirmOpen, setIsTemplateConfirmOpen] = useState(false);
   const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
   const [propertyComboboxOpen, setPropertyComboboxOpen] = useState(false);
+  const [isApplyTemplateOpen, setIsApplyTemplateOpen] = useState(false);
+  const [newInspectionItemText, setNewInspectionItemText] = useState("");
 
   // Task templates
   const taskTemplates = {
@@ -830,6 +836,52 @@ export default function TaskProfile() {
       return response.json();
     },
     enabled: isAuthenticated,
+  });
+
+  // Inspection checklist items (DB-stored, with pass/fail results)
+  const { data: inspectionItems = [], refetch: refetchInspectionItems } = useQuery<any[]>({
+    queryKey: [`/api/tasks/${taskId}/checklist-items`],
+    enabled: isAuthenticated && !!(task as any)?.id,
+  });
+
+  const { data: checklistTemplates = [] } = useQuery<any[]>({
+    queryKey: ["/api/checklist-templates"],
+    enabled: isAuthenticated,
+  });
+  const inspectionTemplates = (checklistTemplates as any[]).filter((t: any) => t.category === "inspection");
+
+  const updateInspectionItemMutation = useMutation({
+    mutationFn: async ({ id, result, resultNote }: { id: number; result: string; resultNote?: string }) =>
+      apiRequest("PATCH", `/api/task-checklist-items/${id}`, { result, resultNote }),
+    onSuccess: () => refetchInspectionItems(),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const addInspectionItemMutation = useMutation({
+    mutationFn: async (text: string) =>
+      apiRequest("POST", `/api/tasks/${taskId}/checklist-items`, { text, required: false }),
+    onSuccess: () => {
+      refetchInspectionItems();
+      setNewInspectionItemText("");
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteInspectionItemMutation = useMutation({
+    mutationFn: async (id: number) => apiRequest("DELETE", `/api/task-checklist-items/${id}`, {}),
+    onSuccess: () => refetchInspectionItems(),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const applyTemplateMutation = useMutation({
+    mutationFn: async (templateId: string) =>
+      apiRequest("POST", `/api/tasks/${taskId}/apply-checklist-template`, { templateId }),
+    onSuccess: () => {
+      refetchInspectionItems();
+      setIsApplyTemplateOpen(false);
+      toast({ title: "Template Applied", description: "Inspection checklist loaded from template." });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message || "Failed to apply template", variant: "destructive" }),
   });
 
   // Archive/Unarchive task mutation
@@ -2972,6 +3024,151 @@ export default function TaskProfile() {
                   />
                 </CardContent>
               </Card>
+
+              {/* Inspection Checklist — only shown for inspection-category tasks */}
+              {(task as any).category === "inspection" && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <ClipboardCheck className="w-5 h-5 text-blue-600" />
+                        Inspection Checklist
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        {inspectionTemplates.length > 0 && (
+                          <Popover open={isApplyTemplateOpen} onOpenChange={setIsApplyTemplateOpen}>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" size="sm">
+                                <ChevronDown className="w-3 h-3 mr-1" />
+                                Apply Template
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64 p-2" align="end">
+                              <p className="text-xs text-slate-500 px-2 pb-2 font-medium">Inspection Templates</p>
+                              {inspectionTemplates.map((tpl: any) => (
+                                <button
+                                  key={tpl.id}
+                                  className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-slate-100 transition-colors"
+                                  onClick={() => applyTemplateMutation.mutate(tpl.id)}
+                                  disabled={applyTemplateMutation.isPending}
+                                >
+                                  {tpl.name}
+                                  <span className="text-xs text-slate-400 ml-1">({(tpl.items || []).length} items)</span>
+                                </button>
+                              ))}
+                            </PopoverContent>
+                          </Popover>
+                        )}
+                        <a href={`/inspection-report/${taskId}`} target="_blank" rel="noopener noreferrer">
+                          <Button variant="outline" size="sm">
+                            <ExternalLink className="w-3 h-3 mr-1" />
+                            View Report
+                          </Button>
+                        </a>
+                      </div>
+                    </div>
+                    {inspectionItems.length > 0 && (() => {
+                      const passCount = inspectionItems.filter((i: any) => i.result === "pass").length;
+                      const failCount = inspectionItems.filter((i: any) => i.result === "fail").length;
+                      const total = inspectionItems.length;
+                      return (
+                        <div className="flex items-center gap-3 text-xs mt-1">
+                          <span className="flex items-center gap-1 text-green-600">
+                            <CheckCircle className="w-3 h-3" />{passCount} Pass
+                          </span>
+                          <span className="flex items-center gap-1 text-red-500">
+                            <XCircle className="w-3 h-3" />{failCount} Fail
+                          </span>
+                          <span className="text-slate-400">{total - passCount - failCount} Pending</span>
+                        </div>
+                      );
+                    })()}
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {inspectionItems.length === 0 ? (
+                      <div className="text-center py-6 text-slate-400 border border-dashed rounded-lg">
+                        <ClipboardCheck className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                        <p className="text-sm">No checklist items. Apply a template or add items below.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {(inspectionItems as any[]).map((item: any) => (
+                          <div key={item.id} className={`flex items-start gap-2 p-2 rounded-lg border ${item.result === "fail" ? "border-red-200 bg-red-50" : item.result === "pass" ? "border-green-200 bg-green-50" : "border-slate-200"}`}>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-slate-900">{item.text}</p>
+                              {item.required && <span className="text-xs text-slate-400">Required</span>}
+                              {item.result === "fail" && item.resultNote && (
+                                <p className="text-xs text-red-600 mt-0.5">{item.resultNote}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <Button
+                                size="sm"
+                                variant={item.result === "pass" ? "default" : "outline"}
+                                className={`h-7 px-2 text-xs ${item.result === "pass" ? "bg-green-600 hover:bg-green-700" : ""}`}
+                                onClick={() => updateInspectionItemMutation.mutate({ id: item.id, result: item.result === "pass" ? "" : "pass" })}
+                                disabled={updateInspectionItemMutation.isPending}
+                              >
+                                <CheckCircle className="w-3 h-3 mr-0.5" />Pass
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={item.result === "fail" ? "destructive" : "outline"}
+                                className="h-7 px-2 text-xs"
+                                onClick={() => updateInspectionItemMutation.mutate({ id: item.id, result: item.result === "fail" ? "" : "fail" })}
+                                disabled={updateInspectionItemMutation.isPending}
+                              >
+                                <XCircle className="w-3 h-3 mr-0.5" />Fail
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={item.result === "na" ? "secondary" : "outline"}
+                                className="h-7 px-2 text-xs"
+                                onClick={() => updateInspectionItemMutation.mutate({ id: item.id, result: item.result === "na" ? "" : "na" })}
+                                disabled={updateInspectionItemMutation.isPending}
+                              >
+                                <MinusCircle className="w-3 h-3 mr-0.5" />N/A
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-slate-400 hover:text-red-500"
+                                onClick={() => deleteInspectionItemMutation.mutate(item.id)}
+                                disabled={deleteInspectionItemMutation.isPending}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {/* Add item */}
+                    <div className="flex gap-2 pt-2">
+                      <Input
+                        placeholder="Add checklist item..."
+                        value={newInspectionItemText}
+                        onChange={(e) => setNewInspectionItemText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && newInspectionItemText.trim()) {
+                            e.preventDefault();
+                            addInspectionItemMutation.mutate(newInspectionItemText.trim());
+                          }
+                        }}
+                        className="text-sm"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => newInspectionItemText.trim() && addInspectionItemMutation.mutate(newInspectionItemText.trim())}
+                        disabled={addInspectionItemMutation.isPending || !newInspectionItemText.trim()}
+                      >
+                        <Plus className="w-3 h-3 mr-1" />Add
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Attachments and Quick Links side by side */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

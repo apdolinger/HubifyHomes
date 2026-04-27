@@ -1262,6 +1262,11 @@ export const userNotificationPreferences = pgTable("user_notification_preference
   emailOnReply: boolean("email_on_reply").notNull().default(true),
   emailOnReaction: boolean("email_on_reaction").notNull().default(false),
   emailOnBroadcast: boolean("email_on_broadcast").notNull().default(true),
+  emailOnTaskAssigned: boolean("email_on_task_assigned").notNull().default(true),
+  emailOnTaskOverdue: boolean("email_on_task_overdue").notNull().default(true),
+  emailOnInspectionDue: boolean("email_on_inspection_due").notNull().default(true),
+  emailOnInvoiceDue: boolean("email_on_invoice_due").notNull().default(true),
+  inAppEnabled: boolean("in_app_enabled").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1515,10 +1520,11 @@ export const propertyPortalSettings = pgTable("property_portal_settings", {
 // Checklist Templates (Admin-managed)
 export const checklistTemplates = pgTable("checklist_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: uuid("org_id").references(() => orgs.id, { onDelete: "cascade" }),
   name: varchar("name").notNull(),
   description: text("description"),
   category: varchar("category").notNull(), // 'inspection', 'maintenance', 'cleaning', etc.
-  items: jsonb("items").notNull().default('[]'), // Array of template items
+  items: jsonb("items").notNull().default('[]'), // Array of { text, required, category } objects
   isActive: boolean("is_active").default(true),
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
@@ -1531,6 +1537,10 @@ export const taskChecklistItems = pgTable("task_checklist_items", {
   taskId: integer("task_id").references(() => tasks.id, { onDelete: "cascade" }).notNull(),
   text: text("text").notNull(),
   completed: boolean("completed").default(false),
+  required: boolean("required").default(false),
+  result: varchar("result").$type<"pass"|"fail"|"na">(), // Inspection result
+  resultNote: text("result_note"), // Inspector note for this item
+  photoUrl: text("photo_url"), // Photo evidence URL
   dueDate: timestamp("due_date"),
   assignedToId: varchar("assigned_to_id").references(() => users.id),
   priority: varchar("priority").default("normal"), // 'urgent', 'high', 'normal', 'low'
@@ -3090,3 +3100,26 @@ export const insertWebhookDeliverySchema = createInsertSchema(webhookDeliveries)
 });
 export type InsertWebhookDelivery = z.infer<typeof insertWebhookDeliverySchema>;
 export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;
+
+// In-app notifications
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  type: varchar("type").$type<"task_assigned"|"task_overdue"|"inspection_due"|"invoice_due"|"mention"|"general">().notNull(),
+  title: varchar("title").notNull(),
+  body: text("body").notNull(),
+  linkUrl: varchar("link_url"),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("notifications_user_read_idx").on(table.userId, table.isRead),
+  index("notifications_org_idx").on(table.orgId),
+]);
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;

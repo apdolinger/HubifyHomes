@@ -82,6 +82,8 @@ import {
   passwordResetTokens,
   webhookEndpoints,
   webhookDeliveries,
+  checklistTemplates,
+  notifications,
   type User,
   type UpsertUser,
   type Team,
@@ -240,6 +242,10 @@ import {
   type InsertWebhookEndpoint,
   type WebhookDelivery,
   type InsertWebhookDelivery,
+  type ChecklistTemplate,
+  type InsertChecklistTemplate,
+  type Notification,
+  type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, like, count, sql, inArray, isNotNull, lt, lte } from "drizzle-orm";
@@ -790,6 +796,27 @@ export interface IStorage {
   getWebhookDeliveries(endpointId: string, orgId: string): Promise<WebhookDelivery[]>;
   getFailedWebhookDeliveriesForRetry(): Promise<WebhookDelivery[]>;
   updateWebhookDelivery(id: string, updates: Partial<InsertWebhookDelivery>): Promise<WebhookDelivery>;
+
+  // Checklist template operations
+  getChecklistTemplates(orgId: string): Promise<ChecklistTemplate[]>;
+  getChecklistTemplate(id: string): Promise<ChecklistTemplate | undefined>;
+  createChecklistTemplate(template: InsertChecklistTemplate): Promise<ChecklistTemplate>;
+  updateChecklistTemplate(id: string, orgId: string, template: Partial<InsertChecklistTemplate>): Promise<ChecklistTemplate>;
+  deleteChecklistTemplate(id: string, orgId: string): Promise<void>;
+
+  // Task checklist item operations (extended)
+  createTaskChecklistItem(item: InsertTaskChecklistItem): Promise<TaskChecklistItem>;
+  updateTaskChecklistItem(id: string, updates: Partial<InsertTaskChecklistItem>): Promise<TaskChecklistItem>;
+  deleteTaskChecklistItem(id: string): Promise<void>;
+  getTaskChecklistItem(id: string): Promise<TaskChecklistItem | undefined>;
+
+  // In-app notification operations
+  getNotifications(userId: string, orgId: string, limit?: number): Promise<Notification[]>;
+  getUnreadNotificationCount(userId: string, orgId: string): Promise<number>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markNotificationRead(id: number, userId: string): Promise<void>;
+  markAllNotificationsRead(userId: string, orgId: string): Promise<void>;
+  getOverdueTasksForNotification(orgId: string): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4188,6 +4215,11 @@ export class DatabaseStorage implements IStorage {
           emailOnReply: preferences.emailOnReply,
           emailOnReaction: preferences.emailOnReaction,
           emailOnBroadcast: preferences.emailOnBroadcast,
+          emailOnTaskAssigned: preferences.emailOnTaskAssigned,
+          emailOnTaskOverdue: preferences.emailOnTaskOverdue,
+          emailOnInspectionDue: preferences.emailOnInspectionDue,
+          emailOnInvoiceDue: preferences.emailOnInvoiceDue,
+          inAppEnabled: preferences.inAppEnabled,
           updatedAt: new Date(),
         }
       })
@@ -6660,6 +6692,133 @@ export class DatabaseStorage implements IStorage {
       .where(eq(webhookDeliveries.id, id))
       .returning();
     return updated;
+  }
+
+  // Checklist template operations
+  async getChecklistTemplates(orgId: string): Promise<ChecklistTemplate[]> {
+    return await db
+      .select()
+      .from(checklistTemplates)
+      .where(
+        and(
+          eq(checklistTemplates.isActive, true),
+          or(
+            eq(checklistTemplates.orgId, orgId),
+            sql`${checklistTemplates.orgId} IS NULL`
+          )
+        )
+      )
+      .orderBy(checklistTemplates.name);
+  }
+
+  async getChecklistTemplate(id: string): Promise<ChecklistTemplate | undefined> {
+    const [template] = await db
+      .select()
+      .from(checklistTemplates)
+      .where(eq(checklistTemplates.id, id));
+    return template;
+  }
+
+  async createChecklistTemplate(template: InsertChecklistTemplate): Promise<ChecklistTemplate> {
+    const [created] = await db.insert(checklistTemplates).values(template).returning();
+    return created;
+  }
+
+  async updateChecklistTemplate(id: string, orgId: string, template: Partial<InsertChecklistTemplate>): Promise<ChecklistTemplate> {
+    const [updated] = await db
+      .update(checklistTemplates)
+      .set({ ...template, updatedAt: new Date() })
+      .where(and(eq(checklistTemplates.id, id), eq(checklistTemplates.orgId, orgId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteChecklistTemplate(id: string, orgId: string): Promise<void> {
+    await db
+      .delete(checklistTemplates)
+      .where(and(eq(checklistTemplates.id, id), eq(checklistTemplates.orgId, orgId)));
+  }
+
+  // Task checklist item operations (extended)
+  async createTaskChecklistItem(item: InsertTaskChecklistItem): Promise<TaskChecklistItem> {
+    const [created] = await db.insert(taskChecklistItems).values(item).returning();
+    return created;
+  }
+
+  async updateTaskChecklistItem(id: string, updates: Partial<InsertTaskChecklistItem>): Promise<TaskChecklistItem> {
+    const [updated] = await db
+      .update(taskChecklistItems)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(taskChecklistItems.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTaskChecklistItem(id: string): Promise<void> {
+    await db.delete(taskChecklistItems).where(eq(taskChecklistItems.id, id));
+  }
+
+  async getTaskChecklistItem(id: string): Promise<TaskChecklistItem | undefined> {
+    const [item] = await db.select().from(taskChecklistItems).where(eq(taskChecklistItems.id, id));
+    return item;
+  }
+
+  // In-app notification operations
+  async getNotifications(userId: string, orgId: string, limit = 50): Promise<Notification[]> {
+    return await db
+      .select()
+      .from(notifications)
+      .where(and(eq(notifications.userId, userId), eq(notifications.orgId, orgId)))
+      .orderBy(desc(notifications.createdAt))
+      .limit(limit);
+  }
+
+  async getUnreadNotificationCount(userId: string, orgId: string): Promise<number> {
+    const [row] = await db
+      .select({ count: count() })
+      .from(notifications)
+      .where(and(eq(notifications.userId, userId), eq(notifications.orgId, orgId), eq(notifications.isRead, false)));
+    return Number(row?.count ?? 0);
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [created] = await db.insert(notifications).values(notification).returning();
+    return created;
+  }
+
+  async markNotificationRead(id: number, userId: string): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ isRead: true })
+      .where(and(eq(notifications.id, id), eq(notifications.userId, userId)));
+  }
+
+  async markAllNotificationsRead(userId: string, orgId: string): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ isRead: true })
+      .where(and(eq(notifications.userId, userId), eq(notifications.orgId, orgId), eq(notifications.isRead, false)));
+  }
+
+  async getOverdueTasksForNotification(orgId: string): Promise<any[]> {
+    const now = new Date();
+    return await db
+      .select({
+        id: tasks.id,
+        title: tasks.title,
+        dueDate: tasks.dueDate,
+        assignedTo: tasks.assignedTo,
+        orgId: tasks.orgId,
+      })
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.orgId, orgId),
+          eq(tasks.status, "open"),
+          lt(tasks.dueDate, now.toISOString()),
+          isNotNull(tasks.assignedTo)
+        )
+      );
   }
 }
 

@@ -672,4 +672,57 @@ export function startScheduledTasks() {
   });
 
   log('[CRON] Webhook retry job initialized - will run every 5 minutes');
+
+  // ── In-app notifications: overdue tasks ──────────────────────────────────
+  // Runs once a day at 8am — creates a notification for each org member whose
+  // assigned task is past due and has no notification yet for today.
+  cron.schedule('0 8 * * *', async () => {
+    try {
+      log('[CRON] Running overdue-task notification job...');
+      const orgs = await storage.getOrgs();
+      let notificationsCreated = 0;
+
+      for (const org of orgs) {
+        const orgId = org.id;
+        const tasks = await storage.getTasks(orgId);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const overdueTasks = (tasks as any[]).filter((t: any) => {
+          if (!t.dueDate || t.status === 'completed' || t.isArchived) return false;
+          const due = new Date(t.dueDate);
+          due.setHours(0, 0, 0, 0);
+          return due < today;
+        });
+
+        for (const task of overdueTasks) {
+          if (!task.assignedToId) continue;
+          // Avoid duplicate: check if notification for this task+user already sent today
+          const existing = await storage.getNotifications(task.assignedToId, orgId, 200);
+          const alreadySent = (existing as any[]).some(
+            (n: any) =>
+              n.type === 'task_overdue' &&
+              n.linkUrl === `/task-profile/${task.id}` &&
+              new Date(n.createdAt).toDateString() === new Date().toDateString()
+          );
+          if (alreadySent) continue;
+
+          await storage.createNotification({
+            orgId,
+            userId: task.assignedToId,
+            type: 'task_overdue',
+            title: 'Task Overdue',
+            body: `"${task.title}" was due on ${new Date(task.dueDate).toLocaleDateString()} and is still open.`,
+            linkUrl: `/task-profile/${task.id}`,
+          });
+          notificationsCreated++;
+        }
+      }
+      log(`[CRON] Overdue-task notifications complete. Created ${notificationsCreated} notifications.`);
+    } catch (error) {
+      log(`[CRON] Error in overdue-task notification job: ${error}`);
+    }
+  });
+
+  log('[CRON] Overdue-task notification job initialized - will run daily at 8am');
 }

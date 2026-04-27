@@ -60,7 +60,8 @@ import {
   ArrowDown,
   ArrowUpDown,
   Check,
-  ChevronsUpDown
+  ChevronsUpDown,
+  ClipboardCheck
 } from "lucide-react";
 import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -928,6 +929,218 @@ function TaskTemplatesManager() {
               data-testid="button-save-template"
             >
               {createTemplateMutation.isPending ? "Creating..." : "Create Template"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// Inspection Templates Manager Component
+function InspectionTemplatesManager() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<any | null>(null);
+  const [items, setItems] = useState<Array<{ text: string; required: boolean }>>([]);
+  const [currentItemText, setCurrentItemText] = useState("");
+  const [formData, setFormData] = useState({ name: "", description: "", category: "inspection" });
+
+  const { data: templates = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/checklist-templates"],
+  });
+
+  const inspectionTemplates = (templates as any[]).filter((t: any) => t.category === "inspection");
+
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => apiRequest("POST", "/api/checklist-templates", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/checklist-templates"] });
+      setIsDialogOpen(false);
+      resetForm();
+      toast({ title: "Template created", description: "Inspection template saved successfully." });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message || "Failed to create template", variant: "destructive" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => apiRequest("PATCH", `/api/checklist-templates/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/checklist-templates"] });
+      setIsDialogOpen(false);
+      resetForm();
+      toast({ title: "Template updated" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message || "Failed to update template", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/checklist-templates/${id}`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/checklist-templates"] });
+      toast({ title: "Template deleted" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message || "Failed to delete template", variant: "destructive" }),
+  });
+
+  const resetForm = () => {
+    setFormData({ name: "", description: "", category: "inspection" });
+    setItems([]);
+    setCurrentItemText("");
+    setEditingTemplate(null);
+  };
+
+  const openEdit = (template: any) => {
+    setEditingTemplate(template);
+    setFormData({ name: template.name, description: template.description || "", category: template.category });
+    setItems((template.items || []).map((i: any) => ({ text: i.text, required: i.required || false })));
+    setIsDialogOpen(true);
+  };
+
+  const addItem = () => {
+    if (currentItemText.trim()) {
+      setItems([...items, { text: currentItemText.trim(), required: false }]);
+      setCurrentItemText("");
+    }
+  };
+
+  const toggleRequired = (index: number) => {
+    setItems(items.map((item, i) => i === index ? { ...item, required: !item.required } : item));
+  };
+
+  const removeItem = (index: number) => setItems(items.filter((_, i) => i !== index));
+
+  const handleSave = () => {
+    if (!formData.name.trim()) {
+      toast({ title: "Name is required", variant: "destructive" });
+      return;
+    }
+    const payload = { ...formData, items };
+    if (editingTemplate) {
+      updateMutation.mutate({ id: editingTemplate.id, data: payload });
+    } else {
+      createMutation.mutate(payload);
+    }
+  };
+
+  if (isLoading) return <div className="text-sm text-slate-500">Loading templates...</div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <p className="text-sm text-slate-600">
+          {inspectionTemplates.length} inspection template{inspectionTemplates.length !== 1 ? "s" : ""}
+        </p>
+        <Button size="sm" onClick={() => { resetForm(); setIsDialogOpen(true); }}>
+          <Plus className="w-4 h-4 mr-2" />
+          New Template
+        </Button>
+      </div>
+
+      {inspectionTemplates.length === 0 ? (
+        <div className="text-center py-8 text-slate-500 border rounded-lg border-dashed">
+          <p className="text-sm">No inspection templates yet.</p>
+          <p className="text-xs mt-1">Create a template to standardize your property inspections.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {inspectionTemplates.map((template: any) => (
+            <div key={template.id} className="border rounded-lg p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="font-medium text-sm">{template.name}</p>
+                  {template.description && <p className="text-xs text-slate-500 mt-0.5">{template.description}</p>}
+                  <p className="text-xs text-slate-400 mt-1">{(template.items || []).length} checklist items</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => openEdit(template)}>
+                    <Edit className="w-3 h-3 mr-1" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-red-600 hover:text-red-700"
+                    onClick={() => {
+                      if (confirm("Delete this template?")) deleteMutation.mutate(template.id);
+                    }}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) resetForm(); setIsDialogOpen(open); }}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingTemplate ? "Edit" : "Create"} Inspection Template</DialogTitle>
+            <DialogDescription>
+              Define a reusable checklist for property inspections.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label>Template Name *</Label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g. Standard Property Inspection"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Description</Label>
+              <Textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Optional description"
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Checklist Items</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={currentItemText}
+                  onChange={(e) => setCurrentItemText(e.target.value)}
+                  placeholder="Add an item..."
+                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addItem())}
+                />
+                <Button type="button" variant="outline" onClick={addItem}>Add</Button>
+              </div>
+              {items.length > 0 && (
+                <div className="space-y-1 mt-2">
+                  {items.map((item, index) => (
+                    <div key={index} className="flex items-center gap-2 p-2 bg-slate-50 rounded">
+                      <Checkbox
+                        checked={item.required}
+                        onCheckedChange={() => toggleRequired(index)}
+                        id={`req-${index}`}
+                      />
+                      <label htmlFor={`req-${index}`} className="text-xs text-slate-500 cursor-pointer">Required</label>
+                      <span className="flex-1 text-sm">{item.text}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-slate-400 hover:text-red-500"
+                        onClick={() => removeItem(index)}
+                      >
+                        <XIcon className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { resetForm(); setIsDialogOpen(false); }}>Cancel</Button>
+            <Button onClick={handleSave} disabled={createMutation.isPending || updateMutation.isPending}>
+              {(createMutation.isPending || updateMutation.isPending) ? "Saving..." : "Save Template"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2693,6 +2906,25 @@ export default function Admin() {
                 When creating a new task, you can select a template to auto-fill all task details.
               </p>
               <TaskTemplatesManager />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <ClipboardCheck className="w-5 h-5 mr-2" />
+                Inspection Checklist Templates
+              </CardTitle>
+              <CardDescription>
+                Create reusable inspection checklists with pass/fail items for property inspections
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-slate-600 mb-4">
+                Inspection templates define a standardized set of checklist items (with required flags) that field staff
+                complete during property inspections. Apply a template to any inspection task with one click.
+              </p>
+              <InspectionTemplatesManager />
             </CardContent>
           </Card>
 
