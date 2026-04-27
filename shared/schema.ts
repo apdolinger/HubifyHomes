@@ -3027,3 +3027,66 @@ export const insertApiKeySchema = createInsertSchema(apiKeys).omit({
 });
 export type InsertApiKey = z.infer<typeof insertApiKeySchema>;
 export type ApiKey = typeof apiKeys.$inferSelect;
+
+// Webhook event types
+export const WEBHOOK_EVENT_TYPES = [
+  "task.created",
+  "task.updated",
+  "task.completed",
+  "contact.created",
+  "invoice.sent",
+  "inspection.completed",
+  "test",
+] as const;
+export type WebhookEventType = typeof WEBHOOK_EVENT_TYPES[number];
+
+// Webhook endpoints - org-configured outbound webhook destinations
+export const webhookEndpoints = pgTable("webhook_endpoints", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  url: text("url").notNull(),
+  secret: varchar("secret").notNull(),
+  eventTypes: jsonb("event_types").$type<WebhookEventType[]>().notNull().default([]),
+  enabled: boolean("enabled").notNull().default(true),
+  description: varchar("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("webhook_endpoints_org_idx").on(table.orgId),
+]);
+
+export const insertWebhookEndpointSchema = createInsertSchema(webhookEndpoints).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertWebhookEndpoint = z.infer<typeof insertWebhookEndpointSchema>;
+export type WebhookEndpoint = typeof webhookEndpoints.$inferSelect;
+
+// Webhook deliveries - log of outbound webhook delivery attempts
+export const webhookDeliveries = pgTable("webhook_deliveries", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  endpointId: uuid("endpoint_id").references(() => webhookEndpoints.id, { onDelete: "cascade" }).notNull(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+  eventType: varchar("event_type").$type<WebhookEventType>().notNull(),
+  payload: jsonb("payload").$type<Record<string, any>>().notNull(),
+  status: varchar("status").$type<"pending"|"success"|"failed">().notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  lastAttemptAt: timestamp("last_attempt_at"),
+  nextRetryAt: timestamp("next_retry_at"),
+  responseStatus: integer("response_status"),
+  responseBody: text("response_body"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("webhook_deliveries_endpoint_idx").on(table.endpointId),
+  index("webhook_deliveries_org_idx").on(table.orgId),
+  index("webhook_deliveries_status_idx").on(table.status),
+]);
+
+export const insertWebhookDeliverySchema = createInsertSchema(webhookDeliveries).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertWebhookDelivery = z.infer<typeof insertWebhookDeliverySchema>;
+export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;

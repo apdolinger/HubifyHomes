@@ -51,8 +51,12 @@ import {
   Copy,
   Info,
   Globe,
-  XCircle
+  XCircle,
+  Webhook,
+  RefreshCw,
+  Send,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Organization form schema
 const orgFormSchema = z.object({
@@ -1356,6 +1360,9 @@ export default function Account() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Webhooks Section */}
+            <WebhooksSection orgId={orgId} />
           </div>
         </TabsContent>
 
@@ -2125,6 +2132,468 @@ function BillingSettingsForm({ orgId, onClose }: { orgId: string; onClose: () =>
           )}
         </Button>
       </div>
+    </div>
+  );
+}
+
+// ─── Webhook Event Types ──────────────────────────────────────────────────────
+const WEBHOOK_EVENT_TYPES = [
+  { value: "task.created", label: "Task Created" },
+  { value: "task.updated", label: "Task Updated" },
+  { value: "task.completed", label: "Task Completed" },
+  { value: "contact.created", label: "Contact Created" },
+  { value: "invoice.sent", label: "Invoice Sent" },
+  { value: "inspection.completed", label: "Inspection Completed" },
+];
+
+// ─── Webhooks Section ─────────────────────────────────────────────────────────
+interface WebhookEndpoint {
+  id: string;
+  orgId: string;
+  url: string;
+  secretHint: string;
+  eventTypes: string[];
+  enabled: boolean;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface WebhookDelivery {
+  id: string;
+  endpointId: string;
+  orgId: string;
+  eventType: string;
+  status: "pending" | "success" | "failed";
+  attempts: number;
+  lastAttemptAt: string | null;
+  responseStatus: number | null;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
+interface WebhookEndpointFormData {
+  url: string;
+  secret?: string;
+  description?: string;
+  eventTypes: string[];
+  enabled?: boolean;
+}
+
+interface TestEventResult {
+  success: boolean;
+  status?: number;
+  error?: string;
+}
+
+function WebhooksSection({ orgId }: { orgId: string }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const [addOpen, setAddOpen] = useState(false);
+  const [editEndpoint, setEditEndpoint] = useState<WebhookEndpoint | null>(null);
+  const [deliveryEndpointId, setDeliveryEndpointId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const { data: endpoints = [], isLoading } = useQuery<WebhookEndpoint[]>({
+    queryKey: ["/api/webhooks/endpoints"],
+    enabled: !!orgId,
+  });
+
+  const { data: deliveries = [], isLoading: loadingDeliveries } = useQuery<WebhookDelivery[]>({
+    queryKey: ["/api/webhooks/endpoints", deliveryEndpointId, "deliveries"],
+    enabled: !!deliveryEndpointId,
+    queryFn: () => fetch(`/api/webhooks/endpoints/${deliveryEndpointId}/deliveries`).then(r => r.json()),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: WebhookEndpointFormData) => apiRequest("POST", "/api/webhooks/endpoints", data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/webhooks/endpoints"] });
+      setAddOpen(false);
+      setEditEndpoint(null);
+      toast({ title: "Webhook endpoint created" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<WebhookEndpointFormData> }) =>
+      apiRequest("PATCH", `/api/webhooks/endpoints/${id}`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/webhooks/endpoints"] });
+      setAddOpen(false);
+      setEditEndpoint(null);
+      toast({ title: "Webhook endpoint updated" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/webhooks/endpoints/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/webhooks/endpoints"] });
+      toast({ title: "Webhook endpoint deleted" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const testMutation = useMutation({
+    mutationFn: async (id: string): Promise<TestEventResult> => {
+      const res = await apiRequest("POST", `/api/webhooks/endpoints/${id}/test`);
+      return res.json() as Promise<TestEventResult>;
+    },
+    onSuccess: (data: TestEventResult, id: string) => {
+      if (data.success) {
+        toast({ title: "Test event delivered", description: `HTTP ${data.status}` });
+      } else {
+        toast({ title: "Test event sent", description: data.error || (data.status ? `HTTP ${data.status}` : "Delivery attempted"), variant: "destructive" });
+      }
+      qc.invalidateQueries({ queryKey: ["/api/webhooks/endpoints", id, "deliveries"] });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
+      apiRequest("PATCH", `/api/webhooks/endpoints/${id}`, { enabled }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/webhooks/endpoints"] }),
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const openEdit = (ep: WebhookEndpoint) => {
+    setEditEndpoint(ep);
+    setAddOpen(true);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center">
+              <Webhook className="w-5 h-5 mr-2" />
+              Outbound Webhooks
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Send real-time HTTP POST notifications to Zapier, Make, N8N, or any custom endpoint when events occur.
+            </CardDescription>
+          </div>
+          <Button onClick={() => { setEditEndpoint(null); setAddOpen(true); }} data-testid="button-add-webhook">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Endpoint
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
+        ) : endpoints.length === 0 ? (
+          <div className="text-center py-12 text-slate-500">
+            <Webhook className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+            <p className="font-medium">No webhook endpoints configured</p>
+            <p className="text-sm mt-1">Add an endpoint to receive real-time event notifications</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {endpoints.map((ep: WebhookEndpoint) => (
+              <div key={ep.id} className="border rounded-lg overflow-hidden">
+                <div className="flex items-center gap-3 p-4">
+                  <Switch
+                    checked={ep.enabled}
+                    onCheckedChange={(v) => toggleMutation.mutate({ id: ep.id, enabled: v })}
+                    data-testid={`switch-endpoint-${ep.id}`}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm font-medium truncate">{ep.url}</span>
+                      {ep.enabled ? (
+                        <Badge className="bg-green-50 text-green-700 border-green-200 shrink-0" variant="outline">Active</Badge>
+                      ) : (
+                        <Badge className="bg-slate-100 text-slate-600 shrink-0" variant="outline">Disabled</Badge>
+                      )}
+                    </div>
+                    {ep.description && (
+                      <p className="text-xs text-slate-500 mt-0.5">{ep.description}</p>
+                    )}
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {(ep.eventTypes as string[]).map((t: string) => (
+                        <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => testMutation.mutate(ep.id)}
+                      disabled={testMutation.isPending}
+                      title="Send test event"
+                      data-testid={`button-test-endpoint-${ep.id}`}
+                    >
+                      <Send className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setDeliveryEndpointId(deliveryEndpointId === ep.id ? null : ep.id)}
+                      title="View delivery log"
+                      data-testid={`button-deliveries-${ep.id}`}
+                    >
+                      <Activity className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => openEdit(ep)}
+                      data-testid={`button-edit-endpoint-${ep.id}`}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    {deleteConfirmId === ep.id ? (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => { deleteMutation.mutate(ep.id); setDeleteConfirmId(null); }}
+                          disabled={deleteMutation.isPending}
+                          data-testid={`button-confirm-delete-${ep.id}`}
+                        >
+                          Delete
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setDeleteConfirmId(null)}
+                          data-testid={`button-cancel-delete-${ep.id}`}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setDeleteConfirmId(ep.id)}
+                        data-testid={`button-delete-endpoint-${ep.id}`}
+                      >
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Delivery Log Drawer */}
+                {deliveryEndpointId === ep.id && (
+                  <div className="border-t bg-slate-50 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-1">
+                        <Activity className="w-4 h-4" />
+                        Recent Deliveries
+                      </h4>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => qc.invalidateQueries({ queryKey: ["/api/webhooks/endpoints", ep.id, "deliveries"] })}
+                      >
+                        <RefreshCw className="w-3 h-3 mr-1" />
+                        Refresh
+                      </Button>
+                    </div>
+                    {loadingDeliveries ? (
+                      <div className="text-center py-4 text-slate-500 text-sm">Loading...</div>
+                    ) : deliveries.length === 0 ? (
+                      <div className="text-center py-4 text-slate-500 text-sm">No deliveries yet</div>
+                    ) : (
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {deliveries.map((d: WebhookDelivery) => (
+                          <div key={d.id} className="bg-white rounded border p-3 text-xs">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                {d.status === "success" ? (
+                                  <CheckCircle className="w-3 h-3 text-green-500" />
+                                ) : d.status === "failed" ? (
+                                  <XCircle className="w-3 h-3 text-red-500" />
+                                ) : (
+                                  <Clock className="w-3 h-3 text-yellow-500" />
+                                )}
+                                <Badge variant="secondary" className="text-xs">{d.eventType}</Badge>
+                              </div>
+                              <div className="text-slate-500">
+                                {d.responseStatus && <span className="mr-2">HTTP {d.responseStatus}</span>}
+                                {d.attempts && <span>{d.attempts} attempt{d.attempts !== 1 ? "s" : ""}</span>}
+                              </div>
+                            </div>
+                            <div className="mt-1 text-slate-500">
+                              {new Date(d.createdAt).toLocaleString()}
+                              {d.errorMessage && (
+                                <span className="ml-2 text-red-600">{d.errorMessage.slice(0, 120)}</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+
+      {/* Add / Edit Endpoint Dialog */}
+      <Dialog open={addOpen} onOpenChange={(v) => { setAddOpen(v); if (!v) setEditEndpoint(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editEndpoint ? "Edit Webhook Endpoint" : "Add Webhook Endpoint"}</DialogTitle>
+            <DialogDescription>
+              Configure an HTTPS URL that will receive POST requests signed with HMAC-SHA256.
+            </DialogDescription>
+          </DialogHeader>
+          <WebhookEndpointForm
+            initial={editEndpoint}
+            onSave={(data) => {
+              if (editEndpoint) {
+                updateMutation.mutate({ id: editEndpoint.id, data });
+              } else {
+                createMutation.mutate(data);
+              }
+            }}
+            onCancel={() => { setAddOpen(false); setEditEndpoint(null); }}
+            isPending={createMutation.isPending || updateMutation.isPending}
+          />
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
+// ─── Webhook Endpoint Form ────────────────────────────────────────────────────
+function WebhookEndpointForm({
+  initial,
+  onSave,
+  onCancel,
+  isPending,
+}: {
+  initial?: WebhookEndpoint | null;
+  onSave: (data: WebhookEndpointFormData) => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
+  const isEditing = !!initial;
+  const [url, setUrl] = useState(initial?.url ?? "");
+  const [secret, setSecret] = useState("");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [selectedEvents, setSelectedEvents] = useState<string[]>(initial?.eventTypes ?? []);
+  const [showSecret, setShowSecret] = useState(false);
+
+  const toggleEvent = (value: string) => {
+    setSelectedEvents(prev =>
+      prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]
+    );
+  };
+
+  const generateSecret = () => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    setSecret(Array.from({ length: 32 }, () => chars[Math.floor(Math.random() * chars.length)]).join(""));
+  };
+
+  const handleSave = () => {
+    const payload: WebhookEndpointFormData = { url, eventTypes: selectedEvents, description: description || undefined };
+    if (secret) payload.secret = secret;
+    onSave(payload);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <Label htmlFor="wh-url">Endpoint URL *</Label>
+        <Input
+          id="wh-url"
+          value={url}
+          onChange={e => setUrl(e.target.value)}
+          placeholder="https://your-server.com/webhook"
+          data-testid="input-webhook-url"
+        />
+        <p className="text-xs text-slate-500 mt-1">Must be publicly reachable HTTPS URL</p>
+      </div>
+
+      <div>
+        <Label htmlFor="wh-secret">
+          {isEditing ? "New Signing Secret (optional)" : "Signing Secret *"}
+        </Label>
+        {isEditing && initial?.secretHint && (
+          <p className="text-xs text-slate-500 mb-1">
+            Current secret: <code className="bg-slate-100 px-1 rounded font-mono">{initial.secretHint}</code>
+            {" "}— leave blank to keep it
+          </p>
+        )}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Input
+              id="wh-secret"
+              type={showSecret ? "text" : "password"}
+              value={secret}
+              onChange={e => setSecret(e.target.value)}
+              placeholder={isEditing ? "Enter new secret to rotate it" : "At least 8 characters"}
+              data-testid="input-webhook-secret"
+            />
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => setShowSecret(v => !v)}>
+            <Eye className="w-4 h-4" />
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={generateSecret} title="Generate random secret">
+            <RefreshCw className="w-4 h-4" />
+          </Button>
+        </div>
+        <p className="text-xs text-slate-500 mt-1">
+          Used to sign payloads via <code className="bg-slate-100 px-1 rounded">X-Hubify-Signature</code> (HMAC-SHA256)
+        </p>
+      </div>
+
+      <div>
+        <Label htmlFor="wh-desc">Description (optional)</Label>
+        <Input
+          id="wh-desc"
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+          placeholder="e.g., Zapier integration"
+          data-testid="input-webhook-description"
+        />
+      </div>
+
+      <div>
+        <Label className="mb-2 block">Events to Subscribe *</Label>
+        <div className="grid grid-cols-2 gap-2 border rounded-lg p-3 bg-slate-50">
+          {WEBHOOK_EVENT_TYPES.map(et => (
+            <div key={et.value} className="flex items-center gap-2">
+              <Checkbox
+                id={`evt-${et.value}`}
+                checked={selectedEvents.includes(et.value)}
+                onCheckedChange={() => toggleEvent(et.value)}
+                data-testid={`checkbox-event-${et.value}`}
+              />
+              <label htmlFor={`evt-${et.value}`} className="text-sm cursor-pointer select-none">
+                {et.label}
+              </label>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <DialogFooter>
+        <Button variant="outline" onClick={onCancel} disabled={isPending}>Cancel</Button>
+        <Button
+          onClick={handleSave}
+          disabled={isPending || !url || (!isEditing && !secret) || selectedEvents.length === 0}
+          data-testid="button-save-webhook"
+        >
+          {isPending ? "Saving..." : initial ? "Update Endpoint" : "Add Endpoint"}
+        </Button>
+      </DialogFooter>
     </div>
   );
 }

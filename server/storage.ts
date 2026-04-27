@@ -80,6 +80,8 @@ import {
   paymentCollectionTokens,
   apiKeys,
   passwordResetTokens,
+  webhookEndpoints,
+  webhookDeliveries,
   type User,
   type UpsertUser,
   type Team,
@@ -234,9 +236,13 @@ import {
   type InsertApiKey,
   type PasswordResetToken,
   type InsertPasswordResetToken,
+  type WebhookEndpoint,
+  type InsertWebhookEndpoint,
+  type WebhookDelivery,
+  type InsertWebhookDelivery,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, or, like, count, sql, inArray, isNotNull } from "drizzle-orm";
+import { eq, desc, and, or, like, count, sql, inArray, isNotNull, lt, lte } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { nanoid } from "nanoid";
 
@@ -770,6 +776,20 @@ export interface IStorage {
   getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
   markPasswordResetTokenUsed(token: string): Promise<void>;
   invalidatePasswordResetTokensForEmail(email: string): Promise<void>;
+
+  // Webhook endpoint operations
+  getWebhookEndpoints(orgId: string): Promise<WebhookEndpoint[]>;
+  getWebhookEndpoint(id: string, orgId: string): Promise<WebhookEndpoint | undefined>;
+  getEnabledWebhookEndpointsForEvent(orgId: string, eventType: string): Promise<WebhookEndpoint[]>;
+  createWebhookEndpoint(endpoint: InsertWebhookEndpoint): Promise<WebhookEndpoint>;
+  updateWebhookEndpoint(id: string, orgId: string, endpoint: Partial<InsertWebhookEndpoint>): Promise<WebhookEndpoint>;
+  deleteWebhookEndpoint(id: string, orgId: string): Promise<void>;
+
+  // Webhook delivery operations
+  createWebhookDelivery(delivery: InsertWebhookDelivery): Promise<WebhookDelivery>;
+  getWebhookDeliveries(endpointId: string, orgId: string): Promise<WebhookDelivery[]>;
+  getFailedWebhookDeliveriesForRetry(): Promise<WebhookDelivery[]>;
+  updateWebhookDelivery(id: string, updates: Partial<InsertWebhookDelivery>): Promise<WebhookDelivery>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -6557,6 +6577,89 @@ export class DatabaseStorage implements IStorage {
         eq(passwordResetTokens.email, email),
         eq(passwordResetTokens.isUsed, false)
       ));
+  }
+
+  // Webhook endpoint operations
+  async getWebhookEndpoints(orgId: string): Promise<WebhookEndpoint[]> {
+    return await db
+      .select()
+      .from(webhookEndpoints)
+      .where(eq(webhookEndpoints.orgId, orgId))
+      .orderBy(desc(webhookEndpoints.createdAt));
+  }
+
+  async getWebhookEndpoint(id: string, orgId: string): Promise<WebhookEndpoint | undefined> {
+    const [endpoint] = await db
+      .select()
+      .from(webhookEndpoints)
+      .where(and(eq(webhookEndpoints.id, id), eq(webhookEndpoints.orgId, orgId)));
+    return endpoint;
+  }
+
+  async getEnabledWebhookEndpointsForEvent(orgId: string, eventType: string): Promise<WebhookEndpoint[]> {
+    const endpoints = await db
+      .select()
+      .from(webhookEndpoints)
+      .where(and(eq(webhookEndpoints.orgId, orgId), eq(webhookEndpoints.enabled, true)));
+    return endpoints.filter(ep => (ep.eventTypes as string[]).includes(eventType));
+  }
+
+  async createWebhookEndpoint(endpoint: InsertWebhookEndpoint): Promise<WebhookEndpoint> {
+    const [created] = await db.insert(webhookEndpoints).values(endpoint).returning();
+    return created;
+  }
+
+  async updateWebhookEndpoint(id: string, orgId: string, endpoint: Partial<InsertWebhookEndpoint>): Promise<WebhookEndpoint> {
+    const [updated] = await db
+      .update(webhookEndpoints)
+      .set({ ...endpoint, updatedAt: new Date() })
+      .where(and(eq(webhookEndpoints.id, id), eq(webhookEndpoints.orgId, orgId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteWebhookEndpoint(id: string, orgId: string): Promise<void> {
+    await db
+      .delete(webhookEndpoints)
+      .where(and(eq(webhookEndpoints.id, id), eq(webhookEndpoints.orgId, orgId)));
+  }
+
+  // Webhook delivery operations
+  async createWebhookDelivery(delivery: InsertWebhookDelivery): Promise<WebhookDelivery> {
+    const [created] = await db.insert(webhookDeliveries).values(delivery).returning();
+    return created;
+  }
+
+  async getWebhookDeliveries(endpointId: string, orgId: string): Promise<WebhookDelivery[]> {
+    return await db
+      .select()
+      .from(webhookDeliveries)
+      .where(and(eq(webhookDeliveries.endpointId, endpointId), eq(webhookDeliveries.orgId, orgId)))
+      .orderBy(desc(webhookDeliveries.createdAt))
+      .limit(50);
+  }
+
+  async getFailedWebhookDeliveriesForRetry(): Promise<WebhookDelivery[]> {
+    const now = new Date();
+    // MAX_ATTEMPTS=3 retries means total 4 deliveries (1 initial + 3 retries).
+    // Fetch any failed delivery with attempts < 4 (i.e. has at least one retry remaining).
+    return await db
+      .select()
+      .from(webhookDeliveries)
+      .where(and(
+        eq(webhookDeliveries.status, "failed"),
+        lte(webhookDeliveries.nextRetryAt, now),
+        lt(webhookDeliveries.attempts, 4)
+      ));
+  }
+
+  async updateWebhookDelivery(id: string, updates: Partial<InsertWebhookDelivery>): Promise<WebhookDelivery> {
+    const [updated] = await db
+      .update(webhookDeliveries)
+      .set(updates)
+      .where(eq(webhookDeliveries.id, id))
+      .returning();
+    return updated;
   }
 }
 

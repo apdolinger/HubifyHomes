@@ -660,4 +660,16 @@ export function startScheduledTasks() {
   });
   
   log('[CRON] Scheduled email processor initialized - will run every 5 minutes');
+
+  // Retry failed webhook deliveries every 5 minutes
+  cron.schedule('*/5 * * * *', async () => {
+    try {
+      const { retryFailedWebhookDeliveries } = await import('./webhookDispatcher');
+      await retryFailedWebhookDeliveries();
+    } catch (error) {
+      log(`[CRON] Error in webhook retry job: ${error}`);
+    }
+  });
+
+  log('[CRON] Webhook retry job initialized - will run every 5 minutes');
 }

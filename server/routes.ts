@@ -84,13 +84,15 @@ import {
   customFields,
   managementNotes,
   isPremiumPropertyType,
-  tierAllowsPremiumProperties
+  tierAllowsPremiumProperties,
+  WEBHOOK_EVENT_TYPES
 } from "@shared/schema";
 import { z } from "zod";
 import { createSetupIntentForClient, detachPaymentMethod } from "./stripe";
 import { db } from "./db";
 import { eq, lt, and } from "drizzle-orm";
 import sgMail from "@sendgrid/mail";
+import { dispatchWebhookEvent, sendTestWebhookEvent, validateWebhookUrlSafe } from "./webhookDispatcher";
 
 // Initialize SendGrid if API key is available
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
@@ -4965,6 +4967,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignedById: userId,
       });
 
+      // Fire webhook event for task creation
+      const taskOrgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (taskOrgId) {
+        dispatchWebhookEvent(taskOrgId, "task.created", { task }).catch(() => {});
+      }
+
       // If this is a recurring task, automatically generate instances
       let generatedInstances: any[] = [];
       if (task.recurrenceRule) {
@@ -5213,6 +5221,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const task = await storage.updateTask(taskId, updateData);
+
+      // Fire webhook event for task update
+      const updateTaskOrgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (updateTaskOrgId) {
+        dispatchWebhookEvent(updateTaskOrgId, "task.updated", { task }).catch(() => {});
+      }
       
       // Check for out-of-office conflicts if assignee or due date changed
       let conflict = { hasConflict: false, activeOOO: null, assignedUser: null };
@@ -5272,6 +5286,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const taskId = parseInt(req.params.id);
       const task = await storage.completeTask(taskId);
+
+      // Fire webhook event for task completion
+      const completeOrgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (completeOrgId) {
+        dispatchWebhookEvent(completeOrgId, "task.completed", { task }).catch(() => {});
+        // Also fire inspection.completed when the completed task is categorized as an inspection
+        if (task.category === "inspection") {
+          dispatchWebhookEvent(completeOrgId, "inspection.completed", { task }).catch(() => {});
+        }
+      }
+
       res.json(task);
     } catch (error) {
       console.error("Error completing task:", error);
@@ -5606,9 +5631,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/contacts", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const orgId = req.user.orgId || "00000000-0000-0000-0000-000000000000";
+      const orgId = req.user?.claims?.orgId || req.user?.orgId || "00000000-0000-0000-0000-000000000000";
       const validatedData = insertContactSchema.parse({ ...req.body, orgId });
       const contact = await storage.createContact(validatedData, userId);
+
+      // Fire webhook event for contact creation
+      if (orgId && orgId !== "00000000-0000-0000-0000-000000000000") {
+        dispatchWebhookEvent(orgId, "contact.created", { contact }).catch(() => {});
+      }
+
       res.status(201).json(contact);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -12136,6 +12167,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: 'open'
       });
 
+      // Fire webhook event for invoice sent
+      const invoiceOrgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (invoiceOrgId) {
+        dispatchWebhookEvent(invoiceOrgId, "invoice.sent", { invoice, recipientEmail: emailTo }).catch(() => {});
+      }
+
       // Log activity
       await storage.logActivity({
         userId,
@@ -13060,6 +13097,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error rescheduling scheduled email:", error);
       res.status(500).json({ message: "Failed to reschedule scheduled email" });
+    }
+  });
+
+  // =====================
+  // Webhook Endpoints API
+  // =====================
+
+  /**
+   * Redacts the signing secret before sending endpoint data to the client.
+   * Returns only the last 4 characters so admins can identify which key is set
+   * without exposing the full secret. All secrets are stored only server-side.
+   */
+  function redactEndpointSecret<T extends { secret: string }>(endpoint: T): Omit<T, "secret"> & { secretHint: string } {
+    const { secret, ...rest } = endpoint;
+    return { ...rest, secretHint: "••••" + secret.slice(-4) };
+  }
+
+  // GET /api/webhooks/endpoints — list org's webhook endpoints
+  app.get("/api/webhooks/endpoints", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (!orgId) return res.status(400).json({ message: "Organization not found" });
+      const endpoints = await storage.getWebhookEndpoints(orgId);
+      res.json(endpoints.map(redactEndpointSecret));
+    } catch (error) {
+      console.error("Error fetching webhook endpoints:", error);
+      res.status(500).json({ message: "Failed to fetch webhook endpoints" });
+    }
+  });
+
+  // POST /api/webhooks/endpoints — create a new webhook endpoint
+  app.post("/api/webhooks/endpoints", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (!orgId) return res.status(400).json({ message: "Organization not found" });
+
+      const schema = z.object({
+        url: z.string().url("Must be a valid URL"),
+        secret: z.string().min(8, "Secret must be at least 8 characters"),
+        eventTypes: z.array(z.enum(WEBHOOK_EVENT_TYPES)).min(1, "Select at least one event type"),
+        enabled: z.boolean().optional().default(true),
+        description: z.string().optional(),
+      });
+
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors[0].message });
+      }
+
+      const urlCheck = await validateWebhookUrlSafe(parsed.data.url);
+      if (!urlCheck.valid) {
+        return res.status(400).json({ message: urlCheck.reason });
+      }
+
+      const endpoint = await storage.createWebhookEndpoint({ ...parsed.data, orgId });
+      res.status(201).json(redactEndpointSecret(endpoint));
+    } catch (error) {
+      console.error("Error creating webhook endpoint:", error);
+      res.status(500).json({ message: "Failed to create webhook endpoint" });
+    }
+  });
+
+  // PATCH /api/webhooks/endpoints/:id — update a webhook endpoint
+  app.patch("/api/webhooks/endpoints/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (!orgId) return res.status(400).json({ message: "Organization not found" });
+
+      const { id } = req.params;
+      const schema = z.object({
+        url: z.string().url().optional(),
+        secret: z.string().min(8).optional(),
+        eventTypes: z.array(z.enum(WEBHOOK_EVENT_TYPES)).optional(),
+        enabled: z.boolean().optional(),
+        description: z.string().optional(),
+      });
+
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors[0].message });
+      }
+
+      if (parsed.data.url) {
+        const urlCheck = await validateWebhookUrlSafe(parsed.data.url);
+        if (!urlCheck.valid) {
+          return res.status(400).json({ message: urlCheck.reason });
+        }
+      }
+
+      const existing = await storage.getWebhookEndpoint(id, orgId);
+      if (!existing) return res.status(404).json({ message: "Endpoint not found" });
+
+      const updated = await storage.updateWebhookEndpoint(id, orgId, parsed.data);
+      res.json(redactEndpointSecret(updated));
+    } catch (error) {
+      console.error("Error updating webhook endpoint:", error);
+      res.status(500).json({ message: "Failed to update webhook endpoint" });
+    }
+  });
+
+  // DELETE /api/webhooks/endpoints/:id — delete a webhook endpoint
+  app.delete("/api/webhooks/endpoints/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (!orgId) return res.status(400).json({ message: "Organization not found" });
+
+      const { id } = req.params;
+      const existing = await storage.getWebhookEndpoint(id, orgId);
+      if (!existing) return res.status(404).json({ message: "Endpoint not found" });
+
+      await storage.deleteWebhookEndpoint(id, orgId);
+      res.json({ message: "Webhook endpoint deleted" });
+    } catch (error) {
+      console.error("Error deleting webhook endpoint:", error);
+      res.status(500).json({ message: "Failed to delete webhook endpoint" });
+    }
+  });
+
+  // POST /api/webhooks/endpoints/:id/test — send a test event
+  app.post("/api/webhooks/endpoints/:id/test", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (!orgId) return res.status(400).json({ message: "Organization not found" });
+
+      const { id } = req.params;
+      const result = await sendTestWebhookEvent(id, orgId);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error sending test webhook:", error);
+      res.status(500).json({ message: error.message || "Failed to send test event" });
+    }
+  });
+
+  // GET /api/webhooks/endpoints/:id/deliveries — delivery log for an endpoint
+  app.get("/api/webhooks/endpoints/:id/deliveries", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (!orgId) return res.status(400).json({ message: "Organization not found" });
+
+      const { id } = req.params;
+      const deliveries = await storage.getWebhookDeliveries(id, orgId);
+      res.json(deliveries);
+    } catch (error) {
+      console.error("Error fetching webhook deliveries:", error);
+      res.status(500).json({ message: "Failed to fetch delivery log" });
     }
   });
 
