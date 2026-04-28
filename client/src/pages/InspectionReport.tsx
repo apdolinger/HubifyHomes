@@ -251,15 +251,26 @@ export default function InspectionReport() {
                       {item.resultNote && (
                         <p className="text-sm text-slate-600 mt-1">{item.resultNote}</p>
                       )}
-                      {item.photoUrl && (
-                        <a href={item.photoUrl} target="_blank" rel="noopener noreferrer" className="mt-2 block">
-                          <img
-                            src={item.photoUrl}
-                            alt="Photo evidence"
-                            className="h-24 w-32 object-cover rounded border border-red-200 cursor-pointer hover:opacity-80 transition-opacity"
-                          />
-                        </a>
-                      )}
+                      {(() => {
+                        const allPhotos: string[] = [
+                          ...(Array.isArray(item.photoUrls) ? item.photoUrls : []),
+                          ...(item.photoUrl && !(item.photoUrls || []).includes(item.photoUrl) ? [item.photoUrl] : []),
+                        ];
+                        if (allPhotos.length === 0) return null;
+                        return (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {allPhotos.map((url: string, idx: number) => (
+                              <a key={idx} href={url} target="_blank" rel="noopener noreferrer">
+                                <img
+                                  src={url}
+                                  alt={`Photo ${idx + 1}`}
+                                  className="h-24 w-32 object-cover rounded border border-red-200 cursor-pointer hover:opacity-80 transition-opacity"
+                                />
+                              </a>
+                            ))}
+                          </div>
+                        );
+                      })()}
                       {item.required && (
                         <Badge variant="outline" className="mt-1 text-xs text-red-600 border-red-300">Required</Badge>
                       )}
@@ -297,15 +308,26 @@ export default function InspectionReport() {
                       {item.resultNote && (
                         <p className="text-sm text-slate-500 mt-0.5">{item.resultNote}</p>
                       )}
-                      {item.photoUrl && (
-                        <a href={item.photoUrl} target="_blank" rel="noopener noreferrer" className="mt-1 block">
-                          <img
-                            src={item.photoUrl}
-                            alt="Photo evidence"
-                            className="h-16 w-24 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity"
-                          />
-                        </a>
-                      )}
+                      {(() => {
+                        const allPhotos: string[] = [
+                          ...(Array.isArray(item.photoUrls) ? item.photoUrls : []),
+                          ...(item.photoUrl && !(item.photoUrls || []).includes(item.photoUrl) ? [item.photoUrl] : []),
+                        ];
+                        if (allPhotos.length === 0) return null;
+                        return (
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {allPhotos.map((url: string, idx: number) => (
+                              <a key={idx} href={url} target="_blank" rel="noopener noreferrer">
+                                <img
+                                  src={url}
+                                  alt={`Photo ${idx + 1}`}
+                                  className="h-16 w-24 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity"
+                                />
+                              </a>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                   {index < checklistItems.length - 1 && <Separator />}

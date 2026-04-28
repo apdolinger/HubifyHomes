@@ -883,6 +883,21 @@ export default function TaskProfile() {
     }
   };
 
+  const removeChecklistItemPhoto = async (itemId: string, photoUrl: string) => {
+    try {
+      const response = await fetch(`/api/task-checklist-items/${itemId}/photo`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photoUrl }),
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Remove failed");
+      refetchInspectionItems();
+    } catch (e: any) {
+      toast({ title: "Failed to remove photo", description: e.message, variant: "destructive" });
+    }
+  };
+
   const addInspectionItemMutation = useMutation({
     mutationFn: async (text: string) =>
       apiRequest("POST", `/api/tasks/${taskId}/checklist-items`, { text, required: false }),
@@ -3142,15 +3157,35 @@ export default function TaskProfile() {
                                 {item.resultNote && editingNoteItemId !== item.id && (
                                   <p className="text-xs text-slate-600 mt-0.5 italic">{item.resultNote}</p>
                                 )}
-                                {item.photoUrl && (
-                                  <a href={item.photoUrl} target="_blank" rel="noopener noreferrer" className="mt-1 block">
-                                    <img
-                                      src={item.photoUrl}
-                                      alt="Photo evidence"
-                                      className="h-16 w-24 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity"
-                                    />
-                                  </a>
-                                )}
+                                {(() => {
+                                  const allPhotos: string[] = [
+                                    ...(Array.isArray(item.photoUrls) ? item.photoUrls : []),
+                                    ...(item.photoUrl && !(item.photoUrls || []).includes(item.photoUrl) ? [item.photoUrl] : []),
+                                  ];
+                                  if (allPhotos.length === 0) return null;
+                                  return (
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                      {allPhotos.map((url: string, idx: number) => (
+                                        <div key={idx} className="relative group">
+                                          <a href={url} target="_blank" rel="noopener noreferrer">
+                                            <img
+                                              src={url}
+                                              alt={`Photo ${idx + 1}`}
+                                              className="h-16 w-24 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity"
+                                            />
+                                          </a>
+                                          <button
+                                            className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full w-4 h-4 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs leading-none"
+                                            title="Remove photo"
+                                            onClick={(e) => { e.stopPropagation(); removeChecklistItemPhoto(item.id, url); }}
+                                          >
+                                            ×
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
                               </div>
                               <div className="flex items-center gap-1 flex-shrink-0">
                                 <Button
@@ -3200,8 +3235,8 @@ export default function TaskProfile() {
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  className={`h-7 w-7 p-0 hover:text-blue-500 ${item.photoUrl ? "text-blue-400" : "text-slate-400"}`}
-                                  title={item.photoUrl ? "Replace photo" : "Attach photo"}
+                                  className={`h-7 w-7 p-0 hover:text-blue-500 ${(item.photoUrls?.length > 0 || item.photoUrl) ? "text-blue-400" : "text-slate-400"}`}
+                                  title={(item.photoUrls?.length > 0 || item.photoUrl) ? "Add another photo" : "Attach photo"}
                                   disabled={uploadingPhotoItemId === item.id}
                                   onClick={() => {
                                     setPhotoTargetItemId(item.id);

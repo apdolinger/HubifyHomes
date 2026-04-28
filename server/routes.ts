@@ -13401,7 +13401,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const userId = req.user?.claims?.sub || req.user?.id;
-      const { text, completed, result, resultNote, photoUrl, required, notes, priority, sortOrder } = req.body;
+      const { text, completed, result, resultNote, photoUrl, photoUrls, required, notes, priority, sortOrder } = req.body;
       const updates: Record<string, any> = {};
       if (text !== undefined) updates.text = text;
       if (required !== undefined) updates.required = required;
@@ -13411,6 +13411,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (result !== undefined) updates.result = result;
       if (resultNote !== undefined) updates.resultNote = resultNote;
       if (photoUrl !== undefined) updates.photoUrl = photoUrl;
+      if (photoUrls !== undefined) updates.photoUrls = photoUrls;
       if (completed !== undefined) {
         updates.completed = completed;
         updates.completedAt = completed ? new Date() : null;
@@ -13532,6 +13533,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? `${(task as any).assignedUser.firstName || ""} ${(task as any).assignedUser.lastName || ""}`.trim()
         : "Your inspector";
 
+      const escHtml = (s: string) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+      const failItems = checklistItems.filter((i: any) => i.result === "fail");
+      const failItemsHtml = failItems.length > 0 ? `
+        <div style="margin:20px 0;">
+          <h3 style="color:#dc2626;margin:0 0 12px;">Failed Items (${failItems.length})</h3>
+          ${failItems.map((item: any) => {
+            const photos: string[] = [
+              ...(Array.isArray(item.photoUrls) ? item.photoUrls : []),
+              ...(item.photoUrl && !(item.photoUrls || []).includes(item.photoUrl) ? [item.photoUrl] : []),
+            ];
+            const safePhotos = photos.filter((u: string) => /^https?:\/\//.test(u));
+            const photoHtml = safePhotos.length > 0
+              ? `<div style="margin-top:8px;">${safePhotos.map((url: string) => `<a href="${escHtml(url)}" target="_blank"><img src="${escHtml(url)}" alt="Photo evidence" style="height:80px;width:106px;object-fit:cover;border-radius:4px;border:1px solid #fca5a5;margin-right:6px;"/></a>`).join("")}</div>`
+              : "";
+            return `<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:10px;margin-bottom:8px;">
+              <p style="margin:0;font-weight:600;color:#1f2937;">${escHtml(item.text)}</p>
+              ${item.resultNote ? `<p style="margin:4px 0 0;color:#4b5563;font-size:13px;">${escHtml(item.resultNote)}</p>` : ""}
+              ${photoHtml}
+            </div>`;
+          }).join("")}
+        </div>
+      ` : "";
+
       await sendGenericEmail({
         to: recipientEmail,
         subject: `Inspection Report — ${propertyAddress}`,
@@ -13557,6 +13581,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 </div>
               </div>
             </div>
+            ${failItemsHtml}
             <p><a href="${reportUrl}" style="display:inline-block;background:#1e40af;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">View Full Report</a></p>
             <p style="color:#6b7280;font-size:13px;">Inspected by: ${inspector}</p>
             <p style="color:#6b7280;font-size:13px;margin-top:30px;">Best regards,<br/>${orgName}</p>
@@ -13571,8 +13596,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/task-checklist-items/:id/photo — upload a photo for a checklist item
-  app.post("/api/task-checklist-items/:id/photo", isAuthenticated, upload.single("photo"), async (req: any, res) => {
+  // POST /api/task-checklist-items/:id/photo — upload a photo for a checklist item (appends to photoUrls)
+  app.post("/api/task-checklist-items/:id/photo", isAuthenticated, uploadToMemory.single("photo"), async (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No photo file provided" });
@@ -13583,29 +13608,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Verify ownership: load the item → task → property → orgId
       const item = await storage.getTaskChecklistItem(itemId);
       if (!item) {
-        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
         return res.status(404).json({ message: "Checklist item not found" });
       }
       const task = await storage.getTask(item.taskId);
       if (!task || !task.propertyId) {
-        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
         return res.status(404).json({ message: "Task or property not found" });
       }
       const property = await storage.getProperty(task.propertyId);
       if (!property || (property as any).orgId !== orgId) {
-        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const photoUrl = `/uploads/photos/${req.file.filename}`;
-      const updated = await storage.updateTaskChecklistItem(itemId, { photoUrl } as any);
+      // Upload to object storage
+      const privateDir = process.env.PRIVATE_OBJECT_DIR || '';
+      const privateDirParts = privateDir.split('/').filter((p: string) => p);
+      const bucketName = privateDirParts[0] || 'repl-default-bucket';
+      const timestamp = Date.now();
+      const randomStr = Math.random().toString(36).substring(7);
+      const ext = path.extname(req.file.originalname) || '.jpg';
+      const filename = `${timestamp}-${randomStr}${ext}`;
+      const objectPath = `public/checklist-photos/${itemId}/${filename}`;
+
+      const { objectStorageClient } = await import("./objectStorage");
+      const bucket = objectStorageClient.bucket(bucketName);
+      const gcsFile = bucket.file(objectPath);
+      await gcsFile.save(req.file.buffer, {
+        contentType: req.file.mimetype,
+        metadata: { originalName: req.file.originalname, uploadedAt: new Date().toISOString() },
+      });
+      const photoUrl = `https://storage.googleapis.com/${bucketName}/${objectPath}`;
+
+      // Append to photoUrls array
+      const existingUrls: string[] = Array.isArray((item as any).photoUrls) ? (item as any).photoUrls : [];
+      const newPhotoUrls = [...existingUrls, photoUrl];
+      const updated = await storage.updateTaskChecklistItem(itemId, { photoUrls: newPhotoUrls } as any);
       res.json({ photoUrl, item: updated });
     } catch (error) {
       console.error("Error uploading checklist item photo:", error);
-      if (req.file && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
       res.status(500).json({ message: "Failed to upload photo" });
+    }
+  });
+
+  // DELETE /api/task-checklist-items/:id/photo — remove a specific photo from a checklist item
+  app.delete("/api/task-checklist-items/:id/photo", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      const itemId = req.params.id;
+      const { photoUrl } = req.body;
+      if (!photoUrl) return res.status(400).json({ message: "photoUrl is required" });
+
+      const item = await storage.getTaskChecklistItem(itemId);
+      if (!item) return res.status(404).json({ message: "Checklist item not found" });
+      const task = await storage.getTask(item.taskId);
+      if (!task || !task.propertyId) return res.status(404).json({ message: "Task not found" });
+      const property = await storage.getProperty(task.propertyId);
+      if (!property || (property as any).orgId !== orgId) return res.status(403).json({ message: "Access denied" });
+
+      const existingUrls: string[] = Array.isArray((item as any).photoUrls) ? (item as any).photoUrls : [];
+      const newPhotoUrls = existingUrls.filter((u: string) => u !== photoUrl);
+      const updated = await storage.updateTaskChecklistItem(itemId, { photoUrls: newPhotoUrls } as any);
+
+      // Best-effort: delete the object from GCS storage to prevent orphaned files
+      try {
+        const gcsPrefix = "https://storage.googleapis.com/";
+        if (photoUrl.startsWith(gcsPrefix)) {
+          const withoutPrefix = photoUrl.slice(gcsPrefix.length);
+          const slashIdx = withoutPrefix.indexOf("/");
+          if (slashIdx !== -1) {
+            const bucketName = withoutPrefix.slice(0, slashIdx);
+            const objectName = withoutPrefix.slice(slashIdx + 1);
+            const { objectStorageClient } = await import("./objectStorage");
+            await objectStorageClient.bucket(bucketName).file(objectName).delete({ ignoreNotFound: true });
+          }
+        }
+      } catch (deleteErr) {
+        console.warn("Failed to delete photo from object storage (non-fatal):", deleteErr);
+      }
+
+      res.json({ item: updated });
+    } catch (error) {
+      console.error("Error removing checklist item photo:", error);
+      res.status(500).json({ message: "Failed to remove photo" });
     }
   });
 

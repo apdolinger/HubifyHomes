@@ -1555,7 +1555,8 @@ export const taskChecklistItems = pgTable("task_checklist_items", {
   required: boolean("required").default(false),
   result: varchar("result").$type<"pass"|"fail"|"na">(), // Inspection result
   resultNote: text("result_note"), // Inspector note for this item
-  photoUrl: text("photo_url"), // Photo evidence URL
+  photoUrl: text("photo_url"), // Photo evidence URL (legacy single photo)
+  photoUrls: text("photo_urls").array().default([]), // Multiple photo evidence URLs
   dueDate: timestamp("due_date"),
   assignedToId: varchar("assigned_to_id").references(() => users.id),
   priority: varchar("priority").default("normal"), // 'urgent', 'high', 'normal', 'low'
