@@ -79,6 +79,264 @@ const orgFormSchema = z.object({
 
 type OrgFormData = z.infer<typeof orgFormSchema>;
 
+type NotifPrefs = {
+  inAppEnabled: boolean;
+  emailOnTaskAssigned: boolean;
+  emailOnTaskOverdue: boolean;
+  emailOnInspectionDue: boolean;
+  emailOnInvoiceDue: boolean;
+  emailOnCalendarEvent: boolean;
+  emailOnMention: boolean;
+  emailOnBroadcast: boolean;
+  // Per-user advance notice windows (null = use org default)
+  taskOverdueHoursOffset: number | null;
+  inspectionAdvanceDays: number | null;
+  invoiceAdvanceDays: number | null;
+  calendarAdvanceMinutes: number | null;
+};
+
+type OrgNotifDefaults = {
+  inspectionDueDays?: number;
+  invoiceDueDays?: number;
+  calendarEventMinutes?: number;
+  taskOverdueHours?: number;
+  forceEnableAll?: boolean;
+};
+
+// Notifications Tab component — connected to real notification-preferences API
+function NotificationsTab({ orgId, fieldModeEnabled, setFieldModeEnabled, isAdmin }: {
+  orgId: string;
+  fieldModeEnabled: boolean;
+  setFieldModeEnabled: (v: boolean) => void;
+  isAdmin: boolean;
+}) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: prefs, isLoading: prefsLoading } = useQuery<NotifPrefs>({
+    queryKey: ["/api/notification-preferences"],
+  });
+
+  const { data: orgDefaults, isLoading: defaultsLoading } = useQuery<OrgNotifDefaults>({
+    queryKey: [`/api/orgs/${orgId}/notification-defaults`],
+    enabled: !!orgId && isAdmin,
+  });
+
+  const updatePrefsMutation = useMutation({
+    mutationFn: async (updates: Partial<NotifPrefs>) =>
+      apiRequest("PUT", "/api/notification-preferences", updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notification-preferences"] });
+      toast({ title: "Preferences saved" });
+    },
+    onError: () => toast({ title: "Failed to save preferences", variant: "destructive" }),
+  });
+
+  const updateDefaultsMutation = useMutation({
+    mutationFn: async (updates: Partial<OrgNotifDefaults>) =>
+      apiRequest("PATCH", `/api/orgs/${orgId}/notification-defaults`, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}/notification-defaults`] });
+      toast({ title: "Org defaults saved" });
+    },
+    onError: () => toast({ title: "Failed to save org defaults", variant: "destructive" }),
+  });
+
+  const togglePref = (key: keyof NotifPrefs, current: boolean) => {
+    updatePrefsMutation.mutate({ ...prefs, [key]: !current });
+  };
+
+  const eventTypeRows: Array<{ key: keyof NotifPrefs; label: string; description: string }> = [
+    { key: "emailOnTaskAssigned", label: "Task assigned to me", description: "When a task is assigned to you" },
+    { key: "emailOnTaskOverdue", label: "Task overdue", description: "When your tasks pass their due date" },
+    { key: "emailOnInspectionDue", label: "Inspection due soon", description: "Upcoming scheduled inspections" },
+    { key: "emailOnInvoiceDue", label: "Invoice due soon", description: "Client invoices nearing their due date" },
+    { key: "emailOnCalendarEvent", label: "Calendar event reminders", description: "Upcoming calendar events you own" },
+    { key: "emailOnMention", label: "Mentions in messages", description: "When someone @mentions you in team chat" },
+    { key: "emailOnBroadcast", label: "Team broadcasts", description: "Org-wide announcements sent to everyone" },
+  ];
+
+  if (prefsLoading) {
+    return <div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>;
+  }
+
+  const p: NotifPrefs = prefs ?? {
+    inAppEnabled: true,
+    emailOnTaskAssigned: true,
+    emailOnTaskOverdue: true,
+    emailOnInspectionDue: true,
+    emailOnInvoiceDue: true,
+    emailOnCalendarEvent: true,
+    emailOnMention: true,
+    emailOnBroadcast: true,
+    taskOverdueHoursOffset: null,
+    inspectionAdvanceDays: null,
+    invoiceAdvanceDays: null,
+    calendarAdvanceMinutes: null,
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center"><Bell className="w-5 h-5 mr-2" />My Notification Preferences</CardTitle>
+          <CardDescription>Control which events trigger notifications for your account.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* In-app toggle */}
+          <div className="flex items-center justify-between p-3 border rounded-lg bg-slate-50">
+            <div>
+              <div className="font-medium text-slate-900">In-app notification bell</div>
+              <div className="text-sm text-slate-500">Show the notification badge and panel in the top navigation</div>
+            </div>
+            <Switch
+              checked={p.inAppEnabled !== false}
+              onCheckedChange={() => togglePref("inAppEnabled", p.inAppEnabled !== false)}
+              disabled={updatePrefsMutation.isPending}
+            />
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">Email Alerts</h3>
+            <div className="space-y-2">
+              {eventTypeRows.map(({ key, label, description }) => (
+                <div key={key} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div>
+                    <div className="font-medium text-slate-900">{label}</div>
+                    <div className="text-sm text-slate-500">{description}</div>
+                  </div>
+                  <Switch
+                    checked={(p[key] as boolean) !== false}
+                    onCheckedChange={() => togglePref(key as keyof NotifPrefs, (p[key] as boolean) !== false)}
+                    disabled={updatePrefsMutation.isPending}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">My Advance Notice Windows</h3>
+            <p className="text-xs text-slate-500 mb-3">Customize how far in advance you want to be reminded. Leave blank to use the organization defaults.</p>
+            <div className="space-y-2">
+              {(
+                [
+                  { key: "taskOverdueHoursOffset" as keyof NotifPrefs, label: "Overdue task alert (hours after due)", placeholder: "e.g. 0", min: 0, max: 168 },
+                  { key: "inspectionAdvanceDays" as keyof NotifPrefs, label: "Inspection reminders (days before)", placeholder: "e.g. 7", min: 1, max: 30 },
+                  { key: "invoiceAdvanceDays" as keyof NotifPrefs, label: "Invoice reminders (days before)", placeholder: "e.g. 3", min: 1, max: 14 },
+                  { key: "calendarAdvanceMinutes" as keyof NotifPrefs, label: "Calendar event reminders (minutes before)", placeholder: "e.g. 60", min: 5, max: 1440 },
+                ]
+              ).map(({ key, label, placeholder, min, max }) => (
+                <div key={key} className="flex items-center justify-between gap-4 p-3 border rounded-lg">
+                  <Label className="text-sm font-medium text-slate-900 flex-1">{label}</Label>
+                  <input
+                    type="number"
+                    min={min}
+                    max={max}
+                    placeholder={placeholder}
+                    defaultValue={(p[key] as number | null) ?? ""}
+                    className="w-24 px-3 py-1.5 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    onBlur={(e) => {
+                      const raw = e.target.value.trim();
+                      if (raw === "") {
+                        updatePrefsMutation.mutate({ [key]: null });
+                      } else {
+                        const val = parseInt(raw);
+                        if (!isNaN(val) && val >= min && val <= max) {
+                          updatePrefsMutation.mutate({ [key]: val });
+                        }
+                      }
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Org-level defaults — admin only */}
+      {isAdmin && <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center"><Settings className="w-5 h-5 mr-2" />Organization Notification Defaults</CardTitle>
+          <CardDescription>
+            Set org-wide timing defaults. These pre-populate preferences for new users and control reminder windows for automated jobs.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {defaultsLoading ? (
+            <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>
+          ) : (
+            <div className="space-y-4">
+              {(
+                [
+                  { key: "taskOverdueHours" as keyof OrgNotifDefaults, label: "Overdue task alert (hours after due)", defaultVal: 0, min: 0, max: 168 },
+                  { key: "inspectionDueDays" as keyof OrgNotifDefaults, label: "Inspection due reminder (days before)", defaultVal: 7, min: 1, max: 30 },
+                  { key: "invoiceDueDays" as keyof OrgNotifDefaults, label: "Invoice due reminder (days before)", defaultVal: 3, min: 1, max: 14 },
+                  { key: "calendarEventMinutes" as keyof OrgNotifDefaults, label: "Calendar event reminder (minutes before)", defaultVal: 60, min: 5, max: 1440 },
+                ]
+              ).map(({ key, label, defaultVal, min, max }) => (
+                <div key={key} className="flex items-center justify-between gap-4 p-3 border rounded-lg">
+                  <Label className="text-sm font-medium text-slate-900 flex-1">{label}</Label>
+                  <input
+                    type="number"
+                    min={min}
+                    max={max}
+                    defaultValue={(orgDefaults?.[key] as number | undefined) ?? defaultVal}
+                    className="w-24 px-3 py-1.5 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    onBlur={(e) => {
+                      const val = parseInt(e.target.value);
+                      if (!isNaN(val) && val >= min && val <= max) {
+                        updateDefaultsMutation.mutate({ [key]: val });
+                      }
+                    }}
+                  />
+                </div>
+              ))}
+              <div className="flex items-center justify-between p-3 border rounded-lg">
+                <div>
+                  <div className="font-medium text-slate-900">Force-enable for all users</div>
+                  <div className="text-sm text-slate-500">Override individual preferences and enable all notification types for every user</div>
+                </div>
+                <Switch
+                  checked={orgDefaults?.forceEnableAll === true}
+                  onCheckedChange={(checked) => updateDefaultsMutation.mutate({ forceEnableAll: checked })}
+                  disabled={updateDefaultsMutation.isPending}
+                />
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>}
+
+      {/* App Preferences */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center"><Smartphone className="w-5 h-5 mr-2" />App Preferences</CardTitle>
+          <CardDescription>Configure how you prefer to use Hubify on your devices.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between p-3 border rounded-lg">
+            <div>
+              <div className="font-medium text-slate-900">Field Mode</div>
+              <div className="text-sm text-slate-600">
+                Automatically open the mobile-optimized Field Mode when you log in.
+              </div>
+            </div>
+            <Switch
+              checked={fieldModeEnabled}
+              onCheckedChange={(checked) => {
+                setFieldModeEnabled(checked);
+                if (checked) enterFieldMode(); else exitFieldMode();
+              }}
+            />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function Account() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
@@ -1046,90 +1304,7 @@ export default function Account() {
 
         {/* Notifications Tab */}
         <TabsContent value="notifications">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Bell className="w-5 h-5 mr-2" />
-                Notification Settings
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <h3 className="font-medium text-slate-900 mb-4">Delivery Methods</h3>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="email-notifications">Email</Label>
-                        <Switch id="email-notifications" defaultChecked />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="sms-notifications">SMS</Label>
-                        <Switch id="sms-notifications" />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="inapp-notifications">In-App</Label>
-                        <Switch id="inapp-notifications" defaultChecked />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="md:col-span-2">
-                    <h3 className="font-medium text-slate-900 mb-4">Notification Categories</h3>
-                    <div className="space-y-4">
-                      {[
-                        { name: 'New Task Assigned', description: 'When a task is assigned to you or your team' },
-                        { name: 'Task Overdue', description: 'When a task passes its due date' },
-                        { name: 'Billing Notices', description: 'Payment reminders and billing updates' },
-                        { name: 'System Updates', description: 'Platform updates and maintenance notices' },
-                        { name: 'Team Messages', description: 'New messages in team chat' }
-                      ].map((notification) => (
-                        <div key={notification.name} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <div className="font-medium text-slate-900">{notification.name}</div>
-                            <div className="text-sm text-slate-600">{notification.description}</div>
-                          </div>
-                          <Switch defaultChecked />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Smartphone className="w-5 h-5 mr-2" />
-                App Preferences
-              </CardTitle>
-              <CardDescription>
-                Configure how you prefer to use Hubify on your devices.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between p-3 border rounded-lg">
-                <div>
-                  <div className="font-medium text-slate-900">Field Mode</div>
-                  <div className="text-sm text-slate-600">
-                    Automatically open the mobile-optimized Field Mode when you log in. Ideal for field staff using phones or tablets.
-                  </div>
-                </div>
-                <Switch
-                  checked={fieldModeEnabled}
-                  onCheckedChange={(checked) => {
-                    setFieldModeEnabled(checked);
-                    if (checked) {
-                      enterFieldMode();
-                    } else {
-                      exitFieldMode();
-                    }
-                  }}
-                />
-              </div>
-            </CardContent>
-          </Card>
+          <NotificationsTab orgId={orgId} fieldModeEnabled={fieldModeEnabled} setFieldModeEnabled={setFieldModeEnabled} isAdmin={(user as { role?: string })?.role === 'admin'} />
         </TabsContent>
 
         {/* Team Roles Tab */}

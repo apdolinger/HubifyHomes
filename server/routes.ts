@@ -6713,17 +6713,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let prefs = await storage.getUserNotificationPreferences(userId);
       
       if (!prefs) {
+        // Seed defaults from org-level notificationDefaults when no user row exists
+        const orgId = (req as any).user?.claims?.orgId;
+        let orgDefaults: Record<string, unknown> = {};
+        if (orgId) {
+          const org = await storage.getOrg(orgId);
+          orgDefaults = (org?.notificationDefaults as Record<string, unknown>) || {};
+        }
         prefs = {
           userId,
-          emailOnMention: true,
-          emailOnReply: true,
-          emailOnReaction: false,
-          emailOnBroadcast: true,
-          emailOnTaskAssigned: true,
-          emailOnTaskOverdue: true,
-          emailOnInspectionDue: true,
-          emailOnInvoiceDue: true,
-          inAppEnabled: true,
+          emailOnMention: orgDefaults.emailOnMention !== false,
+          emailOnReply: orgDefaults.emailOnReply !== false,
+          emailOnReaction: orgDefaults.emailOnReaction === true,
+          emailOnBroadcast: orgDefaults.emailOnBroadcast !== false,
+          emailOnTaskAssigned: orgDefaults.emailOnTaskAssigned !== false,
+          emailOnTaskOverdue: orgDefaults.emailOnTaskOverdue !== false,
+          emailOnInspectionDue: orgDefaults.emailOnInspectionDue !== false,
+          emailOnInvoiceDue: orgDefaults.emailOnInvoiceDue !== false,
+          emailOnCalendarEvent: orgDefaults.emailOnCalendarEvent !== false,
+          inAppEnabled: orgDefaults.inAppEnabled !== false,
+          taskOverdueHoursOffset: null,
+          inspectionAdvanceDays: null,
+          invoiceAdvanceDays: null,
+          calendarAdvanceMinutes: null,
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -6739,25 +6751,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/notification-preferences", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const {
-        emailOnMention, emailOnReply, emailOnReaction, emailOnBroadcast,
-        emailOnTaskAssigned, emailOnTaskOverdue, emailOnInspectionDue,
-        emailOnInvoiceDue, inAppEnabled
-      } = req.body;
-      
+      // Fetch existing row to merge with (prevents partial updates from resetting unspecified fields)
+      const existing = await storage.getUserNotificationPreferences(userId);
+      const body = req.body as Record<string, unknown>;
+
+      const coerceBool = (key: string, fallback: boolean): boolean => {
+        if (key in body) return Boolean(body[key]);
+        if (existing && key in existing) return Boolean((existing as Record<string, unknown>)[key]);
+        return fallback;
+      };
+      const coerceNullInt = (key: string): number | null => {
+        if (key in body) return body[key] === null ? null : Number(body[key]);
+        if (existing && key in existing) return (existing as Record<string, unknown>)[key] as number | null;
+        return null;
+      };
+
       const prefs = await storage.upsertUserNotificationPreferences({
         userId,
-        emailOnMention: emailOnMention !== undefined ? emailOnMention : true,
-        emailOnReply: emailOnReply !== undefined ? emailOnReply : true,
-        emailOnReaction: emailOnReaction !== undefined ? emailOnReaction : false,
-        emailOnBroadcast: emailOnBroadcast !== undefined ? emailOnBroadcast : true,
-        emailOnTaskAssigned: emailOnTaskAssigned !== undefined ? emailOnTaskAssigned : true,
-        emailOnTaskOverdue: emailOnTaskOverdue !== undefined ? emailOnTaskOverdue : true,
-        emailOnInspectionDue: emailOnInspectionDue !== undefined ? emailOnInspectionDue : true,
-        emailOnInvoiceDue: emailOnInvoiceDue !== undefined ? emailOnInvoiceDue : true,
-        inAppEnabled: inAppEnabled !== undefined ? inAppEnabled : true,
+        emailOnMention: coerceBool('emailOnMention', true),
+        emailOnReply: coerceBool('emailOnReply', true),
+        emailOnReaction: coerceBool('emailOnReaction', false),
+        emailOnBroadcast: coerceBool('emailOnBroadcast', true),
+        emailOnTaskAssigned: coerceBool('emailOnTaskAssigned', true),
+        emailOnTaskOverdue: coerceBool('emailOnTaskOverdue', true),
+        emailOnInspectionDue: coerceBool('emailOnInspectionDue', true),
+        emailOnInvoiceDue: coerceBool('emailOnInvoiceDue', true),
+        emailOnCalendarEvent: coerceBool('emailOnCalendarEvent', true),
+        inAppEnabled: coerceBool('inAppEnabled', true),
+        taskOverdueHoursOffset: coerceNullInt('taskOverdueHoursOffset'),
+        inspectionAdvanceDays: coerceNullInt('inspectionAdvanceDays'),
+        invoiceAdvanceDays: coerceNullInt('invoiceAdvanceDays'),
+        calendarAdvanceMinutes: coerceNullInt('calendarAdvanceMinutes'),
       });
-      
+
       res.json(prefs);
     } catch (error) {
       console.error("Error updating notification preferences:", error);
@@ -13695,6 +13721,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error marking all notifications read:", error);
       res.status(500).json({ message: "Failed to mark all notifications read" });
+    }
+  });
+
+  // Portal user notification preferences (invoice reminders opt-in)
+  app.get("/api/portal/notification-preferences", isPortalAuthenticated as any, async (req: any, res) => {
+    try {
+      const portalUser = await storage.getPortalUserById(req.portalSession.portalUserId);
+      if (!portalUser) return res.status(404).json({ message: "Portal user not found" });
+      res.json({ emailInvoiceReminders: portalUser.emailInvoiceReminders ?? true });
+    } catch (error) {
+      console.error("Error fetching portal notification preferences:", error);
+      res.status(500).json({ message: "Failed to fetch notification preferences" });
+    }
+  });
+
+  app.patch("/api/portal/notification-preferences", isPortalAuthenticated as any, async (req: any, res) => {
+    try {
+      const { emailInvoiceReminders } = req.body;
+      const updated = await storage.updatePortalUser(req.portalSession.portalUserId, {
+        emailInvoiceReminders: emailInvoiceReminders !== undefined ? Boolean(emailInvoiceReminders) : true,
+      });
+      res.json({ emailInvoiceReminders: updated.emailInvoiceReminders });
+    } catch (error) {
+      console.error("Error updating portal notification preferences:", error);
+      res.status(500).json({ message: "Failed to update notification preferences" });
+    }
+  });
+
+  // Org notification defaults (admin only)
+  app.get("/api/orgs/:orgId/notification-defaults", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orgId = req.params.orgId;
+      const userOrgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (orgId !== userOrgId) return res.status(403).json({ message: "Access denied" });
+      const org = await storage.getOrg(orgId);
+      if (!org) return res.status(404).json({ message: "Organization not found" });
+      res.json(org.notificationDefaults || {});
+    } catch (error) {
+      console.error("Error fetching notification defaults:", error);
+      res.status(500).json({ message: "Failed to fetch notification defaults" });
+    }
+  });
+
+  app.patch("/api/orgs/:orgId/notification-defaults", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orgId = req.params.orgId;
+      const userOrgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (orgId !== userOrgId) return res.status(403).json({ message: "Access denied" });
+      const org = await storage.getOrg(orgId);
+      if (!org) return res.status(404).json({ message: "Organization not found" });
+      // Read-modify-write: merge incoming fields into existing defaults
+      type OrgNotificationDefaults = {
+        taskOverdueHours?: number;
+        inspectionDueDays?: number;
+        invoiceDueDays?: number;
+        calendarEventMinutes?: number;
+        forceEnableAll?: boolean;
+      };
+      const existing: OrgNotificationDefaults = (org.notificationDefaults as OrgNotificationDefaults | null) ?? {};
+      const { taskOverdueHours, inspectionDueDays, invoiceDueDays, calendarEventMinutes, forceEnableAll } = req.body;
+      const merged: OrgNotificationDefaults = {
+        ...existing,
+        ...(taskOverdueHours !== undefined && { taskOverdueHours: Number(taskOverdueHours) }),
+        ...(inspectionDueDays !== undefined && { inspectionDueDays: Number(inspectionDueDays) }),
+        ...(invoiceDueDays !== undefined && { invoiceDueDays: Number(invoiceDueDays) }),
+        ...(calendarEventMinutes !== undefined && { calendarEventMinutes: Number(calendarEventMinutes) }),
+        ...(forceEnableAll !== undefined && { forceEnableAll: Boolean(forceEnableAll) }),
+      };
+      const updated = await storage.updateOrg(orgId, { notificationDefaults: merged });
+      res.json(updated.notificationDefaults || {});
+    } catch (error) {
+      console.error("Error updating notification defaults:", error);
+      res.status(500).json({ message: "Failed to update notification defaults" });
     }
   });
 

@@ -58,6 +58,13 @@ export const orgs = pgTable("orgs", {
   invoiceGroupingStrategy: varchar("invoice_grouping_strategy").$type<"client"|"property">().default("client"), // How to group submissions for consolidated invoicing
   completedTaskRetentionDays: integer("completed_task_retention_days").default(60), // Days before auto-archiving completed tasks
   cancelledTaskRetentionDays: integer("cancelled_task_retention_days").default(60), // Days before auto-archiving cancelled tasks
+  notificationDefaults: jsonb("notification_defaults").$type<{
+    taskOverdueHours?: number;       // Hours after due before sending overdue alert (default 0)
+    inspectionDueDays?: number;      // Days before inspection due to notify (default 7)
+    invoiceDueDays?: number;         // Days before invoice due to send reminder (default 3)
+    calendarEventMinutes?: number;   // Minutes before event to send reminder (default 60)
+    forceEnableAll?: boolean;        // Force-enable notifications for all users
+  }>().default({}),
   supplyTypes: jsonb("supply_types").$type<string[]>().default(["lightbulb", "filter", "paint", "battery", "cleaning", "hardware", "electrical", "plumbing", "hvac", "other"]), // Customizable supply type categories
   supplyUnits: jsonb("supply_units").$type<string[]>().default(["piece", "gallon", "quart", "liter", "bottle", "box", "pack", "roll", "tube", "bag"]), // Customizable supply unit options
   defaultHourlyRateCents: integer("default_hourly_rate_cents"), // Organization-level default hourly rate (prepopulates client billing settings)
@@ -514,6 +521,7 @@ export const portalUsers = pgTable("portal_users", {
   emailVerified: boolean("email_verified").notNull().default(false),
   phoneVerified: boolean("phone_verified").notNull().default(false),
   lastLoginAt: timestamp("last_login_at"),
+  emailInvoiceReminders: boolean("email_invoice_reminders").notNull().default(true), // Portal user can opt out of invoice reminder emails
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -1267,7 +1275,13 @@ export const userNotificationPreferences = pgTable("user_notification_preference
   emailOnTaskOverdue: boolean("email_on_task_overdue").notNull().default(true),
   emailOnInspectionDue: boolean("email_on_inspection_due").notNull().default(true),
   emailOnInvoiceDue: boolean("email_on_invoice_due").notNull().default(true),
+  emailOnCalendarEvent: boolean("email_on_calendar_event").notNull().default(true),
   inAppEnabled: boolean("in_app_enabled").notNull().default(true),
+  // Per-user advance notice windows (null = use org default)
+  taskOverdueHoursOffset: integer("task_overdue_hours_offset"),
+  inspectionAdvanceDays: integer("inspection_advance_days"),
+  invoiceAdvanceDays: integer("invoice_advance_days"),
+  calendarAdvanceMinutes: integer("calendar_advance_minutes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

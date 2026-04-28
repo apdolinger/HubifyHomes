@@ -251,7 +251,7 @@ import {
   type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, or, like, count, sql, inArray, isNotNull, lt, lte } from "drizzle-orm";
+import { eq, desc, asc, and, or, like, count, sql, inArray, isNotNull, lt, lte } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { nanoid } from "nanoid";
 
@@ -364,6 +364,10 @@ export interface IStorage {
   getPortalSessionByToken(token: string): Promise<PortalSession | undefined>;
   invalidatePortalSession(token: string): Promise<void>;
   getPortalUserProperties(portalUserId: string): Promise<PortalUserProperty[]>;
+  getPortalUsersByOrg(orgId: string): Promise<PortalUser[]>;
+  getUsersByOrg(orgId: string): Promise<User[]>;
+  getClientInvoicesDueSoon(daysAhead: number): Promise<(ClientInvoice & { clientEmail?: string; orgName?: string })[]>;
+  getEventsStartingSoon(orgId: string, hoursAhead: number): Promise<(Event & { calendarOwnerId?: string })[]>;
   
   // Community operations
   getCommunities(): Promise<Community[]>;
@@ -4232,7 +4236,12 @@ export class DatabaseStorage implements IStorage {
           emailOnTaskOverdue: preferences.emailOnTaskOverdue,
           emailOnInspectionDue: preferences.emailOnInspectionDue,
           emailOnInvoiceDue: preferences.emailOnInvoiceDue,
+          emailOnCalendarEvent: preferences.emailOnCalendarEvent,
           inAppEnabled: preferences.inAppEnabled,
+          taskOverdueHoursOffset: preferences.taskOverdueHoursOffset,
+          inspectionAdvanceDays: preferences.inspectionAdvanceDays,
+          invoiceAdvanceDays: preferences.invoiceAdvanceDays,
+          calendarAdvanceMinutes: preferences.calendarAdvanceMinutes,
           updatedAt: new Date(),
         }
       })
@@ -6782,7 +6791,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(notifications)
       .where(and(eq(notifications.userId, userId), eq(notifications.orgId, orgId)))
-      .orderBy(desc(notifications.createdAt))
+      .orderBy(asc(notifications.isRead), desc(notifications.createdAt))
       .limit(limit);
   }
 
@@ -6908,6 +6917,80 @@ export class DatabaseStorage implements IStorage {
       )
       .limit(1);
     return task;
+  }
+
+  // Portal users by org (for invoice reminder emails)
+  async getPortalUsersByOrg(orgId: string): Promise<PortalUser[]> {
+    return await db
+      .select()
+      .from(portalUsers)
+      .where(and(eq(portalUsers.orgId, orgId), eq(portalUsers.isActive, true)));
+  }
+
+  async getUsersByOrg(orgId: string): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(eq(users.orgId, orgId));
+  }
+
+  // Open client invoices due within the next N days across all orgs
+  async getClientInvoicesDueSoon(daysAhead: number): Promise<(ClientInvoice & { clientEmail?: string; orgName?: string })[]> {
+    const now = new Date();
+    const future = new Date(now);
+    future.setDate(future.getDate() + daysAhead);
+
+    const rows = await db
+      .select({
+        invoice: clientInvoices,
+        clientEmail: clients.email,
+        orgName: orgs.name,
+      })
+      .from(clientInvoices)
+      .leftJoin(clients, eq(clientInvoices.clientId, clients.id))
+      .leftJoin(orgs, eq(clientInvoices.orgId, orgs.id))
+      .where(
+        and(
+          eq(clientInvoices.status, 'open'),
+          sql`${clientInvoices.dueDate} >= ${now.toISOString()}`,
+          sql`${clientInvoices.dueDate} <= ${future.toISOString()}`
+        )
+      );
+
+    return rows.map((r) => ({
+      ...r.invoice,
+      clientEmail: r.clientEmail ?? undefined,
+      orgName: r.orgName ?? undefined,
+    }));
+  }
+
+  // Events starting within the next N hours for a given org (includes 1-hour lookback to avoid missed runs)
+  async getEventsStartingSoon(orgId: string, hoursAhead: number): Promise<(Event & { calendarOwnerId?: string })[]> {
+    const now = new Date();
+    const lookback = new Date(now);
+    lookback.setMinutes(lookback.getMinutes() - 60); // 1-hour lookback for missed cron runs
+    const future = new Date(now);
+    future.setHours(future.getHours() + hoursAhead);
+
+    const rows = await db
+      .select({
+        event: events,
+        calendarOwnerId: calendars.ownerId,
+      })
+      .from(events)
+      .leftJoin(calendars, eq(events.calendarId, calendars.id))
+      .where(
+        and(
+          eq(events.orgId, orgId),
+          sql`${events.start} >= ${lookback.toISOString()}`,
+          sql`${events.start} <= ${future.toISOString()}`
+        )
+      );
+
+    return rows.map((r) => ({
+      ...r.event,
+      calendarOwnerId: r.calendarOwnerId ?? undefined,
+    }));
   }
 }
 

@@ -674,40 +674,73 @@ export function startScheduledTasks() {
   log('[CRON] Webhook retry job initialized - will run every 5 minutes');
 
   // ── In-app notifications: overdue tasks ──────────────────────────────────
-  // Runs once a day at 8am — creates a notification for each org member whose
-  // assigned task is past due and has no notification yet for today.
-  cron.schedule('0 8 * * *', async () => {
+  // Runs hourly — creates a notification for each org member whose assigned
+  // task is past due. Dedup via daily notification check prevents repeat sends.
+  // Respects org-level forceEnableAll to override individual preferences.
+  cron.schedule('0 * * * *', async () => {
     try {
       log('[CRON] Running overdue-task notification job...');
       const orgs = await storage.getOrgs();
       let notificationsCreated = 0;
+      let emailsSent = 0;
+
+      // Fetch all tasks and properties once for efficient org-scoped filtering
+      const allTasks = await storage.getTasks();
+      const allProperties = await storage.getProperties(true);
 
       for (const org of orgs) {
         const orgId = org.id;
-        const tasks = await storage.getTasks(orgId);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const orgDefaults = (org.notificationDefaults as Record<string, unknown>) || {};
+        const forceEnableAll = orgDefaults.forceEnableAll === true;
+        // taskOverdueHours: minimum hours a task must be past due before sending reminder
+        const taskOverdueHours = (orgDefaults.taskOverdueHours as number) ?? 0;
+        const now = Date.now();
 
-        const overdueTasks = (tasks as any[]).filter((t: any) => {
+        // Scope tasks to this org via propertyId → property.orgId, OR assignee's orgId for unlinked tasks
+        const orgPropertyIds = new Set(
+          (allProperties as Array<{ id: number | string; orgId: string }>)
+            .filter((p) => p.orgId === orgId)
+            .map((p) => String(p.id))
+        );
+        const orgUsers = await storage.getUsersByOrg(orgId);
+        const orgUserIds = new Set(orgUsers.map((u) => u.id));
+
+        // Pre-filter: tasks that are past due and belong to this org
+        // Per-user threshold (taskOverdueHoursOffset) is checked inside the loop
+        const overdueTasks = allTasks.filter((t) => {
           if (!t.dueDate || t.status === 'completed' || t.isArchived) return false;
-          const due = new Date(t.dueDate);
-          due.setHours(0, 0, 0, 0);
-          return due < today;
+          if (!t.assignedToId) return false;
+          // Scope to this org: via propertyId (property → org) OR assignee is in this org
+          const belongsToOrg = t.propertyId ? orgPropertyIds.has(String(t.propertyId)) : orgUserIds.has(t.assignedToId);
+          if (!belongsToOrg) return false;
+          const dueMs = new Date(t.dueDate).getTime();
+          // Pre-filter: task must be past due (at least 0 hours); per-user threshold applied in loop
+          return now - dueMs >= 0;
         });
 
         for (const task of overdueTasks) {
           if (!task.assignedToId) continue;
-          // Avoid duplicate: check if notification for this task+user already sent today
+          // Avoid duplicate: check if notification for this task already sent today
           const existing = await storage.getNotifications(task.assignedToId, orgId, 200);
-          const alreadySent = (existing as any[]).some(
-            (n: any) =>
+          const alreadySent = existing.some(
+            (n) =>
               n.type === 'task_overdue' &&
               n.linkUrl === `/task-profile/${task.id}` &&
               new Date(n.createdAt).toDateString() === new Date().toDateString()
           );
           if (alreadySent) continue;
 
-          await storage.createNotification({
+          const prefs = await storage.getUserNotificationPreferences(task.assignedToId);
+          // Effective threshold: user override (taskOverdueHoursOffset) → org default (taskOverdueHours)
+          const effectiveHours = prefs?.taskOverdueHoursOffset ?? taskOverdueHours;
+          const dueMs = new Date(task.dueDate!).getTime();
+          if (now - dueMs < effectiveHours * 3600 * 1000) continue; // not past user's threshold yet
+
+          const inAppEnabled = forceEnableAll || !prefs || prefs.inAppEnabled !== false;
+          const emailEnabled = forceEnableAll || !prefs || prefs.emailOnTaskOverdue !== false;
+
+          // Always create notification record for dedup tracking; mark as read if in-app is disabled
+          const overdueNotif = await storage.createNotification({
             orgId,
             userId: task.assignedToId,
             type: 'task_overdue',
@@ -716,15 +749,318 @@ export function startScheduledTasks() {
             linkUrl: `/task-profile/${task.id}`,
           });
           notificationsCreated++;
+          if (!inAppEnabled) {
+            await storage.markNotificationRead(overdueNotif.id, task.assignedToId);
+          }
+
+          if (emailEnabled) {
+            const assignee = await storage.getUser(task.assignedToId);
+            if (assignee?.email) {
+              try {
+                await sendEmail({
+                  to: assignee.email,
+                  subject: `Overdue Task: ${task.title}`,
+                  body: `Your task "${task.title}" was due on ${new Date(task.dueDate).toLocaleDateString()} and is still open.\n\nPlease complete or update this task as soon as possible.`,
+                  orgId,
+                  fromName: org.name,
+                });
+                emailsSent++;
+              } catch (emailErr) {
+                log(`[CRON] Failed to send overdue task email to ${assignee.email}: ${emailErr}`);
+              }
+            }
+          }
         }
       }
-      log(`[CRON] Overdue-task notifications complete. Created ${notificationsCreated} notifications.`);
+      log(`[CRON] Overdue-task notifications complete. Created ${notificationsCreated} in-app, sent ${emailsSent} emails.`);
     } catch (error) {
       log(`[CRON] Error in overdue-task notification job: ${error}`);
     }
   });
 
-  log('[CRON] Overdue-task notification job initialized - will run daily at 8am');
+  log('[CRON] Overdue-task notification job initialized - will run hourly');
+
+  // ── Invoice due reminders ─────────────────────────────────────────────────
+  // Runs hourly — emails portal users whose linked client has an open invoice
+  // due within 3 days (configurable per org). Portal user must have opted in.
+  cron.schedule('0 * * * *', async () => {
+    try {
+      log('[CRON] Running invoice-due reminder job...');
+      const orgs = await storage.getOrgs();
+      let emailsSent = 0;
+
+      for (const org of orgs) {
+        try {
+          const orgDefaults = (org.notificationDefaults as Record<string, unknown>) || {};
+          const forceEnableAll = orgDefaults.forceEnableAll === true;
+          const invoiceDueDays = (orgDefaults.invoiceDueDays as number) ?? 3;
+          const dueInvoices = await storage.getClientInvoicesDueSoon(invoiceDueDays);
+          const orgInvoices = dueInvoices.filter((inv) => inv.orgId === org.id);
+
+          for (const invoice of orgInvoices) {
+            if (!invoice.clientEmail) continue;
+
+            // Find portal user with matching email (opt-in check)
+            const portalUsersForOrg = await storage.getPortalUsersByOrg(org.id);
+            const portalUser = portalUsersForOrg.find(
+              (pu) => pu.email.toLowerCase() === (invoice.clientEmail as string).toLowerCase()
+            );
+
+            // Skip if portal user explicitly opted out (unless org forces all notifications)
+            if (!forceEnableAll && portalUser && portalUser.emailInvoiceReminders === false) continue;
+
+            // Dedup: check invoice metadata for last reminder sent date
+            type InvoiceReminderMeta = { lastReminderSentAt?: string; [key: string]: unknown };
+            const meta: InvoiceReminderMeta = (invoice.metadata as InvoiceReminderMeta | null) ?? {};
+            const lastSentDate = meta.lastReminderSentAt ? new Date(meta.lastReminderSentAt).toDateString() : null;
+            if (lastSentDate === new Date().toDateString()) continue;
+
+            const dueDate = invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : 'soon';
+            const amount = invoice.amountCents
+              ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(invoice.amountCents / 100)
+              : '';
+
+            try {
+              await sendEmail({
+                to: invoice.clientEmail,
+                subject: `Payment Reminder: Invoice ${invoice.invoiceNumber || ''} Due ${dueDate}`,
+                body: `This is a friendly reminder that your invoice${invoice.invoiceNumber ? ` #${invoice.invoiceNumber}` : ''} for ${amount} is due on ${dueDate}.\n\nPlease log in to the portal to view and pay your invoice.\n\nThank you!`,
+                orgId: org.id,
+                fromName: org.name,
+              });
+              emailsSent++;
+              log(`[CRON] Sent invoice reminder to ${invoice.clientEmail} for invoice ${invoice.id}`);
+
+              // Record that reminder was sent today in invoice metadata (dedup marker)
+              const updatedMeta: InvoiceReminderMeta = { ...meta, lastReminderSentAt: new Date().toISOString() };
+              await storage.updateClientInvoice(invoice.id, {
+                metadata: updatedMeta as Record<string, unknown>,
+              });
+            } catch (emailErr) {
+              log(`[CRON] Failed to send invoice reminder to ${invoice.clientEmail}: ${emailErr}`);
+            }
+          }
+          // Staff in-app notifications: per-user invoiceAdvanceDays window
+          const allOrgUsers = await storage.getUsersByOrg(org.id);
+          const broadInvoices = await storage.getClientInvoicesDueSoon(30);
+          const orgBroadInvoices = broadInvoices.filter((inv) => inv.orgId === org.id);
+          const nowMs = Date.now();
+          for (const staffUser of allOrgUsers) {
+            const staffPrefs = await storage.getUserNotificationPreferences(staffUser.id);
+            const staffInAppEnabled = forceEnableAll || !staffPrefs || staffPrefs.inAppEnabled !== false;
+            const staffNotifEnabled = forceEnableAll || !staffPrefs || staffPrefs.emailOnInvoiceDue !== false;
+            if (!staffNotifEnabled) continue;
+            const effectiveDays = staffPrefs?.invoiceAdvanceDays ?? invoiceDueDays;
+            for (const invoice of orgBroadInvoices) {
+              if (!invoice.dueDate) continue;
+              const daysUntilDue = (new Date(invoice.dueDate).getTime() - nowMs) / 86400000;
+              if (daysUntilDue < 0 || daysUntilDue > effectiveDays) continue;
+              const staffExisting = await storage.getNotifications(staffUser.id, org.id, 200);
+              const alreadySent = staffExisting.some(
+                (n) => n.type === 'invoice_due' && n.linkUrl?.includes(String(invoice.id)) && new Date(n.createdAt).toDateString() === new Date().toDateString()
+              );
+              if (alreadySent) continue;
+              const notif = await storage.createNotification({
+                orgId: org.id,
+                userId: staffUser.id,
+                type: 'invoice_due',
+                title: 'Invoice Due Soon',
+                body: `Invoice${invoice.invoiceNumber ? ` #${invoice.invoiceNumber}` : ''} is due on ${new Date(invoice.dueDate).toLocaleDateString()}.`,
+                linkUrl: `/invoices/${invoice.id}`,
+              });
+              if (!staffInAppEnabled) await storage.markNotificationRead(notif.id, staffUser.id);
+            }
+          }
+        } catch (orgErr) {
+          log(`[CRON] Error processing org ${org.id} invoice reminders: ${orgErr}`);
+        }
+      }
+      log(`[CRON] Invoice-due reminder job complete. Sent ${emailsSent} emails.`);
+    } catch (error) {
+      log(`[CRON] Error in invoice-due reminder job: ${error}`);
+    }
+  });
+
+  log('[CRON] Invoice-due reminder job initialized - will run hourly');
+
+  // ── Calendar event reminders ──────────────────────────────────────────────
+  // Runs hourly — creates in-app + email notifications for events starting
+  // within the configured advance window (default 60 minutes).
+  cron.schedule('15 * * * *', async () => {
+    try {
+      log('[CRON] Running calendar-event reminder job...');
+      const orgs = await storage.getOrgs();
+      let notificationsCreated = 0;
+
+      for (const org of orgs) {
+        try {
+          const orgDefaults = (org.notificationDefaults as Record<string, unknown>) || {};
+          const forceEnableAll = orgDefaults.forceEnableAll === true;
+          const calendarEventMinutes = (orgDefaults.calendarEventMinutes as number) ?? 60;
+          // Query with a wide window (24h) so per-user overrides are always captured
+          const upcomingEvents = await storage.getEventsStartingSoon(org.id, 24);
+
+          for (const event of upcomingEvents) {
+            if (!event.calendarOwnerId) continue;
+
+            const prefs = await storage.getUserNotificationPreferences(event.calendarOwnerId);
+            const inAppEnabled = forceEnableAll || !prefs || prefs.inAppEnabled !== false;
+            // Effective advance window: user override → org default
+            const userAdvanceMinutes = prefs?.calendarAdvanceMinutes ?? calendarEventMinutes;
+            // Only notify if event is within user's window or started within the past 60 min (missed run catch)
+            const minutesUntilEvent = (new Date(event.start).getTime() - Date.now()) / 60000;
+            if (minutesUntilEvent > userAdvanceMinutes || minutesUntilEvent < -60) continue;
+
+            // Avoid duplicate (check within user's advance window + 5min buffer)
+            const existing = await storage.getNotifications(event.calendarOwnerId, org.id, 200);
+            const alreadySent = existing.some(
+              (n) =>
+                n.type === 'general' &&
+                n.linkUrl?.includes(event.id) &&
+                n.title?.includes('Event Reminder') &&
+                new Date(n.createdAt) > new Date(Date.now() - userAdvanceMinutes * 60 * 1000 - 5 * 60 * 1000)
+            );
+            if (alreadySent) continue;
+
+            const eventStart = new Date(event.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const notifBody = `"${event.title}" starts at ${eventStart}.`;
+
+            // Always create notification for dedup tracking; mark as read if in-app is disabled
+            const calendarNotif = await storage.createNotification({
+              orgId: org.id,
+              userId: event.calendarOwnerId,
+              type: 'general',
+              title: 'Event Reminder',
+              body: notifBody,
+              linkUrl: `/calendar?event=${event.id}`,
+            });
+            notificationsCreated++;
+            if (!inAppEnabled) {
+              await storage.markNotificationRead(calendarNotif.id, event.calendarOwnerId);
+            }
+
+            // Email reminder — use emailOnCalendarEvent preference (independent of in-app toggle)
+            const emailEnabled = forceEnableAll || !prefs || prefs.emailOnCalendarEvent !== false;
+            if (emailEnabled) {
+              const user = await storage.getUser(event.calendarOwnerId);
+              if (user?.email) {
+                try {
+                  await sendEmail({
+                    to: user.email,
+                    subject: `Reminder: ${event.title} starting soon`,
+                    body: `This is a reminder that "${event.title}" is starting in approximately ${userAdvanceMinutes} minutes at ${eventStart}.\n\n${event.description || ''}`,
+                    orgId: org.id,
+                    fromName: org.name,
+                  });
+                } catch (emailErr) {
+                  log(`[CRON] Failed to send event reminder email: ${emailErr}`);
+                }
+              }
+            }
+          }
+        } catch (orgErr) {
+          log(`[CRON] Error processing org ${org.id} event reminders: ${orgErr}`);
+        }
+      }
+      log(`[CRON] Calendar-event reminder job complete. Created ${notificationsCreated} notifications.`);
+    } catch (error) {
+      log(`[CRON] Error in calendar-event reminder job: ${error}`);
+    }
+  });
+
+  log('[CRON] Calendar-event reminder job initialized - will run hourly at :15');
+
+  // ── Inspection-due reminders ──────────────────────────────────────────────
+  // Runs hourly at :30 — sends in-app + email reminders to inspectors for
+  // upcoming scheduled inspections. Uses org's inspectionDueDays window.
+  // Dedup via notification check prevents repeat sends on the same day.
+  cron.schedule('30 * * * *', async () => {
+    try {
+      log('[CRON] Running inspection-due reminder job...');
+      const orgs = await storage.getOrgs();
+      let notificationsCreated = 0;
+      let emailsSent = 0;
+
+      for (const org of orgs) {
+        try {
+          const orgDefaults = (org.notificationDefaults as Record<string, unknown>) || {};
+          const forceEnableAll = orgDefaults.forceEnableAll === true;
+          const inspectionDueDays = (orgDefaults.inspectionDueDays as number) ?? 7;
+          // Query with generous window (30 days) so per-user overrides are captured
+          const upcomingSchedules = await storage.getUpcomingInspectionSchedules(30);
+          const orgSchedules = upcomingSchedules.filter((s) => s.orgId === org.id);
+
+          for (const schedule of orgSchedules) {
+            if (!schedule.inspectorUserId) continue;
+
+            const prefs = await storage.getUserNotificationPreferences(schedule.inspectorUserId);
+            const inAppEnabled = forceEnableAll || !prefs || prefs.inAppEnabled !== false;
+            const emailEnabled = forceEnableAll || !prefs || prefs.emailOnInspectionDue !== false;
+            // Effective advance window: user override → org default
+            const userInspectionDays = prefs?.inspectionAdvanceDays ?? inspectionDueDays;
+            // Only notify if inspection is upcoming and within this user's advance window
+            const daysUntilDue = (new Date(schedule.nextDueDate).getTime() - Date.now()) / (1000 * 86400);
+            if (daysUntilDue < 0 || daysUntilDue > userInspectionDays) continue;
+
+            // Dedup: check if reminder already sent today for this schedule
+            const existing = await storage.getNotifications(schedule.inspectorUserId, org.id, 200);
+            const dueDateStr = new Date(schedule.nextDueDate).toLocaleDateString();
+            const scheduleIdStr = String(schedule.id);
+            const alreadySent = existing.some(
+              (n) =>
+                n.type === 'inspection_due' &&
+                n.linkUrl?.includes(scheduleIdStr) &&
+                new Date(n.createdAt).toDateString() === new Date().toDateString()
+            );
+            if (alreadySent) continue;
+
+            const property = await storage.getProperty(schedule.propertyId);
+            const frequencyLabel = { weekly: 'Weekly', monthly: 'Monthly', quarterly: 'Quarterly', annually: 'Annual' }[schedule.frequency] ?? schedule.frequency;
+            const label = `${frequencyLabel} Inspection${property ? ` - ${property.name}` : ''}`;
+
+            // Always create notification for dedup tracking; mark as read if in-app is disabled
+            const inspectionNotif = await storage.createNotification({
+              orgId: org.id,
+              userId: schedule.inspectorUserId as string,
+              type: 'inspection_due',
+              title: 'Inspection Due Soon',
+              body: `${label} is scheduled for ${dueDateStr}.`,
+              linkUrl: `/properties/${schedule.propertyId}?tab=inspections&scheduleId=${scheduleIdStr}`,
+            });
+            notificationsCreated++;
+            if (!inAppEnabled) {
+              await storage.markNotificationRead(inspectionNotif.id, schedule.inspectorUserId as string);
+            }
+
+            if (emailEnabled) {
+              const inspector = await storage.getUser(schedule.inspectorUserId);
+              if (inspector?.email) {
+                try {
+                  await sendEmail({
+                    to: inspector.email,
+                    subject: `Upcoming Inspection: ${label}`,
+                    body: `You have an upcoming inspection scheduled:\n\nInspection: ${label}\nDue: ${dueDateStr}\n\nPlease review and prepare accordingly.`,
+                    orgId: org.id,
+                    fromName: org.name,
+                  });
+                  emailsSent++;
+                } catch (emailErr) {
+                  log(`[CRON] Failed to send inspection reminder email: ${emailErr}`);
+                }
+              }
+            }
+          }
+        } catch (orgErr) {
+          log(`[CRON] Error processing org ${org.id} inspection reminders: ${orgErr}`);
+        }
+      }
+      log(`[CRON] Inspection-due reminder job complete. Created ${notificationsCreated} in-app, sent ${emailsSent} emails.`);
+    } catch (error) {
+      log(`[CRON] Error in inspection-due reminder job: ${error}`);
+    }
+  });
+
+  log('[CRON] Inspection-due reminder job initialized - will run hourly at :30');
 
   // ── Automated inspection task generation ─────────────────────────────────
   // Runs daily at 6am — creates inspection tasks for schedules due within 7 days
@@ -782,6 +1118,40 @@ export function startScheduledTasks() {
 
             tasksCreated++;
             log(`[CRON] Created inspection task ${newTask.id} for schedule ${schedule.id} due ${schedule.nextDueDate}`);
+
+            // Notify the assigned inspector (in-app + email)
+            if (newTask.assignedToId && schedule.orgId) {
+              try {
+                const orgRecord = await storage.getOrg(schedule.orgId);
+                const orgForceAll = (orgRecord?.notificationDefaults as Record<string, unknown>)?.forceEnableAll === true;
+                const inspectorPrefs = await storage.getUserNotificationPreferences(newTask.assignedToId);
+                const inAppEnabled = orgForceAll || !inspectorPrefs || inspectorPrefs.inAppEnabled !== false;
+                if (inAppEnabled) {
+                  await storage.createNotification({
+                    orgId: schedule.orgId,
+                    userId: newTask.assignedToId,
+                    type: 'inspection_due',
+                    title: 'Inspection Due Soon',
+                    body: `${taskTitle} is scheduled for ${new Date(schedule.nextDueDate).toLocaleDateString()}.`,
+                    linkUrl: `/task-profile/${newTask.id}`,
+                  });
+                }
+                if (orgForceAll || !inspectorPrefs || inspectorPrefs.emailOnInspectionDue !== false) {
+                  const inspector = await storage.getUser(newTask.assignedToId);
+                  if (inspector?.email) {
+                    await sendEmail({
+                      to: inspector.email,
+                      subject: `Upcoming Inspection: ${taskTitle}`,
+                      body: `You have an upcoming inspection scheduled:\n\nTask: ${taskTitle}\nDue: ${new Date(schedule.nextDueDate).toLocaleDateString()}\n\nPlease review and prepare accordingly.`,
+                      orgId: schedule.orgId,
+                      fromName: orgRecord?.name || 'Hubify',
+                    }).catch((e: unknown) => log(`[CRON] Failed to send inspection email: ${e}`));
+                  }
+                }
+              } catch (notifErr) {
+                log(`[CRON] Error creating inspection notification: ${notifErr}`);
+              }
+            }
           }
 
           // Advance nextDueDate to next occurrence
