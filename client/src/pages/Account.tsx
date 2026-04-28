@@ -55,8 +55,10 @@ import {
   Webhook,
   RefreshCw,
   Send,
+  Smartphone,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { enterFieldMode, exitFieldMode } from "@/components/FieldModeLayout";
 
 // Organization form schema
 const orgFormSchema = z.object({
@@ -88,6 +90,9 @@ export default function Account() {
   const [generatedApiKey, setGeneratedApiKey] = useState<string | null>(null);
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [billingSettingsDialogOpen, setBillingSettingsDialogOpen] = useState(false);
+  const [fieldModeEnabled, setFieldModeEnabled] = useState<boolean>(
+    localStorage.getItem("fieldModeEnabled") === "true"
+  );
 
   const orgId = (user as any)?.orgId;
 
@@ -1089,6 +1094,39 @@ export default function Account() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Smartphone className="w-5 h-5 mr-2" />
+                App Preferences
+              </CardTitle>
+              <CardDescription>
+                Configure how you prefer to use Hubify on your devices.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between p-3 border rounded-lg">
+                <div>
+                  <div className="font-medium text-slate-900">Field Mode</div>
+                  <div className="text-sm text-slate-600">
+                    Automatically open the mobile-optimized Field Mode when you log in. Ideal for field staff using phones or tablets.
+                  </div>
+                </div>
+                <Switch
+                  checked={fieldModeEnabled}
+                  onCheckedChange={(checked) => {
+                    setFieldModeEnabled(checked);
+                    if (checked) {
+                      enterFieldMode();
+                    } else {
+                      exitFieldMode();
+                    }
+                  }}
+                />
               </div>
             </CardContent>
           </Card>

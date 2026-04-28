@@ -13337,6 +13337,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Task Checklist Item Routes (inspection-enhanced)
   // ============================================================
 
+  app.get("/api/tasks/:taskId/checklist-items", isAuthenticated, async (req: any, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId);
+      if (isNaN(taskId)) return res.status(400).json({ message: "Invalid task ID" });
+      const task = await storage.getTask(taskId);
+      if (!task) return res.status(404).json({ message: "Task not found" });
+      const userOrgId = req.user?.claims?.orgId || req.user?.claims?.org_id || req.user?.orgId;
+      if (task.orgId !== userOrgId) return res.status(403).json({ message: "Forbidden" });
+      const items = await storage.getTaskChecklistItems(taskId);
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching checklist items:", error);
+      res.status(500).json({ message: "Failed to fetch checklist items" });
+    }
+  });
+
   app.post("/api/tasks/:taskId/checklist-items", isAuthenticated, async (req: any, res) => {
     try {
       const taskId = parseInt(req.params.taskId);

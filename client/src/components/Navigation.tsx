@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { routes } from "@/lib/routes";
 import { useTaskModal } from "@/contexts/TaskModalContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -15,6 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { TimeTrackingDropdownItems } from "@/components/TimeTracking";
 import { apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
+import { enterFieldMode } from "@/components/FieldModeLayout";
 import { 
   BarChart3, 
   CheckSquare, 
@@ -38,7 +40,9 @@ import {
   Info,
   CheckCircle2,
   FileText,
-  Check
+  Check,
+  Smartphone,
+  X
 } from "lucide-react";
 
 const getNavigationItems = (user: any) => {
@@ -75,6 +79,23 @@ export default function Navigation() {
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
+
+  const [showFieldModeBanner, setShowFieldModeBanner] = useState(false);
+
+  useEffect(() => {
+    const pref = localStorage.getItem("fieldModeEnabled");
+    if (isMobile && pref === null) {
+      setShowFieldModeBanner(true);
+    } else {
+      setShowFieldModeBanner(false);
+    }
+  }, [isMobile]);
+
+  const dismissBanner = () => {
+    localStorage.setItem("fieldModeEnabled", "false");
+    setShowFieldModeBanner(false);
+  };
   
   const navigationItems = getNavigationItems(user);
 
@@ -162,6 +183,26 @@ export default function Navigation() {
 
   return (
     <nav className="bg-white border-b border-slate-200 sticky top-0 z-50">
+      {/* Field Mode Banner */}
+      {showFieldModeBanner && (
+        <div className="bg-blue-600 text-white px-4 py-2.5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <Smartphone className="w-4 h-4 flex-shrink-0" />
+            <span className="text-sm font-medium truncate">Try Field Mode for a better mobile experience</span>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={enterFieldMode}
+              className="text-xs font-semibold bg-white text-blue-600 rounded-full px-3 py-1 hover:bg-blue-50 transition-colors"
+            >
+              Try it
+            </button>
+            <button onClick={dismissBanner} className="text-blue-200 hover:text-white transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo and Brand */}
@@ -327,6 +368,10 @@ export default function Navigation() {
                 <DropdownMenuItem onClick={() => setIsNotificationSettingsOpen(true)}>
                   <Bell className="w-4 h-4 mr-2" />
                   Notification Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={enterFieldMode}>
+                  <Smartphone className="w-4 h-4 mr-2" />
+                  Field Mode
                 </DropdownMenuItem>
                 {((user as any)?.role === 'admin' || (user as any)?.role === 'manager') && (
                   <>
