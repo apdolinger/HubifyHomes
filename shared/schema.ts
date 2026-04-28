@@ -1561,6 +1561,7 @@ export const taskChecklistItems = pgTable("task_checklist_items", {
   assignedToId: varchar("assigned_to_id").references(() => users.id),
   priority: varchar("priority").default("normal"), // 'urgent', 'high', 'normal', 'low'
   sortOrder: integer("sort_order").notNull().default(0),
+  category: varchar("category"), // e.g. 'Exterior', 'Kitchen', 'HVAC', etc.
   notes: text("notes"),
   completedAt: timestamp("completed_at"),
   completedBy: varchar("completed_by").references(() => users.id),

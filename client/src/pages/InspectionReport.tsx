@@ -291,50 +291,69 @@ export default function InspectionReport() {
         <CardContent>
           {totalItems === 0 ? (
             <p className="text-sm text-slate-500 text-center py-6">No checklist items recorded for this inspection.</p>
-          ) : (
-            <div className="space-y-1">
-              {checklistItems.map((item: any, index: number) => (
-                <div key={item.id}>
-                  <div className="flex items-start gap-3 py-3">
-                    <ResultIcon result={item.result} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-medium text-slate-900">{item.text}</span>
-                        {item.required && (
-                          <Badge variant="outline" className="text-xs">Required</Badge>
-                        )}
-                        <ResultBadge result={item.result} />
-                      </div>
-                      {item.resultNote && (
-                        <p className="text-sm text-slate-500 mt-0.5">{item.resultNote}</p>
-                      )}
-                      {(() => {
-                        const allPhotos: string[] = [
-                          ...(Array.isArray(item.photoUrls) ? item.photoUrls : []),
-                          ...(item.photoUrl && !(item.photoUrls || []).includes(item.photoUrl) ? [item.photoUrl] : []),
-                        ];
-                        if (allPhotos.length === 0) return null;
-                        return (
-                          <div className="flex flex-wrap gap-2 mt-1">
-                            {allPhotos.map((url: string, idx: number) => (
-                              <a key={idx} href={url} target="_blank" rel="noopener noreferrer">
-                                <img
-                                  src={url}
-                                  alt={`Photo ${idx + 1}`}
-                                  className="h-16 w-24 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity"
-                                />
-                              </a>
-                            ))}
+          ) : (() => {
+            const grouped: Record<string, any[]> = {};
+            checklistItems.forEach((item: any) => {
+              const cat = item.category?.trim() || "General";
+              if (!grouped[cat]) grouped[cat] = [];
+              grouped[cat].push(item);
+            });
+            return (
+              <div className="space-y-6">
+                {Object.entries(grouped).map(([category, items]) => (
+                  <div key={category}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{category}</span>
+                      <span className="text-xs text-slate-400">({items.length} item{items.length !== 1 ? "s" : ""})</span>
+                      <div className="flex-1 h-px bg-slate-200" />
+                    </div>
+                    <div className="space-y-1">
+                      {items.map((item: any, index: number) => (
+                        <div key={item.id}>
+                          <div className="flex items-start gap-3 py-3">
+                            <ResultIcon result={item.result} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-medium text-slate-900">{item.text}</span>
+                                {item.required && (
+                                  <Badge variant="outline" className="text-xs">Required</Badge>
+                                )}
+                                <ResultBadge result={item.result} />
+                              </div>
+                              {item.resultNote && (
+                                <p className="text-sm text-slate-500 mt-0.5">{item.resultNote}</p>
+                              )}
+                              {(() => {
+                                const allPhotos: string[] = [
+                                  ...(Array.isArray(item.photoUrls) ? item.photoUrls : []),
+                                  ...(item.photoUrl && !(item.photoUrls || []).includes(item.photoUrl) ? [item.photoUrl] : []),
+                                ];
+                                if (allPhotos.length === 0) return null;
+                                return (
+                                  <div className="flex flex-wrap gap-2 mt-1">
+                                    {allPhotos.map((url: string, idx: number) => (
+                                      <a key={idx} href={url} target="_blank" rel="noopener noreferrer">
+                                        <img
+                                          src={url}
+                                          alt={`Photo ${idx + 1}`}
+                                          className="h-16 w-24 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity"
+                                        />
+                                      </a>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
+                            </div>
                           </div>
-                        );
-                      })()}
+                          {index < items.length - 1 && <Separator />}
+                        </div>
+                      ))}
                     </div>
                   </div>
-                  {index < checklistItems.length - 1 && <Separator />}
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 

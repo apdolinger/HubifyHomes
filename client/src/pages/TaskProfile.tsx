@@ -3147,8 +3147,23 @@ export default function TaskProfile() {
                           if (photoInputRef.current) photoInputRef.current.value = "";
                         }}
                       />
-                      <div className="space-y-2">
-                        {(inspectionItems as any[]).map((item: any) => (
+                      <div className="space-y-4">
+                        {(() => {
+                          const grouped: Record<string, any[]> = {};
+                          (inspectionItems as any[]).forEach((item: any) => {
+                            const cat = item.category?.trim() || "General";
+                            if (!grouped[cat]) grouped[cat] = [];
+                            grouped[cat].push(item);
+                          });
+                          return Object.entries(grouped).map(([category, items]) => (
+                            <div key={category}>
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{category}</span>
+                                <span className="text-xs text-slate-400">({items.length} item{items.length !== 1 ? "s" : ""})</span>
+                                <div className="flex-1 h-px bg-slate-200" />
+                              </div>
+                              <div className="space-y-2">
+                                {items.map((item: any) => (
                           <div key={item.id} className={`p-2 rounded-lg border ${item.result === "fail" ? "border-red-200 bg-red-50" : item.result === "pass" ? "border-green-200 bg-green-50" : "border-slate-200"}`}>
                             <div className="flex items-start gap-2">
                               <div className="flex-1 min-w-0">
@@ -3292,7 +3307,11 @@ export default function TaskProfile() {
                               </div>
                             )}
                           </div>
-                        ))}
+                                ))}
+                              </div>
+                            </div>
+                          ));
+                        })()}
                       </div>
                       </>
                     )}

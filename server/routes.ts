@@ -13468,6 +13468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           taskId,
           text: items[i].text,
           required: items[i].required || false,
+          category: items[i].category || null,
           sortOrder: i,
         });
         created.push(item);
