@@ -65,7 +65,8 @@ import {
   ClipboardCheck,
   MinusCircle,
   ExternalLink,
-  ChevronDown
+  ChevronDown,
+  Camera
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -543,6 +544,11 @@ export default function TaskProfile() {
   const [propertyComboboxOpen, setPropertyComboboxOpen] = useState(false);
   const [isApplyTemplateOpen, setIsApplyTemplateOpen] = useState(false);
   const [newInspectionItemText, setNewInspectionItemText] = useState("");
+  const [editingNoteItemId, setEditingNoteItemId] = useState<number | null>(null);
+  const [noteInputValue, setNoteInputValue] = useState("");
+  const [uploadingPhotoItemId, setUploadingPhotoItemId] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [photoTargetItemId, setPhotoTargetItemId] = useState<string | null>(null);
 
   // Task templates
   const taskTemplates = {
@@ -851,11 +857,31 @@ export default function TaskProfile() {
   const inspectionTemplates = (checklistTemplates as any[]).filter((t: any) => t.category === "inspection");
 
   const updateInspectionItemMutation = useMutation({
-    mutationFn: async ({ id, result, resultNote }: { id: number; result: string; resultNote?: string }) =>
+    mutationFn: async ({ id, result, resultNote }: { id: number; result?: string; resultNote?: string }) =>
       apiRequest("PATCH", `/api/task-checklist-items/${id}`, { result, resultNote }),
     onSuccess: () => refetchInspectionItems(),
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
+
+  const uploadChecklistItemPhoto = async (itemId: string, file: File) => {
+    setUploadingPhotoItemId(itemId);
+    try {
+      const formData = new FormData();
+      formData.append("photo", file);
+      const response = await fetch(`/api/task-checklist-items/${itemId}/photo`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Upload failed");
+      refetchInspectionItems();
+    } catch (e: any) {
+      toast({ title: "Photo upload failed", description: e.message, variant: "destructive" });
+    } finally {
+      setUploadingPhotoItemId(null);
+      setPhotoTargetItemId(null);
+    }
+  };
 
   const addInspectionItemMutation = useMutation({
     mutationFn: async (text: string) =>
@@ -3091,57 +3117,149 @@ export default function TaskProfile() {
                         <p className="text-sm">No checklist items. Apply a template or add items below.</p>
                       </div>
                     ) : (
+                      <>
+                      {/* Hidden file input for photo upload */}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        ref={photoInputRef}
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file && photoTargetItemId) {
+                            uploadChecklistItemPhoto(photoTargetItemId, file);
+                          }
+                          if (photoInputRef.current) photoInputRef.current.value = "";
+                        }}
+                      />
                       <div className="space-y-2">
                         {(inspectionItems as any[]).map((item: any) => (
-                          <div key={item.id} className={`flex items-start gap-2 p-2 rounded-lg border ${item.result === "fail" ? "border-red-200 bg-red-50" : item.result === "pass" ? "border-green-200 bg-green-50" : "border-slate-200"}`}>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-slate-900">{item.text}</p>
-                              {item.required && <span className="text-xs text-slate-400">Required</span>}
-                              {item.result === "fail" && item.resultNote && (
-                                <p className="text-xs text-red-600 mt-0.5">{item.resultNote}</p>
-                              )}
+                          <div key={item.id} className={`p-2 rounded-lg border ${item.result === "fail" ? "border-red-200 bg-red-50" : item.result === "pass" ? "border-green-200 bg-green-50" : "border-slate-200"}`}>
+                            <div className="flex items-start gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-slate-900">{item.text}</p>
+                                {item.required && <span className="text-xs text-slate-400">Required</span>}
+                                {item.resultNote && editingNoteItemId !== item.id && (
+                                  <p className="text-xs text-slate-600 mt-0.5 italic">{item.resultNote}</p>
+                                )}
+                                {item.photoUrl && (
+                                  <a href={item.photoUrl} target="_blank" rel="noopener noreferrer" className="mt-1 block">
+                                    <img
+                                      src={item.photoUrl}
+                                      alt="Photo evidence"
+                                      className="h-16 w-24 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity"
+                                    />
+                                  </a>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <Button
+                                  size="sm"
+                                  variant={item.result === "pass" ? "default" : "outline"}
+                                  className={`h-7 px-2 text-xs ${item.result === "pass" ? "bg-green-600 hover:bg-green-700" : ""}`}
+                                  onClick={() => updateInspectionItemMutation.mutate({ id: item.id, result: item.result === "pass" ? "" : "pass" })}
+                                  disabled={updateInspectionItemMutation.isPending}
+                                >
+                                  <CheckCircle className="w-3 h-3 mr-0.5" />Pass
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant={item.result === "fail" ? "destructive" : "outline"}
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => updateInspectionItemMutation.mutate({ id: item.id, result: item.result === "fail" ? "" : "fail" })}
+                                  disabled={updateInspectionItemMutation.isPending}
+                                >
+                                  <XCircle className="w-3 h-3 mr-0.5" />Fail
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant={item.result === "na" ? "secondary" : "outline"}
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => updateInspectionItemMutation.mutate({ id: item.id, result: item.result === "na" ? "" : "na" })}
+                                  disabled={updateInspectionItemMutation.isPending}
+                                >
+                                  <MinusCircle className="w-3 h-3 mr-0.5" />N/A
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0 text-slate-400 hover:text-blue-500"
+                                  title={item.resultNote ? "Edit note" : "Add note"}
+                                  onClick={() => {
+                                    if (editingNoteItemId === item.id) {
+                                      setEditingNoteItemId(null);
+                                      setNoteInputValue("");
+                                    } else {
+                                      setEditingNoteItemId(item.id);
+                                      setNoteInputValue(item.resultNote || "");
+                                    }
+                                  }}
+                                >
+                                  <MessageSquare className="w-3 h-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className={`h-7 w-7 p-0 hover:text-blue-500 ${item.photoUrl ? "text-blue-400" : "text-slate-400"}`}
+                                  title={item.photoUrl ? "Replace photo" : "Attach photo"}
+                                  disabled={uploadingPhotoItemId === item.id}
+                                  onClick={() => {
+                                    setPhotoTargetItemId(item.id);
+                                    photoInputRef.current?.click();
+                                  }}
+                                >
+                                  {uploadingPhotoItemId === item.id
+                                    ? <RefreshCw className="w-3 h-3 animate-spin" />
+                                    : <Camera className="w-3 h-3" />
+                                  }
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0 text-slate-400 hover:text-red-500"
+                                  onClick={() => deleteInspectionItemMutation.mutate(item.id)}
+                                  disabled={deleteInspectionItemMutation.isPending}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                              <Button
-                                size="sm"
-                                variant={item.result === "pass" ? "default" : "outline"}
-                                className={`h-7 px-2 text-xs ${item.result === "pass" ? "bg-green-600 hover:bg-green-700" : ""}`}
-                                onClick={() => updateInspectionItemMutation.mutate({ id: item.id, result: item.result === "pass" ? "" : "pass" })}
-                                disabled={updateInspectionItemMutation.isPending}
-                              >
-                                <CheckCircle className="w-3 h-3 mr-0.5" />Pass
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant={item.result === "fail" ? "destructive" : "outline"}
-                                className="h-7 px-2 text-xs"
-                                onClick={() => updateInspectionItemMutation.mutate({ id: item.id, result: item.result === "fail" ? "" : "fail" })}
-                                disabled={updateInspectionItemMutation.isPending}
-                              >
-                                <XCircle className="w-3 h-3 mr-0.5" />Fail
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant={item.result === "na" ? "secondary" : "outline"}
-                                className="h-7 px-2 text-xs"
-                                onClick={() => updateInspectionItemMutation.mutate({ id: item.id, result: item.result === "na" ? "" : "na" })}
-                                disabled={updateInspectionItemMutation.isPending}
-                              >
-                                <MinusCircle className="w-3 h-3 mr-0.5" />N/A
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 w-7 p-0 text-slate-400 hover:text-red-500"
-                                onClick={() => deleteInspectionItemMutation.mutate(item.id)}
-                                disabled={deleteInspectionItemMutation.isPending}
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </div>
+                            {editingNoteItemId === item.id && (
+                              <div className="flex gap-2 mt-2">
+                                <Input
+                                  value={noteInputValue}
+                                  onChange={(e) => setNoteInputValue(e.target.value)}
+                                  placeholder="Add a note..."
+                                  className="text-xs h-7"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      updateInspectionItemMutation.mutate({ id: item.id, resultNote: noteInputValue });
+                                      setEditingNoteItemId(null);
+                                      setNoteInputValue("");
+                                    } else if (e.key === "Escape") {
+                                      setEditingNoteItemId(null);
+                                      setNoteInputValue("");
+                                    }
+                                  }}
+                                />
+                                <Button
+                                  size="sm"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => {
+                                    updateInspectionItemMutation.mutate({ id: item.id, resultNote: noteInputValue });
+                                    setEditingNoteItemId(null);
+                                    setNoteInputValue("");
+                                  }}
+                                >
+                                  Save
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
+                      </>
                     )}
                     {/* Add item */}
                     <div className="flex gap-2 pt-2">

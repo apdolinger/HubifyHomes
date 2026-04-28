@@ -1,9 +1,15 @@
+import { useState } from "react";
 import { useParams, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import {
   CheckCircle,
   XCircle,
@@ -16,6 +22,7 @@ import {
   User,
   Printer,
   AlertTriangle,
+  Mail,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -38,6 +45,9 @@ function ResultIcon({ result }: { result?: string | null }) {
 export default function InspectionReport() {
   const params = useParams<{ taskId: string }>();
   const taskId = params.taskId;
+  const { toast } = useToast();
+  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+  const [emailOverride, setEmailOverride] = useState("");
 
   const { data, isLoading, error } = useQuery<{
     task: any;
@@ -47,6 +57,27 @@ export default function InspectionReport() {
     queryKey: [`/api/tasks/${taskId}/inspection-report`],
     enabled: !!taskId,
   });
+
+  const emailMutation = useMutation({
+    mutationFn: async (emailAddress?: string) => {
+      const body: any = {};
+      if (emailAddress) body.email = emailAddress;
+      return apiRequest("POST", `/api/tasks/${taskId}/inspection-report/email`, body);
+    },
+    onSuccess: async (response: any) => {
+      const json = await response.json();
+      toast({ title: "Report emailed", description: `Sent to ${json.sentTo}` });
+      setIsEmailDialogOpen(false);
+      setEmailOverride("");
+    },
+    onError: (e: any) => {
+      toast({ title: "Failed to send email", description: e.message || "Please try again", variant: "destructive" });
+    },
+  });
+
+  const handleEmailSend = () => {
+    emailMutation.mutate(emailOverride || undefined);
+  };
 
   if (isLoading) {
     return (
@@ -94,10 +125,15 @@ export default function InspectionReport() {
     ? "text-yellow-600"
     : "text-red-600";
 
+  const clientEmail = task?.contact?.email || "";
+  const clientName = task?.contact
+    ? `${task.contact.firstName || ""} ${task.contact.lastName || ""}`.trim()
+    : "";
+
   return (
     <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between flex-wrap gap-3">
         <div className="flex items-center gap-4">
           <Link href={`/task-profile/${taskId}`}>
             <Button variant="outline" size="sm">
@@ -115,10 +151,16 @@ export default function InspectionReport() {
             </p>
           </div>
         </div>
-        <Button variant="outline" onClick={() => window.print()}>
-          <Printer className="w-4 h-4 mr-2" />
-          Print
-        </Button>
+        <div className="flex items-center gap-2 print:hidden">
+          <Button variant="outline" onClick={() => setIsEmailDialogOpen(true)}>
+            <Mail className="w-4 h-4 mr-2" />
+            Email Report to Client
+          </Button>
+          <Button variant="outline" onClick={() => window.print()}>
+            <Printer className="w-4 h-4 mr-2" />
+            Print
+          </Button>
+        </div>
       </div>
 
       {/* Task Details */}
@@ -131,7 +173,7 @@ export default function InspectionReport() {
             {task.property && (
               <div className="flex items-center gap-2 text-slate-600">
                 <Home className="w-4 h-4 text-slate-400" />
-                <span>{task.property?.address || task.propertyId || "—"}</span>
+                <span>{task.property?.address1 || task.propertyId || "—"}</span>
               </div>
             )}
             {task.dueDate && (
@@ -140,10 +182,10 @@ export default function InspectionReport() {
                 <span>{format(new Date(task.dueDate), "MMMM d, yyyy")}</span>
               </div>
             )}
-            {task.assignedToName && (
+            {task.assignedUser && (
               <div className="flex items-center gap-2 text-slate-600">
                 <User className="w-4 h-4 text-slate-400" />
-                <span>{task.assignedToName}</span>
+                <span>{`${task.assignedUser.firstName || ""} ${task.assignedUser.lastName || ""}`.trim() || "—"}</span>
               </div>
             )}
           </div>
@@ -209,6 +251,15 @@ export default function InspectionReport() {
                       {item.resultNote && (
                         <p className="text-sm text-slate-600 mt-1">{item.resultNote}</p>
                       )}
+                      {item.photoUrl && (
+                        <a href={item.photoUrl} target="_blank" rel="noopener noreferrer" className="mt-2 block">
+                          <img
+                            src={item.photoUrl}
+                            alt="Photo evidence"
+                            className="h-24 w-32 object-cover rounded border border-red-200 cursor-pointer hover:opacity-80 transition-opacity"
+                          />
+                        </a>
+                      )}
                       {item.required && (
                         <Badge variant="outline" className="mt-1 text-xs text-red-600 border-red-300">Required</Badge>
                       )}
@@ -246,6 +297,15 @@ export default function InspectionReport() {
                       {item.resultNote && (
                         <p className="text-sm text-slate-500 mt-0.5">{item.resultNote}</p>
                       )}
+                      {item.photoUrl && (
+                        <a href={item.photoUrl} target="_blank" rel="noopener noreferrer" className="mt-1 block">
+                          <img
+                            src={item.photoUrl}
+                            alt="Photo evidence"
+                            className="h-16 w-24 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity"
+                          />
+                        </a>
+                      )}
                     </div>
                   </div>
                   {index < checklistItems.length - 1 && <Separator />}
@@ -274,6 +334,51 @@ export default function InspectionReport() {
       )}
 
       <div className="print:hidden pb-8" />
+
+      {/* Email Dialog */}
+      <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Email Report to Client</DialogTitle>
+            <DialogDescription>
+              Send the inspection report link to the property's associated client.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {clientEmail && (
+              <div className="p-3 bg-slate-50 rounded-lg text-sm">
+                <p className="text-slate-500">Client on file:</p>
+                <p className="font-medium">{clientName || clientEmail}</p>
+                <p className="text-slate-600">{clientEmail}</p>
+              </div>
+            )}
+            <div className="space-y-1">
+              <Label>{clientEmail ? "Or send to a different email address" : "Recipient email address"}</Label>
+              <Input
+                type="email"
+                placeholder="client@example.com"
+                value={emailOverride}
+                onChange={(e) => setEmailOverride(e.target.value)}
+              />
+              {!clientEmail && !emailOverride && (
+                <p className="text-xs text-amber-600">No client email found on this task. Enter an address above.</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsEmailDialogOpen(false); setEmailOverride(""); }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleEmailSend}
+              disabled={emailMutation.isPending || (!clientEmail && !emailOverride)}
+            >
+              <Mail className="w-4 h-4 mr-2" />
+              {emailMutation.isPending ? "Sending..." : "Send Report"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -73,6 +73,7 @@ import {
   contacts,
   properties,
   tasks,
+  users,
   timeEntries,
   formSubmissions,
   contactProperties,
@@ -90,7 +91,7 @@ import {
 import { z } from "zod";
 import { createSetupIntentForClient, detachPaymentMethod } from "./stripe";
 import { db } from "./db";
-import { eq, lt, and } from "drizzle-orm";
+import { eq, lt, and, desc } from "drizzle-orm";
 import sgMail from "@sendgrid/mail";
 import { dispatchWebhookEvent, sendTestWebhookEvent, validateWebhookUrlSafe } from "./webhookDispatcher";
 
@@ -13373,6 +13374,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updates.completedBy = completed ? userId : null;
       }
       const item = await storage.updateTaskChecklistItem(id, updates);
+
+      // Auto-complete task if all required items now have a result
+      if (result !== undefined && item.taskId) {
+        try {
+          const allItems = await storage.getTaskChecklistItems(item.taskId);
+          const requiredItems = allItems.filter((i: any) => i.required);
+          const allRequiredHaveResult = requiredItems.length > 0 && requiredItems.every((i: any) => i.result && i.result !== "");
+          if (allRequiredHaveResult) {
+            const task = await storage.getTask(item.taskId);
+            if (task && (task as any).status !== "completed") {
+              await storage.updateTask(item.taskId, { status: "completed", completedAt: new Date() } as any);
+            }
+          }
+        } catch (autoErr) {
+          console.warn("Auto-complete check failed (non-fatal):", autoErr);
+        }
+      }
+
       res.json(item);
     } catch (error) {
       console.error("Error updating checklist item:", error);
@@ -13435,17 +13454,173 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/tasks/:id/inspection-report/email — email the report link to the property's client
+  app.post("/api/tasks/:id/inspection-report/email", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      const taskId = parseInt(req.params.id);
+      const task = await storage.getTask(taskId);
+      if (!task || (task as any).orgId !== orgId) return res.status(404).json({ message: "Task not found" });
+
+      const checklistItems = await storage.getTaskChecklistItems(taskId);
+      const passCount = checklistItems.filter((i: any) => i.result === "pass").length;
+      const failCount = checklistItems.filter((i: any) => i.result === "fail").length;
+      const total = checklistItems.length;
+
+      // Find client email — via task's contactId property
+      let recipientEmail: string | null = null;
+      let recipientName = "Client";
+      if ((task as any).contact?.email) {
+        recipientEmail = (task as any).contact.email;
+        recipientName = `${(task as any).contact.firstName || ""} ${(task as any).contact.lastName || ""}`.trim() || "Client";
+      } else if (req.body.email) {
+        recipientEmail = req.body.email;
+      }
+
+      if (!recipientEmail) {
+        return res.status(400).json({ message: "No client email found for this task. Provide an email address." });
+      }
+
+      const org = await storage.getOrg(orgId);
+      const orgName = org?.name || "Your Property Management Company";
+      const reportUrl = `${req.protocol}://${req.get("host")}/inspection-report/${taskId}`;
+      const propertyAddress = (task as any).property?.address1 || "the property";
+      const inspector = (task as any).assignedUser
+        ? `${(task as any).assignedUser.firstName || ""} ${(task as any).assignedUser.lastName || ""}`.trim()
+        : "Your inspector";
+
+      await sendGenericEmail({
+        to: recipientEmail,
+        subject: `Inspection Report — ${propertyAddress}`,
+        htmlContent: `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+            <h2 style="color:#1e40af;">Inspection Report</h2>
+            <p>Dear ${recipientName},</p>
+            <p>Please find your inspection report for <strong>${propertyAddress}</strong> below.</p>
+            <div style="background:#f8fafc;border-radius:8px;padding:16px;margin:20px 0;border:1px solid #e2e8f0;">
+              <h3 style="margin:0 0 12px;color:#374151;">Summary</h3>
+              <div style="display:flex;gap:24px;">
+                <div style="text-align:center;">
+                  <div style="font-size:24px;font-weight:700;color:#16a34a;">${passCount}</div>
+                  <div style="font-size:12px;color:#6b7280;">Passed</div>
+                </div>
+                <div style="text-align:center;">
+                  <div style="font-size:24px;font-weight:700;color:#dc2626;">${failCount}</div>
+                  <div style="font-size:12px;color:#6b7280;">Failed</div>
+                </div>
+                <div style="text-align:center;">
+                  <div style="font-size:24px;font-weight:700;color:#6b7280;">${total}</div>
+                  <div style="font-size:12px;color:#6b7280;">Total Items</div>
+                </div>
+              </div>
+            </div>
+            <p><a href="${reportUrl}" style="display:inline-block;background:#1e40af;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">View Full Report</a></p>
+            <p style="color:#6b7280;font-size:13px;">Inspected by: ${inspector}</p>
+            <p style="color:#6b7280;font-size:13px;margin-top:30px;">Best regards,<br/>${orgName}</p>
+          </div>
+        `,
+      });
+
+      res.json({ success: true, sentTo: recipientEmail });
+    } catch (error) {
+      console.error("Error emailing inspection report:", error);
+      res.status(500).json({ message: "Failed to send inspection report email" });
+    }
+  });
+
+  // POST /api/task-checklist-items/:id/photo — upload a photo for a checklist item
+  app.post("/api/task-checklist-items/:id/photo", isAuthenticated, upload.single("photo"), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No photo file provided" });
+      }
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      const itemId = req.params.id;
+
+      // Verify ownership: load the item → task → property → orgId
+      const item = await storage.getTaskChecklistItem(itemId);
+      if (!item) {
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        return res.status(404).json({ message: "Checklist item not found" });
+      }
+      const task = await storage.getTask(item.taskId);
+      if (!task || !task.propertyId) {
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        return res.status(404).json({ message: "Task or property not found" });
+      }
+      const property = await storage.getProperty(task.propertyId);
+      if (!property || (property as any).orgId !== orgId) {
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const photoUrl = `/uploads/photos/${req.file.filename}`;
+      const updated = await storage.updateTaskChecklistItem(itemId, { photoUrl } as any);
+      res.json({ photoUrl, item: updated });
+    } catch (error) {
+      console.error("Error uploading checklist item photo:", error);
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      res.status(500).json({ message: "Failed to upload photo" });
+    }
+  });
+
   // GET /api/properties/:id/inspection-history — past inspection tasks for a property
   app.get("/api/properties/:id/inspection-history", isAuthenticated, async (req: any, res) => {
     try {
       const orgId = req.user?.claims?.orgId || req.user?.orgId;
       const propertyId = parseInt(req.params.id);
-      // Get all tasks of category inspection for this property
-      const allTasks = await storage.getTasks(orgId);
-      const inspections = (allTasks as any[]).filter(
-        (t: any) => t.propertyId === propertyId && t.category === "inspection"
-      ).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      res.json(inspections);
+
+      // Verify the property belongs to this org (access control)
+      const property = await storage.getProperty(propertyId);
+      if (!property || (property as any).orgId !== orgId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Query completed inspection tasks for this property, sorted by completion date
+      const inspections = await db.select({
+        id: tasks.id,
+        title: tasks.title,
+        status: tasks.status,
+        dueDate: tasks.dueDate,
+        completedAt: tasks.completedAt,
+        category: tasks.category,
+        createdAt: tasks.createdAt,
+        assignedToId: tasks.assignedToId,
+        assignedToName: users.firstName,
+        assignedToLastName: users.lastName,
+      })
+      .from(tasks)
+      .leftJoin(users, eq(tasks.assignedToId, users.id))
+      .where(and(
+        eq(tasks.propertyId, propertyId),
+        eq(tasks.category, "inspection"),
+        eq(tasks.status, "completed")
+      ))
+      .orderBy(desc(tasks.completedAt));
+
+      // Enrich each inspection with pass/fail summary
+      const enriched = await Promise.all(inspections.map(async (insp: any) => {
+        try {
+          const items = await storage.getTaskChecklistItems(insp.id);
+          const passCount = items.filter((i: any) => i.result === "pass").length;
+          const failCount = items.filter((i: any) => i.result === "fail").length;
+          const naCount = items.filter((i: any) => i.result === "na").length;
+          const assignedToName = insp.assignedToName
+            ? `${insp.assignedToName} ${insp.assignedToLastName || ""}`.trim()
+            : null;
+          return {
+            ...insp,
+            assignedToName,
+            checklistSummary: { passCount, failCount, naCount, total: items.length },
+          };
+        } catch {
+          return { ...insp, checklistSummary: null };
+        }
+      }));
+
+      res.json(enriched);
     } catch (error) {
       console.error("Error fetching inspection history:", error);
       res.status(500).json({ message: "Failed to fetch inspection history" });

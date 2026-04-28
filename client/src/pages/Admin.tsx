@@ -938,13 +938,27 @@ function TaskTemplatesManager() {
 }
 
 // Inspection Templates Manager Component
+const ITEM_CATEGORIES = [
+  "General",
+  "Exterior",
+  "Interior",
+  "Kitchen",
+  "Bathroom",
+  "HVAC",
+  "Plumbing",
+  "Electrical",
+  "Safety",
+  "Structural",
+];
+
 function InspectionTemplatesManager() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<any | null>(null);
-  const [items, setItems] = useState<Array<{ text: string; required: boolean }>>([]);
+  const [items, setItems] = useState<Array<{ text: string; required: boolean; category: string }>>([]);
   const [currentItemText, setCurrentItemText] = useState("");
+  const [currentItemCategory, setCurrentItemCategory] = useState("General");
   const [formData, setFormData] = useState({ name: "", description: "", category: "inspection" });
 
   const { data: templates = [], isLoading } = useQuery<any[]>({
@@ -988,20 +1002,22 @@ function InspectionTemplatesManager() {
     setFormData({ name: "", description: "", category: "inspection" });
     setItems([]);
     setCurrentItemText("");
+    setCurrentItemCategory("General");
     setEditingTemplate(null);
   };
 
   const openEdit = (template: any) => {
     setEditingTemplate(template);
     setFormData({ name: template.name, description: template.description || "", category: template.category });
-    setItems((template.items || []).map((i: any) => ({ text: i.text, required: i.required || false })));
+    setItems((template.items || []).map((i: any) => ({ text: i.text, required: i.required || false, category: i.category || "General" })));
     setIsDialogOpen(true);
   };
 
   const addItem = () => {
     if (currentItemText.trim()) {
-      setItems([...items, { text: currentItemText.trim(), required: false }]);
+      setItems([...items, { text: currentItemText.trim(), required: false, category: currentItemCategory }]);
       setCurrentItemText("");
+      setCurrentItemCategory("General");
     }
   };
 
@@ -1109,7 +1125,18 @@ function InspectionTemplatesManager() {
                   onChange={(e) => setCurrentItemText(e.target.value)}
                   placeholder="Add an item..."
                   onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addItem())}
+                  className="flex-1"
                 />
+                <Select value={currentItemCategory} onValueChange={setCurrentItemCategory}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ITEM_CATEGORIES.map((cat) => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Button type="button" variant="outline" onClick={addItem}>Add</Button>
               </div>
               {items.length > 0 && (
@@ -1121,8 +1148,9 @@ function InspectionTemplatesManager() {
                         onCheckedChange={() => toggleRequired(index)}
                         id={`req-${index}`}
                       />
-                      <label htmlFor={`req-${index}`} className="text-xs text-slate-500 cursor-pointer">Required</label>
+                      <label htmlFor={`req-${index}`} className="text-xs text-slate-500 cursor-pointer">Req</label>
                       <span className="flex-1 text-sm">{item.text}</span>
+                      <span className="text-xs text-slate-400 bg-slate-200 rounded px-1.5 py-0.5">{item.category || "General"}</span>
                       <Button
                         variant="ghost"
                         size="icon"

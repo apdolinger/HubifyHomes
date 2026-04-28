@@ -5748,17 +5748,33 @@ export default function PropertyProfile() {
                   <div className="space-y-3">
                     {(inspectionHistory as any[]).map((inspection: any) => {
                       const statusColor = inspection.status === "completed" ? "text-green-600" : inspection.status === "in_progress" ? "text-blue-600" : "text-slate-500";
+                      const summary = inspection.checklistSummary;
                       return (
                         <div key={inspection.id} className="flex items-start justify-between p-4 border rounded-lg hover:bg-slate-50 transition-colors">
                           <div className="space-y-1">
                             <p className="font-medium text-sm text-slate-900">{inspection.title}</p>
-                            {inspection.dueDate && (
+                            {inspection.completedAt && (
+                              <p className="text-xs text-slate-500">
+                                Completed: {new Date(inspection.completedAt).toLocaleDateString()}
+                              </p>
+                            )}
+                            {!inspection.completedAt && inspection.dueDate && (
                               <p className="text-xs text-slate-500">
                                 Due: {new Date(inspection.dueDate).toLocaleDateString()}
                               </p>
                             )}
                             {inspection.assignedToName && (
-                              <p className="text-xs text-slate-500">Assigned to: {inspection.assignedToName}</p>
+                              <p className="text-xs text-slate-500">Inspector: {inspection.assignedToName}</p>
+                            )}
+                            {summary && summary.total > 0 && (
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-xs font-medium text-green-600">{summary.passCount} Pass</span>
+                                <span className="text-xs font-medium text-red-500">{summary.failCount} Fail</span>
+                                {summary.naCount > 0 && (
+                                  <span className="text-xs text-slate-400">{summary.naCount} N/A</span>
+                                )}
+                                <span className="text-xs text-slate-300">({summary.total} total)</span>
+                              </div>
                             )}
                           </div>
                           <div className="flex items-center gap-2">
