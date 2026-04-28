@@ -2359,6 +2359,12 @@ const WEBHOOK_EVENT_TYPES = [
   { value: "inspection.completed", label: "Inspection Completed" },
 ];
 
+function formatEventTypeLabel(eventType: string): string {
+  if (eventType === "test") return "Test";
+  const found = WEBHOOK_EVENT_TYPES.find((t) => t.value === eventType);
+  return found ? found.label : eventType;
+}
+
 // ─── Webhooks Section ─────────────────────────────────────────────────────────
 interface WebhookEndpoint {
   id: string;
@@ -2632,7 +2638,12 @@ function WebhooksSection({ orgId }: { orgId: string }) {
                                 ) : (
                                   <Clock className="w-3 h-3 text-yellow-500" />
                                 )}
-                                <Badge variant="secondary" className="text-xs">{d.eventType}</Badge>
+                                <Badge
+                                  variant="secondary"
+                                  className={`text-xs ${d.eventType === "test" ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300" : ""}`}
+                                >
+                                  {formatEventTypeLabel(d.eventType)}
+                                </Badge>
                               </div>
                               <div className="text-slate-500">
                                 {d.responseStatus && <span className="mr-2">HTTP {d.responseStatus}</span>}
