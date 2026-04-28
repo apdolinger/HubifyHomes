@@ -84,6 +84,9 @@ import {
   webhookDeliveries,
   checklistTemplates,
   notifications,
+  inspectionSchedules,
+  type InspectionSchedule,
+  type InsertInspectionSchedule,
   type User,
   type UpsertUser,
   type Team,
@@ -817,6 +820,16 @@ export interface IStorage {
   markNotificationRead(id: number, userId: string): Promise<void>;
   markAllNotificationsRead(userId: string, orgId: string): Promise<void>;
   getOverdueTasksForNotification(orgId: string): Promise<any[]>;
+
+  // Inspection schedule operations
+  getInspectionSchedulesByProperty(propertyId: number): Promise<InspectionSchedule[]>;
+  getInspectionSchedulesByOrg(orgId: string): Promise<InspectionSchedule[]>;
+  getUpcomingInspectionSchedules(withinDays: number): Promise<InspectionSchedule[]>;
+  getInspectionSchedule(id: number): Promise<InspectionSchedule | undefined>;
+  createInspectionSchedule(schedule: InsertInspectionSchedule): Promise<InspectionSchedule>;
+  updateInspectionSchedule(id: number, updates: Partial<InsertInspectionSchedule>): Promise<InspectionSchedule>;
+  deleteInspectionSchedule(id: number): Promise<void>;
+  getInspectionTaskByScheduleAndDueDate(scheduleId: number, dueDate: string): Promise<Task | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -6819,6 +6832,82 @@ export class DatabaseStorage implements IStorage {
           isNotNull(tasks.assignedTo)
         )
       );
+  }
+
+  // Inspection schedule operations
+  async getInspectionSchedulesByProperty(propertyId: number): Promise<InspectionSchedule[]> {
+    return await db
+      .select()
+      .from(inspectionSchedules)
+      .where(eq(inspectionSchedules.propertyId, propertyId))
+      .orderBy(inspectionSchedules.nextDueDate);
+  }
+
+  async getInspectionSchedulesByOrg(orgId: string): Promise<InspectionSchedule[]> {
+    return await db
+      .select()
+      .from(inspectionSchedules)
+      .where(eq(inspectionSchedules.orgId, orgId))
+      .orderBy(inspectionSchedules.nextDueDate);
+  }
+
+  async getUpcomingInspectionSchedules(withinDays: number): Promise<InspectionSchedule[]> {
+    const now = new Date();
+    const future = new Date(now);
+    future.setDate(future.getDate() + withinDays);
+    const nowStr = now.toISOString().split('T')[0];
+    const futureStr = future.toISOString().split('T')[0];
+    return await db
+      .select()
+      .from(inspectionSchedules)
+      .where(
+        and(
+          eq(inspectionSchedules.isActive, true),
+          sql`${inspectionSchedules.nextDueDate} >= ${nowStr}`,
+          sql`${inspectionSchedules.nextDueDate} <= ${futureStr}`
+        )
+      )
+      .orderBy(inspectionSchedules.nextDueDate);
+  }
+
+  async getInspectionSchedule(id: number): Promise<InspectionSchedule | undefined> {
+    const [schedule] = await db
+      .select()
+      .from(inspectionSchedules)
+      .where(eq(inspectionSchedules.id, id));
+    return schedule;
+  }
+
+  async createInspectionSchedule(schedule: InsertInspectionSchedule): Promise<InspectionSchedule> {
+    const [created] = await db.insert(inspectionSchedules).values(schedule).returning();
+    return created;
+  }
+
+  async updateInspectionSchedule(id: number, updates: Partial<InsertInspectionSchedule>): Promise<InspectionSchedule> {
+    const [updated] = await db
+      .update(inspectionSchedules)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(inspectionSchedules.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteInspectionSchedule(id: number): Promise<void> {
+    await db.delete(inspectionSchedules).where(eq(inspectionSchedules.id, id));
+  }
+
+  async getInspectionTaskByScheduleAndDueDate(scheduleId: number, dueDate: string): Promise<Task | undefined> {
+    const [task] = await db
+      .select()
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.inspectionScheduleId, scheduleId),
+          sql`${tasks.dueDate}::date = ${dueDate}::date`
+        )
+      )
+      .limit(1);
+    return task;
   }
 }
 

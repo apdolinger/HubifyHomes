@@ -42,7 +42,8 @@ function updateUserSession(
   user: any,
   tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers
 ) {
-  user.claims = tokens.claims();
+  // Spread into a new plain object so we can add orgId/role without hitting a frozen JWT object
+  user.claims = { ...tokens.claims() };
   user.access_token = tokens.access_token;
   user.refresh_token = tokens.refresh_token;
   user.expires_at = user.claims?.exp;
@@ -51,15 +52,19 @@ function updateUserSession(
 async function upsertUser(
   claims: any,
 ) {
-  const userData = {
+  const orgId = claims["orgId"] || claims["org_id"] || null;
+  const userData: any = {
     id: claims["sub"],
     email: claims["email"],
     firstName: claims["first_name"],
     lastName: claims["last_name"],
-    profileImageUrl: claims["profile_image_url"],
+    profileImageUrl: claims["profile_image_url"] || null,
     role: claims["role"] || "staff",
-    orgId: claims["orgId"] || claims["org_id"],
   };
+  // Only include orgId if explicitly provided in claims (avoid overwriting existing DB value with null)
+  if (orgId) {
+    userData.orgId = orgId;
+  }
   
   console.log('[OIDC] Upserting user with data:', {
     id: userData.id,
@@ -105,25 +110,31 @@ export async function setupAuth(app: Express) {
           if (process.env.NODE_ENV !== 'production') {
             console.log('[OIDC] User has no orgId, assigning to default organization (DEV MODE)');
             
-            // Get or create Test Organization (deterministic selection)
-            const orgs = await storage.getOrgs();
-            let defaultOrg = orgs.find(o => o.name === 'Test Organization');
-            
+            // Use the seeded default organization (always created with this fixed ID by seedOrgs.ts)
+            const SEEDED_DEFAULT_ORG_ID = '00000000-0000-0000-0000-000000000001';
+            let defaultOrg = await storage.getOrg(SEEDED_DEFAULT_ORG_ID);
+
             if (!defaultOrg) {
-              // Create Test Organization if it doesn't exist
+              // Fall back: any existing active org
+              const allOrgs = await storage.getOrgs();
+              defaultOrg = allOrgs[0];
+            }
+
+            if (!defaultOrg) {
+              // Last resort: create a fallback org
               defaultOrg = await storage.createOrg({
-                name: 'Test Organization',
+                name: 'Default Organization',
                 contactEmail: dbUser.email || 'test@hubify.com',
                 tier: 'premium',
                 status: 'active'
               });
-              console.log('[OIDC] Created Test Organization:', defaultOrg.id);
+              console.log('[OIDC] Created Default Organization:', defaultOrg.id);
             }
             
             // Update user with orgId
             await storage.updateUser(dbUser.id, { orgId: defaultOrg.id });
             dbUser = await storage.getUser(claims["sub"]);
-            console.log('[OIDC] User assigned to Test Organization:', defaultOrg.id);
+            console.log('[OIDC] User assigned to default organization:', defaultOrg.name, defaultOrg.id);
           } else {
             // In production, log error and continue without orgId
             // The user will need to be invited to an organization
@@ -214,6 +225,24 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
+  // If orgId or role is missing from session claims, look up from DB
+  // This handles cases where the session was created without these fields
+  if (!user.claims?.orgId || !user.claims?.role) {
+    const userId = user.claims?.sub || user.id;
+    if (userId) {
+      try {
+        const dbUser = await storage.getUser(userId);
+        if (dbUser) {
+          if (!user.claims) user.claims = {};
+          if (!user.claims.orgId && dbUser.orgId) user.claims.orgId = dbUser.orgId;
+          if (!user.claims.role && dbUser.role) user.claims.role = dbUser.role;
+        }
+      } catch (_) {
+        // Non-critical: proceed without orgId lookup
+      }
+    }
+  }
+
   // Check if token is still valid
   const now = Math.floor(Date.now() / 1000);
   if (now <= user.expires_at) {
@@ -231,6 +260,17 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     const config = await getOidcConfig();
     const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
     updateUserSession(user, tokenResponse);
+    // Re-apply orgId and role after token refresh (updateUserSession resets claims)
+    if (!user.claims?.orgId) {
+      const userId = user.claims?.sub || user.id;
+      if (userId) {
+        const dbUser = await storage.getUser(userId);
+        if (dbUser) {
+          if (dbUser.orgId) user.claims.orgId = dbUser.orgId;
+          if (dbUser.role) user.claims.role = dbUser.role;
+        }
+      }
+    }
     return next();
   } catch (error) {
     res.status(401).json({ message: "Unauthorized" });

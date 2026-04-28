@@ -69,6 +69,7 @@ import {
   insertCustomFieldSchema,
   updateCustomFieldSchema,
   insertManagementNoteSchema,
+  insertInspectionScheduleSchema,
   type Form,
   contacts,
   properties,
@@ -13678,6 +13679,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error marking all notifications read:", error);
       res.status(500).json({ message: "Failed to mark all notifications read" });
+    }
+  });
+
+  // Inspection Schedule routes
+  app.get("/api/properties/:id/inspection-schedules", isAuthenticated, async (req: any, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      const userOrgId = req.user?.claims?.orgId || req.user?.orgId;
+      const property = await storage.getProperty(propertyId);
+      if (!property) return res.status(404).json({ message: "Property not found" });
+      if (property.orgId !== userOrgId) return res.status(403).json({ message: "Access denied" });
+      const schedules = await storage.getInspectionSchedulesByProperty(propertyId);
+      res.json(schedules);
+    } catch (error) {
+      console.error("Error fetching inspection schedules:", error);
+      res.status(500).json({ message: "Failed to fetch inspection schedules" });
+    }
+  });
+
+  app.post("/api/properties/:id/inspection-schedules", isAuthenticated, async (req: any, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      const property = await storage.getProperty(propertyId);
+      if (!property) return res.status(404).json({ message: "Property not found" });
+      if (property.orgId !== orgId) return res.status(403).json({ message: "Access denied" });
+
+      // Validate inspectorUserId belongs to the same org (prevent cross-tenant assignment)
+      if (req.body.inspectorUserId) {
+        const inspector = await storage.getUser(req.body.inspectorUserId);
+        if (!inspector || inspector.orgId !== orgId) {
+          return res.status(403).json({ message: "Inspector must belong to your organization" });
+        }
+      }
+
+      // Validate templateId belongs to this org or is a global template (orgId = null)
+      if (req.body.templateId) {
+        const tmpl = await storage.getChecklistTemplate(req.body.templateId);
+        if (!tmpl || (tmpl.orgId !== null && tmpl.orgId !== orgId)) {
+          return res.status(403).json({ message: "Template not accessible to your organization" });
+        }
+      }
+
+      const body = insertInspectionScheduleSchema.extend({
+        frequency: z.enum(["weekly", "monthly", "quarterly", "annually"]),
+      }).parse({
+        ...req.body,
+        propertyId,
+        orgId,
+        createdBy: userId,
+      });
+      const schedule = await storage.createInspectionSchedule(body);
+      res.status(201).json(schedule);
+    } catch (error: any) {
+      console.error("Error creating inspection schedule:", error);
+      if (error.name === "ZodError") return res.status(400).json({ message: "Validation error", errors: error.errors });
+      res.status(500).json({ message: "Failed to create inspection schedule" });
+    }
+  });
+
+  app.patch("/api/inspection-schedules/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const userOrgId = req.user?.claims?.orgId || req.user?.orgId;
+      const existing = await storage.getInspectionSchedule(id);
+      if (!existing) return res.status(404).json({ message: "Schedule not found" });
+      if (existing.orgId !== userOrgId) return res.status(403).json({ message: "Access denied" });
+
+      // Only allow safe, mutable fields — never let the caller change orgId, propertyId, or createdBy
+      const allowedUpdateSchema = z.object({
+        frequency: z.enum(["weekly", "monthly", "quarterly", "annually"]).optional(),
+        startDate: z.string().optional(),
+        inspectorUserId: z.string().nullable().optional(),
+        templateId: z.string().nullable().optional(),
+        isActive: z.boolean().optional(),
+      }).strict();
+      const parsed = allowedUpdateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Validation error", errors: parsed.error.errors });
+      }
+
+      // If inspectorUserId is being set, verify the inspector is in the same org
+      if (parsed.data.inspectorUserId) {
+        const inspector = await storage.getUser(parsed.data.inspectorUserId);
+        if (!inspector || inspector.orgId !== userOrgId) {
+          return res.status(403).json({ message: "Inspector must belong to your organization" });
+        }
+      }
+
+      // Validate templateId belongs to this org or is a global template (orgId = null)
+      if (parsed.data.templateId) {
+        const tmpl = await storage.getChecklistTemplate(parsed.data.templateId);
+        if (!tmpl || (tmpl.orgId !== null && tmpl.orgId !== userOrgId)) {
+          return res.status(403).json({ message: "Template not accessible to your organization" });
+        }
+      }
+
+      const schedule = await storage.updateInspectionSchedule(id, parsed.data);
+      res.json(schedule);
+    } catch (error) {
+      console.error("Error updating inspection schedule:", error);
+      res.status(500).json({ message: "Failed to update inspection schedule" });
+    }
+  });
+
+  app.delete("/api/inspection-schedules/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const userOrgId = req.user?.claims?.orgId || req.user?.orgId;
+      const existing = await storage.getInspectionSchedule(id);
+      if (!existing) return res.status(404).json({ message: "Schedule not found" });
+      if (existing.orgId !== userOrgId) return res.status(403).json({ message: "Access denied" });
+      await storage.deleteInspectionSchedule(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting inspection schedule:", error);
+      res.status(500).json({ message: "Failed to delete inspection schedule" });
+    }
+  });
+
+  app.get("/api/inspection-schedules", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (!orgId) return res.status(400).json({ message: "Organization not found" });
+      const schedules = await storage.getInspectionSchedulesByOrg(orgId);
+      res.json(schedules);
+    } catch (error) {
+      console.error("Error fetching org inspection schedules:", error);
+      res.status(500).json({ message: "Failed to fetch inspection schedules" });
     }
   });
 

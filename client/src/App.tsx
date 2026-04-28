@@ -53,6 +53,7 @@ import TermsOfService from "@/pages/TermsOfService";
 import Billing from "@/pages/Billing";
 import PaymentCollectionPage from "@/pages/PaymentCollectionPage";
 import InspectionReport from "@/pages/InspectionReport";
+import InspectionSchedules from "@/pages/InspectionSchedules";
 import Navigation from "@/components/Navigation";
 import QuickSearchModal from "@/components/QuickSearchModal";
 import QuickAddTaskModal from "@/components/QuickAddTaskModal";
@@ -175,6 +176,9 @@ function Router() {
           
           {/* Inspection Reports */}
           <Route path="/inspection-report/:taskId" component={InspectionReport} />
+          
+          {/* Inspection Schedules overview */}
+          <Route path="/inspection-schedules" component={InspectionSchedules} />
           
           {/* Billing Routes */}
           <Route path="/billing" component={Billing} />

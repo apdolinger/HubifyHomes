@@ -148,11 +148,323 @@ function CascadedClientAlertsDisplay({ propertyId }: { propertyId: string }) {
   );
 }
 
+// ─── Inspection Schedule Section ──────────────────────────────────────────────
+const FREQ_LABELS: Record<string, string> = {
+  weekly: "Weekly",
+  monthly: "Monthly",
+  quarterly: "Quarterly",
+  annually: "Annually",
+};
+
+const FREQ_COLORS: Record<string, string> = {
+  weekly: "bg-blue-100 text-blue-800",
+  monthly: "bg-green-100 text-green-800",
+  quarterly: "bg-purple-100 text-purple-800",
+  annually: "bg-orange-100 text-orange-800",
+};
+
+
+function InspectionScheduleSection({ propertyId }: { propertyId: string }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isOpen, setIsOpen] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<any>(null);
+  const [form, setForm] = useState({
+    frequency: "monthly",
+    startDate: new Date().toISOString().split("T")[0],
+    inspectorUserId: "",
+    templateId: "",
+    isActive: true,
+  });
+
+  const { data: schedules = [], isLoading } = useQuery<any[]>({
+    queryKey: [`/api/properties/${propertyId}/inspection-schedules`],
+    enabled: !!propertyId,
+  });
+
+  const { data: users = [] } = useQuery<any[]>({
+    queryKey: ["/api/users"],
+  });
+
+  const { data: templates = [] } = useQuery<any[]>({
+    queryKey: ["/api/checklist-templates"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", `/api/properties/${propertyId}/inspection-schedules`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/inspection-schedules`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inspection-schedules"] });
+      toast({ title: "Schedule created", description: "Inspection schedule has been added." });
+      setIsOpen(false);
+      resetForm();
+    },
+    onError: () => toast({ title: "Error", description: "Failed to create schedule.", variant: "destructive" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      const res = await apiRequest("PATCH", `/api/inspection-schedules/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/inspection-schedules`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inspection-schedules"] });
+      toast({ title: "Schedule updated" });
+      setIsOpen(false);
+      setEditingSchedule(null);
+      resetForm();
+    },
+    onError: () => toast({ title: "Error", description: "Failed to update schedule.", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/inspection-schedules/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/inspection-schedules`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inspection-schedules"] });
+      toast({ title: "Schedule deleted" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to delete schedule.", variant: "destructive" }),
+  });
+
+  const resetForm = () => {
+    setForm({ frequency: "monthly", startDate: new Date().toISOString().split("T")[0], inspectorUserId: "", templateId: "", isActive: true });
+  };
+
+  const openAdd = () => {
+    setEditingSchedule(null);
+    resetForm();
+    setIsOpen(true);
+  };
+
+  const openEdit = (schedule: any) => {
+    setEditingSchedule(schedule);
+    setForm({
+      frequency: schedule.frequency,
+      startDate: schedule.startDate || schedule.nextDueDate || new Date().toISOString().split("T")[0],
+      inspectorUserId: schedule.inspectorUserId || "",
+      templateId: schedule.templateId || "",
+      isActive: schedule.isActive,
+    });
+    setIsOpen(true);
+  };
+
+  const handleSubmit = () => {
+    const basePayload = {
+      frequency: form.frequency,
+      startDate: form.startDate,
+      inspectorUserId: form.inspectorUserId || null,
+      templateId: form.templateId || null,
+      isActive: form.isActive,
+    };
+    if (editingSchedule) {
+      // Do NOT overwrite nextDueDate on edit - preserve the cron-managed recurrence pointer
+      updateMutation.mutate({ id: editingSchedule.id, data: basePayload });
+    } else {
+      // On create, nextDueDate starts at startDate
+      createMutation.mutate({ ...basePayload, nextDueDate: form.startDate });
+    }
+  };
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-blue-600" />
+              Inspection Schedules
+            </CardTitle>
+            <p className="text-sm text-slate-500 mt-1">Automated recurring inspections for this property.</p>
+          </div>
+          <Button size="sm" onClick={openAdd} data-testid="btn-add-inspection-schedule">
+            <Plus className="w-4 h-4 mr-1" /> Add Schedule
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <RefreshCw className="w-5 h-5 animate-spin text-blue-600" />
+          </div>
+        ) : (schedules as any[]).length === 0 ? (
+          <div className="text-center py-8 border-2 border-dashed border-slate-200 rounded-lg">
+            <Calendar className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 font-medium">No inspection schedules yet</p>
+            <p className="text-sm text-slate-400 mt-1">Add a schedule to automatically generate inspection tasks.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {(schedules as any[]).map((schedule: any) => {
+              const inspector = (users as any[]).find((u: any) => u.id === schedule.inspectorUserId);
+              const template = (templates as any[]).find((t: any) => t.id === schedule.templateId);
+              return (
+                <div key={schedule.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-slate-50 transition-colors" data-testid={`schedule-row-${schedule.id}`}>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Badge className={`${FREQ_COLORS[schedule.frequency] || "bg-slate-100 text-slate-800"} text-xs font-medium`}>
+                        {FREQ_LABELS[schedule.frequency] || schedule.frequency}
+                      </Badge>
+                      <Badge variant={schedule.isActive ? "default" : "secondary"} className="text-xs">
+                        {schedule.isActive ? "Active" : "Paused"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm text-slate-600">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        Next due: {schedule.nextDueDate ? format(new Date(schedule.nextDueDate + "T12:00:00"), "MMM d, yyyy") : "—"}
+                      </span>
+                      {inspector && (
+                        <span className="flex items-center gap-1">
+                          <User className="w-3.5 h-3.5 text-slate-400" />
+                          {`${inspector.firstName || ""} ${inspector.lastName || ""}`.trim()}
+                        </span>
+                      )}
+                      {template && (
+                        <span className="flex items-center gap-1">
+                          <CheckSquare className="w-3.5 h-3.5 text-slate-400" />
+                          {template.name}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => openEdit(schedule)} data-testid={`btn-edit-schedule-${schedule.id}`}>
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-slate-400 hover:text-red-600"
+                      onClick={() => {
+                        if (confirm("Delete this inspection schedule? Already-created tasks will not be removed.")) {
+                          deleteMutation.mutate(schedule.id);
+                        }
+                      }}
+                      data-testid={`btn-delete-schedule-${schedule.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Add/Edit Schedule Dialog */}
+        <Dialog open={isOpen} onOpenChange={(open) => { setIsOpen(open); if (!open) { setEditingSchedule(null); resetForm(); } }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{editingSchedule ? "Edit Inspection Schedule" : "Add Inspection Schedule"}</DialogTitle>
+              <DialogDescription>
+                Configure a recurring inspection for this property. Tasks will be auto-generated 7 days before each due date.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label>Frequency</Label>
+                <Select value={form.frequency} onValueChange={(v) => setForm(f => ({ ...f, frequency: v }))}>
+                  <SelectTrigger data-testid="select-schedule-frequency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="quarterly">Quarterly</SelectItem>
+                    <SelectItem value="annually">Annually</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Start Date (First Due Date)</Label>
+                <Input
+                  type="date"
+                  value={form.startDate}
+                  onChange={(e) => setForm(f => ({ ...f, startDate: e.target.value }))}
+                  data-testid="input-schedule-start-date"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Assigned Inspector</Label>
+                <Select value={form.inspectorUserId || "_none"} onValueChange={(v) => setForm(f => ({ ...f, inspectorUserId: v === "_none" ? "" : v }))}>
+                  <SelectTrigger data-testid="select-schedule-inspector">
+                    <SelectValue placeholder="Select inspector (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">No inspector assigned</SelectItem>
+                    {(users as any[]).map((u: any) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {`${u.firstName || ""} ${u.lastName || ""}`.trim() || u.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Inspection Template</Label>
+                <Select value={form.templateId || "_none"} onValueChange={(v) => setForm(f => ({ ...f, templateId: v === "_none" ? "" : v }))}>
+                  <SelectTrigger data-testid="select-schedule-template">
+                    <SelectValue placeholder="Select template (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">No template</SelectItem>
+                    {(templates as any[]).map((t: any) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-slate-400">Checklist items from the template will be applied to each generated task.</p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="schedule-active"
+                  checked={form.isActive}
+                  onCheckedChange={(checked) => setForm(f => ({ ...f, isActive: !!checked }))}
+                  data-testid="checkbox-schedule-active"
+                />
+                <Label htmlFor="schedule-active" className="cursor-pointer">Schedule is active</Label>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setIsOpen(false); setEditingSchedule(null); resetForm(); }}>
+                Cancel
+              </Button>
+              <Button onClick={handleSubmit} disabled={isPending || !form.startDate} data-testid="btn-save-inspection-schedule">
+                {isPending ? <RefreshCw className="w-4 h-4 animate-spin mr-1" /> : null}
+                {editingSchedule ? "Save Changes" : "Add Schedule"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function PropertyProfile() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const { openTaskModal } = useTaskModal();
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("tab") || "tasks";
+  });
   const queryClient = useQueryClient();
   const [propertyImage, setPropertyImage] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -3391,7 +3703,7 @@ export default function PropertyProfile() {
         </div>
 
         {/* Tabs for detailed information */}
-        <Tabs defaultValue="tasks" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-10">
             <TabsTrigger value="tasks">Tasks</TabsTrigger>
             <TabsTrigger value="contacts">Residents</TabsTrigger>
@@ -5729,6 +6041,8 @@ export default function PropertyProfile() {
 
           {/* Inspection History Tab */}
           <TabsContent value="inspections">
+            <div className="space-y-6">
+            <InspectionScheduleSection propertyId={propertyId!} />
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -5799,6 +6113,7 @@ export default function PropertyProfile() {
                 )}
               </CardContent>
             </Card>
+            </div>
           </TabsContent>
         </Tabs>
 

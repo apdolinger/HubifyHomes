@@ -725,4 +725,95 @@ export function startScheduledTasks() {
   });
 
   log('[CRON] Overdue-task notification job initialized - will run daily at 8am');
+
+  // ── Automated inspection task generation ─────────────────────────────────
+  // Runs daily at 6am — creates inspection tasks for schedules due within 7 days
+  cron.schedule('0 6 * * *', async () => {
+    try {
+      log('[CRON] Running automated inspection task generation...');
+      let tasksCreated = 0;
+      const upcomingSchedules = await storage.getUpcomingInspectionSchedules(7);
+      log(`[CRON] Found ${upcomingSchedules.length} inspection schedules due within 7 days`);
+
+      for (const schedule of upcomingSchedules) {
+        try {
+          // Check if a task was already created for this schedule's nextDueDate
+          const dueDateStr = schedule.nextDueDate.toString().substring(0, 10);
+          const existingTask = await storage.getInspectionTaskByScheduleAndDueDate(schedule.id, dueDateStr);
+          const alreadyCreated = !!existingTask;
+
+          if (alreadyCreated) {
+            log(`[CRON] Inspection task already exists for schedule ${schedule.id} due ${schedule.nextDueDate}`);
+          } else {
+            // Determine task title
+            const property = await storage.getProperty(schedule.propertyId);
+            const frequencyLabel = { weekly: 'Weekly', monthly: 'Monthly', quarterly: 'Quarterly', annually: 'Annual' }[schedule.frequency] ?? schedule.frequency;
+            const taskTitle = `${frequencyLabel} Inspection${property ? ` - ${property.name}` : ''}`;
+
+            // Create the inspection task
+            const newTask = await storage.createTask({
+              title: taskTitle,
+              description: `Automated ${frequencyLabel.toLowerCase()} inspection generated from schedule.`,
+              status: 'pending',
+              priority: 'normal',
+              category: 'inspection',
+              propertyId: schedule.propertyId,
+              assignedToId: schedule.inspectorUserId ?? undefined,
+              dueDate: new Date(schedule.nextDueDate),
+              inspectionScheduleId: schedule.id,
+            });
+
+            // Apply checklist template items if configured
+            if (schedule.templateId) {
+              const template = await storage.getChecklistTemplate(schedule.templateId);
+              if (template && Array.isArray(template.items) && template.items.length > 0) {
+                for (let i = 0; i < template.items.length; i++) {
+                  const item = template.items[i] as any;
+                  await storage.createTaskChecklistItem({
+                    taskId: newTask.id,
+                    text: item.text || item.label || '',
+                    completed: false,
+                    required: item.required ?? false,
+                    sortOrder: i,
+                  });
+                }
+              }
+            }
+
+            tasksCreated++;
+            log(`[CRON] Created inspection task ${newTask.id} for schedule ${schedule.id} due ${schedule.nextDueDate}`);
+          }
+
+          // Advance nextDueDate to next occurrence
+          const nextDate = new Date(schedule.nextDueDate);
+          switch (schedule.frequency) {
+            case 'weekly':
+              nextDate.setDate(nextDate.getDate() + 7);
+              break;
+            case 'monthly':
+              nextDate.setMonth(nextDate.getMonth() + 1);
+              break;
+            case 'quarterly':
+              nextDate.setMonth(nextDate.getMonth() + 3);
+              break;
+            case 'annually':
+              nextDate.setFullYear(nextDate.getFullYear() + 1);
+              break;
+          }
+          await storage.updateInspectionSchedule(schedule.id, {
+            nextDueDate: nextDate.toISOString().split('T')[0],
+          });
+          log(`[CRON] Advanced schedule ${schedule.id} nextDueDate to ${nextDate.toISOString().split('T')[0]}`);
+        } catch (err) {
+          log(`[CRON] Error processing inspection schedule ${schedule.id}: ${err}`);
+        }
+      }
+
+      log(`[CRON] Automated inspection task generation complete. Created ${tasksCreated} tasks.`);
+    } catch (error) {
+      log(`[CRON] Error in automated inspection task generation: ${error}`);
+    }
+  });
+
+  log('[CRON] Automated inspection task generation initialized - will run daily at 6am');
 }

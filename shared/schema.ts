@@ -1081,6 +1081,7 @@ export const tasks = pgTable("tasks", {
   attachments: jsonb("attachments").$type<PhotoAttachment[]>().default([]),
   tags: text("tags"), // Comma-separated tags, e.g., "urgent, maintenance, inspection"
   customFieldValues: jsonb("custom_field_values").$type<Record<string, any>>().default({}), // Custom field data
+  inspectionScheduleId: integer("inspection_schedule_id"), // Links to inspection_schedules.id when auto-generated
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -3123,3 +3124,31 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 });
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
+
+// Inspection Schedules - recurring automated inspection scheduling per property
+export const inspectionSchedules = pgTable("inspection_schedules", {
+  id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id, { onDelete: "cascade" }).notNull(),
+  propertyId: integer("property_id").references(() => properties.id, { onDelete: "cascade" }).notNull(),
+  templateId: varchar("template_id").references(() => checklistTemplates.id, { onDelete: "set null" }),
+  inspectorUserId: varchar("inspector_user_id").references(() => users.id, { onDelete: "set null" }),
+  frequency: varchar("frequency").$type<"weekly" | "monthly" | "quarterly" | "annually">().notNull(),
+  startDate: date("start_date").notNull(),
+  nextDueDate: date("next_due_date").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("inspection_schedules_org_idx").on(table.orgId),
+  index("inspection_schedules_property_idx").on(table.propertyId),
+  index("inspection_schedules_next_due_idx").on(table.nextDueDate),
+]);
+
+export const insertInspectionScheduleSchema = createInsertSchema(inspectionSchedules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertInspectionSchedule = z.infer<typeof insertInspectionScheduleSchema>;
+export type InspectionSchedule = typeof inspectionSchedules.$inferSelect;

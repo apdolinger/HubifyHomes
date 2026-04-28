@@ -1116,6 +1116,13 @@ export default function Properties() {
             </p>
           </div>
           <div className="mt-4 sm:mt-0 flex items-center gap-4">
+            {/* Inspection Schedules Link */}
+            <a href="/inspection-schedules">
+              <Button variant="outline" size="sm" className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                Inspection Schedules
+              </Button>
+            </a>
             {/* Show Inactive Toggle */}
             <Button
               variant="outline"
