@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -23,6 +24,7 @@ import {
   Printer,
   AlertTriangle,
   Mail,
+  Download,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -48,6 +50,7 @@ export default function InspectionReport() {
   const { toast } = useToast();
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
   const [emailOverride, setEmailOverride] = useState("");
+  const [attachPdfToEmail, setAttachPdfToEmail] = useState(false);
 
   const { data, isLoading, error } = useQuery<{
     task: any;
@@ -60,15 +63,17 @@ export default function InspectionReport() {
 
   const emailMutation = useMutation({
     mutationFn: async (emailAddress?: string) => {
-      const body: any = {};
+      const body: any = { attachPdf: attachPdfToEmail };
       if (emailAddress) body.email = emailAddress;
       return apiRequest("POST", `/api/tasks/${taskId}/inspection-report/email`, body);
     },
     onSuccess: async (response: any) => {
       const json = await response.json();
-      toast({ title: "Report emailed", description: `Sent to ${json.sentTo}` });
+      const desc = json.pdfAttached ? `Sent to ${json.sentTo} with PDF attached` : `Sent to ${json.sentTo}`;
+      toast({ title: "Report emailed", description: desc });
       setIsEmailDialogOpen(false);
       setEmailOverride("");
+      setAttachPdfToEmail(false);
     },
     onError: (e: any) => {
       toast({ title: "Failed to send email", description: e.message || "Please try again", variant: "destructive" });
@@ -159,6 +164,12 @@ export default function InspectionReport() {
           <Button variant="outline" onClick={() => window.print()}>
             <Printer className="w-4 h-4 mr-2" />
             Print
+          </Button>
+          <Button variant="default" asChild>
+            <a href={`/api/tasks/${taskId}/inspection-report/pdf`} download>
+              <Download className="w-4 h-4 mr-2" />
+              Download PDF
+            </a>
           </Button>
         </div>
       </div>
@@ -405,9 +416,19 @@ export default function InspectionReport() {
                 <p className="text-xs text-amber-600">No client email found on this task. Enter an address above.</p>
               )}
             </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Checkbox
+                id="attach-pdf"
+                checked={attachPdfToEmail}
+                onCheckedChange={(checked) => setAttachPdfToEmail(checked === true)}
+              />
+              <Label htmlFor="attach-pdf" className="cursor-pointer text-sm font-normal">
+                Attach PDF report to email
+              </Label>
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setIsEmailDialogOpen(false); setEmailOverride(""); }}>
+            <Button variant="outline" onClick={() => { setIsEmailDialogOpen(false); setEmailOverride(""); setAttachPdfToEmail(false); }}>
               Cancel
             </Button>
             <Button

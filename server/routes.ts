@@ -13480,6 +13480,178 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper: generate inspection report PDF as a Buffer
+  async function buildInspectionReportPdf(task: any, checklistItems: any[]): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 50, size: "A4" });
+      const chunks: Buffer[] = [];
+      doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+      doc.on("end", () => resolve(Buffer.concat(chunks)));
+      doc.on("error", reject);
+
+      const passCount = checklistItems.filter((i: any) => i.result === "pass").length;
+      const failCount = checklistItems.filter((i: any) => i.result === "fail").length;
+      const naCount = checklistItems.filter((i: any) => i.result === "na").length;
+      const pendingCount = checklistItems.filter((i: any) => !i.result).length;
+      const totalItems = checklistItems.length;
+      const overallScore = totalItems > 0 ? Math.round(((passCount + naCount) / totalItems) * 100) : null;
+
+      const propertyAddress = task.property?.address1 || "";
+      const inspector = task.assignedUser
+        ? `${task.assignedUser.firstName || ""} ${task.assignedUser.lastName || ""}`.trim()
+        : "";
+      const dueDateStr = task.dueDate
+        ? new Date(task.dueDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+        : "";
+      const generatedAt = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
+
+      // ── Header ──
+      doc.fontSize(20).fillColor("#1e40af").text("Inspection Report", { align: "left" });
+      doc.fontSize(9).fillColor("#64748b").text(`Generated ${generatedAt}`, { align: "left" });
+      doc.moveDown(0.5);
+
+      // ── Task Details ──
+      doc.fontSize(14).fillColor("#0f172a").text(task.title || "Untitled Task");
+      doc.moveDown(0.3);
+      const detailParts: string[] = [];
+      if (propertyAddress) detailParts.push(`Property: ${propertyAddress}`);
+      if (dueDateStr) detailParts.push(`Due: ${dueDateStr}`);
+      if (inspector) detailParts.push(`Inspector: ${inspector}`);
+      if (detailParts.length > 0) {
+        doc.fontSize(9).fillColor("#475569").text(detailParts.join("   |   "));
+      }
+      if (task.description) {
+        doc.moveDown(0.3);
+        doc.fontSize(9).fillColor("#64748b").text(task.description);
+      }
+      doc.moveDown(0.8);
+
+      // ── Horizontal Rule ──
+      doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor("#e2e8f0").stroke();
+      doc.moveDown(0.6);
+
+      // ── Summary ──
+      doc.fontSize(12).fillColor("#0f172a").text("Performance Summary");
+      doc.moveDown(0.4);
+
+      const scoreColor = overallScore === null ? "#64748b" : overallScore >= 80 ? "#16a34a" : overallScore >= 60 ? "#ca8a04" : "#dc2626";
+      const summaryY = doc.y;
+      const boxWidth = 90;
+      const boxGap = 10;
+      const boxes = [
+        { label: "Overall Score", value: overallScore !== null ? `${overallScore}%` : "—", color: scoreColor },
+        { label: "Passed", value: String(passCount), color: "#16a34a" },
+        { label: "Failed", value: String(failCount), color: "#dc2626" },
+        { label: "N/A", value: String(naCount), color: "#64748b" },
+        { label: "Pending", value: String(pendingCount), color: "#f59e0b" },
+      ];
+
+      boxes.forEach((box, i) => {
+        const bx = 50 + i * (boxWidth + boxGap);
+        doc.rect(bx, summaryY, boxWidth, 52).fillColor("#f8fafc").fill();
+        doc.rect(bx, summaryY, boxWidth, 52).strokeColor("#e2e8f0").stroke();
+        doc.fontSize(20).fillColor(box.color).text(box.value, bx, summaryY + 8, { width: boxWidth, align: "center" });
+        doc.fontSize(8).fillColor("#64748b").text(box.label, bx, summaryY + 34, { width: boxWidth, align: "center" });
+      });
+
+      doc.y = summaryY + 64;
+      doc.moveDown(0.4);
+
+      // ── Failed Items ──
+      const failItems = checklistItems.filter((i: any) => i.result === "fail");
+      if (failItems.length > 0) {
+        doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor("#e2e8f0").stroke();
+        doc.moveDown(0.6);
+        doc.fontSize(12).fillColor("#dc2626").text(`Failed Items (${failItems.length})`);
+        doc.moveDown(0.4);
+        for (const item of failItems) {
+          const itemText = item.text || "";
+          const noteText = item.resultNote || "";
+          const textH = doc.heightOfString(itemText, { fontSize: 9, width: 460 });
+          const noteH = noteText ? doc.heightOfString(noteText, { fontSize: 8, width: 460 }) + 4 : 0;
+          const boxH = 12 + textH + noteH + 10;
+          if (doc.y + boxH > 720) doc.addPage();
+          const startY = doc.y;
+          doc.rect(50, startY, 495, boxH).fillColor("#fef2f2").fill();
+          doc.rect(50, startY, 495, boxH).strokeColor("#fca5a5").stroke();
+          doc.fontSize(9).fillColor("#dc2626").text("✗", 58, startY + 8, { lineBreak: false });
+          doc.fontSize(9).fillColor("#0f172a").text(itemText, 72, startY + 8, { width: 460 });
+          if (noteText) {
+            const noteY = startY + 8 + textH + 4;
+            doc.fontSize(8).fillColor("#475569").text(noteText, 72, noteY, { width: 460 });
+          }
+          doc.y = startY + boxH + 4;
+        }
+        doc.moveDown(0.4);
+      }
+
+      // ── Full Checklist ──
+      doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor("#e2e8f0").stroke();
+      doc.moveDown(0.6);
+      doc.fontSize(12).fillColor("#0f172a").text(`Full Checklist (${totalItems} items)`);
+      doc.moveDown(0.4);
+
+      if (totalItems === 0) {
+        doc.fontSize(9).fillColor("#94a3b8").text("No checklist items recorded for this inspection.", { align: "center" });
+      } else {
+        const grouped: Record<string, any[]> = {};
+        checklistItems.forEach((item: any) => {
+          const cat = (item.category || "General").trim() || "General";
+          if (!grouped[cat]) grouped[cat] = [];
+          grouped[cat].push(item);
+        });
+
+        for (const [category, items] of Object.entries(grouped)) {
+          if (doc.y > 700) doc.addPage();
+
+          doc.fontSize(8).fillColor("#64748b").text(category.toUpperCase(), 50, doc.y, { width: 495 });
+          doc.moveTo(50, doc.y + 1).lineTo(545, doc.y + 1).strokeColor("#e2e8f0").stroke();
+          doc.moveDown(0.5);
+
+          for (const item of items) {
+            if (doc.y > 720) doc.addPage();
+
+            const resultLabel = item.result === "pass" ? "PASS" : item.result === "fail" ? "FAIL" : item.result === "na" ? "N/A" : "PENDING";
+            const resultColor = item.result === "pass" ? "#16a34a" : item.result === "fail" ? "#dc2626" : item.result === "na" ? "#64748b" : "#f59e0b";
+
+            const itemY = doc.y;
+            doc.fontSize(9).fillColor("#0f172a").text(item.text || "", 50, itemY, { width: 400 });
+            doc.fontSize(8).fillColor(resultColor).text(resultLabel, 455, itemY, { width: 90, align: "right" });
+
+            if (item.required) {
+              doc.fontSize(7).fillColor("#64748b").text("Required", 50, doc.y, { width: 100 });
+            }
+            if (item.resultNote) {
+              doc.fontSize(8).fillColor("#64748b").text(item.resultNote, 50, doc.y, { width: 495 });
+            }
+            doc.moveDown(0.5);
+
+            if (doc.y < 720) {
+              doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor("#f1f5f9").stroke();
+              doc.moveDown(0.2);
+            }
+          }
+          doc.moveDown(0.4);
+        }
+      }
+
+      // ── Pending Warning ──
+      if (pendingCount > 0) {
+        if (doc.y > 700) doc.addPage();
+        doc.moveDown(0.4);
+        doc.rect(50, doc.y, 495, 30).fillColor("#fffbeb").fill();
+        doc.rect(50, doc.y, 495, 30).strokeColor("#fcd34d").stroke();
+        doc.fontSize(9).fillColor("#92400e").text(
+          `⚠  ${pendingCount} item${pendingCount !== 1 ? "s" : ""} still pending review — this inspection is not yet complete.`,
+          58, doc.y + 9, { width: 479 }
+        );
+        doc.y = doc.y + 38;
+      }
+
+      doc.end();
+    });
+  }
+
   // GET /api/tasks/:id/inspection-report — full data for inspection report
   app.get("/api/tasks/:id/inspection-report", isAuthenticated, async (req: any, res) => {
     try {
@@ -13557,6 +13729,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         </div>
       ` : "";
 
+      const attachPdf = req.body.attachPdf === true;
+      let emailAttachments: Array<{ content: string; filename: string; type: string; disposition: string }> | undefined;
+      if (attachPdf) {
+        const pdfBuffer = await buildInspectionReportPdf(task, checklistItems);
+        emailAttachments = [{
+          content: pdfBuffer.toString("base64"),
+          filename: `inspection-report-${taskId}.pdf`,
+          type: "application/pdf",
+          disposition: "attachment",
+        }];
+      }
+
+      const pdfNote = attachPdf
+        ? `<p><a href="${reportUrl}" style="display:inline-block;background:#1e40af;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">View Full Report Online</a></p>
+           <p style="color:#64748b;font-size:12px;margin-top:4px;">📎 A PDF copy of this report is also attached to this email.</p>`
+        : `<p><a href="${reportUrl}" style="display:inline-block;background:#1e40af;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">View Full Report Online</a></p>`;
+
       await sendGenericEmail({
         to: recipientEmail,
         subject: `Inspection Report — ${propertyAddress}`,
@@ -13583,17 +13772,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
               </div>
             </div>
             ${failItemsHtml}
-            <p><a href="${reportUrl}" style="display:inline-block;background:#1e40af;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">View Full Report</a></p>
+            ${pdfNote}
             <p style="color:#6b7280;font-size:13px;">Inspected by: ${inspector}</p>
             <p style="color:#6b7280;font-size:13px;margin-top:30px;">Best regards,<br/>${orgName}</p>
           </div>
         `,
+        attachments: emailAttachments,
       });
 
-      res.json({ success: true, sentTo: recipientEmail });
+      res.json({ success: true, sentTo: recipientEmail, pdfAttached: attachPdf });
     } catch (error) {
       console.error("Error emailing inspection report:", error);
       res.status(500).json({ message: "Failed to send inspection report email" });
+    }
+  });
+
+  // GET /api/tasks/:id/inspection-report/pdf — generate and download PDF inspection report
+  app.get("/api/tasks/:id/inspection-report/pdf", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      const taskId = parseInt(req.params.id);
+      const task = await storage.getTask(taskId);
+      if (!task || (task as any).orgId !== orgId) return res.status(404).json({ message: "Task not found" });
+      const checklistItems = await storage.getTaskChecklistItems(taskId);
+      const pdfBuffer = await buildInspectionReportPdf(task, checklistItems);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="inspection-report-${taskId}.pdf"`);
+      res.setHeader("Content-Length", pdfBuffer.length);
+      res.end(pdfBuffer);
+    } catch (error) {
+      console.error("Error generating PDF inspection report:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Failed to generate PDF report" });
+      }
     }
   });
 

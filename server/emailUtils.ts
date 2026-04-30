@@ -1,4 +1,5 @@
-import sgMail from "@sendgrid/mail";
+import sgMail, { MailDataRequired } from "@sendgrid/mail";
+import type { AttachmentData } from "@sendgrid/helpers/classes/attachment";
 import ICAL from "ical.js";
 
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
@@ -704,18 +705,20 @@ export async function sendGenericEmail({
   htmlContent,
   fromEmail,
   fromName,
+  attachments,
 }: {
   to: string;
   subject: string;
   htmlContent: string;
   fromEmail?: string;
   fromName?: string;
+  attachments?: AttachmentData[];
 }): Promise<void> {
   if (!SENDGRID_API_KEY) {
     throw new Error("SENDGRID_API_KEY is not configured. Email sending is disabled.");
   }
 
-  const msg = {
+  const msg: MailDataRequired = {
     to,
     from: {
       email: fromEmail || process.env.SUPPORT_EMAIL_FROM || "noreply@hubify.app",
@@ -723,6 +726,7 @@ export async function sendGenericEmail({
     },
     subject,
     html: htmlContent,
+    ...(attachments && attachments.length > 0 ? { attachments } : {}),
   };
 
   try {
