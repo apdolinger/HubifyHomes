@@ -1,17 +1,23 @@
 import { useEffect, useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ClipboardCheck, Search, Calendar, User, Building, Filter, ExternalLink, RefreshCw } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
-import { format, parseISO, isValid } from "date-fns";
+import {
+  ClipboardCheck, Search, Calendar, User, Building, Filter,
+  ExternalLink, RefreshCw, List, ChevronLeft, ChevronRight,
+} from "lucide-react";
+import {
+  format, parseISO, isValid, startOfMonth, endOfMonth,
+  startOfWeek, endOfWeek, addDays, addMonths, subMonths,
+  isSameDay, isSameMonth,
+} from "date-fns";
 
 function safeDateFormat(dateValue: any, fmt: string): string {
   if (!dateValue) return "—";
@@ -20,6 +26,16 @@ function safeDateFormat(dateValue: any, fmt: string): string {
     return isValid(d) ? format(d, fmt) : "—";
   } catch {
     return "—";
+  }
+}
+
+function parseDate(dateValue: any): Date | null {
+  if (!dateValue) return null;
+  try {
+    const d = typeof dateValue === "string" ? parseISO(dateValue) : new Date(dateValue);
+    return isValid(d) ? d : null;
+  } catch {
+    return null;
   }
 }
 
@@ -37,11 +53,42 @@ const FREQUENCY_COLORS: Record<string, string> = {
   annually: "bg-orange-100 text-orange-800",
 };
 
+const PROPERTY_PALETTE = [
+  "bg-blue-500",
+  "bg-emerald-500",
+  "bg-violet-500",
+  "bg-amber-500",
+  "bg-rose-500",
+  "bg-cyan-500",
+  "bg-fuchsia-500",
+  "bg-lime-500",
+  "bg-orange-500",
+  "bg-teal-500",
+];
+
+function buildCalendarWeeks(month: Date): Date[][] {
+  const start = startOfWeek(startOfMonth(month), { weekStartsOn: 0 });
+  const end = endOfWeek(endOfMonth(month), { weekStartsOn: 0 });
+  const weeks: Date[][] = [];
+  let day = start;
+  while (day <= end) {
+    const week: Date[] = [];
+    for (let i = 0; i < 7; i++) {
+      week.push(day);
+      day = addDays(day, 1);
+    }
+    weeks.push(week);
+  }
+  return weeks;
+}
+
 export default function InspectionSchedules() {
   const { isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const queryClient = useQueryClient();
+
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterProperty, setFilterProperty] = useState("all");
@@ -107,6 +154,14 @@ export default function InspectionSchedules() {
     return Array.from(ids);
   }, [schedules]);
 
+  const propertyColorMap = useMemo(() => {
+    const m: Record<number, string> = {};
+    uniquePropertyIds.forEach((pid, i) => {
+      m[pid] = PROPERTY_PALETTE[i % PROPERTY_PALETTE.length];
+    });
+    return m;
+  }, [uniquePropertyIds]);
+
   const filtered = useMemo(() => {
     let result = (schedules as any[]).filter((s: any) => {
       const prop = propertiesMap[s.propertyId];
@@ -149,6 +204,26 @@ export default function InspectionSchedules() {
     return <span className="text-slate-600 ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>;
   };
 
+  const calendarWeeks = useMemo(() => buildCalendarWeeks(calendarMonth), [calendarMonth]);
+
+  const eventsByDate = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    filtered.forEach((s: any) => {
+      const d = parseDate(s.nextDueDate);
+      if (!d) return;
+      const key = format(d, "yyyy-MM-dd");
+      if (!map[key]) map[key] = [];
+      map[key].push(s);
+    });
+    return map;
+  }, [filtered]);
+
+  const filteredPropertyIds = useMemo(() => {
+    const ids = new Set<number>();
+    filtered.forEach((s: any) => ids.add(s.propertyId));
+    return Array.from(ids);
+  }, [filtered]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -167,9 +242,31 @@ export default function InspectionSchedules() {
             <p className="text-sm text-slate-500">All recurring inspection schedules across your portfolio</p>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} data-testid="btn-refresh-schedules">
-          <RefreshCw className="w-4 h-4 mr-1" /> Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden">
+            <Button
+              variant={viewMode === "list" ? "default" : "ghost"}
+              size="sm"
+              className="rounded-none border-0 h-9"
+              onClick={() => setViewMode("list")}
+              data-testid="btn-view-list"
+            >
+              <List className="w-4 h-4 mr-1" /> List
+            </Button>
+            <Button
+              variant={viewMode === "calendar" ? "default" : "ghost"}
+              size="sm"
+              className="rounded-none border-0 h-9"
+              onClick={() => setViewMode("calendar")}
+              data-testid="btn-view-calendar"
+            >
+              <Calendar className="w-4 h-4 mr-1" /> Calendar
+            </Button>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => refetch()} data-testid="btn-refresh-schedules">
+            <RefreshCw className="w-4 h-4 mr-1" /> Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -251,114 +348,224 @@ export default function InspectionSchedules() {
         <span>Showing <strong>{filtered.length}</strong> of <strong>{schedules.length}</strong> schedules</span>
       </div>
 
-      {/* Table */}
-      <Card>
-        <CardContent className="p-0">
-          {schedulesLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center py-16">
-              <ClipboardCheck className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500 font-medium">No inspection schedules found</p>
-              <p className="text-slate-400 text-sm mt-1">
-                {schedules.length === 0
-                  ? "Add inspection schedules from any property profile."
-                  : "Try adjusting your filters."}
-              </p>
-            </div>
-          ) : (
-            <Table data-testid="table-inspection-schedules">
-              <TableHeader>
-                <TableRow>
-                  <TableHead
-                    className="cursor-pointer select-none"
-                    onClick={() => toggleSort("property")}
-                    data-testid="th-property"
-                  >
-                    Property <SortIndicator field="property" />
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer select-none"
-                    onClick={() => toggleSort("frequency")}
-                    data-testid="th-frequency"
-                  >
-                    Frequency <SortIndicator field="frequency" />
-                  </TableHead>
-                  <TableHead>Inspector</TableHead>
-                  <TableHead>Template</TableHead>
-                  <TableHead
-                    className="cursor-pointer select-none"
-                    onClick={() => toggleSort("nextDueDate")}
-                    data-testid="th-next-due"
-                  >
-                    Next Due Date <SortIndicator field="nextDueDate" />
-                  </TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((schedule: any) => {
-                  const prop = propertiesMap[schedule.propertyId];
-                  const inspector = schedule.inspectorUserId ? usersMap[schedule.inspectorUserId] : null;
-                  const template = schedule.templateId ? templatesMap[schedule.templateId] : null;
-                  return (
-                    <TableRow key={schedule.id} data-testid={`row-schedule-${schedule.id}`}>
-                      <TableCell>
-                        <div className="font-medium text-slate-900">{prop?.name || `Property ${schedule.propertyId}`}</div>
-                        {prop?.address1 && (
-                          <div className="text-xs text-slate-500">{prop.address1}{prop.city ? `, ${prop.city}` : ""}</div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={`${FREQUENCY_COLORS[schedule.frequency] || "bg-slate-100 text-slate-800"} font-medium`}>
-                          {FREQUENCY_LABELS[schedule.frequency] || schedule.frequency}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {inspector
-                          ? <span className="text-slate-700">{`${inspector.firstName || ""} ${inspector.lastName || ""}`.trim()}</span>
-                          : <span className="text-slate-400 italic text-sm">Unassigned</span>}
-                      </TableCell>
-                      <TableCell>
-                        {template
-                          ? <span className="text-slate-700">{template.name}</span>
-                          : <span className="text-slate-400 italic text-sm">No template</span>}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-slate-400" />
-                          <span className="text-slate-700 font-medium">
-                            {safeDateFormat(schedule.nextDueDate, "MMM d, yyyy")}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={schedule.isActive ? "default" : "secondary"}>
-                          {schedule.isActive ? "Active" : "Paused"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setLocation(`/property-profile/${schedule.propertyId}?tab=inspections`)}
-                          data-testid={`btn-view-property-${schedule.id}`}
-                          title="View property"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      {/* Content */}
+      {viewMode === "list" ? (
+        <Card>
+          <CardContent className="p-0">
+            {schedulesLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-16">
+                <ClipboardCheck className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-500 font-medium">No inspection schedules found</p>
+                <p className="text-slate-400 text-sm mt-1">
+                  {schedules.length === 0
+                    ? "Add inspection schedules from any property profile."
+                    : "Try adjusting your filters."}
+                </p>
+              </div>
+            ) : (
+              <Table data-testid="table-inspection-schedules">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead
+                      className="cursor-pointer select-none"
+                      onClick={() => toggleSort("property")}
+                      data-testid="th-property"
+                    >
+                      Property <SortIndicator field="property" />
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none"
+                      onClick={() => toggleSort("frequency")}
+                      data-testid="th-frequency"
+                    >
+                      Frequency <SortIndicator field="frequency" />
+                    </TableHead>
+                    <TableHead>Inspector</TableHead>
+                    <TableHead>Template</TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none"
+                      onClick={() => toggleSort("nextDueDate")}
+                      data-testid="th-next-due"
+                    >
+                      Next Due Date <SortIndicator field="nextDueDate" />
+                    </TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((schedule: any) => {
+                    const prop = propertiesMap[schedule.propertyId];
+                    const inspector = schedule.inspectorUserId ? usersMap[schedule.inspectorUserId] : null;
+                    const template = schedule.templateId ? templatesMap[schedule.templateId] : null;
+                    return (
+                      <TableRow key={schedule.id} data-testid={`row-schedule-${schedule.id}`}>
+                        <TableCell>
+                          <div className="font-medium text-slate-900">{prop?.name || `Property ${schedule.propertyId}`}</div>
+                          {prop?.address1 && (
+                            <div className="text-xs text-slate-500">{prop.address1}{prop.city ? `, ${prop.city}` : ""}</div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={`${FREQUENCY_COLORS[schedule.frequency] || "bg-slate-100 text-slate-800"} font-medium`}>
+                            {FREQUENCY_LABELS[schedule.frequency] || schedule.frequency}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {inspector
+                            ? <span className="text-slate-700">{`${inspector.firstName || ""} ${inspector.lastName || ""}`.trim()}</span>
+                            : <span className="text-slate-400 italic text-sm">Unassigned</span>}
+                        </TableCell>
+                        <TableCell>
+                          {template
+                            ? <span className="text-slate-700">{template.name}</span>
+                            : <span className="text-slate-400 italic text-sm">No template</span>}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-slate-400" />
+                            <span className="text-slate-700 font-medium">
+                              {safeDateFormat(schedule.nextDueDate, "MMM d, yyyy")}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={schedule.isActive ? "default" : "secondary"}>
+                            {schedule.isActive ? "Active" : "Paused"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setLocation(`/property-profile/${schedule.propertyId}?tab=inspections`)}
+                            data-testid={`btn-view-property-${schedule.id}`}
+                            title="View property"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        /* Calendar View */
+        <div data-testid="calendar-view">
+          <Card>
+            <CardContent className="p-4">
+              {/* Month navigation */}
+              <div className="flex items-center justify-between mb-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCalendarMonth(m => subMonths(m, 1))}
+                  data-testid="btn-cal-prev-month"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </Button>
+                <h2 className="text-lg font-semibold text-slate-800" data-testid="cal-month-label">
+                  {format(calendarMonth, "MMMM yyyy")}
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCalendarMonth(m => addMonths(m, 1))}
+                  data-testid="btn-cal-next-month"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </Button>
+              </div>
+
+              {schedulesLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
+                </div>
+              ) : (
+                <>
+                  {/* Day-of-week headers */}
+                  <div className="grid grid-cols-7 mb-1">
+                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => (
+                      <div key={d} className="text-center text-xs font-semibold text-slate-400 py-1">
+                        {d}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Calendar grid */}
+                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                    {calendarWeeks.map((week, wi) => (
+                      <div key={wi} className="grid grid-cols-7 divide-x divide-slate-200">
+                        {week.map((day, di) => {
+                          const dateKey = format(day, "yyyy-MM-dd");
+                          const dayEvents = eventsByDate[dateKey] || [];
+                          const isCurrentMonth = isSameMonth(day, calendarMonth);
+                          const isToday = isSameDay(day, new Date());
+
+                          return (
+                            <div
+                              key={di}
+                              className={`min-h-[100px] p-1.5 ${wi < calendarWeeks.length - 1 ? "border-b border-slate-200" : ""} ${isCurrentMonth ? "bg-white" : "bg-slate-50"}`}
+                              data-testid={`cal-day-${dateKey}`}
+                            >
+                              <div className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full ${isToday ? "bg-blue-600 text-white" : isCurrentMonth ? "text-slate-700" : "text-slate-300"}`}>
+                                {format(day, "d")}
+                              </div>
+                              <div className="space-y-0.5">
+                                {dayEvents.map((s: any) => {
+                                  const prop = propertiesMap[s.propertyId];
+                                  const propName = prop?.name || `Property ${s.propertyId}`;
+                                  const color = propertyColorMap[s.propertyId] || PROPERTY_PALETTE[0];
+                                  return (
+                                    <button
+                                      key={s.id}
+                                      className={`w-full text-left text-white text-xs rounded px-1.5 py-0.5 truncate ${color} hover:opacity-80 transition-opacity cursor-pointer`}
+                                      onClick={() => setLocation(`/property-profile/${s.propertyId}?tab=inspections`)}
+                                      title={propName}
+                                      data-testid={`cal-event-${s.id}`}
+                                    >
+                                      {propName}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Legend — only shows properties in the current filtered result */}
+                  {filteredPropertyIds.length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      {filteredPropertyIds.map(pid => {
+                        const prop = propertiesMap[pid];
+                        if (!prop) return null;
+                        const color = propertyColorMap[pid] || PROPERTY_PALETTE[0];
+                        return (
+                          <div key={pid} className="flex items-center gap-1.5">
+                            <div className={`w-3 h-3 rounded-sm ${color}`} />
+                            <span className="text-xs text-slate-600">{prop.name}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
