@@ -197,21 +197,47 @@ export async function runBillingAutomation(): Promise<{
           
           // Send invoice email if client has an email
           if (client.email) {
-            const pdfBuffer = await generateInvoicePDF(invoice, client, org);
-            const htmlContent = generateInvoiceEmailHTML(invoice, client, org);
-            
-            await sendGenericEmail({
-              to: client.email,
-              subject: `Invoice ${invoice.invoiceNumber} from ${org.name}`,
-              htmlContent,
-              attachments: [{
-                filename: `${invoice.invoiceNumber}.pdf`,
-                content: pdfBuffer,
-                contentType: 'application/pdf',
-              }],
-            });
-            
-            log(`[BILLING] Sent invoice ${invoice.invoiceNumber} to ${client.email}`);
+            const invoiceSentSubject = `Invoice ${invoice.invoiceNumber} from ${org.name}`;
+            try {
+              const pdfBuffer = await generateInvoicePDF(invoice, client, org);
+              const htmlContent = generateInvoiceEmailHTML(invoice, client, org);
+              
+              await sendGenericEmail({
+                to: client.email,
+                subject: invoiceSentSubject,
+                htmlContent,
+                attachments: [{
+                  filename: `${invoice.invoiceNumber}.pdf`,
+                  content: pdfBuffer,
+                  contentType: 'application/pdf',
+                }],
+              });
+              
+              log(`[BILLING] Sent invoice ${invoice.invoiceNumber} to ${client.email}`);
+              storage.createNotificationLog({
+                orgId: org.id,
+                type: 'invoice_sent',
+                recipientEmail: client.email,
+                recipientName: [client.firstName, client.lastName].filter(Boolean).join(' ') || undefined,
+                subject: invoiceSentSubject,
+                status: 'sent',
+                relatedEntityType: 'invoice',
+                relatedEntityId: String(invoice.id),
+              }).catch((e: unknown) => log(`[BILLING] Failed to create notification log: ${e}`));
+            } catch (emailErr) {
+              log(`[BILLING] Failed to send invoice email to ${client.email}: ${emailErr}`);
+              storage.createNotificationLog({
+                orgId: org.id,
+                type: 'invoice_sent',
+                recipientEmail: client.email,
+                recipientName: [client.firstName, client.lastName].filter(Boolean).join(' ') || undefined,
+                subject: invoiceSentSubject,
+                status: 'failed',
+                errorMessage: String(emailErr),
+                relatedEntityType: 'invoice',
+                relatedEntityId: String(invoice.id),
+              }).catch((e: unknown) => log(`[BILLING] Failed to create notification log: ${e}`));
+            }
           } else {
             log(`[BILLING] Warning: Client ${client.firstName} ${client.lastName} has no email address, invoice created but not sent`);
           }
@@ -543,13 +569,30 @@ export function startScheduledTasks() {
               </div>
             `;
             
+            const billingSummarySubject = `[Hubify] Daily Billing Automation Summary - ${new Date().toLocaleDateString()}`;
             await sendGenericEmail({
               to: supportEmail,
-              subject: `[Hubify] Daily Billing Automation Summary - ${new Date().toLocaleDateString()}`,
+              subject: billingSummarySubject,
               htmlContent: summaryHtml,
             });
             
             log(`[BILLING] Sent summary email to ${supportEmail} - ${results.summary}`);
+
+            // Log billing summary email — attribute to first active org (or first org in list)
+            // so the entry is always recorded regardless of whether any org had activity
+            const summaryOrg =
+              (orgSummaries.length > 0
+                ? allOrgs.find(o => o.name === orgSummaries[0].orgName)
+                : null) ?? allOrgs[0];
+            if (summaryOrg) {
+              storage.createNotificationLog({
+                orgId: summaryOrg.id,
+                type: 'billing_summary',
+                recipientEmail: supportEmail,
+                subject: billingSummarySubject,
+                status: 'sent',
+              }).catch((e: unknown) => log(`[BILLING] Failed to create notification log: ${e}`));
+            }
           } catch (emailError) {
             log(`[BILLING] Error sending summary email: ${emailError}`);
           }
@@ -756,17 +799,39 @@ export function startScheduledTasks() {
           if (emailEnabled) {
             const assignee = await storage.getUser(task.assignedToId);
             if (assignee?.email) {
+              const emailSubject = `Overdue Task: ${task.title}`;
               try {
                 await sendEmail({
                   to: assignee.email,
-                  subject: `Overdue Task: ${task.title}`,
+                  subject: emailSubject,
                   body: `Your task "${task.title}" was due on ${new Date(task.dueDate).toLocaleDateString()} and is still open.\n\nPlease complete or update this task as soon as possible.`,
                   orgId,
                   fromName: org.name,
                 });
                 emailsSent++;
+                storage.createNotificationLog({
+                  orgId,
+                  type: 'task_overdue',
+                  recipientEmail: assignee.email,
+                  recipientName: [assignee.firstName, assignee.lastName].filter(Boolean).join(' ') || undefined,
+                  subject: emailSubject,
+                  status: 'sent',
+                  relatedEntityType: 'task',
+                  relatedEntityId: String(task.id),
+                }).catch((e: unknown) => log(`[CRON] Failed to create notification log: ${e}`));
               } catch (emailErr) {
                 log(`[CRON] Failed to send overdue task email to ${assignee.email}: ${emailErr}`);
+                storage.createNotificationLog({
+                  orgId,
+                  type: 'task_overdue',
+                  recipientEmail: assignee.email,
+                  recipientName: [assignee.firstName, assignee.lastName].filter(Boolean).join(' ') || undefined,
+                  subject: emailSubject,
+                  status: 'failed',
+                  errorMessage: String(emailErr),
+                  relatedEntityType: 'task',
+                  relatedEntityId: String(task.id),
+                }).catch((e: unknown) => log(`[CRON] Failed to create notification log: ${e}`));
               }
             }
           }
@@ -820,10 +885,11 @@ export function startScheduledTasks() {
               ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(invoice.amountCents / 100)
               : '';
 
+            const invoiceReminderSubject = `Payment Reminder: Invoice ${invoice.invoiceNumber || ''} Due ${dueDate}`;
             try {
               await sendEmail({
                 to: invoice.clientEmail,
-                subject: `Payment Reminder: Invoice ${invoice.invoiceNumber || ''} Due ${dueDate}`,
+                subject: invoiceReminderSubject,
                 body: `This is a friendly reminder that your invoice${invoice.invoiceNumber ? ` #${invoice.invoiceNumber}` : ''} for ${amount} is due on ${dueDate}.\n\nPlease log in to the portal to view and pay your invoice.\n\nThank you!`,
                 orgId: org.id,
                 fromName: org.name,
@@ -836,8 +902,28 @@ export function startScheduledTasks() {
               await storage.updateClientInvoice(invoice.id, {
                 metadata: updatedMeta as Record<string, unknown>,
               });
+
+              storage.createNotificationLog({
+                orgId: org.id,
+                type: 'invoice_due',
+                recipientEmail: invoice.clientEmail,
+                subject: invoiceReminderSubject,
+                status: 'sent',
+                relatedEntityType: 'invoice',
+                relatedEntityId: String(invoice.id),
+              }).catch((e: unknown) => log(`[CRON] Failed to create notification log: ${e}`));
             } catch (emailErr) {
               log(`[CRON] Failed to send invoice reminder to ${invoice.clientEmail}: ${emailErr}`);
+              storage.createNotificationLog({
+                orgId: org.id,
+                type: 'invoice_due',
+                recipientEmail: invoice.clientEmail,
+                subject: invoiceReminderSubject,
+                status: 'failed',
+                errorMessage: String(emailErr),
+                relatedEntityType: 'invoice',
+                relatedEntityId: String(invoice.id),
+              }).catch((e: unknown) => log(`[CRON] Failed to create notification log: ${e}`));
             }
           }
           // Staff in-app notifications: per-user invoiceAdvanceDays window
@@ -944,16 +1030,38 @@ export function startScheduledTasks() {
             if (emailEnabled) {
               const user = await storage.getUser(event.calendarOwnerId);
               if (user?.email) {
+                const calReminderSubject = `Reminder: ${event.title} starting soon`;
                 try {
                   await sendEmail({
                     to: user.email,
-                    subject: `Reminder: ${event.title} starting soon`,
+                    subject: calReminderSubject,
                     body: `This is a reminder that "${event.title}" is starting in approximately ${userAdvanceMinutes} minutes at ${eventStart}.\n\n${event.description || ''}`,
                     orgId: org.id,
                     fromName: org.name,
                   });
+                  storage.createNotificationLog({
+                    orgId: org.id,
+                    type: 'calendar_reminder',
+                    recipientEmail: user.email,
+                    recipientName: [user.firstName, user.lastName].filter(Boolean).join(' ') || undefined,
+                    subject: calReminderSubject,
+                    status: 'sent',
+                    relatedEntityType: 'event',
+                    relatedEntityId: String(event.id),
+                  }).catch((e: unknown) => log(`[CRON] Failed to create notification log: ${e}`));
                 } catch (emailErr) {
                   log(`[CRON] Failed to send event reminder email: ${emailErr}`);
+                  storage.createNotificationLog({
+                    orgId: org.id,
+                    type: 'calendar_reminder',
+                    recipientEmail: user.email,
+                    recipientName: [user.firstName, user.lastName].filter(Boolean).join(' ') || undefined,
+                    subject: calReminderSubject,
+                    status: 'failed',
+                    errorMessage: String(emailErr),
+                    relatedEntityType: 'event',
+                    relatedEntityId: String(event.id),
+                  }).catch((e: unknown) => log(`[CRON] Failed to create notification log: ${e}`));
                 }
               }
             }
@@ -1035,17 +1143,39 @@ export function startScheduledTasks() {
             if (emailEnabled) {
               const inspector = await storage.getUser(schedule.inspectorUserId);
               if (inspector?.email) {
+                const inspectionReminderSubject = `Upcoming Inspection: ${label}`;
                 try {
                   await sendEmail({
                     to: inspector.email,
-                    subject: `Upcoming Inspection: ${label}`,
+                    subject: inspectionReminderSubject,
                     body: `You have an upcoming inspection scheduled:\n\nInspection: ${label}\nDue: ${dueDateStr}\n\nPlease review and prepare accordingly.`,
                     orgId: org.id,
                     fromName: org.name,
                   });
                   emailsSent++;
+                  storage.createNotificationLog({
+                    orgId: org.id,
+                    type: 'inspection_reminder',
+                    recipientEmail: inspector.email,
+                    recipientName: [inspector.firstName, inspector.lastName].filter(Boolean).join(' ') || undefined,
+                    subject: inspectionReminderSubject,
+                    status: 'sent',
+                    relatedEntityType: 'inspection_schedule',
+                    relatedEntityId: String(schedule.id),
+                  }).catch((e: unknown) => log(`[CRON] Failed to create notification log: ${e}`));
                 } catch (emailErr) {
                   log(`[CRON] Failed to send inspection reminder email: ${emailErr}`);
+                  storage.createNotificationLog({
+                    orgId: org.id,
+                    type: 'inspection_reminder',
+                    recipientEmail: inspector.email,
+                    recipientName: [inspector.firstName, inspector.lastName].filter(Boolean).join(' ') || undefined,
+                    subject: inspectionReminderSubject,
+                    status: 'failed',
+                    errorMessage: String(emailErr),
+                    relatedEntityType: 'inspection_schedule',
+                    relatedEntityId: String(schedule.id),
+                  }).catch((e: unknown) => log(`[CRON] Failed to create notification log: ${e}`));
                 }
               }
             }
@@ -1157,13 +1287,38 @@ export function startScheduledTasks() {
                       ``,
                       `View Task: <a href="${taskUrl}">${taskUrl}</a>`,
                     ].filter((line) => line !== null).join('\n');
-                    await sendEmail({
+                    const inspectionTaskSubject = `Upcoming Inspection: ${taskTitle}`;
+                    sendEmail({
                       to: inspector.email,
-                      subject: `Upcoming Inspection: ${taskTitle}`,
+                      subject: inspectionTaskSubject,
                       body: emailBody,
                       orgId: schedule.orgId,
                       fromName: orgRecord?.name || 'Hubify',
-                    }).catch((e: unknown) => log(`[CRON] Failed to send inspection email: ${e}`));
+                    }).then(() => {
+                      storage.createNotificationLog({
+                        orgId: schedule.orgId,
+                        type: 'inspection_reminder',
+                        recipientEmail: inspector.email!,
+                        recipientName: [inspector.firstName, inspector.lastName].filter(Boolean).join(' ') || undefined,
+                        subject: inspectionTaskSubject,
+                        status: 'sent',
+                        relatedEntityType: 'task',
+                        relatedEntityId: String(newTask.id),
+                      }).catch((e: unknown) => log(`[CRON] Failed to create notification log: ${e}`));
+                    }).catch((e: unknown) => {
+                      log(`[CRON] Failed to send inspection email: ${e}`);
+                      storage.createNotificationLog({
+                        orgId: schedule.orgId,
+                        type: 'inspection_reminder',
+                        recipientEmail: inspector.email!,
+                        recipientName: [inspector.firstName, inspector.lastName].filter(Boolean).join(' ') || undefined,
+                        subject: inspectionTaskSubject,
+                        status: 'failed',
+                        errorMessage: String(e),
+                        relatedEntityType: 'task',
+                        relatedEntityId: String(newTask.id),
+                      }).catch((le: unknown) => log(`[CRON] Failed to create notification log: ${le}`));
+                    });
                   }
                 }
               } catch (notifErr) {

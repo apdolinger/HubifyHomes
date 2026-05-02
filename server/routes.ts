@@ -14229,6 +14229,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Notification logs routes (admin-only: contains org-wide recipient emails + error details)
+  app.get("/api/notification-logs", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId;
+      if (!orgId) return res.status(400).json({ message: "Organization ID not found" });
+      const type = req.query.type as string | undefined;
+      const rawLimit = req.query.limit ? parseInt(req.query.limit as string, 10) : 200;
+      const limit = Number.isNaN(rawLimit) ? 200 : Math.min(Math.max(rawLimit, 1), 500);
+      const logs = await storage.getNotificationLogs(orgId, type, limit);
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching notification logs:", error);
+      res.status(500).json({ message: "Failed to fetch notification logs" });
+    }
+  });
+
   // Register the conflict detector for scheduled tasks
   const { setConflictDetector } = await import('./scheduledTasks');
   setConflictDetector(detectAndCreateEventConflicts);

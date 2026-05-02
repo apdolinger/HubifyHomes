@@ -62,6 +62,9 @@ export default {
           ring: "var(--sidebar-ring)",
         },
       },
+      gridTemplateColumns: {
+        "13": "repeat(13, minmax(0, 1fr))",
+      },
       keyframes: {
         "accordion-down": {
           from: {

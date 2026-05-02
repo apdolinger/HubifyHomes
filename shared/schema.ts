@@ -3169,3 +3169,48 @@ export const insertInspectionScheduleSchema = createInsertSchema(inspectionSched
 });
 export type InsertInspectionSchedule = z.infer<typeof insertInspectionScheduleSchema>;
 export type InspectionSchedule = typeof inspectionSchedules.$inferSelect;
+
+// Notification Logs - Audit trail for all system-sent notification emails
+export const notificationLogs = pgTable("notification_logs", {
+  id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id).notNull(),
+
+  // Notification type
+  type: varchar("type").$type<
+    | "task_overdue"
+    | "invoice_due"
+    | "inspection_reminder"
+    | "calendar_reminder"
+    | "invoice_sent"
+    | "billing_summary"
+  >().notNull(),
+
+  // Recipient info
+  recipientEmail: varchar("recipient_email").notNull(),
+  recipientName: varchar("recipient_name"),
+
+  // Email content summary
+  subject: text("subject").notNull(),
+
+  // Status tracking
+  status: varchar("status").$type<"sent" | "failed">().notNull().default("sent"),
+  errorMessage: text("error_message"),
+
+  // Related entity (optional context)
+  relatedEntityType: varchar("related_entity_type"), // e.g. "task", "invoice", "inspection_schedule", "event"
+  relatedEntityId: varchar("related_entity_id"),
+
+  sentAt: timestamp("sent_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("notification_logs_org_idx").on(table.orgId),
+  index("notification_logs_type_idx").on(table.type),
+  index("notification_logs_recipient_idx").on(table.recipientEmail),
+]);
+
+export const insertNotificationLogSchema = createInsertSchema(notificationLogs).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
+export type NotificationLog = typeof notificationLogs.$inferSelect;

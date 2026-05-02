@@ -337,6 +337,141 @@ function NotificationsTab({ orgId, fieldModeEnabled, setFieldModeEnabled, isAdmi
   );
 }
 
+const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
+  task_overdue: "Task Overdue",
+  invoice_due: "Invoice Due",
+  inspection_reminder: "Inspection Reminder",
+  calendar_reminder: "Calendar Reminder",
+  invoice_sent: "Invoice Sent",
+  billing_summary: "Billing Summary",
+};
+
+function NotificationLogTab() {
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+
+  type NotificationLogEntry = {
+    id: number;
+    orgId: string;
+    type: string;
+    recipientEmail: string;
+    recipientName: string | null;
+    subject: string;
+    status: "sent" | "failed";
+    errorMessage: string | null;
+    relatedEntityType: string | null;
+    relatedEntityId: string | null;
+    sentAt: string | null;
+    createdAt: string;
+  };
+
+  const { data: logs = [], isLoading } = useQuery<NotificationLogEntry[]>({
+    queryKey: ["/api/notification-logs", typeFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (typeFilter !== "all") params.set("type", typeFilter);
+      params.set("limit", "200");
+      const res = await fetch(`/api/notification-logs?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch notification logs");
+      return res.json();
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center">
+          <Mail className="w-5 h-5 mr-2" />
+          Notification Log
+        </CardTitle>
+        <CardDescription>
+          Audit trail of all system-generated notification emails sent by automated cron jobs.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <Label htmlFor="type-filter" className="shrink-0">Filter by type:</Label>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger id="type-filter" className="w-52" data-testid="select-notification-type-filter">
+                <SelectValue placeholder="All types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All types</SelectItem>
+                <SelectItem value="task_overdue">Task Overdue</SelectItem>
+                <SelectItem value="invoice_due">Invoice Due</SelectItem>
+                <SelectItem value="inspection_reminder">Inspection Reminder</SelectItem>
+                <SelectItem value="calendar_reminder">Calendar Reminder</SelectItem>
+                <SelectItem value="invoice_sent">Invoice Sent</SelectItem>
+                <SelectItem value="billing_summary">Billing Summary</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : logs.length === 0 ? (
+            <div className="text-center py-10 text-slate-500">
+              <Bell className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+              <p className="text-sm">No notification emails have been sent yet.</p>
+              <p className="text-xs mt-1">Automated reminders will appear here once cron jobs run.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Sent At</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Recipient</TableHead>
+                  <TableHead>Subject</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {logs.map((log) => (
+                  <TableRow key={log.id}>
+                    <TableCell className="text-sm text-slate-600 whitespace-nowrap">
+                      {log.sentAt ? new Date(log.sentAt).toLocaleString() : new Date(log.createdAt).toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs">
+                        {NOTIFICATION_TYPE_LABELS[log.type] ?? log.type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      <div>{log.recipientName || ""}</div>
+                      <div className="text-slate-500 text-xs">{log.recipientEmail}</div>
+                    </TableCell>
+                    <TableCell className="text-sm max-w-xs truncate" title={log.subject}>
+                      {log.subject}
+                    </TableCell>
+                    <TableCell>
+                      {log.status === "sent" ? (
+                        <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Sent
+                        </Badge>
+                      ) : (
+                        <Badge variant="destructive" className="text-xs" title={log.errorMessage ?? undefined}>
+                          <XCircle className="w-3 h-3 mr-1" />
+                          Failed
+                        </Badge>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+          {logs.length > 0 && (
+            <p className="text-xs text-slate-400">Showing up to 200 most recent entries.</p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Account() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
@@ -580,7 +715,7 @@ export default function Account() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-12">
+        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-13">
           <TabsTrigger value="account-info" data-testid="tab-account-info">Account Info</TabsTrigger>
           <TabsTrigger value="billing" data-testid="tab-billing">Billing</TabsTrigger>
           <TabsTrigger value="forms" data-testid="tab-forms">Forms</TabsTrigger>
@@ -592,6 +727,9 @@ export default function Account() {
           <TabsTrigger value="team-roles" data-testid="tab-team-roles">Team & Roles</TabsTrigger>
           <TabsTrigger value="automation" data-testid="tab-automation">Automation</TabsTrigger>
           <TabsTrigger value="audit-log" data-testid="tab-audit-log">Audit Log</TabsTrigger>
+          {(user as any)?.role === 'admin' || (user as any)?.role === 'supervisor' || (user as any)?.role === 'super_admin' ? (
+            <TabsTrigger value="notification-log" data-testid="tab-notification-log">Notification Log</TabsTrigger>
+          ) : null}
           <TabsTrigger value="integrations" data-testid="tab-integrations">Integrations</TabsTrigger>
         </TabsList>
 
@@ -1409,6 +1547,11 @@ export default function Account() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Notification Log Tab */}
+        <TabsContent value="notification-log">
+          <NotificationLogTab />
         </TabsContent>
 
         {/* Integrations Tab */}

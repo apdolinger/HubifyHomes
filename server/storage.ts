@@ -85,8 +85,11 @@ import {
   checklistTemplates,
   notifications,
   inspectionSchedules,
+  notificationLogs,
   type InspectionSchedule,
   type InsertInspectionSchedule,
+  type NotificationLog,
+  type InsertNotificationLog,
   type User,
   type UpsertUser,
   type Team,
@@ -774,6 +777,10 @@ export interface IStorage {
   getEmailHistory(orgId: string, contactId?: number): Promise<EmailHistory[]>;
   getEmailHistoryItem(id: number, orgId: string): Promise<EmailHistory | undefined>;
   createEmailHistory(history: InsertEmailHistory): Promise<EmailHistory>;
+
+  // Notification log operations
+  createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog>;
+  getNotificationLogs(orgId: string, type?: string, limit?: number): Promise<NotificationLog[]>;
   
   // Scheduled email operations
   getScheduledEmails(orgId: string, status?: "pending"|"sent"|"failed"|"cancelled"): Promise<ScheduledEmail[]>;
@@ -6529,7 +6536,33 @@ export class DatabaseStorage implements IStorage {
     const [created] = await db.insert(emailHistory).values(history).returning();
     return created;
   }
-  
+
+  // Notification log operations
+  async createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog> {
+    const [created] = await db.insert(notificationLogs).values(log).returning();
+    return created;
+  }
+
+  async getNotificationLogs(orgId: string, type?: string, limit = 200): Promise<NotificationLog[]> {
+    if (type) {
+      return await db
+        .select()
+        .from(notificationLogs)
+        .where(and(
+          eq(notificationLogs.orgId, orgId),
+          eq(notificationLogs.type, type as NotificationLog["type"])
+        ))
+        .orderBy(desc(notificationLogs.createdAt))
+        .limit(limit);
+    }
+    return await db
+      .select()
+      .from(notificationLogs)
+      .where(eq(notificationLogs.orgId, orgId))
+      .orderBy(desc(notificationLogs.createdAt))
+      .limit(limit);
+  }
+
   // Scheduled email operations
   async getScheduledEmails(orgId: string, status?: "pending"|"sent"|"failed"|"cancelled"): Promise<ScheduledEmail[]> {
     const conditions = [eq(scheduledEmails.orgId, orgId)];
