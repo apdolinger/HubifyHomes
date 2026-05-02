@@ -2493,6 +2493,9 @@ function BillingSettingsForm({ orgId, onClose }: { orgId: string; onClose: () =>
 }
 
 // ─── Webhook Event Types ──────────────────────────────────────────────────────
+// NOTE: "test" is intentionally excluded here. It is a valid WebhookEventType
+// in the schema (used for ad-hoc test deliveries), but it must never appear as
+// a subscribable event option in the endpoint creation/edit form.
 const WEBHOOK_EVENT_TYPES = [
   { value: "task.created", label: "Task Created" },
   { value: "task.updated", label: "Task Updated" },
