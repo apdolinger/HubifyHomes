@@ -1175,9 +1175,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
 
-      // Include orgId and role from OIDC claims
-      const orgId = req.user.claims.orgId || req.user.claims.org_id;
-      const role = req.user.claims.role || user?.role;
+      // Include orgId and role — DB is source of truth, fall back to claims
+      const orgId = user?.orgId || req.user.claims.orgId || req.user.claims.org_id;
+      const role = user?.role || req.user.claims.role;
 
       // Include effective feature flags so the canonical /api/auth/user response
       // is the single source of truth for feature gating decisions on the client.
@@ -5899,7 +5899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/time-entries", isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user;
-      const orgId = user.orgId;
+      const orgId = user.claims?.orgId || user.orgId;
       
       if (!orgId) {
         return res.status(400).json({ message: "Organization ID is required" });
@@ -5917,6 +5917,156 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching time entries:", error);
       res.status(500).json({ message: "Failed to fetch time entries" });
+    }
+  });
+
+  app.get("/api/time-entries/report", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const userId = user.claims?.sub || user.id;
+      const dbUser = userId ? await storage.getUser(userId) : null;
+      const orgId = dbUser?.orgId || user.claims?.orgId || user.orgId;
+      const role = dbUser?.role || user.claims?.role;
+
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID is required" });
+      }
+
+      if (role !== 'admin' && role !== 'supervisor') {
+        return res.status(403).json({ message: "Only admins and supervisors can view time reports" });
+      }
+
+      const groupBy = req.query.groupBy === 'property' ? 'property' : 'user';
+      const billableFilter = req.query.billable as string | undefined; // 'billable' | 'nonbillable' | 'all' | undefined
+
+      const filters: any = {};
+      if (req.query.userId) filters.userId = req.query.userId as string;
+      if (req.query.propertyId) filters.propertyId = parseInt(req.query.propertyId as string);
+      if (req.query.taskId) filters.taskId = parseInt(req.query.taskId as string);
+      if (req.query.startDate) filters.startDate = req.query.startDate as string;
+      if (req.query.endDate) filters.endDate = req.query.endDate as string;
+
+      const allEntries = await storage.getTimeEntries(orgId, filters);
+
+      const entries = allEntries.filter((e: any) => {
+        if (billableFilter === 'billable') return e.isBillable === true;
+        if (billableFilter === 'nonbillable') return e.isBillable === false;
+        return true;
+      });
+
+      const [allUsers, allProperties] = await Promise.all([
+        storage.getUsersByOrg(orgId),
+        storage.getProperties(true),
+      ]);
+      const userMap = new Map(allUsers.map((u: any) => [u.id, `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || u.email || u.id]));
+      const propertyMap = new Map(allProperties.map((p: any) => [p.id, p.name]));
+
+      const computeHours = (entry: any) => {
+        const start = new Date(entry.clockIn).getTime();
+        const end = entry.clockOut ? new Date(entry.clockOut).getTime() : Date.now();
+        const ms = Math.max(0, end - start);
+        return ms / (1000 * 60 * 60);
+      };
+
+      type Bucket = {
+        key: string;
+        label: string;
+        totalHours: number;
+        billableHours: number;
+        nonBillableHours: number;
+        billableAmountCents: number;
+        entryCount: number;
+        breakdown: Map<string, Bucket>;
+      };
+
+      const makeBucket = (key: string, label: string): Bucket => ({
+        key, label,
+        totalHours: 0, billableHours: 0, nonBillableHours: 0,
+        billableAmountCents: 0, entryCount: 0, breakdown: new Map(),
+      });
+
+      const groups = new Map<string, Bucket>();
+      const activeUserIds = new Set<string>();
+      const activePropertyIds = new Set<string>();
+      let totalHours = 0, billableHours = 0, nonBillableHours = 0, billableAmountCents = 0;
+
+      for (const entry of entries) {
+        const hours = computeHours(entry);
+        const isBillable = entry.isBillable !== false;
+        const amountCents = isBillable && entry.billableRateCents
+          ? Math.round((entry.billableRateCents) * hours)
+          : 0;
+
+        totalHours += hours;
+        if (isBillable) billableHours += hours; else nonBillableHours += hours;
+        billableAmountCents += amountCents;
+        activeUserIds.add(entry.userId);
+        if (entry.propertyId) activePropertyIds.add(String(entry.propertyId));
+
+        const primaryKey = groupBy === 'user'
+          ? (entry.userId || 'unassigned')
+          : (entry.propertyId ? String(entry.propertyId) : 'unassigned');
+        const primaryLabel = groupBy === 'user'
+          ? (userMap.get(entry.userId) || 'Unknown User')
+          : (entry.propertyId ? (propertyMap.get(entry.propertyId) || `Property #${entry.propertyId}`) : '(No Property)');
+
+        let g = groups.get(primaryKey);
+        if (!g) { g = makeBucket(primaryKey, primaryLabel); groups.set(primaryKey, g); }
+        g.totalHours += hours;
+        if (isBillable) g.billableHours += hours; else g.nonBillableHours += hours;
+        g.billableAmountCents += amountCents;
+        g.entryCount += 1;
+
+        const subKey = groupBy === 'user'
+          ? (entry.propertyId ? String(entry.propertyId) : 'unassigned')
+          : (entry.userId || 'unassigned');
+        const subLabel = groupBy === 'user'
+          ? (entry.propertyId ? (propertyMap.get(entry.propertyId) || `Property #${entry.propertyId}`) : '(No Property)')
+          : (userMap.get(entry.userId) || 'Unknown User');
+
+        let sub = g.breakdown.get(subKey);
+        if (!sub) { sub = makeBucket(subKey, subLabel); g.breakdown.set(subKey, sub); }
+        sub.totalHours += hours;
+        if (isBillable) sub.billableHours += hours; else sub.nonBillableHours += hours;
+        sub.billableAmountCents += amountCents;
+        sub.entryCount += 1;
+      }
+
+      const serializeBucket = (b: Bucket) => ({
+        key: b.key,
+        label: b.label,
+        totalHours: Number(b.totalHours.toFixed(2)),
+        billableHours: Number(b.billableHours.toFixed(2)),
+        nonBillableHours: Number(b.nonBillableHours.toFixed(2)),
+        billableAmountCents: b.billableAmountCents,
+        entryCount: b.entryCount,
+      });
+
+      const result = {
+        groupBy,
+        totals: {
+          totalHours: Number(totalHours.toFixed(2)),
+          billableHours: Number(billableHours.toFixed(2)),
+          nonBillableHours: Number(nonBillableHours.toFixed(2)),
+          billableAmountCents,
+          activeUsers: activeUserIds.size,
+          activeProperties: activePropertyIds.size,
+          entryCount: entries.length,
+        },
+        groups: Array.from(groups.values())
+          .sort((a, b) => b.totalHours - a.totalHours)
+          .map((g) => ({
+            ...serializeBucket(g),
+            breakdown: Array.from(g.breakdown.values())
+              .sort((a, b) => b.totalHours - a.totalHours)
+              .map(serializeBucket),
+          })),
+      };
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error generating time report:", error);
+      res.status(500).json({ message: "Failed to generate time report" });
     }
   });
 

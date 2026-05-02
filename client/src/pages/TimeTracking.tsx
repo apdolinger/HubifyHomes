@@ -13,6 +13,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Clock, Edit, Trash2, Filter, Download, Shield } from "lucide-react";
 import { format } from "date-fns";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import TimeReport from "@/components/TimeReport";
 
 interface TimeEntry {
   id: number;
@@ -63,9 +65,11 @@ export default function TimeTracking() {
   const [editPropertyId, setEditPropertyId] = useState<string>("");
   const [editTaskId, setEditTaskId] = useState<string>("");
   const [editUserId, setEditUserId] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<string>("entries");
 
   // Check if user has permission to edit all time entry fields
   const canFullyEditTimeEntries = user?.role === 'admin' || user?.role === 'supervisor';
+  const canViewReport = canFullyEditTimeEntries;
 
   const buildQueryString = () => {
     const params = new URLSearchParams();
@@ -269,12 +273,23 @@ export default function TimeTracking() {
           <h1 className="text-3xl font-bold text-slate-800">Time Tracking</h1>
           <p className="text-slate-600 mt-1">View and manage time entries</p>
         </div>
-        <Button onClick={exportToCSV} variant="outline" data-testid="button-export">
-          <Download className="w-4 h-4 mr-2" />
-          Export CSV
-        </Button>
+        {activeTab === "entries" && (
+          <Button onClick={exportToCSV} variant="outline" data-testid="button-export">
+            <Download className="w-4 h-4 mr-2" />
+            Export CSV
+          </Button>
+        )}
       </div>
 
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="entries" data-testid="tab-entries">Entries</TabsTrigger>
+          {canViewReport && (
+            <TabsTrigger value="report" data-testid="tab-report">Report</TabsTrigger>
+          )}
+        </TabsList>
+
+        <TabsContent value="entries" className="space-y-6 mt-0">
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
@@ -466,6 +481,26 @@ export default function TimeTracking() {
           </Table>
         </CardContent>
       </Card>
+
+        </TabsContent>
+
+        {canViewReport && (
+          <TabsContent value="report" className="mt-0">
+            <TimeReport
+              users={users}
+              properties={properties}
+              tasks={tasks}
+              onDrillIn={(filters) => {
+                setUserFilter(filters.userId ?? "all");
+                setPropertyFilter(filters.propertyId ?? "all");
+                if (filters.startDate) setStartDate(filters.startDate);
+                if (filters.endDate) setEndDate(filters.endDate);
+                setActiveTab("entries");
+              }}
+            />
+          </TabsContent>
+        )}
+      </Tabs>
 
       {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
