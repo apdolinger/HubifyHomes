@@ -1139,10 +1139,28 @@ export function startScheduledTasks() {
                 if (orgForceAll || !inspectorPrefs || inspectorPrefs.emailOnInspectionDue !== false) {
                   const inspector = await storage.getUser(newTask.assignedToId);
                   if (inspector?.email) {
+                    const appBaseUrl = process.env.REPLIT_DOMAINS
+                      ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+                      : 'http://localhost:5000';
+                    const taskUrl = `${appBaseUrl}/task-profile/${newTask.id}`;
+                    const propertyAddress = property
+                      ? [property.address1, property.address2, property.city, property.state, property.zip]
+                          .filter(Boolean)
+                          .join(', ')
+                      : null;
+                    const emailBody = [
+                      `You have a new inspection task assigned to you.`,
+                      ``,
+                      `Task: ${taskTitle}`,
+                      propertyAddress ? `Property Address: ${propertyAddress}` : null,
+                      `Due: ${new Date(schedule.nextDueDate).toLocaleDateString()}`,
+                      ``,
+                      `View Task: <a href="${taskUrl}">${taskUrl}</a>`,
+                    ].filter((line) => line !== null).join('\n');
                     await sendEmail({
                       to: inspector.email,
                       subject: `Upcoming Inspection: ${taskTitle}`,
-                      body: `You have an upcoming inspection scheduled:\n\nTask: ${taskTitle}\nDue: ${new Date(schedule.nextDueDate).toLocaleDateString()}\n\nPlease review and prepare accordingly.`,
+                      body: emailBody,
                       orgId: schedule.orgId,
                       fromName: orgRecord?.name || 'Hubify',
                     }).catch((e: unknown) => log(`[CRON] Failed to send inspection email: ${e}`));
