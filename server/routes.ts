@@ -14024,7 +14024,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const portalUser = await storage.getPortalUserById(req.portalSession.portalUserId);
       if (!portalUser) return res.status(404).json({ message: "Portal user not found" });
-      res.json({ emailInvoiceReminders: portalUser.emailInvoiceReminders ?? true });
+      res.json({
+        emailInvoiceReminders: portalUser.emailInvoiceReminders ?? true,
+        emailInspectionReminders: portalUser.emailInspectionReminders ?? true,
+      });
     } catch (error) {
       console.error("Error fetching portal notification preferences:", error);
       res.status(500).json({ message: "Failed to fetch notification preferences" });
@@ -14033,11 +14036,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/portal/notification-preferences", isPortalAuthenticated as any, async (req: any, res) => {
     try {
-      const { emailInvoiceReminders } = req.body;
-      const updated = await storage.updatePortalUser(req.portalSession.portalUserId, {
-        emailInvoiceReminders: emailInvoiceReminders !== undefined ? Boolean(emailInvoiceReminders) : true,
+      const { emailInvoiceReminders, emailInspectionReminders } = req.body;
+      const updateData: Record<string, boolean> = {};
+      if (emailInvoiceReminders !== undefined) updateData.emailInvoiceReminders = Boolean(emailInvoiceReminders);
+      if (emailInspectionReminders !== undefined) updateData.emailInspectionReminders = Boolean(emailInspectionReminders);
+      const updated = await storage.updatePortalUser(req.portalSession.portalUserId, updateData);
+      res.json({
+        emailInvoiceReminders: updated.emailInvoiceReminders,
+        emailInspectionReminders: updated.emailInspectionReminders,
       });
-      res.json({ emailInvoiceReminders: updated.emailInvoiceReminders });
     } catch (error) {
       console.error("Error updating portal notification preferences:", error);
       res.status(500).json({ message: "Failed to update notification preferences" });

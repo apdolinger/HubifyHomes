@@ -522,6 +522,7 @@ export const portalUsers = pgTable("portal_users", {
   phoneVerified: boolean("phone_verified").notNull().default(false),
   lastLoginAt: timestamp("last_login_at"),
   emailInvoiceReminders: boolean("email_invoice_reminders").notNull().default(true), // Portal user can opt out of invoice reminder emails
+  emailInspectionReminders: boolean("email_inspection_reminders").notNull().default(true), // Portal user can opt out of inspection reminder emails
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
