@@ -1,10 +1,11 @@
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation, useRoute } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import EnhancedChecklist from "@/components/EnhancedChecklist";
+import { PhotoAnnotationEditor } from "@/components/PhotoAnnotationEditor";
 import { formatRecurrenceRule } from "@/lib/rruleUtils";
 import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,7 +67,8 @@ import {
   MinusCircle,
   ExternalLink,
   ChevronDown,
-  Camera
+  Camera,
+  Pencil
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -549,6 +551,11 @@ export default function TaskProfile() {
   const [uploadingPhotoItemId, setUploadingPhotoItemId] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [photoTargetItemId, setPhotoTargetItemId] = useState<string | null>(null);
+  const [annotatingPhoto, setAnnotatingPhoto] = useState<
+    | { url: string; source: "task"; index: number }
+    | { url: string; source: "checklist"; itemId: string; currentUrls: string[] }
+    | null
+  >(null);
 
   // Task templates
   const taskTemplates = {
@@ -897,6 +904,37 @@ export default function TaskProfile() {
       toast({ title: "Failed to remove photo", description: e.message, variant: "destructive" });
     }
   };
+
+  const handleAnnotationSave = useCallback(async (annotatedUrl: string) => {
+    if (!annotatingPhoto) return;
+    if (annotatingPhoto.source === "task") {
+      const updatedAttachments = photoAttachments.map((p, i) =>
+        i === annotatingPhoto.index ? { ...p, url: annotatedUrl } : p
+      );
+      const previousAttachments = photoAttachments;
+      setPhotoAttachments(updatedAttachments);
+      try {
+        await apiRequest("PATCH", `/api/tasks/${taskId}`, { attachments: updatedAttachments });
+        queryClient.invalidateQueries({ queryKey: [`/api/tasks/${taskId}`] });
+      } catch (e: any) {
+        setPhotoAttachments(previousAttachments);
+        toast({ title: "Failed to save annotation", description: e.message, variant: "destructive" });
+      }
+    } else if (annotatingPhoto.source === "checklist") {
+      const newUrls = annotatingPhoto.currentUrls.map((u) =>
+        u === annotatingPhoto.url ? annotatedUrl : u
+      );
+      try {
+        await apiRequest("PATCH", `/api/task-checklist-items/${annotatingPhoto.itemId}`, {
+          photoUrls: newUrls,
+        });
+        refetchInspectionItems();
+      } catch (e: any) {
+        toast({ title: "Failed to save annotation", description: e.message, variant: "destructive" });
+      }
+    }
+    setAnnotatingPhoto(null);
+  }, [annotatingPhoto, photoAttachments, taskId, queryClient, refetchInspectionItems]);
 
   const addInspectionItemMutation = useMutation({
     mutationFn: async (text: string) =>
@@ -2788,7 +2826,16 @@ export default function TaskProfile() {
                                         alt={attachment.filename}
                                         className="w-full h-full object-cover"
                                       />
-                                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center">
+                                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center gap-2">
+                                        <Button
+                                          variant="secondary"
+                                          size="sm"
+                                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                          title="Annotate photo"
+                                          onClick={() => setAnnotatingPhoto({ url: attachment.url, source: "task", index: photoAttachments.indexOf(attachment) })}
+                                        >
+                                          <Pencil className="w-4 h-4" />
+                                        </Button>
                                         <Button
                                           variant="destructive"
                                           size="sm"
@@ -2821,7 +2868,16 @@ export default function TaskProfile() {
                                         alt={attachment.filename}
                                         className="w-full h-full object-cover"
                                       />
-                                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center">
+                                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center gap-2">
+                                        <Button
+                                          variant="secondary"
+                                          size="sm"
+                                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                          title="Annotate photo"
+                                          onClick={() => setAnnotatingPhoto({ url: attachment.url, source: "task", index: photoAttachments.indexOf(attachment) })}
+                                        >
+                                          <Pencil className="w-4 h-4" />
+                                        </Button>
                                         <Button
                                           variant="destructive"
                                           size="sm"
@@ -2882,6 +2938,16 @@ export default function TaskProfile() {
                                               variant="ghost"
                                               size="sm"
                                               className="px-2"
+                                              title="Annotate photo"
+                                              onClick={() => setAnnotatingPhoto({ url: attachment.url, source: "task", index })}
+                                              data-testid={`button-annotate-uncategorized-${index}`}
+                                            >
+                                              <Pencil className="w-3 h-3 text-blue-500" />
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="px-2"
                                               onClick={() => removePhotoAttachment(index)}
                                               data-testid={`button-remove-uncategorized-${index}`}
                                             >
@@ -2910,7 +2976,17 @@ export default function TaskProfile() {
                                   alt={attachment.filename}
                                   className="w-full h-full object-cover"
                                 />
-                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center">
+                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center gap-2">
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                    title="Annotate photo"
+                                    onClick={() => setAnnotatingPhoto({ url: attachment.url, source: "task", index })}
+                                    data-testid={`button-annotate-photo-${index}`}
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </Button>
                                   <Button
                                     variant="destructive"
                                     size="sm"
@@ -3189,13 +3265,22 @@ export default function TaskProfile() {
                                               className="h-16 w-24 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity"
                                             />
                                           </a>
-                                          <button
-                                            className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full w-4 h-4 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs leading-none"
-                                            title="Remove photo"
-                                            onClick={(e) => { e.stopPropagation(); removeChecklistItemPhoto(item.id, url); }}
-                                          >
-                                            ×
-                                          </button>
+                                          <div className="absolute inset-0 flex items-end justify-center gap-0.5 pb-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                              className="bg-blue-600/90 text-white rounded px-1 py-0.5 flex items-center gap-0.5 text-xs"
+                                              title="Annotate photo"
+                                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAnnotatingPhoto({ url, source: "checklist", itemId: String(item.id), currentUrls: allPhotos }); }}
+                                            >
+                                              <Pencil className="w-2.5 h-2.5" />
+                                            </button>
+                                            <button
+                                              className="bg-black/70 text-white rounded px-1 py-0.5 flex items-center gap-0.5 text-xs"
+                                              title="Remove photo"
+                                              onClick={(e) => { e.stopPropagation(); removeChecklistItemPhoto(item.id, url); }}
+                                            >
+                                              ×
+                                            </button>
+                                          </div>
                                         </div>
                                       ))}
                                     </div>
@@ -4405,6 +4490,15 @@ export default function TaskProfile() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {annotatingPhoto && (
+        <PhotoAnnotationEditor
+          imageUrl={annotatingPhoto.url}
+          open={!!annotatingPhoto}
+          onClose={() => setAnnotatingPhoto(null)}
+          onSave={handleAnnotationSave}
+        />
+      )}
     </main>
   );
 }
