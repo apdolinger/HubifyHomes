@@ -71,6 +71,7 @@ import {
   insertManagementNoteSchema,
   insertInspectionScheduleSchema,
   type Form,
+  type TimeEntry,
   contacts,
   properties,
   tasks,
@@ -5936,19 +5937,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Only admins and supervisors can view time reports" });
       }
 
-      const groupBy = req.query.groupBy === 'property' ? 'property' : 'user';
-      const billableFilter = req.query.billable as string | undefined; // 'billable' | 'nonbillable' | 'all' | undefined
+      const groupBy: "user" | "property" = req.query.groupBy === 'property' ? 'property' : 'user';
+      const billableFilter = typeof req.query.billable === 'string' ? req.query.billable : undefined;
 
-      const filters: any = {};
-      if (req.query.userId) filters.userId = req.query.userId as string;
-      if (req.query.propertyId) filters.propertyId = parseInt(req.query.propertyId as string);
-      if (req.query.taskId) filters.taskId = parseInt(req.query.taskId as string);
-      if (req.query.startDate) filters.startDate = req.query.startDate as string;
-      if (req.query.endDate) filters.endDate = req.query.endDate as string;
+      const propertyIdRaw = typeof req.query.propertyId === 'string' ? parseInt(req.query.propertyId, 10) : undefined;
+      const taskIdRaw = typeof req.query.taskId === 'string' ? parseInt(req.query.taskId, 10) : undefined;
+      const startDateRaw = typeof req.query.startDate === 'string' ? req.query.startDate : undefined;
+      const endDateRaw = typeof req.query.endDate === 'string' ? req.query.endDate : undefined;
 
-      const allEntries = await storage.getTimeEntries(orgId, filters);
+      const filters: { userId?: string; propertyId?: number; taskId?: number; startDate?: string; endDate?: string } = {};
+      if (typeof req.query.userId === 'string') filters.userId = req.query.userId;
+      if (propertyIdRaw !== undefined && Number.isFinite(propertyIdRaw)) filters.propertyId = propertyIdRaw;
+      if (taskIdRaw !== undefined && Number.isFinite(taskIdRaw)) filters.taskId = taskIdRaw;
+      if (startDateRaw) filters.startDate = startDateRaw;
+      // Make endDate inclusive of the full selected day (storage compares clockIn <= endDate)
+      if (endDateRaw) filters.endDate = `${endDateRaw}T23:59:59.999Z`;
 
-      const entries = allEntries.filter((e: any) => {
+      const allEntries: TimeEntry[] = await storage.getTimeEntries(orgId, filters);
+
+      const entries = allEntries.filter((e) => {
         if (billableFilter === 'billable') return e.isBillable === true;
         if (billableFilter === 'nonbillable') return e.isBillable === false;
         return true;
@@ -5958,10 +5965,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getUsersByOrg(orgId),
         storage.getProperties(true),
       ]);
-      const userMap = new Map(allUsers.map((u: any) => [u.id, `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || u.email || u.id]));
-      const propertyMap = new Map(allProperties.map((p: any) => [p.id, p.name]));
+      const userMap = new Map<string, string>(
+        allUsers.map((u) => [u.id, `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || u.email || u.id])
+      );
+      const propertyMap = new Map<number, string>(
+        allProperties.map((p) => [p.id, p.name])
+      );
 
-      const computeHours = (entry: any) => {
+      const computeHours = (entry: TimeEntry): number => {
         const start = new Date(entry.clockIn).getTime();
         const end = entry.clockOut ? new Date(entry.clockOut).getTime() : Date.now();
         const ms = Math.max(0, end - start);

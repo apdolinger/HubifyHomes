@@ -491,8 +491,10 @@ export default function TimeTracking() {
               properties={properties}
               tasks={tasks}
               onDrillIn={(filters) => {
+                // Clear all entry-list filters so drill-in shows exactly the report scope.
                 setUserFilter(filters.userId ?? "all");
                 setPropertyFilter(filters.propertyId ?? "all");
+                setTaskFilter("all");
                 if (filters.startDate) setStartDate(filters.startDate);
                 if (filters.endDate) setEndDate(filters.endDate);
                 setActiveTab("entries");

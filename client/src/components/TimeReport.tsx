@@ -161,12 +161,15 @@ export default function TimeReport({ users, properties, tasks, onDrillIn }: Prop
         g.totalHours.toFixed(2), g.billableHours.toFixed(2), g.nonBillableHours.toFixed(2),
         (g.billableAmountCents / 100).toFixed(2), String(g.entryCount),
       ]);
-      for (const sub of g.breakdown) {
-        rows.push([
-          "Detail", g.label, sub.label,
-          sub.totalHours.toFixed(2), sub.billableHours.toFixed(2), sub.nonBillableHours.toFixed(2),
-          (sub.billableAmountCents / 100).toFixed(2), String(sub.entryCount),
-        ]);
+      // Match the on-screen view: only export breakdown rows for expanded groups.
+      if (expanded.has(g.key)) {
+        for (const sub of g.breakdown) {
+          rows.push([
+            "Detail", g.label, sub.label,
+            sub.totalHours.toFixed(2), sub.billableHours.toFixed(2), sub.nonBillableHours.toFixed(2),
+            (sub.billableAmountCents / 100).toFixed(2), String(sub.entryCount),
+          ]);
+        }
       }
     }
     rows.push([
@@ -238,7 +241,15 @@ export default function TimeReport({ users, properties, tasks, onDrillIn }: Prop
             </div>
             <div className="space-y-2">
               <Label>Group By</Label>
-              <Tabs value={groupBy} onValueChange={(v) => { setGroupBy(v as any); setExpanded(new Set()); }}>
+              <Tabs
+                value={groupBy}
+                onValueChange={(v) => {
+                  if (v === "user" || v === "property") {
+                    setGroupBy(v);
+                    setExpanded(new Set());
+                  }
+                }}
+              >
                 <TabsList className="grid grid-cols-2 w-full">
                   <TabsTrigger value="user" data-testid="tab-group-user">By Employee</TabsTrigger>
                   <TabsTrigger value="property" data-testid="tab-group-property">By Property</TabsTrigger>
