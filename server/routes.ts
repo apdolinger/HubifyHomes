@@ -5906,12 +5906,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Organization ID is required" });
       }
 
-      const filters: any = {};
-      if (req.query.userId) filters.userId = req.query.userId as string;
-      if (req.query.propertyId) filters.propertyId = parseInt(req.query.propertyId as string);
-      if (req.query.taskId) filters.taskId = parseInt(req.query.taskId as string);
-      if (req.query.startDate) filters.startDate = req.query.startDate as string;
-      if (req.query.endDate) filters.endDate = req.query.endDate as string;
+      const filters: { userId?: string; propertyId?: number; taskId?: number; startDate?: string; endDate?: string } = {};
+      if (typeof req.query.userId === 'string') filters.userId = req.query.userId;
+      if (typeof req.query.propertyId === 'string') {
+        const n = parseInt(req.query.propertyId, 10);
+        if (Number.isFinite(n)) filters.propertyId = n;
+      }
+      if (typeof req.query.taskId === 'string') {
+        const n = parseInt(req.query.taskId, 10);
+        if (Number.isFinite(n)) filters.taskId = n;
+      }
+      if (typeof req.query.startDate === 'string') filters.startDate = req.query.startDate;
+      // Make endDate inclusive of the full selected day to match the report endpoint.
+      if (typeof req.query.endDate === 'string') filters.endDate = `${req.query.endDate}T23:59:59.999Z`;
 
       const entries = await storage.getTimeEntries(orgId, filters);
       res.json(entries);
