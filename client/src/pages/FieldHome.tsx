@@ -6,7 +6,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Clock, AlertCircle, Building, ChevronRight, Loader2, ArrowRight } from "lucide-react";
+import { CheckCircle2, Clock, AlertCircle, Building, ChevronRight, Loader2, ArrowRight, Camera, ListChecks, TrendingUp } from "lucide-react";
 import { format, isToday, isPast, startOfDay, endOfDay } from "date-fns";
 
 function getStatusColor(status: string) {
@@ -53,6 +53,18 @@ export default function FieldHome() {
 
   const { data: allTasks = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/tasks?showArchived=false"],
+    enabled: !!userId,
+  });
+
+  const { data: todaySummary } = useQuery<{
+    tasksCompleted: number;
+    tasksTotal: number;
+    checklistPass: number;
+    checklistFail: number;
+    checklistNa: number;
+    photosUploaded: number;
+  }>({
+    queryKey: ["/api/field-mode/today-summary"],
     enabled: !!userId,
   });
 
@@ -166,20 +178,34 @@ export default function FieldHome() {
           <div className="space-y-4">
             {groupedByProperty.map(({ property, tasks }) => (
               <div key={property?.name || "no-property"} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                {/* Property header */}
-                <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 border-b border-slate-100">
-                  <Building className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 truncate">
-                      {property?.name || "No Property"}
-                    </p>
-                    {property?.address1 && (
-                      <p className="text-xs text-slate-500 truncate">
-                        {[property.address1, property.city, property.state].filter(Boolean).join(", ")}
+                {/* Property header (tap to open property detail) */}
+                {property?.id ? (
+                  <button
+                    onClick={() => navigate(`/field/property/${property.id}`)}
+                    className="w-full flex items-center gap-2 px-4 py-3 bg-slate-50 border-b border-slate-100 hover:bg-slate-100 text-left"
+                    data-testid={`property-header-${property.id}`}
+                  >
+                    <Building className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-slate-800 truncate">
+                        {property?.name || "No Property"}
                       </p>
-                    )}
+                      {property?.address1 && (
+                        <p className="text-xs text-slate-500 truncate">
+                          {[property.address1, property.city, property.state].filter(Boolean).join(", ")}
+                        </p>
+                      )}
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 border-b border-slate-100">
+                    <Building className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-800 truncate">No Property</p>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Tasks */}
                 <div className="divide-y divide-slate-100">
@@ -245,6 +271,57 @@ export default function FieldHome() {
           </div>
         )}
       </div>
+
+      {/* Today's Summary — only shows when there's something to celebrate */}
+      {todaySummary && todaySummary.tasksCompleted > 0 && (
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100 p-4 space-y-3" data-testid="today-summary">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-blue-600" />
+            <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Today's Summary</h2>
+          </div>
+
+          {/* Progress bar */}
+          {todaySummary.tasksTotal > 0 && (
+            <div>
+              <div className="flex items-center justify-between text-xs text-slate-600 mb-1">
+                <span>Progress</span>
+                <span data-testid="summary-progress-text">
+                  {todaySummary.tasksCompleted}/{todaySummary.tasksTotal} ({Math.round((todaySummary.tasksCompleted / todaySummary.tasksTotal) * 100)}%)
+                </span>
+              </div>
+              <div className="w-full bg-white rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-blue-600 h-full transition-all"
+                  style={{ width: `${Math.min(100, (todaySummary.tasksCompleted / todaySummary.tasksTotal) * 100)}%` }}
+                  data-testid="summary-progress-bar"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-white rounded-lg p-3 text-center">
+              <CheckCircle2 className="w-4 h-4 text-green-600 mx-auto mb-1" />
+              <div className="text-lg font-bold text-slate-900" data-testid="summary-tasks-completed">{todaySummary.tasksCompleted}</div>
+              <div className="text-[10px] text-slate-500 uppercase tracking-wide">Done</div>
+            </div>
+            <div className="bg-white rounded-lg p-3 text-center">
+              <ListChecks className="w-4 h-4 text-blue-600 mx-auto mb-1" />
+              <div className="text-lg font-bold text-slate-900" data-testid="summary-checklist-count">
+                {todaySummary.checklistPass + todaySummary.checklistFail + todaySummary.checklistNa}
+              </div>
+              <div className="text-[10px] text-slate-500 uppercase tracking-wide">
+                {todaySummary.checklistPass}P · {todaySummary.checklistFail}F · {todaySummary.checklistNa}NA
+              </div>
+            </div>
+            <div className="bg-white rounded-lg p-3 text-center">
+              <Camera className="w-4 h-4 text-indigo-600 mx-auto mb-1" />
+              <div className="text-lg font-bold text-slate-900" data-testid="summary-photos">{todaySummary.photosUploaded}</div>
+              <div className="text-[10px] text-slate-500 uppercase tracking-wide">Photos</div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

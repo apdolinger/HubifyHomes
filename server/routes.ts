@@ -2424,8 +2424,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Community routes
-  app.get("/api/communities", isAuthenticated, async (req, res) => {
+  // Community routes — gated by community_profiles feature flag
+  const { requireFeatureFlag } = await import("./featureFlags");
+  const requireCommunities = requireFeatureFlag("community_profiles");
+
+  app.get("/api/communities", isAuthenticated, requireCommunities, async (req, res) => {
     try {
       const communities = await storage.getCommunities();
       res.json(communities);
@@ -2435,7 +2438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/communities/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/communities/:id", isAuthenticated, requireCommunities, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -2454,7 +2457,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/communities/:id/properties", isAuthenticated, async (req, res) => {
+  app.get("/api/communities/:id/properties", isAuthenticated, requireCommunities, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -3183,6 +3186,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/field-mode/today-summary — counts of today's completed tasks,
+  // checklist results, and uploaded photos for the signed-in field user.
+  app.get("/api/field-mode/today-summary", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+      const { tasks, taskChecklistItems } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { and, eq, gte, lte, sql, inArray } = await import("drizzle-orm");
+
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+      // All tasks assigned to this user that are due/active today, plus those completed today
+      const userTasks = await db
+        .select({ id: tasks.id, status: tasks.status, completedAt: tasks.completedAt, dueDate: tasks.dueDate })
+        .from(tasks)
+        .where(eq(tasks.assignedToId, userId));
+
+      const tasksTodayBucket = userTasks.filter((t: any) => {
+        if (t.status === "completed" && t.completedAt) {
+          const d = new Date(t.completedAt);
+          return d >= todayStart && d <= todayEnd;
+        }
+        if (t.status === "in_progress") return true;
+        if (t.dueDate) {
+          const d = new Date(t.dueDate);
+          return d >= todayStart && d <= todayEnd;
+        }
+        return false;
+      });
+      const tasksCompleted = tasksTodayBucket.filter((t: any) => t.status === "completed").length;
+      const tasksTotal = tasksTodayBucket.length;
+
+      // Checklist items completed today across this user's tasks
+      const userTaskIds = userTasks.map((t: any) => t.id);
+      let checklistPass = 0, checklistFail = 0, checklistNa = 0, photosUploaded = 0;
+      if (userTaskIds.length > 0) {
+        const items = await db
+          .select({ result: taskChecklistItems.result, photoUrls: taskChecklistItems.photoUrls, completedAt: taskChecklistItems.completedAt })
+          .from(taskChecklistItems)
+          .where(
+            and(
+              inArray(taskChecklistItems.taskId, userTaskIds),
+              gte(taskChecklistItems.completedAt, todayStart),
+              lte(taskChecklistItems.completedAt, todayEnd),
+            ),
+          );
+        for (const it of items) {
+          if (it.result === "pass") checklistPass++;
+          else if (it.result === "fail") checklistFail++;
+          else if (it.result === "na") checklistNa++;
+          if (Array.isArray(it.photoUrls)) photosUploaded += it.photoUrls.length;
+        }
+      }
+
+      res.json({ tasksCompleted, tasksTotal, checklistPass, checklistFail, checklistNa, photosUploaded });
+    } catch (error) {
+      console.error("Error fetching today summary:", error);
+      res.status(500).json({ message: "Failed to fetch today summary" });
+    }
+  });
+
   // Server-side gate for Field Mode. Returns 403 when the org has the
   // mobile_field_mode flag disabled. The Field Mode shell calls this on mount
   // so users who land directly on /field with a stale localStorage preference
@@ -3492,7 +3560,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/communities", isAuthenticated, async (req, res) => {
+  app.post("/api/communities", isAuthenticated, requireCommunities, async (req, res) => {
     try {
       const userId = (req.user as any)?.claims?.sub;
       console.log("Creating community with data:", req.body);
@@ -3522,7 +3590,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/communities/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/communities/:id", isAuthenticated, requireCommunities, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -3638,7 +3706,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/communities/:communityId/link-template/:templateId", isAuthenticated, async (req: any, res) => {
+  app.post("/api/communities/:communityId/link-template/:templateId", isAuthenticated, requireCommunities, async (req: any, res) => {
     try {
       const communityId = parseInt(req.params.communityId);
       const templateId = parseInt(req.params.templateId);
@@ -3661,7 +3729,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Community documents routes
-  app.post("/api/communities/:id/documents/upload-url", isAuthenticated, async (req, res) => {
+  app.post("/api/communities/:id/documents/upload-url", isAuthenticated, requireCommunities, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
       if (isNaN(communityId)) {
@@ -3682,7 +3750,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/communities/:id/documents", isAuthenticated, async (req, res) => {
+  app.get("/api/communities/:id/documents", isAuthenticated, requireCommunities, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
       if (isNaN(communityId)) {
@@ -3697,7 +3765,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/communities/:id/documents", isAuthenticated, async (req: any, res) => {
+  app.post("/api/communities/:id/documents", isAuthenticated, requireCommunities, async (req: any, res) => {
     try {
       const communityId = parseInt(req.params.id);
       if (isNaN(communityId)) {
@@ -13561,8 +13629,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return { ...rest, secretHint: "••••" + secret.slice(-4) };
   }
 
+  // Zapier/webhook endpoints — gated by zapier_integration feature flag
+  const requireZapier = requireFeatureFlag("zapier_integration");
+
   // GET /api/webhooks/endpoints — list org's webhook endpoints
-  app.get("/api/webhooks/endpoints", isAuthenticated, isAdmin, async (req, res) => {
+  app.get("/api/webhooks/endpoints", isAuthenticated, isAdmin, requireZapier, async (req, res) => {
     try {
       const orgId = req.user?.claims?.orgId || req.user?.orgId;
       if (!orgId) return res.status(400).json({ message: "Organization not found" });
@@ -13575,7 +13646,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/webhooks/endpoints — create a new webhook endpoint
-  app.post("/api/webhooks/endpoints", isAuthenticated, isAdmin, async (req, res) => {
+  app.post("/api/webhooks/endpoints", isAuthenticated, isAdmin, requireZapier, async (req, res) => {
     try {
       const orgId = req.user?.claims?.orgId || req.user?.orgId;
       if (!orgId) return res.status(400).json({ message: "Organization not found" });
@@ -13607,7 +13678,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/webhooks/endpoints/:id — update a webhook endpoint
-  app.patch("/api/webhooks/endpoints/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.patch("/api/webhooks/endpoints/:id", isAuthenticated, isAdmin, requireZapier, async (req, res) => {
     try {
       const orgId = req.user?.claims?.orgId || req.user?.orgId;
       if (!orgId) return res.status(400).json({ message: "Organization not found" });
@@ -13645,7 +13716,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/webhooks/endpoints/:id — delete a webhook endpoint
-  app.delete("/api/webhooks/endpoints/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.delete("/api/webhooks/endpoints/:id", isAuthenticated, isAdmin, requireZapier, async (req, res) => {
     try {
       const orgId = req.user?.claims?.orgId || req.user?.orgId;
       if (!orgId) return res.status(400).json({ message: "Organization not found" });
@@ -13663,7 +13734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/webhooks/endpoints/:id/test — send a test event
-  app.post("/api/webhooks/endpoints/:id/test", isAuthenticated, isAdmin, async (req, res) => {
+  app.post("/api/webhooks/endpoints/:id/test", isAuthenticated, isAdmin, requireZapier, async (req, res) => {
     try {
       const orgId = req.user?.claims?.orgId || req.user?.orgId;
       if (!orgId) return res.status(400).json({ message: "Organization not found" });
@@ -13678,7 +13749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/webhooks/endpoints/:id/deliveries — delivery log for an endpoint
-  app.get("/api/webhooks/endpoints/:id/deliveries", isAuthenticated, isAdmin, async (req, res) => {
+  app.get("/api/webhooks/endpoints/:id/deliveries", isAuthenticated, isAdmin, requireZapier, async (req, res) => {
     try {
       const orgId = req.user?.claims?.orgId || req.user?.orgId;
       if (!orgId) return res.status(400).json({ message: "Organization not found" });

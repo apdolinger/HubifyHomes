@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -474,6 +475,7 @@ function NotificationLogTab() {
 
 export default function Account() {
   const { user, isAuthenticated, isLoading } = useAuth();
+  const { isFeatureEnabled } = useFeatureFlags();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("account-info");
@@ -722,7 +724,9 @@ export default function Account() {
           <TabsTrigger value="custom-fields" data-testid="tab-custom-fields">Custom Fields</TabsTrigger>
           <TabsTrigger value="email-templates" data-testid="tab-email-templates">Email Templates</TabsTrigger>
           <TabsTrigger value="task-templates" data-testid="tab-task-templates">Task Templates</TabsTrigger>
-          <TabsTrigger value="reports" data-testid="tab-reports">Reports</TabsTrigger>
+          {isFeatureEnabled("advanced_reporting") && (
+            <TabsTrigger value="reports" data-testid="tab-reports">Reports</TabsTrigger>
+          )}
           <TabsTrigger value="notifications" data-testid="tab-notifications">Notifications</TabsTrigger>
           <TabsTrigger value="team-roles" data-testid="tab-team-roles">Team & Roles</TabsTrigger>
           <TabsTrigger value="automation" data-testid="tab-automation">Automation</TabsTrigger>
@@ -1717,12 +1721,14 @@ export default function Account() {
               </CardContent>
             </Card>
 
-            {/* Webhooks Section */}
-            <WebhooksSection orgId={orgId} />
+            {/* Webhooks Section — gated by zapier_integration flag */}
+            {isFeatureEnabled("zapier_integration") && (
+              <WebhooksSection orgId={orgId} />
+            )}
           </div>
         </TabsContent>
 
-        {/* Reports Tab */}
+        {/* Reports Tab — gated by advanced_reporting flag */}
         <TabsContent value="reports">
           <Card>
             <CardHeader>

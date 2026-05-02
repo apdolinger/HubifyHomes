@@ -1,3 +1,4 @@
+import type { Request, Response, NextFunction } from "express";
 import { db } from "./db";
 import { featureFlags, orgs } from "@shared/schema";
 import { eq } from "drizzle-orm";
@@ -59,4 +60,29 @@ export async function getEffectiveFeatureFlags(
       : flag.defaultEnabled === true;
   }
   return result;
+}
+
+/**
+ * Express middleware factory: rejects the request with 403 when the named
+ * feature flag is disabled for the caller's org. Use after `isAuthenticated`
+ * so that `req.user.claims.orgId` is populated.
+ */
+export function requireFeatureFlag(flagKey: string) {
+  return async (req: any, res: Response, next: NextFunction) => {
+    try {
+      const orgId = req.user?.claims?.orgId ?? req.user?.claims?.org_id ?? null;
+      const enabled = await isFeatureEnabled(orgId, flagKey);
+      if (!enabled) {
+        return res.status(403).json({
+          enabled: false,
+          flag: flagKey,
+          message: `This feature ("${flagKey}") is disabled for your organization.`,
+        });
+      }
+      next();
+    } catch (error) {
+      console.error(`requireFeatureFlag(${flagKey}) error:`, error);
+      res.status(500).json({ message: "Failed to evaluate feature flag" });
+    }
+  };
 }

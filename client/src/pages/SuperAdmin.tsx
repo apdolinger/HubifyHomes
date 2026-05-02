@@ -1015,8 +1015,13 @@ function SettingsTabContent() {
       for (const k of keys) updates[k] = draft[k];
       return apiRequest('PATCH', '/api/super-admin/platform-settings', updates);
     },
-    onSuccess: (savedSettings: any) => {
+    onSuccess: (savedSettings: any, savedKeys: string[]) => {
       queryClient.invalidateQueries({ queryKey: ['/api/super-admin/platform-settings'] });
+      // If the support phone was just saved, refresh the public support-info
+      // query so HubifyConsole picks up the new value without a full reload.
+      if (Array.isArray(savedKeys) && savedKeys.includes('support_phone')) {
+        queryClient.invalidateQueries({ queryKey: ['/api/support-info'] });
+      }
       // Reconcile draft with the server response so saved values are authoritative
       if (savedSettings && typeof savedSettings === 'object') {
         setDraft((d) => ({ ...d, ...savedSettings }));
@@ -1025,6 +1030,16 @@ function SettingsTabContent() {
     },
     onError: (e: any) => toast({ title: 'Failed to save', description: e.message, variant: 'destructive' }),
   });
+
+  // Validate phone format: digits, spaces, parentheses, dashes, dots, plus sign;
+  // must contain 7-20 digits.
+  const isValidPhone = (raw: string): boolean => {
+    if (!raw || !raw.trim()) return true; // empty is allowed (clears the value)
+    const cleaned = raw.replace(/[^\d]/g, '');
+    return cleaned.length >= 7 && cleaned.length <= 20 && /^[\d\s()+\-.]+$/.test(raw.trim());
+  };
+  const supportPhoneDraft = (draft.support_phone ?? '') as string;
+  const supportPhoneValid = isValidPhone(supportPhoneDraft);
 
   const set = (k: string, v: any) => setDraft((d) => ({ ...d, [k]: v }));
 
@@ -1047,6 +1062,42 @@ function SettingsTabContent() {
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center"><Phone className="w-5 h-5 mr-2" />Support Contact</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="support-phone">Support Phone Number</Label>
+            <Input
+              id="support-phone"
+              type="tel"
+              placeholder="e.g. (555) 123-4567"
+              value={supportPhoneDraft}
+              onChange={(e) => set('support_phone', e.target.value)}
+              data-testid="input-support-phone"
+              aria-invalid={!supportPhoneValid}
+            />
+            {!supportPhoneValid && (
+              <p className="text-xs text-red-600 mt-1" data-testid="text-support-phone-error">
+                Enter a valid phone number (digits, spaces, dashes, parentheses, +). 7–20 digits.
+              </p>
+            )}
+            <p className="text-xs text-slate-500 mt-1">
+              Shown on the Hubify Console "Call Support" button. Leave blank to hide the button.
+            </p>
+          </div>
+          <Button
+            onClick={() => saveSection.mutate(['support_phone'])}
+            disabled={saveSection.isPending || !supportPhoneValid}
+            data-testid="button-save-support-phone"
+          >
+            <Phone className="w-4 h-4 mr-2" />
+            Save Support Phone
+          </Button>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center"><Settings className="w-5 h-5 mr-2" />Platform Configuration</CardTitle>

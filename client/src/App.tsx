@@ -74,6 +74,7 @@ import FieldHome from "@/pages/FieldHome";
 import FieldTasks from "@/pages/FieldTasks";
 import FieldTaskDetail from "@/pages/FieldTaskDetail";
 import FieldProfile from "@/pages/FieldProfile";
+import FieldPropertyDetail from "@/pages/FieldPropertyDetail";
 
 // Global Task Modal Component
 function GlobalTaskModal() {
@@ -95,6 +96,7 @@ function FieldModeRouter() {
         <Route path="/field" component={FieldHome} />
         <Route path="/field/tasks" component={FieldTasks} />
         <Route path="/field/task/:id" component={FieldTaskDetail} />
+        <Route path="/field/property/:id" component={FieldPropertyDetail} />
         <Route path="/field/profile" component={FieldProfile} />
         <Route component={FieldHome} />
       </Switch>
@@ -104,6 +106,7 @@ function FieldModeRouter() {
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { isFeatureEnabled } = useFeatureFlags();
 
   return (
     <Switch>
@@ -174,7 +177,9 @@ function Router() {
           <Route path="/task-profile/:id" component={TaskProfile} />
           <Route path="/properties" component={Properties} />
           <Route path="/property-profile/:id" component={PropertyProfile} />
-          <Route path="/communities/:id" component={CommunityProfile} />
+          {isFeatureEnabled("community_profiles") && (
+            <Route path="/communities/:id" component={CommunityProfile} />
+          )}
           <Route path="/calendar" component={Calendar} />
           <Route path="/time-tracking" component={TimeTracking} />
           <Route path="/team" component={Team} />
