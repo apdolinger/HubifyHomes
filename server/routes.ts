@@ -1179,7 +1179,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const orgId = req.user.claims.orgId || req.user.claims.org_id;
       const role = req.user.claims.role || user?.role;
 
-      res.json({ ...user, orgId, role });
+      // Include effective feature flags so the canonical /api/auth/user response
+      // is the single source of truth for feature gating decisions on the client.
+      const { getEffectiveFeatureFlags } = await import("./featureFlags");
+      const featureFlags = await getEffectiveFeatureFlags(orgId ?? null);
+
+      res.json({ ...user, orgId, role, featureFlags });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
