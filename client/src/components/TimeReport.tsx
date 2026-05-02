@@ -57,7 +57,7 @@ interface Props {
   users: UserOpt[];
   properties: PropertyOpt[];
   tasks: TaskOpt[];
-  onDrillIn: (filters: { userId?: string; propertyId?: string; startDate: string; endDate: string }) => void;
+  onDrillIn: (filters: { userId?: string; propertyId?: string; taskId?: string; startDate: string; endDate: string }) => void;
 }
 
 function presetRange(preset: Preset): { startDate: string; endDate: string } | null {
@@ -138,10 +138,24 @@ export default function TimeReport({ users, properties, tasks, onDrillIn }: Prop
 
   const handleDrill = (g: ReportGroup) => {
     if (g.key === "unassigned") return;
+    // Preserve current report filters where applicable so the flat list mirrors the visible report context.
+    const base = {
+      startDate,
+      endDate,
+      taskId: taskFilter !== "all" ? taskFilter : undefined,
+    };
     if (groupBy === "user") {
-      onDrillIn({ userId: g.key, startDate, endDate });
+      onDrillIn({
+        ...base,
+        userId: g.key,
+        propertyId: propertyFilter !== "all" ? propertyFilter : undefined,
+      });
     } else {
-      onDrillIn({ propertyId: g.key, startDate, endDate });
+      onDrillIn({
+        ...base,
+        propertyId: g.key,
+        userId: userFilter !== "all" ? userFilter : undefined,
+      });
     }
   };
 
