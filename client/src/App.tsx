@@ -47,6 +47,7 @@ import PortalNotifications from "@/pages/PortalNotifications";
 import OrganizationProfile from "@/pages/OrganizationProfile";
 import AdminBilling from "@/pages/AdminBilling";
 import AdminInvoices from "@/pages/AdminInvoices";
+import AdminPdfMockups from "@/pages/AdminPdfMockups";
 import OrgBillingInvoices from "@/pages/OrgBillingInvoices";
 import OrgClientInvoices from "@/pages/OrgClientInvoices";
 import OrgStripeSettings from "@/pages/OrgStripeSettings";
@@ -201,6 +202,7 @@ function Router() {
           <Route path="/admin/vendors/:id" component={VendorProfile} />
           <Route path="/admin/notes/search" component={AdminNoteSearch} />
           <Route path="/admin/email-templates" component={AdminEmailTemplates} />
+          <Route path="/admin/pdf-mockups" component={AdminPdfMockups} />
           <Route path="/admin/forms/:id" component={FormEdit} />
           <Route path="/admin/forms" component={AdminForms} />
           

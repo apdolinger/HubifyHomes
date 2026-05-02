@@ -2956,6 +2956,30 @@ export default function Admin() {
             </CardContent>
           </Card>
 
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <FileText className="w-5 h-5 mr-2" />
+                PDF Mockup Gallery
+              </CardTitle>
+              <CardDescription>
+                Preview every client-facing PDF (invoice, batch invoice, inspection, property, time report) with sample data
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-slate-600 mb-4">
+                See exactly what each Hubify-generated PDF looks like — fields, layout, and totals — even before you have any
+                real records. Every sample PDF is clearly watermarked "SAMPLE" so it can never be confused with a live document.
+              </p>
+              <Link href="/admin/pdf-mockups">
+                <Button data-testid="button-open-pdf-mockups">
+                  <FileText className="w-4 h-4 mr-2" />
+                  Open PDF Mockup Gallery
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
         </TabsContent>
 
         {/* Billing Tab */}

@@ -5928,6 +5928,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PDF Mockup Gallery — admin-only sample PDFs for design / demo / preview
+  app.get("/api/pdf-mockups/:type", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const type = String(req.params.type);
+      const { generateSampleInvoicePdf } = await import("./pdfGenerators/sampleInvoicePdf");
+      const { generateSampleConsolidatedInvoicePdf } = await import("./pdfGenerators/sampleConsolidatedInvoicePdf");
+      const { generateSampleInspectionPdf } = await import("./pdfGenerators/sampleInspectionPdf");
+      const { generateSamplePropertyReportPdf } = await import("./pdfGenerators/samplePropertyReportPdf");
+      const { generateSampleTimeReportPdf } = await import("./pdfGenerators/sampleTimeReportPdf");
+      const generators: Record<string, () => Promise<Buffer>> = {
+        invoice: generateSampleInvoicePdf,
+        consolidated: generateSampleConsolidatedInvoicePdf,
+        inspection: generateSampleInspectionPdf,
+        property: generateSamplePropertyReportPdf,
+        time: generateSampleTimeReportPdf,
+      };
+      const gen = generators[type];
+      if (!gen) {
+        return res.status(404).json({ message: `Unknown mockup type: ${type}` });
+      }
+      const buf = await gen();
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="sample-${type}.pdf"`);
+      res.send(buf);
+    } catch (error) {
+      console.error("Error generating mockup PDF:", error);
+      res.status(500).json({ message: "Failed to generate mockup PDF" });
+    }
+  });
+
   app.get("/api/time-entries/report", isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user;
