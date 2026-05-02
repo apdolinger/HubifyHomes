@@ -13857,13 +13857,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/tasks/:taskId/checklist-items", isAuthenticated, async (req: any, res) => {
     try {
       const taskId = parseInt(req.params.taskId);
-      const { text, required, sortOrder } = req.body;
+      const { text, required, sortOrder, category } = req.body;
       if (!text) return res.status(400).json({ message: "text is required" });
+      const trimmedCategory = typeof category === "string" ? category.trim() : undefined;
       const item = await storage.createTaskChecklistItem({
         taskId,
         text,
         required: required || false,
         sortOrder: sortOrder || 0,
+        ...(trimmedCategory ? { category: trimmedCategory } : {}),
       });
       res.status(201).json(item);
     } catch (error) {

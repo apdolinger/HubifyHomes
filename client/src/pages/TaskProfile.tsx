@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import type { TaskChecklistItem } from "@shared/schema";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -546,6 +547,7 @@ export default function TaskProfile() {
   const [propertyComboboxOpen, setPropertyComboboxOpen] = useState(false);
   const [isApplyTemplateOpen, setIsApplyTemplateOpen] = useState(false);
   const [newInspectionItemText, setNewInspectionItemText] = useState("");
+  const [newInspectionItemCategory, setNewInspectionItemCategory] = useState("");
   const [editingNoteItemId, setEditingNoteItemId] = useState<number | null>(null);
   const [noteInputValue, setNoteInputValue] = useState("");
   const [uploadingPhotoItemId, setUploadingPhotoItemId] = useState<string | null>(null);
@@ -943,11 +945,12 @@ export default function TaskProfile() {
   }, [annotatingPhoto, photoAttachments, taskId, queryClient, refetchInspectionItems]);
 
   const addInspectionItemMutation = useMutation({
-    mutationFn: async (text: string) =>
-      apiRequest("POST", `/api/tasks/${taskId}/checklist-items`, { text, required: false }),
+    mutationFn: async ({ text, category }: { text: string; category?: string }) =>
+      apiRequest("POST", `/api/tasks/${taskId}/checklist-items`, { text, required: false, category: category || undefined }),
     onSuccess: () => {
       refetchInspectionItems();
       setNewInspectionItemText("");
+      setNewInspectionItemCategory("");
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
@@ -3423,28 +3426,64 @@ export default function TaskProfile() {
                       </>
                     )}
                     {/* Add item */}
-                    <div className="flex gap-2 pt-2">
-                      <Input
-                        placeholder="Add checklist item..."
-                        value={newInspectionItemText}
-                        onChange={(e) => setNewInspectionItemText(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && newInspectionItemText.trim()) {
-                            e.preventDefault();
-                            addInspectionItemMutation.mutate(newInspectionItemText.trim());
-                          }
-                        }}
-                        className="text-sm"
-                      />
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => newInspectionItemText.trim() && addInspectionItemMutation.mutate(newInspectionItemText.trim())}
-                        disabled={addInspectionItemMutation.isPending || !newInspectionItemText.trim()}
-                      >
-                        <Plus className="w-3 h-3 mr-1" />Add
-                      </Button>
-                    </div>
+                    {(() => {
+                      const existingCategories = Array.from(
+                        new Set(
+                          (inspectionItems as TaskChecklistItem[])
+                            .map((i) => i.category?.trim())
+                            .filter((c): c is string => !!c)
+                        )
+                      );
+                      const handleAdd = () => {
+                        if (!newInspectionItemText.trim()) return;
+                        addInspectionItemMutation.mutate({
+                          text: newInspectionItemText.trim(),
+                          category: newInspectionItemCategory.trim() || undefined,
+                        });
+                      };
+                      return (
+                        <div className="flex gap-2 pt-2">
+                          <Input
+                            placeholder="Add checklist item..."
+                            value={newInspectionItemText}
+                            onChange={(e) => setNewInspectionItemText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && newInspectionItemText.trim()) {
+                                e.preventDefault();
+                                handleAdd();
+                              }
+                            }}
+                            className="text-sm flex-1"
+                          />
+                          <input
+                            list="inspection-category-suggestions"
+                            placeholder="Category…"
+                            value={newInspectionItemCategory}
+                            onChange={(e) => setNewInspectionItemCategory(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && newInspectionItemText.trim()) {
+                                e.preventDefault();
+                                handleAdd();
+                              }
+                            }}
+                            className="w-32 h-9 rounded-md border border-slate-200 bg-white px-2 text-sm focus:outline-none focus:ring-1 focus:ring-slate-400"
+                          />
+                          <datalist id="inspection-category-suggestions">
+                            {existingCategories.map((cat) => (
+                              <option key={cat} value={cat} />
+                            ))}
+                          </datalist>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleAdd}
+                            disabled={addInspectionItemMutation.isPending || !newInspectionItemText.trim()}
+                          >
+                            <Plus className="w-3 h-3 mr-1" />Add
+                          </Button>
+                        </div>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
               )}
