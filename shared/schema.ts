@@ -1618,6 +1618,7 @@ export const taskChecklistItems = pgTable("task_checklist_items", {
   resultNote: text("result_note"), // Inspector note for this item
   photoUrl: text("photo_url"), // Photo evidence URL (legacy single photo)
   photoUrls: text("photo_urls").array().default([]), // Multiple photo evidence URLs
+  thumbnailUrls: text("thumbnail_urls").array().default([]), // Thumbnail versions of photos
   dueDate: timestamp("due_date"),
   assignedToId: varchar("assigned_to_id").references(() => users.id),
   priority: varchar("priority").default("normal"), // 'urgent', 'high', 'normal', 'low'

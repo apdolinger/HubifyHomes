@@ -691,7 +691,7 @@ const uploadInvoice = multer({
 const uploadToMemory = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 25 * 1024 * 1024, // 25MB limit — allows large mobile photos to reach server-side compression
   },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
@@ -14235,30 +14235,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
 
+      // Compress and resize the image using sharp before storing
+      const sharp = (await import("sharp")).default;
+      const MAX_DIMENSION = 1920;
+      const JPEG_QUALITY = 80;
+      const THUMBNAIL_SIZE = 300;
+
+      const compressedBuffer = await sharp(req.file.buffer)
+        .rotate() // auto-orient based on EXIF
+        .resize(MAX_DIMENSION, MAX_DIMENSION, { fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: JPEG_QUALITY })
+        .toBuffer();
+
+      const thumbnailBuffer = await sharp(req.file.buffer)
+        .rotate()
+        .resize(THUMBNAIL_SIZE, THUMBNAIL_SIZE, { fit: "cover" })
+        .jpeg({ quality: 75 })
+        .toBuffer();
+
       // Upload to object storage
       const privateDir = process.env.PRIVATE_OBJECT_DIR || '';
       const privateDirParts = privateDir.split('/').filter((p: string) => p);
       const bucketName = privateDirParts[0] || 'repl-default-bucket';
       const timestamp = Date.now();
       const randomStr = Math.random().toString(36).substring(7);
-      const ext = path.extname(req.file.originalname) || '.jpg';
-      const filename = `${timestamp}-${randomStr}${ext}`;
+      const filename = `${timestamp}-${randomStr}.jpg`;
+      const thumbnailFilename = `${timestamp}-${randomStr}-thumb.jpg`;
       const objectPath = `public/checklist-photos/${itemId}/${filename}`;
+      const thumbnailPath = `public/checklist-photos/${itemId}/${thumbnailFilename}`;
 
       const { objectStorageClient } = await import("./objectStorage");
       const bucket = objectStorageClient.bucket(bucketName);
-      const gcsFile = bucket.file(objectPath);
-      await gcsFile.save(req.file.buffer, {
-        contentType: req.file.mimetype,
-        metadata: { originalName: req.file.originalname, uploadedAt: new Date().toISOString() },
-      });
-      const photoUrl = `https://storage.googleapis.com/${bucketName}/${objectPath}`;
 
-      // Append to photoUrls array
+      await Promise.all([
+        bucket.file(objectPath).save(compressedBuffer, {
+          contentType: "image/jpeg",
+          metadata: { originalName: req.file.originalname, uploadedAt: new Date().toISOString() },
+        }),
+        bucket.file(thumbnailPath).save(thumbnailBuffer, {
+          contentType: "image/jpeg",
+          metadata: { originalName: req.file.originalname, uploadedAt: new Date().toISOString(), type: "thumbnail" },
+        }),
+      ]);
+
+      const photoUrl = `https://storage.googleapis.com/${bucketName}/${objectPath}`;
+      const thumbnailUrl = `https://storage.googleapis.com/${bucketName}/${thumbnailPath}`;
+
+      // Append to photoUrls and thumbnailUrls arrays, keeping index alignment for legacy photos
       const existingUrls: string[] = Array.isArray((item as any).photoUrls) ? (item as any).photoUrls : [];
+      const existingThumbnails: string[] = Array.isArray((item as any).thumbnailUrls) ? (item as any).thumbnailUrls : [];
+      // Pad thumbnailUrls with empty strings to match the length of existing photoUrls
+      // This preserves index alignment for legacy photos that don't have thumbnails yet
+      const paddedThumbnails = existingUrls.map((_: string, i: number) => existingThumbnails[i] || "");
       const newPhotoUrls = [...existingUrls, photoUrl];
-      const updated = await storage.updateTaskChecklistItem(itemId, { photoUrls: newPhotoUrls } as any);
-      res.json({ photoUrl, item: updated });
+      const newThumbnailUrls = [...paddedThumbnails, thumbnailUrl];
+      const updated = await storage.updateTaskChecklistItem(itemId, { photoUrls: newPhotoUrls, thumbnailUrls: newThumbnailUrls } as any);
+      res.json({ photoUrl, thumbnailUrl, item: updated });
     } catch (error) {
       console.error("Error uploading checklist item photo:", error);
       res.status(500).json({ message: "Failed to upload photo" });
@@ -14281,22 +14313,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!property || (property as any).orgId !== orgId) return res.status(403).json({ message: "Access denied" });
 
       const existingUrls: string[] = Array.isArray((item as any).photoUrls) ? (item as any).photoUrls : [];
-      const newPhotoUrls = existingUrls.filter((u: string) => u !== photoUrl);
-      const updated = await storage.updateTaskChecklistItem(itemId, { photoUrls: newPhotoUrls } as any);
+      const existingThumbnails: string[] = Array.isArray((item as any).thumbnailUrls) ? (item as any).thumbnailUrls : [];
 
-      // Best-effort: delete the object from GCS storage to prevent orphaned files
+      // Find the corresponding thumbnail by index to maintain parallel array alignment
+      const photoIndex = existingUrls.indexOf(photoUrl);
+      const thumbnailUrl = (photoIndex !== -1 && existingThumbnails[photoIndex]) ? existingThumbnails[photoIndex] : null;
+
+      // Remove by index to keep arrays aligned (splice copies so originals are not mutated)
+      const newPhotoUrls = existingUrls.filter((_: string, i: number) => i !== photoIndex);
+      const newThumbnailUrls = photoIndex !== -1
+        ? existingThumbnails.filter((_: string, i: number) => i !== photoIndex)
+        : existingThumbnails;
+      const updated = await storage.updateTaskChecklistItem(itemId, { photoUrls: newPhotoUrls, thumbnailUrls: newThumbnailUrls } as any);
+
+      // Best-effort: delete the photo and thumbnail from GCS storage to prevent orphaned files
+      const gcsPrefix = "https://storage.googleapis.com/";
+      const urlsToDelete = [photoUrl, thumbnailUrl].filter(Boolean) as string[];
       try {
-        const gcsPrefix = "https://storage.googleapis.com/";
-        if (photoUrl.startsWith(gcsPrefix)) {
-          const withoutPrefix = photoUrl.slice(gcsPrefix.length);
-          const slashIdx = withoutPrefix.indexOf("/");
-          if (slashIdx !== -1) {
-            const bucketName = withoutPrefix.slice(0, slashIdx);
-            const objectName = withoutPrefix.slice(slashIdx + 1);
-            const { objectStorageClient } = await import("./objectStorage");
-            await objectStorageClient.bucket(bucketName).file(objectName).delete({ ignoreNotFound: true });
+        const { objectStorageClient } = await import("./objectStorage");
+        await Promise.all(urlsToDelete.map(async (url) => {
+          if (url.startsWith(gcsPrefix)) {
+            const withoutPrefix = url.slice(gcsPrefix.length);
+            const slashIdx = withoutPrefix.indexOf("/");
+            if (slashIdx !== -1) {
+              const bucketName = withoutPrefix.slice(0, slashIdx);
+              const objectName = withoutPrefix.slice(slashIdx + 1);
+              await objectStorageClient.bucket(bucketName).file(objectName).delete({ ignoreNotFound: true });
+            }
           }
-        }
+        }));
       } catch (deleteErr) {
         console.warn("Failed to delete photo from object storage (non-fatal):", deleteErr);
       }

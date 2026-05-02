@@ -553,7 +553,7 @@ export default function TaskProfile() {
   const [photoTargetItemId, setPhotoTargetItemId] = useState<string | null>(null);
   const [annotatingPhoto, setAnnotatingPhoto] = useState<
     | { url: string; source: "task"; index: number }
-    | { url: string; source: "checklist"; itemId: string; currentUrls: string[] }
+    | { url: string; source: "checklist"; itemId: string; currentUrls: string[]; currentThumbnailUrls: string[] }
     | null
   >(null);
 
@@ -921,12 +921,18 @@ export default function TaskProfile() {
         toast({ title: "Failed to save annotation", description: e.message, variant: "destructive" });
       }
     } else if (annotatingPhoto.source === "checklist") {
+      const replacedIndex = annotatingPhoto.currentUrls.indexOf(annotatingPhoto.url);
       const newUrls = annotatingPhoto.currentUrls.map((u) =>
         u === annotatingPhoto.url ? annotatedUrl : u
+      );
+      // Clear the thumbnail at the replaced index so stale imagery is not shown
+      const newThumbnailUrls = annotatingPhoto.currentThumbnailUrls.map((t, i) =>
+        i === replacedIndex ? "" : t
       );
       try {
         await apiRequest("PATCH", `/api/task-checklist-items/${annotatingPhoto.itemId}`, {
           photoUrls: newUrls,
+          thumbnailUrls: newThumbnailUrls,
         });
         refetchInspectionItems();
       } catch (e: any) {
@@ -3253,6 +3259,7 @@ export default function TaskProfile() {
                                     ...(Array.isArray(item.photoUrls) ? item.photoUrls : []),
                                     ...(item.photoUrl && !(item.photoUrls || []).includes(item.photoUrl) ? [item.photoUrl] : []),
                                   ];
+                                  const allThumbnails: string[] = Array.isArray(item.thumbnailUrls) ? item.thumbnailUrls : [];
                                   if (allPhotos.length === 0) return null;
                                   return (
                                     <div className="flex flex-wrap gap-2 mt-1">
@@ -3260,7 +3267,7 @@ export default function TaskProfile() {
                                         <div key={idx} className="relative group">
                                           <a href={url} target="_blank" rel="noopener noreferrer">
                                             <img
-                                              src={url}
+                                              src={allThumbnails[idx] || url}
                                               alt={`Photo ${idx + 1}`}
                                               className="h-16 w-24 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity"
                                             />
@@ -3269,7 +3276,7 @@ export default function TaskProfile() {
                                             <button
                                               className="bg-blue-600/90 text-white rounded px-1 py-0.5 flex items-center gap-0.5 text-xs"
                                               title="Annotate photo"
-                                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAnnotatingPhoto({ url, source: "checklist", itemId: String(item.id), currentUrls: allPhotos }); }}
+                                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAnnotatingPhoto({ url, source: "checklist", itemId: String(item.id), currentUrls: allPhotos, currentThumbnailUrls: allThumbnails }); }}
                                             >
                                               <Pencil className="w-2.5 h-2.5" />
                                             </button>
