@@ -5968,10 +5968,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return true;
       });
 
-      const [allUsers, allProperties] = await Promise.all([
+      const [allUsers, allPropertiesGlobal] = await Promise.all([
         storage.getUsersByOrg(orgId),
         storage.getProperties(true),
       ]);
+      // Strict multi-tenant boundary: only resolve labels for this org's properties.
+      const allProperties = allPropertiesGlobal.filter((p) => p.orgId === orgId);
       const userMap = new Map<string, string>(
         allUsers.map((u) => [u.id, `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || u.email || u.id])
       );
