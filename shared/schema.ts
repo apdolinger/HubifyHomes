@@ -84,7 +84,22 @@ export const orgs = pgTable("orgs", {
   currency: varchar("currency").default("USD"),
   primaryContact: varchar("primary_contact"), // Name of primary contact person
   industry: varchar("industry"), // Type of business (e.g., "Property Management", "HOA Management")
-  
+
+  // Per-org feature flag overrides — { flagKey: boolean }. Missing key = use feature_flags.defaultEnabled.
+  featureFlags: jsonb("feature_flags").$type<Record<string, boolean>>().default({}),
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Platform-wide feature flags (Super Admin owned)
+export const featureFlags = pgTable("feature_flags", {
+  key: varchar("key").primaryKey(), // canonical snake_case identifier
+  displayName: varchar("display_name").notNull(),
+  description: text("description"),
+  defaultEnabled: boolean("default_enabled").notNull().default(false),
+  beta: boolean("beta").notNull().default(false),
+  category: varchar("category"), // optional grouping label
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -2249,6 +2264,11 @@ export const insertPlatformAlertSchema = createInsertSchema(platformAlerts).omit
   updatedAt: true,
 });
 
+export const insertFeatureFlagSchema = createInsertSchema(featureFlags).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertPlatformAlertAcknowledgementSchema = createInsertSchema(platformAlertAcknowledgements).omit({
   id: true,
   acknowledgedAt: true,
@@ -2681,6 +2701,8 @@ export type InsertPlatformAlert = z.infer<typeof insertPlatformAlertSchema>;
 export type PlatformAlert = typeof platformAlerts.$inferSelect;
 export type InsertPlatformAlertAcknowledgement = z.infer<typeof insertPlatformAlertAcknowledgementSchema>;
 export type PlatformAlertAcknowledgement = typeof platformAlertAcknowledgements.$inferSelect;
+export type InsertFeatureFlag = z.infer<typeof insertFeatureFlagSchema>;
+export type FeatureFlag = typeof featureFlags.$inferSelect;
 export type InsertProperty = z.infer<typeof insertPropertySchema>;
 export type Property = typeof properties.$inferSelect;
 export type InsertPropertyForm = z.infer<typeof insertPropertyFormSchema>;

@@ -50,6 +50,7 @@ import {
   platformSettings,
   platformAlerts,
   platformAlertAcknowledgements,
+  featureFlags,
   teamMessages,
   messageReactions,
   messageMentions,
@@ -191,6 +192,8 @@ import {
   type InsertPlatformAlert,
   type PlatformAlertAcknowledgement,
   type InsertPlatformAlertAcknowledgement,
+  type FeatureFlag,
+  type InsertFeatureFlag,
   type TeamMessage,
   type InsertTeamMessage,
   type MessageReaction,
@@ -624,6 +627,15 @@ export interface IStorage {
   deletePlatformAlert(id: number): Promise<void>;
   acknowledgePlatformAlert(alertId: number, userId: string): Promise<PlatformAlertAcknowledgement>;
   hasUserAcknowledgedPlatformAlert(alertId: number, userId: string): Promise<boolean>;
+
+  // Feature flag operations (Super Admin owns flags; orgs override via orgs.feature_flags)
+  getAllFeatureFlags(): Promise<FeatureFlag[]>;
+  getFeatureFlag(key: string): Promise<FeatureFlag | undefined>;
+  createFeatureFlag(flag: InsertFeatureFlag): Promise<FeatureFlag>;
+  updateFeatureFlag(key: string, updates: Partial<InsertFeatureFlag>): Promise<FeatureFlag>;
+  deleteFeatureFlag(key: string): Promise<void>;
+  getOrgFeatureFlagOverrides(orgId: string): Promise<Record<string, boolean>>;
+  setOrgFeatureFlagOverride(orgId: string, key: string, enabled: boolean | null): Promise<Record<string, boolean>>;
 
   // Super Admin metrics
   getRevenueMetrics(): Promise<{
@@ -3879,6 +3891,58 @@ export class DatabaseStorage implements IStorage {
         ),
       );
     return !!row;
+  }
+
+  // Feature flag operations
+  async getAllFeatureFlags(): Promise<FeatureFlag[]> {
+    return await db.select().from(featureFlags).orderBy(asc(featureFlags.key));
+  }
+
+  async getFeatureFlag(key: string): Promise<FeatureFlag | undefined> {
+    const [flag] = await db.select().from(featureFlags).where(eq(featureFlags.key, key));
+    return flag;
+  }
+
+  async createFeatureFlag(flag: InsertFeatureFlag): Promise<FeatureFlag> {
+    const [created] = await (db.insert(featureFlags) as any).values(flag).returning();
+    return created;
+  }
+
+  async updateFeatureFlag(key: string, updates: Partial<InsertFeatureFlag>): Promise<FeatureFlag> {
+    const [updated] = await (db.update(featureFlags) as any)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(featureFlags.key, key))
+      .returning();
+    return updated;
+  }
+
+  async deleteFeatureFlag(key: string): Promise<void> {
+    // Also strip this key from any org overrides so we don't leave dangling references.
+    await db.execute(sql`UPDATE orgs SET feature_flags = feature_flags - ${key} WHERE feature_flags ? ${key}`);
+    await db.delete(featureFlags).where(eq(featureFlags.key, key));
+  }
+
+  async getOrgFeatureFlagOverrides(orgId: string): Promise<Record<string, boolean>> {
+    const [org] = await db.select({ featureFlags: orgs.featureFlags }).from(orgs).where(eq(orgs.id, orgId));
+    return (org?.featureFlags ?? {}) as Record<string, boolean>;
+  }
+
+  async setOrgFeatureFlagOverride(
+    orgId: string,
+    key: string,
+    enabled: boolean | null,
+  ): Promise<Record<string, boolean>> {
+    const current = await this.getOrgFeatureFlagOverrides(orgId);
+    const next = { ...current };
+    if (enabled === null) {
+      delete next[key];
+    } else {
+      next[key] = enabled === true;
+    }
+    await (db.update(orgs) as any)
+      .set({ featureFlags: next, updatedAt: new Date() })
+      .where(eq(orgs.id, orgId));
+    return next;
   }
 
   // Super Admin Revenue Metrics - aggregated from org_subscriptions

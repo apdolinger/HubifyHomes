@@ -26,6 +26,11 @@ export default function HubifyConsole() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+  const { data: supportInfo } = useQuery<{ supportPhone: string | null }>({
+    queryKey: ["/api/support-info"],
+  });
+  const supportPhone = supportInfo?.supportPhone ?? null;
+  const telHref = supportPhone ? `tel:${supportPhone.replace(/[^+\d]/g, "")}` : null;
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -371,10 +376,14 @@ export default function HubifyConsole() {
                 <Mail className="w-4 h-4 mr-2" />
                 Contact Support
               </Button>
-              <Button variant="outline">
-                <Phone className="w-4 h-4 mr-2" />
-                Call Support
-              </Button>
+              {telHref && (
+                <Button variant="outline" asChild data-testid="button-call-support">
+                  <a href={telHref}>
+                    <Phone className="w-4 h-4 mr-2" />
+                    Call Support {supportPhone && <span className="ml-1 text-slate-500">({supportPhone})</span>}
+                  </a>
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>

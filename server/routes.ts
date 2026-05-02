@@ -3015,6 +3015,182 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================
+  // Feature Flags (Super Admin owns flags; orgs override per-org)
+  // ============================================================
+  app.get("/api/super-admin/feature-flags", isAuthenticated, isSuperAdmin, requireMFA, async (_req, res) => {
+    try {
+      const flags = await storage.getAllFeatureFlags();
+      res.json(flags);
+    } catch (error) {
+      console.error("Error fetching feature flags:", error);
+      res.status(500).json({ message: "Failed to fetch feature flags" });
+    }
+  });
+
+  app.post("/api/super-admin/feature-flags", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { insertFeatureFlagSchema } = await import("@shared/schema");
+      const data = insertFeatureFlagSchema.parse(req.body);
+      if (!/^[a-z][a-z0-9_]*$/.test(data.key)) {
+        return res.status(400).json({ message: "Flag key must be snake_case (lowercase, digits, underscores)" });
+      }
+      const existing = await storage.getFeatureFlag(data.key);
+      if (existing) return res.status(409).json({ message: "Flag with that key already exists" });
+      const flag = await storage.createFeatureFlag(data);
+      await AuditLogger.log({
+        req,
+        action: "create_feature_flag",
+        actionType: "create",
+        resource: "feature_flag",
+        resourceId: data.key,
+        severity: "info",
+        success: true,
+      });
+      res.status(201).json(flag);
+    } catch (error: any) {
+      if (error?.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid flag data", errors: error.errors });
+      }
+      console.error("Error creating feature flag:", error);
+      res.status(500).json({ message: "Failed to create feature flag" });
+    }
+  });
+
+  app.patch("/api/super-admin/feature-flags/:key", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const key = req.params.key;
+      const existing = await storage.getFeatureFlag(key);
+      if (!existing) return res.status(404).json({ message: "Feature flag not found" });
+      const { insertFeatureFlagSchema } = await import("@shared/schema");
+      // Disallow renaming the key via PATCH; updates only mutate metadata + defaultEnabled.
+      const updateSchema = insertFeatureFlagSchema.partial().omit({ key: true });
+      const data = updateSchema.parse(req.body);
+      const updated = await storage.updateFeatureFlag(key, data);
+      await AuditLogger.log({
+        req,
+        action: "update_feature_flag",
+        actionType: "update",
+        resource: "feature_flag",
+        resourceId: key,
+        severity: "info",
+        success: true,
+        metadata: { keys: Object.keys(data) },
+      });
+      res.json(updated);
+    } catch (error: any) {
+      if (error?.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid flag data", errors: error.errors });
+      }
+      console.error("Error updating feature flag:", error);
+      res.status(500).json({ message: "Failed to update feature flag" });
+    }
+  });
+
+  app.delete("/api/super-admin/feature-flags/:key", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const key = req.params.key;
+      const existing = await storage.getFeatureFlag(key);
+      if (!existing) return res.status(404).json({ message: "Feature flag not found" });
+      await storage.deleteFeatureFlag(key);
+      await AuditLogger.log({
+        req,
+        action: "delete_feature_flag",
+        actionType: "delete",
+        resource: "feature_flag",
+        resourceId: key,
+        severity: "warning",
+        success: true,
+      });
+      res.json({ message: "Feature flag deleted" });
+    } catch (error) {
+      console.error("Error deleting feature flag:", error);
+      res.status(500).json({ message: "Failed to delete feature flag" });
+    }
+  });
+
+  // Per-org effective flag map (override merged with defaults)
+  app.get(
+    "/api/super-admin/orgs/:orgId/feature-flags",
+    isAuthenticated, isSuperAdmin, requireMFA,
+    async (req, res) => {
+      try {
+        const { getEffectiveFeatureFlags } = await import("./featureFlags");
+        const orgId = req.params.orgId;
+        const org = await storage.getOrg(orgId);
+        if (!org) return res.status(404).json({ message: "Organization not found" });
+        const overrides = await storage.getOrgFeatureFlagOverrides(orgId);
+        const effective = await getEffectiveFeatureFlags(orgId);
+        res.json({ orgId, overrides, effective });
+      } catch (error) {
+        console.error("Error fetching org feature flags:", error);
+        res.status(500).json({ message: "Failed to fetch org feature flags" });
+      }
+    },
+  );
+
+  app.patch(
+    "/api/super-admin/orgs/:orgId/feature-flags",
+    isAuthenticated, isSuperAdmin, requireMFA,
+    async (req, res) => {
+      try {
+        const orgId = req.params.orgId;
+        const org = await storage.getOrg(orgId);
+        if (!org) return res.status(404).json({ message: "Organization not found" });
+        const { key, enabled } = req.body ?? {};
+        if (typeof key !== 'string' || key.length === 0) {
+          return res.status(400).json({ message: "Body must include flag `key`" });
+        }
+        if (enabled !== null && typeof enabled !== 'boolean') {
+          return res.status(400).json({ message: "`enabled` must be true, false, or null (clear override)" });
+        }
+        const flag = await storage.getFeatureFlag(key);
+        if (!flag) return res.status(404).json({ message: "Unknown flag key" });
+        const overrides = await storage.setOrgFeatureFlagOverride(orgId, key, enabled);
+        await AuditLogger.log({
+          req,
+          action: enabled === null ? "clear_org_feature_flag_override" : "set_org_feature_flag_override",
+          actionType: "update",
+          resource: "feature_flag_override",
+          resourceId: `${orgId}:${key}`,
+          severity: "info",
+          success: true,
+          metadata: { orgId, key, enabled },
+        });
+        res.json({ orgId, overrides });
+      } catch (error) {
+        console.error("Error updating org feature flag override:", error);
+        res.status(500).json({ message: "Failed to update org feature flag override" });
+      }
+    },
+  );
+
+  // Public effective flag map for the calling user's org
+  app.get("/api/feature-flags/me", isAuthenticated, async (req: any, res) => {
+    try {
+      const { getEffectiveFeatureFlags } = await import("./featureFlags");
+      const orgId = req.user?.claims?.orgId ?? req.user?.claims?.org_id ?? null;
+      const flags = await getEffectiveFeatureFlags(orgId);
+      res.json(flags);
+    } catch (error) {
+      console.error("Error fetching effective feature flags:", error);
+      res.status(500).json({ message: "Failed to fetch feature flags" });
+    }
+  });
+
+  // Public support contact info (used by Hubify Console "Call Support" button)
+  app.get("/api/support-info", async (_req, res) => {
+    try {
+      const settings = await storage.getPlatformSettings();
+      const raw = settings.support_phone ?? settings.supportPhone ?? null;
+      const supportPhone = typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : null;
+      res.json({ supportPhone });
+    } catch (error) {
+      console.error("Error fetching support info:", error);
+      res.status(500).json({ message: "Failed to fetch support info" });
+    }
+  });
+
   app.post("/api/platform-alerts/:id/acknowledge", isAuthenticated, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);

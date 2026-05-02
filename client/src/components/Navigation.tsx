@@ -17,6 +17,7 @@ import { TimeTrackingDropdownItems } from "@/components/TimeTracking";
 import { apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
 import { enterFieldMode } from "@/components/FieldModeLayout";
+import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import { 
   BarChart3, 
   CheckSquare, 
@@ -82,15 +83,17 @@ export default function Navigation() {
   const isMobile = useIsMobile();
 
   const [showFieldModeBanner, setShowFieldModeBanner] = useState(false);
+  const { isFeatureEnabled: isFlagEnabled } = useFeatureFlags();
+  const fieldModeEnabled = isFlagEnabled("mobile_field_mode");
 
   useEffect(() => {
     const pref = localStorage.getItem("fieldModeEnabled");
-    if (isMobile && pref === null) {
+    if (isMobile && pref === null && fieldModeEnabled) {
       setShowFieldModeBanner(true);
     } else {
       setShowFieldModeBanner(false);
     }
-  }, [isMobile]);
+  }, [isMobile, fieldModeEnabled]);
 
   const dismissBanner = () => {
     localStorage.setItem("fieldModeEnabled", "false");
@@ -369,10 +372,12 @@ export default function Navigation() {
                   <Bell className="w-4 h-4 mr-2" />
                   Notification Settings
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={enterFieldMode}>
-                  <Smartphone className="w-4 h-4 mr-2" />
-                  Field Mode
-                </DropdownMenuItem>
+                {fieldModeEnabled && (
+                  <DropdownMenuItem onClick={enterFieldMode}>
+                    <Smartphone className="w-4 h-4 mr-2" />
+                    Field Mode
+                  </DropdownMenuItem>
+                )}
                 {((user as any)?.role === 'admin' || (user as any)?.role === 'manager') && (
                   <>
                     <DropdownMenuSeparator />

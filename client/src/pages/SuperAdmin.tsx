@@ -2561,6 +2561,350 @@ function VendorsReport() {
   );
 }
 
+// ============================================================================
+// Feature Flags Tab — DB-backed CRUD + per-org override picker
+// ============================================================================
+function FeatureFlagsTabContent() {
+  const { toast } = useToast();
+  const [selectedOrgId, setSelectedOrgId] = useState<string>("");
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingFlag, setEditingFlag] = useState<any>(null);
+  const [form, setForm] = useState({
+    key: "",
+    displayName: "",
+    description: "",
+    category: "",
+    defaultEnabled: false,
+    beta: false,
+  });
+
+  const flagsQ = useQuery<any[]>({ queryKey: ["/api/super-admin/feature-flags"] });
+  const orgsQ = useQuery<any[]>({ queryKey: ["/api/super-admin/orgs"] });
+  const overridesQ = useQuery<{ orgId: string; overrides: Record<string, boolean>; effective: Record<string, boolean> }>({
+    queryKey: ["/api/super-admin/orgs", selectedOrgId, "feature-flags"],
+    queryFn: async () => {
+      const res = await fetch(`/api/super-admin/orgs/${selectedOrgId}/feature-flags`, { credentials: "include" });
+      if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+      return res.json();
+    },
+    enabled: !!selectedOrgId,
+  });
+
+  const createMut = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/super-admin/feature-flags", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/feature-flags"] });
+      setIsCreateOpen(false);
+      setForm({ key: "", displayName: "", description: "", category: "", defaultEnabled: false, beta: false });
+      toast({ title: "Flag created" });
+    },
+    onError: (e: any) => toast({ title: "Failed to create flag", description: e?.message ?? String(e), variant: "destructive" }),
+  });
+
+  const updateMut = useMutation({
+    mutationFn: ({ key, data }: { key: string; data: any }) => apiRequest("PATCH", `/api/super-admin/feature-flags/${key}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/feature-flags"] });
+      if (selectedOrgId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/super-admin/orgs", selectedOrgId, "feature-flags"] });
+      }
+      setEditingFlag(null);
+      toast({ title: "Flag updated" });
+    },
+    onError: (e: any) => toast({ title: "Failed to update flag", description: e?.message ?? String(e), variant: "destructive" }),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (key: string) => apiRequest("DELETE", `/api/super-admin/feature-flags/${key}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/feature-flags"] });
+      if (selectedOrgId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/super-admin/orgs", selectedOrgId, "feature-flags"] });
+      }
+      toast({ title: "Flag deleted" });
+    },
+    onError: (e: any) => toast({ title: "Failed to delete flag", description: e?.message ?? String(e), variant: "destructive" }),
+  });
+
+  const overrideMut = useMutation({
+    mutationFn: ({ key, enabled }: { key: string; enabled: boolean | null }) =>
+      apiRequest("PATCH", `/api/super-admin/orgs/${selectedOrgId}/feature-flags`, { key, enabled }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/orgs", selectedOrgId, "feature-flags"] });
+    },
+    onError: (e: any) => toast({ title: "Failed to update override", description: e?.message ?? String(e), variant: "destructive" }),
+  });
+
+  const handleEditClick = (flag: any) => {
+    setEditingFlag(flag);
+    setForm({
+      key: flag.key,
+      displayName: flag.displayName ?? "",
+      description: flag.description ?? "",
+      category: flag.category ?? "",
+      defaultEnabled: !!flag.defaultEnabled,
+      beta: !!flag.beta,
+    });
+  };
+
+  const submitCreate = () => {
+    if (!form.key || !form.displayName) {
+      toast({ title: "Key and display name required", variant: "destructive" });
+      return;
+    }
+    createMut.mutate({
+      key: form.key,
+      displayName: form.displayName,
+      description: form.description || null,
+      category: form.category || null,
+      defaultEnabled: form.defaultEnabled,
+      beta: form.beta,
+    });
+  };
+
+  const submitEdit = () => {
+    if (!editingFlag) return;
+    updateMut.mutate({
+      key: editingFlag.key,
+      data: {
+        displayName: form.displayName,
+        description: form.description || null,
+        category: form.category || null,
+        defaultEnabled: form.defaultEnabled,
+        beta: form.beta,
+      },
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
+          <CardTitle className="flex items-center">
+            <ToggleLeft className="w-5 h-5 mr-2" />
+            Available Feature Flags
+          </CardTitle>
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" data-testid="button-add-feature-flag" onClick={() => setForm({ key: "", displayName: "", description: "", category: "", defaultEnabled: false, beta: false })}>
+                <Plus className="w-4 h-4 mr-1" /> Add flag
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>New feature flag</DialogTitle>
+                <DialogDescription>
+                  The key is a stable snake_case identifier used in code (e.g. <code>mobile_field_mode</code>) and cannot be changed later.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div>
+                  <Label>Key</Label>
+                  <Input value={form.key} onChange={(e) => setForm({ ...form, key: e.target.value })} placeholder="snake_case_key" data-testid="input-flag-key" />
+                </div>
+                <div>
+                  <Label>Display name</Label>
+                  <Input value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} data-testid="input-flag-name" />
+                </div>
+                <div>
+                  <Label>Description</Label>
+                  <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} data-testid="input-flag-description" />
+                </div>
+                <div>
+                  <Label>Category (optional)</Label>
+                  <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="e.g. mobile, billing" data-testid="input-flag-category" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="flag-default">Default enabled</Label>
+                  <Switch id="flag-default" checked={form.defaultEnabled} onCheckedChange={(v) => setForm({ ...form, defaultEnabled: v })} data-testid="switch-flag-default" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="flag-beta">Beta</Label>
+                  <Switch id="flag-beta" checked={form.beta} onCheckedChange={(v) => setForm({ ...form, beta: v })} data-testid="switch-flag-beta" />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+                <Button onClick={submitCreate} disabled={createMut.isPending} data-testid="button-create-flag">
+                  {createMut.isPending ? "Creating..." : "Create flag"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </CardHeader>
+        <CardContent>
+          {flagsQ.isLoading ? (
+            <div className="text-center py-8 text-gray-500">Loading flags...</div>
+          ) : flagsQ.isError ? (
+            <div className="text-center py-8 text-red-600">
+              Failed to load feature flags.{" "}
+              <button onClick={() => flagsQ.refetch()} className="underline">Retry</button>
+            </div>
+          ) : (flagsQ.data ?? []).length === 0 ? (
+            <div className="text-center py-8 text-gray-500">No flags yet. Click "Add flag" to create one.</div>
+          ) : (
+            <div className="space-y-3">
+              {(flagsQ.data ?? []).map((flag: any) => (
+                <div key={flag.key} className="flex items-start justify-between p-4 border rounded-lg" data-testid={`row-flag-${flag.key}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="font-medium text-slate-900">{flag.displayName}</h4>
+                      <code className="text-xs text-slate-500">{flag.key}</code>
+                      {flag.beta && <Badge variant="secondary" className="text-xs">Beta</Badge>}
+                      {flag.category && <Badge variant="outline" className="text-xs">{flag.category}</Badge>}
+                    </div>
+                    {flag.description && <p className="text-sm text-slate-600 mt-1">{flag.description}</p>}
+                  </div>
+                  <div className="flex items-center space-x-3 ml-4">
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      Default
+                      <Switch
+                        checked={!!flag.defaultEnabled}
+                        onCheckedChange={(v) => updateMut.mutate({ key: flag.key, data: { defaultEnabled: v } })}
+                        disabled={updateMut.isPending}
+                        data-testid={`switch-default-${flag.key}`}
+                      />
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => handleEditClick(flag)} data-testid={`button-edit-${flag.key}`}>
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (confirm(`Delete flag "${flag.key}"? Any per-org overrides will be cleared.`)) {
+                          deleteMut.mutate(flag.key);
+                        }
+                      }}
+                      data-testid={`button-delete-${flag.key}`}
+                    >
+                      <Trash2 className="w-4 h-4 text-red-600" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Building2 className="w-5 h-5 mr-2" />
+            Per-Organization Overrides
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label>Organization</Label>
+            <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
+              <SelectTrigger data-testid="select-org-for-flags">
+                <SelectValue placeholder="Choose an organization to manage overrides" />
+              </SelectTrigger>
+              <SelectContent>
+                {(orgsQ.data ?? []).map((o: any) => (
+                  <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {selectedOrgId && (
+            overridesQ.isLoading ? (
+              <div className="text-center py-6 text-gray-500">Loading overrides...</div>
+            ) : overridesQ.isError ? (
+              <div className="text-center py-6 text-red-600">
+                Failed to load overrides.{" "}
+                <button onClick={() => overridesQ.refetch()} className="underline">Retry</button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {(flagsQ.data ?? []).map((flag: any) => {
+                  const isOverridden = Object.prototype.hasOwnProperty.call(overridesQ.data?.overrides ?? {}, flag.key);
+                  const effective = overridesQ.data?.effective?.[flag.key] === true;
+                  return (
+                    <div key={flag.key} className="flex items-center justify-between p-3 border rounded" data-testid={`override-${flag.key}`}>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">{flag.displayName}</span>
+                          <code className="text-xs text-slate-500">{flag.key}</code>
+                          {isOverridden ? (
+                            <Badge variant="secondary" className="text-xs">Overridden</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs">Default</Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Switch
+                          checked={effective}
+                          onCheckedChange={(v) => overrideMut.mutate({ key: flag.key, enabled: v })}
+                          disabled={overrideMut.isPending}
+                          data-testid={`switch-override-${flag.key}`}
+                        />
+                        {isOverridden && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => overrideMut.mutate({ key: flag.key, enabled: null })}
+                            disabled={overrideMut.isPending}
+                            data-testid={`button-clear-override-${flag.key}`}
+                          >
+                            Reset
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={!!editingFlag} onOpenChange={(o) => !o && setEditingFlag(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit feature flag</DialogTitle>
+            <DialogDescription>
+              Key <code>{editingFlag?.key}</code> cannot be changed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Display name</Label>
+              <Input value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            </div>
+            <div>
+              <Label>Category</Label>
+              <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label>Default enabled</Label>
+              <Switch checked={form.defaultEnabled} onCheckedChange={(v) => setForm({ ...form, defaultEnabled: v })} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label>Beta</Label>
+              <Switch checked={form.beta} onCheckedChange={(v) => setForm({ ...form, beta: v })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingFlag(null)}>Cancel</Button>
+            <Button onClick={submitEdit} disabled={updateMut.isPending} data-testid="button-save-flag">
+              {updateMut.isPending ? "Saving..." : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 export default function SuperAdmin() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -3064,44 +3408,7 @@ export default function SuperAdmin() {
 
         {/* Feature Flags Tab */}
         <TabsContent value="features">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <ToggleLeft className="w-5 h-5 mr-2" />
-                Feature Flags & Beta Features
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {[
-                  { name: 'Task Cost Tracking', description: 'Track labor and material costs per task', enabled: true, beta: true },
-                  { name: 'Community Profiles', description: 'HOA community management features', enabled: false, beta: true },
-                  { name: 'Zapier Integration', description: 'Third-party automation integration', enabled: true, beta: false },
-                  { name: 'Advanced Reporting', description: 'Custom report builder and analytics', enabled: false, beta: true },
-                  { name: 'Mobile Push Notifications', description: 'Native mobile app notifications', enabled: true, beta: false },
-                  { name: 'White Label Branding', description: 'Custom branding and domain options', enabled: false, beta: true }
-                ].map((feature, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <h4 className="font-medium text-slate-900">{feature.name}</h4>
-                        {feature.beta && (
-                          <Badge variant="secondary" className="text-xs">Beta</Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-slate-600 mt-1">{feature.description}</p>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <Switch checked={feature.enabled} />
-                      <Button size="sm" variant="outline">
-                        Configure
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <FeatureFlagsTabContent />
         </TabsContent>
 
         {/* Monitoring Tab */}

@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import { useHotkeys } from "@/hooks/useHotkeys";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { RefreshCw } from "lucide-react";
@@ -321,17 +322,26 @@ function AuthenticatedApp() {
 
 function AuthWrapper() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { isFeatureEnabled: isFlagEnabled, isLoading: flagsLoading } = useFeatureFlags();
   const [location, navigate] = useLocation();
   const isMobile = useIsMobile();
   const isFieldRoute = location.startsWith("/field");
+  const fieldModeEnabled = isFlagEnabled("mobile_field_mode");
 
   useEffect(() => {
-    if (!isAuthenticated || isLoading) return;
+    if (!isAuthenticated || isLoading || flagsLoading) return;
+    // If the flag is off, force any user on /field back to the desktop app.
+    if (isFieldRoute && !fieldModeEnabled) {
+      localStorage.setItem("fieldModeEnabled", "false");
+      navigate("/");
+      return;
+    }
+    if (!fieldModeEnabled) return;
     const pref = localStorage.getItem("fieldModeEnabled");
     if (pref === "true" && !isFieldRoute && isMobile) {
       navigate("/field");
     }
-  }, [isAuthenticated, isLoading, isFieldRoute, isMobile, navigate]);
+  }, [isAuthenticated, isLoading, flagsLoading, isFieldRoute, isMobile, fieldModeEnabled, navigate]);
 
   return (
     <TooltipProvider>
