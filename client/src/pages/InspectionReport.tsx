@@ -258,7 +258,20 @@ export default function InspectionReport() {
                   <div className="flex items-start gap-3">
                     <XCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
                     <div className="flex-1">
-                      <p className="font-medium text-sm text-slate-900">{item.text}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-sm text-slate-900">{item.text}</p>
+                        {(() => {
+                          const photoCount = [
+                            ...(Array.isArray(item.photoUrls) ? item.photoUrls : []),
+                            ...(item.photoUrl && !(item.photoUrls || []).includes(item.photoUrl) ? [item.photoUrl] : []),
+                          ].length;
+                          return photoCount > 0 ? (
+                            <Badge className="h-5 px-1.5 text-xs bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100">
+                              {photoCount} {photoCount === 1 ? "photo" : "photos"}
+                            </Badge>
+                          ) : null;
+                        })()}
+                      </div>
                       {item.resultNote && (
                         <p className="text-sm text-slate-600 mt-1">{item.resultNote}</p>
                       )}
@@ -330,6 +343,17 @@ export default function InspectionReport() {
                                   <Badge variant="outline" className="text-xs">Required</Badge>
                                 )}
                                 <ResultBadge result={item.result} />
+                                {(() => {
+                                  const photoCount = [
+                                    ...(Array.isArray(item.photoUrls) ? item.photoUrls : []),
+                                    ...(item.photoUrl && !(item.photoUrls || []).includes(item.photoUrl) ? [item.photoUrl] : []),
+                                  ].length;
+                                  return photoCount > 0 ? (
+                                    <Badge className="h-5 px-1.5 text-xs bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100">
+                                      {photoCount} {photoCount === 1 ? "photo" : "photos"}
+                                    </Badge>
+                                  ) : null;
+                                })()}
                               </div>
                               {item.resultNote && (
                                 <p className="text-sm text-slate-500 mt-0.5">{item.resultNote}</p>

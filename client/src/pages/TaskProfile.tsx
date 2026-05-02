@@ -3355,6 +3355,21 @@ export default function TaskProfile() {
                                     : <Camera className="w-3 h-3" />
                                   }
                                 </Button>
+                                {(() => {
+                                  const photoCount = [
+                                    ...(Array.isArray(item.photoUrls) ? item.photoUrls : []),
+                                    ...(item.photoUrl && !(item.photoUrls || []).includes(item.photoUrl) ? [item.photoUrl] : []),
+                                  ].length;
+                                  return photoCount > 0 ? (
+                                    <Badge
+                                      className="h-5 px-1.5 text-xs bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100 pointer-events-none"
+                                      title={`${photoCount} ${photoCount === 1 ? "photo" : "photos"}`}
+                                      aria-label={`${photoCount} ${photoCount === 1 ? "photo" : "photos"}`}
+                                    >
+                                      {photoCount}
+                                    </Badge>
+                                  ) : null;
+                                })()}
                                 <Button
                                   size="sm"
                                   variant="ghost"
