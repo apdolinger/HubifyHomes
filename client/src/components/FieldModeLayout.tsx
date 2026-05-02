@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Home, ListChecks, Camera, User, Monitor } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 interface FieldModeLayoutProps {
@@ -18,8 +20,33 @@ export function enterFieldMode() {
 }
 
 export default function FieldModeLayout({ children }: FieldModeLayoutProps) {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { user } = useAuth();
+  const { toast } = useToast();
+
+  // Belt-and-suspenders: ask the server whether this org is allowed in Field
+  // Mode. If the mobile_field_mode flag is off, /api/field-mode/access returns
+  // 403 — we honor that even if the client-side flag map hasn't loaded yet.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/field-mode/access", { credentials: "include" });
+        if (cancelled) return;
+        if (res.status === 403) {
+          localStorage.setItem("fieldModeEnabled", "false");
+          toast({
+            title: "Field Mode unavailable",
+            description: "Your organization has Field Mode disabled.",
+          });
+          navigate("/");
+        }
+      } catch {
+        // Network errors don't kick the user out; the client-side flag check still applies.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [navigate, toast]);
 
   const tabs = [
     { label: "Home", href: "/field", icon: Home },

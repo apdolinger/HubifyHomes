@@ -3178,6 +3178,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Server-side gate for Field Mode. Returns 403 when the org has the
+  // mobile_field_mode flag disabled. The Field Mode shell calls this on mount
+  // so users who land directly on /field with a stale localStorage preference
+  // get a definitive server signal even if the client-side check is bypassed.
+  app.get("/api/field-mode/access", isAuthenticated, async (req: any, res) => {
+    try {
+      const { isFeatureEnabled } = await import("./featureFlags");
+      const orgId = req.user?.claims?.orgId ?? req.user?.claims?.org_id ?? null;
+      const enabled = await isFeatureEnabled(orgId, "mobile_field_mode");
+      if (!enabled) {
+        return res.status(403).json({
+          enabled: false,
+          flag: "mobile_field_mode",
+          message: "Field Mode is disabled for your organization.",
+        });
+      }
+      res.json({ enabled: true, flag: "mobile_field_mode" });
+    } catch (error) {
+      console.error("Error checking field mode access:", error);
+      res.status(500).json({ message: "Failed to check field mode access" });
+    }
+  });
+
   // Public support contact info (used by Hubify Console "Call Support" button)
   app.get("/api/support-info", async (_req, res) => {
     try {

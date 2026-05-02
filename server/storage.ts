@@ -3904,12 +3904,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createFeatureFlag(flag: InsertFeatureFlag): Promise<FeatureFlag> {
-    const [created] = await (db.insert(featureFlags) as any).values(flag).returning();
+    const [created] = await db.insert(featureFlags).values(flag).returning();
     return created;
   }
 
   async updateFeatureFlag(key: string, updates: Partial<InsertFeatureFlag>): Promise<FeatureFlag> {
-    const [updated] = await (db.update(featureFlags) as any)
+    const [updated] = await db
+      .update(featureFlags)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(featureFlags.key, key))
       .returning();
@@ -3933,13 +3934,14 @@ export class DatabaseStorage implements IStorage {
     enabled: boolean | null,
   ): Promise<Record<string, boolean>> {
     const current = await this.getOrgFeatureFlagOverrides(orgId);
-    const next = { ...current };
+    const next: Record<string, boolean> = { ...current };
     if (enabled === null) {
       delete next[key];
     } else {
       next[key] = enabled === true;
     }
-    await (db.update(orgs) as any)
+    await db
+      .update(orgs)
       .set({ featureFlags: next, updatedAt: new Date() })
       .where(eq(orgs.id, orgId));
     return next;
