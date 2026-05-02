@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -475,6 +475,775 @@ function TemplateManagement() {
         </DialogContent>
       </Dialog>
     </Card>
+  );
+}
+
+// ============================================================================
+// Revenue Tab — real data from /api/super-admin/revenue-metrics
+// ============================================================================
+function RevenueTabContent() {
+  const { data, isLoading, isError, error, refetch } = useQuery<{
+    mrrCents: number;
+    arrCents: number;
+    arpuCents: number;
+    activeOrgs: number;
+    trialingOrgs: number;
+    pastDueOrgs: number;
+    canceledLast30Days: number;
+    churnRate: number;
+    planDistribution: Array<{ tier: string; count: number; mrrCents: number }>;
+  }>({
+    queryKey: ['/api/super-admin/revenue-metrics'],
+  });
+
+  const fmt = (cents: number) =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(cents / 100);
+
+  const tierLabel = (t: string) => ({ starter: 'Starter', pro: 'Pro', grow: 'Grow', enterprise: 'Enterprise' } as Record<string, string>)[t] || t;
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-slate-500" data-testid="revenue-loading">Loading revenue metrics…</CardContent>
+      </Card>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center" data-testid="revenue-error">
+          <AlertCircle className="w-10 h-10 mx-auto mb-2 text-red-500" />
+          <div className="text-red-700 font-medium mb-1">Failed to load revenue metrics</div>
+          <div className="text-sm text-slate-500 mb-4">{(error as any)?.message || 'Unknown error'}</div>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center"><TrendingUp className="w-5 h-5 mr-2" />Revenue Metrics</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex justify-between"><span className="text-sm text-slate-600">MRR</span><span className="font-semibold" data-testid="text-mrr">{fmt(data.mrrCents)}</span></div>
+          <div className="flex justify-between"><span className="text-sm text-slate-600">ARR</span><span className="font-semibold" data-testid="text-arr">{fmt(data.arrCents)}</span></div>
+          <div className="flex justify-between"><span className="text-sm text-slate-600">ARPU</span><span className="font-semibold" data-testid="text-arpu">{fmt(data.arpuCents)}</span></div>
+          <div className="flex justify-between"><span className="text-sm text-slate-600">Churn (30d)</span><span className={`font-semibold ${data.churnRate > 5 ? 'text-red-600' : 'text-green-600'}`} data-testid="text-churn">{data.churnRate.toFixed(2)}%</span></div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Plan Distribution</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {data.planDistribution.map((p) => (
+            <div key={p.tier} className="flex justify-between" data-testid={`plan-${p.tier}`}>
+              <span className="text-sm text-slate-600">{tierLabel(p.tier)}</span>
+              <span className="font-semibold">{p.count} orgs · {fmt(p.mrrCents)}/mo</span>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Subscription Status</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex justify-between"><span className="text-sm text-slate-600">Active</span><span className="font-semibold text-green-600" data-testid="text-active-orgs">{data.activeOrgs}</span></div>
+          <div className="flex justify-between"><span className="text-sm text-slate-600">Trialing</span><span className="font-semibold text-blue-600" data-testid="text-trialing-orgs">{data.trialingOrgs}</span></div>
+          <div className="flex justify-between"><span className="text-sm text-slate-600">Past Due</span><span className={`font-semibold ${data.pastDueOrgs > 0 ? 'text-yellow-600' : 'text-slate-600'}`} data-testid="text-pastdue-orgs">{data.pastDueOrgs}</span></div>
+          <div className="flex justify-between"><span className="text-sm text-slate-600">Canceled (30d)</span><span className="font-semibold text-slate-600" data-testid="text-canceled-orgs">{data.canceledLast30Days}</span></div>
+          <div className="text-xs text-slate-500 pt-2 border-t">MRR/ARR/ARPU include both Active and Past Due (still being billed).</div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ============================================================================
+// Monitoring Tab — real system health data
+// ============================================================================
+function MonitoringTabContent() {
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery<{
+    uptimeSeconds: number;
+    nodeVersion: string;
+    memory: { rssMb: number; heapUsedMb: number; heapTotalMb: number };
+    counts: { orgs: number; users: number; activeSessions: number };
+    recentErrors: Array<{ type: string; severity: string; title: string; message: string; orgName?: string; createdAt: string }>;
+  }>({
+    queryKey: ['/api/super-admin/system-health'],
+    refetchInterval: 30000,
+  });
+
+  const formatUptime = (seconds: number) => {
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (d > 0) return `${d}d ${h}h ${m}m`;
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+  };
+
+  if (isLoading) {
+    return <Card><CardContent className="py-12 text-center text-slate-500" data-testid="monitoring-loading">Loading system health…</CardContent></Card>;
+  }
+
+  if (isError || !data) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center" data-testid="monitoring-error">
+          <AlertCircle className="w-10 h-10 mx-auto mb-2 text-red-500" />
+          <div className="text-red-700 font-medium mb-1">Failed to load system health</div>
+          <div className="text-sm text-slate-500 mb-4">{(error as any)?.message || 'Unknown error'}</div>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const heapPct = data.memory.heapTotalMb > 0 ? Math.round((data.memory.heapUsedMb / data.memory.heapTotalMb) * 100) : 0;
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center"><Server className="w-5 h-5 mr-2" />System Performance</CardTitle>
+          <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching} data-testid="button-refresh-health">
+            <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div>
+              <div className="text-sm text-slate-600 mb-1">Uptime</div>
+              <div className="text-2xl font-semibold" data-testid="text-uptime">{formatUptime(data.uptimeSeconds)}</div>
+              <div className="text-xs text-slate-500 mt-1">Node {data.nodeVersion}</div>
+            </div>
+            <div>
+              <div className="flex items-center justify-between text-sm text-slate-600 mb-1">
+                <span>Heap Memory</span>
+                <span className="font-semibold">{data.memory.heapUsedMb} / {data.memory.heapTotalMb} MB</span>
+              </div>
+              <div className="w-full bg-slate-200 rounded-full h-2 mt-2">
+                <div className={`h-2 rounded-full ${heapPct > 80 ? 'bg-red-600' : heapPct > 60 ? 'bg-yellow-600' : 'bg-green-600'}`} style={{ width: `${heapPct}%` }} data-testid="bar-heap" />
+              </div>
+              <div className="text-xs text-slate-500 mt-1">RSS: {data.memory.rssMb} MB</div>
+            </div>
+            <div>
+              <div className="text-sm text-slate-600 mb-1">Active Sessions (15m)</div>
+              <div className="text-2xl font-semibold" data-testid="text-active-sessions">{data.counts.activeSessions}</div>
+              <div className="text-xs text-slate-500 mt-1">{data.counts.users} total users</div>
+            </div>
+            <div>
+              <div className="text-sm text-slate-600 mb-1">Organizations</div>
+              <div className="text-2xl font-semibold" data-testid="text-org-count">{data.counts.orgs}</div>
+              <div className="text-xs text-slate-500 mt-1">Across the platform</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center"><AlertTriangle className="w-5 h-5 mr-2" />Recent Errors (last 24h)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {data.recentErrors.length === 0 ? (
+            <div className="py-8 text-center text-slate-500" data-testid="text-no-errors">
+              <CheckCircle className="w-10 h-10 mx-auto mb-2 text-green-500" />
+              No errors in the last 24 hours.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {data.recentErrors.map((err, idx) => {
+                const isCritical = err.severity === 'critical';
+                return (
+                  <div key={idx} className={`flex items-start justify-between p-3 rounded-lg border ${isCritical ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'}`} data-testid={`error-${idx}`}>
+                    <div className="flex items-start space-x-3 flex-1 min-w-0">
+                      {isCritical ? <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" /> : <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />}
+                      <div className="min-w-0 flex-1">
+                        <div className={`font-medium ${isCritical ? 'text-red-900' : 'text-yellow-900'}`}>{err.title}</div>
+                        <div className={`text-sm break-words ${isCritical ? 'text-red-700' : 'text-yellow-700'}`}>{err.message}</div>
+                        {err.orgName && <div className={`text-xs mt-1 ${isCritical ? 'text-red-600' : 'text-yellow-600'}`}>Org: {err.orgName}</div>}
+                      </div>
+                    </div>
+                    <div className={`text-xs ml-2 flex-shrink-0 ${isCritical ? 'text-red-600' : 'text-yellow-600'}`}>{new Date(err.createdAt).toLocaleString()}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ============================================================================
+// Communication Tab — Platform Alerts CRUD
+// ============================================================================
+function CommunicationTabContent() {
+  const { toast } = useToast();
+  const [editingAlert, setEditingAlert] = useState<any>(null);
+  const ROLE_OPTIONS = ['super_admin', 'admin', 'manager', 'staff', 'client'] as const;
+  const [form, setForm] = useState({
+    title: '',
+    message: '',
+    severity: 'info',
+    location: 'all',
+    requireAck: true,
+    showOncePerSession: false,
+    actionLabel: '',
+    actionUrl: '',
+    startsAt: '',
+    expiresAt: '',
+    isActive: true,
+    targetOrgIdsText: '',
+    targetRoles: [] as string[],
+  });
+
+  const toggleRole = (role: string) => {
+    setForm((f) => ({
+      ...f,
+      targetRoles: f.targetRoles.includes(role)
+        ? f.targetRoles.filter((r) => r !== role)
+        : [...f.targetRoles, role],
+    }));
+  };
+
+  const parseOrgIds = (text: string): string[] | null => {
+    const ids = text
+      .split(/[,\s]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return ids.length > 0 ? ids : null;
+  };
+
+  const { data: alerts = [], isLoading } = useQuery<any[]>({
+    queryKey: ['/api/super-admin/platform-alerts'],
+  });
+
+  const resetForm = () => {
+    setEditingAlert(null);
+    setForm({
+      title: '', message: '', severity: 'info', location: 'all',
+      requireAck: true, showOncePerSession: false,
+      actionLabel: '', actionUrl: '', startsAt: '', expiresAt: '', isActive: true,
+      targetOrgIdsText: '', targetRoles: [],
+    });
+  };
+
+  const buildPayload = () => ({
+    title: form.title.trim(),
+    message: form.message.trim(),
+    severity: form.severity,
+    location: form.location,
+    requireAck: form.requireAck,
+    showOncePerSession: form.showOncePerSession,
+    actionLabel: form.actionLabel.trim() || null,
+    actionUrl: form.actionUrl.trim() || null,
+    startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null,
+    expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
+    isActive: form.isActive,
+    targetOrgIds: parseOrgIds(form.targetOrgIdsText),
+    targetRoles: form.targetRoles.length > 0 ? form.targetRoles : null,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async () => apiRequest('POST', '/api/super-admin/platform-alerts', buildPayload()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/super-admin/platform-alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/platform-alerts/active'] });
+      toast({ title: 'Alert created' });
+      resetForm();
+    },
+    onError: (e: any) => toast({ title: 'Failed to create alert', description: e.message, variant: 'destructive' }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async () => apiRequest('PATCH', `/api/super-admin/platform-alerts/${editingAlert.id}`, buildPayload()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/super-admin/platform-alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/platform-alerts/active'] });
+      toast({ title: 'Alert updated' });
+      resetForm();
+    },
+    onError: (e: any) => toast({ title: 'Failed to update alert', description: e.message, variant: 'destructive' }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => apiRequest('DELETE', `/api/super-admin/platform-alerts/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/super-admin/platform-alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/platform-alerts/active'] });
+      toast({ title: 'Alert deleted' });
+    },
+    onError: (e: any) => toast({ title: 'Failed to delete alert', description: e.message, variant: 'destructive' }),
+  });
+
+  const handleEdit = (a: any) => {
+    setEditingAlert(a);
+    setForm({
+      title: a.title || '',
+      message: a.message || '',
+      severity: a.severity || 'info',
+      location: a.location || 'all',
+      requireAck: a.requireAck ?? true,
+      showOncePerSession: a.showOncePerSession ?? false,
+      actionLabel: a.actionLabel || '',
+      actionUrl: a.actionUrl || '',
+      startsAt: a.startsAt ? new Date(a.startsAt).toISOString().slice(0, 16) : '',
+      expiresAt: a.expiresAt ? new Date(a.expiresAt).toISOString().slice(0, 16) : '',
+      isActive: a.isActive ?? true,
+      targetOrgIdsText: Array.isArray(a.targetOrgIds) ? a.targetOrgIds.join(', ') : '',
+      targetRoles: Array.isArray(a.targetRoles) ? a.targetRoles : [],
+    });
+  };
+
+  const handleSubmit = () => {
+    if (!form.title.trim() || !form.message.trim()) {
+      toast({ title: 'Title and message are required', variant: 'destructive' });
+      return;
+    }
+    if (editingAlert) updateMutation.mutate();
+    else createMutation.mutate();
+  };
+
+  const severityBadge = (sev: string) => {
+    const color = sev === 'critical' ? 'bg-red-100 text-red-800' : sev === 'warning' ? 'bg-yellow-100 text-yellow-800' : sev === 'success' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800';
+    return <Badge variant="outline" className={color}>{sev}</Badge>;
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <AlertTriangle className="w-5 h-5 mr-2" />
+            {editingAlert ? `Edit Alert #${editingAlert.id}` : 'Create Platform Alert'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="alert-title">Title</Label>
+            <Input id="alert-title" placeholder="e.g., Scheduled Maintenance" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} data-testid="input-alert-title" />
+          </div>
+          <div>
+            <Label htmlFor="alert-message">Message</Label>
+            <Textarea id="alert-message" placeholder="Alert message body..." rows={4} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} data-testid="input-alert-message" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Starts At</Label>
+              <Input type="datetime-local" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} data-testid="input-alert-starts" />
+            </div>
+            <div>
+              <Label>Expires At</Label>
+              <Input type="datetime-local" value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} data-testid="input-alert-expires" />
+            </div>
+          </div>
+          <div>
+            <Label>Severity</Label>
+            <Select value={form.severity} onValueChange={(v) => setForm({ ...form, severity: v })}>
+              <SelectTrigger data-testid="select-alert-severity"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="info">Info (Blue)</SelectItem>
+                <SelectItem value="warning">Warning (Yellow)</SelectItem>
+                <SelectItem value="critical">Critical (Red)</SelectItem>
+                <SelectItem value="success">Success (Green)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Page Location</Label>
+            <Select value={form.location} onValueChange={(v) => setForm({ ...form, location: v })}>
+              <SelectTrigger data-testid="select-alert-location"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Pages</SelectItem>
+                <SelectItem value="dashboard">Dashboard Only</SelectItem>
+                <SelectItem value="properties">Properties Page</SelectItem>
+                <SelectItem value="tasks">Tasks Page</SelectItem>
+                <SelectItem value="calendar">Calendar Page</SelectItem>
+                <SelectItem value="billing">Billing Page</SelectItem>
+                <SelectItem value="settings">Settings Page</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Switch id="require-ack" checked={form.requireAck} onCheckedChange={(v) => setForm({ ...form, requireAck: v })} data-testid="switch-require-ack" />
+            <Label htmlFor="require-ack">Require acknowledgment</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Switch id="show-once" checked={form.showOncePerSession} onCheckedChange={(v) => setForm({ ...form, showOncePerSession: v })} data-testid="switch-show-once" />
+            <Label htmlFor="show-once">Show only once per session</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Switch id="alert-active" checked={form.isActive} onCheckedChange={(v) => setForm({ ...form, isActive: v })} data-testid="switch-alert-active" />
+            <Label htmlFor="alert-active">Active</Label>
+          </div>
+          <div>
+            <Label>Target Organizations (optional)</Label>
+            <Textarea
+              placeholder="Comma- or space-separated organization IDs. Leave blank to target all organizations."
+              rows={2}
+              value={form.targetOrgIdsText}
+              onChange={(e) => setForm({ ...form, targetOrgIdsText: e.target.value })}
+              data-testid="input-alert-target-orgs"
+            />
+            <div className="text-xs text-slate-500 mt-1">Empty = all organizations</div>
+          </div>
+          <div>
+            <Label>Target Roles (optional)</Label>
+            <div className="flex flex-wrap gap-2 mt-1" data-testid="alert-target-roles">
+              {ROLE_OPTIONS.map((role) => {
+                const checked = form.targetRoles.includes(role);
+                return (
+                  <button
+                    type="button"
+                    key={role}
+                    onClick={() => toggleRole(role)}
+                    className={`px-2.5 py-1 rounded-md border text-xs font-medium transition-colors ${
+                      checked
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                    }`}
+                    data-testid={`role-toggle-${role}`}
+                  >
+                    {role.replace('_', ' ')}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="text-xs text-slate-500 mt-1">No selection = all roles</div>
+          </div>
+          <div>
+            <Label>Action Button (optional)</Label>
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              <Input placeholder="Button text" value={form.actionLabel} onChange={(e) => setForm({ ...form, actionLabel: e.target.value })} data-testid="input-action-label" />
+              <Input placeholder="https://..." value={form.actionUrl} onChange={(e) => setForm({ ...form, actionUrl: e.target.value })} data-testid="input-action-url" />
+            </div>
+          </div>
+          <div className="flex space-x-2">
+            <Button onClick={handleSubmit} disabled={createMutation.isPending || updateMutation.isPending} className="flex-1" data-testid="button-save-alert">
+              {editingAlert ? 'Update Alert' : 'Create Alert'}
+            </Button>
+            {editingAlert && (
+              <Button variant="outline" onClick={resetForm} data-testid="button-cancel-edit">Cancel</Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center"><Bell className="w-5 h-5 mr-2" />Platform Alerts ({alerts.length})</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isLoading ? (
+            <div className="text-center text-slate-500 py-6" data-testid="alerts-loading">Loading…</div>
+          ) : alerts.length === 0 ? (
+            <div className="text-center text-slate-500 py-6" data-testid="alerts-empty">No platform alerts yet.</div>
+          ) : (
+            alerts.map((a: any) => {
+              const sev = a.severity || 'info';
+              const bgClass = sev === 'critical' ? 'border-red-200 bg-red-50' : sev === 'warning' ? 'border-yellow-200 bg-yellow-50' : sev === 'success' ? 'border-green-200 bg-green-50' : 'border-blue-200 bg-blue-50';
+              return (
+                <div key={a.id} className={`p-4 border rounded-lg ${bgClass}`} data-testid={`alert-row-${a.id}`}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <span className="font-semibold">{a.title}</span>
+                        {severityBadge(sev)}
+                        {!a.isActive && <Badge variant="outline">Inactive</Badge>}
+                      </div>
+                      <p className="text-sm text-slate-700 mb-2">{a.message}</p>
+                      <div className="text-xs text-slate-500">
+                        {a.location && a.location !== 'all' ? `Location: ${a.location} · ` : ''}
+                        {a.requireAck ? 'Requires ack' : 'Dismissable'}
+                        {a.expiresAt ? ` · Expires ${new Date(a.expiresAt).toLocaleString()}` : ''}
+                        {Array.isArray(a.targetOrgIds) && a.targetOrgIds.length > 0
+                          ? ` · ${a.targetOrgIds.length} org${a.targetOrgIds.length === 1 ? '' : 's'}`
+                          : ' · all orgs'}
+                        {Array.isArray(a.targetRoles) && a.targetRoles.length > 0
+                          ? ` · roles: ${a.targetRoles.join(', ')}`
+                          : ''}
+                      </div>
+                    </div>
+                    <div className="flex space-x-1">
+                      <Button size="sm" variant="ghost" onClick={() => handleEdit(a)} data-testid={`button-edit-alert-${a.id}`}><Edit className="w-3 h-3" /></Button>
+                      <Button size="sm" variant="ghost" onClick={() => { if (confirm('Delete this alert?')) deleteMutation.mutate(a.id); }} data-testid={`button-delete-alert-${a.id}`}><Trash2 className="w-3 h-3" /></Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ============================================================================
+// Settings Tab — backed by /api/super-admin/platform-settings
+// ============================================================================
+function SettingsTabContent() {
+  const { toast } = useToast();
+  const { data: settings, isLoading, isError, error, refetch } = useQuery<Record<string, any>>({
+    queryKey: ['/api/super-admin/platform-settings'],
+  });
+
+  const [draft, setDraft] = useState<Record<string, any>>({});
+  const hydratedRef = useRef(false);
+
+  useEffect(() => {
+    // Only hydrate once on first successful load to avoid clobbering in-progress edits on refetch
+    if (settings && !hydratedRef.current) {
+      setDraft(settings);
+      hydratedRef.current = true;
+    }
+  }, [settings]);
+
+  const saveSection = useMutation({
+    mutationFn: async (keys: string[]) => {
+      const updates: Record<string, any> = {};
+      for (const k of keys) updates[k] = draft[k];
+      return apiRequest('PATCH', '/api/super-admin/platform-settings', updates);
+    },
+    onSuccess: (savedSettings: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/super-admin/platform-settings'] });
+      // Reconcile draft with the server response so saved values are authoritative
+      if (savedSettings && typeof savedSettings === 'object') {
+        setDraft((d) => ({ ...d, ...savedSettings }));
+      }
+      toast({ title: 'Settings saved' });
+    },
+    onError: (e: any) => toast({ title: 'Failed to save', description: e.message, variant: 'destructive' }),
+  });
+
+  const set = (k: string, v: any) => setDraft((d) => ({ ...d, [k]: v }));
+
+  if (isLoading) {
+    return <Card><CardContent className="py-12 text-center text-slate-500" data-testid="settings-loading">Loading settings…</CardContent></Card>;
+  }
+
+  if (isError || !settings) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center" data-testid="settings-error">
+          <AlertCircle className="w-10 h-10 mx-auto mb-2 text-red-500" />
+          <div className="text-red-700 font-medium mb-1">Failed to load platform settings</div>
+          <div className="text-sm text-slate-500 mb-4">{(error as any)?.message || 'Unknown error'}</div>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center"><Settings className="w-5 h-5 mr-2" />Platform Configuration</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="api-rate-limit">API Rate Limit (requests/hour)</Label>
+              <Input id="api-rate-limit" type="number" value={draft.apiRateLimitPerHour ?? ''} onChange={(e) => set('apiRateLimitPerHour', parseInt(e.target.value) || 0)} data-testid="input-api-rate-limit" />
+            </div>
+            <div>
+              <Label htmlFor="session-timeout">Session Timeout (minutes)</Label>
+              <Input id="session-timeout" type="number" value={draft.sessionTimeoutMinutes ?? ''} onChange={(e) => set('sessionTimeoutMinutes', parseInt(e.target.value) || 0)} data-testid="input-session-timeout" />
+            </div>
+            <div>
+              <Label htmlFor="max-file-size">Max File Upload Size (MB)</Label>
+              <Input id="max-file-size" type="number" value={draft.maxFileUploadSizeMb ?? ''} onChange={(e) => set('maxFileUploadSizeMb', parseInt(e.target.value) || 0)} data-testid="input-max-file-size" />
+            </div>
+            <div>
+              <Label htmlFor="webhook-retries">Webhook Retry Attempts</Label>
+              <Input id="webhook-retries" type="number" value={draft.webhookRetryAttempts ?? ''} onChange={(e) => set('webhookRetryAttempts', parseInt(e.target.value) || 0)} data-testid="input-webhook-retries" />
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="global-timezone">Global Time Zone</Label>
+            <Select value={draft.globalTimezone || 'utc'} onValueChange={(v) => set('globalTimezone', v)}>
+              <SelectTrigger id="global-timezone" data-testid="select-global-timezone"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="utc">UTC</SelectItem>
+                <SelectItem value="est">Eastern (EST/EDT)</SelectItem>
+                <SelectItem value="cst">Central (CST/CDT)</SelectItem>
+                <SelectItem value="mst">Mountain (MST/MDT)</SelectItem>
+                <SelectItem value="pst">Pacific (PST/PDT)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={() => saveSection.mutate(['apiRateLimitPerHour', 'sessionTimeoutMinutes', 'maxFileUploadSizeMb', 'webhookRetryAttempts', 'globalTimezone'])} disabled={saveSection.isPending} data-testid="button-save-platform-config">
+            <Settings className="w-4 h-4 mr-2" />
+            Save Platform Configuration
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center"><Building2 className="w-5 h-5 mr-2" />Default Organization Settings</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="default-plan">Default Plan for New Orgs</Label>
+              <Select value={draft.defaultPlanForNewOrgs || 'starter'} onValueChange={(v) => set('defaultPlanForNewOrgs', v)}>
+                <SelectTrigger id="default-plan" data-testid="select-default-plan"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="starter">Starter</SelectItem>
+                  <SelectItem value="pro">Pro</SelectItem>
+                  <SelectItem value="grow">Grow</SelectItem>
+                  <SelectItem value="enterprise">Enterprise</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="trial-length">Free Trial Length (days)</Label>
+              <Input id="trial-length" type="number" value={draft.freeTrialLengthDays ?? ''} onChange={(e) => set('freeTrialLengthDays', parseInt(e.target.value) || 0)} data-testid="input-trial-length" />
+            </div>
+          </div>
+          <Button onClick={() => saveSection.mutate(['defaultPlanForNewOrgs', 'freeTrialLengthDays'])} disabled={saveSection.isPending} data-testid="button-save-org-defaults">
+            <Building2 className="w-4 h-4 mr-2" />
+            Save Organization Defaults
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center"><CreditCard className="w-5 h-5 mr-2" />Billing & Subscription Settings</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <Label>Starter ($/mo)</Label>
+              <Input type="number" value={draft.starterPlanPrice ?? ''} onChange={(e) => set('starterPlanPrice', parseFloat(e.target.value) || 0)} data-testid="input-price-starter" />
+            </div>
+            <div>
+              <Label>Pro ($/mo)</Label>
+              <Input type="number" value={draft.proPlanPrice ?? ''} onChange={(e) => set('proPlanPrice', parseFloat(e.target.value) || 0)} data-testid="input-price-pro" />
+            </div>
+            <div>
+              <Label>Grow ($/mo)</Label>
+              <Input type="number" value={draft.growPlanPrice ?? ''} onChange={(e) => set('growPlanPrice', parseFloat(e.target.value) || 0)} data-testid="input-price-grow" />
+            </div>
+            <div>
+              <Label>Enterprise ($/mo)</Label>
+              <Input type="number" value={draft.enterprisePlanPrice ?? ''} onChange={(e) => set('enterprisePlanPrice', parseFloat(e.target.value) || 0)} data-testid="input-price-enterprise" />
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="grace-period">Payment Grace Period (days)</Label>
+            <Input id="grace-period" type="number" value={draft.paymentGracePeriodDays ?? ''} onChange={(e) => set('paymentGracePeriodDays', parseInt(e.target.value) || 0)} data-testid="input-grace-period" />
+          </div>
+          <Button onClick={() => saveSection.mutate(['starterPlanPrice', 'proPlanPrice', 'growPlanPrice', 'enterprisePlanPrice', 'paymentGracePeriodDays'])} disabled={saveSection.isPending} data-testid="button-save-billing-settings">
+            <CreditCard className="w-4 h-4 mr-2" />
+            Save Billing Settings
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center"><Server className="w-5 h-5 mr-2" />System Maintenance</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="p-4 border rounded-lg bg-yellow-50 border-yellow-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <AlertTriangle className="w-5 h-5 text-yellow-600" />
+                <div>
+                  <div className="font-medium text-yellow-900">Maintenance Mode</div>
+                  <div className="text-sm text-yellow-700">When enabled, this flag is exposed via the platform settings API (consumers should display the maintenance message and block writes).</div>
+                </div>
+              </div>
+              <Switch id="maintenance-mode" checked={!!draft.maintenanceMode} onCheckedChange={(v) => set('maintenanceMode', v)} data-testid="switch-maintenance-mode" />
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="downtime-message">Maintenance Mode Message</Label>
+            <Textarea id="downtime-message" value={draft.maintenanceMessage ?? ''} onChange={(e) => set('maintenanceMessage', e.target.value)} data-testid="textarea-downtime-message" />
+          </div>
+          <Button onClick={() => saveSection.mutate(['maintenanceMode', 'maintenanceMessage'])} disabled={saveSection.isPending} data-testid="button-save-maintenance-settings">
+            <Server className="w-4 h-4 mr-2" />
+            Save Maintenance Settings
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center"><Lock className="w-5 h-5 mr-2" />Password Policy & Session Limits</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label>Password Complexity Requirements</Label>
+            <div className="space-y-2 mt-2 pl-4">
+              <div className="flex items-center space-x-2">
+                <Switch id="pwd-uppercase" checked={!!draft.passwordRequireUppercase} onCheckedChange={(v) => set('passwordRequireUppercase', v)} data-testid="switch-pwd-uppercase" />
+                <Label htmlFor="pwd-uppercase">Require uppercase letters</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch id="pwd-numbers" checked={!!draft.passwordRequireNumbers} onCheckedChange={(v) => set('passwordRequireNumbers', v)} data-testid="switch-pwd-numbers" />
+                <Label htmlFor="pwd-numbers">Require numbers</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch id="pwd-special" checked={!!draft.passwordRequireSpecial} onCheckedChange={(v) => set('passwordRequireSpecial', v)} data-testid="switch-pwd-special" />
+                <Label htmlFor="pwd-special">Require special characters</Label>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="pwd-min-length">Minimum Password Length</Label>
+              <Input id="pwd-min-length" type="number" value={draft.passwordMinLength ?? ''} onChange={(e) => set('passwordMinLength', parseInt(e.target.value) || 0)} data-testid="input-pwd-min-length" />
+            </div>
+            <div>
+              <Label htmlFor="session-length">Max Session Length (hours)</Label>
+              <Input id="session-length" type="number" value={draft.maxSessionLengthHours ?? ''} onChange={(e) => set('maxSessionLengthHours', parseInt(e.target.value) || 0)} data-testid="input-session-length" />
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="ip-whitelist">IP Whitelist (comma-separated)</Label>
+            <Textarea id="ip-whitelist" placeholder="192.168.1.1, 10.0.0.0/24" value={draft.ipWhitelist ?? ''} onChange={(e) => set('ipWhitelist', e.target.value)} data-testid="textarea-ip-whitelist" />
+          </div>
+          <Button onClick={() => saveSection.mutate(['passwordMinLength', 'passwordRequireUppercase', 'passwordRequireNumbers', 'passwordRequireSpecial', 'maxSessionLengthHours', 'ipWhitelist'])} disabled={saveSection.isPending} data-testid="button-save-security-settings">
+            <Lock className="w-4 h-4 mr-2" />
+            Save Security Settings
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center"><Palette className="w-5 h-5 mr-2" />Branding</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="brand-color">Default Brand Color</Label>
+            <div className="flex items-center space-x-2">
+              <Input id="brand-color" type="color" value={draft.brandPrimaryColor || '#4F46E5'} onChange={(e) => set('brandPrimaryColor', e.target.value)} className="w-20 h-10" data-testid="input-default-color" />
+              <Input type="text" value={draft.brandPrimaryColor || ''} onChange={(e) => set('brandPrimaryColor', e.target.value)} className="flex-1" data-testid="input-default-color-hex" />
+            </div>
+          </div>
+          <Button onClick={() => saveSection.mutate(['brandPrimaryColor'])} disabled={saveSection.isPending} data-testid="button-save-customization-settings">
+            <Palette className="w-4 h-4 mr-2" />
+            Save Branding
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -2284,258 +3053,13 @@ export default function SuperAdmin() {
 
         {/* Communication Tab - System Alerts */}
         <TabsContent value="communication">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Create Alert */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <AlertTriangle className="w-5 h-5 mr-2" />
-                  Create System Alert
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="alert-title">Alert Title</Label>
-                  <Input 
-                    placeholder="e.g., Scheduled Maintenance Notice"
-                    className="mt-1"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="alert-message">Message</Label>
-                  <Textarea 
-                    placeholder="Alert message content..."
-                    rows={4}
-                    className="mt-1"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="start-time">Start Time</Label>
-                    <Input type="datetime-local" className="mt-1" />
-                  </div>
-                  <div>
-                    <Label htmlFor="end-time">End Time</Label>
-                    <Input type="datetime-local" className="mt-1" />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="target">Target Audience</Label>
-                  <Select>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select target audience" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Users</SelectItem>
-                      <SelectItem value="admins">Admin Users Only</SelectItem>
-                      <SelectItem value="account">Specific Account</SelectItem>
-                      <SelectItem value="role">Specific Role</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="severity">Alert Severity</Label>
-                  <Select>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select severity level" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="info">Info (Blue)</SelectItem>
-                      <SelectItem value="warning">Warning (Yellow)</SelectItem>
-                      <SelectItem value="error">Critical (Red)</SelectItem>
-                      <SelectItem value="success">Success (Green)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="location">Page/Location (Optional)</Label>
-                  <Select>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Show on all pages" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Pages</SelectItem>
-                      <SelectItem value="dashboard">Dashboard Only</SelectItem>
-                      <SelectItem value="properties">Properties Page</SelectItem>
-                      <SelectItem value="tasks">Tasks Page</SelectItem>
-                      <SelectItem value="calendar">Calendar Page</SelectItem>
-                      <SelectItem value="team">Team Page</SelectItem>
-                      <SelectItem value="contacts">Contacts Page</SelectItem>
-                      <SelectItem value="billing">Billing Page</SelectItem>
-                      <SelectItem value="settings">Settings Page</SelectItem>
-                      <SelectItem value="support">Support Area</SelectItem>
-                      <SelectItem value="admin">Admin Pages Only</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Alert will only appear on the selected page/location
-                  </p>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <input type="checkbox" id="require-ack" className="rounded" />
-                  <Label htmlFor="require-ack">Require acknowledgment</Label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <input type="checkbox" id="show-once" className="rounded" />
-                  <Label htmlFor="show-once">Show only once per session</Label>
-                </div>
-
-                <div>
-                  <Label htmlFor="action-button">Action Button (Optional)</Label>
-                  <div className="grid grid-cols-2 gap-2 mt-1">
-                    <Input placeholder="Button text" />
-                    <Input placeholder="Button URL" />
-                  </div>
-                </div>
-
-                <Button className="w-full">
-                  Create Alert
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Active Alerts */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Bell className="w-5 h-5 mr-2" />
-                  Active System Alerts
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Sample Active Alert */}
-                <div className="p-4 border border-yellow-200 bg-yellow-50 rounded-lg">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <AlertTriangle className="w-4 h-4 text-yellow-600" />
-                        <span className="font-semibold text-yellow-800">Scheduled Maintenance</span>
-                        <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Warning</Badge>
-                      </div>
-                      <p className="text-sm text-yellow-700 mb-2">
-                        Platform will be offline for maintenance on Jan 25, 2025 from 1:00 AM - 3:00 AM EST.
-                      </p>
-                      <div className="text-xs text-yellow-600">
-                        Active: Jan 24, 1:00 PM - Jan 25, 4:00 AM | Target: All Users | Location: All Pages
-                      </div>
-                    </div>
-                    <div className="flex space-x-1">
-                      <Button size="sm" variant="ghost">
-                        <Edit className="w-3 h-3" />
-                      </Button>
-                      <Button size="sm" variant="ghost">
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Sample Feature Alert */}
-                <div className="p-4 border border-blue-200 bg-blue-50 rounded-lg">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <Info className="w-4 h-4 text-blue-600" />
-                        <span className="font-semibold text-blue-800">New Feature Available</span>
-                        <Badge variant="outline" className="bg-blue-100 text-blue-800">Info</Badge>
-                      </div>
-                      <p className="text-sm text-blue-700 mb-2">
-                        🎉 Dashboard customization is now live! Personalize your workspace with drag-and-drop widgets.
-                      </p>
-                      <div className="text-xs text-blue-600">
-                        Active: Jan 22, 9:00 AM - Jan 29, 11:59 PM | Target: Admin Users | Location: Dashboard Only
-                      </div>
-                    </div>
-                    <div className="flex space-x-1">
-                      <Button size="sm" variant="ghost">
-                        <Edit className="w-3 h-3" />
-                      </Button>
-                      <Button size="sm" variant="ghost">
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-center text-sm text-gray-500 mt-4">
-                  2 active alerts • 847 users notified today
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <CommunicationTabContent />
         </TabsContent>
+
 
         {/* Revenue Tab */}
         <TabsContent value="revenue">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <TrendingUp className="w-5 h-5 mr-2" />
-                  Revenue Metrics
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between">
-                  <span className="text-sm text-slate-600">MRR</span>
-                  <span className="font-semibold">$47,830</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-slate-600">ARR</span>
-                  <span className="font-semibold">$573,960</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-slate-600">Churn Rate</span>
-                  <span className="font-semibold text-green-600">2.3%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-slate-600">ARPU</span>
-                  <span className="font-semibold">$203</span>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Plan Distribution</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between">
-                  <span className="text-sm text-slate-600">Starter</span>
-                  <span className="font-semibold">78 orgs</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-slate-600">Professional</span>
-                  <span className="font-semibold">142 orgs</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-slate-600">Enterprise</span>
-                  <span className="font-semibold">27 orgs</span>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Payment Methods</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between">
-                  <span className="text-sm text-slate-600">Credit Card</span>
-                  <span className="font-semibold">89%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-slate-600">ACH/Bank</span>
-                  <span className="font-semibold">11%</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <RevenueTabContent />
         </TabsContent>
 
         {/* Feature Flags Tab */}
@@ -2582,79 +3106,7 @@ export default function SuperAdmin() {
 
         {/* Monitoring Tab */}
         <TabsContent value="monitoring">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Server className="w-5 h-5 mr-2" />
-                  System Performance
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-600">CPU Usage</span>
-                      <span className="font-semibold">{systemMetrics.cpu}</span>
-                    </div>
-                    <div className="w-full bg-slate-200 rounded-full h-2">
-                      <div className="bg-green-600 h-2 rounded-full" style={{ width: '23%' }}></div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-600">Memory</span>
-                      <span className="font-semibold">{systemMetrics.memory}</span>
-                    </div>
-                    <div className="w-full bg-slate-200 rounded-full h-2">
-                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: '26%' }}></div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-600">Disk Usage</span>
-                      <span className="font-semibold">{systemMetrics.disk}</span>
-                    </div>
-                    <div className="w-full bg-slate-200 rounded-full h-2">
-                      <div className="bg-yellow-600 h-2 rounded-full" style={{ width: '33%' }}></div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <AlertTriangle className="w-5 h-5 mr-2" />
-                  Recent Errors & Alerts
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <AlertTriangle className="w-5 h-5 text-red-600" />
-                      <div>
-                        <div className="font-medium text-red-900">Database Connection Timeout</div>
-                        <div className="text-sm text-red-700">Organization: Coastal Home Watch</div>
-                      </div>
-                    </div>
-                    <div className="text-xs text-red-600">2 min ago</div>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <AlertCircle className="w-5 h-5 text-yellow-600" />
-                      <div>
-                        <div className="font-medium text-yellow-900">High API Request Volume</div>
-                        <div className="text-sm text-yellow-700">15.2K requests in last hour</div>
-                      </div>
-                    </div>
-                    <div className="text-xs text-yellow-600">5 min ago</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <MonitoringTabContent />
         </TabsContent>
 
         {/* Messaging Tab */}
@@ -3035,535 +3487,7 @@ export default function SuperAdmin() {
 
         {/* Settings Tab */}
         <TabsContent value="settings">
-          <div className="space-y-6">
-            {/* Platform Configuration */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Settings className="w-5 h-5 mr-2" />
-                  Platform Configuration
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="api-rate-limit">API Rate Limit (requests/hour)</Label>
-                    <Input id="api-rate-limit" type="number" defaultValue="10000" data-testid="input-api-rate-limit" />
-                  </div>
-                  <div>
-                    <Label htmlFor="session-timeout">Default Session Timeout (minutes)</Label>
-                    <Input id="session-timeout" type="number" defaultValue="60" data-testid="input-session-timeout" />
-                  </div>
-                  <div>
-                    <Label htmlFor="max-file-size">Max File Upload Size (MB)</Label>
-                    <Input id="max-file-size" type="number" defaultValue="25" data-testid="input-max-file-size" />
-                  </div>
-                  <div>
-                    <Label htmlFor="webhook-retries">Webhook Retry Attempts</Label>
-                    <Input id="webhook-retries" type="number" defaultValue="3" data-testid="input-webhook-retries" />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="global-timezone">Global Time Zone</Label>
-                  <Select>
-                    <SelectTrigger id="global-timezone" data-testid="select-global-timezone">
-                      <SelectValue placeholder="Select timezone" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="utc">UTC</SelectItem>
-                      <SelectItem value="est">Eastern (EST/EDT)</SelectItem>
-                      <SelectItem value="cst">Central (CST/CDT)</SelectItem>
-                      <SelectItem value="mst">Mountain (MST/MDT)</SelectItem>
-                      <SelectItem value="pst">Pacific (PST/PDT)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button data-testid="button-save-platform-config">
-                  <Settings className="w-4 h-4 mr-2" />
-                  Save Platform Configuration
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Email & Communication */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Mail className="w-5 h-5 mr-2" />
-                  Email & Communication Settings
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="smtp-provider">Email Provider</Label>
-                  <Select>
-                    <SelectTrigger id="smtp-provider" data-testid="select-smtp-provider">
-                      <SelectValue placeholder="Select provider" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="sendgrid">SendGrid</SelectItem>
-                      <SelectItem value="mailgun">Mailgun</SelectItem>
-                      <SelectItem value="smtp">Custom SMTP</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="sendgrid-key">SendGrid API Key</Label>
-                  <Input id="sendgrid-key" type="password" placeholder="SG.xxxxx" data-testid="input-sendgrid-key" />
-                </div>
-                <div>
-                  <Label htmlFor="from-email">Default From Email</Label>
-                  <Input id="from-email" type="email" defaultValue="noreply@hubify.com" data-testid="input-from-email" />
-                </div>
-                <div>
-                  <Label htmlFor="sms-provider">SMS Gateway Provider</Label>
-                  <Select>
-                    <SelectTrigger id="sms-provider" data-testid="select-sms-provider">
-                      <SelectValue placeholder="Select SMS provider" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="twilio">Twilio</SelectItem>
-                      <SelectItem value="plivo">Plivo</SelectItem>
-                      <SelectItem value="none">None</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch id="email-notifications" defaultChecked data-testid="switch-email-notifications" />
-                  <Label htmlFor="email-notifications">Enable System Email Notifications</Label>
-                </div>
-                <Button data-testid="button-save-email-settings">
-                  <Mail className="w-4 h-4 mr-2" />
-                  Save Email Settings
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Integration Management */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Zap className="w-5 h-5 mr-2" />
-                  Integration Management
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="stripe-master-key">Stripe Master Secret Key</Label>
-                  <Input id="stripe-master-key" type="password" placeholder="sk_live_xxxxx" data-testid="input-stripe-master-key" />
-                  <p className="text-xs text-gray-500 mt-1">Used for platform billing</p>
-                </div>
-                <div>
-                  <Label htmlFor="oauth-google">Google OAuth Client ID</Label>
-                  <Input id="oauth-google" placeholder="xxxxx.apps.googleusercontent.com" data-testid="input-oauth-google" />
-                </div>
-                <div>
-                  <Label htmlFor="oauth-microsoft">Microsoft OAuth Client ID</Label>
-                  <Input id="oauth-microsoft" placeholder="xxxxx-xxxxx-xxxxx" data-testid="input-oauth-microsoft" />
-                </div>
-                <div>
-                  <Label htmlFor="quickbooks-key">QuickBooks API Key</Label>
-                  <Input id="quickbooks-key" type="password" placeholder="Optional" data-testid="input-quickbooks-key" />
-                </div>
-                <Button data-testid="button-save-integrations">
-                  <Zap className="w-4 h-4 mr-2" />
-                  Save Integration Settings
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Default Organization Settings */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Building2 className="w-5 h-5 mr-2" />
-                  Default Organization Settings
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="default-plan">Default Plan for New Orgs</Label>
-                    <Select>
-                      <SelectTrigger id="default-plan" data-testid="select-default-plan">
-                        <SelectValue placeholder="Select plan" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="starter">Starter</SelectItem>
-                        <SelectItem value="professional">Professional</SelectItem>
-                        <SelectItem value="enterprise">Enterprise</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="trial-length">Free Trial Length (days)</Label>
-                    <Input id="trial-length" type="number" defaultValue="14" data-testid="input-trial-length" />
-                  </div>
-                  <div>
-                    <Label htmlFor="default-storage">Default Storage Quota (GB)</Label>
-                    <Input id="default-storage" type="number" defaultValue="10" data-testid="input-default-storage" />
-                  </div>
-                  <div>
-                    <Label htmlFor="max-users">Default Max Users</Label>
-                    <Input id="max-users" type="number" defaultValue="5" data-testid="input-max-users" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Default Feature Toggles</Label>
-                  <div className="space-y-2 pl-4">
-                    <div className="flex items-center space-x-2">
-                      <Switch id="feature-maintenance" defaultChecked data-testid="switch-feature-maintenance" />
-                      <Label htmlFor="feature-maintenance">Maintenance Module</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch id="feature-calendar" defaultChecked data-testid="switch-feature-calendar" />
-                      <Label htmlFor="feature-calendar">Calendar System</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch id="feature-invoices" defaultChecked data-testid="switch-feature-invoices" />
-                      <Label htmlFor="feature-invoices">Invoice Management</Label>
-                    </div>
-                  </div>
-                </div>
-                <Button data-testid="button-save-org-defaults">
-                  <Building2 className="w-4 h-4 mr-2" />
-                  Save Organization Defaults
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Billing & Subscription */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <CreditCard className="w-5 h-5 mr-2" />
-                  Billing & Subscription Settings
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <Label>Starter Plan Price</Label>
-                    <Input type="number" defaultValue="49" placeholder="$/month" data-testid="input-price-starter" />
-                  </div>
-                  <div>
-                    <Label>Professional Plan Price</Label>
-                    <Input type="number" defaultValue="149" placeholder="$/month" data-testid="input-price-professional" />
-                  </div>
-                  <div>
-                    <Label>Enterprise Plan Price</Label>
-                    <Input type="number" defaultValue="399" placeholder="$/month" data-testid="input-price-enterprise" />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="grace-period">Payment Grace Period (days)</Label>
-                  <Input id="grace-period" type="number" defaultValue="3" data-testid="input-grace-period" />
-                </div>
-                <div>
-                  <Label>Add-ons Pricing</Label>
-                  <div className="grid grid-cols-2 gap-4 mt-2">
-                    <div>
-                      <Label htmlFor="addon-storage">Extra Storage (per 10GB/month)</Label>
-                      <Input id="addon-storage" type="number" defaultValue="15" data-testid="input-addon-storage" />
-                    </div>
-                    <div>
-                      <Label htmlFor="addon-support">Premium Support (/month)</Label>
-                      <Input id="addon-support" type="number" defaultValue="99" data-testid="input-addon-support" />
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch id="referral-program" data-testid="switch-referral-program" />
-                  <Label htmlFor="referral-program">Enable Referral Program</Label>
-                </div>
-                <Button data-testid="button-save-billing-settings">
-                  <CreditCard className="w-4 h-4 mr-2" />
-                  Save Billing Settings
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Compliance & Legal */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <FileText className="w-5 h-5 mr-2" />
-                  Compliance & Legal Settings
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="retention-period">Document Retention Period (years)</Label>
-                  <Input id="retention-period" type="number" defaultValue="7" data-testid="input-retention-period" />
-                </div>
-                <div>
-                  <Label htmlFor="esign-provider">E-Signature Provider</Label>
-                  <Select>
-                    <SelectTrigger id="esign-provider" data-testid="select-esign-provider">
-                      <SelectValue placeholder="Select provider" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="docusign">DocuSign</SelectItem>
-                      <SelectItem value="hellosign">HelloSign</SelectItem>
-                      <SelectItem value="none">None</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Data Privacy Controls</Label>
-                  <div className="space-y-2 pl-4">
-                    <div className="flex items-center space-x-2">
-                      <Switch id="gdpr-compliance" defaultChecked data-testid="switch-gdpr-compliance" />
-                      <Label htmlFor="gdpr-compliance">GDPR Compliance Mode</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch id="ccpa-compliance" defaultChecked data-testid="switch-ccpa-compliance" />
-                      <Label htmlFor="ccpa-compliance">CCPA Compliance Mode</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch id="audit-logging" defaultChecked data-testid="switch-audit-logging" />
-                      <Label htmlFor="audit-logging">Global Audit Logging</Label>
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="data-purge">Auto Data Purge Schedule</Label>
-                  <Select>
-                    <SelectTrigger id="data-purge" data-testid="select-data-purge">
-                      <SelectValue placeholder="Select schedule" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="never">Never</SelectItem>
-                      <SelectItem value="30days">After 30 days of deletion</SelectItem>
-                      <SelectItem value="90days">After 90 days of deletion</SelectItem>
-                      <SelectItem value="1year">After 1 year of deletion</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button data-testid="button-save-compliance-settings">
-                  <FileText className="w-4 h-4 mr-2" />
-                  Save Compliance Settings
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* System Maintenance */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Server className="w-5 h-5 mr-2" />
-                  System Maintenance
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 border rounded-lg bg-yellow-50 border-yellow-200">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <AlertTriangle className="w-5 h-5 text-yellow-600" />
-                      <div>
-                        <div className="font-medium text-yellow-900">Maintenance Mode</div>
-                        <div className="text-sm text-yellow-700">Enable to prevent user access during maintenance</div>
-                      </div>
-                    </div>
-                    <Switch id="maintenance-mode" data-testid="switch-maintenance-mode" />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="downtime-message">Maintenance Mode Message</Label>
-                  <Textarea 
-                    id="downtime-message" 
-                    placeholder="We're performing scheduled maintenance. We'll be back shortly!"
-                    defaultValue="We're performing scheduled maintenance. We'll be back shortly!"
-                    data-testid="textarea-downtime-message"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="backup-schedule">Automated Backup Schedule</Label>
-                  <Select>
-                    <SelectTrigger id="backup-schedule" data-testid="select-backup-schedule">
-                      <SelectValue placeholder="Select schedule" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="hourly">Hourly</SelectItem>
-                      <SelectItem value="daily">Daily at 2 AM</SelectItem>
-                      <SelectItem value="weekly">Weekly (Sunday 2 AM)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="health-check">System Health Check Interval</Label>
-                  <Select>
-                    <SelectTrigger id="health-check" data-testid="select-health-check">
-                      <SelectValue placeholder="Select interval" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1min">Every 1 minute</SelectItem>
-                      <SelectItem value="5min">Every 5 minutes</SelectItem>
-                      <SelectItem value="15min">Every 15 minutes</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button data-testid="button-save-maintenance-settings">
-                  <Server className="w-4 h-4 mr-2" />
-                  Save Maintenance Settings
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Security & Access */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Lock className="w-5 h-5 mr-2" />
-                  Security & Access Controls
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="2fa-policy">Two-Factor Authentication Policy</Label>
-                  <Select>
-                    <SelectTrigger id="2fa-policy" data-testid="select-2fa-policy">
-                      <SelectValue placeholder="Select policy" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="required">Required for all users</SelectItem>
-                      <SelectItem value="admins">Required for admins only</SelectItem>
-                      <SelectItem value="optional">Optional</SelectItem>
-                      <SelectItem value="off">Disabled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Password Complexity Requirements</Label>
-                  <div className="space-y-2 mt-2 pl-4">
-                    <div className="flex items-center space-x-2">
-                      <Switch id="pwd-length" defaultChecked data-testid="switch-pwd-length" />
-                      <Label htmlFor="pwd-length">Minimum 8 characters</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch id="pwd-uppercase" defaultChecked data-testid="switch-pwd-uppercase" />
-                      <Label htmlFor="pwd-uppercase">Require uppercase letters</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch id="pwd-numbers" defaultChecked data-testid="switch-pwd-numbers" />
-                      <Label htmlFor="pwd-numbers">Require numbers</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch id="pwd-special" defaultChecked data-testid="switch-pwd-special" />
-                      <Label htmlFor="pwd-special">Require special characters</Label>
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="session-length">Max Session Length (hours)</Label>
-                    <Input id="session-length" type="number" defaultValue="24" data-testid="input-session-length" />
-                  </div>
-                  <div>
-                    <Label htmlFor="reauth-period">Re-authentication Period (hours)</Label>
-                    <Input id="reauth-period" type="number" defaultValue="8" data-testid="input-reauth-period" />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="ip-whitelist">IP Whitelist (comma-separated)</Label>
-                  <Textarea 
-                    id="ip-whitelist" 
-                    placeholder="192.168.1.1, 10.0.0.0/24"
-                    data-testid="textarea-ip-whitelist"
-                  />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch id="intrusion-detection" defaultChecked data-testid="switch-intrusion-detection" />
-                  <Label htmlFor="intrusion-detection">Enable Intrusion Detection Alerts</Label>
-                </div>
-                <Button data-testid="button-save-security-settings">
-                  <Lock className="w-4 h-4 mr-2" />
-                  Save Security Settings
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Customization Controls */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Palette className="w-5 h-5 mr-2" />
-                  Customization Controls
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label>Global Feature Toggles</Label>
-                  <div className="space-y-2 mt-2 pl-4">
-                    <div className="flex items-center space-x-2">
-                      <Switch id="feature-vendor-portal" defaultChecked data-testid="switch-feature-vendor-portal" />
-                      <Label htmlFor="feature-vendor-portal">Vendor Portal (all orgs)</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch id="feature-client-portal" defaultChecked data-testid="switch-feature-client-portal" />
-                      <Label htmlFor="feature-client-portal">Client Portal (all orgs)</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch id="feature-mobile-app" data-testid="switch-feature-mobile-app" />
-                      <Label htmlFor="feature-mobile-app">Mobile App Access</Label>
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="global-theme">Global Default Theme</Label>
-                  <Select>
-                    <SelectTrigger id="global-theme" data-testid="select-global-theme">
-                      <SelectValue placeholder="Select theme" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="light">Light Mode</SelectItem>
-                      <SelectItem value="dark">Dark Mode</SelectItem>
-                      <SelectItem value="auto">Auto (System Preference)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="default-color">Default Brand Color</Label>
-                  <div className="flex items-center space-x-2">
-                    <Input 
-                      id="default-color" 
-                      type="color" 
-                      defaultValue="#3b82f6" 
-                      className="w-20 h-10"
-                      data-testid="input-default-color"
-                    />
-                    <Input 
-                      type="text" 
-                      defaultValue="#3b82f6" 
-                      className="flex-1"
-                      data-testid="input-default-color-hex"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label>Default Notification Templates</Label>
-                  <div className="mt-2 space-y-2">
-                    <Button variant="outline" size="sm" className="w-full justify-start" data-testid="button-edit-welcome-template">
-                      <Mail className="w-4 h-4 mr-2" />
-                      Edit Welcome Email Template
-                    </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start" data-testid="button-edit-reminder-template">
-                      <Bell className="w-4 h-4 mr-2" />
-                      Edit Reminder Email Template
-                    </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start" data-testid="button-edit-invoice-template">
-                      <FileText className="w-4 h-4 mr-2" />
-                      Edit Invoice Email Template
-                    </Button>
-                  </div>
-                </div>
-                <Button data-testid="button-save-customization-settings">
-                  <Palette className="w-4 h-4 mr-2" />
-                  Save Customization Settings
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+          <SettingsTabContent />
         </TabsContent>
       </Tabs>
     </main>

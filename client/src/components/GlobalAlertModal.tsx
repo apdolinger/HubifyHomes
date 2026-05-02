@@ -5,7 +5,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, AlertTriangle, Info } from "lucide-react";
+import { AlertCircle, AlertTriangle, CheckCircle2, Info } from "lucide-react";
+
+type AlertSeverity = "info" | "warning" | "critical" | "success";
 
 interface SystemAlert {
   id: number;
@@ -20,7 +22,38 @@ interface SystemAlert {
   createdAt: string;
 }
 
-const SEVERITY_CONFIG = {
+interface PlatformAlert {
+  id: number;
+  title: string;
+  message: string;
+  severity: AlertSeverity;
+  isActive: boolean;
+  requireAck: boolean;
+  showOncePerSession: boolean;
+  actionLabel?: string | null;
+  actionUrl?: string | null;
+  expiresAt?: string | null;
+  createdAt: string;
+}
+
+interface MergedAlert {
+  source: "system" | "platform";
+  id: number;
+  title: string;
+  message: string;
+  severity: AlertSeverity;
+  requireAck: boolean;
+  actionLabel?: string | null;
+  actionUrl?: string | null;
+}
+
+const SEVERITY_CONFIG: Record<AlertSeverity, {
+  icon: typeof Info;
+  bgColor: string;
+  iconColor: string;
+  titleColor: string;
+  borderColor: string;
+}> = {
   info: {
     icon: Info,
     bgColor: "bg-blue-50 dark:bg-blue-950",
@@ -42,67 +75,147 @@ const SEVERITY_CONFIG = {
     titleColor: "text-red-900 dark:text-red-100",
     borderColor: "border-red-200 dark:border-red-800",
   },
+  success: {
+    icon: CheckCircle2,
+    bgColor: "bg-green-50 dark:bg-green-950",
+    iconColor: "text-green-600 dark:text-green-400",
+    titleColor: "text-green-900 dark:text-green-100",
+    borderColor: "border-green-200 dark:border-green-800",
+  },
 };
 
+const SESSION_DISMISSED_KEY = "platformAlertsDismissedThisSession";
+
+function getDismissedThisSession(): Set<number> {
+  try {
+    const raw = sessionStorage.getItem(SESSION_DISMISSED_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function addDismissedThisSession(id: number) {
+  const s = getDismissedThisSession();
+  s.add(id);
+  sessionStorage.setItem(SESSION_DISMISSED_KEY, JSON.stringify(Array.from(s)));
+}
+
 export function GlobalAlertModal() {
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [currentAlertIndex, setCurrentAlertIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [dismissedTick, setDismissedTick] = useState(0);
 
-  const { data: alerts = [], isLoading, refetch } = useQuery<SystemAlert[]>({
+  const { data: systemAlerts = [], isLoading: loadingSystem } = useQuery<SystemAlert[]>({
     queryKey: ["/api/system-alerts"],
     enabled: isAuthenticated,
-    refetchInterval: 60000, // Check for new alerts every minute
+    refetchInterval: 60000,
   });
 
-  const acknowledgeMutation = useMutation({
-    mutationFn: async (alertId: number) => {
-      return apiRequest("POST", `/api/system-alerts/${alertId}/acknowledge`);
-    },
+  const { data: platformAlertsRaw = [], isLoading: loadingPlatform } = useQuery<PlatformAlert[]>({
+    queryKey: ["/api/platform-alerts/active"],
+    enabled: isAuthenticated,
+    refetchInterval: 60000,
+  });
+
+  const dismissed = (() => {
+    void dismissedTick; // re-evaluate when state ticks
+    return getDismissedThisSession();
+  })();
+
+  const merged: MergedAlert[] = [
+    ...(systemAlerts || []).map<MergedAlert>((a) => ({
+      source: "system",
+      id: a.id,
+      title: a.title,
+      message: a.message,
+      severity: a.severity,
+      requireAck: true,
+    })),
+    ...(platformAlertsRaw || [])
+      .filter((a) => !(a.showOncePerSession && dismissed.has(a.id)))
+      .map<MergedAlert>((a) => ({
+        source: "platform",
+        id: a.id,
+        title: a.title,
+        message: a.message,
+        severity: a.severity,
+        requireAck: a.requireAck,
+        actionLabel: a.actionLabel,
+        actionUrl: a.actionUrl,
+      })),
+  ];
+
+  const acknowledgeSystemMutation = useMutation({
+    mutationFn: async (alertId: number) => apiRequest("POST", `/api/system-alerts/${alertId}/acknowledge`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/system-alerts"] });
-      
-      // Move to next alert or close
-      if (currentAlertIndex < alerts.length - 1) {
-        setCurrentAlertIndex(currentAlertIndex + 1);
-      } else {
-        setCurrentAlertIndex(0);
-      }
+      advance();
     },
     onError: (error: any) => {
-      toast({
-        title: "Failed to acknowledge alert",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Failed to acknowledge alert", description: error.message, variant: "destructive" });
     },
   });
 
-  const currentAlert = alerts[currentAlertIndex];
-  const hasAlerts = alerts.length > 0;
+  const acknowledgePlatformMutation = useMutation({
+    mutationFn: async (alertId: number) => apiRequest("POST", `/api/platform-alerts/${alertId}/acknowledge`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/platform-alerts/active"] });
+      advance();
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to acknowledge alert", description: error.message, variant: "destructive" });
+    },
+  });
 
-  // Reset index when alerts change
-  useEffect(() => {
-    if (alerts.length === 0) {
-      setCurrentAlertIndex(0);
+  function advance() {
+    if (currentIndex < merged.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+    } else {
+      setCurrentIndex(0);
     }
-  }, [alerts.length]);
-
-  if (!isAuthenticated || isLoading || !hasAlerts || !currentAlert) {
-    return null;
   }
 
-  const config = SEVERITY_CONFIG[currentAlert.severity];
+  useEffect(() => {
+    if (merged.length === 0) setCurrentIndex(0);
+  }, [merged.length]);
+
+  if (!isAuthenticated || loadingSystem || loadingPlatform) return null;
+  if (merged.length === 0) return null;
+
+  const current = merged[currentIndex] || merged[0];
+  if (!current) return null;
+
+  const config = SEVERITY_CONFIG[current.severity] || SEVERITY_CONFIG.info;
   const Icon = config.icon;
 
+  function handleDismiss() {
+    if (current.source === "system") {
+      acknowledgeSystemMutation.mutate(current.id);
+    } else {
+      if (current.requireAck) {
+        acknowledgePlatformMutation.mutate(current.id);
+      } else {
+        addDismissedThisSession(current.id);
+        setDismissedTick((t) => t + 1);
+        advance();
+      }
+    }
+  }
+
+  const isPending = acknowledgeSystemMutation.isPending || acknowledgePlatformMutation.isPending;
+
   return (
-    <Dialog open={hasAlerts} onOpenChange={() => {}}>
-      <DialogContent 
+    <Dialog open={merged.length > 0} onOpenChange={() => {}}>
+      <DialogContent
         className="max-w-2xl"
-        onEscapeKeyDown={(e) => e.preventDefault()}
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => current.requireAck && e.preventDefault()}
+        onPointerDownOutside={(e) => current.requireAck && e.preventDefault()}
+        onInteractOutside={(e) => current.requireAck && e.preventDefault()}
         data-testid="dialog-global-alert"
       >
         <div className={`rounded-lg border-2 ${config.borderColor} ${config.bgColor} p-6`}>
@@ -113,10 +226,10 @@ export function GlobalAlertModal() {
               </div>
               <div className="flex-1">
                 <DialogTitle className={`text-2xl font-bold ${config.titleColor}`} data-testid="text-alert-title">
-                  {currentAlert.title}
+                  {current.title}
                 </DialogTitle>
-                <DialogDescription className="mt-2 text-base text-slate-700 dark:text-slate-300" data-testid="text-alert-message">
-                  {currentAlert.message}
+                <DialogDescription className="mt-2 text-base text-slate-700 dark:text-slate-300 whitespace-pre-wrap" data-testid="text-alert-message">
+                  {current.message}
                 </DialogDescription>
               </div>
             </div>
@@ -124,21 +237,44 @@ export function GlobalAlertModal() {
 
           <DialogFooter className="mt-6 flex items-center justify-between">
             <div className="text-sm text-slate-500">
-              {alerts.length > 1 && (
+              {merged.length > 1 && (
                 <span data-testid="text-alert-count">
-                  Alert {currentAlertIndex + 1} of {alerts.length}
+                  Alert {currentIndex + 1} of {merged.length}
                 </span>
               )}
             </div>
-            <Button
-              onClick={() => acknowledgeMutation.mutate(currentAlert.id)}
-              disabled={acknowledgeMutation.isPending}
-              size="lg"
-              className="min-w-[120px]"
-              data-testid="button-acknowledge-alert"
-            >
-              {acknowledgeMutation.isPending ? "Acknowledging..." : "I Understand"}
-            </Button>
+            <div className="flex items-center gap-2">
+              {current.actionUrl && current.actionLabel && (() => {
+                let safeUrl: string | null = null;
+                try {
+                  const u = new URL(current.actionUrl, window.location.origin);
+                  if (u.protocol === "http:" || u.protocol === "https:") {
+                    safeUrl = u.toString();
+                  }
+                } catch {
+                  // invalid URL — hide the button
+                }
+                if (!safeUrl) return null;
+                return (
+                  <Button
+                    variant="outline"
+                    onClick={() => window.open(safeUrl!, "_blank", "noopener,noreferrer")}
+                    data-testid="button-alert-action"
+                  >
+                    {current.actionLabel}
+                  </Button>
+                );
+              })()}
+              <Button
+                onClick={handleDismiss}
+                disabled={isPending}
+                size="lg"
+                className="min-w-[120px]"
+                data-testid="button-acknowledge-alert"
+              >
+                {isPending ? "Saving..." : current.requireAck ? "I Understand" : "Dismiss"}
+              </Button>
+            </div>
           </DialogFooter>
         </div>
       </DialogContent>

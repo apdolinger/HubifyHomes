@@ -47,6 +47,9 @@ import {
   alerts,
   systemAlerts,
   systemAlertAcknowledgements,
+  platformSettings,
+  platformAlerts,
+  platformAlertAcknowledgements,
   teamMessages,
   messageReactions,
   messageMentions,
@@ -182,6 +185,12 @@ import {
   type InsertSystemAlert,
   type SystemAlertAcknowledgement,
   type InsertSystemAlertAcknowledgement,
+  type PlatformSettings,
+  type InsertPlatformSettings,
+  type PlatformAlert,
+  type InsertPlatformAlert,
+  type PlatformAlertAcknowledgement,
+  type InsertPlatformAlertAcknowledgement,
   type TeamMessage,
   type InsertTeamMessage,
   type MessageReaction,
@@ -255,6 +264,43 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, like, count, sql, inArray, isNotNull, lt, lte } from "drizzle-orm";
+
+// Default values for the platform_settings key/value store. Any key not in the DB
+// falls back to the value defined here.
+export const PLATFORM_SETTINGS_DEFAULTS: Record<string, any> = {
+  // Platform Configuration
+  apiRateLimitPerHour: 10000,
+  sessionTimeoutMinutes: 60,
+  maxFileUploadSizeMb: 25,
+  webhookRetryAttempts: 3,
+  globalTimezone: "utc",
+
+  // Default Organization Settings
+  defaultPlanForNewOrgs: "starter",
+  freeTrialLengthDays: 14,
+
+  // Billing & Subscription (display-only prices used by Revenue tab)
+  starterPlanPrice: 49,
+  proPlanPrice: 149,
+  growPlanPrice: 249,
+  enterprisePlanPrice: 399,
+  paymentGracePeriodDays: 3,
+
+  // System Maintenance
+  maintenanceMode: false,
+  maintenanceMessage: "We're performing scheduled maintenance. We'll be back shortly!",
+
+  // Security & Access
+  passwordMinLength: 8,
+  passwordRequireUppercase: true,
+  passwordRequireNumbers: true,
+  passwordRequireSpecial: true,
+  maxSessionLengthHours: 24,
+  ipWhitelist: "",
+
+  // Branding
+  brandPrimaryColor: "#4F46E5",
+};
 import { alias } from "drizzle-orm/pg-core";
 import { nanoid } from "nanoid";
 
@@ -564,6 +610,48 @@ export interface IStorage {
   deleteSystemAlert(id: number, orgId: string): Promise<void>;
   acknowledgeSystemAlert(alertId: number, userId: string): Promise<SystemAlertAcknowledgement>;
   hasUserAcknowledgedAlert(alertId: number, userId: string): Promise<boolean>;
+
+  // Platform-wide settings operations (Super Admin)
+  getPlatformSettings(): Promise<Record<string, any>>;
+  setPlatformSettings(updates: Record<string, any>, updatedBy: string): Promise<Record<string, any>>;
+
+  // Platform-wide alert operations (Super Admin)
+  getAllPlatformAlerts(): Promise<PlatformAlert[]>;
+  getPlatformAlert(id: number): Promise<PlatformAlert | undefined>;
+  getActivePlatformAlertsForUser(userId: string, orgId: string | null, userRole: string): Promise<PlatformAlert[]>;
+  createPlatformAlert(alert: InsertPlatformAlert): Promise<PlatformAlert>;
+  updatePlatformAlert(id: number, alert: Partial<InsertPlatformAlert>): Promise<PlatformAlert>;
+  deletePlatformAlert(id: number): Promise<void>;
+  acknowledgePlatformAlert(alertId: number, userId: string): Promise<PlatformAlertAcknowledgement>;
+  hasUserAcknowledgedPlatformAlert(alertId: number, userId: string): Promise<boolean>;
+
+  // Super Admin metrics
+  getRevenueMetrics(): Promise<{
+    mrrCents: number;
+    arrCents: number;
+    arpuCents: number;
+    activeOrgs: number;
+    trialingOrgs: number;
+    pastDueOrgs: number;
+    canceledLast30Days: number;
+    churnRate: number;
+    planDistribution: Array<{ tier: string; count: number; mrrCents: number }>;
+    pricesCents: Record<string, number>;
+  }>;
+  getSystemHealthMetrics(): Promise<{
+    uptimeSeconds: number;
+    nodeVersion: string;
+    memory: { rssMb: number; heapUsedMb: number; heapTotalMb: number };
+    counts: { orgs: number; users: number; activeSessions: number };
+    recentErrors: Array<{
+      type: 'webhook' | 'notification';
+      severity: 'critical' | 'warning';
+      title: string;
+      message: string;
+      orgName?: string;
+      createdAt: Date;
+    }>;
+  }>;
   
   // Team message operations
   getTeamMessages(limit?: number): Promise<TeamMessage[]>;
@@ -3673,6 +3761,321 @@ export class DatabaseStorage implements IStorage {
         eq(systemAlertAcknowledgements.userId, userId)
       ));
     return !!result;
+  }
+
+  // Platform-wide settings (Super Admin)
+  async getPlatformSettings(): Promise<Record<string, any>> {
+    const rows = await db.select().from(platformSettings);
+    const merged: Record<string, any> = { ...PLATFORM_SETTINGS_DEFAULTS };
+    for (const row of rows) {
+      merged[row.key] = row.value;
+    }
+    return merged;
+  }
+
+  async setPlatformSettings(updates: Record<string, any>, updatedBy: string): Promise<Record<string, any>> {
+    const now = new Date();
+    for (const [key, value] of Object.entries(updates)) {
+      await db
+        .insert(platformSettings)
+        .values({ key, value, updatedBy, updatedAt: now })
+        .onConflictDoUpdate({
+          target: platformSettings.key,
+          set: { value, updatedBy, updatedAt: now },
+        });
+    }
+    return this.getPlatformSettings();
+  }
+
+  // Platform-wide alerts (Super Admin)
+  async getAllPlatformAlerts(): Promise<PlatformAlert[]> {
+    return await db
+      .select()
+      .from(platformAlerts)
+      .orderBy(desc(platformAlerts.createdAt));
+  }
+
+  async getPlatformAlert(id: number): Promise<PlatformAlert | undefined> {
+    const [alert] = await db
+      .select()
+      .from(platformAlerts)
+      .where(eq(platformAlerts.id, id));
+    return alert;
+  }
+
+  async getActivePlatformAlertsForUser(
+    userId: string,
+    orgId: string | null,
+    userRole: string,
+  ): Promise<PlatformAlert[]> {
+    const now = new Date();
+    const active = await db
+      .select()
+      .from(platformAlerts)
+      .where(
+        and(
+          eq(platformAlerts.isActive, true),
+          or(
+            sql`${platformAlerts.startsAt} IS NULL`,
+            sql`${platformAlerts.startsAt} <= ${now.toISOString()}`,
+          ),
+          or(
+            sql`${platformAlerts.expiresAt} IS NULL`,
+            sql`${platformAlerts.expiresAt} > ${now.toISOString()}`,
+          ),
+        ),
+      )
+      .orderBy(desc(platformAlerts.severity), desc(platformAlerts.createdAt));
+
+    const result: PlatformAlert[] = [];
+    for (const alert of active) {
+      if (alert.targetOrgIds && alert.targetOrgIds.length > 0) {
+        if (!orgId || !alert.targetOrgIds.includes(orgId)) continue;
+      }
+      if (alert.targetRoles && alert.targetRoles.length > 0) {
+        if (!alert.targetRoles.includes(userRole)) continue;
+      }
+      const acked = await this.hasUserAcknowledgedPlatformAlert(alert.id, userId);
+      if (acked) continue;
+      result.push(alert);
+    }
+    return result;
+  }
+
+  async createPlatformAlert(alert: InsertPlatformAlert): Promise<PlatformAlert> {
+    const [created] = await db.insert(platformAlerts).values(alert).returning();
+    return created;
+  }
+
+  async updatePlatformAlert(id: number, updates: Partial<InsertPlatformAlert>): Promise<PlatformAlert> {
+    const [updated] = await db
+      .update(platformAlerts)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(platformAlerts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePlatformAlert(id: number): Promise<void> {
+    await db.delete(platformAlerts).where(eq(platformAlerts.id, id));
+  }
+
+  async acknowledgePlatformAlert(alertId: number, userId: string): Promise<PlatformAlertAcknowledgement> {
+    const [ack] = await db
+      .insert(platformAlertAcknowledgements)
+      .values({ alertId, userId })
+      .returning();
+    return ack;
+  }
+
+  async hasUserAcknowledgedPlatformAlert(alertId: number, userId: string): Promise<boolean> {
+    const [row] = await db
+      .select()
+      .from(platformAlertAcknowledgements)
+      .where(
+        and(
+          eq(platformAlertAcknowledgements.alertId, alertId),
+          eq(platformAlertAcknowledgements.userId, userId),
+        ),
+      );
+    return !!row;
+  }
+
+  // Super Admin Revenue Metrics - aggregated from org_subscriptions
+  async getRevenueMetrics() {
+    const settings = await this.getPlatformSettings();
+    const pricesCents: Record<string, number> = {
+      starter: Math.round((settings.starterPlanPrice ?? 49) * 100),
+      pro: Math.round((settings.proPlanPrice ?? 149) * 100),
+      grow: Math.round((settings.growPlanPrice ?? 249) * 100),
+      enterprise: Math.round((settings.enterprisePlanPrice ?? 399) * 100),
+    };
+
+    const subs = await db.select().from(orgSubscriptions);
+
+    const planDistMap: Record<string, { count: number; mrrCents: number }> = {
+      starter: { count: 0, mrrCents: 0 },
+      pro: { count: 0, mrrCents: 0 },
+      grow: { count: 0, mrrCents: 0 },
+      enterprise: { count: 0, mrrCents: 0 },
+    };
+
+    let activeOrgs = 0;
+    let trialingOrgs = 0;
+    let pastDueOrgs = 0;
+    let mrrCents = 0;
+
+    for (const s of subs) {
+      const tier = s.tier || 'starter';
+      const status = s.status || 'trialing';
+      const tierPrice = pricesCents[tier] ?? 0;
+
+      if (status === 'active') {
+        activeOrgs++;
+        mrrCents += tierPrice;
+        if (planDistMap[tier]) {
+          planDistMap[tier].count += 1;
+          planDistMap[tier].mrrCents += tierPrice;
+        }
+      } else if (status === 'past_due') {
+        pastDueOrgs++;
+        mrrCents += tierPrice;
+        if (planDistMap[tier]) {
+          planDistMap[tier].count += 1;
+          planDistMap[tier].mrrCents += tierPrice;
+        }
+      } else if (status === 'trialing') {
+        trialingOrgs++;
+      }
+    }
+
+    // Billing orgs include both active and past_due (they're still being charged)
+    const billingOrgs = activeOrgs + pastDueOrgs;
+
+    // Churn: orgs canceled within last 30 days vs billing orgs 30 days ago
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const canceledRecently = subs.filter(
+      (s) =>
+        s.status === 'canceled' &&
+        s.updatedAt &&
+        new Date(s.updatedAt) >= thirtyDaysAgo,
+    ).length;
+    const baselineActive = billingOrgs + canceledRecently;
+    const churnRate = baselineActive > 0 ? (canceledRecently / baselineActive) * 100 : 0;
+
+    const arrCents = mrrCents * 12;
+    const arpuCents = billingOrgs > 0 ? Math.round(mrrCents / billingOrgs) : 0;
+
+    const planDistribution = Object.entries(planDistMap).map(([tier, v]) => ({
+      tier,
+      count: v.count,
+      mrrCents: v.mrrCents,
+    }));
+
+    return {
+      mrrCents,
+      arrCents,
+      arpuCents,
+      activeOrgs,
+      trialingOrgs,
+      pastDueOrgs,
+      canceledLast30Days: canceledRecently,
+      churnRate: Math.round(churnRate * 100) / 100,
+      planDistribution,
+      pricesCents,
+    };
+  }
+
+  // Super Admin System Health Metrics
+  async getSystemHealthMetrics() {
+    const mem = process.memoryUsage();
+    const uptimeSeconds = Math.floor(process.uptime());
+
+    const [orgCount] = await db.select({ c: count() }).from(orgs);
+    const [userCount] = await db.select({ c: count() }).from(users);
+
+    const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const [activeSessionsCount] = await db
+      .select({ c: count() })
+      .from(userSessions)
+      .where(
+        and(
+          eq(userSessions.isActive, true),
+          sql`${userSessions.lastActivityAt} >= ${fifteenMinAgo.toISOString()}`,
+        ),
+      );
+
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const failedWebhooks = await db
+      .select({
+        id: stripeWebhookEvents.id,
+        eventType: stripeWebhookEvents.eventType,
+        errorMessage: stripeWebhookEvents.errorMessage,
+        orgId: stripeWebhookEvents.orgId,
+        createdAt: stripeWebhookEvents.createdAt,
+        orgName: orgs.name,
+      })
+      .from(stripeWebhookEvents)
+      .leftJoin(orgs, eq(stripeWebhookEvents.orgId, orgs.id))
+      .where(
+        and(
+          eq(stripeWebhookEvents.processed, false),
+          isNotNull(stripeWebhookEvents.errorMessage),
+          sql`${stripeWebhookEvents.createdAt} >= ${oneDayAgo.toISOString()}`,
+        ),
+      )
+      .orderBy(desc(stripeWebhookEvents.createdAt))
+      .limit(10);
+
+    const failedNotifications = await db
+      .select({
+        id: notificationLogs.id,
+        type: notificationLogs.type,
+        recipientEmail: notificationLogs.recipientEmail,
+        errorMessage: notificationLogs.errorMessage,
+        orgId: notificationLogs.orgId,
+        createdAt: notificationLogs.createdAt,
+        orgName: orgs.name,
+      })
+      .from(notificationLogs)
+      .leftJoin(orgs, eq(notificationLogs.orgId, orgs.id))
+      .where(
+        and(
+          eq(notificationLogs.status, 'failed'),
+          sql`${notificationLogs.createdAt} >= ${oneDayAgo.toISOString()}`,
+        ),
+      )
+      .orderBy(desc(notificationLogs.createdAt))
+      .limit(10);
+
+    const recentErrors: Array<{
+      type: 'webhook' | 'notification';
+      severity: 'critical' | 'warning';
+      title: string;
+      message: string;
+      orgName?: string;
+      createdAt: Date;
+    }> = [];
+
+    for (const w of failedWebhooks) {
+      recentErrors.push({
+        type: 'webhook',
+        severity: 'critical',
+        title: `Stripe webhook failed: ${w.eventType}`,
+        message: w.errorMessage || 'Unknown error',
+        orgName: w.orgName ?? undefined,
+        createdAt: w.createdAt ?? new Date(),
+      });
+    }
+    for (const n of failedNotifications) {
+      recentErrors.push({
+        type: 'notification',
+        severity: 'warning',
+        title: `Notification failed: ${n.type}`,
+        message: `Recipient ${n.recipientEmail}: ${n.errorMessage || 'Unknown error'}`,
+        orgName: n.orgName ?? undefined,
+        createdAt: n.createdAt ?? new Date(),
+      });
+    }
+
+    recentErrors.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    return {
+      uptimeSeconds,
+      nodeVersion: process.version,
+      memory: {
+        rssMb: Math.round(mem.rss / 1024 / 1024),
+        heapUsedMb: Math.round(mem.heapUsed / 1024 / 1024),
+        heapTotalMb: Math.round(mem.heapTotal / 1024 / 1024),
+      },
+      counts: {
+        orgs: Number(orgCount?.c ?? 0),
+        users: Number(userCount?.c ?? 0),
+        activeSessions: Number(activeSessionsCount?.c ?? 0),
+      },
+      recentErrors: recentErrors.slice(0, 15),
+    };
   }
 
   // Contact-Property relationship operations

@@ -793,6 +793,51 @@ export const systemAlertAcknowledgements = pgTable("system_alert_acknowledgement
   index("system_alert_ack_unique_idx").on(table.alertId, table.userId),
 ]);
 
+// Platform-wide settings (Super Admin) - simple key/value JSONB store
+export const platformSettings = pgTable("platform_settings", {
+  key: varchar("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  updatedBy: varchar("updated_by").references(() => users.id),
+});
+
+// Platform-wide alerts authored by Super Admin (separate from per-org system_alerts)
+export const platformAlerts = pgTable("platform_alerts", {
+  id: serial("id").primaryKey(),
+  title: varchar("title").notNull(),
+  message: text("message").notNull(),
+  severity: varchar("severity").notNull().$type<"info" | "warning" | "critical" | "success">().default("info"),
+  isActive: boolean("is_active").notNull().default(true),
+  // Empty/null targetOrgIds = all orgs; otherwise restrict to listed orgs
+  targetOrgIds: text("target_org_ids").array(),
+  // Empty/null targetRoles = all roles; otherwise restrict to listed roles (admin, manager, staff, etc.)
+  targetRoles: text("target_roles").array(),
+  // Optional page/location filter (e.g. "all", "dashboard", "properties", ...)
+  location: varchar("location").default("all"),
+  requireAck: boolean("require_ack").notNull().default(true),
+  showOncePerSession: boolean("show_once_per_session").notNull().default(false),
+  actionLabel: varchar("action_label"),
+  actionUrl: text("action_url"),
+  startsAt: timestamp("starts_at"),
+  expiresAt: timestamp("expires_at"),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("platform_alerts_active_idx").on(table.isActive),
+]);
+
+export const platformAlertAcknowledgements = pgTable("platform_alert_acknowledgements", {
+  id: serial("id").primaryKey(),
+  alertId: integer("alert_id").references(() => platformAlerts.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  acknowledgedAt: timestamp("acknowledged_at").defaultNow().notNull(),
+}, (table) => [
+  index("platform_alert_ack_alert_idx").on(table.alertId),
+  index("platform_alert_ack_user_idx").on(table.userId),
+  index("platform_alert_ack_unique_idx").on(table.alertId, table.userId),
+]);
+
 // Properties table
 export const properties = pgTable("properties", {
   id: serial("id").primaryKey(),
@@ -2194,6 +2239,21 @@ export const insertSystemAlertAcknowledgementSchema = createInsertSchema(systemA
   acknowledgedAt: true,
 });
 
+export const insertPlatformSettingsSchema = createInsertSchema(platformSettings).omit({
+  updatedAt: true,
+});
+
+export const insertPlatformAlertSchema = createInsertSchema(platformAlerts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPlatformAlertAcknowledgementSchema = createInsertSchema(platformAlertAcknowledgements).omit({
+  id: true,
+  acknowledgedAt: true,
+});
+
 export const insertPropertySchema = createInsertSchema(properties).omit({
   id: true,
   createdAt: true,
@@ -2615,6 +2675,12 @@ export type InsertSystemAlert = z.infer<typeof insertSystemAlertSchema>;
 export type SystemAlert = typeof systemAlerts.$inferSelect;
 export type InsertSystemAlertAcknowledgement = z.infer<typeof insertSystemAlertAcknowledgementSchema>;
 export type SystemAlertAcknowledgement = typeof systemAlertAcknowledgements.$inferSelect;
+export type InsertPlatformSettings = z.infer<typeof insertPlatformSettingsSchema>;
+export type PlatformSettings = typeof platformSettings.$inferSelect;
+export type InsertPlatformAlert = z.infer<typeof insertPlatformAlertSchema>;
+export type PlatformAlert = typeof platformAlerts.$inferSelect;
+export type InsertPlatformAlertAcknowledgement = z.infer<typeof insertPlatformAlertAcknowledgementSchema>;
+export type PlatformAlertAcknowledgement = typeof platformAlertAcknowledgements.$inferSelect;
 export type InsertProperty = z.infer<typeof insertPropertySchema>;
 export type Property = typeof properties.$inferSelect;
 export type InsertPropertyForm = z.infer<typeof insertPropertyFormSchema>;

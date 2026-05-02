@@ -2836,6 +2836,206 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================
+  // Super Admin: Revenue Metrics, System Health, Platform Settings, Platform Alerts
+  // ============================================================
+
+  // Revenue metrics aggregated from org_subscriptions + platform_settings prices
+  app.get("/api/super-admin/revenue-metrics", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const metrics = await storage.getRevenueMetrics();
+      res.json(metrics);
+    } catch (error) {
+      console.error("Error fetching revenue metrics:", error);
+      res.status(500).json({ message: "Failed to fetch revenue metrics" });
+    }
+  });
+
+  // System health: process info, counts, recent failed webhooks/notifications
+  app.get("/api/super-admin/system-health", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const health = await storage.getSystemHealthMetrics();
+      res.json(health);
+    } catch (error) {
+      console.error("Error fetching system health:", error);
+      res.status(500).json({ message: "Failed to fetch system health" });
+    }
+  });
+
+  // Platform settings (key/value JSONB store)
+  app.get("/api/super-admin/platform-settings", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const settings = await storage.getPlatformSettings();
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching platform settings:", error);
+      res.status(500).json({ message: "Failed to fetch platform settings" });
+    }
+  });
+
+  app.patch("/api/super-admin/platform-settings", isAuthenticated, isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const updates = req.body;
+      if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
+        return res.status(400).json({ message: "Body must be an object of key/value updates" });
+      }
+      const settings = await storage.setPlatformSettings(updates, userId);
+
+      await AuditLogger.log({
+        req,
+        action: "update_platform_settings",
+        actionType: "update",
+        resource: "platform_settings",
+        severity: "info",
+        success: true,
+        metadata: { keys: Object.keys(updates) },
+      });
+
+      res.json(settings);
+    } catch (error) {
+      console.error("Error updating platform settings:", error);
+      res.status(500).json({ message: "Failed to update platform settings" });
+    }
+  });
+
+  // Platform alerts CRUD (Super Admin)
+  app.get("/api/super-admin/platform-alerts", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const alerts = await storage.getAllPlatformAlerts();
+      res.json(alerts);
+    } catch (error) {
+      console.error("Error fetching platform alerts:", error);
+      res.status(500).json({ message: "Failed to fetch platform alerts" });
+    }
+  });
+
+  app.post("/api/super-admin/platform-alerts", isAuthenticated, isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { insertPlatformAlertSchema } = await import("@shared/schema");
+      const data = insertPlatformAlertSchema.parse({
+        ...req.body,
+        createdBy: userId,
+      });
+      const alert = await storage.createPlatformAlert(data);
+
+      await AuditLogger.log({
+        req,
+        action: "create_platform_alert",
+        actionType: "create",
+        resource: "platform_alert",
+        resourceId: String(alert.id),
+        severity: "info",
+        success: true,
+      });
+
+      res.status(201).json(alert);
+    } catch (error: any) {
+      if (error?.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid alert data", errors: error.errors });
+      }
+      console.error("Error creating platform alert:", error);
+      res.status(500).json({ message: "Failed to create platform alert" });
+    }
+  });
+
+  app.patch("/api/super-admin/platform-alerts/:id", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid alert ID" });
+      const existing = await storage.getPlatformAlert(id);
+      if (!existing) return res.status(404).json({ message: "Platform alert not found" });
+
+      const { insertPlatformAlertSchema } = await import("@shared/schema");
+      // Allow partial updates; createdBy cannot be changed
+      const updateSchema = insertPlatformAlertSchema.partial().omit({ createdBy: true });
+      const data = updateSchema.parse(req.body);
+
+      const updated = await storage.updatePlatformAlert(id, data);
+
+      await AuditLogger.log({
+        req,
+        action: "update_platform_alert",
+        actionType: "update",
+        resource: "platform_alert",
+        resourceId: String(id),
+        severity: "info",
+        success: true,
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      if (error?.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid alert data", errors: error.errors });
+      }
+      console.error("Error updating platform alert:", error);
+      res.status(500).json({ message: "Failed to update platform alert" });
+    }
+  });
+
+  app.delete("/api/super-admin/platform-alerts/:id", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid alert ID" });
+      const existing = await storage.getPlatformAlert(id);
+      if (!existing) return res.status(404).json({ message: "Platform alert not found" });
+
+      await storage.deletePlatformAlert(id);
+
+      await AuditLogger.log({
+        req,
+        action: "delete_platform_alert",
+        actionType: "delete",
+        resource: "platform_alert",
+        resourceId: String(id),
+        severity: "warning",
+        success: true,
+      });
+
+      res.json({ message: "Platform alert deleted" });
+    } catch (error) {
+      console.error("Error deleting platform alert:", error);
+      res.status(500).json({ message: "Failed to delete platform alert" });
+    }
+  });
+
+  // Active platform alerts for the current user (any authenticated user)
+  app.get("/api/platform-alerts/active", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const orgId = req.user?.claims?.orgId ?? null;
+      const userRole = req.user?.claims?.role || 'staff';
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const alerts = await storage.getActivePlatformAlertsForUser(userId, orgId, userRole);
+      res.json(alerts);
+    } catch (error) {
+      console.error("Error fetching active platform alerts:", error);
+      res.status(500).json({ message: "Failed to fetch platform alerts" });
+    }
+  });
+
+  app.post("/api/platform-alerts/:id/acknowledge", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid alert ID" });
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+      const existing = await storage.getPlatformAlert(id);
+      if (!existing) return res.status(404).json({ message: "Platform alert not found" });
+
+      const already = await storage.hasUserAcknowledgedPlatformAlert(id, userId);
+      if (already) return res.json({ message: "Already acknowledged" });
+
+      const ack = await storage.acknowledgePlatformAlert(id, userId);
+      res.status(201).json(ack);
+    } catch (error) {
+      console.error("Error acknowledging platform alert:", error);
+      res.status(500).json({ message: "Failed to acknowledge alert" });
+    }
+  });
+
   // Get calendar report templates (for regular users)
   app.get("/api/calendar-report-templates", isAuthenticated, async (req, res) => {
     try {
