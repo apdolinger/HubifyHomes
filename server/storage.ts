@@ -482,7 +482,7 @@ export interface IStorage {
   getProperties(includeInactive?: boolean): Promise<Property[]>;
   getProperty(id: number): Promise<Property | undefined>;
   getPropertiesByIds(ids: number[], orgId: string): Promise<Property[]>;
-  getTasksByPropertyIds(ids: number[]): Promise<Task[]>;
+  getTasksByPropertyIds(ids: number[], orgId: string): Promise<Task[]>;
   createProperty(property: InsertProperty, userId: string): Promise<Property>;
   updateProperty(id: number, property: Partial<InsertProperty>): Promise<Property>;
   deleteProperty(id: number): Promise<void>;
@@ -2371,7 +2371,7 @@ export class DatabaseStorage implements IStorage {
       .where(and(inArray(properties.id, ids), eq(properties.orgId, orgId)));
   }
 
-  async getTasksByPropertyIds(ids: number[]): Promise<Task[]> {
+  async getTasksByPropertyIds(ids: number[], orgId: string): Promise<Task[]> {
     if (ids.length === 0) return [];
     return await db
       .select({
@@ -2397,8 +2397,9 @@ export class DatabaseStorage implements IStorage {
         },
       })
       .from(tasks)
+      .innerJoin(properties, eq(tasks.propertyId, properties.id))
       .leftJoin(users, eq(tasks.assignedToId, users.id))
-      .where(inArray(tasks.propertyId, ids))
+      .where(and(inArray(tasks.propertyId, ids), eq(properties.orgId, orgId)))
       .orderBy(desc(tasks.createdAt));
   }
 

@@ -1996,7 +1996,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const propertyIds = links.map((l) => l.propertyId);
       if (propertyIds.length === 0) return res.json([]);
       const props = await storage.getPropertiesByIds(propertyIds, portalUser.orgId);
-      const visible = props
+      const propsById = new Map(props.map((p) => [p.id, p] as const));
+      const visible = propertyIds
+        .map((id) => propsById.get(id))
+        .filter((p): p is NonNullable<typeof p> => !!p)
         .map((p) => ({
           id: p.id,
           name: p.name,
@@ -2063,7 +2066,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const propsById = new Map<number, string>(props.map((p) => [p.id, p.name]));
       const allowedIds = Array.from(propsById.keys());
       if (allowedIds.length === 0) return res.json([]);
-      const taskRows = await storage.getTasksByPropertyIds(allowedIds);
+      const taskRows = await storage.getTasksByPropertyIds(allowedIds, portalUser.orgId);
       const merged: Array<{
         id: number;
         title: string;
@@ -2089,7 +2092,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       merged.sort((a, b) => {
         const ad = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
         const bd = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
-        return ad - bd;
+        if (ad !== bd) return ad - bd;
+        return a.id - b.id;
       });
       res.json(merged);
     } catch (error) {
