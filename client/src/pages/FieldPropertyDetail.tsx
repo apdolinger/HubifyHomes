@@ -11,7 +11,7 @@ import { format, isPast } from "date-fns";
 
 function formatAddress(p: any): string {
   if (!p) return "";
-  return [p.address1, p.address2, p.city, p.state, p.zipCode]
+  return [p.address1, p.address2, p.city, p.state, p.zip || p.zipCode]
     .filter(Boolean)
     .join(", ");
 }
@@ -54,6 +54,11 @@ export default function FieldPropertyDetail() {
     queryKey: ["/api/tasks?showArchived=false"],
   });
 
+  const { data: propertyContacts = [] } = useQuery<any[]>({
+    queryKey: [`/api/properties/${propertyId}/contacts`],
+    enabled: !!propertyId,
+  });
+
   const activeTasks = useMemo(() => {
     if (!Array.isArray(allTasks) || !propertyId) return [];
     // propertyId from the route is a string; task.property.id may be a number
@@ -92,9 +97,19 @@ export default function FieldPropertyDetail() {
     );
   }
 
-  const ownerName = property.ownerName || property.contactName || null;
-  const ownerPhone = property.ownerPhone || property.contactPhone || null;
-  const ownerEmail = property.ownerEmail || property.contactEmail || null;
+  const primaryContact =
+    (Array.isArray(propertyContacts) &&
+      (propertyContacts.find(
+        (c: any) => property.primaryContactId && c.id === property.primaryContactId,
+      ) ||
+        propertyContacts.find((c: any) => c.isPrimary) ||
+        propertyContacts[0])) ||
+    null;
+  const ownerName = primaryContact
+    ? [primaryContact.firstName, primaryContact.lastName].filter(Boolean).join(" ")
+    : property.ownerName || property.contactName || null;
+  const ownerPhone = primaryContact?.phone || property.ownerPhone || property.contactPhone || null;
+  const ownerEmail = primaryContact?.email || property.ownerEmail || property.contactEmail || null;
 
   return (
     <div className="p-4 space-y-4" data-testid="field-property-detail">
