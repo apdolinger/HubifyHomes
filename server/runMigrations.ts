@@ -56,3 +56,49 @@ export async function ensureWebhookTables(): Promise<void> {
     client.release();
   }
 }
+
+/**
+ * Rename the cookie-consent `marketing` column to `preference` on both the
+ * OIDC user table and the portal user table. The UI and Privacy Policy now
+ * call this category "Preference"; this brings the schema in line.
+ *
+ * Idempotent:
+ *   - if only `marketing` exists, rename to `preference`
+ *   - if both exist (transient state), backfill `preference` from `marketing`
+ *     and drop `marketing`
+ *   - if only `preference` exists, do nothing
+ */
+export async function ensureCookieConsentPreferenceColumn(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    for (const table of ["user_cookie_consent", "portal_user_cookie_consent"]) {
+      await client.query(`
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = '${table}' AND column_name = 'marketing'
+          ) AND NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = '${table}' AND column_name = 'preference'
+          ) THEN
+            ALTER TABLE ${table} RENAME COLUMN marketing TO preference;
+          ELSIF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = '${table}' AND column_name = 'marketing'
+          ) AND EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = '${table}' AND column_name = 'preference'
+          ) THEN
+            UPDATE ${table} SET preference = marketing WHERE preference IS DISTINCT FROM marketing;
+            ALTER TABLE ${table} DROP COLUMN marketing;
+          END IF;
+        END $$;
+      `);
+    }
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to rename cookie consent column: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}

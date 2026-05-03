@@ -52,16 +52,12 @@ export function loadConsent(): CookieConsentState | null {
   try {
     const raw = localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<CookieConsentState> & { marketing?: boolean };
+    const parsed = JSON.parse(raw) as Partial<CookieConsentState>;
     if (!parsed || parsed.version !== COOKIE_CONSENT_VERSION) return null;
-    // Backward-compat: previous schema stored the second category as `marketing`.
-    const preference = typeof parsed.preference === "boolean"
-      ? parsed.preference
-      : !!parsed.marketing;
     return {
       version: COOKIE_CONSENT_VERSION,
       essential: true,
-      preference,
+      preference: !!parsed.preference,
       analytics: !!parsed.analytics,
       decidedAt: parsed.decidedAt || new Date().toISOString(),
     };
@@ -188,11 +184,6 @@ export function isAnalyticsAllowed(): boolean {
 
 export function isPreferenceAllowed(): boolean {
   return loadConsent()?.preference === true;
-}
-
-// Backward-compat alias for the old name.
-export function isMarketingAllowed(): boolean {
-  return isPreferenceAllowed();
 }
 
 // Storage helper for non-essential preference data. Both reads and writes are

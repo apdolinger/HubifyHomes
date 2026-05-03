@@ -23,7 +23,7 @@ type ServerConsent = {
   version: number;
   essential: boolean;
   analytics: boolean;
-  marketing: boolean;
+  preference: boolean;
   decidedAt?: string | Date | null;
 } | null;
 
@@ -72,7 +72,7 @@ export default function CookieConsentBanner() {
       if (server && server.version === COOKIE_CONSENT_VERSION) {
         const next = saveConsent({
           analytics: !!server.analytics,
-          preference: !!server.marketing,
+          preference: !!server.preference,
         });
         setAnalytics(next.analytics);
         setPreference(next.preference);
@@ -117,7 +117,7 @@ export default function CookieConsentBanner() {
       version: next.version,
       essential: true,
       analytics: next.analytics,
-      marketing: next.preference,
+      preference: next.preference,
     });
     try {
       await fetch("/api/me/cookie-consent", {

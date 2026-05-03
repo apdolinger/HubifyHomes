@@ -3313,7 +3313,7 @@ export const userCookieConsent = pgTable("user_cookie_consent", {
   version: integer("version").notNull().default(1),
   essential: boolean("essential").notNull().default(true),
   analytics: boolean("analytics").notNull().default(false),
-  marketing: boolean("marketing").notNull().default(false),
+  preference: boolean("preference").notNull().default(false),
   decidedAt: timestamp("decided_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -3332,7 +3332,7 @@ export const portalUserCookieConsent = pgTable("portal_user_cookie_consent", {
   version: integer("version").notNull().default(1),
   essential: boolean("essential").notNull().default(true),
   analytics: boolean("analytics").notNull().default(false),
-  marketing: boolean("marketing").notNull().default(false),
+  preference: boolean("preference").notNull().default(false),
   decidedAt: timestamp("decided_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -1232,13 +1232,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
       const userId = req.user.claims.sub;
-      const { version, analytics, marketing } = req.body || {};
+      const { version, analytics, preference } = req.body || {};
       const consent = await storage.upsertUserCookieConsent({
         userId,
         version: Number.isFinite(version) ? Number(version) : 1,
         essential: true,
         analytics: !!analytics,
-        marketing: !!marketing,
+        preference: !!preference,
       });
       res.json(consent);
     } catch (error) {
@@ -1882,13 +1882,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/portal/me/cookie-consent', isPortalAuthenticated, async (req: any, res) => {
     try {
       const portalUserId = req.portalSession.portalUserId;
-      const { version, analytics, marketing } = req.body || {};
+      const { version, analytics, preference } = req.body || {};
       const consent = await storage.upsertPortalUserCookieConsent({
         portalUserId,
         version: Number.isFinite(version) ? Number(version) : 1,
         essential: true,
         analytics: !!analytics,
-        marketing: !!marketing,
+        preference: !!preference,
       });
       res.json(consent);
     } catch (error) {

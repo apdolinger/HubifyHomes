@@ -129,10 +129,19 @@ app.use((req, res, next) => {
     // Without this the dispatcher logs an error on every task mutation in
     // environments where the webhook integration was never provisioned.
     try {
-      const { ensureWebhookTables } = await import('./runMigrations.js');
-      await ensureWebhookTables();
+      const { ensureWebhookTables, ensureCookieConsentPreferenceColumn } = await import('./runMigrations.js');
+      try {
+        await ensureWebhookTables();
+      } catch (err) {
+        console.error('Error ensuring webhook tables:', err);
+      }
+      try {
+        await ensureCookieConsentPreferenceColumn();
+      } catch (err) {
+        console.error('Error ensuring cookie-consent preference column:', err);
+      }
     } catch (error) {
-      console.error('Error ensuring webhook tables:', error);
+      console.error('Error loading startup migrations:', error);
     }
 
     // Start scheduled background tasks
