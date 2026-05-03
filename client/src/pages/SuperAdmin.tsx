@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -2956,6 +2956,576 @@ function FeatureFlagsTabContent() {
   );
 }
 
+// ===========================================================================
+// Super Admin: Real-data tabs (Organizations, All Users, Platform Overview, Compliance)
+// ===========================================================================
+
+type OrgOverviewRow = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  primaryAdminEmail: string | null;
+  tier: string;
+  subscriptionStatus: string;
+  propertyCount: number;
+  userCount: number;
+  mrrCents: number;
+  createdAt: string | null;
+};
+
+type UserOverviewRow = {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  role: string;
+  isActive: boolean;
+  lastActiveAt: string | null;
+  createdAt: string | null;
+  orgId: string | null;
+  orgName: string | null;
+};
+
+function formatRelative(date: string | null | undefined): string {
+  if (!date) return "Never";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "—";
+  const diff = Date.now() - d.getTime();
+  if (diff < 0) return d.toLocaleDateString();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`;
+  return d.toLocaleDateString();
+}
+
+function formatDateOnly(date: string | null | undefined): string {
+  if (!date) return "—";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString();
+}
+
+function PlatformOverviewCards() {
+  const { data: revenue } = useQuery<any>({ queryKey: ["/api/super-admin/revenue-metrics"] });
+  const { data: health } = useQuery<any>({ queryKey: ["/api/super-admin/system-health"] });
+
+  const totalOrgs = health?.counts?.orgs ?? 0;
+  const billingOrgs = (revenue?.activeOrgs ?? 0) + (revenue?.pastDueOrgs ?? 0);
+  const totalUsers = health?.counts?.users ?? 0;
+  const activeSessions = health?.counts?.activeSessions ?? 0;
+  const mrr = revenue?.mrrCents != null
+    ? `$${(revenue.mrrCents / 100).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+    : "$0";
+  const uptimeSeconds: number = health?.uptimeSeconds ?? 0;
+  const uptimeStr = uptimeSeconds >= 86400
+    ? `${Math.floor(uptimeSeconds / 86400)}d`
+    : uptimeSeconds >= 3600
+      ? `${Math.floor(uptimeSeconds / 3600)}h`
+      : `${Math.floor(uptimeSeconds / 60)}m`;
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Total Organizations</CardTitle>
+          <Building2 className="h-4 w-4 text-blue-600" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold" data-testid="text-total-orgs">{totalOrgs}</div>
+          <p className="text-xs text-muted-foreground">{billingOrgs} billing</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+          <Users className="h-4 w-4 text-green-600" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold" data-testid="text-total-users">{totalUsers}</div>
+          <p className="text-xs text-muted-foreground">{activeSessions} active session{activeSessions === 1 ? "" : "s"}</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Monthly Revenue</CardTitle>
+          <DollarSign className="h-4 w-4 text-purple-600" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold" data-testid="text-mrr">{mrr}</div>
+          <p className="text-xs text-muted-foreground">Aggregated from active subscriptions</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Server Uptime</CardTitle>
+          <Activity className="h-4 w-4 text-green-600" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-green-600" data-testid="text-uptime">{uptimeStr}</div>
+          <p className="text-xs text-muted-foreground">Since last restart</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function OrganizationsTab() {
+  const { toast } = useToast();
+  const { data: orgs = [], isLoading } = useQuery<OrgOverviewRow[]>({
+    queryKey: ["/api/super-admin/orgs-overview"],
+  });
+
+  const setStatusMut = useMutation({
+    mutationFn: async ({ orgId, isActive }: { orgId: string; isActive: boolean }) =>
+      apiRequest("PATCH", `/api/super-admin/orgs/${orgId}/status`, { isActive }),
+    onSuccess: (_d, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/orgs-overview"] });
+      toast({ title: vars.isActive ? "Organization activated" : "Organization suspended" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Update failed", description: err?.message || "Could not update status", variant: "destructive" });
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center">
+            <Building2 className="w-5 h-5 mr-2" />
+            Organizations Management
+          </CardTitle>
+          <Button
+            size="sm"
+            variant="outline"
+            asChild
+            data-testid="button-export-orgs"
+          >
+            <a href="/api/super-admin/orgs-overview.csv">
+              <Download className="w-4 h-4 mr-2" />
+              Export CSV
+            </a>
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="text-sm text-slate-500">Loading organizations…</div>
+        ) : orgs.length === 0 ? (
+          <div className="text-sm text-slate-500">No organizations yet.</div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Organization</TableHead>
+                <TableHead>Primary Admin</TableHead>
+                <TableHead>Plan</TableHead>
+                <TableHead>Subscription</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Properties</TableHead>
+                <TableHead className="text-right">Users</TableHead>
+                <TableHead className="text-right">MRR</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {orgs.map((o) => (
+                <TableRow key={o.id} data-testid={`row-org-${o.id}`}>
+                  <TableCell className="font-medium">{o.name}</TableCell>
+                  <TableCell className="text-sm">{o.primaryAdminEmail || <span className="text-slate-400">—</span>}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="capitalize">{o.tier}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={o.subscriptionStatus === "active" ? "default" :
+                        o.subscriptionStatus === "trialing" ? "secondary" : "destructive"}
+                      className="capitalize"
+                    >
+                      {o.subscriptionStatus.replace("_", " ")}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={o.isActive ? "default" : "destructive"}
+                      data-testid={`badge-org-status-${o.id}`}
+                    >
+                      {o.isActive ? "Active" : "Suspended"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">{o.propertyCount}</TableCell>
+                  <TableCell className="text-right">{o.userCount}</TableCell>
+                  <TableCell className="text-right">${(o.mrrCents / 100).toFixed(0)}</TableCell>
+                  <TableCell>
+                    {o.isActive ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        title="Suspend organization"
+                        disabled={setStatusMut.isPending}
+                        onClick={() => {
+                          if (confirm(`Suspend ${o.name}? Users will lose access until reactivated.`)) {
+                            setStatusMut.mutate({ orgId: o.id, isActive: false });
+                          }
+                        }}
+                        data-testid={`button-suspend-${o.id}`}
+                      >
+                        <Pause className="w-4 h-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        title="Reactivate organization"
+                        disabled={setStatusMut.isPending}
+                        onClick={() => setStatusMut.mutate({ orgId: o.id, isActive: true })}
+                        data-testid={`button-activate-${o.id}`}
+                      >
+                        <Play className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function AllUsersTab() {
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const { data: users = [], isLoading } = useQuery<UserOverviewRow[]>({
+    queryKey: ["/api/super-admin/users-overview"],
+  });
+
+  const filtered = useMemo(() => {
+    const s = search.trim().toLowerCase();
+    return users.filter((u) => {
+      if (roleFilter !== "all" && u.role !== roleFilter) return false;
+      if (statusFilter === "active" && !u.isActive) return false;
+      if (statusFilter === "suspended" && u.isActive) return false;
+      if (s) {
+        const hay = `${u.firstName ?? ""} ${u.lastName ?? ""} ${u.email ?? ""} ${u.orgName ?? ""}`.toLowerCase();
+        if (!hay.includes(s)) return false;
+      }
+      return true;
+    });
+  }, [users, search, roleFilter, statusFilter]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="flex items-center">
+            <Users className="w-5 h-5 mr-2" />
+            All Users Across Platform
+          </CardTitle>
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              placeholder="Search name, email, org…"
+              className="w-64"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              data-testid="input-user-search"
+            />
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-36" data-testid="select-user-role">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="super_admin">Super Admin</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="supervisor">Supervisor</SelectItem>
+                <SelectItem value="staff">Staff</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-36" data-testid="select-user-status">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="suspended">Suspended</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button size="sm" variant="outline" asChild data-testid="button-export-users">
+              <a href="/api/super-admin/users-overview.csv">
+                <Download className="w-4 h-4 mr-2" />
+                Export CSV
+              </a>
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="text-sm text-slate-500">Loading users…</div>
+        ) : (
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>User</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Organization</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Last Active</TableHead>
+                  <TableHead>Created</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((u) => {
+                  const name = [u.firstName, u.lastName].filter(Boolean).join(" ") || "—";
+                  return (
+                    <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
+                      <TableCell className="font-medium">{name}</TableCell>
+                      <TableCell>{u.email || <span className="text-slate-400">—</span>}</TableCell>
+                      <TableCell>{u.orgName || <span className="text-slate-400">—</span>}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="capitalize">{u.role.replace("_", " ")}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={u.isActive ? "default" : "destructive"}>
+                          {u.isActive ? "Active" : "Suspended"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-600">{formatRelative(u.lastActiveAt)}</TableCell>
+                      <TableCell className="text-sm text-slate-600">{formatDateOnly(u.createdAt)}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            <div className="mt-4 text-sm text-slate-500">
+              Showing {filtered.length} of {users.length} users
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ComplianceTab() {
+  const { data: auditLogs = [], isLoading: auditLoading } = useQuery<any[]>({
+    queryKey: ["/api/super-admin/audit-logs"],
+  });
+  const { data: adminUsers = [], isLoading: adminLoading } = useQuery<any[]>({
+    queryKey: ["/api/super-admin/access-review"],
+  });
+  const { data: sessions = [], isLoading: sessionsLoading, refetch: refetchSessions, isFetching: sessionsFetching } = useQuery<any[]>({
+    queryKey: ["/api/super-admin/sessions"],
+  });
+
+  const failedAuth24h = useMemo(() => {
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    return auditLogs.filter((l) =>
+      l?.actionType === "auth" &&
+      l?.success === false &&
+      l?.createdAt &&
+      new Date(l.createdAt).getTime() >= cutoff
+    ).length;
+  }, [auditLogs]);
+
+  return (
+    <div className="space-y-6">
+      {/* Audit Logs */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Shield className="w-5 h-5 mr-2" />
+            Security Audit Logs
+          </CardTitle>
+          <p className="text-sm text-slate-600 mt-1">Latest 100 security events across the platform.</p>
+        </CardHeader>
+        <CardContent>
+          <div className="border rounded-md max-h-96 overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 sticky top-0">
+                <tr className="border-b">
+                  <th className="text-left p-3 font-medium">Timestamp</th>
+                  <th className="text-left p-3 font-medium">User</th>
+                  <th className="text-left p-3 font-medium">Action</th>
+                  <th className="text-left p-3 font-medium">Resource</th>
+                  <th className="text-left p-3 font-medium">Severity</th>
+                  <th className="text-left p-3 font-medium">IP</th>
+                  <th className="text-left p-3 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {auditLoading ? (
+                  <tr><td className="p-3 text-slate-500" colSpan={7}>Loading…</td></tr>
+                ) : auditLogs.length === 0 ? (
+                  <tr><td className="p-3 text-slate-500" colSpan={7}>No audit events recorded yet.</td></tr>
+                ) : auditLogs.map((l) => (
+                  <tr key={l.id} className="border-b hover:bg-slate-50" data-testid={`row-audit-${l.id}`}>
+                    <td className="p-3 whitespace-nowrap">{formatRelative(l.createdAt)}</td>
+                    <td className="p-3">{l.userId || <span className="text-slate-400">—</span>}</td>
+                    <td className="p-3">{l.action}</td>
+                    <td className="p-3">{l.resource}{l.resourceId ? ` (${l.resourceId})` : ""}</td>
+                    <td className="p-3">
+                      <Badge variant={l.severity === "critical" ? "destructive" : l.severity === "warning" ? "secondary" : "outline"} className="capitalize">
+                        {l.severity}
+                      </Badge>
+                    </td>
+                    <td className="p-3">{l.ipAddress || <span className="text-slate-400">—</span>}</td>
+                    <td className="p-3">
+                      {l.success ? <span className="text-green-600">Success</span> : <span className="text-red-600">Failed</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Admin Access Review */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Users className="w-5 h-5 mr-2" />
+            Admin Access Review
+          </CardTitle>
+          <p className="text-sm text-slate-600 mt-1">
+            All users with admin, supervisor, or super_admin privileges.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="border rounded-md max-h-96 overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 sticky top-0">
+                <tr className="border-b">
+                  <th className="text-left p-3 font-medium">Name</th>
+                  <th className="text-left p-3 font-medium">Email</th>
+                  <th className="text-left p-3 font-medium">Role</th>
+                  <th className="text-left p-3 font-medium">Admin Account</th>
+                  <th className="text-left p-3 font-medium">Last Active</th>
+                </tr>
+              </thead>
+              <tbody>
+                {adminLoading ? (
+                  <tr><td className="p-3 text-slate-500" colSpan={5}>Loading…</td></tr>
+                ) : adminUsers.length === 0 ? (
+                  <tr><td className="p-3 text-slate-500" colSpan={5}>No privileged users yet.</td></tr>
+                ) : adminUsers.map((u) => (
+                  <tr key={u.id} className="border-b hover:bg-slate-50" data-testid={`row-admin-${u.id}`}>
+                    <td className="p-3">{[u.firstName, u.lastName].filter(Boolean).join(" ") || "—"}</td>
+                    <td className="p-3">{u.email || <span className="text-slate-400">—</span>}</td>
+                    <td className="p-3"><Badge variant="outline" className="capitalize">{(u.role || "").replace("_", " ")}</Badge></td>
+                    <td className="p-3">{u.isAdminAccount ? <Badge variant="secondary">Separate</Badge> : <span className="text-slate-400">Combined</span>}</td>
+                    <td className="p-3 whitespace-nowrap">{formatRelative(u.lastActiveAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Active Sessions */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Activity className="w-5 h-5 mr-2" />
+              Active Sessions
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetchSessions()}
+              disabled={sessionsFetching}
+              data-testid="button-refresh-sessions"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${sessionsFetching ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="border rounded-md max-h-96 overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 sticky top-0">
+                <tr className="border-b">
+                  <th className="text-left p-3 font-medium">User</th>
+                  <th className="text-left p-3 font-medium">Email</th>
+                  <th className="text-left p-3 font-medium">IP</th>
+                  <th className="text-left p-3 font-medium">Last Activity</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sessionsLoading ? (
+                  <tr><td className="p-3 text-slate-500" colSpan={4}>Loading…</td></tr>
+                ) : sessions.length === 0 ? (
+                  <tr><td className="p-3 text-slate-500" colSpan={4}>No active sessions.</td></tr>
+                ) : sessions.map((s) => (
+                  <tr key={s.sessionId} className="border-b hover:bg-slate-50" data-testid={`row-session-${s.sessionId}`}>
+                    <td className="p-3">{s.userName || "—"}</td>
+                    <td className="p-3">{s.userEmail || <span className="text-slate-400">—</span>}</td>
+                    <td className="p-3">{s.ipAddress || <span className="text-slate-400">—</span>}</td>
+                    <td className="p-3 whitespace-nowrap">{formatRelative(s.lastActivityAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Quick stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-600">Failed Auth (24h)</p>
+                <p className="text-3xl font-bold" data-testid="text-failed-auth">{failedAuth24h}</p>
+              </div>
+              <AlertTriangle className="w-12 h-12 text-yellow-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-600">Privileged Users</p>
+                <p className="text-3xl font-bold" data-testid="text-active-admins">{adminUsers.length}</p>
+              </div>
+              <Users className="w-12 h-12 text-blue-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-600">Active Sessions</p>
+                <p className="text-3xl font-bold" data-testid="text-active-sessions">{sessions.length}</p>
+              </div>
+              <Activity className="w-12 h-12 text-green-500" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 export default function SuperAdmin() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -3021,34 +3591,6 @@ export default function SuperAdmin() {
     return null;
   }
 
-  const platformStats = {
-    totalOrganizations: 247,
-    activeOrganizations: 235,
-    totalUsers: 1842,
-    activeUsers: 1654,
-    totalProperties: 8934,
-    totalTasks: 45672,
-    monthlyRevenue: "$47,830",
-    uptime: "99.97%"
-  };
-
-  const organizations = [
-    { id: 1, name: "Sterling Property Management", admin: "andrew.dolinger@gmail.com", plan: "Professional", status: "Active", properties: 45, users: 12, mrr: "$149" },
-    { id: 2, name: "Coastal Home Watch", admin: "sarah.johnson@coastal.com", plan: "Enterprise", status: "Active", properties: 128, users: 24, mrr: "$299" },
-    { id: 3, name: "Desert Valley HOA", admin: "mike.torres@dvhoa.org", plan: "Starter", status: "Trial", properties: 15, users: 3, mrr: "$0" },
-    { id: 4, name: "Pacific Property Care", admin: "lisa.chen@pacificcare.com", plan: "Professional", status: "Suspended", properties: 67, users: 8, mrr: "$149" }
-  ];
-
-  const systemMetrics = {
-    cpu: "23%",
-    memory: "4.2GB / 16GB",
-    disk: "67GB / 200GB",
-    network: "↑ 2.1MB/s ↓ 5.8MB/s",
-    dbConnections: 45,
-    apiRequests: "12.4K/hour",
-    errorRate: "0.03%"
-  };
-
   return (
     <main className="max-w-7xl mx-auto p-6 space-y-6">
       {/* Header */}
@@ -3089,56 +3631,7 @@ export default function SuperAdmin() {
       </div>
 
       {/* Platform Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Organizations</CardTitle>
-            <Building2 className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{platformStats.totalOrganizations}</div>
-            <p className="text-xs text-muted-foreground">
-              {platformStats.activeOrganizations} active
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            <Users className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{platformStats.totalUsers}</div>
-            <p className="text-xs text-muted-foreground">
-              {platformStats.activeUsers} active
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monthly Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-purple-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{platformStats.monthlyRevenue}</div>
-            <p className="text-xs text-muted-foreground">
-              +12% from last month
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">System Uptime</CardTitle>
-            <Activity className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{platformStats.uptime}</div>
-            <p className="text-xs text-muted-foreground">
-              Last 30 days
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <PlatformOverviewCards />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -3159,93 +3652,7 @@ export default function SuperAdmin() {
 
         {/* Organizations Tab */}
         <TabsContent value="organizations">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center">
-                  <Building2 className="w-5 h-5 mr-2" />
-                  Organizations Management
-                </CardTitle>
-                <div className="flex space-x-2">
-                  <Button size="sm" variant="outline">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export
-                  </Button>
-                  <Button size="sm">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Organization
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Organization</TableHead>
-                    <TableHead>Admin Contact</TableHead>
-                    <TableHead>Plan</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Properties</TableHead>
-                    <TableHead>Users</TableHead>
-                    <TableHead>MRR</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {organizations.map((org) => (
-                    <TableRow key={org.id}>
-                      <TableCell className="font-medium">
-                        <button 
-                          onClick={() => setLocation(`/nestive-admin/organization/${org.id}`)}
-                          className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                        >
-                          {org.name}
-                        </button>
-                      </TableCell>
-                      <TableCell>{org.admin}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{org.plan}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={org.status === 'Active' ? 'default' : 
-                                   org.status === 'Trial' ? 'secondary' : 'destructive'}
-                        >
-                          {org.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{org.properties}</TableCell>
-                      <TableCell>{org.users}</TableCell>
-                      <TableCell>{org.mrr}</TableCell>
-                      <TableCell>
-                        <div className="flex space-x-1">
-                          <Button size="sm" variant="ghost" title="Login as Admin">
-                            <LogIn className="w-4 h-4" />
-                          </Button>
-                          <Button size="sm" variant="ghost" title="View Details">
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button size="sm" variant="ghost" title="Edit">
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          {org.status === 'Active' ? (
-                            <Button size="sm" variant="ghost" title="Suspend">
-                              <Pause className="w-4 h-4" />
-                            </Button>
-                          ) : (
-                            <Button size="sm" variant="ghost" title="Activate">
-                              <Play className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <OrganizationsTab />
         </TabsContent>
 
         {/* Reports Tab */}
@@ -3295,155 +3702,7 @@ export default function SuperAdmin() {
 
         {/* All Users Tab */}
         <TabsContent value="users">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center">
-                  <Users className="w-5 h-5 mr-2" />
-                  All Users Across Platform
-                </CardTitle>
-                <div className="flex space-x-2">
-                  <Input
-                    placeholder="Search users..."
-                    className="w-64"
-                  />
-                  <Select>
-                    <SelectTrigger className="w-32">
-                      <SelectValue placeholder="Role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Roles</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="supervisor">Supervisor</SelectItem>
-                      <SelectItem value="staff">Field Staff</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select>
-                    <SelectTrigger className="w-32">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="suspended">Suspended</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button size="sm" variant="outline">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export CSV
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-4">
-                <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
-                  <Mail className="w-4 h-4 mr-2" />
-                  Email Selected Users
-                </Button>
-                <span className="ml-2 text-sm text-gray-500">0 users selected</span>
-              </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">
-                      <input type="checkbox" className="rounded" />
-                    </TableHead>
-                    <TableHead className="cursor-pointer hover:bg-gray-50">
-                      User Name ↕
-                    </TableHead>
-                    <TableHead className="cursor-pointer hover:bg-gray-50">
-                      Email ↕
-                    </TableHead>
-                    <TableHead className="cursor-pointer hover:bg-gray-50">
-                      Company ↕
-                    </TableHead>
-                    <TableHead className="cursor-pointer hover:bg-gray-50">
-                      Role ↕
-                    </TableHead>
-                    <TableHead className="cursor-pointer hover:bg-gray-50">
-                      Status ↕
-                    </TableHead>
-                    <TableHead className="cursor-pointer hover:bg-gray-50">
-                      Last Login ↕
-                    </TableHead>
-                    <TableHead className="cursor-pointer hover:bg-gray-50">
-                      Created ↕
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell>
-                      <input type="checkbox" className="rounded" />
-                    </TableCell>
-                    <TableCell className="font-medium">Andrew Dolinger</TableCell>
-                    <TableCell>andrew.dolinger@gmail.com</TableCell>
-                    <TableCell>Sterling Property Management</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="bg-red-50 text-red-700">Admin</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className="bg-green-100 text-green-800">Active</Badge>
-                    </TableCell>
-                    <TableCell>2 hours ago</TableCell>
-                    <TableCell>Jan 15, 2023</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>
-                      <input type="checkbox" className="rounded" />
-                    </TableCell>
-                    <TableCell className="font-medium">Sarah Johnson</TableCell>
-                    <TableCell>sarah.johnson@coastal.com</TableCell>
-                    <TableCell>Coastal Home Watch</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700">Supervisor</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className="bg-green-100 text-green-800">Active</Badge>
-                    </TableCell>
-                    <TableCell>1 day ago</TableCell>
-                    <TableCell>Mar 22, 2023</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>
-                      <input type="checkbox" className="rounded" />
-                    </TableCell>
-                    <TableCell className="font-medium">Mike Torres</TableCell>
-                    <TableCell>mike.torres@dvhoa.org</TableCell>
-                    <TableCell>Desert Valley HOA</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="bg-green-50 text-green-700">Field Staff</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className="bg-red-100 text-red-800">Suspended</Badge>
-                    </TableCell>
-                    <TableCell>3 weeks ago</TableCell>
-                    <TableCell>Jun 8, 2024</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>
-                      <input type="checkbox" className="rounded" />
-                    </TableCell>
-                    <TableCell className="font-medium">Lisa Chen</TableCell>
-                    <TableCell>lisa.chen@pacificcare.com</TableCell>
-                    <TableCell>Pacific Property Care</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="bg-red-50 text-red-700">Admin</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className="bg-green-100 text-green-800">Active</Badge>
-                    </TableCell>
-                    <TableCell>5 hours ago</TableCell>
-                    <TableCell>Aug 14, 2023</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-              <div className="mt-4 text-sm text-gray-500">
-                Showing 4 of 1,842 users
-              </div>
-            </CardContent>
-          </Card>
+          <AllUsersTab />
         </TabsContent>
 
         {/* Communication Tab - System Alerts */}
@@ -3467,380 +3726,14 @@ export default function SuperAdmin() {
           <MonitoringTabContent />
         </TabsContent>
 
-        {/* Messaging Tab */}
-        <TabsContent value="messaging">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <MessageSquare className="w-5 h-5 mr-2" />
-                Platform Announcements
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div className="p-4 border rounded-lg">
-                  <h3 className="font-medium text-slate-900 mb-4">Send New Announcement</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="announcement-type">Message Type</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select message type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="maintenance">Maintenance Notice</SelectItem>
-                          <SelectItem value="feature">New Feature</SelectItem>
-                          <SelectItem value="security">Security Alert</SelectItem>
-                          <SelectItem value="general">General Announcement</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="announcement-title">Title</Label>
-                      <Input id="announcement-title" placeholder="Announcement title" />
-                    </div>
-                    <div>
-                      <Label htmlFor="announcement-message">Message</Label>
-                      <Textarea 
-                        id="announcement-message" 
-                        placeholder="Announcement content..."
-                        className="min-h-24"
-                      />
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center space-x-2">
-                        <Switch id="email-delivery" />
-                        <Label htmlFor="email-delivery">Send Email</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch id="inapp-delivery" defaultChecked />
-                        <Label htmlFor="inapp-delivery">In-App Banner</Label>
-                      </div>
-                    </div>
-                    <Button>
-                      <Send className="w-4 h-4 mr-2" />
-                      Send Announcement
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         {/* Platform Tab */}
         <TabsContent value="platform">
           <TemplateManagement />
         </TabsContent>
 
-        {/* Compliance Tab */}
         <TabsContent value="compliance">
-          <div className="space-y-6">
-            {/* Audit Logs */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Shield className="w-5 h-5 mr-2" />
-                    Security Audit Logs
-                  </div>
-                  <Button variant="outline" size="sm" data-testid="button-export-audit-logs">
-                    <FileText className="w-4 h-4 mr-2" />
-                    Export
-                  </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Filters */}
-                  <div className="flex gap-2">
-                    <Select>
-                      <SelectTrigger className="w-[180px]" data-testid="select-severity-filter">
-                        <SelectValue placeholder="Severity" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Severities</SelectItem>
-                        <SelectItem value="info">Info</SelectItem>
-                        <SelectItem value="warning">Warning</SelectItem>
-                        <SelectItem value="critical">Critical</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    
-                    <Select>
-                      <SelectTrigger className="w-[180px]" data-testid="select-action-type-filter">
-                        <SelectValue placeholder="Action Type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Actions</SelectItem>
-                        <SelectItem value="read">Read</SelectItem>
-                        <SelectItem value="create">Create</SelectItem>
-                        <SelectItem value="update">Update</SelectItem>
-                        <SelectItem value="delete">Delete</SelectItem>
-                        <SelectItem value="auth">Authentication</SelectItem>
-                        <SelectItem value="admin">Admin Action</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    
-                    <Input 
-                      type="date" 
-                      placeholder="Start Date"
-                      className="w-[180px]"
-                      data-testid="input-start-date"
-                    />
-                    
-                    <Input 
-                      type="date" 
-                      placeholder="End Date"
-                      className="w-[180px]"
-                      data-testid="input-end-date"
-                    />
-                  </div>
-                  
-                  {/* Audit Log Table */}
-                  <div className="border rounded-md">
-                    <div className="max-h-96 overflow-auto">
-                      <table className="w-full">
-                        <thead className="bg-slate-50 sticky top-0">
-                          <tr className="border-b">
-                            <th className="text-left p-3 text-sm font-medium">Timestamp</th>
-                            <th className="text-left p-3 text-sm font-medium">User</th>
-                            <th className="text-left p-3 text-sm font-medium">Action</th>
-                            <th className="text-left p-3 text-sm font-medium">Resource</th>
-                            <th className="text-left p-3 text-sm font-medium">Severity</th>
-                            <th className="text-left p-3 text-sm font-medium">IP Address</th>
-                            <th className="text-left p-3 text-sm font-medium">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr className="border-b hover:bg-slate-50" data-testid="audit-log-row-sample">
-                            <td className="p-3 text-sm">Loading...</td>
-                            <td className="p-3 text-sm" colSpan={6}>
-                              <span className="text-slate-500">Connect to view audit logs</span>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Access Review */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Users className="w-5 h-5 mr-2" />
-                    Admin Access Review
-                  </div>
-                  <Button variant="outline" size="sm" data-testid="button-export-access-review">
-                    <FileText className="w-4 h-4 mr-2" />
-                    Export Review
-                  </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-slate-600 mb-4">
-                  Quarterly review of all users with admin, supervisor, or super_admin privileges (required for SOC 2 compliance)
-                </p>
-                <div className="border rounded-md">
-                  <div className="max-h-96 overflow-auto">
-                    <table className="w-full">
-                      <thead className="bg-slate-50 sticky top-0">
-                        <tr className="border-b">
-                          <th className="text-left p-3 text-sm font-medium">Name</th>
-                          <th className="text-left p-3 text-sm font-medium">Email</th>
-                          <th className="text-left p-3 text-sm font-medium">Role</th>
-                          <th className="text-left p-3 text-sm font-medium">Admin Account</th>
-                          <th className="text-left p-3 text-sm font-medium">Last Active</th>
-                          <th className="text-left p-3 text-sm font-medium">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="border-b hover:bg-slate-50" data-testid="access-review-row-sample">
-                          <td className="p-3 text-sm">Loading...</td>
-                          <td className="p-3 text-sm" colSpan={5}>
-                            <span className="text-slate-500">Connect to view admin users</span>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Active Sessions */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Activity className="w-5 h-5 mr-2" />
-                    Active Sessions
-                  </div>
-                  <Button variant="outline" size="sm" data-testid="button-refresh-sessions">
-                    <Activity className="w-4 h-4 mr-2" />
-                    Refresh
-                  </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-slate-600 mb-4">
-                  Monitor and manage active user sessions. Force logout if needed.
-                </p>
-                <div className="border rounded-md">
-                  <div className="max-h-96 overflow-auto">
-                    <table className="w-full">
-                      <thead className="bg-slate-50 sticky top-0">
-                        <tr className="border-b">
-                          <th className="text-left p-3 text-sm font-medium">User</th>
-                          <th className="text-left p-3 text-sm font-medium">Email</th>
-                          <th className="text-left p-3 text-sm font-medium">IP Address</th>
-                          <th className="text-left p-3 text-sm font-medium">Last Activity</th>
-                          <th className="text-left p-3 text-sm font-medium">Duration</th>
-                          <th className="text-left p-3 text-sm font-medium">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="border-b hover:bg-slate-50" data-testid="session-row-sample">
-                          <td className="p-3 text-sm">Loading...</td>
-                          <td className="p-3 text-sm" colSpan={5}>
-                            <span className="text-slate-500">Connect to view active sessions</span>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Security & Compliance Overview */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Shield className="w-5 h-5 mr-2" />
-                  Security & Compliance
-                </CardTitle>
-                <p className="text-sm text-slate-600 mt-2">
-                  Comprehensive security controls achieving 85% vulnerability mitigation for SOC 2 and GDPR compliance
-                </p>
-              </CardHeader>
-              <CardContent>
-                <div className="mb-6 p-6 bg-green-50 border border-green-200 rounded-lg text-center">
-                  <p className="text-sm text-slate-600 mb-2">Overall Security Mitigation</p>
-                  <p className="text-5xl font-bold text-green-600" data-testid="text-overall-mitigation">85%</p>
-                  <p className="text-sm text-slate-600 mt-2">Target Achievement: 85% of security vulnerabilities mitigated</p>
-                </div>
-
-                <h3 className="text-lg font-semibold mb-4">Security Control Breakdown</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <Card className="border-blue-200 bg-blue-50">
-                    <CardContent className="pt-6">
-                      <div className="text-center">
-                        <p className="text-sm text-slate-600 mb-1">MFA Enforcement</p>
-                        <p className="text-4xl font-bold text-blue-600" data-testid="text-mfa-percentage">20%</p>
-                        <p className="text-xs text-slate-500 mt-2">All admin accounts require 2FA</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-purple-200 bg-purple-50">
-                    <CardContent className="pt-6">
-                      <div className="text-center">
-                        <p className="text-sm text-slate-600 mb-1">Separate Admin Accounts</p>
-                        <p className="text-4xl font-bold text-purple-600" data-testid="text-admin-accounts-percentage">30%</p>
-                        <p className="text-xs text-slate-500 mt-2">Least privilege controls enforced</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-amber-200 bg-amber-50">
-                    <CardContent className="pt-6">
-                      <div className="text-center">
-                        <p className="text-sm text-slate-600 mb-1">Comprehensive Audit Logging</p>
-                        <p className="text-4xl font-bold text-amber-600" data-testid="text-audit-logging-percentage">15%</p>
-                        <p className="text-xs text-slate-500 mt-2">All actions tracked & logged</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-teal-200 bg-teal-50">
-                    <CardContent className="pt-6">
-                      <div className="text-center">
-                        <p className="text-sm text-slate-600 mb-1">Session Management</p>
-                        <p className="text-4xl font-bold text-teal-600" data-testid="text-session-management-percentage">10%</p>
-                        <p className="text-xs text-slate-500 mt-2">Concurrent session limits & monitoring</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-red-200 bg-red-50">
-                    <CardContent className="pt-6">
-                      <div className="text-center">
-                        <p className="text-sm text-slate-600 mb-1">IP Allowlist Enforcement</p>
-                        <p className="text-4xl font-bold text-red-600" data-testid="text-ip-allowlist-percentage">5%</p>
-                        <p className="text-xs text-slate-500 mt-2">Geographic access restrictions</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-indigo-200 bg-indigo-50">
-                    <CardContent className="pt-6">
-                      <div className="text-center">
-                        <p className="text-sm text-slate-600 mb-1">Quarterly Access Reviews</p>
-                        <p className="text-4xl font-bold text-indigo-600" data-testid="text-access-reviews-percentage">5%</p>
-                        <p className="text-xs text-slate-500 mt-2">Regular privilege verification</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Security Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-slate-600">Security Score</p>
-                      <p className="text-3xl font-bold text-green-600" data-testid="text-security-score">85%</p>
-                      <p className="text-xs text-slate-500 mt-1">Target: 85% mitigation</p>
-                    </div>
-                    <Shield className="w-12 h-12 text-green-500" />
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-slate-600">Failed Auth Attempts</p>
-                      <p className="text-3xl font-bold" data-testid="text-failed-auth">0</p>
-                      <p className="text-xs text-slate-500 mt-1">Last 24 hours</p>
-                    </div>
-                    <AlertTriangle className="w-12 h-12 text-yellow-500" />
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-slate-600">Active Admins</p>
-                      <p className="text-3xl font-bold" data-testid="text-active-admins">0</p>
-                      <p className="text-xs text-slate-500 mt-1">Requires MFA</p>
-                    </div>
-                    <Users className="w-12 h-12 text-blue-500" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+          <ComplianceTab />
         </TabsContent>
 
         {/* Settings Tab */}

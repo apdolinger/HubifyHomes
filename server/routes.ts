@@ -2870,6 +2870,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Orgs overview (Super Admin Organizations tab)
+  app.get("/api/super-admin/orgs-overview", isAuthenticated, isSuperAdmin, requireMFA, async (_req, res) => {
+    try {
+      const rows = await storage.getOrgsOverview();
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching orgs overview:", error);
+      res.status(500).json({ message: "Failed to fetch orgs overview" });
+    }
+  });
+
+  app.get("/api/super-admin/orgs-overview.csv", isAuthenticated, isSuperAdmin, requireMFA, async (_req, res) => {
+    try {
+      const rows = await storage.getOrgsOverview();
+      const esc = (v: any) => {
+        if (v === null || v === undefined) return '';
+        let s = String(v);
+        if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const header = ['Organization', 'Primary Admin', 'Plan', 'Subscription Status', 'Active', 'Properties', 'Users', 'MRR (USD)', 'Created'];
+      const lines = [header.join(',')];
+      for (const r of rows) {
+        lines.push([
+          esc(r.name),
+          esc(r.primaryAdminEmail),
+          esc(r.tier),
+          esc(r.subscriptionStatus),
+          esc(r.isActive ? 'yes' : 'no'),
+          esc(r.propertyCount),
+          esc(r.userCount),
+          esc((r.mrrCents / 100).toFixed(2)),
+          esc(r.createdAt ? new Date(r.createdAt).toISOString() : ''),
+        ].join(','));
+      }
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="organizations.csv"');
+      res.send(lines.join('\n'));
+    } catch (error) {
+      console.error("Error exporting orgs overview:", error);
+      res.status(500).json({ message: "Failed to export organizations" });
+    }
+  });
+
+  app.patch("/api/super-admin/orgs/:orgId/status", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const { isActive } = req.body ?? {};
+      if (typeof isActive !== 'boolean') {
+        return res.status(400).json({ message: "isActive (boolean) required" });
+      }
+      const updated = await storage.updateOrg(orgId, { isActive });
+      if (!updated) {
+        await AuditLogger.log({
+          req,
+          action: isActive ? "activate_organization" : "suspend_organization",
+          actionType: "admin",
+          resource: "organization",
+          resourceId: orgId,
+          severity: "warning",
+          success: false,
+          errorMessage: "Organization not found",
+        });
+        return res.status(404).json({ message: "Organization not found" });
+      }
+      await AuditLogger.log({
+        req,
+        action: isActive ? "activate_organization" : "suspend_organization",
+        actionType: "admin",
+        resource: "organization",
+        resourceId: orgId,
+        severity: "warning",
+        success: true,
+      });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating org status:", error);
+      res.status(500).json({ message: "Failed to update organization status" });
+    }
+  });
+
+  // Users overview across all orgs (Super Admin All Users tab)
+  app.get("/api/super-admin/users-overview", isAuthenticated, isSuperAdmin, requireMFA, async (_req, res) => {
+    try {
+      const rows = await storage.getUsersOverview();
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching users overview:", error);
+      res.status(500).json({ message: "Failed to fetch users overview" });
+    }
+  });
+
+  app.get("/api/super-admin/users-overview.csv", isAuthenticated, isSuperAdmin, requireMFA, async (_req, res) => {
+    try {
+      const rows = await storage.getUsersOverview();
+      const esc = (v: any) => {
+        if (v === null || v === undefined) return '';
+        let s = String(v);
+        if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const header = ['Name', 'Email', 'Organization', 'Role', 'Active', 'Last Active', 'Created'];
+      const lines = [header.join(',')];
+      for (const r of rows) {
+        const name = [r.firstName, r.lastName].filter(Boolean).join(' ').trim();
+        lines.push([
+          esc(name),
+          esc(r.email),
+          esc(r.orgName),
+          esc(r.role),
+          esc(r.isActive ? 'yes' : 'no'),
+          esc(r.lastActiveAt ? new Date(r.lastActiveAt).toISOString() : ''),
+          esc(r.createdAt ? new Date(r.createdAt).toISOString() : ''),
+        ].join(','));
+      }
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="users.csv"');
+      res.send(lines.join('\n'));
+    } catch (error) {
+      console.error("Error exporting users overview:", error);
+      res.status(500).json({ message: "Failed to export users" });
+    }
+  });
+
   // System health: process info, counts, recent failed webhooks/notifications
   app.get("/api/super-admin/system-health", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
     try {

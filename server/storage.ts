@@ -348,6 +348,30 @@ export interface IStorage {
   getOrg(id: string): Promise<Org | undefined>;
   createOrg(org: InsertOrg): Promise<Org>;
   updateOrg(id: string, org: Partial<InsertOrg>): Promise<Org>;
+  getOrgsOverview(): Promise<Array<{
+    id: string;
+    name: string;
+    isActive: boolean;
+    primaryAdminEmail: string | null;
+    tier: string;
+    subscriptionStatus: string;
+    propertyCount: number;
+    userCount: number;
+    mrrCents: number;
+    createdAt: Date | null;
+  }>>;
+  getUsersOverview(): Promise<Array<{
+    id: string;
+    email: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    role: string;
+    isActive: boolean;
+    lastActiveAt: Date | null;
+    createdAt: Date | null;
+    orgId: string | null;
+    orgName: string | null;
+  }>>;
   getOrgSubscription(orgId: string): Promise<OrgSubscription | undefined>;
   upsertOrgSubscription(subscription: InsertOrgSubscription): Promise<OrgSubscription>;
   getOrgSupplySettings(id: string): Promise<{ supplyTypes: string[]; supplyUnits: string[] } | undefined>;
@@ -1225,6 +1249,97 @@ export class DatabaseStorage implements IStorage {
   async getOrg(id: string): Promise<Org | undefined> {
     const [org] = await db.select().from(orgs).where(eq(orgs.id, id));
     return org;
+  }
+
+  async getOrgsOverview() {
+    const settings = await this.getPlatformSettings();
+    const pricesCents: Record<string, number> = {
+      starter: Math.round((settings.starterPlanPrice ?? 49) * 100),
+      pro: Math.round((settings.proPlanPrice ?? 149) * 100),
+      grow: Math.round((settings.growPlanPrice ?? 249) * 100),
+      enterprise: Math.round((settings.enterprisePlanPrice ?? 399) * 100),
+    };
+
+    const orgRows = await db
+      .select({
+        id: orgs.id,
+        name: orgs.name,
+        isActive: orgs.isActive,
+        createdAt: orgs.createdAt,
+      })
+      .from(orgs)
+      .orderBy(orgs.name);
+
+    const subRows = await db.select().from(orgSubscriptions);
+    const subByOrg = new Map<string, typeof subRows[number]>();
+    for (const s of subRows) subByOrg.set(s.orgId, s);
+
+    const userCounts = await db
+      .select({ orgId: users.orgId, c: count() })
+      .from(users)
+      .where(isNotNull(users.orgId))
+      .groupBy(users.orgId);
+    const userCountByOrg = new Map<string, number>();
+    for (const r of userCounts) {
+      if (r.orgId) userCountByOrg.set(r.orgId, Number(r.c));
+    }
+
+    const propCounts = await db
+      .select({ orgId: properties.orgId, c: count() })
+      .from(properties)
+      .groupBy(properties.orgId);
+    const propCountByOrg = new Map<string, number>();
+    for (const r of propCounts) propCountByOrg.set(r.orgId, Number(r.c));
+
+    const adminRows = await db
+      .select({ orgId: users.orgId, email: users.email, createdAt: users.createdAt })
+      .from(users)
+      .where(and(eq(users.role, 'admin'), isNotNull(users.orgId)))
+      .orderBy(asc(users.createdAt));
+    const adminByOrg = new Map<string, string | null>();
+    for (const r of adminRows) {
+      if (r.orgId && !adminByOrg.has(r.orgId)) adminByOrg.set(r.orgId, r.email ?? null);
+    }
+
+    return orgRows.map((o) => {
+      const sub = subByOrg.get(o.id);
+      const tier = (sub?.tier as string) || 'starter';
+      const status = (sub?.status as string) || 'trialing';
+      const billing = status === 'active' || status === 'past_due';
+      const mrrCents = billing ? (pricesCents[tier] ?? 0) : 0;
+      return {
+        id: o.id,
+        name: o.name,
+        isActive: o.isActive,
+        primaryAdminEmail: adminByOrg.get(o.id) ?? null,
+        tier,
+        subscriptionStatus: status,
+        propertyCount: propCountByOrg.get(o.id) ?? 0,
+        userCount: userCountByOrg.get(o.id) ?? 0,
+        mrrCents,
+        createdAt: o.createdAt,
+      };
+    });
+  }
+
+  async getUsersOverview() {
+    const rows = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        role: users.role,
+        isActive: users.isActive,
+        lastActiveAt: users.lastActiveAt,
+        createdAt: users.createdAt,
+        orgId: users.orgId,
+        orgName: orgs.name,
+      })
+      .from(users)
+      .leftJoin(orgs, eq(users.orgId, orgs.id))
+      .orderBy(desc(users.lastActiveAt));
+    return rows;
   }
 
   async createOrg(orgData: InsertOrg): Promise<Org> {
