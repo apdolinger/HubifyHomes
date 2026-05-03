@@ -3056,7 +3056,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Platform settings (key/value JSONB store)
-  app.get("/api/super-admin/platform-settings", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+  // Note: auth is enforced by isSuperAdmin (which accepts both session-based super admin
+  // and OIDC users with role super_admin). isAuthenticated is intentionally not required
+  // so that the session-based super admin login can manage platform settings.
+  app.get("/api/super-admin/platform-settings", isSuperAdmin, requireMFA, async (req, res) => {
     try {
       const settings = await storage.getPlatformSettings();
       res.json(settings);
@@ -3066,9 +3069,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/super-admin/platform-settings", isAuthenticated, isSuperAdmin, requireMFA, async (req: any, res) => {
+  app.patch("/api/super-admin/platform-settings", isSuperAdmin, requireMFA, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub || null;
       const updates = req.body;
       if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
         return res.status(400).json({ message: "Body must be an object of key/value updates" });

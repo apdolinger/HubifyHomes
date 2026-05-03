@@ -650,7 +650,7 @@ export interface IStorage {
 
   // Platform-wide settings operations (Super Admin)
   getPlatformSettings(): Promise<Record<string, any>>;
-  setPlatformSettings(updates: Record<string, any>, updatedBy: string): Promise<Record<string, any>>;
+  setPlatformSettings(updates: Record<string, any>, updatedBy: string | null): Promise<Record<string, any>>;
 
   // Platform-wide alert operations (Super Admin)
   getAllPlatformAlerts(): Promise<PlatformAlert[]>;
@@ -3917,7 +3917,7 @@ export class DatabaseStorage implements IStorage {
     return merged;
   }
 
-  async setPlatformSettings(updates: Record<string, any>, updatedBy: string): Promise<Record<string, any>> {
+  async setPlatformSettings(updates: Record<string, any>, updatedBy: string | null): Promise<Record<string, any>> {
     const now = new Date();
     for (const [key, value] of Object.entries(updates)) {
       await db
