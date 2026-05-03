@@ -14,7 +14,7 @@ interface PortalUser {
 interface PortalAuthContextType {
   user: PortalUser | null;
   token: string | null;
-  login: (orgId: string, email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   register: (inviteToken: string, email: string, password: string, firstName?: string, lastName?: string) => Promise<void>;
   logout: () => Promise<void>;
   isLoading: boolean;
@@ -60,11 +60,11 @@ export function PortalAuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const login = async (orgId: string, email: string, password: string) => {
+  const login = async (email: string, password: string) => {
     const response = await fetch('/api/portal/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orgId, email, password }),
+      body: JSON.stringify({ email, password }),
     });
 
     if (!response.ok) {

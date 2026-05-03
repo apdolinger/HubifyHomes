@@ -11,7 +11,6 @@ import LegalLinks from '@/components/LegalLinks';
 import { HUBIFY_HOMES_LOGO_URL, HUBIFY_HOMES_LOGO_ALT } from '@/lib/brand';
 
 export default function PortalLogin() {
-  const [orgId, setOrgId] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -23,7 +22,7 @@ export default function PortalLogin() {
     setIsLoading(true);
 
     try {
-      await login(orgId, email, password);
+      await login(email, password);
       toast({
         title: 'Login successful',
         description: 'Welcome to Hubify Portal',
@@ -51,18 +50,6 @@ export default function PortalLogin() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="orgId">Organization ID</Label>
-              <Input
-                id="orgId"
-                type="text"
-                value={orgId}
-                onChange={(e) => setOrgId(e.target.value)}
-                placeholder="Enter your organization ID"
-                required
-                data-testid="input-org-id"
-              />
-            </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input

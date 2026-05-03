@@ -57,7 +57,7 @@ A copy-paste-friendly checklist any teammate can run against a freshly seeded en
 
 1. **Replit OIDC login** — Sign in as `beta-admin` via Replit Auth. ✅ Pass: lands on the dashboard for "Hubify Beta Demo" with the admin's name in the header.
 2. **Super Admin login** — Open `/super-admin/login`, sign in with the Super Admin account, complete the MFA prompt. ✅ Pass: Super Admin Console loads at `/super-admin`.
-3. **Hubify Portal login** — In incognito, open `/portal/login`. The current form requires three fields: Organization ID `00000000-0000-0000-0000-0000000000be`, Email `client@beta.hubify.test`, Password `HubifyBeta!2025`. ✅ Pass: portal home shows the demo client's properties and no admin chrome. ⚠️ See "Known issues" below — the orgId field and the blank portal home for client-role users are tracked bugs.
+3. **Hubify Portal login** — In incognito, open `/portal/login`. Sign in with Email `client@beta.hubify.test` and Password `HubifyBeta!2025`. ✅ Pass: portal home shows the demo client's properties and no admin chrome. ⚠️ See "Known issues" below — the blank portal home for client-role users is still a tracked bug.
 4. **Portal invitation flow** — As `beta-admin`, invite a new portal user with a throwaway email. ✅ Pass: invitation link is generated; opening it in a new window lets the invitee set a password and reach the portal home.
 5. **Logout (3 surfaces)** — From admin, super-admin, and portal sign out. ✅ Pass: each redirects to its login screen and revisiting a protected URL bounces back to login.
 6. **Portal password reset** — From `/portal/login` click "Forgot password", submit the demo client email, follow the reset link, set a new password. ✅ Pass: new password works on `/portal/login`; the previous password is rejected with an error.
@@ -216,5 +216,5 @@ These are intentional and should NOT be filed as bugs during beta QA:
 
 ### Bugs found during the 2026-05-03 automated smoke pass (file before beta launch)
 
-- **Portal login form requires the raw Organization UUID** (`/portal/login` shows an "Organization ID" input). A real beta partner will not know their org UUID. Either prefill from the invite link / subdomain, or drop the field entirely and look the org up by email.
+- ~~**Portal login form requires the raw Organization UUID**~~ — Fixed 2026-05-03. `/portal/login` and `/portal/forgot-password` now accept email + password only; the org is resolved server-side by matching the email/password (see `tests/portal-login.e2e.ts`).
 - **Portal home (`/portal`) renders a blank white page after login** for the seeded `client@beta.hubify.test` user. The Portal page in `client/src/pages/Portal.tsx` only renders `<StaffDashboard />` or `<VendorDashboard />` based on `user.role`, and the `PortalAuthContext` types `role` as `'staff' | 'vendor'` — a `client` role (or anything else) yields an empty `<main>`. Needs an unconditional client-facing dashboard (Properties / Tasks / Invoices / Documents) for the typical portal client persona.

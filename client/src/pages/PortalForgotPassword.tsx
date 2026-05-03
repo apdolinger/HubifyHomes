@@ -10,7 +10,6 @@ import LegalLinks from '@/components/LegalLinks';
 import { HUBIFY_HOMES_LOGO_URL, HUBIFY_HOMES_LOGO_ALT } from '@/lib/brand';
 
 export default function PortalForgotPassword() {
-  const [orgId, setOrgId] = useState('');
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -24,7 +23,7 @@ export default function PortalForgotPassword() {
       const response = await fetch('/api/portal/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orgId, email }),
+        body: JSON.stringify({ email }),
       });
 
       const data = await response.json();
@@ -95,22 +94,10 @@ export default function PortalForgotPassword() {
             <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="h-14 w-auto" />
           </div>
           <CardTitle className="text-2xl font-bold">Forgot Password</CardTitle>
-          <CardDescription>Enter your organization ID and email to receive a password reset link</CardDescription>
+          <CardDescription>Enter your email to receive a password reset link</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="orgId">Organization ID</Label>
-              <Input
-                id="orgId"
-                type="text"
-                value={orgId}
-                onChange={(e) => setOrgId(e.target.value)}
-                placeholder="Enter your organization ID"
-                required
-                data-testid="input-org-id"
-              />
-            </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input

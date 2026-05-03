@@ -1706,21 +1706,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/portal/login', async (req, res) => {
     try {
-      const { orgId, email, password } = req.body;
+      const { email, password } = req.body;
 
-      if (!orgId || !email || !password) {
+      if (!email || !password) {
         return res.status(400).json({ message: 'Missing required fields' });
       }
 
-      // Get user
-      const user = await storage.getPortalUserByEmail(orgId, email);
-      if (!user || !user.isActive) {
-        return res.status(401).json({ message: 'Invalid credentials' });
+      // Look up matching portal users by email across all orgs and verify
+      // the password against each match. Return the first one that verifies.
+      // Future: subdomain-based org routing (e.g. acme.hubify.app) could
+      // narrow this lookup before password verification.
+      const candidates = await storage.getPortalUsersByEmailAcrossOrgs(email.toLowerCase());
+      let user: typeof candidates[number] | undefined;
+      for (const candidate of candidates) {
+        if (!candidate.isActive) continue;
+        const isValid = await bcrypt.compare(password, candidate.passwordHash);
+        if (isValid) {
+          user = candidate;
+          break;
+        }
       }
-
-      // Verify password
-      const isValid = await bcrypt.compare(password, user.passwordHash);
-      if (!isValid) {
+      if (!user) {
         return res.status(401).json({ message: 'Invalid credentials' });
       }
 
@@ -1760,18 +1766,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Password reset for portal users - Request reset
   app.post('/api/portal/forgot-password', async (req, res) => {
     try {
-      const { orgId, email } = req.body;
+      const { email } = req.body;
 
-      if (!orgId || !email) {
-        return res.status(400).json({ message: 'Organization ID and email are required' });
+      if (!email) {
+        return res.status(400).json({ message: 'Email is required' });
       }
 
-      const user = await storage.getPortalUserByEmail(orgId, email.toLowerCase());
-      
+      // Look up across orgs; pick the first active match.
+      const candidates = await storage.getPortalUsersByEmailAcrossOrgs(email.toLowerCase());
+      const user = candidates.find((u) => u.isActive);
+
       // Always return success to prevent email enumeration
-      if (!user || !user.isActive) {
+      if (!user) {
         return res.json({ message: 'If an account exists with this email, you will receive a password reset link.' });
       }
+      const orgId = user.orgId;
 
       // Invalidate any existing reset tokens for this email
       await storage.invalidatePasswordResetTokensForEmail(email.toLowerCase());

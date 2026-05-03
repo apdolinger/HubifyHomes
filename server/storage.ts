@@ -443,6 +443,7 @@ export interface IStorage {
   
   // Portal user operations
   getPortalUserByEmail(orgId: string, email: string): Promise<PortalUser | undefined>;
+  getPortalUsersByEmailAcrossOrgs(email: string): Promise<PortalUser[]>;
   getPortalUserById(id: string): Promise<PortalUser | undefined>;
   createPortalUser(user: InsertPortalUser): Promise<PortalUser>;
   updatePortalUser(id: string, updates: Partial<InsertPortalUser>): Promise<PortalUser>;
@@ -1967,6 +1968,13 @@ export class DatabaseStorage implements IStorage {
       .from(portalUsers)
       .where(and(eq(portalUsers.orgId, orgId), eq(portalUsers.email, email)));
     return user;
+  }
+
+  async getPortalUsersByEmailAcrossOrgs(email: string): Promise<PortalUser[]> {
+    return await db
+      .select()
+      .from(portalUsers)
+      .where(eq(portalUsers.email, email));
   }
 
   async getPortalUserById(id: string): Promise<PortalUser | undefined> {
