@@ -1192,9 +1192,7 @@ async function main() {
   await ensureCommunityDocs(communityId);
 
   // Attach the portal client's properties to the community so community-wide
-  // documents flow through `/api/portal/documents` (which is strictly scoped:
-  // a community-wide doc is only visible when the user has at least one linked
-  // property in that community — no org-wide fallback).
+  // documents are visible under the portal's strict per-property scoping.
   await db
     .update(properties)
     .set({ communityId })

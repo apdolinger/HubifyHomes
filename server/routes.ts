@@ -2116,7 +2116,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ));
       if (!client) return res.json([]);
       const invoices = await storage.getClientInvoicesByClient(client.id);
-      // Server-side: drafts MUST never be exposed to the client portal.
       const visible = invoices
         .filter((inv) => inv.status !== 'draft')
         .map((inv) => ({
@@ -2139,18 +2138,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Portal client home: documents tied strictly to the portal user's linked
-  // properties. Visibility rules:
-  //   * Property-scoped docs: included only when the doc's propertyId is one of
-  //     the user's linked properties.
-  //   * Community-wide docs: included only for communities attached (via
-  //     properties.communityId) to one of the user's linked properties.
-  // No org-wide fallback — that would expose documents the user is not entitled
-  // to see.
+  // Documents for properties linked to the portal user. Property-scoped docs
+  // are visible only for linked properties; community-wide docs are visible
+  // only for communities attached to those linked properties.
   app.get('/api/portal/documents', isPortalAuthenticated, async (req: any, res) => {
     try {
       const portalUser = req.portalUser;
       const { communityDocuments, properties: propsTable } = await import('@shared/schema');
+      const { or } = await import('drizzle-orm');
       const links = await storage.getPortalUserProperties(portalUser.id);
       const propertyIds = links.map((l) => l.propertyId);
       if (propertyIds.length === 0) return res.json([]);
@@ -2166,16 +2161,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (r.communityId) communityIds.add(r.communityId);
       }
       if (allowedPropIds.size === 0) return res.json([]);
-      // Pull docs whose communityId matches an allowed community OR whose
-      // propertyId matches an allowed property — then filter to enforce both
-      // rules in code (a property-scoped doc must be in an allowed property;
-      // a community-wide doc must be in an allowed community).
-      const { or } = await import('drizzle-orm');
-      const orClauses = [] as any[];
-      if (communityIds.size > 0) {
-        orClauses.push(inArray(communityDocuments.communityId, Array.from(communityIds)));
-      }
-      orClauses.push(inArray(communityDocuments.propertyId, Array.from(allowedPropIds)));
+      const propClause = inArray(communityDocuments.propertyId, Array.from(allowedPropIds));
+      const where =
+        communityIds.size > 0
+          ? or(inArray(communityDocuments.communityId, Array.from(communityIds)), propClause)
+          : propClause;
       const docs = await db
         .select({
           id: communityDocuments.id,
@@ -2188,7 +2178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           uploadedAt: communityDocuments.uploadedAt,
         })
         .from(communityDocuments)
-        .where(or(...orClauses))
+        .where(where)
         .orderBy(desc(communityDocuments.uploadedAt));
       const visible = docs.filter((d) => {
         if (d.propertyId) return allowedPropIds.has(d.propertyId);
