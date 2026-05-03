@@ -4,6 +4,12 @@ A copy-paste-friendly checklist any teammate can run against a freshly seeded en
 
 ## Before you start
 
+> **Run the portal e2e first.** Before walking the checklist by hand, run the portal happy-path e2e — it catches the regressions surfaced by the 2026-05-03 QA pass before you spend time on the manual run:
+> ```bash
+> npx tsx tests/portal-happy-path.e2e.ts
+> ```
+> The script seeds the demo org for you (idempotent) and exercises sign-in → properties → invoices (with the `BETA-DRAFT-0001` negative assertion) → sign-out → re-auth bounce.
+
 1. Reset / seed the demo organization (idempotent — safe to re-run):
    ```bash
    npx tsx scripts/seed-beta-org.ts
