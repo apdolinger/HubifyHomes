@@ -351,8 +351,18 @@ const isAdmin = async (req: Request, res: Response, next: NextFunction) => {
       hasUser: !!user,
     });
     
-    // Check both user.role (for super admin) and user.claims.role (for OIDC users)
-    const role = user?.role || user?.claims?.role;
+    // Check user.role (super admin), then DB role (canonical for OIDC users), then claims fallback
+    let role: string | undefined = user?.role;
+    if (!role) {
+      const userId = user?.claims?.sub || user?.id;
+      if (userId) {
+        const dbUser = await storage.getUser(userId);
+        role = dbUser?.role;
+      }
+    }
+    if (!role) {
+      role = user?.claims?.role;
+    }
     
     if (role !== 'admin' && role !== 'supervisor' && role !== 'super_admin') {
       console.log('[AUTH] isAdmin check failed - insufficient role:', role);

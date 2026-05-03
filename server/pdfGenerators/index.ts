@@ -2,19 +2,19 @@ import PDFDocument from "pdfkit";
 
 export type PdfDoc = InstanceType<typeof PDFDocument>;
 
-export function addSampleWatermark(doc: PdfDoc) {
+export function addSampleWatermark(doc: PdfDoc): void {
   const w = doc.page.width;
   const h = doc.page.height;
   doc.save();
   doc.rotate(-30, { origin: [w / 2, h / 2] });
-  doc.fontSize(110)
-    .fillColor("#9ca3af", 0.18 as any)
+  doc.fillOpacity(0.18);
+  doc.fontSize(110).fillColor("#9ca3af")
     .text("SAMPLE", 0, h / 2 - 60, { width: w, align: "center" });
+  doc.fillOpacity(1);
   doc.restore();
-  doc.fillColor("black", 1 as any);
 }
 
-export function addSampleBanner(doc: PdfDoc) {
+export function addSampleBanner(doc: PdfDoc): void {
   doc.save();
   doc.rect(0, 0, doc.page.width, 22).fillColor("#fef3c7").fill();
   doc.fontSize(9).fillColor("#92400e").text(
@@ -22,15 +22,12 @@ export function addSampleBanner(doc: PdfDoc) {
     0, 7, { width: doc.page.width, align: "center" }
   );
   doc.restore();
-  doc.fillColor("black", 1 as any);
   doc.y = 32;
 }
 
-export function attachWatermark(doc: PdfDoc) {
-  // Apply to current page
+export function attachWatermark(doc: PdfDoc): void {
   addSampleBanner(doc);
   addSampleWatermark(doc);
-  // Apply to every subsequent page
   doc.on("pageAdded", () => {
     addSampleBanner(doc);
     addSampleWatermark(doc);
@@ -55,19 +52,19 @@ export function streamPdf(build: (doc: PdfDoc) => void): Promise<Buffer> {
   });
 }
 
-export function hr(doc: PdfDoc, color = "#e2e8f0") {
+export function hr(doc: PdfDoc, color: string = "#e2e8f0"): void {
   doc.moveTo(50, doc.y).lineTo(doc.page.width - 50, doc.y).strokeColor(color).stroke();
   doc.moveDown(0.4);
 }
 
-export function sectionTitle(doc: PdfDoc, label: string, color = "#1e40af") {
+export function sectionTitle(doc: PdfDoc, label: string, color: string = "#1e40af"): void {
   doc.moveDown(0.4);
   doc.fontSize(12).fillColor(color).text(label.toUpperCase(), 50, doc.y, { characterSpacing: 1 });
   doc.moveDown(0.2);
   hr(doc);
 }
 
-export function kv(doc: PdfDoc, label: string, value: string, x: number, y: number, w: number) {
+export function kv(doc: PdfDoc, label: string, value: string, x: number, y: number, w: number): void {
   doc.fontSize(7).fillColor("#64748b").text(label.toUpperCase(), x, y, { width: w, characterSpacing: 0.6 });
   doc.fontSize(10).fillColor("#0f172a").text(value || "—", x, y + 11, { width: w });
 }
