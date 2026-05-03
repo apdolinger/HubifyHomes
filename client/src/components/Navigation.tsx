@@ -247,20 +247,18 @@ export default function Navigation() {
           {/* Global Search and User Menu */}
           <div className="flex items-center space-x-2">
             {/* Global Search */}
-            <div className="relative hidden sm:block">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 text-slate-400" />
-              </div>
-              <input
-                type="text"
-                placeholder="Search properties, clients, tasks..."
-                className="w-64 pl-10 pr-12 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                id="globalSearch"
-              />
-              <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                <kbd className="kbd">S</kbd>
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("hubify:open-quick-search"))}
+              className="relative hidden sm:flex items-center w-64 pl-10 pr-12 py-2 border border-slate-300 rounded-lg text-sm text-slate-400 hover:bg-slate-50 hover:border-slate-400 transition-colors text-left"
+              id="globalSearch"
+              data-testid="button-global-search"
+              aria-label="Open quick search"
+            >
+              <Search className="absolute left-3 h-4 w-4 text-slate-400" />
+              <span>Search properties, clients, tasks...</span>
+              <kbd className="kbd absolute right-3" aria-hidden="true">S</kbd>
+            </button>
 
             {/* Notification Bell */}
             <Sheet open={isNotificationPanelOpen} onOpenChange={setIsNotificationPanelOpen}>

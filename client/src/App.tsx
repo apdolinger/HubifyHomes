@@ -268,6 +268,12 @@ function AuthenticatedAppContent() {
     },
   });
 
+  useEffect(() => {
+    const openSearch = () => setIsQuickSearchOpen(true);
+    window.addEventListener("hubify:open-quick-search", openSearch);
+    return () => window.removeEventListener("hubify:open-quick-search", openSearch);
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <Navigation />

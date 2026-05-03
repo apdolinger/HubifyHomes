@@ -7,10 +7,6 @@ import {
   HelpCircle, 
   UserX, 
   Clock,
-  ExternalLink,
-  BookOpen,
-  Lightbulb,
-  Users,
   Eye,
   ArrowRight,
   RefreshCw,
@@ -255,45 +251,9 @@ export function SupportWidget({ className, externalModalOpen, onExternalModalCha
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            <div className="grid grid-cols-1 gap-3">
-              <Button 
-                variant="outline" 
-                className="justify-start"
-                onClick={() => window.open('https://help.hubifyhomes.app', '_blank')}
-              >
-                <BookOpen className="w-4 h-4 mr-2" />
-                Help Documentation
-                <ExternalLink className="w-3 h-3 ml-auto" />
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                className="justify-start"
-                onClick={() => window.open('https://help.hubifyhomes.app/videos', '_blank')}
-              >
-                <Users className="w-4 h-4 mr-2" />
-                Training Videos
-                <ExternalLink className="w-3 h-3 ml-auto" />
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                className="justify-start"
-                onClick={() => window.open('https://help.hubifyhomes.app/tips', '_blank')}
-              >
-                <Lightbulb className="w-4 h-4 mr-2" />
-                Tips & Tricks
-                <ExternalLink className="w-3 h-3 ml-auto" />
-              </Button>
-            </div>
-            
-            <div className="bg-slate-50 rounded-lg p-3">
-              <h4 className="font-medium text-slate-900 mb-1">Quick Tip</h4>
-              <p className="text-sm text-slate-600">
-                Press "?" to open support, or "T" to quickly add a new task from anywhere.
-              </p>
-            </div>
-            
+            <p className="text-sm text-slate-600">
+              Need help? Send us a message and our team will get back to you.
+            </p>
             <Button 
               className="w-full bg-primary hover:bg-primary/90"
               onClick={() => setModalOpen(true)}

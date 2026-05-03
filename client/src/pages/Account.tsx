@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -490,6 +491,19 @@ export default function Account() {
   );
 
   const orgId = (user as any)?.orgId;
+  const [, setLocation] = useLocation();
+
+  const { data: orgSubscription } = useQuery<{
+    tier?: string;
+    status?: string;
+    currentPeriodEnd?: string | null;
+    cancelAtPeriodEnd?: boolean;
+    stripeSubscriptionId?: string | null;
+  }>({
+    queryKey: [`/api/orgs/${orgId}/subscription`],
+    enabled: !!orgId && (user as any)?.role === 'admin',
+    retry: false,
+  });
 
   // Redirect to home if not authenticated or not admin
   useEffect(() => {
@@ -680,13 +694,26 @@ export default function Account() {
     return null;
   }
 
+  const tierLabel: Record<string, string> = {
+    starter: "Starter",
+    pro: "Pro",
+    grow: "Grow",
+    enterprise: "Enterprise",
+  };
+  const statusLabel: Record<string, string> = {
+    active: "Active",
+    trialing: "Trial",
+    past_due: "Past Due",
+    canceled: "Canceled",
+    incomplete: "Incomplete",
+  };
   const subscriptionInfo = {
-    plan: "Professional Tier",
-    status: "Active",
-    billingCycle: "Monthly",
-    nextBilling: "2025-08-24",
-    amount: "$149/month",
-    paymentMethod: "**** **** **** 4532"
+    plan: orgSubscription?.tier ? `${tierLabel[orgSubscription.tier] ?? orgSubscription.tier} Plan` : "—",
+    status: orgSubscription?.status ? statusLabel[orgSubscription.status] ?? orgSubscription.status : "—",
+    nextBilling: orgSubscription?.currentPeriodEnd
+      ? new Date(orgSubscription.currentPeriodEnd).toLocaleDateString()
+      : "—",
+    cancelAtPeriodEnd: orgSubscription?.cancelAtPeriodEnd ?? false,
   };
 
   return (
@@ -1079,44 +1106,40 @@ export default function Account() {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="p-4 bg-slate-50 border rounded-lg" data-testid="card-current-plan">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h3 className="font-medium text-green-900">{subscriptionInfo.plan}</h3>
-                          <p className="text-sm text-green-700">{subscriptionInfo.status}</p>
+                          <h3 className="font-medium text-slate-900" data-testid="text-plan-name">
+                            {subscriptionInfo.plan}
+                          </h3>
+                          <p className="text-sm text-slate-600">Current plan</p>
                         </div>
-                        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
-                          Active
+                        <Badge
+                          variant="outline"
+                          className={
+                            orgSubscription?.status === 'active' || orgSubscription?.status === 'trialing'
+                              ? 'bg-green-100 text-green-800 border-green-300'
+                              : orgSubscription?.status === 'past_due'
+                                ? 'bg-red-100 text-red-800 border-red-300'
+                                : 'bg-slate-100 text-slate-700 border-slate-300'
+                          }
+                          data-testid="badge-plan-status"
+                        >
+                          {subscriptionInfo.status}
                         </Badge>
                       </div>
-                      <div className="mt-3 text-sm text-green-700">
-                        <p>Billing: {subscriptionInfo.amount} ({subscriptionInfo.billingCycle})</p>
-                        <p>Next billing: {subscriptionInfo.nextBilling}</p>
+                      <div className="mt-3 text-sm text-slate-600 space-y-1">
+                        <p>Renews: <span className="font-medium">{subscriptionInfo.nextBilling}</span></p>
+                        {subscriptionInfo.cancelAtPeriodEnd && (
+                          <p className="text-amber-700">Cancels at end of period</p>
+                        )}
                       </div>
                     </div>
-                    <div className="p-4 bg-slate-50 border rounded-lg">
-                      <h4 className="font-medium text-slate-900 mb-2">Payment Method</h4>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-slate-600">{subscriptionInfo.paymentMethod}</span>
-                        <Button variant="outline" size="sm">
-                          <Edit className="w-4 h-4 mr-2" />
-                          Update
-                        </Button>
-                      </div>
-                    </div>
+                    <p className="text-xs text-slate-500">
+                      To change your plan or update payment details, contact your Hubify account manager.
+                    </p>
                   </div>
                   <div className="space-y-4">
-                    <div>
-                      <h4 className="font-medium text-slate-900 mb-3">Plan Options</h4>
-                      <div className="space-y-2">
-                        <Button className="w-full justify-start" variant="outline">
-                          Upgrade to Enterprise
-                        </Button>
-                        <Button className="w-full justify-start" variant="outline">
-                          Change Billing Cycle
-                        </Button>
-                      </div>
-                    </div>
                     <div>
                       <h4 className="font-medium text-slate-900 mb-3">Default Billing Settings</h4>
                       <Button 
@@ -1130,10 +1153,15 @@ export default function Account() {
                       </Button>
                     </div>
                     <div>
-                      <h4 className="font-medium text-slate-900 mb-3">Billing History</h4>
-                      <Button className="w-full justify-start" variant="outline">
-                        <Download className="w-4 h-4 mr-2" />
-                        Download Invoices
+                      <h4 className="font-medium text-slate-900 mb-3">Client Invoices</h4>
+                      <Button
+                        className="w-full justify-start"
+                        variant="outline"
+                        onClick={() => setLocation('/admin/invoices')}
+                        data-testid="button-view-invoices"
+                      >
+                        <FileText className="w-4 h-4 mr-2" />
+                        View Client Invoices
                       </Button>
                     </div>
                   </div>
@@ -1145,206 +1173,29 @@ export default function Account() {
 
         {/* Forms Tab */}
         <TabsContent value="forms">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center">
-                    <FileText className="w-5 h-5 mr-2" />
-                    Form Management
-                  </CardTitle>
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create New Form
-                  </Button>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <FileText className="w-5 h-5 mr-2" />
+                Form Management
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 space-y-4">
+                <FileText className="w-12 h-12 text-slate-400 mx-auto" />
+                <div>
+                  <h3 className="font-medium text-slate-900">Manage forms in the Forms admin</h3>
+                  <p className="text-sm text-slate-600 mt-1">
+                    Build, share, and view submissions for your organization's forms.
+                  </p>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Sample Forms */}
-                  <div className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <h3 className="font-semibold">Property Intake Form</h3>
-                        <p className="text-sm text-gray-600">Collect new property information from clients</p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant="outline" className="bg-green-50 text-green-700">Public</Badge>
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700">Embeddable</Badge>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
-                      <div>
-                        <span className="font-medium">Fields:</span> 8 fields
-                      </div>
-                      <div>
-                        <span className="font-medium">Submissions:</span> 23 total
-                      </div>
-                      <div>
-                        <span className="font-medium">Destination:</span> Creates Contacts
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between mt-4 pt-3 border-t">
-                      <div className="text-sm text-gray-500">
-                        Created: Jan 15, 2025 • Last updated: Jan 20, 2025
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button variant="outline" size="sm">
-                          <Eye className="w-3 h-3 mr-1" />
-                          Preview
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <Edit className="w-3 h-3 mr-1" />
-                          Edit
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          Embed Code
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <Download className="w-3 h-3 mr-1" />
-                          Export Data
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <h3 className="font-semibold">Maintenance Request Form</h3>
-                        <p className="text-sm text-gray-600">Allow residents to submit maintenance requests</p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant="outline" className="bg-gray-50 text-gray-700">Private</Badge>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
-                      <div>
-                        <span className="font-medium">Fields:</span> 12 fields
-                      </div>
-                      <div>
-                        <span className="font-medium">Submissions:</span> 47 total
-                      </div>
-                      <div>
-                        <span className="font-medium">Destination:</span> Creates Tasks
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between mt-4 pt-3 border-t">
-                      <div className="text-sm text-gray-500">
-                        Created: Dec 8, 2024 • Last updated: Jan 18, 2025
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button variant="outline" size="sm">
-                          <Eye className="w-3 h-3 mr-1" />
-                          Preview
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <Edit className="w-3 h-3 mr-1" />
-                          Edit
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          Share Link
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <Download className="w-3 h-3 mr-1" />
-                          Export Data
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <h3 className="font-semibold">Client Feedback Survey</h3>
-                        <p className="text-sm text-gray-600">Collect service feedback from property owners</p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant="outline" className="bg-green-50 text-green-700">Public</Badge>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
-                      <div>
-                        <span className="font-medium">Fields:</span> 6 fields
-                      </div>
-                      <div>
-                        <span className="font-medium">Submissions:</span> 12 total
-                      </div>
-                      <div>
-                        <span className="font-medium">Destination:</span> None (Survey only)
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between mt-4 pt-3 border-t">
-                      <div className="text-sm text-gray-500">
-                        Created: Jan 5, 2025 • Last updated: Jan 5, 2025
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button variant="outline" size="sm">
-                          <Eye className="w-3 h-3 mr-1" />
-                          Preview
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <Edit className="w-3 h-3 mr-1" />
-                          Edit
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          Share Link
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <Download className="w-3 h-3 mr-1" />
-                          Export Data
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Form Builder */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Settings className="w-5 h-5 mr-2" />
-                  Form Templates & Quick Actions
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Button variant="outline" className="h-24 flex flex-col justify-center">
-                    <FileText className="w-6 h-6 mb-2" />
-                    <span className="font-medium">Property Intake</span>
-                    <span className="text-xs text-gray-500">Collect new property info</span>
-                  </Button>
-                  <Button variant="outline" className="h-24 flex flex-col justify-center">
-                    <Settings className="w-6 h-6 mb-2" />
-                    <span className="font-medium">Maintenance Request</span>
-                    <span className="text-xs text-gray-500">Resident service requests</span>
-                  </Button>
-                  <Button variant="outline" className="h-24 flex flex-col justify-center">
-                    <User className="w-6 h-6 mb-2" />
-                    <span className="font-medium">Contact Information</span>
-                    <span className="text-xs text-gray-500">Collect contact details</span>
-                  </Button>
-                  <Button variant="outline" className="h-24 flex flex-col justify-center">
-                    <CheckCircle className="w-6 h-6 mb-2" />
-                    <span className="font-medium">Service Feedback</span>
-                    <span className="text-xs text-gray-500">Customer satisfaction</span>
-                  </Button>
-                  <Button variant="outline" className="h-24 flex flex-col justify-center">
-                    <AlertTriangle className="w-6 h-6 mb-2" />
-                    <span className="font-medium">Incident Report</span>
-                    <span className="text-xs text-gray-500">Report issues or incidents</span>
-                  </Button>
-                  <Button variant="outline" className="h-24 flex flex-col justify-center">
-                    <Plus className="w-6 h-6 mb-2" />
-                    <span className="font-medium">Custom Form</span>
-                    <span className="text-xs text-gray-500">Build from scratch</span>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                <Button onClick={() => setLocation('/admin/forms')} data-testid="button-go-to-forms-admin">
+                  <ArrowLeft className="w-4 h-4 mr-2 rotate-180" />
+                  Open Forms Admin
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Custom Fields Tab */}
@@ -1356,48 +1207,24 @@ export default function Account() {
         <TabsContent value="email-templates">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center">
-                  <Mail className="w-5 h-5 mr-2" />
-                  Email Template Editor
-                </CardTitle>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Template
-                </Button>
-              </div>
+              <CardTitle className="flex items-center">
+                <Mail className="w-5 h-5 mr-2" />
+                Email Templates
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-4">
-                  <h3 className="font-medium text-slate-900">Template Categories</h3>
-                  <div className="space-y-2">
-                    {['Welcome Emails', 'Task Notifications', 'Reminders & Alerts', 'Billing Notices'].map((category) => (
-                      <Button key={category} variant="ghost" className="w-full justify-start">
-                        {category}
-                      </Button>
-                    ))}
-                  </div>
+              <div className="text-center py-8 space-y-4">
+                <Mail className="w-12 h-12 text-slate-400 mx-auto" />
+                <div>
+                  <h3 className="font-medium text-slate-900">Manage email templates</h3>
+                  <p className="text-sm text-slate-600 mt-1">
+                    Create, edit, and preview templates with merge fields in the Email Templates admin.
+                  </p>
                 </div>
-                <div className="md:col-span-2 space-y-4">
-                  <div className="p-4 border rounded-lg">
-                    <h4 className="font-medium text-slate-900 mb-2">Welcome Email Template</h4>
-                    <p className="text-sm text-slate-600 mb-4">Sent to new team members when they join</p>
-                    <Textarea
-                      className="min-h-32"
-                      placeholder="Hi {{firstName}}, welcome to {{companyName}}! Your account has been created..."
-                    />
-                    <div className="flex justify-between items-center mt-4">
-                      <div className="text-xs text-slate-500">
-                        Available variables: {'{'}firstName{'}'}, {'{'}lastName{'}'}, {'{'}companyName{'}'}, {'{'}loginUrl{'}'}
-                      </div>
-                      <Button size="sm">
-                        <Save className="w-4 h-4 mr-2" />
-                        Save
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+                <Button onClick={() => setLocation('/admin/email-templates')} data-testid="button-go-to-email-templates">
+                  <Mail className="w-4 h-4 mr-2" />
+                  Open Email Templates
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -1407,38 +1234,24 @@ export default function Account() {
         <TabsContent value="task-templates">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center">
-                  <CheckCircle className="w-5 h-5 mr-2" />
-                  Task Template Manager
-                </CardTitle>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Template
-                </Button>
-              </div>
+              <CardTitle className="flex items-center">
+                <CheckCircle className="w-5 h-5 mr-2" />
+                Task Templates
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {['Weekly Inspection Checklist', 'Monthly Maintenance Review', 'New Property Setup', 'Emergency Response'].map((template) => (
-                  <Card key={template} className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium text-slate-900">{template}</h4>
-                      <Button size="sm" variant="ghost">
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    <p className="text-sm text-slate-600 mb-3">
-                      {template === 'Weekly Inspection Checklist' && '8 tasks • Used by 12 properties'}
-                      {template === 'Monthly Maintenance Review' && '5 tasks • Used by 8 properties'}
-                      {template === 'New Property Setup' && '15 tasks • Used by all new properties'}
-                      {template === 'Emergency Response' && '6 tasks • High priority template'}
-                    </p>
-                    <Button size="sm" variant="outline" className="w-full">
-                      Apply to Property
-                    </Button>
-                  </Card>
-                ))}
+              <div className="text-center py-8 space-y-4">
+                <CheckCircle className="w-12 h-12 text-slate-400 mx-auto" />
+                <div>
+                  <h3 className="font-medium text-slate-900">Manage task templates</h3>
+                  <p className="text-sm text-slate-600 mt-1">
+                    Reusable task and inspection templates live under Admin &gt; Templates.
+                  </p>
+                </div>
+                <Button onClick={() => setLocation('/admin?tab=templates')} data-testid="button-go-to-task-templates">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Open Templates
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -1459,43 +1272,34 @@ export default function Account() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {['Field Staff', 'Supervisor', 'Admin'].map((role) => (
-                    <Card key={role} className="p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium text-slate-900">{role}</h4>
-                        <Button size="sm" variant="ghost">
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                      </div>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex items-center justify-between">
-                          <span>View Properties</span>
-                          <CheckCircle className="w-4 h-4 text-green-600" />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Create Tasks</span>
-                          <CheckCircle className="w-4 h-4 text-green-600" />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Manage Team</span>
-                          {role === 'Admin' ? 
-                            <CheckCircle className="w-4 h-4 text-green-600" /> :
-                            <div className="w-4 h-4 rounded-full bg-slate-200"></div>
-                          }
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Billing Access</span>
-                          {role === 'Admin' ? 
-                            <CheckCircle className="w-4 h-4 text-green-600" /> :
-                            <div className="w-4 h-4 rounded-full bg-slate-200"></div>
-                          }
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
+              <div className="space-y-4">
+                <p className="text-sm text-slate-600">
+                  Hubify uses three built-in roles. Assign roles to team members from the Team page.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="font-medium text-slate-900">Admin</h4>
+                    <p className="text-xs text-slate-600 mt-1">
+                      Full access to settings, billing, team, and all org data.
+                    </p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="font-medium text-slate-900">Manager</h4>
+                    <p className="text-xs text-slate-600 mt-1">
+                      Manage properties, tasks, calendar, and the Hubify Console. No billing access.
+                    </p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="font-medium text-slate-900">Member / Field Staff</h4>
+                    <p className="text-xs text-slate-600 mt-1">
+                      View and complete assigned tasks, log time, and use Field Mode.
+                    </p>
+                  </div>
                 </div>
+                <Button variant="outline" onClick={() => setLocation('/team')} data-testid="button-go-to-team">
+                  <Users className="w-4 h-4 mr-2" />
+                  Manage Team Members
+                </Button>
               </div>
             </CardContent>
           </Card>

@@ -20,11 +20,12 @@ import {
   Mail,
   Eye
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 export default function HubifyConsole() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const { data: supportInfo } = useQuery<{ supportPhone: string | null }>({
     queryKey: ["/api/support-info"],
@@ -331,7 +332,8 @@ export default function HubifyConsole() {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => window.location.href = routes.adminClientPortalSettings(property.id)}
+                        onClick={() => setLocation(routes.adminClientPortalSettings(property.id))}
+                        data-testid={`button-portal-settings-${property.id}`}
                       >
                         <Home className="w-4 h-4 mr-2" />
                         Portal Settings
