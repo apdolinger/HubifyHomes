@@ -118,6 +118,7 @@ function Router() {
       <Route path="/privacy" component={PrivacyPolicy} />
       <Route path="/terms" component={TermsOfService} />
       <Route path="/super-admin/login" component={SuperAdminLogin} />
+      <Route path="/super-admin" component={SuperAdmin} />
       <Route path="/payment-collection/:token" component={PaymentCollectionPage} />
       
       {/* Portal routes (separate auth system) */}
@@ -247,7 +248,6 @@ function Router() {
               return null;
             }}
           </Route>
-          <Route path="/super-admin" component={SuperAdmin} />
           <Route path="/dwellerly-admin" component={SuperAdmin} />
           <Route path="/dwellerly-admin/organization/:id" component={OrganizationProfile} />
         </>
