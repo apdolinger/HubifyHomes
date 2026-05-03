@@ -201,7 +201,17 @@ export async function dispatchWebhookEvent(
   payload: Record<string, any>
 ): Promise<void> {
   try {
-    const endpoints = await storage.getEnabledWebhookEndpointsForEvent(orgId, eventType);
+    let endpoints;
+    try {
+      endpoints = await storage.getEnabledWebhookEndpointsForEvent(orgId, eventType);
+    } catch (err: any) {
+      // If the webhook tables haven't been provisioned in this environment,
+      // silently no-op rather than logging an error on every task mutation.
+      if (err?.code === "42P01" || /relation .*webhook_endpoints.* does not exist/i.test(String(err?.message))) {
+        return;
+      }
+      throw err;
+    }
 
     if (endpoints.length === 0) return;
 
@@ -245,7 +255,15 @@ export async function dispatchWebhookEvent(
  */
 export async function retryFailedWebhookDeliveries(): Promise<void> {
   try {
-    const failedDeliveries = await storage.getFailedWebhookDeliveriesForRetry();
+    let failedDeliveries;
+    try {
+      failedDeliveries = await storage.getFailedWebhookDeliveriesForRetry();
+    } catch (err: any) {
+      if (err?.code === "42P01" || /relation .*webhook_(endpoints|deliveries).* does not exist/i.test(String(err?.message))) {
+        return;
+      }
+      throw err;
+    }
 
     if (failedDeliveries.length === 0) return;
 

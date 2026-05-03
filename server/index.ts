@@ -124,7 +124,17 @@ app.use((req, res, next) => {
     reusePort: true,
   }, async () => {
     log(`serving on port ${port}`);
-    
+
+    // Ensure the outbound-webhook tables exist (targeted, idempotent).
+    // Without this the dispatcher logs an error on every task mutation in
+    // environments where the webhook integration was never provisioned.
+    try {
+      const { ensureWebhookTables } = await import('./runMigrations.js');
+      await ensureWebhookTables();
+    } catch (error) {
+      console.error('Error ensuring webhook tables:', error);
+    }
+
     // Start scheduled background tasks
     startScheduledTasks();
     
