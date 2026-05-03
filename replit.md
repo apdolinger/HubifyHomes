@@ -43,6 +43,16 @@ Core features include:
 ### System Design Choices
 The database uses PostgreSQL with Drizzle ORM (Better SQLite3 for local development). The architecture is multi-tenant and organization-scoped, utilizing UUID-based primary keys and JSONB for flexible data structures.
 
+## Beta Demo Org
+A scripted, idempotent demo organization for closed-beta testing and screencasts.
+
+- **Seed command**: `npx tsx scripts/seed-beta-org.ts` (refuses to run when `NODE_ENV=production` unless `--force` is passed). Re-running is safe — fixed UUIDs/natural keys mean nothing is duplicated.
+- **Org**: "Hubify Beta Demo" — `orgId = 00000000-0000-0000-0000-0000000000be`
+- **Internal users** (Replit Auth IDs; sign in via Replit account, then map): `beta-admin` (admin@beta.hubify.test, role admin), `beta-supervisor` (supervisor@beta.hubify.test), `beta-staff-1` (staff1@beta.hubify.test), `beta-staff-2` (staff2@beta.hubify.test).
+- **Portal credentials**: `client@beta.hubify.test` / `HubifyBeta!2025` at `/portal/login`.
+- **Seeded content**: 10 contacts (owners/vendors/tenants/emergency), 6 mixed properties, 20 tasks (incl. 3 inspections w/ checklists, 2 overdue, recurring), 2 active inspection schedules, 5 calendar events (incl. an intentional conflict + a recurring weekly standup), 2 published forms with sample submissions, 1 community + 2 community documents, 4 invoices (draft/sent/paid/overdue) + 1 consolidated batch invoice, 4 in-app notifications.
+- **Stripe**: payment-method seeding is skipped cleanly when `STRIPE_SECRET_KEY` is unset; with the key present the script attaches a stored test card to the demo client.
+
 ## External Dependencies
 
 ### Core
