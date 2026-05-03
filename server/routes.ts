@@ -1239,7 +1239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         essential: true,
         analytics: !!analytics,
         marketing: !!marketing,
-      } as any);
+      });
       res.json(consent);
     } catch (error) {
       console.error("Error saving cookie consent:", error);
@@ -1867,6 +1867,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Portal user cookie consent (Bearer token via isPortalAuthenticated)
+  app.get('/api/portal/me/cookie-consent', isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const portalUserId = req.portalSession.portalUserId;
+      const consent = await storage.getPortalUserCookieConsent(portalUserId);
+      res.json(consent || null);
+    } catch (error) {
+      console.error("Error fetching portal cookie consent:", error);
+      res.status(500).json({ message: "Failed to fetch cookie consent" });
+    }
+  });
+
+  app.post('/api/portal/me/cookie-consent', isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const portalUserId = req.portalSession.portalUserId;
+      const { version, analytics, marketing } = req.body || {};
+      const consent = await storage.upsertPortalUserCookieConsent({
+        portalUserId,
+        version: Number.isFinite(version) ? Number(version) : 1,
+        essential: true,
+        analytics: !!analytics,
+        marketing: !!marketing,
+      });
+      res.json(consent);
+    } catch (error) {
+      console.error("Error saving portal cookie consent:", error);
+      res.status(500).json({ message: "Failed to save cookie consent" });
+    }
+  });
+
   // Public: org-level cookie banner override for portal pages.
   // Returns enabled=false only when the org's published portal settings
   // explicitly disable the cookie notice. Defaults to enabled=true.
@@ -1885,7 +1915,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eq(propertyPortalSettings.status, 'published')
         ));
       // Disable banner only if every published setting opted out.
-      if (rows.length > 0 && rows.every((r) => (r.legal as any)?.cookieNotice === false)) {
+      if (rows.length > 0 && rows.every((r) => r.legal?.cookieNotice === false)) {
         return res.json({ enabled: false });
       }
       res.json({ enabled: true });

@@ -1576,6 +1576,7 @@ export const propertyPortalSettings = pgTable("property_portal_settings", {
     termsUrl?: string;
     privacyUrl?: string;
     disclaimerText?: string;
+    cookieNotice?: boolean;
   }>().default({}),
   i18n: jsonb("i18n").$type<{
     defaultLocale?: string;
@@ -3321,3 +3322,21 @@ export const insertUserCookieConsentSchema = createInsertSchema(userCookieConsen
 });
 export type InsertUserCookieConsent = z.infer<typeof insertUserCookieConsentSchema>;
 export type UserCookieConsent = typeof userCookieConsent.$inferSelect;
+
+// Portal users authenticate separately from OIDC users, so their consent has
+// its own table keyed by portal_user_id.
+export const portalUserCookieConsent = pgTable("portal_user_cookie_consent", {
+  portalUserId: uuid("portal_user_id").primaryKey().references(() => portalUsers.id, { onDelete: 'cascade' }).notNull(),
+  version: integer("version").notNull().default(1),
+  essential: boolean("essential").notNull().default(true),
+  analytics: boolean("analytics").notNull().default(false),
+  marketing: boolean("marketing").notNull().default(false),
+  decidedAt: timestamp("decided_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertPortalUserCookieConsentSchema = createInsertSchema(portalUserCookieConsent).omit({
+  decidedAt: true,
+  updatedAt: true,
+});
+export type InsertPortalUserCookieConsent = z.infer<typeof insertPortalUserCookieConsentSchema>;
+export type PortalUserCookieConsent = typeof portalUserCookieConsent.$inferSelect;

@@ -56,6 +56,7 @@ import {
   messageMentions,
   userNotificationPreferences,
   userCookieConsent,
+  portalUserCookieConsent,
   activityLog,
   forms,
   formFields,
@@ -205,6 +206,8 @@ import {
   type InsertUserNotificationPreferences,
   type UserCookieConsent,
   type InsertUserCookieConsent,
+  type PortalUserCookieConsent,
+  type InsertPortalUserCookieConsent,
   type ActivityLog,
   type InsertActivityLog,
   type Form,
@@ -379,6 +382,8 @@ export interface IStorage {
   upsertOrgSubscription(subscription: InsertOrgSubscription): Promise<OrgSubscription>;
   getUserCookieConsent(userId: string): Promise<UserCookieConsent | undefined>;
   upsertUserCookieConsent(consent: InsertUserCookieConsent): Promise<UserCookieConsent>;
+  getPortalUserCookieConsent(portalUserId: string): Promise<PortalUserCookieConsent | undefined>;
+  upsertPortalUserCookieConsent(consent: InsertPortalUserCookieConsent): Promise<PortalUserCookieConsent>;
   getOrgSupplySettings(id: string): Promise<{ supplyTypes: string[]; supplyUnits: string[] } | undefined>;
   updateOrgSupplySettings(id: string, settings: { supplyTypes?: string[]; supplyUnits?: string[] }): Promise<{ supplyTypes: string[]; supplyUnits: string[] } | undefined>;
   
@@ -7630,7 +7635,34 @@ export class DatabaseStorage implements IStorage {
       .onConflictDoUpdate({
         target: userCookieConsent.userId,
         set: {
-          version: consent.version,
+          version: consent.version ?? 1,
+          essential: true,
+          analytics: consent.analytics ?? false,
+          marketing: consent.marketing ?? false,
+          decidedAt: new Date(),
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return row;
+  }
+
+  async getPortalUserCookieConsent(portalUserId: string): Promise<PortalUserCookieConsent | undefined> {
+    const [row] = await db
+      .select()
+      .from(portalUserCookieConsent)
+      .where(eq(portalUserCookieConsent.portalUserId, portalUserId));
+    return row;
+  }
+
+  async upsertPortalUserCookieConsent(consent: InsertPortalUserCookieConsent): Promise<PortalUserCookieConsent> {
+    const [row] = await db
+      .insert(portalUserCookieConsent)
+      .values(consent)
+      .onConflictDoUpdate({
+        target: portalUserCookieConsent.portalUserId,
+        set: {
+          version: consent.version ?? 1,
           essential: true,
           analytics: consent.analytics ?? false,
           marketing: consent.marketing ?? false,

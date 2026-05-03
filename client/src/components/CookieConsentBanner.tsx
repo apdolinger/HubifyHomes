@@ -11,21 +11,77 @@ import {
   type CookieConsentState,
 } from "@/lib/cookieConsent";
 
+type ServerConsent = {
+  version: number;
+  essential: boolean;
+  analytics: boolean;
+  marketing: boolean;
+  decidedAt?: string | Date | null;
+} | null;
+
+async function fetchServerConsent(): Promise<ServerConsent> {
+  // Try OIDC user first (cookie session), then portal user (Bearer token).
+  try {
+    const res = await fetch("/api/me/cookie-consent", { credentials: "include" });
+    if (res.ok) {
+      const data = (await res.json()) as ServerConsent;
+      if (data) return data;
+    }
+  } catch {
+    // ignore
+  }
+  try {
+    const portalToken = localStorage.getItem("portal_token");
+    if (portalToken) {
+      const res = await fetch("/api/portal/me/cookie-consent", {
+        headers: { Authorization: `Bearer ${portalToken}` },
+      });
+      if (res.ok) {
+        const data = (await res.json()) as ServerConsent;
+        if (data) return data;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 export default function CookieConsentBanner() {
   const [open, setOpen] = useState(false);
   const [showCustomize, setShowCustomize] = useState(false);
   const [analytics, setAnalytics] = useState(false);
   const [marketing, setMarketing] = useState(false);
   const [suppressed, setSuppressed] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
 
+  // Hydrate: prefer server-side consent (cross-browser), fall back to localStorage.
   useEffect(() => {
-    const existing = loadConsent();
-    if (!existing) {
-      setOpen(true);
-    } else {
-      setAnalytics(existing.analytics);
-      setMarketing(existing.marketing);
-    }
+    let cancelled = false;
+    (async () => {
+      const local = loadConsent();
+      const server = await fetchServerConsent();
+      if (cancelled) return;
+
+      if (server && server.version === COOKIE_CONSENT_VERSION) {
+        // Mirror server choice into localStorage so future loads don't prompt
+        // and so client gates work without an extra round-trip.
+        const next = saveConsent({ analytics: !!server.analytics, marketing: !!server.marketing });
+        setAnalytics(next.analytics);
+        setMarketing(next.marketing);
+        setOpen(false);
+      } else if (local) {
+        setAnalytics(local.analytics);
+        setMarketing(local.marketing);
+        setOpen(false);
+      } else {
+        setOpen(true);
+      }
+      setHydrated(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -51,20 +107,37 @@ export default function CookieConsentBanner() {
   }, []);
 
   const persist = async (next: CookieConsentState) => {
+    const body = JSON.stringify({
+      version: next.version,
+      essential: true,
+      analytics: next.analytics,
+      marketing: next.marketing,
+    });
+    // Best-effort persist to whichever auth surface the user has.
     try {
       await fetch("/api/me/cookie-consent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          version: next.version,
-          essential: true,
-          analytics: next.analytics,
-          marketing: next.marketing,
-        }),
+        body,
       });
     } catch {
-      // best-effort; localStorage already saved
+      // ignore
+    }
+    try {
+      const portalToken = localStorage.getItem("portal_token");
+      if (portalToken) {
+        await fetch("/api/portal/me/cookie-consent", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${portalToken}`,
+          },
+          body,
+        });
+      }
+    } catch {
+      // ignore
     }
   };
 
@@ -93,7 +166,7 @@ export default function CookieConsentBanner() {
     setShowCustomize(false);
   };
 
-  if (suppressed || !open) return null;
+  if (!hydrated || suppressed || !open) return null;
 
   return (
     <div
