@@ -32,7 +32,7 @@ export default function PortalPropertyDetail() {
   }, [user, authLoading, setLocation]);
 
   const { data, isLoading, isError } = useQuery<PortalProperty>({
-    queryKey: ['/api/portal/properties', id],
+    queryKey: ['/api/portal/properties', user?.id, id],
     queryFn: async () => {
       const res = await fetch(`/api/portal/properties/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -40,7 +40,7 @@ export default function PortalPropertyDetail() {
       if (!res.ok) throw new Error('Failed to load property');
       return res.json();
     },
-    enabled: !!token && !!id,
+    enabled: !!token && !!user?.id && !!id,
   });
 
   if (authLoading) {

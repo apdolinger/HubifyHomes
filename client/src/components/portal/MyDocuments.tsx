@@ -18,9 +18,9 @@ interface PortalDocument {
 }
 
 export default function MyDocuments() {
-  const { token } = usePortalAuth();
+  const { token, user } = usePortalAuth();
   const { data, isLoading } = useQuery<PortalDocument[]>({
-    queryKey: ['/api/portal/documents'],
+    queryKey: ['/api/portal/documents', user?.id],
     queryFn: async () => {
       const res = await fetch('/api/portal/documents', {
         headers: { Authorization: `Bearer ${token}` },
@@ -28,7 +28,7 @@ export default function MyDocuments() {
       if (!res.ok) throw new Error('Failed to load documents');
       return res.json();
     },
-    enabled: !!token,
+    enabled: !!token && !!user?.id,
   });
 
   if (isLoading) return <Skeleton className="h-32 w-full" />;

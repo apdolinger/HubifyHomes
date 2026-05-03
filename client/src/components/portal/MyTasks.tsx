@@ -24,9 +24,9 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | '
 };
 
 export default function MyTasks() {
-  const { token } = usePortalAuth();
+  const { token, user } = usePortalAuth();
   const { data, isLoading } = useQuery<PortalTask[]>({
-    queryKey: ['/api/portal/tasks'],
+    queryKey: ['/api/portal/tasks', user?.id],
     queryFn: async () => {
       const res = await fetch('/api/portal/tasks', {
         headers: { Authorization: `Bearer ${token}` },
@@ -34,7 +34,7 @@ export default function MyTasks() {
       if (!res.ok) throw new Error('Failed to load tasks');
       return res.json();
     },
-    enabled: !!token,
+    enabled: !!token && !!user?.id,
   });
 
   if (isLoading) {

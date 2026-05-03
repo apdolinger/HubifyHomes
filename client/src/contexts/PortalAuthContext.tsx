@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useLocation } from 'wouter';
+import { queryClient } from '@/lib/queryClient';
 
 interface PortalUser {
   id: string;
@@ -112,6 +113,12 @@ export function PortalAuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem('portal_token');
       setToken(null);
       setUser(null);
+      queryClient.removeQueries({
+        predicate: (q) => {
+          const k = q.queryKey?.[0];
+          return typeof k === 'string' && k.startsWith('/api/portal');
+        },
+      });
       setLocation('/portal/login');
     }
   };

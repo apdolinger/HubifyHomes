@@ -37,9 +37,9 @@ function fmtMoney(cents: number, currency: string) {
 }
 
 export default function MyInvoices() {
-  const { token } = usePortalAuth();
+  const { token, user } = usePortalAuth();
   const { data, isLoading } = useQuery<PortalInvoice[]>({
-    queryKey: ['/api/portal/invoices'],
+    queryKey: ['/api/portal/invoices', user?.id],
     queryFn: async () => {
       const res = await fetch('/api/portal/invoices', {
         headers: { Authorization: `Bearer ${token}` },
@@ -47,7 +47,7 @@ export default function MyInvoices() {
       if (!res.ok) throw new Error('Failed to load invoices');
       return res.json();
     },
-    enabled: !!token,
+    enabled: !!token && !!user?.id,
   });
 
   if (isLoading) return <Skeleton className="h-48 w-full" />;
