@@ -26,7 +26,7 @@ Core features include:
 - **Admin Customization**: Centralized customization for fields, supply settings, and billing, including organization-level default hourly rates.
 - **Automated Invoice and Billing System**: A three-tier system with object storage, webhook-driven payment tracking, automated status updates, consolidated invoice batching, and secure Stripe integration for payment collection.
 - **Forms System**: Multi-tenant forms with complex field types, property assignments, and admin viewing capabilities.
-- **Specialized Portals**: Includes a client-facing Hubify Portal with role-based access and a Super Admin Control Panel for platform management, featuring real-time data for organizations, users, revenue, and compliance.
+- **Specialized Portals**: Includes a client-facing Hubify Portal and a Super Admin Control Panel for platform management. The Portal home (`/portal`) renders four data-backed tabs for the signed-in portal user — **My Properties**, **My Tasks**, **My Invoices**, **Documents** — wired to `GET /api/portal/{properties,tasks,invoices,documents}` (all gated by `isPortalAuthenticated` and scoped via `portal_user_properties`). Invoices are filtered server-side to drop `status = 'draft'` so drafts never reach the client. The Super Admin Control Panel features real-time data for organizations, users, revenue, and compliance.
 - **Branding and Compliance**: Tier-based branding policy enforcement and publicly accessible legal compliance pages.
 - **Import Manager**: CSV import functionality for key data entities with AI field mapping.
 - **Time Tracking**: Dedicated tracking for billable and non-billable time.

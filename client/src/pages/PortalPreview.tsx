@@ -1,26 +1,19 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Smartphone, Monitor, Eye } from 'lucide-react';
-import StaffDashboard from '@/components/portal/StaffDashboard';
-import VendorDashboard from '@/components/portal/VendorDashboard';
+import { Smartphone, Monitor, Eye, Building2, CheckSquare, Receipt, FileText } from 'lucide-react';
 
-type PortalRole = 'staff' | 'vendor';
 type DeviceView = 'desktop' | 'mobile';
 
-export default function PortalPreview() {
-  const [selectedRole, setSelectedRole] = useState<PortalRole>('staff');
-  const [deviceView, setDeviceView] = useState<DeviceView>('desktop');
+const SECTIONS = [
+  { icon: Building2, title: 'My Properties', desc: 'Properties linked to the portal user.' },
+  { icon: CheckSquare, title: 'My Tasks', desc: 'Open tasks at the user’s properties.' },
+  { icon: Receipt, title: 'My Invoices', desc: 'Non-draft invoices for the user’s client.' },
+  { icon: FileText, title: 'Documents', desc: 'Community documents shared with the user.' },
+];
 
-  const renderDashboard = () => {
-    switch (selectedRole) {
-      case 'staff':
-        return <StaffDashboard />;
-      case 'vendor':
-        return <VendorDashboard />;
-    }
-  };
+export default function PortalPreview() {
+  const [deviceView, setDeviceView] = useState<DeviceView>('desktop');
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
@@ -31,53 +24,33 @@ export default function PortalPreview() {
             Portal Preview
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Preview how the portal looks for different user roles
+            Preview of the four sections shown to clients on `/portal` after sign-in.
           </p>
         </div>
 
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>Preview Controls</CardTitle>
-            <CardDescription>Select a role and device type to preview</CardDescription>
+            <CardDescription>Toggle the device frame</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-4">
-              <div className="flex-1 min-w-[200px]">
-                <label className="text-sm font-medium mb-2 block">Portal Role</label>
-                <Select value={selectedRole} onValueChange={(value) => setSelectedRole(value as PortalRole)}>
-                  <SelectTrigger data-testid="select-role">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="staff" data-testid="option-staff">Staff</SelectItem>
-                    <SelectItem value="vendor" data-testid="option-vendor">Vendor</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex-1 min-w-[200px]">
-                <label className="text-sm font-medium mb-2 block">Device View</label>
-                <div className="flex gap-2">
-                  <Button
-                    variant={deviceView === 'desktop' ? 'default' : 'outline'}
-                    onClick={() => setDeviceView('desktop')}
-                    className="flex-1"
-                    data-testid="button-desktop"
-                  >
-                    <Monitor className="h-4 w-4 mr-2" />
-                    Desktop
-                  </Button>
-                  <Button
-                    variant={deviceView === 'mobile' ? 'default' : 'outline'}
-                    onClick={() => setDeviceView('mobile')}
-                    className="flex-1"
-                    data-testid="button-mobile"
-                  >
-                    <Smartphone className="h-4 w-4 mr-2" />
-                    Mobile
-                  </Button>
-                </div>
-              </div>
+            <div className="flex gap-2 max-w-sm">
+              <Button
+                variant={deviceView === 'desktop' ? 'default' : 'outline'}
+                onClick={() => setDeviceView('desktop')}
+                className="flex-1"
+                data-testid="button-desktop"
+              >
+                <Monitor className="h-4 w-4 mr-2" /> Desktop
+              </Button>
+              <Button
+                variant={deviceView === 'mobile' ? 'default' : 'outline'}
+                onClick={() => setDeviceView('mobile')}
+                className="flex-1"
+                data-testid="button-mobile"
+              >
+                <Smartphone className="h-4 w-4 mr-2" /> Mobile
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -95,13 +68,23 @@ export default function PortalPreview() {
                 <div className="bg-white dark:bg-gray-800 border-b">
                   <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Hubify Portal</h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Preview Mode - {selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)}
-                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Preview Mode</p>
                   </div>
                 </div>
-                <div className="p-4 sm:p-6 lg:p-8">
-                  {renderDashboard()}
+                <div className="p-4 sm:p-6 lg:p-8 grid gap-4 md:grid-cols-2">
+                  {SECTIONS.map((s) => (
+                    <Card key={s.title}>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base">{s.title}</CardTitle>
+                          <s.icon className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground">{s.desc}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
               </div>
             </div>
@@ -110,8 +93,9 @@ export default function PortalPreview() {
 
         <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
           <p className="text-sm text-blue-800 dark:text-blue-200">
-            <strong>Note:</strong> This is a preview of the portal interface. The actual portal is accessible at{' '}
-            <code className="px-1 py-0.5 bg-blue-100 dark:bg-blue-800 rounded">/portal</code> for registered users.
+            <strong>Note:</strong> This is a static preview. The live client portal at{' '}
+            <code className="px-1 py-0.5 bg-blue-100 dark:bg-blue-800 rounded">/portal</code> renders real data for the
+            authenticated portal user.
           </p>
         </div>
       </div>

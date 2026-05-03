@@ -93,7 +93,7 @@ import {
 import { z } from "zod";
 import { createSetupIntentForClient, detachPaymentMethod } from "./stripe";
 import { db } from "./db";
-import { eq, lt, and, desc } from "drizzle-orm";
+import { eq, lt, and, desc, inArray } from "drizzle-orm";
 import sgMail from "@sendgrid/mail";
 import { dispatchWebhookEvent, sendTestWebhookEvent, validateWebhookUrlSafe } from "./webhookDispatcher";
 
@@ -1985,6 +1985,170 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching portal user:', error);
       res.status(500).json({ message: 'Failed to fetch user' });
+    }
+  });
+
+  // Portal client home: properties linked to the portal user.
+  app.get('/api/portal/properties', isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const portalUser = req.portalUser;
+      const links = await storage.getPortalUserProperties(portalUser.id);
+      const propertyIds = links.map((l) => l.propertyId);
+      if (propertyIds.length === 0) return res.json([]);
+      const props = await Promise.all(propertyIds.map((id) => storage.getProperty(id)));
+      const visible = props
+        .filter((p): p is NonNullable<typeof p> => !!p && p.orgId === portalUser.orgId)
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          address1: p.address1,
+          address2: p.address2,
+          city: p.city,
+          state: p.state,
+          zip: p.zip,
+          type: p.type,
+          imageUrl: p.imageUrl,
+        }));
+      res.json(visible);
+    } catch (error) {
+      console.error('Error fetching portal properties:', error);
+      res.status(500).json({ message: 'Failed to fetch properties' });
+    }
+  });
+
+  // Portal client home: tasks across the portal user's properties.
+  app.get('/api/portal/tasks', isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const portalUser = req.portalUser;
+      const links = await storage.getPortalUserProperties(portalUser.id);
+      const propertyIds = links.map((l) => l.propertyId);
+      if (propertyIds.length === 0) return res.json([]);
+      const all = await Promise.all(propertyIds.map((id) => storage.getTasksByProperty(id)));
+      const merged: any[] = [];
+      const propsById = new Map<number, string>();
+      for (const id of propertyIds) {
+        const p = await storage.getProperty(id);
+        if (p && p.orgId === portalUser.orgId) propsById.set(id, p.name);
+      }
+      for (const list of all) {
+        for (const t of list) {
+          if (!t.propertyId || !propsById.has(t.propertyId)) continue;
+          if ((t as any).isArchived) continue;
+          merged.push({
+            id: t.id,
+            title: t.title,
+            status: t.status,
+            priority: t.priority,
+            dueDate: t.dueDate,
+            propertyId: t.propertyId,
+            propertyName: propsById.get(t.propertyId) || null,
+          });
+        }
+      }
+      merged.sort((a, b) => {
+        const ad = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+        const bd = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+        return ad - bd;
+      });
+      res.json(merged);
+    } catch (error) {
+      console.error('Error fetching portal tasks:', error);
+      res.status(500).json({ message: 'Failed to fetch tasks' });
+    }
+  });
+
+  // Portal client home: invoices for the portal user's client (drafts hidden).
+  app.get('/api/portal/invoices', isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const portalUser = req.portalUser;
+      const { clients: clientsTable } = await import('@shared/schema');
+      const [client] = await db
+        .select()
+        .from(clientsTable)
+        .where(and(
+          eq(clientsTable.orgId, portalUser.orgId),
+          eq(clientsTable.email, portalUser.email)
+        ));
+      if (!client) return res.json([]);
+      const invoices = await storage.getClientInvoicesByClient(client.id);
+      // Server-side: drafts MUST never be exposed to the client portal.
+      const visible = invoices
+        .filter((inv) => inv.status !== 'draft')
+        .map((inv) => ({
+          id: inv.id,
+          invoiceNumber: inv.invoiceNumber,
+          amountCents: inv.amountCents,
+          currency: inv.currency,
+          status: inv.status,
+          paymentStatus: inv.paymentStatus,
+          dueDate: inv.dueDate,
+          issuedAt: inv.issuedAt,
+          sentAt: inv.sentAt,
+          description: inv.description,
+          hostedInvoiceUrl: inv.hostedInvoiceUrl,
+        }));
+      res.json(visible);
+    } catch (error) {
+      console.error('Error fetching portal invoices:', error);
+      res.status(500).json({ message: 'Failed to fetch invoices' });
+    }
+  });
+
+  // Portal client home: community documents tied to the portal user's properties.
+  // Falls back to community-wide documents managed by users in the same org so
+  // seeded community-wide docs still surface even when properties have no
+  // explicit communityId set.
+  app.get('/api/portal/documents', isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const portalUser = req.portalUser;
+      const { communityDocuments, communities, users: usersTable, properties: propsTable } =
+        await import('@shared/schema');
+      const links = await storage.getPortalUserProperties(portalUser.id);
+      const propertyIds = links.map((l) => l.propertyId);
+      const communityIds = new Set<number>();
+      if (propertyIds.length > 0) {
+        const propRows = await db
+          .select({ id: propsTable.id, communityId: propsTable.communityId, orgId: propsTable.orgId })
+          .from(propsTable)
+          .where(inArray(propsTable.id, propertyIds));
+        for (const r of propRows) {
+          if (r.orgId === portalUser.orgId && r.communityId) communityIds.add(r.communityId);
+        }
+      }
+      // Org fallback: include communities whose manager is in the portal user's org.
+      const orgUsers = await storage.getUsersByOrg(portalUser.orgId);
+      const orgUserIds = new Set(orgUsers.map((u) => u.id));
+      if (orgUserIds.size > 0) {
+        const orgCommunities = await db
+          .select({ id: communities.id, managerId: communities.managerId })
+          .from(communities);
+        for (const c of orgCommunities) {
+          if (c.managerId && orgUserIds.has(c.managerId)) communityIds.add(c.id);
+        }
+      }
+      if (communityIds.size === 0) return res.json([]);
+      const docs = await db
+        .select({
+          id: communityDocuments.id,
+          communityId: communityDocuments.communityId,
+          propertyId: communityDocuments.propertyId,
+          documentType: communityDocuments.documentType,
+          classification: communityDocuments.classification,
+          fileUrl: communityDocuments.fileUrl,
+          fileName: communityDocuments.fileName,
+          uploadedAt: communityDocuments.uploadedAt,
+        })
+        .from(communityDocuments)
+        .where(inArray(communityDocuments.communityId, Array.from(communityIds)))
+        .orderBy(desc(communityDocuments.uploadedAt));
+      // If a doc is property-scoped, only include it when it matches one of the
+      // portal user's properties.
+      const allowedPropIds = new Set(propertyIds);
+      const visible = docs.filter((d) => !d.propertyId || allowedPropIds.has(d.propertyId));
+      res.json(visible);
+    } catch (error) {
+      console.error('Error fetching portal documents:', error);
+      res.status(500).json({ message: 'Failed to fetch documents' });
     }
   });
 

@@ -2,8 +2,11 @@ import { useEffect } from 'react';
 import { useLocation, Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { usePortalAuth } from '@/contexts/PortalAuthContext';
-import StaffDashboard from '@/components/portal/StaffDashboard';
-import VendorDashboard from '@/components/portal/VendorDashboard';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import MyProperties from '@/components/portal/MyProperties';
+import MyTasks from '@/components/portal/MyTasks';
+import MyInvoices from '@/components/portal/MyInvoices';
+import MyDocuments from '@/components/portal/MyDocuments';
 import { Button } from '@/components/ui/button';
 import { LogOut, Loader2, Bell } from 'lucide-react';
 import LegalLinks from '@/components/LegalLinks';
@@ -44,13 +47,7 @@ export default function Portal() {
     );
   }
 
-  if (!user) {
-    return null;
-  }
-
-  const handleLogout = async () => {
-    await logout();
-  };
+  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
@@ -68,7 +65,7 @@ export default function Portal() {
                 <Bell className="h-4 w-4" />
               </Button>
             </Link>
-            <Button variant="outline" onClick={handleLogout} data-testid="button-logout">
+            <Button variant="outline" onClick={() => logout()} data-testid="button-logout">
               <LogOut className="h-4 w-4 mr-2" />
               Logout
             </Button>
@@ -77,8 +74,18 @@ export default function Portal() {
       </header>
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {user.role === 'staff' && <StaffDashboard />}
-        {user.role === 'vendor' && <VendorDashboard />}
+        <Tabs defaultValue="properties" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="properties" data-testid="tab-properties">My Properties</TabsTrigger>
+            <TabsTrigger value="tasks" data-testid="tab-tasks">My Tasks</TabsTrigger>
+            <TabsTrigger value="invoices" data-testid="tab-invoices">My Invoices</TabsTrigger>
+            <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
+          </TabsList>
+          <TabsContent value="properties"><MyProperties /></TabsContent>
+          <TabsContent value="tasks"><MyTasks /></TabsContent>
+          <TabsContent value="invoices"><MyInvoices /></TabsContent>
+          <TabsContent value="documents"><MyDocuments /></TabsContent>
+        </Tabs>
       </main>
 
       <footer className="bg-white dark:bg-gray-800 border-t border-slate-200 dark:border-gray-700 py-4 mt-auto">

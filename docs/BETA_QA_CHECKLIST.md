@@ -172,11 +172,11 @@ A copy-paste-friendly checklist any teammate can run against a freshly seeded en
 ## 14. Hubify Portal (client side)
 **Logged in as:** `client@beta.hubify.test` / `HubifyBeta!2025` at `/portal/login`. **Demo data:** the seeded properties linked to this portal user, the seeded invoices visible to clients (`BETA-SENT-0002`, `BETA-PAID-0003`, `BETA-OVERDUE-0004`, `BETA-CONSOL-0005`), and the 2 seeded community documents.
 
-1. **Properties + tasks** — Open "My properties" and "My tasks". ✅ Pass: only the properties associated with this portal user appear; their visible tasks match the seeded data.
-2. **Invoices** — Open Invoices. ✅ Pass: the 4 client-visible seeded invoices are listed; the draft invoice `BETA-DRAFT-0001` is NOT shown.
+1. **Properties + tasks** — On the Portal home, switch between the **My Properties** and **My Tasks** tabs. ✅ Pass: both seeded properties (`Bayshore Estate`, `Palmview Condo 12B`) appear with full address; the Tasks tab lists tasks at those two properties (Bayshore + Palmview only — no tasks from properties this user is not linked to).
+2. **Invoices** — Open the **My Invoices** tab. ✅ Pass: the 4 client-visible seeded invoices (`BETA-SENT-0002`, `BETA-PAID-0003`, `BETA-OVERDUE-0004`, `BETA-CONSOL-0005`) are listed with status pills and amounts; `BETA-DRAFT-0001` is NOT shown (drafts are filtered server-side in `GET /api/portal/invoices`).
 3. **Pay (test mode)** — On `BETA-OVERDUE-0004` click "Pay now" and complete with `4242 4242 4242 4242`. ✅ Pass: invoice status flips to Paid via the Stripe webhook and `payment_method` shows `card`.
 4. **Notification preferences** — Toggle "Email invoice reminders" off and save. ✅ Pass: the toggle persists after reload and `SELECT email_invoice_reminders FROM portal_users WHERE email='client@beta.hubify.test';` returns `false`.
-5. **Documents** — Open Documents. ✅ Pass: the 2 seeded community documents are listed and each downloads cleanly.
+5. **Documents** — Open the **Documents** tab. ✅ Pass: the 2 seeded community documents (`Beta-Welcome-Packet.pdf`, `Beta-CCRs-2025.pdf`) are listed and each Download link opens cleanly.
 
 ## 15. Super Admin Console
 **Logged in as:** Super Admin (with MFA). **Demo data:** all real platform data — confirm there are no fake/mocked numbers anywhere. Use the seeded "Hubify Beta Demo" org for spot-checks.
