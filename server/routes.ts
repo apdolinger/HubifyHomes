@@ -14370,11 +14370,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Helper: generate inspection report PDF as a Buffer
+  /**
+   * Download a photo from trusted GCS object storage and resize it for PDF embedding.
+   * Only accepts URLs from the known storage.googleapis.com domain for our Replit
+   * bucket (prefix "repl-"), which prevents SSRF to internal or arbitrary hosts.
+   * Enforces a max download size before Sharp processing to limit memory use.
+   */
+  async function fetchPhotoForPdf(url: string): Promise<Buffer | null> {
+    const GCS_PREFIX = "https://storage.googleapis.com/";
+    if (typeof url !== "string" || !url.startsWith(GCS_PREFIX)) return null;
+    const withoutPrefix = url.slice(GCS_PREFIX.length);
+    const slashIdx = withoutPrefix.indexOf("/");
+    if (slashIdx === -1) return null;
+    const bucketName = withoutPrefix.slice(0, slashIdx);
+    const objectName = withoutPrefix.slice(slashIdx + 1);
+    // Only allow our Replit-provisioned buckets and the checklist-photos path
+    if (!bucketName.startsWith("repl-") || !objectName) return null;
+    if (!objectName.startsWith("public/checklist-photos/")) return null;
+    const MAX_PHOTO_BYTES = 8 * 1024 * 1024; // 8 MB hard limit before processing
+    try {
+      const { objectStorageClient } = await import("./objectStorage");
+      const [contents] = await objectStorageClient.bucket(bucketName).file(objectName).download();
+      if (!contents || contents.length > MAX_PHOTO_BYTES) return null;
+      const sharp = (await import("sharp")).default;
+      return await sharp(contents as Buffer)
+        .rotate()
+        .resize(320, undefined, { fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: 70 })
+        .toBuffer();
+    } catch {
+      return null;
+    }
+  }
+
   async function buildInspectionReportPdf(
     task: any,
     checklistItems: any[],
     opts?: { watermark?: boolean }
   ): Promise<Buffer> {
+    // Pre-fetch and resize photos for failed items before PDF construction.
+    // Capped at MAX_PHOTOS_TOTAL across the whole report and MAX_PHOTOS_PER_ITEM
+    // per item. Photos are fetched sequentially to bound concurrency/memory.
+    const MAX_PHOTOS_PER_ITEM = 3;
+    const MAX_PHOTOS_TOTAL = 9;
+    const failItems = checklistItems.filter((i: any) => i.result === "fail");
+
+    // Collect (itemId, url) pairs up to the global cap
+    const photoJobs: Array<{ itemId: string; url: string }> = [];
+    for (const item of failItems) {
+      if (photoJobs.length >= MAX_PHOTOS_TOTAL) break;
+      const urls: string[] = [
+        ...(Array.isArray(item.photoUrls) ? item.photoUrls : []),
+        ...(item.photoUrl && !(item.photoUrls || []).includes(item.photoUrl) ? [item.photoUrl] : []),
+      ]
+        .filter((u: string) => typeof u === "string" && u.startsWith("https://storage.googleapis.com/"))
+        .slice(0, MAX_PHOTOS_PER_ITEM);
+      for (const url of urls) {
+        if (photoJobs.length >= MAX_PHOTOS_TOTAL) break;
+        photoJobs.push({ itemId: String(item.id), url });
+      }
+    }
+
+    // Fetch sequentially to keep memory/concurrency predictable
+    const photoBufferMap = new Map<string, Buffer[]>();
+    for (const { itemId, url } of photoJobs) {
+      const buf = await fetchPhotoForPdf(url);
+      if (!buf) continue;
+      const arr = photoBufferMap.get(itemId) || [];
+      arr.push(buf);
+      photoBufferMap.set(itemId, arr);
+    }
+
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: opts?.watermark === true });
       const chunks: Buffer[] = [];
@@ -14451,7 +14517,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.moveDown(0.4);
 
       // ── Failed Items ──
-      const failItems = checklistItems.filter((i: any) => i.result === "fail");
       if (failItems.length > 0) {
         doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor("#e2e8f0").stroke();
         doc.moveDown(0.6);
@@ -14460,10 +14525,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const item of failItems) {
           const itemText = item.text || "";
           const noteText = item.resultNote || "";
+          const photoBuffers = (photoBufferMap.get(item.id) || []).filter(Boolean) as Buffer[];
           const textH = doc.heightOfString(itemText, { fontSize: 9, width: 460 });
           const noteH = noteText ? doc.heightOfString(noteText, { fontSize: 8, width: 460 }) + 4 : 0;
+          const PHOTO_DISPLAY_WIDTH = 160;
+          const PHOTO_DISPLAY_HEIGHT = 120;
+          const PHOTO_GAP = 7;
+          const photoRowH = photoBuffers.length > 0 ? PHOTO_DISPLAY_HEIGHT + 10 : 0;
           const boxH = 12 + textH + noteH + 10;
-          if (doc.y + boxH > 720) doc.addPage();
+          if (doc.y + boxH + photoRowH > 720) doc.addPage();
           const startY = doc.y;
           doc.rect(50, startY, 495, boxH).fillColor("#fef2f2").fill();
           doc.rect(50, startY, 495, boxH).strokeColor("#fca5a5").stroke();
@@ -14474,6 +14544,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             doc.fontSize(8).fillColor("#475569").text(noteText, 72, noteY, { width: 460 });
           }
           doc.y = startY + boxH + 4;
+          // Embed photos below the item box
+          if (photoBuffers.length > 0) {
+            const photoY = doc.y + 2;
+            photoBuffers.forEach((buf, idx) => {
+              const photoX = 50 + idx * (PHOTO_DISPLAY_WIDTH + PHOTO_GAP);
+              try {
+                doc.image(buf, photoX, photoY, { width: PHOTO_DISPLAY_WIDTH, height: PHOTO_DISPLAY_HEIGHT });
+              } catch {
+                // skip unembeddable image
+              }
+            });
+            doc.y = photoY + PHOTO_DISPLAY_HEIGHT + 6;
+          }
         }
         doc.moveDown(0.4);
       }
