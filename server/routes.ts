@@ -2016,6 +2016,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Portal client home: single property detail (only if linked to portal user).
+  app.get('/api/portal/properties/:id', isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const portalUser = req.portalUser;
+      const propertyId = Number(req.params.id);
+      if (!Number.isInteger(propertyId)) {
+        return res.status(400).json({ message: 'Invalid property id' });
+      }
+      const links = await storage.getPortalUserProperties(portalUser.id);
+      const allowed = new Set(links.map((l) => l.propertyId));
+      if (!allowed.has(propertyId)) {
+        return res.status(404).json({ message: 'Property not found' });
+      }
+      const property = await storage.getProperty(propertyId);
+      if (!property || property.orgId !== portalUser.orgId) {
+        return res.status(404).json({ message: 'Property not found' });
+      }
+      res.json({
+        id: property.id,
+        name: property.name,
+        type: property.type,
+        address1: property.address1,
+        address2: property.address2,
+        city: property.city,
+        state: property.state,
+        zip: property.zip,
+        units: property.units,
+        squareFootage: property.squareFootage,
+        description: property.description,
+        imageUrl: property.imageUrl,
+      });
+    } catch (error) {
+      console.error('Error fetching portal property:', error);
+      res.status(500).json({ message: 'Failed to fetch property' });
+    }
+  });
+
   // Portal client home: tasks across the portal user's properties.
   app.get('/api/portal/tasks', isPortalAuthenticated, async (req: any, res) => {
     try {
@@ -2024,16 +2061,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const propertyIds = links.map((l) => l.propertyId);
       if (propertyIds.length === 0) return res.json([]);
       const all = await Promise.all(propertyIds.map((id) => storage.getTasksByProperty(id)));
-      const merged: any[] = [];
       const propsById = new Map<number, string>();
       for (const id of propertyIds) {
         const p = await storage.getProperty(id);
         if (p && p.orgId === portalUser.orgId) propsById.set(id, p.name);
       }
+      const merged: Array<{
+        id: number;
+        title: string;
+        status: string;
+        priority: string;
+        dueDate: Date | null;
+        propertyId: number | null;
+        propertyName: string | null;
+      }> = [];
       for (const list of all) {
         for (const t of list) {
           if (!t.propertyId || !propsById.has(t.propertyId)) continue;
-          if ((t as any).isArchived) continue;
+          if (t.isArchived) continue;
           merged.push({
             id: t.id,
             title: t.title,
@@ -2094,39 +2139,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Portal client home: community documents tied to the portal user's properties.
-  // Falls back to community-wide documents managed by users in the same org so
-  // seeded community-wide docs still surface even when properties have no
-  // explicit communityId set.
+  // Portal client home: documents tied strictly to the portal user's linked
+  // properties. Visibility rules:
+  //   * Property-scoped docs: included only when the doc's propertyId is one of
+  //     the user's linked properties.
+  //   * Community-wide docs: included only for communities attached (via
+  //     properties.communityId) to one of the user's linked properties.
+  // No org-wide fallback — that would expose documents the user is not entitled
+  // to see.
   app.get('/api/portal/documents', isPortalAuthenticated, async (req: any, res) => {
     try {
       const portalUser = req.portalUser;
-      const { communityDocuments, communities, users: usersTable, properties: propsTable } =
-        await import('@shared/schema');
+      const { communityDocuments, properties: propsTable } = await import('@shared/schema');
       const links = await storage.getPortalUserProperties(portalUser.id);
       const propertyIds = links.map((l) => l.propertyId);
+      if (propertyIds.length === 0) return res.json([]);
+      const propRows = await db
+        .select({ id: propsTable.id, communityId: propsTable.communityId, orgId: propsTable.orgId })
+        .from(propsTable)
+        .where(inArray(propsTable.id, propertyIds));
+      const allowedPropIds = new Set<number>();
       const communityIds = new Set<number>();
-      if (propertyIds.length > 0) {
-        const propRows = await db
-          .select({ id: propsTable.id, communityId: propsTable.communityId, orgId: propsTable.orgId })
-          .from(propsTable)
-          .where(inArray(propsTable.id, propertyIds));
-        for (const r of propRows) {
-          if (r.orgId === portalUser.orgId && r.communityId) communityIds.add(r.communityId);
-        }
+      for (const r of propRows) {
+        if (r.orgId !== portalUser.orgId) continue;
+        allowedPropIds.add(r.id);
+        if (r.communityId) communityIds.add(r.communityId);
       }
-      // Org fallback: include communities whose manager is in the portal user's org.
-      const orgUsers = await storage.getUsersByOrg(portalUser.orgId);
-      const orgUserIds = new Set(orgUsers.map((u) => u.id));
-      if (orgUserIds.size > 0) {
-        const orgCommunities = await db
-          .select({ id: communities.id, managerId: communities.managerId })
-          .from(communities);
-        for (const c of orgCommunities) {
-          if (c.managerId && orgUserIds.has(c.managerId)) communityIds.add(c.id);
-        }
+      if (allowedPropIds.size === 0) return res.json([]);
+      // Pull docs whose communityId matches an allowed community OR whose
+      // propertyId matches an allowed property — then filter to enforce both
+      // rules in code (a property-scoped doc must be in an allowed property;
+      // a community-wide doc must be in an allowed community).
+      const { or } = await import('drizzle-orm');
+      const orClauses = [] as any[];
+      if (communityIds.size > 0) {
+        orClauses.push(inArray(communityDocuments.communityId, Array.from(communityIds)));
       }
-      if (communityIds.size === 0) return res.json([]);
+      orClauses.push(inArray(communityDocuments.propertyId, Array.from(allowedPropIds)));
       const docs = await db
         .select({
           id: communityDocuments.id,
@@ -2139,12 +2188,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           uploadedAt: communityDocuments.uploadedAt,
         })
         .from(communityDocuments)
-        .where(inArray(communityDocuments.communityId, Array.from(communityIds)))
+        .where(or(...orClauses))
         .orderBy(desc(communityDocuments.uploadedAt));
-      // If a doc is property-scoped, only include it when it matches one of the
-      // portal user's properties.
-      const allowedPropIds = new Set(propertyIds);
-      const visible = docs.filter((d) => !d.propertyId || allowedPropIds.has(d.propertyId));
+      const visible = docs.filter((d) => {
+        if (d.propertyId) return allowedPropIds.has(d.propertyId);
+        return d.communityId != null && communityIds.has(d.communityId);
+      });
       res.json(visible);
     } catch (error) {
       console.error('Error fetching portal documents:', error);

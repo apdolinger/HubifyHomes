@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Building2, MapPin } from 'lucide-react';
+import { Building2, MapPin, ChevronRight } from 'lucide-react';
 import { usePortalAuth } from '@/contexts/PortalAuthContext';
 
 interface PortalProperty {
@@ -54,24 +55,39 @@ export default function MyProperties() {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {data.map((p) => (
-        <Card key={p.id} data-testid={`property-${p.id}`}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">{p.name}</CardTitle>
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-start gap-2 text-sm text-muted-foreground">
-              <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
-              <div>
-                <div>{p.address1}{p.address2 ? `, ${p.address2}` : ''}</div>
-                <div>{p.city}, {p.state} {p.zip}</div>
+        <Link
+          key={p.id}
+          href={`/portal/properties/${p.id}`}
+          data-testid={`link-property-${p.id}`}
+          className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg"
+        >
+          <Card
+            data-testid={`property-${p.id}`}
+            className="cursor-pointer hover:shadow-md hover:border-primary/40 transition h-full"
+          >
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">{p.name}</CardTitle>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2 capitalize">{p.type.replace(/[-_]/g, ' ')}</p>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
+                <div>
+                  <div>{p.address1}{p.address2 ? `, ${p.address2}` : ''}</div>
+                  <div>{p.city}, {p.state} {p.zip}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <Building2 className="h-3 w-3 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground capitalize">
+                  {(p.type || 'property').replace(/[-_]/g, ' ')}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       ))}
     </div>
   );

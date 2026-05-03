@@ -27,7 +27,7 @@
  *   password:  HubifyBeta!2025
  */
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db, pool } from "../server/db";
 import {
@@ -1190,6 +1190,15 @@ async function main() {
   // 8. Community + 2 community documents
   const communityId = await ensureCommunity();
   await ensureCommunityDocs(communityId);
+
+  // Attach the portal client's properties to the community so community-wide
+  // documents flow through `/api/portal/documents` (which is strictly scoped:
+  // a community-wide doc is only visible when the user has at least one linked
+  // property in that community — no org-wide fallback).
+  await db
+    .update(properties)
+    .set({ communityId })
+    .where(inArray(properties.id, [propA, propB]));
 
   // 9. Client + portal user + property links
   await ensureClient();

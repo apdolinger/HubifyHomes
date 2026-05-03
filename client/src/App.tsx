@@ -43,6 +43,7 @@ import PortalRegister from "@/pages/PortalRegister";
 import PortalForgotPassword from "@/pages/PortalForgotPassword";
 import PortalResetPassword from "@/pages/PortalResetPassword";
 import Portal from "@/pages/Portal";
+import PortalPropertyDetail from "@/pages/PortalPropertyDetail";
 import PortalNotifications from "@/pages/PortalNotifications";
 import OrganizationProfile from "@/pages/OrganizationProfile";
 import AdminBilling from "@/pages/AdminBilling";
@@ -127,6 +128,7 @@ function Router() {
       <Route path="/portal/forgot-password" component={PortalForgotPassword} />
       <Route path="/portal/reset-password" component={PortalResetPassword} />
       <Route path="/portal/notifications" component={PortalNotifications} />
+      <Route path="/portal/properties/:id" component={PortalPropertyDetail} />
       <Route path="/portal" component={Portal} />
       
       {isLoading ? (
