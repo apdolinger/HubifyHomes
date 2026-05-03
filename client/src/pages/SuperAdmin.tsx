@@ -1021,6 +1021,20 @@ function SettingsTabContent() {
       // query so HubifyConsole picks up the new value without a full reload.
       if (Array.isArray(savedKeys) && savedKeys.includes('support_phone')) {
         queryClient.invalidateQueries({ queryKey: ['/api/support-info'] });
+        // Broadcast to other open tabs (e.g. a Hubify Console open in
+        // another tab/window) so the Call Support button updates within
+        // seconds without a manual page reload.
+        if (typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined') {
+          try {
+            const channel = new BroadcastChannel('hubify-support-info');
+            channel.postMessage({ type: 'support-info-changed' });
+            channel.close();
+          } catch {
+            // BroadcastChannel may be unavailable in some browsers; the
+            // per-query refetchInterval/refetchOnWindowFocus will still
+            // pick up the change shortly.
+          }
+        }
       }
       // Reconcile draft with the server response so saved values are authoritative
       if (savedSettings && typeof savedSettings === 'object') {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { routes } from "@/lib/routes";
 import { useToast } from "@/hooks/use-toast";
@@ -29,9 +30,36 @@ export default function HubifyConsole() {
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const { data: supportInfo } = useQuery<{ supportPhone: string | null }>({
     queryKey: ["/api/support-info"],
+    // Override the global staleTime: Infinity so this query stays fresh
+    // when admins change the support phone number. Refetch on window focus
+    // and on a short interval as a safety net in case the broadcast below
+    // is missed (e.g. unsupported browser, different origin context).
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+    refetchInterval: 60_000,
   });
   const supportPhone = supportInfo?.supportPhone ?? null;
   const telHref = supportPhone ? `tel:${supportPhone.replace(/[^+\d]/g, "")}` : null;
+
+  // Listen for cross-tab notifications that the support phone changed so
+  // the Call Support button appears/disappears within seconds without a
+  // manual page reload.
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof BroadcastChannel === "undefined") {
+      return;
+    }
+    const channel = new BroadcastChannel("hubify-support-info");
+    const handleMessage = (event: MessageEvent) => {
+      if (event?.data?.type === "support-info-changed") {
+        queryClient.invalidateQueries({ queryKey: ["/api/support-info"] });
+      }
+    };
+    channel.addEventListener("message", handleMessage);
+    return () => {
+      channel.removeEventListener("message", handleMessage);
+      channel.close();
+    };
+  }, []);
 
   // Redirect if not authenticated
   useEffect(() => {
