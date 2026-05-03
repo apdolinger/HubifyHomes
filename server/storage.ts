@@ -55,6 +55,7 @@ import {
   messageReactions,
   messageMentions,
   userNotificationPreferences,
+  userCookieConsent,
   activityLog,
   forms,
   formFields,
@@ -202,6 +203,8 @@ import {
   type InsertMessageMention,
   type UserNotificationPreferences,
   type InsertUserNotificationPreferences,
+  type UserCookieConsent,
+  type InsertUserCookieConsent,
   type ActivityLog,
   type InsertActivityLog,
   type Form,
@@ -374,6 +377,8 @@ export interface IStorage {
   }>>;
   getOrgSubscription(orgId: string): Promise<OrgSubscription | undefined>;
   upsertOrgSubscription(subscription: InsertOrgSubscription): Promise<OrgSubscription>;
+  getUserCookieConsent(userId: string): Promise<UserCookieConsent | undefined>;
+  upsertUserCookieConsent(consent: InsertUserCookieConsent): Promise<UserCookieConsent>;
   getOrgSupplySettings(id: string): Promise<{ supplyTypes: string[]; supplyUnits: string[] } | undefined>;
   updateOrgSupplySettings(id: string, settings: { supplyTypes?: string[]; supplyUnits?: string[] }): Promise<{ supplyTypes: string[]; supplyUnits: string[] } | undefined>;
   
@@ -7608,6 +7613,33 @@ export class DatabaseStorage implements IStorage {
       ...r.event,
       calendarOwnerId: r.calendarOwnerId ?? undefined,
     }));
+  }
+
+  async getUserCookieConsent(userId: string): Promise<UserCookieConsent | undefined> {
+    const [row] = await db
+      .select()
+      .from(userCookieConsent)
+      .where(eq(userCookieConsent.userId, userId));
+    return row;
+  }
+
+  async upsertUserCookieConsent(consent: InsertUserCookieConsent): Promise<UserCookieConsent> {
+    const [row] = await db
+      .insert(userCookieConsent)
+      .values(consent)
+      .onConflictDoUpdate({
+        target: userCookieConsent.userId,
+        set: {
+          version: consent.version,
+          essential: true,
+          analytics: consent.analytics ?? false,
+          marketing: consent.marketing ?? false,
+          decidedAt: new Date(),
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return row;
   }
 }
 

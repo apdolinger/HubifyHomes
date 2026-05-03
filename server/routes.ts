@@ -1202,6 +1202,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cookie consent: GET/POST current user's choice (auth via OIDC or super-admin session)
+  app.get('/api/me/cookie-consent', async (req: any, res) => {
+    try {
+      const superAdmin = (req.session as any)?.superAdmin;
+      if (superAdmin?.authenticated) {
+        return res.json(null);
+      }
+      if (!req.isAuthenticated || !req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const userId = req.user.claims.sub;
+      const consent = await storage.getUserCookieConsent(userId);
+      res.json(consent || null);
+    } catch (error) {
+      console.error("Error fetching cookie consent:", error);
+      res.status(500).json({ message: "Failed to fetch cookie consent" });
+    }
+  });
+
+  app.post('/api/me/cookie-consent', async (req: any, res) => {
+    try {
+      const superAdmin = (req.session as any)?.superAdmin;
+      if (superAdmin?.authenticated) {
+        // Super admin choice is held in localStorage only.
+        return res.json({ ok: true, persisted: false });
+      }
+      if (!req.isAuthenticated || !req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const userId = req.user.claims.sub;
+      const { version, analytics, marketing } = req.body || {};
+      const consent = await storage.upsertUserCookieConsent({
+        userId,
+        version: Number.isFinite(version) ? Number(version) : 1,
+        essential: true,
+        analytics: !!analytics,
+        marketing: !!marketing,
+      } as any);
+      res.json(consent);
+    } catch (error) {
+      console.error("Error saving cookie consent:", error);
+      res.status(500).json({ message: "Failed to save cookie consent" });
+    }
+  });
+
   // User routes
   app.get("/api/current-user", isAuthenticated, async (req, res) => {
     try {
@@ -1819,6 +1864,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error verifying reset token:', error);
       res.status(500).json({ valid: false, message: 'Failed to verify token' });
+    }
+  });
+
+  // Public: org-level cookie banner override for portal pages.
+  // Returns enabled=false only when the org's published portal settings
+  // explicitly disable the cookie notice. Defaults to enabled=true.
+  app.get('/api/portal/cookie-notice', async (req, res) => {
+    try {
+      const orgId = String(req.query.orgId || '').trim();
+      if (!orgId) {
+        return res.json({ enabled: true });
+      }
+      const { propertyPortalSettings } = await import("@shared/schema");
+      const rows = await db
+        .select({ legal: propertyPortalSettings.legal })
+        .from(propertyPortalSettings)
+        .where(and(
+          eq(propertyPortalSettings.orgId, orgId),
+          eq(propertyPortalSettings.status, 'published')
+        ));
+      // Disable banner only if every published setting opted out.
+      if (rows.length > 0 && rows.every((r) => (r.legal as any)?.cookieNotice === false)) {
+        return res.json({ enabled: false });
+      }
+      res.json({ enabled: true });
+    } catch (error) {
+      console.error("Error fetching portal cookie notice:", error);
+      res.json({ enabled: true });
     }
   });
 

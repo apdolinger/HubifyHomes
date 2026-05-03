@@ -38,6 +38,7 @@ Core features include:
 - **Feature Flags**: Platform-wide rollout control for features with per-organization overrides.
 - **PDF Mockup Gallery**: Admin-only page for previewing client-facing PDFs with sample data and watermarking.
 - **Field Mode**: Mobile-optimized, touch-first interface for field staff, providing access to assigned tasks, property details, and task management functionalities on the go.
+- **Cookie Consent & Legal Links**: Bottom cookie banner with Accept all / Reject non-essential / Customize (Essential always-on, Analytics, Marketing). Choices persist in `localStorage` (key `hubify_cookie_consent_v1`) and, for OIDC users, in the `user_cookie_consent` table via `GET/POST /api/me/cookie-consent`. Analytics/marketing scripts must gate on `isAnalyticsAllowed()`/`isMarketingAllowed()` from `@/lib/cookieConsent`. Portal pages honor org override `legal.cookieNotice` from `propertyPortalSettings` via public `GET /api/portal/cookie-notice?orgId=`. Privacy/Terms links appear on PortalLogin/Register/ForgotPassword/ResetPassword/SuperAdminLogin auth pages and the Portal footer; "Cookie preferences" link sits in the in-app and Landing footers and re-opens the banner.
 
 ### System Design Choices
 The database uses PostgreSQL with Drizzle ORM (Better SQLite3 for local development). The architecture is multi-tenant and organization-scoped, utilizing UUID-based primary keys and JSONB for flexible data structures.

@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Lock } from "lucide-react";
+import LegalLinks from "@/components/LegalLinks";
 
 export default function SuperAdminLogin() {
   const [username, setUsername] = useState("");
@@ -140,6 +141,7 @@ export default function SuperAdminLogin() {
           </div>
         </CardContent>
       </Card>
+      <LegalLinks className="mt-6 text-slate-400" />
     </div>
   );
 }

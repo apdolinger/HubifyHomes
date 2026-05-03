@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Building2, Loader2, ArrowLeft, CheckCircle, XCircle, Eye, EyeOff, Lock } from 'lucide-react';
+import LegalLinks from '@/components/LegalLinks';
 
 export default function PortalResetPassword() {
   const [, setLocation] = useLocation();
@@ -120,6 +121,7 @@ export default function PortalResetPassword() {
             <p className="text-muted-foreground">Verifying reset link...</p>
           </CardContent>
         </Card>
+        <LegalLinks className="mt-6" />
       </div>
     );
   }
@@ -154,6 +156,7 @@ export default function PortalResetPassword() {
             </div>
           </CardContent>
         </Card>
+        <LegalLinks className="mt-6" />
       </div>
     );
   }
@@ -179,6 +182,7 @@ export default function PortalResetPassword() {
             </Link>
           </CardContent>
         </Card>
+        <LegalLinks className="mt-6" />
       </div>
     );
   }
@@ -255,6 +259,7 @@ export default function PortalResetPassword() {
           </div>
         </CardContent>
       </Card>
+      <LegalLinks className="mt-6" />
     </div>
   );
 }

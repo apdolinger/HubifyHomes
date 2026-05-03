@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Building2, Loader2 } from 'lucide-react';
+import LegalLinks from '@/components/LegalLinks';
 
 export default function PortalRegister() {
   const [location] = useLocation();
@@ -159,6 +160,7 @@ export default function PortalRegister() {
           </div>
         </CardContent>
       </Card>
+      <LegalLinks className="mt-6" />
     </div>
   );
 }

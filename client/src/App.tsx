@@ -63,6 +63,8 @@ import QuickSearchModal from "@/components/QuickSearchModal";
 import QuickAddTaskModal from "@/components/QuickAddTaskModal";
 import KeyboardHelpModal from "@/components/KeyboardHelpModal";
 import SupportModal from "@/components/SupportModal";
+import CookieConsentBanner from "@/components/CookieConsentBanner";
+import { openCookiePreferences } from "@/lib/cookieConsent";
 import { GlobalAlertModal } from "@/components/GlobalAlertModal";
 import { TaskModalProvider, useTaskModal } from "@/contexts/TaskModalContext";
 import { PortalAuthProvider } from "@/contexts/PortalAuthContext";
@@ -304,6 +306,15 @@ function AuthenticatedAppContent() {
           <a href="/terms" className="text-blue-600 hover:underline" data-testid="link-terms">
             Terms of Service
           </a>
+          <span className="mx-2">·</span>
+          <button
+            type="button"
+            onClick={openCookiePreferences}
+            className="text-blue-600 hover:underline"
+            data-testid="link-cookie-preferences"
+          >
+            Cookie preferences
+          </button>
         </div>
         <div className="text-xs">
           <a 
@@ -376,6 +387,7 @@ function AuthWrapper() {
       ) : (
         <AuthenticatedApp />
       )}
+      <CookieConsentBanner />
     </TooltipProvider>
   );
 }

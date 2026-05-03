@@ -3303,3 +3303,21 @@ export const insertNotificationLogSchema = createInsertSchema(notificationLogs).
 });
 export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
 export type NotificationLog = typeof notificationLogs.$inferSelect;
+
+// User Cookie Consent table
+export const userCookieConsent = pgTable("user_cookie_consent", {
+  userId: varchar("user_id").primaryKey().references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  version: integer("version").notNull().default(1),
+  essential: boolean("essential").notNull().default(true),
+  analytics: boolean("analytics").notNull().default(false),
+  marketing: boolean("marketing").notNull().default(false),
+  decidedAt: timestamp("decided_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserCookieConsentSchema = createInsertSchema(userCookieConsent).omit({
+  decidedAt: true,
+  updatedAt: true,
+});
+export type InsertUserCookieConsent = z.infer<typeof insertUserCookieConsentSchema>;
+export type UserCookieConsent = typeof userCookieConsent.$inferSelect;

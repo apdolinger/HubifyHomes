@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Building2, Loader2, ArrowLeft, Mail, CheckCircle } from 'lucide-react';
+import LegalLinks from '@/components/LegalLinks';
 
 export default function PortalForgotPassword() {
   const [orgId, setOrgId] = useState('');
@@ -80,6 +81,7 @@ export default function PortalForgotPassword() {
             </div>
           </CardContent>
         </Card>
+        <LegalLinks className="mt-6" />
       </div>
     );
   }
@@ -141,6 +143,7 @@ export default function PortalForgotPassword() {
           </div>
         </CardContent>
       </Card>
+      <LegalLinks className="mt-6" />
     </div>
   );
 }

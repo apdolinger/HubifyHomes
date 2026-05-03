@@ -1,10 +1,13 @@
 import { useEffect } from 'react';
 import { useLocation, Link } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
 import { usePortalAuth } from '@/contexts/PortalAuthContext';
 import StaffDashboard from '@/components/portal/StaffDashboard';
 import VendorDashboard from '@/components/portal/VendorDashboard';
 import { Button } from '@/components/ui/button';
 import { LogOut, Loader2, Bell } from 'lucide-react';
+import LegalLinks from '@/components/LegalLinks';
+import { suppressCookieBanner } from '@/lib/cookieConsent';
 
 export default function Portal() {
   const { user, isLoading, logout } = usePortalAuth();
@@ -15,6 +18,23 @@ export default function Portal() {
       setLocation('/portal/login');
     }
   }, [user, isLoading, setLocation]);
+
+  // Honor org-level cookie notice override (PropertyPortalSettings.legal.cookieNotice).
+  const { data: cookieNotice } = useQuery<{ enabled: boolean }>({
+    queryKey: ['/api/portal/cookie-notice', user?.orgId],
+    queryFn: async () => {
+      const res = await fetch(`/api/portal/cookie-notice?orgId=${encodeURIComponent(user!.orgId)}`);
+      return res.ok ? res.json() : { enabled: true };
+    },
+    enabled: !!user?.orgId,
+  });
+
+  useEffect(() => {
+    if (cookieNotice && cookieNotice.enabled === false) {
+      suppressCookieBanner(true);
+      return () => suppressCookieBanner(false);
+    }
+  }, [cookieNotice]);
 
   if (isLoading) {
     return (
@@ -33,7 +53,7 @@ export default function Portal() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
       <header className="bg-white dark:bg-gray-800 border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div>
@@ -56,10 +76,16 @@ export default function Portal() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {user.role === 'staff' && <StaffDashboard />}
         {user.role === 'vendor' && <VendorDashboard />}
       </main>
+
+      <footer className="bg-white dark:bg-gray-800 border-t border-slate-200 dark:border-gray-700 py-4 mt-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <LegalLinks />
+        </div>
+      </footer>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building, Users, CheckSquare, BarChart3 } from "lucide-react";
+import { openCookiePreferences } from "@/lib/cookieConsent";
 
 export default function Landing() {
   const handleLogin = async () => {
@@ -159,6 +160,15 @@ export default function Landing() {
                 <a href="/terms" className="text-blue-600 hover:underline" data-testid="link-terms">
                   Terms of Service
                 </a>
+                {' · '}
+                <button
+                  type="button"
+                  onClick={openCookiePreferences}
+                  className="text-blue-600 hover:underline"
+                  data-testid="link-cookie-preferences"
+                >
+                  Cookie preferences
+                </button>
               </p>
             </div>
             <div>
