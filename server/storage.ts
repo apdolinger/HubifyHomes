@@ -481,6 +481,8 @@ export interface IStorage {
   // Property operations
   getProperties(includeInactive?: boolean): Promise<Property[]>;
   getProperty(id: number): Promise<Property | undefined>;
+  getPropertiesByIds(ids: number[], orgId: string): Promise<Property[]>;
+  getTasksByPropertyIds(ids: number[]): Promise<Task[]>;
   createProperty(property: InsertProperty, userId: string): Promise<Property>;
   updateProperty(id: number, property: Partial<InsertProperty>): Promise<Property>;
   deleteProperty(id: number): Promise<void>;
@@ -2359,6 +2361,45 @@ export class DatabaseStorage implements IStorage {
   async getProperty(id: number): Promise<Property | undefined> {
     const [property] = await db.select().from(properties).where(eq(properties.id, id));
     return property;
+  }
+
+  async getPropertiesByIds(ids: number[], orgId: string): Promise<Property[]> {
+    if (ids.length === 0) return [];
+    return await db
+      .select()
+      .from(properties)
+      .where(and(inArray(properties.id, ids), eq(properties.orgId, orgId)));
+  }
+
+  async getTasksByPropertyIds(ids: number[]): Promise<Task[]> {
+    if (ids.length === 0) return [];
+    return await db
+      .select({
+        id: tasks.id,
+        title: tasks.title,
+        description: tasks.description,
+        priority: tasks.priority,
+        status: tasks.status,
+        propertyId: tasks.propertyId,
+        assignedToId: tasks.assignedToId,
+        assignedById: tasks.assignedById,
+        dueDate: tasks.dueDate,
+        completedAt: tasks.completedAt,
+        isArchived: tasks.isArchived,
+        createdAt: tasks.createdAt,
+        updatedAt: tasks.updatedAt,
+        assignedUser: {
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+          profileImageUrl: users.profileImageUrl,
+        },
+      })
+      .from(tasks)
+      .leftJoin(users, eq(tasks.assignedToId, users.id))
+      .where(inArray(tasks.propertyId, ids))
+      .orderBy(desc(tasks.createdAt));
   }
 
   async getPropertyByAddress(address: string, orgId: string): Promise<Property | null> {

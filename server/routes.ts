@@ -1995,9 +1995,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const links = await storage.getPortalUserProperties(portalUser.id);
       const propertyIds = links.map((l) => l.propertyId);
       if (propertyIds.length === 0) return res.json([]);
-      const props = await Promise.all(propertyIds.map((id) => storage.getProperty(id)));
+      const props = await storage.getPropertiesByIds(propertyIds, portalUser.orgId);
       const visible = props
-        .filter((p): p is NonNullable<typeof p> => !!p && p.orgId === portalUser.orgId)
         .map((p) => ({
           id: p.id,
           name: p.name,
@@ -2060,12 +2059,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const links = await storage.getPortalUserProperties(portalUser.id);
       const propertyIds = links.map((l) => l.propertyId);
       if (propertyIds.length === 0) return res.json([]);
-      const all = await Promise.all(propertyIds.map((id) => storage.getTasksByProperty(id)));
-      const propsById = new Map<number, string>();
-      for (const id of propertyIds) {
-        const p = await storage.getProperty(id);
-        if (p && p.orgId === portalUser.orgId) propsById.set(id, p.name);
-      }
+      const props = await storage.getPropertiesByIds(propertyIds, portalUser.orgId);
+      const propsById = new Map<number, string>(props.map((p) => [p.id, p.name]));
+      const allowedIds = Array.from(propsById.keys());
+      if (allowedIds.length === 0) return res.json([]);
+      const taskRows = await storage.getTasksByPropertyIds(allowedIds);
       const merged: Array<{
         id: number;
         title: string;
@@ -2075,20 +2073,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         propertyId: number | null;
         propertyName: string | null;
       }> = [];
-      for (const list of all) {
-        for (const t of list) {
-          if (!t.propertyId || !propsById.has(t.propertyId)) continue;
-          if (t.isArchived) continue;
-          merged.push({
-            id: t.id,
-            title: t.title,
-            status: t.status,
-            priority: t.priority,
-            dueDate: t.dueDate,
-            propertyId: t.propertyId,
-            propertyName: propsById.get(t.propertyId) || null,
-          });
-        }
+      for (const t of taskRows) {
+        if (!t.propertyId || !propsById.has(t.propertyId)) continue;
+        if (t.isArchived) continue;
+        merged.push({
+          id: t.id,
+          title: t.title,
+          status: t.status,
+          priority: t.priority,
+          dueDate: t.dueDate,
+          propertyId: t.propertyId,
+          propertyName: propsById.get(t.propertyId) || null,
+        });
       }
       merged.sort((a, b) => {
         const ad = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
