@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   ClipboardCheck, Search, Calendar, User, Building, Filter,
   ExternalLink, RefreshCw, List, ChevronLeft, ChevronRight,
@@ -540,6 +541,7 @@ export default function InspectionSchedules() {
                   </div>
 
                   {/* Calendar grid */}
+                  <TooltipProvider delayDuration={300}>
                   <div className="border border-slate-200 rounded-lg overflow-hidden">
                     {calendarWeeks.map((week, wi) => (
                       <div key={wi} className="grid grid-cols-7 divide-x divide-slate-200">
@@ -563,16 +565,47 @@ export default function InspectionSchedules() {
                                   const prop = propertiesMap[s.propertyId];
                                   const propName = prop?.name || `Property ${s.propertyId}`;
                                   const color = propertyColorMap[s.propertyId] || PROPERTY_PALETTE[0];
+                                  const inspector = s.inspectorUserId ? usersMap[s.inspectorUserId] : null;
+                                  const inspectorName = inspector
+                                    ? `${inspector.firstName || ""} ${inspector.lastName || ""}`.trim() || "Unassigned"
+                                    : "Unassigned";
+                                  const template = s.templateId ? templatesMap[s.templateId] : null;
+                                  const templateName = template?.name || "No template";
                                   return (
-                                    <button
-                                      key={s.id}
-                                      className={`w-full text-left text-white text-xs rounded px-1.5 py-0.5 truncate ${color} hover:opacity-80 transition-opacity cursor-pointer`}
-                                      onClick={() => setLocation(`/property-profile/${s.propertyId}?tab=inspections`)}
-                                      title={propName}
-                                      data-testid={`cal-event-${s.id}`}
-                                    >
-                                      {propName}
-                                    </button>
+                                    <Tooltip key={s.id}>
+                                      <TooltipTrigger asChild>
+                                        <button
+                                          className={`w-full text-left text-white text-xs rounded px-1.5 py-0.5 truncate ${color} hover:opacity-80 transition-opacity cursor-pointer`}
+                                          onClick={() => setLocation(`/property-profile/${s.propertyId}?tab=inspections`)}
+                                          data-testid={`cal-event-${s.id}`}
+                                        >
+                                          {propName}
+                                        </button>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" className="max-w-[220px] p-3 space-y-1.5">
+                                        <p className="font-semibold text-sm leading-tight">{propName}</p>
+                                        <div className="text-xs space-y-1 text-muted-foreground">
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="font-medium text-foreground">Frequency:</span>
+                                            {FREQUENCY_LABELS[s.frequency] || s.frequency}
+                                          </div>
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="font-medium text-foreground">Inspector:</span>
+                                            {inspectorName}
+                                          </div>
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="font-medium text-foreground">Template:</span>
+                                            {templateName}
+                                          </div>
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="font-medium text-foreground">Status:</span>
+                                            <span className={s.isActive ? "text-green-600" : "text-slate-500"}>
+                                              {s.isActive ? "Active" : "Paused"}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </TooltipContent>
+                                    </Tooltip>
                                   );
                                 })}
                               </div>
@@ -582,6 +615,7 @@ export default function InspectionSchedules() {
                       </div>
                     ))}
                   </div>
+                  </TooltipProvider>
 
                   {/* Legend — only shows properties in the current filtered result */}
                   {filteredPropertyIds.length > 0 && (
