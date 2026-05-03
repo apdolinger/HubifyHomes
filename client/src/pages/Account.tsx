@@ -1283,13 +1283,13 @@ export default function Account() {
                     </p>
                   </div>
                   <div className="p-4 border rounded-lg">
-                    <h4 className="font-medium text-slate-900">Manager</h4>
+                    <h4 className="font-medium text-slate-900">Supervisor</h4>
                     <p className="text-xs text-slate-600 mt-1">
                       Manage properties, tasks, calendar, and the Hubify Console. No billing access.
                     </p>
                   </div>
                   <div className="p-4 border rounded-lg">
-                    <h4 className="font-medium text-slate-900">Member / Field Staff</h4>
+                    <h4 className="font-medium text-slate-900">Staff</h4>
                     <p className="text-xs text-slate-600 mt-1">
                       View and complete assigned tasks, log time, and use Field Mode.
                     </p>
