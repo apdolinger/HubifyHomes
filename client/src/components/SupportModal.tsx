@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -11,16 +11,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import {
   MessageSquare,
-  ExternalLink,
-  BookOpen,
-  Search,
-  HelpCircle,
-  Lightbulb,
   X,
   Send,
   Link,
@@ -35,21 +29,6 @@ interface SupportModalProps {
   onClose: () => void;
 }
 
-interface SupportArticle {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  url: string;
-  keywords: string[];
-}
-
-// Suggested-articles feature is intentionally disabled until a real
-// help-content backend exists. The empty array short-circuits the
-// suggestion useEffect so no fake "help.hubifyhomes.app" links are
-// ever rendered.
-const supportArticles: SupportArticle[] = [];
-
 export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
@@ -58,7 +37,6 @@ export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
   const [hyperlinks, setHyperlinks] = useState<string[]>(['']);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [suggestedArticles, setSuggestedArticles] = useState<SupportArticle[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
@@ -141,56 +119,6 @@ export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
     }
   };
 
-  // Function to calculate relevance score for articles
-  const calculateRelevance = (article: SupportArticle, searchText: string): number => {
-    if (!searchText.trim()) return 0;
-    
-    const searchWords = searchText.toLowerCase().split(/\s+/).filter(word => word.length > 2);
-    let score = 0;
-    
-    searchWords.forEach(word => {
-      // Check title (higher weight)
-      if (article.title.toLowerCase().includes(word)) {
-        score += 5;
-      }
-      
-      // Check description
-      if (article.description.toLowerCase().includes(word)) {
-        score += 3;
-      }
-      
-      // Check keywords (highest weight)
-      article.keywords.forEach(keyword => {
-        if (keyword.toLowerCase().includes(word) || word.includes(keyword.toLowerCase())) {
-          score += 7;
-        }
-      });
-    });
-    
-    return score;
-  };
-
-  // Update suggested articles when subject or message changes
-  useEffect(() => {
-    const searchText = `${subject} ${message}`.trim();
-    
-    if (searchText.length < 3) {
-      setSuggestedArticles([]);
-      return;
-    }
-
-    const articlesWithScores = supportArticles
-      .map(article => ({
-        ...article,
-        relevanceScore: calculateRelevance(article, searchText)
-      }))
-      .filter(article => article.relevanceScore > 0)
-      .sort((a, b) => b.relevanceScore - a.relevanceScore)
-      .slice(0, 3);
-
-    setSuggestedArticles(articlesWithScores);
-  }, [subject, message]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -267,7 +195,6 @@ export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
       setUrgency('medium');
       setHyperlinks(['']);
       setAttachments([]);
-      setSuggestedArticles([]);
       onClose();
     } catch (error) {
       toast({
@@ -278,10 +205,6 @@ export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleOpenArticle = (_url: string) => {
-    // No-op until a real help-content destination exists.
   };
 
   return (
@@ -498,15 +421,6 @@ export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
               </div>
             )}
           </div>
-
-          {/* Suggested Articles — intentionally hidden until a real help-content backend exists. */}
-          {false && (
-            <div className="space-y-3">
-              <p className="text-xs text-slate-600">
-                Help articles will appear here once the help center is available.
-              </p>
-            </div>
-          )}
 
           {/* Submit Button */}
           <div className="flex items-center justify-between pt-4 border-t">

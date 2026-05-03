@@ -9013,9 +9013,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/orgs/:orgId/subscription", isAuthenticated, async (req, res) => {
+  app.get("/api/orgs/:orgId/subscription", isAuthenticated, async (req: any, res) => {
     try {
       const orgId = req.params.orgId;
+      const userOrgId = req.user?.claims?.orgId || req.user?.claims?.org_id || req.user?.orgId;
+      const isSuperAdminSession = (req.session as any)?.superAdmin?.authenticated === true;
+      const isSuperAdminRole = req.user?.claims?.role === 'super_admin';
+      if (!isSuperAdminSession && !isSuperAdminRole && userOrgId !== orgId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
       const subscription = await storage.getOrgSubscription(orgId);
       
       if (!subscription) {
