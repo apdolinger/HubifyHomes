@@ -271,7 +271,17 @@ function AuthenticatedAppContent() {
   useEffect(() => {
     const openSearch = () => setIsQuickSearchOpen(true);
     window.addEventListener("hubify:open-quick-search", openSearch);
-    return () => window.removeEventListener("hubify:open-quick-search", openSearch);
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        setIsQuickSearchOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("hubify:open-quick-search", openSearch);
+      window.removeEventListener("keydown", onKey);
+    };
   }, []);
 
   return (

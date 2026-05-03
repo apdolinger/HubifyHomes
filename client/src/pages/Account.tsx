@@ -1152,15 +1152,15 @@ export default function Account() {
                       </Button>
                     </div>
                     <div>
-                      <h4 className="font-medium text-slate-900 mb-3">Client Invoices</h4>
+                      <h4 className="font-medium text-slate-900 mb-3">Subscription Invoices</h4>
                       <Button
                         className="w-full justify-start"
                         variant="outline"
-                        onClick={() => setLocation('/admin/invoices')}
-                        data-testid="button-view-invoices"
+                        onClick={() => setLocation('/billing/invoices')}
+                        data-testid="button-view-org-billing-invoices"
                       >
                         <FileText className="w-4 h-4 mr-2" />
-                        View Client Invoices
+                        View Subscription Invoices
                       </Button>
                     </div>
                   </div>

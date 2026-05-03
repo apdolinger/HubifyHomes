@@ -250,14 +250,15 @@ export default function Navigation() {
             <button
               type="button"
               onClick={() => window.dispatchEvent(new CustomEvent("hubify:open-quick-search"))}
-              className="relative hidden sm:flex items-center w-64 pl-10 pr-12 py-2 border border-slate-300 rounded-lg text-sm text-slate-400 hover:bg-slate-50 hover:border-slate-400 transition-colors text-left"
+              onFocus={() => window.dispatchEvent(new CustomEvent("hubify:open-quick-search"))}
+              className="relative hidden sm:flex items-center w-64 pl-10 pr-16 py-2 border border-slate-300 rounded-lg text-sm text-slate-400 hover:bg-slate-50 hover:border-slate-400 transition-colors text-left"
               id="globalSearch"
               data-testid="button-global-search"
-              aria-label="Open quick search"
+              aria-label="Open quick search (S or Ctrl/Cmd+K)"
             >
               <Search className="absolute left-3 h-4 w-4 text-slate-400" />
-              <span>Search properties, clients, tasks...</span>
-              <kbd className="kbd absolute right-3" aria-hidden="true">S</kbd>
+              <span>Search...</span>
+              <kbd className="kbd absolute right-3 text-[10px]" aria-hidden="true">⌘K</kbd>
             </button>
 
             {/* Notification Bell */}

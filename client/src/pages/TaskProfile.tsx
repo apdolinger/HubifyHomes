@@ -506,9 +506,6 @@ export default function TaskProfile() {
   const [newComment, setNewComment] = useState("");
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
   const [editingCommentText, setEditingCommentText] = useState("");
-  const [taskImage, setTaskImage] = useState<string | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [isImageUploading, setIsImageUploading] = useState(false);
   const [conflictData, setConflictData] = useState<any>(null);
   const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -1505,62 +1502,6 @@ export default function TaskProfile() {
     setEditingCommentText("");
   };
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        toast({
-          title: "Invalid file type",
-          description: "Please select an image file (JPG, PNG, GIF, etc.)",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Validate file size (10MB limit)
-      if (file.size > 10 * 1024 * 1024) {
-        toast({
-          title: "File too large",
-          description: "Please select an image smaller than 10MB",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setImageFile(file);
-      
-      // Create preview URL
-      const previewUrl = URL.createObjectURL(file);
-      setTaskImage(previewUrl);
-      
-      // TODO: Upload to server
-      setIsImageUploading(true);
-      
-      // Simulate upload
-      setTimeout(() => {
-        setIsImageUploading(false);
-        toast({
-          title: "Image uploaded",
-          description: "Task image has been updated successfully",
-        });
-      }, 1500);
-    }
-  };
-
-  const removeTaskImage = () => {
-    if (taskImage) {
-      URL.revokeObjectURL(taskImage);
-    }
-    setTaskImage(null);
-    setImageFile(null);
-    
-    toast({
-      title: "Image removed",
-      description: "Task image has been removed",
-    });
-  };
-
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files && files.length > 0) {
@@ -1934,43 +1875,6 @@ export default function TaskProfile() {
 
         {/* Task Header */}
         <div className="flex items-start gap-6">
-          {/* Task Image */}
-          <div className="flex-shrink-0">
-            {taskImage ? (
-              <div className="relative group">
-                <img
-                  src={taskImage}
-                  alt="Task image"
-                  className="w-20 h-20 object-cover rounded-xl border-2 border-slate-200 shadow-sm"
-                />
-                {isImageUploading && (
-                  <div className="absolute inset-0 bg-black bg-opacity-50 rounded-xl flex items-center justify-center">
-                    <RefreshCw className="w-5 h-5 text-white animate-spin" />
-                  </div>
-                )}
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  className="absolute -top-2 -right-2 w-6 h-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
-                  onClick={removeTaskImage}
-                >
-                  <X className="w-3 h-3" />
-                </Button>
-              </div>
-            ) : (
-              <label className="w-20 h-20 border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-slate-400 hover:bg-slate-50 transition-all shadow-sm">
-                <Upload className="w-5 h-5 text-slate-400 mb-1" />
-                <span className="text-xs text-slate-500 text-center px-1">Add Photo</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-              </label>
-            )}
-          </div>
-
           {/* Task Title and Badges */}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-4">
