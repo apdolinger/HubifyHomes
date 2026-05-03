@@ -1338,6 +1338,8 @@ export const userNotificationPreferences = pgTable("user_notification_preference
   emailOnInvoiceDue: boolean("email_on_invoice_due").notNull().default(true),
   emailOnCalendarEvent: boolean("email_on_calendar_event").notNull().default(true),
   inAppEnabled: boolean("in_app_enabled").notNull().default(true),
+  // Mobile push delivery opt-in (gated by mobile_push_notifications feature flag).
+  pushNotificationsEnabled: boolean("push_notifications_enabled").notNull().default(false),
   // Per-user advance notice windows (null = use org default)
   taskOverdueHoursOffset: integer("task_overdue_hours_offset"),
   inspectionAdvanceDays: integer("inspection_advance_days"),

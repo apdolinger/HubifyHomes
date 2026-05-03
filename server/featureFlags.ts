@@ -76,6 +76,8 @@ export function requireFeatureFlag(flagKey: string) {
         return res.status(403).json({
           enabled: false,
           flag: flagKey,
+          code: "FEATURE_DISABLED",
+          feature: flagKey,
           message: `This feature ("${flagKey}") is disabled for your organization.`,
         });
       }

@@ -184,7 +184,9 @@ function Router() {
             <Route path="/communities/:id" component={CommunityProfile} />
           )}
           <Route path="/calendar" component={Calendar} />
-          <Route path="/time-tracking" component={TimeTracking} />
+          {isFeatureEnabled("task_cost_tracking") && (
+            <Route path="/time-tracking" component={TimeTracking} />
+          )}
           <Route path="/team" component={Team} />
           <Route path="/team/member/:id" component={TeamMemberProfile} />
           <Route path="/people" component={People} />

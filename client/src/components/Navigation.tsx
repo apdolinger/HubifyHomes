@@ -350,7 +350,7 @@ export default function Navigation() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <TimeTrackingDropdownItems />
+                {isFlagEnabled("task_cost_tracking") && <TimeTrackingDropdownItems />}
                 <DropdownMenuItem onClick={() => window.location.href = '/messages'}>
                   <MessageSquare className="w-4 h-4 mr-2" />
                   Messages
@@ -359,10 +359,12 @@ export default function Navigation() {
                   <Calendar className="w-4 h-4 mr-2" />
                   Calendar
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => window.location.href = '/time-tracking'}>
-                  <Clock className="w-4 h-4 mr-2" />
-                  Time Tracking
-                </DropdownMenuItem>
+                {isFlagEnabled("task_cost_tracking") && (
+                  <DropdownMenuItem onClick={() => window.location.href = '/time-tracking'} data-testid="menu-time-tracking">
+                    <Clock className="w-4 h-4 mr-2" />
+                    Time Tracking
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => window.location.href = '/settings/stripe'}>
                   <CreditCard className="w-4 h-4 mr-2" />
                   Stripe Settings

@@ -6150,7 +6150,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/time-entries/report", isAuthenticated, async (req: any, res) => {
+  app.get("/api/time-entries/report", isAuthenticated, requireFeatureFlag("advanced_reporting"), async (req: any, res) => {
     try {
       const user = req.user;
       const userId = user.claims?.sub || user.id;
@@ -6339,7 +6339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/time-entries/clock-in", isAuthenticated, async (req: any, res) => {
+  app.post("/api/time-entries/clock-in", isAuthenticated, requireFeatureFlag("task_cost_tracking"), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = req.user;
@@ -6390,7 +6390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/time-entries/:id/clock-out", isAuthenticated, async (req: any, res) => {
+  app.post("/api/time-entries/:id/clock-out", isAuthenticated, requireFeatureFlag("task_cost_tracking"), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const userId = req.user.claims.sub;
@@ -6417,7 +6417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/time-entries/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/time-entries/:id", isAuthenticated, requireFeatureFlag("task_cost_tracking"), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const user = req.user;
@@ -6453,7 +6453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/time-entries/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/time-entries/:id", isAuthenticated, requireFeatureFlag("task_cost_tracking"), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteTimeEntry(id);
@@ -7619,6 +7619,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existing = await storage.getUserNotificationPreferences(userId);
       const body = req.body as Record<string, unknown>;
 
+      // Gate: pushNotificationsEnabled requires the mobile_push_notifications flag.
+      // Reject the entire request when the field is supplied with a truthy value
+      // and the org has the flag turned off.
+      if ('pushNotificationsEnabled' in body && Boolean(body.pushNotificationsEnabled)) {
+        const { isFeatureEnabled } = await import("./featureFlags");
+        const orgId = req.user?.claims?.orgId ?? null;
+        const enabled = await isFeatureEnabled(orgId, "mobile_push_notifications");
+        if (!enabled) {
+          return res.status(403).json({
+            message: "Mobile push notifications are disabled for your organization",
+            code: "FEATURE_DISABLED",
+            feature: "mobile_push_notifications",
+          });
+        }
+      }
+
       const coerceBool = (key: string, fallback: boolean): boolean => {
         if (key in body) return Boolean(body[key]);
         if (existing && key in existing) return Boolean((existing as Record<string, unknown>)[key]);
@@ -7642,6 +7658,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         emailOnInvoiceDue: coerceBool('emailOnInvoiceDue', true),
         emailOnCalendarEvent: coerceBool('emailOnCalendarEvent', true),
         inAppEnabled: coerceBool('inAppEnabled', true),
+        pushNotificationsEnabled: coerceBool('pushNotificationsEnabled', false),
         taskOverdueHoursOffset: coerceNullInt('taskOverdueHoursOffset'),
         inspectionAdvanceDays: coerceNullInt('inspectionAdvanceDays'),
         invoiceAdvanceDays: coerceNullInt('invoiceAdvanceDays'),
@@ -8881,11 +8898,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/orgs/:orgId/branding", isAuthenticated, async (req, res) => {
+  app.patch("/api/orgs/:orgId/branding", isAuthenticated, async (req: any, res) => {
     try {
       const orgId = req.params.orgId;
+      const callerOrgId = req.user?.claims?.orgId;
+      const callerRole = req.user?.claims?.role;
+      const superAdminSession = (req.session as any)?.superAdmin?.authenticated === true;
+      if (!superAdminSession && (callerOrgId !== orgId || (callerRole !== "admin" && callerRole !== "owner"))) {
+        return res.status(403).json({ message: "Forbidden: cannot modify branding for another organization" });
+      }
+      const { isFeatureEnabled } = await import("./featureFlags");
+      const enabled = await isFeatureEnabled(orgId, "white_label_branding");
+      if (!enabled) {
+        return res.status(403).json({
+          enabled: false,
+          flag: "white_label_branding",
+          code: "FEATURE_DISABLED",
+          feature: "white_label_branding",
+          message: 'This feature ("white_label_branding") is disabled for your organization.',
+        });
+      }
       const org = await storage.getOrg(orgId);
-      
+
       if (!org) {
         return res.status(404).json({ message: "Organization not found" });
       }
@@ -9125,17 +9159,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/orgs/:orgId/properties/:propertyId/portal-settings", isAuthenticated, async (req, res) => {
+  app.post("/api/orgs/:orgId/properties/:propertyId/portal-settings", isAuthenticated, async (req: any, res) => {
     try {
       const { orgId, propertyId } = req.params;
-      
+
+      const callerOrgId = req.user?.claims?.orgId;
+      const callerRole = req.user?.claims?.role;
+      const superAdminSession = (req.session as any)?.superAdmin?.authenticated === true;
+      if (!superAdminSession && (callerOrgId !== orgId || (callerRole !== "admin" && callerRole !== "owner"))) {
+        return res.status(403).json({ message: "Forbidden: cannot modify portal settings for another organization" });
+      }
+
+      const { isFeatureEnabled } = await import("./featureFlags");
+      const whiteLabelEnabled = await isFeatureEnabled(orgId, "white_label_branding");
+      const submittedBranding =
+        (req.body.branding && Object.keys(req.body.branding).length > 0) ||
+        (req.body.theme && Object.keys(req.body.theme).length > 0);
+      if (!whiteLabelEnabled && submittedBranding) {
+        return res.status(403).json({
+          message: "White label branding is disabled for this organization",
+          code: "FEATURE_DISABLED",
+          feature: "white_label_branding",
+        });
+      }
+
       // Get current branding level to enforce policy
       const brandingLevel = await getBrandingLevel(orgId);
-      
-      // Extract branding data and enforce policy
+
       const brandingData = {
         branding: req.body.branding || {},
-        theme: req.body.theme || {}
+        theme: req.body.theme || {},
       };
       const allowedBranding = enforceBrandingPolicy(brandingLevel, brandingData);
       
@@ -9172,13 +9225,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/orgs/:orgId/properties/:propertyId/portal-settings/:settingsId", isAuthenticated, async (req, res) => {
+  app.patch("/api/orgs/:orgId/properties/:propertyId/portal-settings/:settingsId", isAuthenticated, async (req: any, res) => {
     try {
       const { orgId, settingsId } = req.params;
-      
+
+      const callerOrgId = req.user?.claims?.orgId;
+      const callerRole = req.user?.claims?.role;
+      const superAdminSession = (req.session as any)?.superAdmin?.authenticated === true;
+      if (!superAdminSession && (callerOrgId !== orgId || (callerRole !== "admin" && callerRole !== "owner"))) {
+        return res.status(403).json({ message: "Forbidden: cannot modify portal settings for another organization" });
+      }
+
+      const { isFeatureEnabled } = await import("./featureFlags");
+      const whiteLabelEnabled = await isFeatureEnabled(orgId, "white_label_branding");
+      const submittedBranding =
+        (req.body.branding && Object.keys(req.body.branding).length > 0) ||
+        (req.body.theme && Object.keys(req.body.theme).length > 0);
+      if (!whiteLabelEnabled && submittedBranding) {
+        return res.status(403).json({
+          message: "White label branding is disabled for this organization",
+          code: "FEATURE_DISABLED",
+          feature: "white_label_branding",
+        });
+      }
+
       // Get current branding level to enforce policy
       const brandingLevel = await getBrandingLevel(orgId);
-      
+
       // Extract branding data and enforce policy if provided
       const updateData: any = { ...req.body };
       if (req.body.branding || req.body.theme) {
@@ -9199,9 +9272,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/orgs/:orgId/properties/:propertyId/portal-settings/publish", isAuthenticated, async (req, res) => {
+  app.post("/api/orgs/:orgId/properties/:propertyId/portal-settings/publish", isAuthenticated, async (req: any, res) => {
     try {
       const { orgId, propertyId } = req.params;
+
+      const callerOrgId = req.user?.claims?.orgId;
+      const callerRole = req.user?.claims?.role;
+      const superAdminSession = (req.session as any)?.superAdmin?.authenticated === true;
+      if (!superAdminSession && (callerOrgId !== orgId || (callerRole !== "admin" && callerRole !== "owner"))) {
+        return res.status(403).json({ message: "Forbidden: cannot publish portal settings for another organization" });
+      }
+
       const { version } = req.body;
       
       if (!version) {

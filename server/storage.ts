@@ -4839,6 +4839,7 @@ export class DatabaseStorage implements IStorage {
           emailOnInvoiceDue: preferences.emailOnInvoiceDue,
           emailOnCalendarEvent: preferences.emailOnCalendarEvent,
           inAppEnabled: preferences.inAppEnabled,
+          pushNotificationsEnabled: preferences.pushNotificationsEnabled,
           taskOverdueHoursOffset: preferences.taskOverdueHoursOffset,
           inspectionAdvanceDays: preferences.inspectionAdvanceDays,
           invoiceAdvanceDays: preferences.invoiceAdvanceDays,

@@ -89,6 +89,7 @@ type NotifPrefs = {
   emailOnCalendarEvent: boolean;
   emailOnMention: boolean;
   emailOnBroadcast: boolean;
+  pushNotificationsEnabled: boolean;
   // Per-user advance notice windows (null = use org default)
   taskOverdueHoursOffset: number | null;
   inspectionAdvanceDays: number | null;
@@ -113,7 +114,8 @@ function NotificationsTab({ orgId, fieldModeEnabled, setFieldModeEnabled, isAdmi
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
+  const { isFeatureEnabled: isFlagOn } = useFeatureFlags();
+  const pushNotifGated = isFlagOn("mobile_push_notifications");
   const { data: prefs, isLoading: prefsLoading } = useQuery<NotifPrefs>({
     queryKey: ["/api/notification-preferences"],
   });
@@ -170,6 +172,7 @@ function NotificationsTab({ orgId, fieldModeEnabled, setFieldModeEnabled, isAdmi
     emailOnCalendarEvent: true,
     emailOnMention: true,
     emailOnBroadcast: true,
+    pushNotificationsEnabled: false,
     taskOverdueHoursOffset: null,
     inspectionAdvanceDays: null,
     invoiceAdvanceDays: null,
@@ -196,6 +199,21 @@ function NotificationsTab({ orgId, fieldModeEnabled, setFieldModeEnabled, isAdmi
               disabled={updatePrefsMutation.isPending}
             />
           </div>
+
+          {pushNotifGated && (
+            <div className="flex items-center justify-between p-3 border rounded-lg bg-slate-50" data-testid="row-push-notifications">
+              <div>
+                <div className="font-medium text-slate-900">Mobile push notifications</div>
+                <div className="text-sm text-slate-500">Send alerts to your registered mobile devices</div>
+              </div>
+              <Switch
+                data-testid="switch-push-notifications"
+                checked={p.pushNotificationsEnabled === true}
+                onCheckedChange={() => togglePref("pushNotificationsEnabled", p.pushNotificationsEnabled === true)}
+                disabled={updatePrefsMutation.isPending}
+              />
+            </div>
+          )}
 
           <div>
             <h3 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">Email Alerts</h3>
@@ -316,7 +334,7 @@ function NotificationsTab({ orgId, fieldModeEnabled, setFieldModeEnabled, isAdmi
           <CardTitle className="flex items-center"><Smartphone className="w-5 h-5 mr-2" />App Preferences</CardTitle>
           <CardDescription>Configure how you prefer to use Hubify on your devices.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <div className="flex items-center justify-between p-3 border rounded-lg">
             <div>
               <div className="font-medium text-slate-900">Field Mode</div>
@@ -1489,23 +1507,24 @@ export default function Account() {
           </div>
         </TabsContent>
 
-        {/* Reports Tab — gated by advanced_reporting flag */}
-        <TabsContent value="reports">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <FileText className="w-5 h-5 mr-2" />
-                Report Templates
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-slate-500">
-                <FileText className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-                <p>Report template configuration will be available in Phase 2</p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        {isFeatureEnabled("advanced_reporting") && (
+          <TabsContent value="reports">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <FileText className="w-5 h-5 mr-2" />
+                  Report Templates
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8 text-slate-500">
+                  <FileText className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+                  <p>Report template configuration will be available in Phase 2</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         {/* Automation Tab */}
         <TabsContent value="automation">

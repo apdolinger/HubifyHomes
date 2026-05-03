@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import { apiRequest } from '@/lib/queryClient';
 import { routes } from '@/lib/routes';
 import { Save, Eye, Upload, Palette, Settings, Shield, Globe } from 'lucide-react';
@@ -35,6 +36,8 @@ export default function PropertyPortalSettings() {
   const { propertyId } = useParams();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isFeatureEnabled } = useFeatureFlags();
+  const whiteLabelEnabled = isFeatureEnabled("white_label_branding");
   
   // Get user's organization ID from auth context
   const { data: user } = useQuery({
@@ -209,10 +212,14 @@ export default function PropertyPortalSettings() {
   }, [publishedSettings]);
 
   const handleSave = () => {
-    createSettingsMutation.mutate({
-      ...formData,
-      status: 'draft'
-    });
+    if (whiteLabelEnabled) {
+      createSettingsMutation.mutate({ ...formData, status: 'draft' });
+      return;
+    }
+    const { branding, theme, ...rest } = formData;
+    void branding;
+    void theme;
+    createSettingsMutation.mutate({ ...rest, status: 'draft' });
   };
 
   const handlePublish = () => {
@@ -297,12 +304,14 @@ export default function PropertyPortalSettings() {
         </Button>
       </div>
 
-      <Tabs defaultValue="branding" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="branding" className="flex items-center gap-2">
-            <Palette className="h-4 w-4" />
-            Branding
-          </TabsTrigger>
+      <Tabs defaultValue={whiteLabelEnabled ? "branding" : "layout"} className="w-full">
+        <TabsList className={`grid w-full ${whiteLabelEnabled ? 'grid-cols-6' : 'grid-cols-5'}`}>
+          {whiteLabelEnabled && (
+            <TabsTrigger value="branding" className="flex items-center gap-2" data-testid="tab-portal-branding">
+              <Palette className="h-4 w-4" />
+              Branding
+            </TabsTrigger>
+          )}
           <TabsTrigger value="layout" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             Layout
@@ -319,7 +328,7 @@ export default function PropertyPortalSettings() {
           <TabsTrigger value="auth">Authentication</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="branding" className="space-y-6">
+        {whiteLabelEnabled && <TabsContent value="branding" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Branding Configuration</CardTitle>
@@ -419,7 +428,7 @@ export default function PropertyPortalSettings() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent>}
 
         <TabsContent value="layout" className="space-y-6">
           <Card>
