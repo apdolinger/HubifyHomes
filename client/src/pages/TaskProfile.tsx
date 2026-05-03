@@ -3139,12 +3139,21 @@ export default function TaskProfile() {
                       <div className="space-y-4">
                         {(() => {
                           const grouped: Record<string, any[]> = {};
+                          const minOrder: Record<string, number> = {};
                           (inspectionItems as any[]).forEach((item: any) => {
                             const cat = item.category?.trim() || "General";
                             if (!grouped[cat]) grouped[cat] = [];
                             grouped[cat].push(item);
+                            const so = typeof item.sortOrder === "number" ? item.sortOrder : Number.MAX_SAFE_INTEGER;
+                            if (minOrder[cat] === undefined || so < minOrder[cat]) minOrder[cat] = so;
                           });
-                          return Object.entries(grouped).map(([category, items]) => (
+                          const sortedEntries = Object.entries(grouped).sort(([a], [b]) => {
+                            const oa = minOrder[a] ?? Number.MAX_SAFE_INTEGER;
+                            const ob = minOrder[b] ?? Number.MAX_SAFE_INTEGER;
+                            if (oa !== ob) return oa - ob;
+                            return a.localeCompare(b);
+                          });
+                          return sortedEntries.map(([category, items]) => (
                             <div key={category}>
                               <div className="flex items-center gap-2 mb-2">
                                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{category}</span>

@@ -317,14 +317,23 @@ export default function InspectionReport() {
             <p className="text-sm text-slate-500 text-center py-6">No checklist items recorded for this inspection.</p>
           ) : (() => {
             const grouped: Record<string, any[]> = {};
+            const minOrder: Record<string, number> = {};
             checklistItems.forEach((item: any) => {
               const cat = item.category?.trim() || "General";
               if (!grouped[cat]) grouped[cat] = [];
               grouped[cat].push(item);
+              const so = typeof item.sortOrder === "number" ? item.sortOrder : Number.MAX_SAFE_INTEGER;
+              if (minOrder[cat] === undefined || so < minOrder[cat]) minOrder[cat] = so;
+            });
+            const sortedEntries = Object.entries(grouped).sort(([a], [b]) => {
+              const oa = minOrder[a] ?? Number.MAX_SAFE_INTEGER;
+              const ob = minOrder[b] ?? Number.MAX_SAFE_INTEGER;
+              if (oa !== ob) return oa - ob;
+              return a.localeCompare(b);
             });
             return (
               <div className="space-y-6">
-                {Object.entries(grouped).map(([category, items]) => (
+                {sortedEntries.map(([category, items]) => (
                   <div key={category}>
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{category}</span>
