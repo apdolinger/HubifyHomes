@@ -53,6 +53,7 @@ A scripted, idempotent demo organization for closed-beta testing and screencasts
 - **Seeded content**: 10 contacts (owners/vendors/tenants/emergency), 6 mixed properties (each with door/wifi/alarm/gate access codes and preferred-vendor links), 20 tasks (incl. 3 inspections w/ checklists, 2 overdue, recurring), 2 active inspection schedules, 5 calendar events (incl. an intentional conflict + a recurring weekly standup), 2 published forms with sample submissions, 1 community + 2 community documents, 4 invoices (draft/sent/paid/overdue) + 1 consolidated batch invoice, 4 in-app notifications.
 - **Portal URL**: relative path `/portal/login`. Full URL is `https://<your-replit-deployment-host>/portal/login` once deployed (e.g. on the `*.replit.app` domain).
 - **Stripe**: payment-method seeding is skipped cleanly when `STRIPE_SECRET_KEY` is unset; with the key present the script attaches a stored test card to the demo client.
+- **QA checklist**: see `docs/BETA_QA_CHECKLIST.md` for the full closed-beta walkthrough script.
 
 ## External Dependencies
 
