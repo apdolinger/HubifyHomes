@@ -58,9 +58,12 @@ import {
   RefreshCw,
   Send,
   Smartphone,
+  Palette,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { enterFieldMode, exitFieldMode } from "@/components/FieldModeLayout";
+import { HUBIFY_HOMES_LOGO_URL, HUBIFY_HOMES_LOGO_ALT } from "@/lib/brand";
 
 // Organization form schema
 const orgFormSchema = z.object({
@@ -492,6 +495,320 @@ function NotificationLogTab() {
   );
 }
 
+type OrgBranding = {
+  logo?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  accentColor?: string;
+};
+
+type OrgBrandingTheme = {
+  tokens?: Record<string, string>;
+  customCss?: string;
+};
+
+type OrgBrandingCapabilities = {
+  logoUpload?: boolean;
+  customColors?: boolean;
+  customFonts?: boolean;
+  customCss?: boolean;
+};
+
+type OrgBrandingResponse = {
+  branding: OrgBranding;
+  theme?: OrgBrandingTheme;
+  capabilities?: OrgBrandingCapabilities;
+  tier?: string;
+};
+
+const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+const DEFAULT_PRIMARY = "#0066cc";
+const DEFAULT_SECONDARY = "#004499";
+
+function safeColor(value: string, fallback: string): string {
+  return HEX_COLOR_RE.test(value) ? value : fallback;
+}
+
+type OrgRecord = {
+  id: string;
+  name?: string;
+  branding?: OrgBranding;
+  address1?: string;
+  address2?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+  phone?: string;
+  website?: string;
+  timezone?: string;
+  currency?: string;
+  primaryContact?: string;
+  industry?: string;
+};
+
+function BrandingTab({ orgId, orgName }: { orgId: string; orgName: string }) {
+  const { toast } = useToast();
+  const queryClientLocal = useQueryClient();
+
+  const { data, isLoading } = useQuery<OrgBrandingResponse>({
+    queryKey: [`/api/orgs/${orgId}/branding`],
+    enabled: !!orgId,
+  });
+
+  const [logo, setLogo] = useState("");
+  const [primaryColor, setPrimaryColor] = useState(DEFAULT_PRIMARY);
+  const [secondaryColor, setSecondaryColor] = useState(DEFAULT_SECONDARY);
+
+  useEffect(() => {
+    if (data?.branding) {
+      setLogo(data.branding.logo || "");
+      setPrimaryColor(data.branding.primaryColor || DEFAULT_PRIMARY);
+      setSecondaryColor(data.branding.secondaryColor || DEFAULT_SECONDARY);
+    }
+  }, [data]);
+
+  const primaryColorValid = HEX_COLOR_RE.test(primaryColor);
+  const secondaryColorValid = HEX_COLOR_RE.test(secondaryColor);
+  const colorsValid = primaryColorValid && secondaryColorValid;
+  const previewPrimary = safeColor(primaryColor, DEFAULT_PRIMARY);
+  const previewSecondary = safeColor(secondaryColor, DEFAULT_SECONDARY);
+
+  const saveMutation = useMutation<unknown, Error, void>({
+    mutationFn: async () =>
+      apiRequest("PATCH", `/api/orgs/${orgId}/branding`, {
+        branding: {
+          ...(data?.branding || {}),
+          logo: logo || undefined,
+          primaryColor: previewPrimary,
+          secondaryColor: previewSecondary,
+        },
+      }),
+    onSuccess: () => {
+      queryClientLocal.invalidateQueries({ queryKey: [`/api/orgs/${orgId}/branding`] });
+      queryClientLocal.invalidateQueries({ queryKey: ["/api/orgs", orgId] });
+      toast({ title: "Branding saved", description: "Your changes are live for new PDFs and emails." });
+    },
+    onError: (err: Error) => {
+      const msg = err.message || "Failed to save branding";
+      const featureDisabled = /white_label_branding/i.test(msg) || /FEATURE_DISABLED/i.test(msg);
+      toast({
+        title: featureDisabled ? "White-label branding not available" : "Save failed",
+        description: featureDisabled
+          ? "Upgrade your plan to customize the logo shown on PDFs and emails."
+          : msg,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const previewLogoSrc = logo || HUBIFY_HOMES_LOGO_URL;
+  const previewLogoAlt = logo ? `${orgName} logo` : HUBIFY_HOMES_LOGO_ALT;
+  const usingFallback = !logo;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Palette className="w-5 h-5 mr-2" />
+            Branding
+          </CardTitle>
+          <CardDescription>
+            Customize the logo and colors that appear on inspection report PDFs and branded
+            email headers. Falls back to the Hubify Homes logo when no logo is set.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="md:col-span-2 space-y-2">
+              <Label htmlFor="branding-logo-url">Logo URL</Label>
+              <Input
+                id="branding-logo-url"
+                placeholder="https://example.com/logo.png"
+                value={logo}
+                onChange={(e) => setLogo(e.target.value)}
+                data-testid="input-branding-logo-url"
+              />
+              <p className="text-xs text-slate-500">
+                Public HTTPS URL to a PNG, JPG, or SVG. Leave blank to use the Hubify Homes
+                logo as a fallback.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="branding-primary-color">Header Color</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="branding-primary-color"
+                  type="color"
+                  value={previewPrimary}
+                  onChange={(e) => setPrimaryColor(e.target.value)}
+                  className="w-14 h-10 p-1"
+                  data-testid="input-branding-primary"
+                />
+                <Input
+                  type="text"
+                  value={primaryColor}
+                  onChange={(e) => setPrimaryColor(e.target.value)}
+                  className={`flex-1 ${primaryColorValid ? "" : "border-red-500 focus-visible:ring-red-500"}`}
+                  placeholder="#0066cc"
+                  data-testid="input-branding-primary-hex"
+                />
+              </div>
+              {!primaryColorValid && (
+                <p className="text-xs text-red-600" data-testid="text-branding-primary-error">
+                  Enter a hex color like #0066cc.
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="branding-secondary-color">Header Gradient End</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="branding-secondary-color"
+                  type="color"
+                  value={previewSecondary}
+                  onChange={(e) => setSecondaryColor(e.target.value)}
+                  className="w-14 h-10 p-1"
+                  data-testid="input-branding-secondary"
+                />
+                <Input
+                  type="text"
+                  value={secondaryColor}
+                  onChange={(e) => setSecondaryColor(e.target.value)}
+                  className={`flex-1 ${secondaryColorValid ? "" : "border-red-500 focus-visible:ring-red-500"}`}
+                  placeholder="#004499"
+                  data-testid="input-branding-secondary-hex"
+                />
+              </div>
+              {!secondaryColorValid && (
+                <p className="text-xs text-red-600" data-testid="text-branding-secondary-error">
+                  Enter a hex color like #004499.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              onClick={() => saveMutation.mutate()}
+              disabled={saveMutation.isPending || !colorsValid}
+              data-testid="button-save-branding"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {saveMutation.isPending ? "Saving..." : "Save Branding"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card data-testid="card-branding-preview-email">
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Mail className="w-5 h-5 mr-2" />
+            Email Header Preview
+          </CardTitle>
+          <CardDescription>
+            How your logo appears at the top of branded transactional emails.
+            {usingFallback && " Currently showing the Hubify Homes fallback logo."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="border rounded-md overflow-hidden max-w-[600px] mx-auto bg-white">
+            <div
+              className="px-5 py-8 text-center"
+              style={{
+                background: `linear-gradient(135deg, ${previewPrimary} 0%, ${previewSecondary} 100%)`,
+              }}
+            >
+              <img
+                src={previewLogoSrc}
+                alt={previewLogoAlt}
+                style={{
+                  maxWidth: 200,
+                  maxHeight: 80,
+                  height: "auto",
+                  width: "auto",
+                  display: "inline-block",
+                  marginBottom: 12,
+                }}
+                data-testid="img-email-preview-logo"
+              />
+              <p className="text-white text-lg font-semibold m-0">{orgName || "Your Organization"}</p>
+            </div>
+            <div className="px-8 py-10 text-sm text-slate-700 leading-relaxed">
+              Hi there,
+              <br />
+              <br />
+              This is a sample message body so you can see how your branding looks alongside
+              the email content recipients will receive.
+            </div>
+            <div className="bg-slate-50 px-5 py-4 text-center text-xs text-slate-500 border-t">
+              This message was sent from {orgName || "Your Organization"}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card data-testid="card-branding-preview-pdf">
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <FileText className="w-5 h-5 mr-2" />
+            PDF Header Preview
+          </CardTitle>
+          <CardDescription>
+            How your logo appears on inspection report PDFs.
+            {usingFallback && " Currently showing the Hubify Homes fallback logo."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="border rounded-md max-w-[700px] mx-auto bg-white shadow-sm">
+            <div className="px-12 pt-10 pb-6">
+              <div className="flex items-start justify-between gap-6">
+                <div>
+                  <h3 className="text-2xl font-semibold m-0" style={{ color: "#1e40af" }}>
+                    Inspection Report
+                  </h3>
+                  <p className="text-xs mt-1 m-0" style={{ color: "#64748b" }}>
+                    Generated {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+                  </p>
+                </div>
+                <img
+                  src={previewLogoSrc}
+                  alt={previewLogoAlt}
+                  style={{ maxWidth: 110, maxHeight: 44, width: "auto", height: "auto" }}
+                  data-testid="img-pdf-preview-logo"
+                />
+              </div>
+              <div className="mt-6 text-base font-medium" style={{ color: "#0f172a" }}>
+                Sample Quarterly Walkthrough
+              </div>
+              <div className="text-xs mt-1" style={{ color: "#475569" }}>
+                Property: 123 Main St   |   Due: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}   |   Inspector: Jane Doe
+              </div>
+              <div className="mt-4 border-t" style={{ borderColor: "#e2e8f0" }} />
+            </div>
+          </div>
+          {usingFallback && (
+            <p className="text-xs text-slate-500 mt-3 flex items-center gap-1.5" data-testid="text-branding-fallback-notice">
+              <ImageIcon className="w-3.5 h-3.5" />
+              No organization logo set — preview shows the Hubify Homes platform logo.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function Account() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { isFeatureEnabled } = useFeatureFlags();
@@ -539,7 +856,7 @@ export default function Account() {
   }, [isAuthenticated, isLoading, user, toast]);
 
   // Fetch organization data
-  const { data: org, isLoading: isLoadingOrg } = useQuery<any>({
+  const { data: org, isLoading: isLoadingOrg } = useQuery<OrgRecord>({
     queryKey: ['/api/orgs', orgId],
     enabled: !!orgId && isAuthenticated,
   });
@@ -762,12 +1079,13 @@ export default function Account() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-13">
+        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-14">
           <TabsTrigger value="account-info" data-testid="tab-account-info">Account Info</TabsTrigger>
           <TabsTrigger value="billing" data-testid="tab-billing">Billing</TabsTrigger>
           <TabsTrigger value="forms" data-testid="tab-forms">Forms</TabsTrigger>
           <TabsTrigger value="custom-fields" data-testid="tab-custom-fields">Custom Fields</TabsTrigger>
           <TabsTrigger value="email-templates" data-testid="tab-email-templates">Email Templates</TabsTrigger>
+          <TabsTrigger value="branding" data-testid="tab-branding">Branding</TabsTrigger>
           <TabsTrigger value="task-templates" data-testid="tab-task-templates">Task Templates</TabsTrigger>
           {isFeatureEnabled("advanced_reporting") && (
             <TabsTrigger value="reports" data-testid="tab-reports">Reports</TabsTrigger>
@@ -1246,6 +1564,11 @@ export default function Account() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Branding Tab */}
+        <TabsContent value="branding">
+          {orgId && <BrandingTab orgId={orgId} orgName={org?.name || ""} />}
         </TabsContent>
 
         {/* Task Templates Tab */}
