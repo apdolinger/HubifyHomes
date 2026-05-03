@@ -8963,23 +8963,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/orgs/:orgId/subscription", isAuthenticated, async (req: any, res) => {
     try {
       const orgId = req.params.orgId;
-      const userOrgId = req.user?.claims?.orgId || req.user?.claims?.org_id || req.user?.orgId;
+      const userId = req.user?.claims?.sub;
+      const dbUser = userId ? await storage.getUser(userId) : null;
+      const userOrgId = dbUser?.orgId || req.user?.claims?.orgId || req.user?.claims?.org_id;
+      const userRole = dbUser?.role || req.user?.claims?.role;
       const isSuperAdminSession = (req.session as any)?.superAdmin?.authenticated === true;
-      const isSuperAdminRole = req.user?.claims?.role === 'super_admin';
-      if (!isSuperAdminSession && !isSuperAdminRole && userOrgId !== orgId) {
-        return res.status(403).json({ message: "Forbidden" });
+      const isSuperAdminRole = userRole === 'super_admin';
+
+      if (!isSuperAdminSession && !isSuperAdminRole) {
+        if (userOrgId !== orgId) {
+          return res.status(403).json({ message: "Forbidden" });
+        }
+        if (userRole !== 'admin') {
+          return res.status(403).json({ message: "Admin access required" });
+        }
       }
+
       const subscription = await storage.getOrgSubscription(orgId);
-      
+
       if (!subscription) {
         return res.status(404).json({ message: "Subscription not found" });
       }
 
       const capabilities = getBrandingCapabilities(subscription.tier as any);
-      
+
+      // Return only the fields the Account UI needs; never leak Stripe IDs.
       res.json({
-        ...subscription,
-        capabilities
+        tier: subscription.tier,
+        status: subscription.status,
+        currentPeriodEnd: subscription.currentPeriodEnd,
+        cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+        capabilities,
       });
     } catch (error) {
       console.error("Error fetching organization subscription:", error);
