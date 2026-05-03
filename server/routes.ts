@@ -5938,27 +5938,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PDF Mockup Gallery — admin-only sample PDFs for design / demo / preview
+  // PDF Mockup Gallery — admin-only sample PDFs for design / demo / preview.
+  // Reuses the production PDF generators (generateInvoicePDF for invoice + consolidated,
+  // buildInspectionReportPdf for inspection) with sample data and watermark=true.
   app.get("/api/pdf-mockups/:type", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const type = String(req.params.type);
-      const { generateSampleInvoicePdf } = await import("./pdfGenerators/sampleInvoicePdf");
-      const { generateSampleConsolidatedInvoicePdf } = await import("./pdfGenerators/sampleConsolidatedInvoicePdf");
-      const { generateSampleInspectionPdf } = await import("./pdfGenerators/sampleInspectionPdf");
-      const { generateSamplePropertyReportPdf } = await import("./pdfGenerators/samplePropertyReportPdf");
-      const { generateSampleTimeReportPdf } = await import("./pdfGenerators/sampleTimeReportPdf");
-      const generators: Record<string, () => Promise<Buffer>> = {
-        invoice: generateSampleInvoicePdf,
-        consolidated: generateSampleConsolidatedInvoicePdf,
-        inspection: generateSampleInspectionPdf,
-        property: generateSamplePropertyReportPdf,
-        time: generateSampleTimeReportPdf,
-      };
-      const gen = generators[type];
-      if (!gen) {
+      const { getSampleInvoiceArgs, getSampleInspectionArgs } = await import("./pdfMockData");
+      const { generateInvoicePDF } = await import("./invoiceUtils.js");
+
+      let buf: Buffer;
+      if (type === "invoice") {
+        const a = getSampleInvoiceArgs(false);
+        buf = await generateInvoicePDF(a.invoice, a.client, a.org, { watermark: true });
+      } else if (type === "consolidated") {
+        const a = getSampleInvoiceArgs(true);
+        buf = await generateInvoicePDF(a.invoice, a.client, a.org, { watermark: true });
+      } else if (type === "inspection") {
+        const a = getSampleInspectionArgs();
+        buf = await buildInspectionReportPdf(a.task, a.checklistItems, { watermark: true });
+      } else if (type === "property") {
+        const { generateSamplePropertyReportPdf } = await import("./pdfGenerators/samplePropertyReportPdf");
+        buf = await generateSamplePropertyReportPdf();
+      } else if (type === "time") {
+        const { generateSampleTimeReportPdf } = await import("./pdfGenerators/sampleTimeReportPdf");
+        buf = await generateSampleTimeReportPdf();
+      } else {
         return res.status(404).json({ message: `Unknown mockup type: ${type}` });
       }
-      const buf = await gen();
+
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `inline; filename="sample-${type}.pdf"`);
       res.send(buf);
@@ -14168,9 +14176,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Helper: generate inspection report PDF as a Buffer
-  async function buildInspectionReportPdf(task: any, checklistItems: any[]): Promise<Buffer> {
+  async function buildInspectionReportPdf(
+    task: any,
+    checklistItems: any[],
+    opts?: { watermark?: boolean }
+  ): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50, size: "A4" });
+      const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: opts?.watermark === true });
       const chunks: Buffer[] = [];
       doc.on("data", (chunk: Buffer) => chunks.push(chunk));
       doc.on("end", () => resolve(Buffer.concat(chunks)));
@@ -14335,7 +14347,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         doc.y = doc.y + 38;
       }
 
-      doc.end();
+      if (opts?.watermark === true) {
+        import('./pdfGenerators/index.js').then(({ applyWatermarkToAllPages }) => {
+          applyWatermarkToAllPages(doc);
+          doc.end();
+        }).catch(reject);
+      } else {
+        doc.end();
+      }
     });
   }
 

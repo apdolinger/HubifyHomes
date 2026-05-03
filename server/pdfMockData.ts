@@ -229,6 +229,128 @@ export function getSamplePropertyReport(): SamplePropertyReport {
   };
 }
 
+// Sample objects shaped to match the REAL Hubify generators (generateInvoicePDF /
+// buildInspectionReportPdf), so the mockup gallery exercises the production
+// rendering paths instead of parallel sample renderers.
+
+export function getSampleInvoiceArgs(consolidated: boolean = false): {
+  invoice: any; client: any; org: any;
+} {
+  const org = {
+    name: "Acme Property Management",
+    address: "123 Main St, Suite 200\nNaples, FL 34102",
+    email: "billing@acmepm.com",
+    phone: "(239) 555-0142",
+    primaryColor: "#1e40af",
+    secondaryColor: "#3b82f6",
+    logoUrl: null,
+  };
+  if (!consolidated) {
+    return {
+      invoice: {
+        invoiceNumber: "INV-2026-0042",
+        issuedAt: new Date("2026-05-02T12:00:00Z").toISOString(),
+        dueDate: new Date("2026-05-16T12:00:00Z").toISOString(),
+        currency: "usd",
+        amountCents: 80825,
+        paidAt: null,
+        description: "April 2026 home watch services for 789 Beachfront Dr.",
+        lineItems: [
+          { description: "Home Watch — April 2026 (4 weekly visits)", quantity: 4, unitAmountCents: 7500, totalCents: 30000 },
+          { description: "Pool Service — April 2026", quantity: 4, unitAmountCents: 4500, totalCents: 18000 },
+          { description: "Storm Prep — Pre-season inspection", quantity: 1, unitAmountCents: 25000, totalCents: 25000 },
+          { description: "Light bulb replacement (parts + labor)", quantity: 1, unitAmountCents: 3250, totalCents: 3250 },
+          { description: "Sales tax (6.0%)", quantity: 1, unitAmountCents: 4575, totalCents: 4575 },
+        ],
+        metadata: {
+          terms: "Net 14",
+          notes: "Thank you for your business. Please contact us with any questions about this invoice within 7 days of receipt.",
+        },
+      },
+      client: {
+        firstName: "Jane",
+        lastName: "Owner",
+        address: "789 Beachfront Dr\nMarco Island, FL 34145",
+        email: "jane.owner@example.com",
+        phone: "(239) 555-9988",
+      },
+      org,
+    };
+  }
+  // Consolidated invoice — uses metadata.consolidatedInvoice flag in generateInvoicePDF.
+  return {
+    invoice: {
+      invoiceNumber: "BATCH-2026-04",
+      issuedAt: new Date("2026-05-02T12:00:00Z").toISOString(),
+      dueDate: new Date("2026-05-16T12:00:00Z").toISOString(),
+      currency: "usd",
+      amountCents: 241283,
+      paidAt: null,
+      description: "Consolidated billing for April 2026 across 3 properties.",
+      lineItems: [
+        { description: "P-204 · 789 Beachfront Dr — Weekly home watch (4x)", quantity: 4, unitAmountCents: 7500, totalCents: 30000 },
+        { description: "P-204 · 789 Beachfront Dr — Pool service (4x)", quantity: 4, unitAmountCents: 3300, totalCents: 13200 },
+        { description: "P-118 · 12 Palm Ct — Weekly home watch (4x)", quantity: 4, unitAmountCents: 8500, totalCents: 34000 },
+        { description: "P-118 · 12 Palm Ct — HVAC filter replacement", quantity: 1, unitAmountCents: 5850, totalCents: 5850 },
+        { description: "P-118 · 12 Palm Ct — Lawn touch-up (vendor reimb.)", quantity: 1, unitAmountCents: 20000, totalCents: 20000 },
+        { description: "P-077 · 3401 Gulf Shore Blvd N — Weekly home watch (4x)", quantity: 4, unitAmountCents: 11000, totalCents: 44000 },
+        { description: "P-077 · 3401 Gulf Shore Blvd N — Storm prep inspection", quantity: 1, unitAmountCents: 35000, totalCents: 35000 },
+        { description: "P-077 · 3401 Gulf Shore Blvd N — Bulb + smoke alarm", quantity: 1, unitAmountCents: 9575, totalCents: 9575 },
+        { description: "P-077 · 3401 Gulf Shore Blvd N — Vendor coord. (pool repair)", quantity: 3, unitAmountCents: 12000, totalCents: 36000 },
+        { description: "Sales tax (6.0%)", quantity: 1, unitAmountCents: 13658, totalCents: 13658 },
+      ],
+      metadata: {
+        consolidatedInvoice: true,
+        submissionCount: 9,
+        terms: "Net 14",
+        notes: "Consolidated billing for Apr 01–30, 2026 across 3 properties (P-204, P-118, P-077).",
+      },
+    },
+    client: {
+      firstName: "Sunset",
+      lastName: "Properties LLC",
+      address: "500 Harbor Ave\nNaples, FL 34102",
+      email: "robert@sunset.example",
+      phone: "(239) 555-7000",
+    },
+    org,
+  };
+}
+
+export function getSampleInspectionArgs(): { task: any; checklistItems: any[] } {
+  const task = {
+    title: "Monthly Home Watch — 789 Beachfront Dr",
+    description: "Owner request: please verify the upstairs A/C and check for any storm damage from last week.",
+    dueDate: new Date("2026-05-02T12:00:00Z").toISOString(),
+    property: { address1: "789 Beachfront Dr, Marco Island, FL 34145" },
+    assignedUser: { firstName: "Sarah", lastName: "Chen" },
+  };
+  const mk = (text: string, result: "pass" | "fail" | "na" | null, category: string, opts?: { note?: string; required?: boolean }) => ({
+    text, result, category, resultNote: opts?.note, required: opts?.required,
+  });
+  const checklistItems = [
+    mk("Roof — visible damage", "pass", "Exterior"),
+    mk("Gutters & downspouts clear", "pass", "Exterior"),
+    mk("Pool equipment running", "pass", "Exterior"),
+    mk("Landscaping condition", "pass", "Exterior"),
+    mk("Storm shutters secured", "pass", "Exterior"),
+    mk("Front door / locks", "pass", "Interior", { required: true }),
+    mk("Windows secured", "pass", "Interior"),
+    mk("A/C running, set to 78°F", "pass", "Interior", { required: true }),
+    mk("Refrigerator temperature", "pass", "Interior"),
+    mk("Master bath plumbing", "fail", "Interior", {
+      note: "Slow leak under sink. Towels placed under trap, water shutoff confirmed accessible. Recommend plumber within 7 days.",
+      required: true,
+    }),
+    mk("Toilets flush correctly", "pass", "Interior"),
+    mk("Smoke detectors", "pass", "Safety", { required: true }),
+    mk("CO detectors", "pass", "Safety", { required: true }),
+    mk("Fire extinguisher", "na", "Safety"),
+    mk("Water shutoff accessible", "pass", "Safety"),
+  ];
+  return { task, checklistItems };
+}
+
 export function getSampleTimeReport(): SampleTimeReport {
   return {
     dateRange: "Apr 03 – May 02, 2026 (30 days)",

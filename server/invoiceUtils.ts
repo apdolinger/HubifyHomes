@@ -584,12 +584,18 @@ function formatCurrency(amount: number, currency: string): string {
 }
 
 // New function that generates PDF and returns a Buffer (for email attachments and storage)
-export async function generateInvoicePDF(invoice: any, client: any, org: any): Promise<Buffer> {
+export async function generateInvoicePDF(
+  invoice: any,
+  client: any,
+  org: any,
+  opts?: { watermark?: boolean }
+): Promise<Buffer> {
   return new Promise(async (resolve, reject) => {
     try {
       const doc = new PDFDocument({ 
         margin: 50,
-        size: 'LETTER'
+        size: 'LETTER',
+        bufferPages: opts?.watermark === true,
       });
       
       const buffers: Buffer[] = [];
@@ -1065,6 +1071,12 @@ export async function generateInvoicePDF(invoice: any, client: any, org: any): P
            }
          );
       
+      // Apply SAMPLE watermark on every page if requested (post-flight).
+      if (opts?.watermark === true) {
+        const { applyWatermarkToAllPages } = await import('./pdfGenerators/index.js');
+        applyWatermarkToAllPages(doc);
+      }
+
       // Finalize the PDF
       doc.end();
     } catch (error) {
