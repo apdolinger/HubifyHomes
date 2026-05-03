@@ -35,6 +35,8 @@ import {
   users,
   contacts,
   properties,
+  propertyAccessItems,
+  propertyVendors,
   tasks,
   taskChecklistItems,
   inspectionSchedules,
@@ -236,6 +238,67 @@ async function ensureProperty(opts: {
     .returning();
   log("create", `Property "${opts.name}"`);
   return row.id;
+}
+
+async function ensureAccessItem(opts: {
+  propertyId: number;
+  category: string;
+  description: string;
+  value: string;
+  notes?: string;
+}) {
+  const [existing] = await db
+    .select()
+    .from(propertyAccessItems)
+    .where(
+      and(
+        eq(propertyAccessItems.propertyId, opts.propertyId),
+        eq(propertyAccessItems.category, opts.category),
+        eq(propertyAccessItems.description, opts.description),
+      ),
+    )
+    .limit(1);
+  if (existing) {
+    log("skip", `Access "${opts.description}" on property ${opts.propertyId}`);
+    return;
+  }
+  await db.insert(propertyAccessItems).values({
+    propertyId: opts.propertyId,
+    category: opts.category,
+    description: opts.description,
+    value: opts.value,
+    notes: opts.notes,
+    createdById: USER_IDS.admin,
+  });
+  log("create", `Access "${opts.description}" on property ${opts.propertyId}`);
+}
+
+async function ensurePropertyVendor(opts: {
+  propertyId: number;
+  vendorId: number;
+  notes?: string;
+}) {
+  const [existing] = await db
+    .select()
+    .from(propertyVendors)
+    .where(
+      and(
+        eq(propertyVendors.propertyId, opts.propertyId),
+        eq(propertyVendors.vendorId, opts.vendorId),
+      ),
+    )
+    .limit(1);
+  if (existing) {
+    log("skip", `Vendor link ${opts.vendorId} on property ${opts.propertyId}`);
+    return;
+  }
+  await db.insert(propertyVendors).values({
+    orgId: ORG_ID,
+    propertyId: opts.propertyId,
+    vendorId: opts.vendorId,
+    notes: opts.notes,
+  });
+  log("create", `Vendor link ${opts.vendorId} on property ${opts.propertyId}`);
 }
 
 async function ensureTask(opts: {
@@ -763,7 +826,7 @@ async function main() {
       })
     );
   }
-  await ensureContact({
+  const vendorHvacId = await ensureContact({
     firstName: "Vince",
     lastName: "HVAC Co",
     email: "vince@hvac.beta.test",
@@ -772,7 +835,7 @@ async function main() {
     vendorCategory: "organization",
     phone: "555-0301",
   });
-  await ensureContact({
+  const vendorElectricId = await ensureContact({
     firstName: "Ellie",
     lastName: "Electric",
     email: "ellie@electric.beta.test",
@@ -781,7 +844,7 @@ async function main() {
     vendorCategory: "individual",
     phone: "555-0302",
   });
-  await ensureContact({
+  const vendorSecurityId = await ensureContact({
     firstName: "Sigrid",
     lastName: "Security",
     email: "sigrid@security.beta.test",
@@ -888,6 +951,43 @@ async function main() {
     primaryContactId: ownerIds[1],
   });
   const allProps = [propA, propB, propC, propD, propE, propF];
+
+  // 3a. Property access codes (door / wifi / alarm / gate per property)
+  const accessSpecs: Array<{ p: number; cat: string; desc: string; val: string; notes?: string }> = [
+    { p: propA, cat: "door", desc: "Front Door Lockbox", val: "4827", notes: "Rotate quarterly" },
+    { p: propA, cat: "wifi", desc: "Bayshore Guest WiFi", val: "BayshoreGuest / Sunset!2025" },
+    { p: propA, cat: "alarm", desc: "Main Alarm Panel", val: "9134#" },
+    { p: propA, cat: "gate", desc: "Driveway Gate Code", val: "1100*" },
+    { p: propB, cat: "door", desc: "Lobby Keypad", val: "5521" },
+    { p: propB, cat: "wifi", desc: "Palmview Owner WiFi", val: "Palmview12B / CondoLife!" },
+    { p: propC, cat: "door", desc: "Main Entry Code", val: "3300", notes: "Shared with leasing" },
+    { p: propC, cat: "alarm", desc: "Common Area Alarm", val: "7788#" },
+    { p: propD, cat: "door", desc: "Front Door Smart Lock", val: "9012", notes: "August lock app" },
+    { p: propD, cat: "garage", desc: "Garage Side Door", val: "2244" },
+    { p: propE, cat: "door", desc: "Tenant Entrance", val: "1492" },
+    { p: propE, cat: "alarm", desc: "After-hours Alarm", val: "5566#" },
+    { p: propF, cat: "gate", desc: "Storage Yard Gate", val: "0606*" },
+  ];
+  for (const a of accessSpecs) {
+    await ensureAccessItem({ propertyId: a.p, category: a.cat, description: a.desc, value: a.val, notes: a.notes });
+  }
+
+  // 3b. Preferred vendors per property
+  const vendorLinks: Array<{ p: number; v: number; notes?: string }> = [
+    { p: propA, v: vendorHvacId, notes: "Preferred for HVAC + pool equipment" },
+    { p: propA, v: vendorSecurityId, notes: "Manages alarm + camera system" },
+    { p: propB, v: vendorHvacId },
+    { p: propB, v: vendorElectricId, notes: "Condo board approved" },
+    { p: propC, v: vendorElectricId, notes: "On call for unit turnover" },
+    { p: propC, v: vendorSecurityId },
+    { p: propD, v: vendorHvacId },
+    { p: propE, v: vendorElectricId, notes: "Commercial-rated electrician" },
+    { p: propE, v: vendorSecurityId, notes: "24/7 monitoring contract" },
+    { p: propF, v: vendorSecurityId, notes: "Yard alarm + cameras" },
+  ];
+  for (const link of vendorLinks) {
+    await ensurePropertyVendor({ propertyId: link.p, vendorId: link.v, notes: link.notes });
+  }
 
   // 4. Inspection schedules (2)
   const monthlySchedule = await ensureInspectionSchedule({
