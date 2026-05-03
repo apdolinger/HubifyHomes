@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { prefStorage } from "@/lib/cookieConsent";
 import { useQuery as useAuthQuery } from "@tanstack/react-query";
 import { CheckSquare, Clock, User, Building, Eye, Edit, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, Settings, Repeat, Archive } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -128,9 +129,9 @@ export default function Tasks() {
     { id: 'createdAt', label: 'Created', visible: true },
   ];
 
-  // Load column configuration from localStorage
+  // Load column configuration from localStorage (gated by Preference cookie consent)
   const [columns, setColumns] = useState<ColumnConfig[]>(() => {
-    const saved = localStorage.getItem('taskTableColumns');
+    const saved = prefStorage.getItem('taskTableColumns');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -144,7 +145,7 @@ export default function Tasks() {
   // Save column configuration to localStorage
   const handleSaveColumns = (newColumns: ColumnConfig[]) => {
     setColumns(newColumns);
-    localStorage.setItem('taskTableColumns', JSON.stringify(newColumns));
+    prefStorage.setItem('taskTableColumns', JSON.stringify(newColumns));
   };
 
   // Get visible columns in order

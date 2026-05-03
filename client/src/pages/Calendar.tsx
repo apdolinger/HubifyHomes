@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
+import { prefStorage } from "@/lib/cookieConsent";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -82,7 +83,7 @@ export default function CalendarPage() {
   useEffect(() => {
     if (!orgId) return;
     
-    const stored = localStorage.getItem(`calendar-settings-${orgId}`);
+    const stored = prefStorage.getItem(`calendar-settings-${orgId}`);
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
@@ -396,7 +397,7 @@ export default function CalendarPage() {
         : [...settings.hiddenCalendars, calendarId]
     };
     setSettings(newSettings);
-    localStorage.setItem(`calendar-settings-${orgId}`, JSON.stringify(newSettings));
+    prefStorage.setItem(`calendar-settings-${orgId}`, JSON.stringify(newSettings));
   };
 
   if (isLoading) {

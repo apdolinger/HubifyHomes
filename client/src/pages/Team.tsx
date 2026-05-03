@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Users, Plus, Mail, User, Search, Settings, ArrowUpDown, ArrowUp, ArrowDown, Filter, ChevronDown, ChevronUp, UserPlus, UserCheck, ShieldCheck, UserCog } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { prefStorage } from "@/lib/cookieConsent";
 import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
 import ClientsStatsCustomizationModal, { StatsWidget } from "@/components/ClientsStatsCustomizationModal";
 import { TeamCommunicationModal } from "@/components/TeamCommunicationModal";
@@ -82,7 +83,7 @@ export default function Team() {
 
   // Load stats widgets configuration from localStorage
   const [statsWidgets, setStatsWidgets] = useState<StatsWidget[]>(() => {
-    const saved = localStorage.getItem('teamStatsWidgets');
+    const saved = prefStorage.getItem('teamStatsWidgets');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -96,7 +97,7 @@ export default function Team() {
   // Save stats widgets configuration to localStorage
   const handleSaveStatsWidgets = (newWidgets: StatsWidget[]) => {
     setStatsWidgets(newWidgets);
-    localStorage.setItem('teamStatsWidgets', JSON.stringify(newWidgets));
+    prefStorage.setItem('teamStatsWidgets', JSON.stringify(newWidgets));
   };
 
   // Default column configuration for team table
@@ -109,7 +110,7 @@ export default function Team() {
 
   // Load column configuration from localStorage
   const [columns, setColumns] = useState<ColumnConfig[]>(() => {
-    const saved = localStorage.getItem('teamTableColumns');
+    const saved = prefStorage.getItem('teamTableColumns');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -123,7 +124,7 @@ export default function Team() {
   // Save column configuration to localStorage
   const handleSaveColumns = (newColumns: ColumnConfig[]) => {
     setColumns(newColumns);
-    localStorage.setItem('teamTableColumns', JSON.stringify(newColumns));
+    prefStorage.setItem('teamTableColumns', JSON.stringify(newColumns));
   };
 
   // Sort handler

@@ -37,6 +37,7 @@ import {
   Settings
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { prefStorage } from "@/lib/cookieConsent";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
 import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
@@ -99,7 +100,7 @@ export default function People() {
 
   // Load stats widgets configuration from localStorage
   const [statsWidgets, setStatsWidgets] = useState<StatsWidget[]>(() => {
-    const saved = localStorage.getItem('clientsStatsWidgets');
+    const saved = prefStorage.getItem('clientsStatsWidgets');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -113,7 +114,7 @@ export default function People() {
   // Save stats widgets configuration to localStorage
   const handleSaveStatsWidgets = (newWidgets: StatsWidget[]) => {
     setStatsWidgets(newWidgets);
-    localStorage.setItem('clientsStatsWidgets', JSON.stringify(newWidgets));
+    prefStorage.setItem('clientsStatsWidgets', JSON.stringify(newWidgets));
   };
 
   // Default column configuration for clients table
@@ -129,7 +130,7 @@ export default function People() {
 
   // Load column configuration from localStorage
   const [columns, setColumns] = useState<ColumnConfig[]>(() => {
-    const saved = localStorage.getItem('clientsTableColumns');
+    const saved = prefStorage.getItem('clientsTableColumns');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -143,7 +144,7 @@ export default function People() {
   // Save column configuration to localStorage
   const handleSaveColumns = (newColumns: ColumnConfig[]) => {
     setColumns(newColumns);
-    localStorage.setItem('clientsTableColumns', JSON.stringify(newColumns));
+    prefStorage.setItem('clientsTableColumns', JSON.stringify(newColumns));
   };
 
   // Redirect if not authenticated

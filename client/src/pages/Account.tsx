@@ -8,6 +8,7 @@ import { z } from "zod";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { prefStorage } from "@/lib/cookieConsent";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -504,7 +505,7 @@ export default function Account() {
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [billingSettingsDialogOpen, setBillingSettingsDialogOpen] = useState(false);
   const [fieldModeEnabled, setFieldModeEnabled] = useState<boolean>(
-    localStorage.getItem("fieldModeEnabled") === "true"
+    prefStorage.getItem("fieldModeEnabled") === "true"
   );
 
   const orgId = (user as any)?.orgId;

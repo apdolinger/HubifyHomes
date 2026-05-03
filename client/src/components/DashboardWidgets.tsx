@@ -16,6 +16,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { format, isToday, isTomorrow, parseISO } from "date-fns";
+import { prefStorage } from "@/lib/cookieConsent";
 
 interface CalendarWidgetProps {
   className?: string;
@@ -45,7 +46,7 @@ export function CalendarWidget({ className }: CalendarWidgetProps) {
   useEffect(() => {
     if (!orgId) return;
     
-    const stored = localStorage.getItem(`calendar-settings-${orgId}`);
+    const stored = prefStorage.getItem(`calendar-settings-${orgId}`);
     if (stored) {
       try {
         const parsed = JSON.parse(stored);

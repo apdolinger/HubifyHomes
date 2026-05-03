@@ -64,7 +64,7 @@ import QuickAddTaskModal from "@/components/QuickAddTaskModal";
 import KeyboardHelpModal from "@/components/KeyboardHelpModal";
 import SupportModal from "@/components/SupportModal";
 import CookieConsentBanner from "@/components/CookieConsentBanner";
-import { openCookiePreferences } from "@/lib/cookieConsent";
+import { openCookiePreferences, prefStorage } from "@/lib/cookieConsent";
 import { GlobalAlertModal } from "@/components/GlobalAlertModal";
 import { TaskModalProvider, useTaskModal } from "@/contexts/TaskModalContext";
 import { PortalAuthProvider } from "@/contexts/PortalAuthContext";
@@ -368,12 +368,12 @@ function AuthWrapper() {
     if (!isAuthenticated || isLoading || flagsLoading) return;
     // If the flag is off, force any user on /field back to the desktop app.
     if (isFieldRoute && !fieldModeEnabled) {
-      localStorage.setItem("fieldModeEnabled", "false");
+      prefStorage.setItem("fieldModeEnabled", "false");
       navigate("/");
       return;
     }
     if (!fieldModeEnabled) return;
-    const pref = localStorage.getItem("fieldModeEnabled");
+    const pref = prefStorage.getItem("fieldModeEnabled");
     if (pref === "true" && !isFieldRoute && isMobile) {
       navigate("/field");
     }

@@ -17,6 +17,7 @@ import { TimeTrackingDropdownItems } from "@/components/TimeTracking";
 import { apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
 import { enterFieldMode } from "@/components/FieldModeLayout";
+import { prefStorage } from "@/lib/cookieConsent";
 import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import { 
   BarChart3, 
@@ -87,7 +88,7 @@ export default function Navigation() {
   const fieldModeEnabled = isFlagEnabled("mobile_field_mode");
 
   useEffect(() => {
-    const pref = localStorage.getItem("fieldModeEnabled");
+    const pref = prefStorage.getItem("fieldModeEnabled");
     if (isMobile && pref === null && fieldModeEnabled) {
       setShowFieldModeBanner(true);
     } else {
@@ -96,7 +97,7 @@ export default function Navigation() {
   }, [isMobile, fieldModeEnabled]);
 
   const dismissBanner = () => {
-    localStorage.setItem("fieldModeEnabled", "false");
+    prefStorage.setItem("fieldModeEnabled", "false");
     setShowFieldModeBanner(false);
   };
   

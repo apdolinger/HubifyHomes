@@ -28,6 +28,7 @@ import {
   Download
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { prefStorage } from "@/lib/cookieConsent";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
 
@@ -110,7 +111,7 @@ export default function Vendors() {
     if (typeof window === 'undefined') return defaultColumns;
     
     try {
-      const saved = localStorage.getItem('vendorsTableColumns');
+      const saved = prefStorage.getItem('vendorsTableColumns');
       if (saved) {
         const parsedColumns = JSON.parse(saved);
         return mergeColumns(parsedColumns, defaultColumns);
@@ -126,7 +127,7 @@ export default function Vendors() {
     setColumns(newColumns);
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem('vendorsTableColumns', JSON.stringify(newColumns));
+        prefStorage.setItem('vendorsTableColumns', JSON.stringify(newColumns));
       } catch (error) {
         console.warn('Failed to save vendors table columns to localStorage:', error);
       }

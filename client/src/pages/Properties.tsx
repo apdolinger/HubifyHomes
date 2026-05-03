@@ -21,6 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { apiRequest } from "@/lib/queryClient";
+import { prefStorage } from "@/lib/cookieConsent";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
@@ -424,7 +425,7 @@ export default function Properties() {
 
   // Load column configuration from localStorage
   const [columns, setColumns] = useState<ColumnConfig[]>(() => {
-    const saved = localStorage.getItem('propertyTableColumns');
+    const saved = prefStorage.getItem('propertyTableColumns');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -438,7 +439,7 @@ export default function Properties() {
   // Save column configuration to localStorage
   const handleSaveColumns = (newColumns: ColumnConfig[]) => {
     setColumns(newColumns);
-    localStorage.setItem('propertyTableColumns', JSON.stringify(newColumns));
+    prefStorage.setItem('propertyTableColumns', JSON.stringify(newColumns));
   };
 
   // Get visible columns in order

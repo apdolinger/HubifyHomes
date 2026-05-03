@@ -4,18 +4,19 @@ import { Home, ListChecks, Camera, User, Monitor } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { prefStorage } from "@/lib/cookieConsent";
 
 interface FieldModeLayoutProps {
   children: React.ReactNode;
 }
 
 export function exitFieldMode() {
-  localStorage.setItem("fieldModeEnabled", "false");
+  prefStorage.setItem("fieldModeEnabled", "false");
   window.location.href = "/";
 }
 
 export function enterFieldMode() {
-  localStorage.setItem("fieldModeEnabled", "true");
+  prefStorage.setItem("fieldModeEnabled", "true");
   window.location.href = "/field";
 }
 
@@ -34,7 +35,7 @@ export default function FieldModeLayout({ children }: FieldModeLayoutProps) {
         const res = await fetch("/api/field-mode/access", { credentials: "include" });
         if (cancelled) return;
         if (res.status === 403) {
-          localStorage.setItem("fieldModeEnabled", "false");
+          prefStorage.setItem("fieldModeEnabled", "false");
           toast({
             title: "Field Mode unavailable",
             description: "Your organization has Field Mode disabled.",

@@ -40,6 +40,7 @@ import {
   Mail
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { prefStorage } from "@/lib/cookieConsent";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useLocation } from "wouter";
 import DashboardCustomizationModal from "@/components/DashboardCustomizationModal";
@@ -198,7 +199,7 @@ function renderMessageWithMentions(content: string) {
   // Load saved widget configuration from localStorage or use defaults
   const [dashboardWidgets, setDashboardWidgets] = useState(() => {
     const defaultWidgets = getDefaultWidgets();
-    const saved = localStorage.getItem('dashboardWidgets');
+    const saved = prefStorage.getItem('dashboardWidgets');
     
     if (saved) {
       try {
@@ -505,7 +506,7 @@ function renderMessageWithMentions(content: string) {
       order: widget.order,
       category: widget.category
     }));
-    localStorage.setItem('dashboardWidgets', JSON.stringify(serializableWidgets));
+    prefStorage.setItem('dashboardWidgets', JSON.stringify(serializableWidgets));
     toast({
       title: "Dashboard Updated",
       description: "Your dashboard layout has been saved successfully.",

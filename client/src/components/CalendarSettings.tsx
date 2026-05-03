@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Trash2, Edit2, Check, X, Eye, EyeOff, Copy, RefreshCw, FileDown, Calendar as CalendarIcon } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { prefStorage } from "@/lib/cookieConsent";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -179,7 +180,7 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
 
   // Load settings from localStorage on mount
   useEffect(() => {
-    const stored = localStorage.getItem(`calendar-settings-${orgId}`);
+    const stored = prefStorage.getItem(`calendar-settings-${orgId}`);
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
@@ -194,7 +195,7 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
         };
         setSettings(mergedSettings);
         // Persist the upgraded settings back to localStorage
-        localStorage.setItem(`calendar-settings-${orgId}`, JSON.stringify(mergedSettings));
+        prefStorage.setItem(`calendar-settings-${orgId}`, JSON.stringify(mergedSettings));
         onSettingsChange?.(mergedSettings);
       } catch (e) {
         console.error('Failed to parse calendar settings:', e);
@@ -205,7 +206,7 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
   // Save settings to localStorage whenever they change
   const saveSettings = (newSettings: CalendarDisplaySettings) => {
     setSettings(newSettings);
-    localStorage.setItem(`calendar-settings-${orgId}`, JSON.stringify(newSettings));
+    prefStorage.setItem(`calendar-settings-${orgId}`, JSON.stringify(newSettings));
     onSettingsChange?.(newSettings);
   };
 

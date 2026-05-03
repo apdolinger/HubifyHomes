@@ -43,6 +43,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
+import { prefStorage } from "@/lib/cookieConsent";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import ClientsStatsCustomizationModal, { StatsWidget } from "@/components/ClientsStatsCustomizationModal";
 
@@ -96,7 +97,7 @@ export default function TeamMemberProfile() {
 
   // Load stats widgets configuration from localStorage
   const [statsWidgets, setStatsWidgets] = useState<StatsWidget[]>(() => {
-    const saved = localStorage.getItem('teamMemberProfileStatsWidgets');
+    const saved = prefStorage.getItem('teamMemberProfileStatsWidgets');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -110,7 +111,7 @@ export default function TeamMemberProfile() {
   // Save stats widgets configuration to localStorage
   const handleSaveStatsWidgets = (newWidgets: StatsWidget[]) => {
     setStatsWidgets(newWidgets);
-    localStorage.setItem('teamMemberProfileStatsWidgets', JSON.stringify(newWidgets));
+    prefStorage.setItem('teamMemberProfileStatsWidgets', JSON.stringify(newWidgets));
   };
 
   // Get current user for authorization

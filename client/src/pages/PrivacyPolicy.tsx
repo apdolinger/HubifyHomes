@@ -1,5 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Shield, Mail, Lock, Users, FileText, AlertCircle } from "lucide-react";
+import { Shield, Mail, Lock, Users, FileText, AlertCircle, Cookie } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { openCookiePreferences } from "@/lib/cookieConsent";
 
 export default function PrivacyPolicy() {
   const lastUpdated = "October 2, 2025";
@@ -251,9 +253,20 @@ export default function PrivacyPolicy() {
               </div>
               <div>
                 <h3 className="font-semibold mb-2">7.2 Your Cookie Choices</h3>
-                <p className="text-slate-700">
-                  You can control cookies through your browser settings. Disabling essential cookies may affect platform functionality. We do not use cookies for advertising or cross-site tracking.
+                <p className="text-slate-700 mb-3">
+                  You can manage your Preference and Analytics cookies at any time using the button below. Essential cookies cannot be disabled because they are required for sign-in, security, and core functionality. You can also control cookies through your browser settings. We do not use cookies for advertising or cross-site tracking.
                 </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={openCookiePreferences}
+                  className="gap-2"
+                  data-testid="button-open-cookie-preferences"
+                >
+                  <Cookie className="w-4 h-4" />
+                  Manage cookie preferences
+                </Button>
               </div>
             </div>
           </section>
@@ -348,6 +361,15 @@ export default function PrivacyPolicy() {
             <a href="/privacy" className="text-blue-600 hover:underline">Privacy Policy</a>
             {' · '}
             <a href="/terms" className="text-blue-600 hover:underline">Terms of Service</a>
+            {' · '}
+            <button
+              type="button"
+              onClick={openCookiePreferences}
+              className="text-blue-600 hover:underline"
+              data-testid="link-cookie-preferences-footer"
+            >
+              Cookie preferences
+            </button>
           </p>
         </div>
       </footer>

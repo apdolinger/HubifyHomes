@@ -9,6 +9,7 @@ import { CustomFieldsSettings } from "./Account";
 import { SystemAlertsManagement } from "@/components/SystemAlertsManagement";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { prefStorage } from "@/lib/cookieConsent";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -1522,7 +1523,7 @@ export default function Admin() {
 
   // Load column configuration from localStorage
   const [communityColumns, setCommunityColumns] = useState<ColumnConfig[]>(() => {
-    const saved = localStorage.getItem('communityTableColumns');
+    const saved = prefStorage.getItem('communityTableColumns');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -1536,7 +1537,7 @@ export default function Admin() {
   // Save column configuration to localStorage
   const handleSaveCommunityColumns = (newColumns: ColumnConfig[]) => {
     setCommunityColumns(newColumns);
-    localStorage.setItem('communityTableColumns', JSON.stringify(newColumns));
+    prefStorage.setItem('communityTableColumns', JSON.stringify(newColumns));
   };
 
   // Get visible columns
