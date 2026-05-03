@@ -30,7 +30,6 @@ import {
   FileText,
   Users,
   Mail,
-  Phone,
   MapPin,
   CreditCard,
   Bell,
@@ -1475,53 +1474,11 @@ export default function Account() {
                   </AlertDescription>
                 </Alert>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* SendGrid Card */}
-                  <div className="border rounded-lg p-6 relative">
-                    <div className="absolute top-4 right-4">
-                      <Badge variant="secondary">Coming Soon</Badge>
-                    </div>
-                    <div className="flex items-start space-x-4">
-                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <Mail className="w-6 h-6 text-blue-600" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-lg">SendGrid</h3>
-                        <p className="text-sm text-slate-600 mt-1">
-                          Send transactional and marketing emails
-                        </p>
-                        <div className="mt-4">
-                          <Button variant="outline" size="sm" disabled data-testid="button-connect-sendgrid">
-                            Connect
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Twilio Card */}
-                  <div className="border rounded-lg p-6 relative">
-                    <div className="absolute top-4 right-4">
-                      <Badge variant="secondary">Coming Soon</Badge>
-                    </div>
-                    <div className="flex items-start space-x-4">
-                      <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                        <Phone className="w-6 h-6 text-red-600" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-lg">Twilio</h3>
-                        <p className="text-sm text-slate-600 mt-1">
-                          Send SMS notifications and alerts
-                        </p>
-                        <div className="mt-4">
-                          <Button variant="outline" size="sm" disabled data-testid="button-connect-twilio">
-                            Connect
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <p className="text-sm text-slate-600">
+                  Email delivery is already wired through Hubify's managed SendGrid integration —
+                  no per-organization setup is required. Additional third-party connectors (e.g. SMS)
+                  will appear here once they are available.
+                </p>
               </CardContent>
             </Card>
 

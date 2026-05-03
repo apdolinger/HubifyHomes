@@ -31,7 +31,6 @@ import {
   Clock,
   TrendingUp,
   Users,
-  Star,
   AlertCircle,
   Award,
   Plus,
@@ -945,20 +944,6 @@ export default function TeamMemberProfile() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Star className="w-4 h-4 mr-2" />
-                  Recent Achievements
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-sm text-slate-500">
-                  <Star className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-                  Achievement tracking coming soon
-                </div>
-              </CardContent>
-            </Card>
           </div>
 
           {/* Management Notes Section */}

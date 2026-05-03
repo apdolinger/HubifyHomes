@@ -323,7 +323,7 @@ export default function OrganizationProfile() {
                 <p className="text-gray-600 mb-4">Manage users and their permissions for this organization.</p>
                 <div className="text-center py-8">
                   <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-sm text-gray-500">User management interface coming soon</p>
+                  <p className="text-sm text-gray-500">Manage users from the Team page or Super Admin Console.</p>
                 </div>
               </CardContent>
             </Card>

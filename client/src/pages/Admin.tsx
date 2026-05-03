@@ -911,12 +911,6 @@ function TaskTemplatesManager() {
               />
             </div>
 
-            <div>
-              <Label>Checklist Items (Coming Soon)</Label>
-              <p className="text-xs text-slate-500 mt-1">
-                Checklist functionality will be added in the next update. For now, you can create the basic template structure.
-              </p>
-            </div>
           </div>
 
           <DialogFooter>

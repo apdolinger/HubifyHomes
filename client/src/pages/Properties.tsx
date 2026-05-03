@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Building, MapPin, Users, Plus, Home, Square, DollarSign, Activity, Eye, Edit, ToggleLeft, ToggleRight, Trash2, FileText, Mail, MessageCircle, ChevronUp, ChevronDown, Search, Filter, Crown, Anchor, Package, Calendar, Settings, Upload, Image as ImageIcon, RefreshCw } from "lucide-react";
+import { Building, MapPin, Users, Plus, Home, Square, DollarSign, Activity, Eye, Edit, ToggleLeft, ToggleRight, Trash2, FileText, Mail, ChevronUp, ChevronDown, Search, Filter, Crown, Anchor, Package, Calendar, Settings, Upload, Image as ImageIcon, RefreshCw } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -994,17 +994,6 @@ export default function Properties() {
     });
   };
 
-  const handleBulkCommunication = () => {
-    const selectedPropertyList = properties?.filter((p: any) => selectedProperties.has(p.id));
-    if (!selectedPropertyList?.length) return;
-
-    // For now, show a simple message about the communication feature
-    toast({
-      title: "Communication Feature",
-      description: `This would open a communication interface for ${selectedPropertyList.length} properties. Feature coming soon!`,
-    });
-  };
-
   // Sorting and filtering logic
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -1588,10 +1577,6 @@ export default function Properties() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
-                      <DropdownMenuItem onClick={handleBulkCommunication}>
-                        <MessageCircle className="w-4 h-4 mr-2" />
-                        Send Messages
-                      </DropdownMenuItem>
                       <DropdownMenuItem 
                         onClick={() => setBulkTaskModalOpen(true)}
                         data-testid="menu-item-create-tasks"

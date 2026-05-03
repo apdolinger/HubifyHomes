@@ -32,7 +32,7 @@ Core features include:
 - **Time Tracking**: Dedicated tracking for billable and non-billable time.
 - **Support Ticket System**: Internal system for user requests.
 - **System Alerts**: Organization-level alert system with severity and targeting.
-- **Account Settings**: Comprehensive organization configuration, including company profile management and secure API key management for integrations.
+- **Account Settings**: Organization configuration with company profile and secure API key management. Subscription card reads real `org_subscriptions` data via `GET /api/orgs/:orgId/subscription` (no mocked plan/payment-method UI). Forms, Email Templates, Task Templates, and Team Roles tabs are empty-state cards that SPA-navigate (wouter `setLocation`) to the real admin pages (`/admin/forms`, `/admin/email-templates`, `/admin?tab=templates`, `/team`). Integrations tab no longer shows SendGrid/Twilio "Coming Soon" placeholder cards.
 - **Inspection Management**: Full inspection workflow with customizable checklists, reusable templates, and automated recurring inspection scheduling.
 - **In-App Notifications**: Real-time notifications with an unread badge, a slide-over panel, and customizable preferences.
 - **Feature Flags**: Platform-wide rollout control for features with per-organization overrides.
