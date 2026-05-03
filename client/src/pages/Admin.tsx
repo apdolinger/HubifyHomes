@@ -1264,16 +1264,33 @@ function DocumentTemplatesManager() {
 
     setIsUploading(true);
     try {
-      // In a real implementation, this would upload to object storage
-      // For now, we'll just set a placeholder URL
-      const mockFileUrl = `/documents/templates/${file.name}`;
+      const formData = new FormData();
+      formData.append('files', file);
+      formData.append('directory', '.private/document-templates');
+
+      const uploadResponse = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload file');
+      }
+
+      const uploadData = await uploadResponse.json();
+      const fileUrl = uploadData.urls?.[0];
+      if (!fileUrl) {
+        throw new Error('Upload did not return a file URL');
+      }
+
       setNewTemplate(prev => ({
         ...prev,
         fileName: file.name,
-        fileUrl: mockFileUrl,
+        fileUrl,
       }));
       toast({
-        title: "File Ready",
+        title: "File Uploaded",
         description: "File is ready to be saved as a template.",
       });
     } catch (error: any) {
@@ -3360,88 +3377,21 @@ export default function Admin() {
         {/* Notifications Tab */}
         <TabsContent value="notifications" className="space-y-6">
           <div>
-            <h3 className="text-xl font-semibold">Notifications & Alerts</h3>
-            <p className="text-slate-600">Manage system-wide alert settings</p>
+            <h3 className="text-xl font-semibold">Notifications</h3>
+            <p className="text-slate-600">Manage how you receive in-app and email notifications</p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Alert Settings</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Task Deadline Alerts</p>
-                    <p className="text-sm text-slate-500">Email notifications for overdue tasks</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Duplicate Warnings</p>
-                    <p className="text-sm text-slate-500">Alert when potential duplicates are detected</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Login Failure Alerts</p>
-                    <p className="text-sm text-slate-500">Security notifications for failed logins</p>
-                  </div>
-                  <Switch />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Property Access Logs</p>
-                    <p className="text-sm text-slate-500">Weekly summary of property visits</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Notification Methods</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label className="text-base font-medium">Urgent Alerts</Label>
-                  <div className="mt-2 space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <input type="checkbox" id="urgent-email" defaultChecked />
-                      <Label htmlFor="urgent-email">Email</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input type="checkbox" id="urgent-sms" />
-                      <Label htmlFor="urgent-sms">SMS</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input type="checkbox" id="urgent-app" defaultChecked />
-                      <Label htmlFor="urgent-app">In-App</Label>
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-base font-medium">Regular Updates</Label>
-                  <div className="mt-2 space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <input type="checkbox" id="regular-email" defaultChecked />
-                      <Label htmlFor="regular-email">Email</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input type="checkbox" id="regular-app" defaultChecked />
-                      <Label htmlFor="regular-app">In-App</Label>
-                    </div>
-                  </div>
-                </div>
-                <Button className="w-full">
-                  Save Notification Settings
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+          <Card>
+            <CardContent className="py-8 text-center">
+              <Bell className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+              <p className="text-sm text-slate-700 font-medium mb-1">
+                Notification preferences live in the bell menu
+              </p>
+              <p className="text-sm text-slate-500 mb-4">
+                Open the notification bell in the top navigation to update which alerts you receive and how.
+              </p>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Tools & Support Tab */}
