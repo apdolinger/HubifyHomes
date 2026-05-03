@@ -27,7 +27,7 @@
  *   password:  HubifyBeta!2025
  */
 
-import { sql, and, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db, pool } from "../server/db";
 import {
