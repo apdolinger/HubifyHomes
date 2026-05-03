@@ -23,15 +23,22 @@ A copy-paste-friendly checklist any teammate can run against a freshly seeded en
 3. Open the app at the running Replit URL (e.g. `https://<host>/`) in a fresh incognito window so cookie consent and auth state are clean.
 4. Internal user accounts (all in the "Hubify Beta Demo" org, `orgId 00000000-0000-0000-0000-0000000000be`):
 
-   | Role          | Internal user id    | Email                          |
-   | ------------- | ------------------- | ------------------------------ |
-   | Admin         | `beta-admin`        | admin@beta.hubify.test         |
-   | Supervisor    | `beta-supervisor`   | supervisor@beta.hubify.test    |
-   | Staff 1       | `beta-staff-1`      | staff1@beta.hubify.test        |
-   | Staff 2       | `beta-staff-2`      | staff2@beta.hubify.test        |
-   | Portal client | `client@beta.hubify.test` (password `HubifyBeta!2025`) |
+   | Role        | Internal user id    | Email                          |
+   | ----------- | ------------------- | ------------------------------ |
+   | Admin       | `beta-admin`        | admin@beta.hubify.test         |
+   | Supervisor  | `beta-supervisor`   | supervisor@beta.hubify.test    |
+   | Staff 1     | `beta-staff-1`      | staff1@beta.hubify.test        |
+   | Staff 2     | `beta-staff-2`      | staff2@beta.hubify.test        |
 
    Internal users sign in with **Replit Auth** (Replit OIDC). To exercise a specific role, sign in with the corresponding Replit account, then map your Replit ID to the seeded user via the dev-login / impersonation flow if available, or by editing `users.id` of your row in the dev DB only.
+
+   **Portal client** (separate auth — email + password at `/portal/login`):
+
+   | Email                       | Password         |
+   | --------------------------- | ---------------- |
+   | `client@beta.hubify.test`   | `HubifyBeta!2025` |
+
+   **Super Admin** (separate auth — `/super-admin/login` with TOTP MFA): credentials are NOT seeded by this script. Use the shared closed-beta Super Admin credentials from the team's 1Password vault under "Hubify — Super Admin (closed beta)". If you do not have access, ask the project lead before starting Section 1 step 2.
 
 5. Demo properties seeded (also printed by the seed script):
    - **Bayshore Estate** (single-family, FL) — 4 access codes (door / wifi / alarm / gate) + HVAC + Security vendors + active monthly inspection schedule
@@ -60,7 +67,7 @@ A copy-paste-friendly checklist any teammate can run against a freshly seeded en
 
 1. **Company Profile save** — Account → Company Profile, change Company Phone to `555-9999`, click Save. ✅ Pass: success toast appears and the new phone number persists after a hard reload.
 2. **API key issue** — Account → Integrations → "Create API key", name it `qa-key`. ✅ Pass: secret is shown exactly once and `qa-key` appears in the list with a created-at timestamp.
-3. **API key revoke** — Click revoke on `qa-key`, confirm. ✅ Pass: row is marked revoked / disappears, and `curl -H "Authorization: Bearer <key>" /api/...` returns HTTP 401.
+3. **API key revoke** — Click revoke on `qa-key`, confirm. ✅ Pass: row is marked revoked / disappears, and `curl -H "Authorization: Bearer <key>" https://<host>/api/orgs/00000000-0000-0000-0000-0000000000be/properties` returns HTTP 401.
 4. **Default hourly rate** — Admin → Billing → set default hourly rate to `75`, save. ✅ Pass: value persists after reload and a newly created task pre-fills `$75/hr`.
 5. **Billing settings save** — Change the invoice number prefix (e.g. `BETA-`) and save. ✅ Pass: value persists; the next invoice you create uses the new prefix.
 
@@ -152,7 +159,7 @@ A copy-paste-friendly checklist any teammate can run against a freshly seeded en
 2. **Bell badge increments** — Reload the page. ✅ Pass: the bell badge count is one higher than before step 1.
 3. **Mark read** — Click a single unread notification. ✅ Pass: it switches to a read style and the unread count decreases by 1.
 4. **Mark all read** — Click "Mark all read". ✅ Pass: every notification is marked read and the bell badge clears to 0.
-5. **Per-user preferences** — In user settings, toggle "Email me about overdue tasks" off and save. ✅ Pass: the toggle persists after reload and a subsequent overdue trigger does NOT email this user (verify via SendGrid logs or local mailcatcher).
+5. **Per-user preferences** — In user settings, toggle "Email me about overdue tasks" off and save. ✅ Pass: the toggle persists after reload (`SELECT email_overdue_tasks FROM user_notification_preferences WHERE user_id='beta-staff-1';` returns `false`) and a subsequent overdue trigger does NOT email this user (verify via SendGrid Activity at https://app.sendgrid.com/email_activity, filtering by the user's email address).
 
 ## 13. Reports
 **Logged in as:** `beta-admin`. **Demo data:** the seeded tasks and time entries from the past 30 days plus the 5 sample PDFs in the PDF Mockup Gallery.
