@@ -6,7 +6,7 @@ const ROOT = path.resolve(import.meta.dirname, "..");
 export const HUBIFY_HOMES_LOGO_PATH = path.join(
   ROOT,
   "attached_assets",
-  "hubify_homes_logo.png",
+  "Hubify_Homes-2_1777805213575.png",
 );
 
 export function getHubifyHomesLogoBuffer(): Buffer | null {
