@@ -1281,7 +1281,14 @@ async function main() {
   console.log(
     `\n=== Done — ${created} created, ${skipped} skipped ===\n` +
       `Org id:        ${ORG_ID}\n` +
-      `Portal login:  /portal/login (email: client@beta.hubify.test  password: ${PORTAL_PASSWORD})\n`
+      `Portal login:  /portal/login (email: client@beta.hubify.test  password: ${PORTAL_PASSWORD})\n` +
+      `Property ids:\n` +
+      `  Bayshore Estate         = ${propA}\n` +
+      `  Palmview Condo 12B      = ${propB}\n` +
+      `  Magnolia Apartments     = ${propC}\n` +
+      `  Cedar Ridge House       = ${propD}\n` +
+      `  Harborfront Commercial  = ${propE}\n` +
+      `  Sunset Storage          = ${propF}\n`
   );
 }
 

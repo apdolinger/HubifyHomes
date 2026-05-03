@@ -4,18 +4,24 @@ A copy-paste-friendly checklist any teammate can run against a freshly seeded en
 
 ## Before you start
 
-1. Reset / seed the demo organization:
+1. Reset / seed the demo organization (idempotent — safe to re-run):
    ```bash
    npx tsx scripts/seed-beta-org.ts
    ```
-   Re-running is safe — the script is idempotent.
-2. Confirm the script printed:
+2. Capture the seed output — it ends with the org id, portal login, and the numeric property ids you'll need:
    ```
    Org id:        00000000-0000-0000-0000-0000000000be
    Portal login:  /portal/login (email: client@beta.hubify.test  password: HubifyBeta!2025)
+   Property ids:
+     Bayshore Estate         = <PROP_A>
+     Palmview Condo 12B      = <PROP_B>
+     Magnolia Apartments     = <PROP_C>
+     Cedar Ridge House       = <PROP_D>
+     Harborfront Commercial  = <PROP_E>
+     Sunset Storage          = <PROP_F>
    ```
-3. Open the app at the running Replit URL (e.g. `https://<host>/`). Use a fresh incognito window so cookie consent and auth state are clean.
-4. Demo accounts (all in the "Hubify Beta Demo" org, `orgId 00000000-0000-0000-0000-0000000000be`):
+3. Open the app at the running Replit URL (e.g. `https://<host>/`) in a fresh incognito window so cookie consent and auth state are clean.
+4. Internal user accounts (all in the "Hubify Beta Demo" org, `orgId 00000000-0000-0000-0000-0000000000be`):
 
    | Role          | Internal user id    | Email                          |
    | ------------- | ------------------- | ------------------------------ |
@@ -25,168 +31,167 @@ A copy-paste-friendly checklist any teammate can run against a freshly seeded en
    | Staff 2       | `beta-staff-2`      | staff2@beta.hubify.test        |
    | Portal client | `client@beta.hubify.test` (password `HubifyBeta!2025`) |
 
-   Internal users sign in with **Replit Auth** (Replit OIDC). To exercise a specific role, sign in with the corresponding Replit account, then map your Replit ID to the seeded user via the dev-login / impersonation flow if available, or by editing the `users.id` of your row in the DB (dev only).
+   Internal users sign in with **Replit Auth** (Replit OIDC). To exercise a specific role, sign in with the corresponding Replit account, then map your Replit ID to the seeded user via the dev-login / impersonation flow if available, or by editing `users.id` of your row in the dev DB only.
 
-5. Demo properties created by the seed (capture the numeric IDs from the run output for use below):
-   - **Bayshore Estate** (single-family, FL) — has 4 access codes + HVAC + Security vendors
-   - **Palmview Condo 12B** (condo, FL) — HVAC + Electrician
-   - **Magnolia Apartments** (apartment, FL) — Electrician + Security
-   - **Cedar Ridge House** (house, NC) — HVAC
-   - **Harborfront Commercial** (commercial, FL) — Electrician + Security
-   - **Sunset Storage** (storage_unit, FL) — Security
+5. Demo properties seeded (also printed by the seed script):
+   - **Bayshore Estate** (single-family, FL) — 4 access codes (door / wifi / alarm / gate) + HVAC + Security vendors + active monthly inspection schedule
+   - **Palmview Condo 12B** (condo, FL) — door + wifi codes + HVAC + Electrician + active quarterly inspection schedule
+   - **Magnolia Apartments** (apartment, FL) — door + alarm codes + Electrician + Security vendors
+   - **Cedar Ridge House** (house, NC) — smart-lock + garage codes + HVAC vendor
+   - **Harborfront Commercial** (commercial, FL) — door + alarm codes + Electrician + Security vendors
+   - **Sunset Storage** (storage_unit, FL) — gate code + Security vendor
+
+6. Demo invoices seeded: `BETA-DRAFT-0001` (draft), `BETA-SENT-0002` (open/sent), `BETA-PAID-0003` (paid), `BETA-OVERDUE-0004` (overdue), `BETA-CONSOL-0005` (consolidated batch covering Bayshore + Palmview).
 
 ---
 
 ## 1. Login & Auth
-**Logged in as:** rotates per step. **Demo data:** all 4 internal users + the portal client.
+**Logged in as:** rotates per step. **Demo data:** the 4 seeded internal users (`beta-admin/supervisor/staff-1/staff-2`) and the seeded portal client `client@beta.hubify.test`.
 
-1. **Replit OIDC login** — Sign in as `beta-admin` via Replit Auth. ✅ Pass: lands on the dashboard for "Hubify Beta Demo".
-2. **Super Admin login** — Sign in via `/super-admin/login` with the Super Admin account; complete MFA prompt. ✅ Pass: Super Admin Console loads.
-3. **Hubify Portal login** — Open `/portal/login` (incognito), submit `client@beta.hubify.test` / `HubifyBeta!2025`. ✅ Pass: portal home shows the demo client's properties.
-4. **Portal invitation flow** — As `beta-admin`, invite a new portal user (use a throwaway email). ✅ Pass: invitation email/link generated; opening the link lets the invitee set a password and log in.
-5. **Logout** — From each surface (admin, super-admin, portal) sign out. ✅ Pass: redirected to login; protected pages now bounce to the login screen.
-6. **Portal password reset** — From `/portal/login`, click "Forgot password", submit the demo client email, follow the reset link. ✅ Pass: password updates; old password no longer works.
+1. **Replit OIDC login** — Sign in as `beta-admin` via Replit Auth. ✅ Pass: lands on the dashboard for "Hubify Beta Demo" with the admin's name in the header.
+2. **Super Admin login** — Open `/super-admin/login`, sign in with the Super Admin account, complete the MFA prompt. ✅ Pass: Super Admin Console loads at `/super-admin`.
+3. **Hubify Portal login** — In incognito, open `/portal/login`, submit `client@beta.hubify.test` / `HubifyBeta!2025`. ✅ Pass: portal home shows the demo client's properties and no admin chrome.
+4. **Portal invitation flow** — As `beta-admin`, invite a new portal user with a throwaway email. ✅ Pass: invitation link is generated; opening it in a new window lets the invitee set a password and reach the portal home.
+5. **Logout (3 surfaces)** — From admin, super-admin, and portal sign out. ✅ Pass: each redirects to its login screen and revisiting a protected URL bounces back to login.
+6. **Portal password reset** — From `/portal/login` click "Forgot password", submit the demo client email, follow the reset link, set a new password. ✅ Pass: new password works on `/portal/login`; the previous password is rejected with an error.
 
 ## 2. Org Setup
-**Logged in as:** `beta-admin`. **Demo data:** the Hubify Beta Demo org.
+**Logged in as:** `beta-admin`. **Demo data:** the "Hubify Beta Demo" org (`orgId 00000000-0000-0000-0000-0000000000be`).
 
-1. **Company Profile save** — Open Account → Company Profile, change Company Phone, click Save. ✅ Pass: success toast and value persists after reload.
-2. **API key issue** — Account → Integrations → "Create API key", name it `qa-key`. ✅ Pass: secret shown once, key visible in the list.
-3. **API key revoke** — Revoke `qa-key`. ✅ Pass: row disappears / shows revoked; calling the API with that key returns 401.
-4. **Default hourly rate** — Admin → Billing → set default hourly rate to `75`, save. ✅ Pass: value persists; new tasks default to $75/hr.
-5. **Billing settings save** — Toggle a billing setting (e.g. invoice numbering prefix), save. ✅ Pass: value persists after reload.
+1. **Company Profile save** — Account → Company Profile, change Company Phone to `555-9999`, click Save. ✅ Pass: success toast appears and the new phone number persists after a hard reload.
+2. **API key issue** — Account → Integrations → "Create API key", name it `qa-key`. ✅ Pass: secret is shown exactly once and `qa-key` appears in the list with a created-at timestamp.
+3. **API key revoke** — Click revoke on `qa-key`, confirm. ✅ Pass: row is marked revoked / disappears, and `curl -H "Authorization: Bearer <key>" /api/...` returns HTTP 401.
+4. **Default hourly rate** — Admin → Billing → set default hourly rate to `75`, save. ✅ Pass: value persists after reload and a newly created task pre-fills `$75/hr`.
+5. **Billing settings save** — Change the invoice number prefix (e.g. `BETA-`) and save. ✅ Pass: value persists; the next invoice you create uses the new prefix.
 
 ## 3. Properties
-**Logged in as:** `beta-admin`. **Demo data:** the 6 seeded properties.
+**Logged in as:** `beta-admin`. **Demo data:** the 6 seeded properties (`<PROP_A>`…`<PROP_F>` from the seed output) plus the 13 seeded access codes and 10 seeded preferred-vendor links.
 
-1. **List & filter** — Open Properties; filter by type=`single-family`. ✅ Pass: only Bayshore Estate shows.
-2. **Detail view** — Open Bayshore Estate. ✅ Pass: address, manager, primary contact, units, sqft all match seed.
-3. **Create property** — Add property "QA Test Property". ✅ Pass: appears in list; detail page loads.
-4. **Edit access codes** — On Bayshore Estate, edit the "Front Door Lockbox" code from `4827` to `9999`. ✅ Pass: change persists; audit/edit timestamp updates.
-5. **Add preferred vendor** — On Cedar Ridge House, link the "Sigrid Security" vendor. ✅ Pass: vendor shows under Preferred Vendors and is unique (no duplicate).
-6. **Inspection History** — Open Bayshore → Inspection History. ✅ Pass: prior monthly inspection task is listed with its checklist.
-7. **Inspection Schedules** — Open Inspection Schedules tab. ✅ Pass: monthly schedule on Bayshore + quarterly on Palmview are present and active.
+1. **List & filter** — Open Properties; filter by type=`single-family`. ✅ Pass: only Bayshore Estate (`<PROP_A>`) is shown.
+2. **Detail view** — Open Bayshore Estate. ✅ Pass: address `100 Bayshore Dr, Sarasota, FL 34236`, manager `beta-supervisor`, primary contact Olivia Owner, units `1`, sqft `4200` all match the seed.
+3. **Create property** — Add a new property "QA Test Property" in any city. ✅ Pass: row appears in the list and its detail page loads cleanly.
+4. **Edit access codes** — On Bayshore Estate, edit the "Front Door Lockbox" code from `4827` to `9999`, save. ✅ Pass: new value persists after reload and the updated_at column moves forward.
+5. **Add preferred vendor** — On Cedar Ridge House (`<PROP_D>`), link the "Sigrid Security" vendor. ✅ Pass: Sigrid Security appears in the property's Preferred Vendors list and trying to add the same vendor again is blocked (unique constraint).
+6. **Inspection History** — Open Bayshore Estate → Inspection History. ✅ Pass: at least one inspection task ("Monthly Inspection — Bayshore Estate") with its 5 checklist items is listed.
+7. **Inspection Schedules** — Open Inspection Schedules. ✅ Pass: the seeded monthly schedule on Bayshore (`<PROP_A>`) and quarterly schedule on Palmview (`<PROP_B>`) are listed and both flagged active.
 
 ## 4. Tasks
-**Logged in as:** `beta-supervisor` (assigner) and `beta-staff-1` (assignee). **Demo data:** the 20 seeded tasks.
+**Logged in as:** `beta-supervisor` (assigner) and `beta-staff-1` (assignee). **Demo data:** the 20 seeded tasks, including 2 prefixed `OVERDUE:` and one weekly recurring "Weekly Pool Cleaning — Bayshore".
 
-1. **Create & assign** — Create task "QA: Replace bulb" on Magnolia Apartments, assign to staff1, due tomorrow. ✅ Pass: task appears in staff1's queue.
-2. **Complete with photo** — As staff1, open the task, upload one photo, mark complete. ✅ Pass: status flips to completed and photo attaches.
-3. **Recurring task** — Create a weekly recurring task on Sunset Storage. ✅ Pass: task is flagged recurring; next occurrence visible after completion.
-4. **Bulk-create from template** — Use a task template to seed several tasks across two properties. ✅ Pass: each generated task references the template.
-5. **Overdue notification** — Verify the seeded "OVERDUE: Storm cleanup" task on Bayshore shows an overdue badge for staff1 and triggered the corresponding in-app notification. ✅ Pass: task list highlights overdue; bell badge shows ≥1 unread.
+1. **Create & assign** — Create task "QA: Replace bulb" on Magnolia Apartments (`<PROP_C>`), assign to staff1, due tomorrow. ✅ Pass: the task appears in `beta-staff-1`'s task list with the correct due date.
+2. **Complete with photo** — As `beta-staff-1`, open "QA: Replace bulb", upload one photo, mark complete. ✅ Pass: status flips to Completed, photo thumbnail appears, and `completed_at` is set.
+3. **Recurring task** — Create a weekly recurring task on Sunset Storage (`<PROP_F>`). ✅ Pass: task is flagged recurring and after marking it complete, the next occurrence is generated with a future due date.
+4. **Bulk-create from template** — Use a task template to bulk-create tasks across two properties. ✅ Pass: each generated task references the template name, and the count of new tasks equals (template count) × (selected properties).
+5. **Overdue notification** — Open `beta-staff-1`'s task list. ✅ Pass: the seeded "OVERDUE: Storm cleanup" task on Bayshore renders with an overdue badge and the matching "Task overdue: Storm cleanup" notification appears in the bell with unread state.
 
 ## 5. Inspections
-**Logged in as:** `beta-staff-1`. **Demo data:** "Monthly Inspection — Bayshore Estate" and the 5 checklist items the seed creates.
+**Logged in as:** `beta-staff-1`. **Demo data:** the seeded inspection task "Monthly Inspection — Bayshore Estate" (5 checklist items) and the two other seeded inspection tasks on Palmview and Cedar Ridge.
 
-1. **Open inspection panel** — Open the Monthly Inspection task. ✅ Pass: checklist panel loads with the 5 items.
-2. **Apply checklist template** — Apply a template to a different inspection task. ✅ Pass: items populate; existing items aren't lost.
-3. **Mark items pass/fail/N/A + notes** — Mark item 1 pass, item 2 fail (with note), item 3 N/A. ✅ Pass: state persists after reload.
-4. **Generate printable report** — Click "Generate Report". ✅ Pass: report opens in a new tab with all marked items.
-5. **Download PDF** — Download the PDF. ✅ Pass: PDF downloads; opens in a viewer with org branding.
+1. **Open inspection panel** — Open the Monthly Inspection task. ✅ Pass: checklist panel renders all 5 seeded items in order.
+2. **Apply checklist template** — Open the Cedar Ridge "Move-out Inspection" task and apply a checklist template. ✅ Pass: the template's items are appended; previously seeded items are not deleted.
+3. **Mark items pass/fail/N/A + notes** — Mark item 1 pass, item 2 fail with note "broken latch", item 3 N/A. ✅ Pass: state and note persist after a full page reload.
+4. **Generate printable report** — Click "Generate Report". ✅ Pass: a report opens in a new tab listing every checklist item with its result and any notes.
+5. **Download PDF** — From the report click "Download PDF". ✅ Pass: a PDF file downloads, opens in any viewer, and shows the org name plus all marked items.
 
 ## 6. Field Mode
-**Logged in as:** `beta-staff-2`. **Demo data:** any task assigned to staff2 + Bayshore Estate.
+**Logged in as:** `beta-staff-2`. **Demo data:** any task seeded against `beta-staff-2` (e.g. "Replace HVAC filter") and Bayshore Estate (`<PROP_A>`).
 
-1. **Switch to Field Mode** — From the desktop user menu, switch to Field Mode. ✅ Pass: layout swaps to mobile-optimized.
-2. **Phone-sized viewport** — Resize browser to 390×844 (or use device emulation). ✅ Pass: nav and cards reflow without overflow.
-3. **Today's Summary** — Verify today's task count and overdue count match seed expectations. ✅ Pass: counts match.
-4. **Tap into a property** — Open Bayshore from the property list. ✅ Pass: address, contact, access codes visible.
-5. **Get directions** — Tap "Directions". ✅ Pass: opens Maps with the seeded address.
-6. **Complete task with photo** — Open a pending task, upload a photo, mark complete. ✅ Pass: status flips, photo attached.
-7. **Toggle status** — Toggle a task between in-progress and pending. ✅ Pass: state persists.
+1. **Switch to Field Mode** — From the desktop user menu, choose "Switch to Field Mode". ✅ Pass: the chrome swaps to the mobile-optimized layout.
+2. **Phone-sized viewport** — Resize the browser to 390×844 (or use device emulation). ✅ Pass: nav and cards reflow with no horizontal scroll or overflow.
+3. **Today's Summary** — Inspect Today's Summary on the home screen. ✅ Pass: today's task count and overdue count are non-zero and match what the seed produced for `beta-staff-2`.
+4. **Tap into a property** — From the property list, open Bayshore Estate. ✅ Pass: address `100 Bayshore Dr, Sarasota, FL 34236`, primary contact, and the 4 seeded access codes are visible.
+5. **Get directions** — Tap "Directions". ✅ Pass: the device's Maps app (or maps.google.com) opens with the Bayshore address pre-filled.
+6. **Complete task with photo** — Open a pending task assigned to staff2, upload a photo, mark complete. ✅ Pass: status flips to Completed and the photo is attached when re-opened.
+7. **Toggle status** — Toggle a different task between In Progress and Pending. ✅ Pass: the new status persists after navigating away and back.
 
 ## 7. Calendar
-**Logged in as:** `beta-supervisor`. **Demo data:** 5 seeded events including the "Palmview vendor meeting (CONFLICT)" entry.
+**Logged in as:** `beta-supervisor`. **Demo data:** the 5 seeded events on the default calendar, including "Palmview vendor meeting (CONFLICT)" (intentionally overlapping another event) and the recurring "Weekly team standup".
 
-1. **Create event** — Create "QA: Walkthrough" tomorrow 09:00–10:00. ✅ Pass: event appears on calendar.
-2. **Invite attendees** — Add staff1 + staff2 as attendees. ✅ Pass: attendees show in the event detail.
-3. **Trigger conflict** — Verify the seeded conflict pair flags overlap; create a new event that overlaps and confirm the warning. ✅ Pass: UI surfaces a conflict indicator.
-4. **Recurring event** — Create a weekly recurring event. ✅ Pass: future occurrences render; editing one occurrence prompts "this event / all events".
-5. **Copy iCal feed** — Copy the iCal URL from settings. ✅ Pass: URL copies; opening it in a calendar client subscribes successfully.
+1. **Create event** — Create "QA: Walkthrough" tomorrow 09:00–10:00 on the default calendar. ✅ Pass: the event renders on tomorrow's calendar slot.
+2. **Invite attendees** — Edit "QA: Walkthrough" and add `beta-staff-1` and `beta-staff-2` as attendees. ✅ Pass: both names appear in the event's attendee list with response status visible.
+3. **Trigger conflict** — Inspect the day containing the seeded "Palmview vendor meeting (CONFLICT)"; then create a new event that overlaps it. ✅ Pass: the UI surfaces a visible conflict indicator on both events.
+4. **Recurring event** — Create a weekly recurring event "QA: Weekly". ✅ Pass: future weeks render the event, and editing one occurrence prompts "this event only / all events".
+5. **Copy iCal feed** — Open calendar settings and copy the iCal feed URL. ✅ Pass: the URL copies to clipboard and pasting it into a calendar client (or `curl` returning a `BEGIN:VCALENDAR` body) lists the seeded events.
 
 ## 8. Forms
-**Logged in as:** `beta-admin` (admin viewer) and the demo portal client. **Demo data:** "Beta — New Service Request" and "Beta — Owner Onboarding".
+**Logged in as:** `beta-admin` (admin viewer) and the seeded portal client. **Demo data:** the seeded forms "Beta — New Service Request" (3 fields, 2 prior submissions) and "Beta — Owner Onboarding" (4 fields, 1 prior submission).
 
-1. **Open published form (client)** — As the portal client, open "Beta — New Service Request". ✅ Pass: 3 fields render, required validation works.
-2. **Submit** — Submit a sample response. ✅ Pass: confirmation screen.
-3. **Admin viewer** — As admin, open the form's submissions tab. ✅ Pass: the new submission is listed alongside the 2 seeded ones.
-4. **Export CSV** — Click "Export CSV". ✅ Pass: CSV downloads with all submissions and headers.
+1. **Open published form (client)** — As the portal client, open "Beta — New Service Request". ✅ Pass: 3 fields render; submitting with a required field empty shows a validation error.
+2. **Submit** — Fill the form and submit. ✅ Pass: a confirmation screen appears and the count of submissions in admin grows by 1.
+3. **Admin viewer** — As `beta-admin`, open the form's submissions tab. ✅ Pass: the new submission is listed alongside the 2 seeded ones (3 rows total).
+4. **Export CSV** — Click "Export CSV". ✅ Pass: a CSV file downloads with a header row plus one data row per submission.
 
 ## 9. Documents
-**Logged in as:** `beta-admin`. **Demo data:** the seeded community + 2 documents.
+**Logged in as:** `beta-admin`. **Demo data:** the seeded community ("Hubify Beta Community") and its 2 seeded documents.
 
-1. **Upload** — Upload a small PDF with classification "Policy". ✅ Pass: document appears in the community's document list.
-2. **Download** — Download the uploaded file. ✅ Pass: file downloads intact.
-3. **Delete** — Delete the uploaded file. ✅ Pass: row disappears; download URL 404s.
+1. **Upload** — Upload a small PDF with classification "Policy". ✅ Pass: the document appears in the community's document list (3 docs total).
+2. **Download** — Click Download on the new file. ✅ Pass: the file downloads with its original name and identical bytes.
+3. **Delete** — Delete the uploaded file. ✅ Pass: the row disappears (back to 2 docs) and the previous download URL returns HTTP 404.
 
 ## 10. Invoices
-**Logged in as:** `beta-admin`. **Demo data:** invoices `BETA-DRAFT-0001`…`BETA-OVERDUE-0004` and the consolidated batch `BETA-CONSOL-0005`.
+**Logged in as:** `beta-admin`. **Demo data:** seeded invoices `BETA-DRAFT-0001`, `BETA-SENT-0002`, `BETA-PAID-0003`, `BETA-OVERDUE-0004`, and the consolidated `BETA-CONSOL-0005` (covers Bayshore + Palmview).
 
-1. **Create invoice** — Create a manual invoice for the demo client, $250, two line items. ✅ Pass: appears in the invoice list as Draft.
-2. **View PDF** — Click "View PDF" on the new invoice. ✅ Pass: PDF renders with org branding and line items.
-3. **Send to client** — Send the invoice. ✅ Pass: status moves to Open / Sent; client portal sees it.
-4. **Mark paid manually** — Mark `BETA-SENT-0002` as paid. ✅ Pass: status flips to Paid; payment_date set.
-5. **Consolidated batch** — Run a new consolidated batch across Bayshore Estate + Palmview Condo. ✅ Pass: a single batch invoice is generated with both properties' line items.
-6. **Download both PDFs** — Download the per-property PDFs and the consolidated PDF. ✅ Pass: both download cleanly.
+1. **Create invoice** — Create a manual invoice for the demo client, $250 total, two line items. ✅ Pass: invoice appears in the list with status Draft and the amount $250.
+2. **View PDF** — Click "View PDF" on the new invoice. ✅ Pass: a PDF renders with org branding, the demo client's name, and both line items.
+3. **Send to client** — Click "Send" on the new invoice. ✅ Pass: status moves to Open / Sent, `sent_at` is set, and the demo client's portal lists this invoice.
+4. **Mark paid manually** — Open `BETA-SENT-0002` and mark it Paid. ✅ Pass: status flips to Paid and `payment_date` is set.
+5. **Consolidated batch** — Run a new consolidated batch across Bayshore (`<PROP_A>`) + Palmview (`<PROP_B>`). ✅ Pass: a single batch invoice is generated whose line items cover both properties' open work.
+6. **Download both PDFs** — Download the per-property PDFs and the consolidated PDF. ✅ Pass: all PDFs download, open without errors, and totals match the on-screen amounts.
 
 ## 11. Stripe Payment-Method Collection
-**Requires `STRIPE_SECRET_KEY` (test mode).** **Logged in as:** `beta-admin` and the portal client.
+**Requires `STRIPE_SECRET_KEY` (test mode).** **Logged in as:** `beta-admin` (admin flow) and the seeded portal client (self-service flow). **Demo data:** the seeded client `000000be-0000-0000-0000-000000000010` (`client@beta.hubify.test`).
 
-1. **Admin-authenticated add-card** — From the demo client's detail page, click "Add card on file", complete the Stripe Elements form with `4242 4242 4242 4242`. ✅ Pass: success toast; card listed under saved methods.
-2. **Client self-service** — As the portal client, open Billing → Payment methods → Add card; complete the same flow. ✅ Pass: card listed under the client's saved methods.
-3. **DB spot-check** — In the dev DB, query `SELECT stripe_payment_method_id, brand, last4 FROM client_payment_methods WHERE client_id = '000000be-0000-0000-0000-000000000010';`. ✅ Pass: only `stripe_payment_method_id` (and display metadata) is stored — no raw PAN, CVV, or full card object.
+1. **Admin-authenticated add-card** — From the demo client's detail page click "Add card on file"; complete the Stripe Elements form with `4242 4242 4242 4242` (any future expiry, any CVC). ✅ Pass: success toast and the new card (brand Visa, last4 4242) is listed under saved methods.
+2. **Client self-service** — As the portal client open Billing → Payment methods → Add card; complete the same Stripe form. ✅ Pass: the new card appears under the client's saved methods in both the portal and the admin view.
+3. **DB spot-check** — Run `SELECT stripe_payment_method_id, brand, last4 FROM client_payment_methods WHERE client_id = '000000be-0000-0000-0000-000000000010';` against the dev DB. ✅ Pass: only `stripe_payment_method_id` plus display metadata (brand / last4) is present — no PAN, no CVV, no full card object.
 
 ## 12. Notifications
-**Logged in as:** `beta-staff-1` and `beta-admin`. **Demo data:** the 4 seeded notifications.
+**Logged in as:** `beta-staff-1` and `beta-admin`. **Demo data:** the 4 seeded in-app notifications ("Task overdue: Storm cleanup" for staff-1, "Invoice past due" for supervisor, "Inspection due soon" for admin, "New task assigned" for staff-2).
 
-1. **Trigger overdue notification** — Adjust a task's due date to yesterday (or run the overdue cron). ✅ Pass: a new notification appears and bell badge increments.
-2. **Bell badge increments** — Reload; the badge count rises by 1. ✅ Pass.
-3. **Mark read** — Click a single notification. ✅ Pass: it dims; unread count decreases.
-4. **Mark all read** — Click "Mark all read". ✅ Pass: badge clears.
-5. **Per-user preferences** — Toggle "Email me about overdue tasks" off in user settings. ✅ Pass: setting persists; subsequent overdue events do not email this user (verify via SendGrid logs or local mailcatcher).
+1. **Trigger overdue notification** — Adjust an open task's due date to yesterday (or run the overdue cron job). ✅ Pass: a new "Task overdue" notification is created and the bell badge increments by 1.
+2. **Bell badge increments** — Reload the page. ✅ Pass: the bell badge count is one higher than before step 1.
+3. **Mark read** — Click a single unread notification. ✅ Pass: it switches to a read style and the unread count decreases by 1.
+4. **Mark all read** — Click "Mark all read". ✅ Pass: every notification is marked read and the bell badge clears to 0.
+5. **Per-user preferences** — In user settings, toggle "Email me about overdue tasks" off and save. ✅ Pass: the toggle persists after reload and a subsequent overdue trigger does NOT email this user (verify via SendGrid logs or local mailcatcher).
 
 ## 13. Reports
-**Logged in as:** `beta-admin`.
+**Logged in as:** `beta-admin`. **Demo data:** the seeded tasks and time entries from the past 30 days plus the 5 sample PDFs in the PDF Mockup Gallery.
 
-1. **Time Report** — Run Time Report for the last 30 days, grouped by user. ✅ Pass: report renders with totals.
-2. **Export CSV** — Export the report to CSV. ✅ Pass: CSV downloads with matching rows.
-3. **PDF Mockup Gallery** — Open `/admin/pdf-mockups`. ✅ Pass: all 5 sample PDFs are listed.
-4. **Download all 5** — Download each sample PDF. ✅ Pass: all downloads succeed and open without errors.
+1. **Time Report** — Run Time Report for the last 30 days, grouped by user. ✅ Pass: the report renders with non-empty totals and the per-user breakdown matches what is visible in the Tasks list.
+2. **Export CSV** — Click "Export CSV" on the Time Report. ✅ Pass: a CSV downloads whose row count equals the on-screen row count plus the header row.
+3. **PDF Mockup Gallery** — Open `/admin/pdf-mockups`. ✅ Pass: all 5 sample PDF cards are listed with thumbnails and a Download button.
+4. **Download all 5** — Download each sample PDF. ✅ Pass: all 5 downloads succeed, each opens in a viewer, and each carries the watermark.
 
 ## 14. Hubify Portal (client side)
-**Logged in as:** `client@beta.hubify.test` / `HubifyBeta!2025` at `/portal/login`.
+**Logged in as:** `client@beta.hubify.test` / `HubifyBeta!2025` at `/portal/login`. **Demo data:** the seeded properties linked to this portal user, the seeded invoices visible to clients (`BETA-SENT-0002`, `BETA-PAID-0003`, `BETA-OVERDUE-0004`, `BETA-CONSOL-0005`), and the 2 seeded community documents.
 
-1. **Properties + tasks** — View "My properties" and "My tasks". ✅ Pass: only properties linked to this portal user appear; tasks reflect the seeded data.
-2. **Invoices** — Open Invoices. ✅ Pass: the seeded sent / paid / overdue / consolidated invoices are visible (draft is hidden from clients).
-3. **Pay (test mode)** — On the Open invoice, click "Pay now", complete with `4242 4242 4242 4242`. ✅ Pass: invoice flips to Paid; webhook updates status.
-4. **Notification preferences** — Toggle "Email invoice reminders" off, save. ✅ Pass: value persists in `portal_users.email_invoice_reminders`.
-5. **Documents** — Open Documents. ✅ Pass: the 2 seeded community documents are listed and downloadable.
+1. **Properties + tasks** — Open "My properties" and "My tasks". ✅ Pass: only the properties associated with this portal user appear; their visible tasks match the seeded data.
+2. **Invoices** — Open Invoices. ✅ Pass: the 4 client-visible seeded invoices are listed; the draft invoice `BETA-DRAFT-0001` is NOT shown.
+3. **Pay (test mode)** — On `BETA-OVERDUE-0004` click "Pay now" and complete with `4242 4242 4242 4242`. ✅ Pass: invoice status flips to Paid via the Stripe webhook and `payment_method` shows `card`.
+4. **Notification preferences** — Toggle "Email invoice reminders" off and save. ✅ Pass: the toggle persists after reload and `SELECT email_invoice_reminders FROM portal_users WHERE email='client@beta.hubify.test';` returns `false`.
+5. **Documents** — Open Documents. ✅ Pass: the 2 seeded community documents are listed and each downloads cleanly.
 
 ## 15. Super Admin Console
-**Logged in as:** Super Admin (with MFA).
+**Logged in as:** Super Admin (with MFA). **Demo data:** all real platform data — confirm there are no fake/mocked numbers anywhere. Use the seeded "Hubify Beta Demo" org for spot-checks.
 
-Walk every tab in order. For each tab, ✅ Pass means: no fake numbers, no dead buttons, no placeholder rows.
-
-1. **Organizations** — Counts match real DB (`SELECT count(*) FROM orgs`). Row actions work.
-2. **Users** — Real user list; suspend/restore actions work on a non-critical test user.
-3. **Revenue** — Numbers come from real subscription data (no mocked totals).
-4. **Compliance** — All status pills reflect real columns.
-5. **Feature Flags** — Toggling a flag persists and shows in the org override view.
-6. **Support Tickets** — Real ticket list; reply works.
-7. **System Alerts** — Create, edit, dismiss an alert.
-8. **Audit log** — Recent actions you took during this checklist appear here.
+1. **Organizations tab** — Open Organizations. ✅ Pass: the row count matches `SELECT count(*) FROM orgs;` and "Hubify Beta Demo" is present; clicking the row opens its detail.
+2. **Users tab** — Open Users. ✅ Pass: the 4 seeded `beta-*` users appear; suspending and then restoring a non-critical test user works without page errors.
+3. **Revenue tab** — Open Revenue. ✅ Pass: totals come from real subscription data (no obvious placeholder figures like `$0.00` everywhere or `$1,234,567`).
+4. **Compliance tab** — Open Compliance. ✅ Pass: every status pill / row reflects an actual DB column (not a hard-coded string).
+5. **Feature Flags tab** — Toggle a non-destructive flag for "Hubify Beta Demo" and save. ✅ Pass: the override persists and the flag's effect is visible in the demo org's UI.
+6. **Support Tickets tab** — Open Support Tickets and reply to any ticket. ✅ Pass: the reply is saved and visible after reload.
+7. **System Alerts tab** — Create, edit, then dismiss a system alert. ✅ Pass: each action persists and the alert disappears after dismissal.
+8. **Audit log tab** — Open the Audit log. ✅ Pass: the actions you performed earlier in this section appear with the correct timestamp and actor.
 
 ## 16. Cookie Consent + Legal
-**Logged in as:** anonymous, then portal client.
+**Logged in as:** anonymous, then the seeded portal client. **Demo data:** the cookie consent banner driven by `localStorage["hubify_cookie_consent_v1"]` plus the `user_cookie_consent` / `portal_user_cookie_consent` tables.
 
-1. **Clear browser storage** — DevTools → Application → Clear storage.
-2. **Visit landing page** — Banner appears at the bottom with Accept all / Reject non-essential / Customize.
-3. **Accept** — Click Accept all. ✅ Pass: banner disappears; `localStorage["hubify_cookie_consent_v1"]` shows essential+analytics+marketing true.
-4. **Reload + reject test** — Re-clear storage, reload, click Reject non-essential. ✅ Pass: only essential is true.
-5. **Customize** — Re-clear storage, open Customize, toggle only Analytics on, save. ✅ Pass: persisted choice matches.
-6. **Persistence after login** — Sign in to the portal as the demo client, change preferences via the Cookie preferences footer link. ✅ Pass: choice persists in `user_cookie_consent` (or `portal_user_cookie_consent` for portal users).
-7. **Privacy / Terms from portal auth** — From `/portal/login`, `/portal/register`, `/portal/forgot-password`, and `/portal/reset-password`, click Privacy and Terms. ✅ Pass: both pages load publicly without auth.
+1. **Clear browser storage** — DevTools → Application → Clear storage; reload the landing page. ✅ Pass: the cookie banner reappears at the bottom with the three buttons (Accept all / Reject non-essential / Customize).
+2. **Accept** — Click Accept all. ✅ Pass: banner disappears and `localStorage["hubify_cookie_consent_v1"]` shows `essential: true, analytics: true, marketing: true`.
+3. **Reload + reject test** — Re-clear storage, reload, click Reject non-essential. ✅ Pass: only `essential: true` is set; analytics and marketing are `false`.
+4. **Customize** — Re-clear storage, open Customize, enable only Analytics, save. ✅ Pass: stored value matches `essential+analytics: true, marketing: false`.
+5. **Persistence after login** — Sign in to the portal as the demo client and change preferences from the Cookie preferences footer link. ✅ Pass: a row exists in `portal_user_cookie_consent` for this portal user with the chosen booleans.
+6. **Privacy / Terms from portal auth pages** — From `/portal/login`, `/portal/register`, `/portal/forgot-password`, `/portal/reset-password` click Privacy and Terms. ✅ Pass: both pages load publicly without an auth redirect.
 
 ---
 
