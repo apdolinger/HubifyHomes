@@ -44,89 +44,11 @@ interface SupportArticle {
   keywords: string[];
 }
 
-// Sample support articles database
-const supportArticles: SupportArticle[] = [
-  {
-    id: '1',
-    title: 'Getting Started with Property Management',
-    description: 'Learn the basics of adding and managing properties in Hubify',
-    category: 'Getting Started',
-    url: '/help/getting-started-properties',
-    keywords: ['property', 'add', 'create', 'manage', 'basic', 'setup', 'new']
-  },
-  {
-    id: '2',
-    title: 'How to Create and Assign Tasks',
-    description: 'Step-by-step guide to creating tasks and assigning them to team members',
-    category: 'Task Management',
-    url: '/help/create-assign-tasks',
-    keywords: ['task', 'create', 'assign', 'team', 'member', 'workflow', 'to-do']
-  },
-  {
-    id: '3',
-    title: 'Managing Team Members and Permissions',
-    description: 'Add team members, set roles, and configure permissions',
-    category: 'Team Management',
-    url: '/help/team-permissions',
-    keywords: ['team', 'member', 'user', 'permission', 'role', 'access', 'admin']
-  },
-  {
-    id: '4',
-    title: 'Setting Up Contact Information',
-    description: 'How to add and manage property contacts, tenants, and vendors',
-    category: 'Contacts',
-    url: '/help/contact-management',
-    keywords: ['contact', 'tenant', 'vendor', 'owner', 'phone', 'email', 'people']
-  },
-  {
-    id: '5',
-    title: 'Dashboard Customization Guide',
-    description: 'Personalize your dashboard with widgets and layout options',
-    category: 'Dashboard',
-    url: '/help/dashboard-customization',
-    keywords: ['dashboard', 'customize', 'widget', 'layout', 'personalize', 'arrange']
-  },
-  {
-    id: '6',
-    title: 'Using Quick Search and Keyboard Shortcuts',
-    description: 'Master time-saving shortcuts and search functionality',
-    category: 'Productivity',
-    url: '/help/shortcuts-search',
-    keywords: ['search', 'shortcut', 'keyboard', 'quick', 'fast', 'productivity', 'hotkey']
-  },
-  {
-    id: '7',
-    title: 'Billing and Subscription Management',
-    description: 'Manage your account billing, plans, and payment methods',
-    category: 'Account',
-    url: '/help/billing-subscription',
-    keywords: ['billing', 'payment', 'subscription', 'plan', 'invoice', 'account', 'upgrade']
-  },
-  {
-    id: '8',
-    title: 'Troubleshooting Login Issues',
-    description: 'Common solutions for login and authentication problems',
-    category: 'Account',
-    url: '/help/login-troubleshooting',
-    keywords: ['login', 'password', 'authentication', 'access', 'signin', 'locked', 'error']
-  },
-  {
-    id: '9',
-    title: 'Setting Up Property Inspections',
-    description: 'Create recurring inspection schedules and checklists',
-    category: 'Property Management',
-    url: '/help/property-inspections',
-    keywords: ['inspection', 'schedule', 'checklist', 'recurring', 'maintenance', 'visit']
-  },
-  {
-    id: '10',
-    title: 'Generating Reports and Analytics',
-    description: 'Create custom reports and view performance analytics',
-    category: 'Reports',
-    url: '/help/reports-analytics',
-    keywords: ['report', 'analytics', 'data', 'export', 'performance', 'statistics', 'chart']
-  }
-];
+// Suggested-articles feature is intentionally disabled until a real
+// help-content backend exists. The empty array short-circuits the
+// suggestion useEffect so no fake "help.hubifyhomes.app" links are
+// ever rendered.
+const supportArticles: SupportArticle[] = [];
 
 export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
   const [subject, setSubject] = useState('');
@@ -358,9 +280,8 @@ export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
     }
   };
 
-  const handleOpenArticle = (url: string) => {
-    // In a real app, this would navigate to the help article
-    window.open(`https://help.hubifyhomes.app${url}`, '_blank');
+  const handleOpenArticle = (_url: string) => {
+    // No-op until a real help-content destination exists.
   };
 
   return (
@@ -372,7 +293,7 @@ export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
             Contact Support
           </DialogTitle>
           <DialogDescription>
-            Tell us how we can help you. As you type, we'll suggest relevant help articles that might solve your issue immediately.
+            Tell us how we can help you. The Hubify support team will reply by email.
           </DialogDescription>
         </DialogHeader>
 
@@ -578,44 +499,11 @@ export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
             )}
           </div>
 
-          {/* Suggested Articles */}
-          {suggestedArticles.length > 0 && (
+          {/* Suggested Articles — intentionally hidden until a real help-content backend exists. */}
+          {false && (
             <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <Lightbulb className="w-4 h-4 text-yellow-600" />
-                <h4 className="font-medium text-sm">Suggested Help Articles</h4>
-              </div>
-              <div className="space-y-2">
-                {suggestedArticles.map((article) => (
-                  <Card key={article.id} className="bg-blue-50 border-blue-200">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <BookOpen className="w-4 h-4 text-blue-600" />
-                            <h5 className="font-medium text-blue-900">{article.title}</h5>
-                            <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
-                              {article.category}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-blue-700">{article.description}</p>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="text-blue-600 hover:text-blue-800 hover:bg-blue-100"
-                          onClick={() => handleOpenArticle(article.url)}
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
               <p className="text-xs text-slate-600">
-                💡 These articles might help solve your issue without waiting for a response.
+                Help articles will appear here once the help center is available.
               </p>
             </div>
           )}

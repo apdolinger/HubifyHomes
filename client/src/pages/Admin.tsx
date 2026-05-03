@@ -3527,20 +3527,6 @@ export default function Admin() {
                     <MessageSquare className="w-4 h-4 mr-2" />
                     Contact Support
                   </Button>
-                  <Button variant="outline" className="w-full justify-start">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Request a Feature
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start">
-                    <HelpCircle className="w-4 h-4 mr-2" />
-                    Help Documentation
-                  </Button>
-                  <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                    <p className="text-sm text-blue-800 font-medium">Quick Tip</p>
-                    <p className="text-sm text-blue-700 mt-1">
-                      Use the search shortcut (Space) to quickly find properties, people, or tasks anywhere in the app.
-                    </p>
-                  </div>
                 </div>
               </CardContent>
             </Card>
