@@ -19,6 +19,7 @@ import { formatDistanceToNow } from "date-fns";
 import { enterFieldMode } from "@/components/FieldModeLayout";
 import { prefStorage } from "@/lib/cookieConsent";
 import { useFeatureFlags } from "@/hooks/useFeatureFlags";
+import { HUBIFY_HOMES_LOGO_URL, HUBIFY_HOMES_LOGO_ALT } from "@/lib/brand";
 import { 
   BarChart3, 
   CheckSquare, 
@@ -213,9 +214,13 @@ export default function Navigation() {
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <Link href="/">
-                <h1 className="text-xl font-bold text-slate-800 cursor-pointer">
-                  Hubify
-                </h1>
+                <a className="flex items-center cursor-pointer" data-testid="link-home-brand">
+                  <img
+                    src={HUBIFY_HOMES_LOGO_URL}
+                    alt={HUBIFY_HOMES_LOGO_ALT}
+                    className="h-8 sm:h-9 w-auto"
+                  />
+                </a>
               </Link>
             </div>
           </div>

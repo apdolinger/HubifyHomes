@@ -1,6 +1,8 @@
 import PDFDocument from "pdfkit";
 import type { Response } from "express";
 import { getInvoiceTemplate } from './invoiceTemplates.js';
+import { getHubifyHomesLogoBuffer } from "./brandAsset";
+import { resolvePdfHeaderLogo } from "./pdfLogoHelper";
 
 interface InvoiceLineItem {
   description: string;
@@ -82,16 +84,28 @@ export async function generateInvoicePDFToResponse(invoiceData: InvoiceData, res
   gradient.stop(1, secondaryColor);
   doc.rect(0, 0, doc.page.width, headerHeight).fill(gradient);
   
-  // Organization logo (if available)
+  // Organization logo (or Hubify Homes platform fallback)
+  let logoToRender: Buffer | string | null = null;
   if (invoiceData.organizationLogo) {
+    logoToRender = invoiceData.organizationLogo;
+  } else {
+    logoToRender = getHubifyHomesLogoBuffer();
+  }
+  if (logoToRender) {
     try {
-      doc.image(invoiceData.organizationLogo, 50, 30, { 
+      doc.image(logoToRender, 50, 30, {
         width: 150,
         height: 60,
         fit: [150, 60]
       });
     } catch (error) {
-      console.error("Error loading logo:", error);
+      console.error("Error rendering invoice header logo:", error);
+      const hubBuf = getHubifyHomesLogoBuffer();
+      if (hubBuf && hubBuf !== logoToRender) {
+        try { doc.image(hubBuf, 50, 30, { fit: [150, 60] }); } catch (e) {
+          console.error("Hubify Homes fallback render failed:", e);
+        }
+      }
     }
   }
   
@@ -613,20 +627,17 @@ export async function generateInvoicePDF(
       gradient.stop(1, secondaryColor);
       doc.rect(0, 0, doc.page.width, headerHeight).fill(gradient);
       
-      // Organization logo (if available)
-      if (org.logoUrl) {
+      // Organization logo (or Hubify Homes platform fallback)
+      const headerLogoBuf = await resolvePdfHeaderLogo(org.logoUrl ?? null);
+      if (headerLogoBuf) {
         try {
-          const logoResponse = await fetch(org.logoUrl);
-          if (logoResponse.ok) {
-            const logoBuffer = Buffer.from(await logoResponse.arrayBuffer());
-            doc.image(logoBuffer, 50, 30, { 
-              width: 150,
-              height: 60,
-              fit: [150, 60]
-            });
-          }
+          doc.image(headerLogoBuf, 50, 30, {
+            width: 150,
+            height: 60,
+            fit: [150, 60]
+          });
         } catch (error) {
-          console.error("Error loading logo:", error);
+          console.error("Error rendering invoice header logo:", error);
         }
       }
       
@@ -1124,28 +1135,23 @@ export async function generateInvoicePDFWithTemplate(
         doc.rect(0, 0, doc.page.width, template.header.height).fill('#f8f9fa');
       }
       
-      // Logo
-      if (org.branding?.logo) {
+      // Logo (org-uploaded first, Hubify Homes platform fallback otherwise)
+      const templateLogoBuf = await resolvePdfHeaderLogo(org.branding?.logo ?? null);
+      if (templateLogoBuf) {
         try {
-          const logoResponse = await fetch(org.branding.logo);
-          if (logoResponse.ok) {
-            const logoBuffer = Buffer.from(await logoResponse.arrayBuffer());
-            let logoX = template.spacing.marginX;
-            
-            if (template.header.logoPosition === 'center') {
-              logoX = (doc.page.width - template.header.logoMaxWidth) / 2;
-            } else if (template.header.logoPosition === 'right') {
-              logoX = doc.page.width - template.header.logoMaxWidth - template.spacing.marginX;
-            }
-            
-            doc.image(logoBuffer, logoX, 30, { 
-              width: template.header.logoMaxWidth,
-              height: template.header.logoMaxHeight,
-              fit: [template.header.logoMaxWidth, template.header.logoMaxHeight]
-            });
+          let logoX = template.spacing.marginX;
+          if (template.header.logoPosition === 'center') {
+            logoX = (doc.page.width - template.header.logoMaxWidth) / 2;
+          } else if (template.header.logoPosition === 'right') {
+            logoX = doc.page.width - template.header.logoMaxWidth - template.spacing.marginX;
           }
+          doc.image(templateLogoBuf, logoX, 30, {
+            width: template.header.logoMaxWidth,
+            height: template.header.logoMaxHeight,
+            fit: [template.header.logoMaxWidth, template.header.logoMaxHeight]
+          });
         } catch (error) {
-          console.error("Error loading logo:", error);
+          console.error("Error rendering template invoice logo:", error);
         }
       }
       

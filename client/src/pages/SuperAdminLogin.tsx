@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Lock } from "lucide-react";
 import LegalLinks from "@/components/LegalLinks";
+import { HUBIFY_HOMES_LOGO_URL, HUBIFY_HOMES_LOGO_ALT } from "@/lib/brand";
 
 export default function SuperAdminLogin() {
   const [username, setUsername] = useState("");
@@ -58,8 +59,11 @@ export default function SuperAdminLogin() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-6">
       <Card className="w-full max-w-md border-slate-700 bg-slate-800/50 backdrop-blur">
         <CardHeader className="space-y-3 text-center">
-          <div className="mx-auto w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center">
-            <Shield className="w-8 h-8 text-red-500" />
+          <div className="mx-auto bg-white rounded-lg px-4 py-3">
+            <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="h-12 w-auto" />
+          </div>
+          <div className="mx-auto w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
+            <Shield className="w-6 h-6 text-red-500" />
           </div>
           <CardTitle className="text-2xl font-bold text-white">Super Admin Access</CardTitle>
           <CardDescription className="text-slate-400">

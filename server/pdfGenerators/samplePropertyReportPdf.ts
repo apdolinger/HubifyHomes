@@ -1,5 +1,6 @@
 import { streamPdf, sectionTitle, kv, hr, type PdfDoc } from "./index";
 import { getSamplePropertyReport, type SamplePropertyReport } from "../pdfMockData";
+import { getHubifyHomesLogoBuffer } from "../brandAsset";
 
 export function generateSamplePropertyReportPdf(
   data: SamplePropertyReport = getSamplePropertyReport()
@@ -14,6 +15,18 @@ function renderPropertyReport(doc: PdfDoc, d: SamplePropertyReport): void {
   doc.rect(0, 32, W, 70).fillColor("#7c3aed").fill();
   doc.fontSize(20).fillColor("#ffffff").text("Property Report", M, 52);
   doc.fontSize(10).fillColor("#ede9fe").text(d.property.address, M, 80);
+  const hubifyLogo = getHubifyHomesLogoBuffer();
+  if (hubifyLogo) {
+    const logoBoxW = 110, logoBoxH = 40;
+    const logoX = W - M - logoBoxW;
+    const logoY = 47;
+    doc.rect(logoX, logoY, logoBoxW, logoBoxH).fillColor("#ffffff").fill();
+    try {
+      doc.image(hubifyLogo, logoX + 6, logoY + 4, { fit: [logoBoxW - 12, logoBoxH - 8], align: "center", valign: "center" });
+    } catch (err) {
+      console.error("Failed to render Hubify Homes logo on sample property report PDF:", err);
+    }
+  }
 
   doc.fillColor("black");
   doc.y = 120;

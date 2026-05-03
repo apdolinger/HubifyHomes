@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { prefStorage } from "@/lib/cookieConsent";
+import { HUBIFY_HOMES_LOGO_URL, HUBIFY_HOMES_LOGO_ALT } from "@/lib/brand";
 
 interface FieldModeLayoutProps {
   children: React.ReactNode;
@@ -66,13 +67,19 @@ export default function FieldModeLayout({ children }: FieldModeLayoutProps) {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col max-w-lg mx-auto relative">
       {/* Top bar */}
-      <header className="bg-blue-600 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-40 shadow-md">
+      <header className="bg-white text-slate-900 px-4 py-3 flex items-center justify-between sticky top-0 z-40 shadow-md border-b border-slate-200">
+        <Link href="/field">
+          <a className="flex items-center gap-2 cursor-pointer" data-testid="link-field-brand">
+            <img
+              src={HUBIFY_HOMES_LOGO_URL}
+              alt={HUBIFY_HOMES_LOGO_ALT}
+              className="h-7 w-auto"
+            />
+            <span className="text-xs bg-blue-100 text-blue-700 rounded-full px-2 py-0.5 font-medium">Field</span>
+          </a>
+        </Link>
         <div className="flex items-center gap-2">
-          <span className="text-lg font-bold">Hubify</span>
-          <span className="text-xs bg-blue-500 rounded-full px-2 py-0.5 font-medium">Field</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-sm font-bold">
+          <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold">
             {getUserInitials()}
           </div>
         </div>

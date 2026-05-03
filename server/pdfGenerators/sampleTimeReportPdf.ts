@@ -1,5 +1,6 @@
 import { streamPdf, sectionTitle, kv, type PdfDoc } from "./index";
 import { getSampleTimeReport, type SampleTimeReport } from "../pdfMockData";
+import { getHubifyHomesLogoBuffer } from "../brandAsset";
 
 export function generateSampleTimeReportPdf(
   data: SampleTimeReport = getSampleTimeReport()
@@ -14,6 +15,18 @@ function renderTimeReport(doc: PdfDoc, d: SampleTimeReport): void {
   doc.rect(0, 32, W, 70).fillColor("#0e7490").fill();
   doc.fontSize(20).fillColor("#ffffff").text("Time Report", M, 52);
   doc.fontSize(10).fillColor("#cffafe").text(`${d.dateRange} · Grouped by ${d.groupBy}`, M, 80);
+  const hubifyLogo = getHubifyHomesLogoBuffer();
+  if (hubifyLogo) {
+    const logoBoxW = 110, logoBoxH = 40;
+    const logoX = W - M - logoBoxW;
+    const logoY = 47;
+    doc.rect(logoX, logoY, logoBoxW, logoBoxH).fillColor("#ffffff").fill();
+    try {
+      doc.image(hubifyLogo, logoX + 6, logoY + 4, { fit: [logoBoxW - 12, logoBoxH - 8], align: "center", valign: "center" });
+    } catch (err) {
+      console.error("Failed to render Hubify Homes logo on sample time report PDF:", err);
+    }
+  }
 
   doc.fillColor("black");
   doc.y = 120;

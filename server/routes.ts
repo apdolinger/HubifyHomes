@@ -14490,7 +14490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   async function buildInspectionReportPdf(
     task: any,
     checklistItems: any[],
-    opts?: { watermark?: boolean }
+    opts?: { watermark?: boolean; orgBrandingLogo?: string | null }
   ): Promise<Buffer> {
     // Pre-fetch and resize photos for failed items before PDF construction.
     // Capped at MAX_PHOTOS_TOTAL across the whole report and MAX_PHOTOS_PER_ITEM
@@ -14525,6 +14525,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       photoBufferMap.set(itemId, arr);
     }
 
+    // Pre-fetch header logo (org branding logo if set, else Hubify Homes platform logo).
+    const { resolvePdfHeaderLogo: resolveInspectionLogo } = await import("./pdfLogoHelper");
+    const headerLogoBuf = await resolveInspectionLogo(opts?.orgBrandingLogo ?? null);
+
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: opts?.watermark === true });
       const chunks: Buffer[] = [];
@@ -14549,8 +14553,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const generatedAt = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
       // ── Header ──
-      doc.fontSize(20).fillColor("#1e40af").text("Inspection Report", { align: "left" });
-      doc.fontSize(9).fillColor("#64748b").text(`Generated ${generatedAt}`, { align: "left" });
+      const headerStartY = doc.y;
+      doc.fontSize(20).fillColor("#1e40af").text("Inspection Report", 50, headerStartY, { align: "left" });
+      doc.fontSize(9).fillColor("#64748b").text(`Generated ${generatedAt}`, 50, doc.y, { align: "left" });
+      if (headerLogoBuf) {
+        try {
+          doc.image(headerLogoBuf, doc.page.width - 50 - 110, headerStartY, { fit: [110, 44], align: "right", valign: "top" });
+        } catch (err) {
+          console.error("Error rendering header logo on inspection PDF:", err);
+        }
+      }
       doc.moveDown(0.5);
 
       // ── Task Details ──
@@ -14799,7 +14811,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const attachPdf = req.body.attachPdf === true;
       let emailAttachments: Array<{ content: string; filename: string; type: string; disposition: string }> | undefined;
       if (attachPdf) {
-        const pdfBuffer = await buildInspectionReportPdf(task, checklistItems);
+        const orgRecord = await storage.getOrg(orgId);
+        const branding = (orgRecord?.branding ?? null) as { logo?: string | null } | null;
+        const pdfBuffer = await buildInspectionReportPdf(task, checklistItems, {
+          orgBrandingLogo: branding?.logo ?? null,
+        });
         emailAttachments = [{
           content: pdfBuffer.toString("base64"),
           filename: `inspection-report-${taskId}.pdf`,
@@ -14862,7 +14878,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const task = await storage.getTask(taskId);
       if (!task || (task as any).orgId !== orgId) return res.status(404).json({ message: "Task not found" });
       const checklistItems = await storage.getTaskChecklistItems(taskId);
-      const pdfBuffer = await buildInspectionReportPdf(task, checklistItems);
+      const orgRecord = await storage.getOrg(orgId);
+      const branding = (orgRecord?.branding ?? null) as { logo?: string | null } | null;
+      const pdfBuffer = await buildInspectionReportPdf(task, checklistItems, {
+        orgBrandingLogo: branding?.logo ?? null,
+      });
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="inspection-report-${taskId}.pdf"`);
       res.setHeader("Content-Length", pdfBuffer.length);

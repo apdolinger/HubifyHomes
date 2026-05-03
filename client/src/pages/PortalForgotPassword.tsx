@@ -5,8 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Loader2, ArrowLeft, Mail, CheckCircle } from 'lucide-react';
+import { Loader2, ArrowLeft, Mail, CheckCircle } from 'lucide-react';
 import LegalLinks from '@/components/LegalLinks';
+import { HUBIFY_HOMES_LOGO_URL, HUBIFY_HOMES_LOGO_ALT } from '@/lib/brand';
 
 export default function PortalForgotPassword() {
   const [orgId, setOrgId] = useState('');
@@ -91,9 +92,7 @@ export default function PortalForgotPassword() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <div className="p-3 bg-primary/10 rounded-full">
-              <Building2 className="h-8 w-8 text-primary" />
-            </div>
+            <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="h-14 w-auto" />
           </div>
           <CardTitle className="text-2xl font-bold">Forgot Password</CardTitle>
           <CardDescription>Enter your organization ID and email to receive a password reset link</CardDescription>

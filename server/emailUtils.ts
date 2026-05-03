@@ -1,6 +1,7 @@
 import sgMail, { MailDataRequired } from "@sendgrid/mail";
 import type { AttachmentData } from "@sendgrid/helpers/classes/attachment";
 import ICAL from "ical.js";
+import { getHubifyHomesLogoUrl } from "./brandAsset";
 
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
 if (SENDGRID_API_KEY) {
@@ -44,7 +45,9 @@ export function generateEventInvitationHTML(data: EventInvitationData): string {
   const primaryColor = organizationBranding.primaryColor || '#0066cc';
   const secondaryColor = organizationBranding.secondaryColor || '#004499';
   const accentColor = organizationBranding.accentColor || '#00aaff';
-  const logo = organizationBranding.logo;
+  const orgLogo = organizationBranding.logo;
+  const logo = orgLogo || getHubifyHomesLogoUrl();
+  const logoAlt = orgLogo ? organizationName : 'Hubify Homes';
 
   const formatDateTime = (date: Date) => {
     return new Intl.DateTimeFormat('en-US', {
@@ -189,7 +192,7 @@ export function generateEventInvitationHTML(data: EventInvitationData): string {
 <body>
   <div class="container">
     <div class="header">
-      ${logo ? `<img src="${logo}" alt="${organizationName}" class="logo">` : ''}
+      ${logo ? `<img src="${logo}" alt="${logoAlt}" width="200" height="60" class="logo" style="max-width:200px;max-height:80px;height:auto;width:auto;">` : ''}
       <p class="header-text">You're Invited to an Event</p>
     </div>
     
@@ -361,7 +364,7 @@ export async function sendEventInvitationEmail(
       // Use stored template with variable replacement
       const variables = createEventInvitationVariables({
         organizationName: eventData.organizationName,
-        organizationLogoUrl: eventData.organizationBranding?.logo || null,
+        organizationLogoUrl: eventData.organizationBranding?.logo || getHubifyHomesLogoUrl(),
         eventTitle: eventData.eventTitle,
         eventDescription: eventData.eventDescription || null,
         eventLocation: eventData.eventLocation || null,
@@ -443,7 +446,9 @@ export function generateInvoiceEmailHTML(data: InvoiceEmailData): string {
 
   const primaryColor = organizationBranding.primaryColor || '#667eea';
   const secondaryColor = organizationBranding.secondaryColor || '#764ba2';
-  const logo = organizationBranding.logo;
+  const orgLogo = organizationBranding.logo;
+  const logo = orgLogo || getHubifyHomesLogoUrl();
+  const logoAlt = orgLogo ? organizationName : 'Hubify Homes';
 
   const formatCurrency = (amount: number, curr: string): string => {
     const formatter = new Intl.NumberFormat('en-US', {
@@ -604,7 +609,7 @@ export function generateInvoiceEmailHTML(data: InvoiceEmailData): string {
   <div class="container">
     <!-- Header -->
     <div class="header">
-      ${logo ? `<img src="${logo}" alt="${organizationName}" class="logo">` : ''}
+      ${logo ? `<img src="${logo}" alt="${logoAlt}" width="200" height="60" class="logo" style="max-width:200px;max-height:80px;height:auto;width:auto;">` : ''}
       <h1 class="header-text">Invoice</h1>
       <p class="invoice-number">#${invoiceNumber}</p>
     </div>

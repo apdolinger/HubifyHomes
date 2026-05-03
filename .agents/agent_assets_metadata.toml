@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "_tH9RY2LcdQzft9rcChma"
+uri = "file://attached_assets/hubify_homes_logo.png"
+type = "image"
+title = "hubify homes logo"
