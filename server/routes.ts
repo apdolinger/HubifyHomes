@@ -1648,6 +1648,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Missing required fields' });
       }
 
+      // Normalize email to lowercase so the email-only login lookup
+      // (which lowercases the submitted email) always matches.
+      const normalizedEmail = String(email).toLowerCase();
+
       // Get and validate invitation
       const invitation = await storage.getPortalInvitationByToken(inviteToken);
       if (!invitation) {
@@ -1660,12 +1664,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verify email matches invitation
-      if (email.toLowerCase() !== invitation.email.toLowerCase()) {
+      if (normalizedEmail !== invitation.email.toLowerCase()) {
         return res.status(400).json({ message: 'Email does not match invitation' });
       }
 
       // Check if user already exists
-      const existingUser = await storage.getPortalUserByEmail(invitation.orgId, email);
+      const existingUser = await storage.getPortalUserByEmail(invitation.orgId, normalizedEmail);
       if (existingUser) {
         return res.status(409).json({ message: 'User already exists' });
       }
@@ -1676,7 +1680,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create user with invitation's orgId and role
       const user = await storage.createPortalUser({
         orgId: invitation.orgId,
-        email,
+        email: normalizedEmail,
         passwordHash,
         role: invitation.role,
         firstName: firstName || null,
