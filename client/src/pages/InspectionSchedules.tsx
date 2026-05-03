@@ -16,7 +16,7 @@ import {
 import {
   format, parseISO, isValid, startOfMonth, endOfMonth,
   startOfWeek, endOfWeek, addDays, addMonths, subMonths,
-  isSameDay, isSameMonth,
+  isSameDay, isSameMonth, setMonth, setYear,
 } from "date-fns";
 
 function safeDateFormat(dateValue: any, fmt: string): string {
@@ -463,26 +463,65 @@ export default function InspectionSchedules() {
           <Card>
             <CardContent className="p-4">
               {/* Month navigation */}
-              <div className="flex items-center justify-between mb-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setCalendarMonth(m => subMonths(m, 1))}
-                  data-testid="btn-cal-prev-month"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </Button>
-                <h2 className="text-lg font-semibold text-slate-800" data-testid="cal-month-label">
-                  {format(calendarMonth, "MMMM yyyy")}
-                </h2>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setCalendarMonth(m => addMonths(m, 1))}
-                  data-testid="btn-cal-next-month"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </Button>
+              <div className="flex items-center justify-between mb-4 gap-2">
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCalendarMonth(m => subMonths(m, 1))}
+                    data-testid="btn-cal-prev-month"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </Button>
+                  <h2 className="text-lg font-semibold text-slate-800 min-w-[160px] text-center" data-testid="cal-month-label">
+                    {format(calendarMonth, "MMMM yyyy")}
+                  </h2>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCalendarMonth(m => addMonths(m, 1))}
+                    data-testid="btn-cal-next-month"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={String(calendarMonth.getMonth())}
+                    onValueChange={val => setCalendarMonth(m => setMonth(m, parseInt(val)))}
+                  >
+                    <SelectTrigger className="w-[130px] h-8 text-sm" data-testid="select-cal-month">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {["January","February","March","April","May","June","July","August","September","October","November","December"].map((name, idx) => (
+                        <SelectItem key={idx} value={String(idx)}>{name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={String(calendarMonth.getFullYear())}
+                    onValueChange={val => setCalendarMonth(m => setYear(m, parseInt(val)))}
+                  >
+                    <SelectTrigger className="w-[90px] h-8 text-sm" data-testid="select-cal-year">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 21 }, (_, i) => new Date().getFullYear() - 10 + i).map(yr => (
+                        <SelectItem key={yr} value={String(yr)}>{yr}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-sm"
+                    onClick={() => setCalendarMonth(new Date())}
+                    data-testid="btn-cal-today"
+                  >
+                    Today
+                  </Button>
+                </div>
               </div>
 
               {schedulesLoading ? (
