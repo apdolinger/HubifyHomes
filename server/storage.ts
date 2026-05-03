@@ -3143,11 +3143,18 @@ export class DatabaseStorage implements IStorage {
 
   async updateTask(id: number, task: Partial<InsertTask>): Promise<Task> {
     const vendorContacts = alias(contacts, 'vendorContacts');
-    
+
+    const updates: Partial<InsertTask> = { ...task };
+    if (updates.status === "completed" && updates.completedAt === undefined) {
+      (updates as any).completedAt = new Date();
+    } else if (updates.status && updates.status !== "completed" && updates.completedAt === undefined) {
+      (updates as any).completedAt = null;
+    }
+
     // First update the task
     await db
       .update(tasks)
-      .set({ ...task, updatedAt: new Date() })
+      .set({ ...updates, updatedAt: new Date() })
       .where(eq(tasks.id, id));
     
     // Then return the complete task with joined data - INCLUDING ALL FIELDS
