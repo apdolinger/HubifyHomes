@@ -1566,59 +1566,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Send SMS to entire team (placeholder)
-  app.post("/api/teams/send-sms", isAuthenticated, async (req: any, res) => {
-    try {
-      const orgId = req.user?.claims?.orgId;
-      
-      if (!orgId) {
-        return res.status(400).json({ message: "Organization ID not found" });
-      }
-
-      const { teamId, message } = req.body;
-
-      if (!teamId || !message) {
-        return res.status(400).json({ message: "Team ID and message are required" });
-      }
-
-      // Get team and verify it belongs to the organization
-      const team = await storage.getTeamById(teamId);
-      if (!team) {
-        return res.status(404).json({ message: "Team not found" });
-      }
-
-      if (team.orgId !== orgId) {
-        return res.status(403).json({ message: "Access denied to this team" });
-      }
-
-      // Get all team members
-      const teamMembers = team.members || [];
-      if (teamMembers.length === 0) {
-        return res.status(400).json({ message: "Team has no members" });
-      }
-
-      // Check if any members have phone numbers
-      const membersWithPhone = teamMembers.filter((m: any) => m.phone);
-      
-      if (membersWithPhone.length === 0) {
-        return res.status(400).json({ 
-          message: "No team members have phone numbers configured. SMS messaging requires phone numbers to be added to user profiles."
-        });
-      }
-
-      // TODO: Implement Twilio SMS sending when phone numbers are added to users table
-      // For now, return a not implemented response
-      res.status(501).json({ 
-        message: "SMS functionality is not yet implemented. Please use email communication or add phone number support to the users table.",
-        membersWithPhone: membersWithPhone.length,
-        totalMembers: teamMembers.length
-      });
-    } catch (error: any) {
-      console.error("Error sending team SMS:", error);
-      res.status(500).json({ message: error.message || "Failed to send team SMS" });
-    }
-  });
-
   // Portal authentication middleware
   const isPortalAuthenticated = async (req: any, res: Response, next: NextFunction) => {
     const token = req.headers.authorization?.replace('Bearer ', '');

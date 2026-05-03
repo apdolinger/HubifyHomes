@@ -7,11 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Code2, Mail, MessageSquare, Users, Info } from "lucide-react";
+import { Code2, Mail, Users } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { OrgEmailTemplate } from "@shared/schema";
 
 interface TeamCommunicationModalProps {
@@ -41,7 +39,6 @@ export function TeamCommunicationModal({
   const { toast } = useToast();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
-  const [communicationType, setCommunicationType] = useState<"email" | "sms">("email");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
@@ -49,7 +46,7 @@ export function TeamCommunicationModal({
   // Fetch email templates
   const { data: templates, isLoading: templatesLoading } = useQuery<OrgEmailTemplate[]>({
     queryKey: ["/api/email-templates"],
-    enabled: isOpen && communicationType === "email",
+    enabled: isOpen,
   });
 
   // Fetch team members to show recipient preview
@@ -79,30 +76,6 @@ export function TeamCommunicationModal({
       toast({
         title: "Failed to send email",
         description: error.message || "An error occurred while sending the email.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Send SMS mutation (placeholder)
-  const sendSMSMutation = useMutation({
-    mutationFn: async (data: {
-      teamId: string;
-      message: string;
-    }) => {
-      return apiRequest("POST", "/api/teams/send-sms", data);
-    },
-    onSuccess: () => {
-      toast({
-        title: "SMS Sent",
-        description: `Successfully sent SMS to ${memberCount} team member${memberCount !== 1 ? 's' : ''}.`,
-      });
-      handleClose();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Failed to send SMS",
-        description: error.message || "An error occurred while sending the SMS.",
         variant: "destructive",
       });
     },
@@ -149,46 +122,30 @@ export function TeamCommunicationModal({
 
   // Handle send
   const handleSubmit = () => {
-    if (communicationType === "email") {
-      if (!subject.trim()) {
-        toast({
-          title: "Validation Error",
-          description: "Please provide an email subject.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (!message.trim()) {
-        toast({
-          title: "Validation Error",
-          description: "Please provide an email message.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      sendEmailMutation.mutate({
-        teamId,
-        subject,
-        body: message,
-        templateId: selectedTemplateId ? parseInt(selectedTemplateId) : undefined,
+    if (!subject.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide an email subject.",
+        variant: "destructive",
       });
-    } else {
-      if (!message.trim()) {
-        toast({
-          title: "Validation Error",
-          description: "Please provide an SMS message.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      sendSMSMutation.mutate({
-        teamId,
-        message,
-      });
+      return;
     }
+
+    if (!message.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide an email message.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    sendEmailMutation.mutate({
+      teamId,
+      subject,
+      body: message,
+      templateId: selectedTemplateId ? parseInt(selectedTemplateId) : undefined,
+    });
   };
 
   // Handle close and reset
@@ -196,11 +153,10 @@ export function TeamCommunicationModal({
     setSubject("");
     setMessage("");
     setSelectedTemplateId("");
-    setCommunicationType("email");
     onClose();
   };
 
-  const isPending = sendEmailMutation.isPending || sendSMSMutation.isPending;
+  const isPending = sendEmailMutation.isPending;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -215,20 +171,11 @@ export function TeamCommunicationModal({
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={communicationType} onValueChange={(v) => setCommunicationType(v as "email" | "sms")}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="email" data-testid="tab-email">
-              <Mail className="w-4 h-4 mr-2" />
-              Email
-            </TabsTrigger>
-            <TabsTrigger value="sms" data-testid="tab-sms">
-              <MessageSquare className="w-4 h-4 mr-2" />
-              SMS
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Email Tab */}
-          <TabsContent value="email" className="space-y-4 mt-4">
+        <div className="flex items-center gap-2 text-sm text-slate-600 border-b pb-2">
+          <Mail className="w-4 h-4" />
+          Email
+        </div>
+        <div className="space-y-4 mt-4">
             {/* Recipients Preview */}
             <div className="bg-slate-50 p-3 rounded-lg">
               <Label className="text-xs text-slate-600 mb-2 block">Recipients</Label>
@@ -319,59 +266,7 @@ export function TeamCommunicationModal({
                 data-testid="textarea-email-message"
               />
             </div>
-          </TabsContent>
-
-          {/* SMS Tab */}
-          <TabsContent value="sms" className="space-y-4 mt-4">
-            <Alert>
-              <Info className="w-4 h-4" />
-              <AlertDescription>
-                SMS messaging requires phone numbers to be configured for team members. Currently, the users table doesn't include phone numbers. This feature will be available once phone number support is added.
-              </AlertDescription>
-            </Alert>
-
-            {/* Recipients Preview */}
-            <div className="bg-slate-50 p-3 rounded-lg">
-              <Label className="text-xs text-slate-600 mb-2 block">Recipients</Label>
-              <div className="flex flex-wrap gap-2">
-                {membersLoading ? (
-                  <span className="text-sm text-slate-500">Loading team members...</span>
-                ) : teamMembers.length === 0 ? (
-                  <span className="text-sm text-slate-500">No team members</span>
-                ) : (
-                  teamMembers.slice(0, 10).map((member: any) => (
-                    <Badge key={member.userId} variant="secondary" className="text-xs">
-                      {member.firstName} {member.lastName}
-                      {member.phone && <span className="ml-1">📱</span>}
-                    </Badge>
-                  ))
-                )}
-                {teamMembers.length > 10 && (
-                  <Badge variant="outline" className="text-xs">
-                    +{teamMembers.length - 10} more
-                  </Badge>
-                )}
-              </div>
-            </div>
-
-            {/* Message */}
-            <div>
-              <Label htmlFor="sms-message">Message</Label>
-              <Textarea
-                id="sms-message"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Compose your SMS message (160 characters recommended)..."
-                rows={5}
-                maxLength={320}
-                data-testid="textarea-sms-message"
-              />
-              <p className="text-xs text-slate-500 mt-1">
-                {message.length}/320 characters
-              </p>
-            </div>
-          </TabsContent>
-        </Tabs>
+        </div>
 
         <DialogFooter>
           <Button
@@ -384,14 +279,10 @@ export function TeamCommunicationModal({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isPending || (communicationType === "sms" && teamMembers.every((m: any) => !m.phone))}
+            disabled={isPending}
             data-testid="button-send"
           >
-            {isPending
-              ? "Sending..."
-              : communicationType === "email"
-              ? "Send Email to Team"
-              : "Send SMS to Team"}
+            {isPending ? "Sending..." : "Send Email to Team"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1264,16 +1264,33 @@ function DocumentTemplatesManager() {
 
     setIsUploading(true);
     try {
-      // In a real implementation, this would upload to object storage
-      // For now, we'll just set a placeholder URL
-      const mockFileUrl = `/documents/templates/${file.name}`;
+      const formData = new FormData();
+      formData.append('files', file);
+      formData.append('directory', '.private/document-templates');
+
+      const uploadResponse = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload file');
+      }
+
+      const uploadData = await uploadResponse.json();
+      const fileUrl = uploadData.urls?.[0];
+      if (!fileUrl) {
+        throw new Error('Upload did not return a file URL');
+      }
+
       setNewTemplate(prev => ({
         ...prev,
         fileName: file.name,
-        fileUrl: mockFileUrl,
+        fileUrl,
       }));
       toast({
-        title: "File Ready",
+        title: "File Uploaded",
         description: "File is ready to be saved as a template.",
       });
     } catch (error: any) {
