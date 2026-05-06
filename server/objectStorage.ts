@@ -4,6 +4,15 @@ import { randomUUID } from "crypto";
 
 const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
 
+/**
+ * Whether the Replit object storage sidecar is expected to be available.
+ * On non-Replit deployments (e.g. Render) this will be false and all
+ * object-storage operations will return a clear 503 error instead of
+ * hanging or crashing.
+ */
+export const isObjectStorageAvailable =
+  !!process.env.PUBLIC_OBJECT_SEARCH_PATHS || !!process.env.REPL_ID;
+
 // The object storage client is used to interact with the object storage service.
 export const objectStorageClient = new Storage({
   credentials: {

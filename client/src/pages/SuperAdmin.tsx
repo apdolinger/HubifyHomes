@@ -73,9 +73,616 @@ import {
   Headphones,
   ExternalLink,
   Paperclip,
-  Star
+  Star,
+  ArrowRight,
+  ChevronDown,
+  ChevronRight,
+  XCircle,
+  Funnel,
+  ClipboardList,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Separator } from "@/components/ui/separator";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+
+// ============================================================================
+// Onboarding Pipeline Tab
+// ============================================================================
+
+type OnboardingStage = "inquiry" | "agreement" | "payment_setup" | "initial_payment" | "welcome" | "dropped";
+
+interface StageHistoryEntry { stage: OnboardingStage; enteredAt: string; }
+
+interface Prospect {
+  id: string;
+  name: string;
+  email: string;
+  company: string | null;
+  phone: string | null;
+  stage: OnboardingStage;
+  stageHistory: StageHistoryEntry[];
+  droppedReason: string | null;
+  welcomeEmailSentAt: string | null;
+  notes: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+const PIPELINE_STAGES: { key: OnboardingStage; label: string; color: string }[] = [
+  { key: "inquiry",         label: "Inquiry",         color: "border-blue-400 bg-blue-50" },
+  { key: "agreement",       label: "Agreement",        color: "border-yellow-400 bg-yellow-50" },
+  { key: "payment_setup",   label: "Payment Setup",    color: "border-orange-400 bg-orange-50" },
+  { key: "initial_payment", label: "Initial Payment",  color: "border-purple-400 bg-purple-50" },
+  { key: "welcome",         label: "Welcome",          color: "border-green-400 bg-green-50" },
+];
+
+const STAGE_ORDER: OnboardingStage[] = ["inquiry", "agreement", "payment_setup", "initial_payment", "welcome"];
+
+function nextStage(current: OnboardingStage): OnboardingStage | null {
+  const idx = STAGE_ORDER.indexOf(current);
+  if (idx === -1 || idx === STAGE_ORDER.length - 1) return null;
+  return STAGE_ORDER[idx + 1];
+}
+
+function daysSince(dateStr: string | null | undefined): number {
+  if (!dateStr) return 0;
+  const ms = Date.now() - new Date(dateStr).getTime();
+  return Math.floor(ms / 86400000);
+}
+
+function stageDays(prospect: Prospect): number {
+  const history = prospect.stageHistory ?? [];
+  const lastEntry = [...history].reverse().find(e => e.stage === prospect.stage);
+  return daysSince(lastEntry?.enteredAt ?? prospect.updatedAt ?? prospect.createdAt);
+}
+
+const prospectFormSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Valid email required"),
+  company: z.string().optional(),
+  phone: z.string().optional(),
+  notes: z.string().optional(),
+});
+type ProspectFormValues = z.infer<typeof prospectFormSchema>;
+
+function ProspectCard({
+  prospect,
+  stuckDays,
+  onAdvance,
+  onDrop,
+  onEdit,
+  onSendWelcome,
+  sendingEmail,
+}: {
+  prospect: Prospect;
+  stuckDays: number;
+  onAdvance: () => void;
+  onDrop: () => void;
+  onEdit: () => void;
+  onSendWelcome: () => void;
+  sendingEmail: boolean;
+}) {
+  const days = stageDays(prospect);
+  const stuck = days >= stuckDays;
+  const next = nextStage(prospect.stage);
+
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData("prospectId", prospect.id);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  return (
+    <div
+      className="bg-white border rounded-lg p-3 shadow-sm space-y-2 cursor-grab active:cursor-grabbing"
+      draggable
+      onDragStart={handleDragStart}
+    >
+      <div className="flex items-start justify-between gap-1">
+        <div className="min-w-0">
+          <p className="font-medium text-sm truncate">{prospect.name}</p>
+          {prospect.company && (
+            <p className="text-xs text-gray-500 truncate">{prospect.company}</p>
+          )}
+          <p className="text-xs text-gray-400 truncate">{prospect.email}</p>
+        </div>
+        <Badge
+          className={stuck
+            ? "bg-orange-100 text-orange-800 shrink-0 text-xs"
+            : "bg-gray-100 text-gray-600 shrink-0 text-xs"}
+          title={stuck ? `${days} days — stuck for more than ${stuckDays} days` : `${days} days in this stage`}
+        >
+          {days}d{stuck ? " ⚠" : ""}
+        </Badge>
+      </div>
+
+      {prospect.stage === "welcome" && (
+        <div className="text-xs">
+          {prospect.welcomeEmailSentAt ? (
+            <span className="text-green-600 flex items-center gap-1">
+              <CheckCircle className="w-3 h-3" />
+              Sent {new Date(prospect.welcomeEmailSentAt).toLocaleDateString()}
+            </span>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 text-xs px-2 w-full"
+              onClick={onSendWelcome}
+              disabled={sendingEmail}
+            >
+              {sendingEmail
+                ? <><RefreshCw className="w-3 h-3 mr-1 animate-spin" /> Sending…</>
+                : <><Send className="w-3 h-3 mr-1" /> Send Welcome Email</>
+              }
+            </Button>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-center gap-1 pt-1">
+        <Button size="sm" variant="ghost" className="h-6 px-2 text-xs flex-1" onClick={onEdit}>
+          <Edit className="w-3 h-3 mr-1" /> Edit
+        </Button>
+        {next && (
+          <Button size="sm" variant="outline" className="h-6 px-2 text-xs flex-1" onClick={onAdvance}>
+            <ArrowRight className="w-3 h-3 mr-1" /> {next.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()).split(" ")[0]}
+          </Button>
+        )}
+        <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-red-500 hover:text-red-700" onClick={onDrop} title="Mark as dropped">
+          <XCircle className="w-3 h-3" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function DropDialog({
+  open,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: (reason: string) => void;
+}) {
+  const [reason, setReason] = useState("");
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Mark as Dropped</DialogTitle>
+          <DialogDescription>Optionally record why this prospect dropped out.</DialogDescription>
+        </DialogHeader>
+        <Textarea
+          placeholder="Reason (optional)"
+          value={reason}
+          onChange={e => setReason(e.target.value)}
+          rows={3}
+        />
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="destructive" onClick={() => { onConfirm(reason); setReason(""); }}>Confirm Drop</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function OnboardingPipelineTab() {
+  const { toast } = useToast();
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editingProspect, setEditingProspect] = useState<Prospect | null>(null);
+  const [droppingProspect, setDroppingProspect] = useState<Prospect | null>(null);
+  const [showDropped, setShowDropped] = useState(false);
+  const [stuckDays, setStuckDays] = useState(7);
+  const [dragOverStage, setDragOverStage] = useState<OnboardingStage | null>(null);
+
+  const { data: allProspects = [], isLoading } = useQuery<Prospect[]>({
+    queryKey: ["/api/super-admin/onboarding-prospects"],
+  });
+
+  const active = allProspects.filter(p => p.stage !== "dropped");
+  const dropped = allProspects.filter(p => p.stage === "dropped");
+
+  const stageCounts = PIPELINE_STAGES.reduce<Record<string, number>>((acc, s) => {
+    acc[s.key] = active.filter(p => p.stage === s.key).length;
+    return acc;
+  }, {});
+
+  const form = useForm<ProspectFormValues>({
+    resolver: zodResolver(prospectFormSchema),
+    defaultValues: { name: "", email: "", company: "", phone: "", notes: "" },
+  });
+
+  const openCreate = () => {
+    setEditingProspect(null);
+    form.reset({ name: "", email: "", company: "", phone: "", notes: "" });
+    setSheetOpen(true);
+  };
+
+  const openEdit = (p: Prospect) => {
+    setEditingProspect(p);
+    form.reset({
+      name: p.name,
+      email: p.email,
+      company: p.company ?? "",
+      phone: p.phone ?? "",
+      notes: p.notes ?? "",
+    });
+    setSheetOpen(true);
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async (values: ProspectFormValues) => {
+      if (editingProspect) {
+        return apiRequest("PATCH", `/api/super-admin/onboarding-prospects/${editingProspect.id}`, values);
+      }
+      return apiRequest("POST", "/api/super-admin/onboarding-prospects", values);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      setSheetOpen(false);
+      toast({ title: editingProspect ? "Prospect updated" : "Prospect added to Inquiry" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to save prospect", variant: "destructive" }),
+  });
+
+  const advanceMutation = useMutation({
+    mutationFn: ({ id, stage }: { id: string; stage: OnboardingStage }) =>
+      apiRequest("PATCH", `/api/super-admin/onboarding-prospects/${id}`, { stage }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      toast({ title: "Prospect advanced" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to advance prospect", variant: "destructive" }),
+  });
+
+  const dropMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      apiRequest("PATCH", `/api/super-admin/onboarding-prospects/${id}`, {
+        stage: "dropped",
+        droppedReason: reason || null,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      setDroppingProspect(null);
+      toast({ title: "Prospect marked as dropped" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to update prospect", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/super-admin/onboarding-prospects/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      toast({ title: "Prospect deleted" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to delete prospect", variant: "destructive" }),
+  });
+
+  const welcomeEmailMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/send-welcome-email`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      toast({ title: "Welcome email sent!" });
+    },
+    onError: (e: Error) => toast({
+      title: "Email failed",
+      description: e?.message || "Could not send welcome email",
+      variant: "destructive",
+    }),
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest("PATCH", `/api/super-admin/onboarding-prospects/${id}`, { stage: "inquiry", droppedReason: null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      toast({ title: "Prospect restored to Inquiry" });
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <ClipboardList className="w-5 h-5 text-indigo-600" />
+            Onboarding Pipeline
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Track new customers from first contact to welcome. Drag cards between columns to move stages.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <label htmlFor="stuck-threshold" className="whitespace-nowrap">Stuck after</label>
+            <input
+              id="stuck-threshold"
+              type="number"
+              min={1}
+              max={90}
+              value={stuckDays}
+              onChange={e => setStuckDays(Math.max(1, Number(e.target.value)))}
+              className="w-14 border rounded px-2 py-1 text-sm text-center"
+            />
+            <span className="whitespace-nowrap">days</span>
+          </div>
+          <Button onClick={openCreate}>
+            <Plus className="w-4 h-4 mr-2" /> Add Prospect
+          </Button>
+        </div>
+      </div>
+
+      {/* Funnel summary */}
+      <div className="flex flex-wrap gap-2">
+        {PIPELINE_STAGES.map((s, i) => (
+          <div key={s.key} className="flex items-center gap-1">
+            <div className={`rounded-full px-3 py-1 text-sm font-medium border ${s.color}`}>
+              {s.label}: <span className="font-bold">{stageCounts[s.key] ?? 0}</span>
+            </div>
+            {i < PIPELINE_STAGES.length - 1 && (
+              <ChevronRight className="w-3 h-3 text-gray-400" />
+            )}
+          </div>
+        ))}
+        <div className="rounded-full px-3 py-1 text-sm font-medium border border-red-300 bg-red-50">
+          Dropped: <span className="font-bold">{dropped.length}</span>
+        </div>
+      </div>
+
+      {/* Pipeline board */}
+      <div className="overflow-x-auto pb-4">
+        <div className="flex gap-4 min-w-max">
+          {PIPELINE_STAGES.map(stage => {
+            const prospects = active.filter(p => p.stage === stage.key);
+            const isOver = dragOverStage === stage.key;
+            return (
+              <div
+                key={stage.key}
+                className={`w-52 rounded-xl border-2 flex flex-col transition-colors ${stage.color} ${isOver ? "ring-2 ring-indigo-400 ring-offset-1" : ""}`}
+                onDragOver={e => { e.preventDefault(); setDragOverStage(stage.key); }}
+                onDragLeave={() => setDragOverStage(null)}
+                onDrop={e => {
+                  e.preventDefault();
+                  setDragOverStage(null);
+                  const prospectId = e.dataTransfer.getData("prospectId");
+                  if (!prospectId) return;
+                  const prospect = active.find(p => p.id === prospectId);
+                  if (!prospect || prospect.stage === stage.key) return;
+                  advanceMutation.mutate({ id: prospectId, stage: stage.key });
+                }}
+              >
+                <div className="px-3 py-2 font-semibold text-sm border-b border-gray-200 flex items-center justify-between">
+                  <span>{stage.label}</span>
+                  <Badge variant="secondary" className="text-xs">{prospects.length}</Badge>
+                </div>
+                <div className={`flex flex-col gap-2 p-2 flex-1 min-h-[80px] rounded-b-xl ${isOver ? "bg-indigo-50/60" : ""}`}>
+                  {prospects.length === 0 ? (
+                    <p className="text-xs text-gray-400 text-center pt-4">{isOver ? "Drop here" : "Empty"}</p>
+                  ) : (
+                    prospects.map(p => (
+                      <ProspectCard
+                        key={p.id}
+                        prospect={p}
+                        stuckDays={stuckDays}
+                        onAdvance={() => {
+                          const ns = nextStage(p.stage);
+                          if (ns) advanceMutation.mutate({ id: p.id, stage: ns });
+                        }}
+                        onDrop={() => setDroppingProspect(p)}
+                        onEdit={() => openEdit(p)}
+                        onSendWelcome={() => welcomeEmailMutation.mutate(p.id)}
+                        sendingEmail={welcomeEmailMutation.isPending && welcomeEmailMutation.variables === p.id}
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Dropped section */}
+      <div>
+        <button
+          className="flex items-center gap-2 text-sm font-medium text-red-600 hover:text-red-800"
+          onClick={() => setShowDropped(v => !v)}
+        >
+          {showDropped ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          Dropped Prospects ({dropped.length})
+        </button>
+
+        {showDropped && dropped.length > 0 && (
+          <div className="mt-3 border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Dropped From</TableHead>
+                  <TableHead>Reason</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {dropped.map(p => {
+                  const history = p.stageHistory ?? [];
+                  const lastBeforeDrop = [...history].reverse().find(e => e.stage !== "dropped");
+                  return (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium">{p.name}</TableCell>
+                      <TableCell>{p.company ?? "—"}</TableCell>
+                      <TableCell className="text-sm text-gray-500">{p.email}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="capitalize text-xs">
+                          {lastBeforeDrop?.stage?.replace(/_/g, " ") ?? "inquiry"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-500 max-w-[200px] truncate">
+                        {p.droppedReason ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => restoreMutation.mutate(p.id)}
+                          >
+                            <RefreshCw className="w-3 h-3 mr-1" /> Restore
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-red-500"
+                            onClick={() => {
+                              if (confirm(`Delete ${p.name} permanently?`)) deleteMutation.mutate(p.id);
+                            }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+        {showDropped && dropped.length === 0 && (
+          <p className="text-sm text-gray-400 mt-2">No dropped prospects.</p>
+        )}
+      </div>
+
+      {/* Create / Edit sheet */}
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>{editingProspect ? "Edit Prospect" : "Add New Prospect"}</SheetTitle>
+            <SheetDescription>
+              {editingProspect ? "Update contact details and notes." : "This will place them in the Inquiry stage."}
+            </SheetDescription>
+          </SheetHeader>
+          <Separator className="my-4" />
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(v => saveMutation.mutate(v))} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Full Name *</FormLabel>
+                    <FormControl><Input placeholder="Jane Smith" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email *</FormLabel>
+                    <FormControl><Input type="email" placeholder="jane@example.com" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="company"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Company</FormLabel>
+                    <FormControl><Input placeholder="Acme Property Group" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone</FormLabel>
+                    <FormControl><Input placeholder="+1 555 000 0000" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes</FormLabel>
+                    <FormControl>
+                      <Textarea rows={3} placeholder="Any context about this prospect..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => setSheetOpen(false)} className="flex-1">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={saveMutation.isPending} className="flex-1">
+                  {saveMutation.isPending ? "Saving…" : editingProspect ? "Save Changes" : "Add Prospect"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+
+          {editingProspect && (
+            <>
+              <Separator className="my-4" />
+              <div>
+                <p className="text-sm font-medium mb-2 text-gray-700">Stage History</p>
+                <ol className="space-y-1">
+                  {(editingProspect.stageHistory ?? []).map((entry, i) => (
+                    <li key={i} className="flex items-center gap-2 text-xs text-gray-600">
+                      <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0" />
+                      <span className="capitalize font-medium">{entry.stage.replace(/_/g, " ")}</span>
+                      <span className="text-gray-400">{new Date(entry.enteredAt).toLocaleString()}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Drop dialog */}
+      <DropDialog
+        open={!!droppingProspect}
+        onClose={() => setDroppingProspect(null)}
+        onConfirm={reason => {
+          if (droppingProspect) dropMutation.mutate({ id: droppingProspect.id, reason });
+        }}
+      />
+    </div>
+  );
+}
 
 // Template Management Component
 function TemplateManagement() {
@@ -3649,7 +4256,8 @@ export default function SuperAdmin() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-12">
+        <TabsList className="grid w-full grid-cols-13">
+          <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
           <TabsTrigger value="organizations">Organizations</TabsTrigger>
           <TabsTrigger value="users">All Users</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
@@ -3663,6 +4271,11 @@ export default function SuperAdmin() {
           <TabsTrigger value="compliance">Compliance</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
+
+        {/* Onboarding Pipeline Tab */}
+        <TabsContent value="onboarding">
+          <OnboardingPipelineTab />
+        </TabsContent>
 
         {/* Organizations Tab */}
         <TabsContent value="organizations">

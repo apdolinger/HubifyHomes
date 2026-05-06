@@ -3342,3 +3342,53 @@ export const insertPortalUserCookieConsentSchema = createInsertSchema(portalUser
 });
 export type InsertPortalUserCookieConsent = z.infer<typeof insertPortalUserCookieConsentSchema>;
 export type PortalUserCookieConsent = typeof portalUserCookieConsent.$inferSelect;
+
+// ─── Onboarding Prospects ───────────────────────────────────────────────────
+// Tracks new customer leads through the super-admin onboarding funnel.
+export type OnboardingStage =
+  | "inquiry"
+  | "agreement"
+  | "payment_setup"
+  | "initial_payment"
+  | "welcome"
+  | "dropped";
+
+export type StageHistoryEntry = { stage: OnboardingStage; enteredAt: string };
+
+export const onboardingProspects = pgTable("onboarding_prospects", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name").notNull(),
+  email: varchar("email").notNull(),
+  company: varchar("company"),
+  phone: varchar("phone"),
+  stage: varchar("stage").$type<OnboardingStage>().notNull().default("inquiry"),
+  stageHistory: jsonb("stage_history").$type<StageHistoryEntry[]>().notNull().default([]),
+  droppedReason: text("dropped_reason"),
+  welcomeEmailSentAt: timestamp("welcome_email_sent_at"),
+  notes: text("notes"),
+  orgId: uuid("org_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("onboarding_prospects_stage_idx").on(table.stage),
+  index("onboarding_prospects_email_idx").on(table.email),
+]);
+
+export const onboardingStageEnum = z.enum([
+  "inquiry",
+  "agreement",
+  "payment_setup",
+  "initial_payment",
+  "welcome",
+  "dropped",
+]);
+
+export const insertOnboardingProspectSchema = createInsertSchema(onboardingProspects).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  stage: onboardingStageEnum.optional(),
+});
+export type InsertOnboardingProspect = z.infer<typeof insertOnboardingProspectSchema>;
+export type OnboardingProspect = typeof onboardingProspects.$inferSelect;

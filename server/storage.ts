@@ -1,4 +1,7 @@
 import {
+  onboardingProspects,
+  type OnboardingProspect,
+  type InsertOnboardingProspect,
   users,
   outOfOfficePeriods,
   teams,
@@ -271,6 +274,7 @@ import {
   type Notification,
   type InsertNotification,
 } from "@shared/schema";
+
 import { db } from "./db";
 import { eq, desc, asc, and, or, like, count, sql, inArray, isNotNull, lt, lte } from "drizzle-orm";
 
@@ -978,6 +982,13 @@ export interface IStorage {
   updateInspectionSchedule(id: number, updates: Partial<InsertInspectionSchedule>): Promise<InspectionSchedule>;
   deleteInspectionSchedule(id: number): Promise<void>;
   getInspectionTaskByScheduleAndDueDate(scheduleId: number, dueDate: string): Promise<Task | undefined>;
+
+  // Onboarding prospect operations
+  listOnboardingProspects(): Promise<OnboardingProspect[]>;
+  getOnboardingProspect(id: string): Promise<OnboardingProspect | undefined>;
+  createOnboardingProspect(data: InsertOnboardingProspect): Promise<OnboardingProspect>;
+  updateOnboardingProspect(id: string, patch: Partial<InsertOnboardingProspect>): Promise<OnboardingProspect>;
+  deleteOnboardingProspect(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -7730,6 +7741,53 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return row;
+  }
+
+  // ── Onboarding prospects ───────────────────────────────────────────────────
+  async listOnboardingProspects(): Promise<OnboardingProspect[]> {
+    return await db
+      .select()
+      .from(onboardingProspects)
+      .orderBy(desc(onboardingProspects.createdAt));
+  }
+
+  async getOnboardingProspect(id: string): Promise<OnboardingProspect | undefined> {
+    const [row] = await db
+      .select()
+      .from(onboardingProspects)
+      .where(eq(onboardingProspects.id, id));
+    return row;
+  }
+
+  async createOnboardingProspect(data: InsertOnboardingProspect): Promise<OnboardingProspect> {
+    const now = new Date().toISOString();
+    const history = [{ stage: data.stage ?? "inquiry", enteredAt: now }];
+    const [row] = await db
+      .insert(onboardingProspects)
+      .values({ ...data, stageHistory: history })
+      .returning();
+    return row;
+  }
+
+  async updateOnboardingProspect(id: string, patch: Partial<InsertOnboardingProspect>): Promise<OnboardingProspect> {
+    const existing = await this.getOnboardingProspect(id);
+    if (!existing) throw new Error(`Onboarding prospect ${id} not found`);
+
+    let stageHistory = existing.stageHistory ?? [];
+    if (patch.stage && patch.stage !== existing.stage) {
+      stageHistory = [...stageHistory, { stage: patch.stage, enteredAt: new Date().toISOString() }];
+    }
+
+    const [row] = await db
+      .update(onboardingProspects)
+      .set({ ...patch, stageHistory, updatedAt: new Date() })
+      .where(eq(onboardingProspects.id, id))
+      .returning();
+    return row;
+  }
+
+  async deleteOnboardingProspect(id: string): Promise<void> {
+    await db.delete(onboardingProspects).where(eq(onboardingProspects.id, id));
   }
 }
 

@@ -1,9 +1,44 @@
 import express, { type Request, Response, NextFunction } from "express";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startScheduledTasks } from "./scheduledTasks";
 
 const app = express();
+
+// Security headers (production only — skip CSP in dev to keep Vite HMR working)
+if (process.env.NODE_ENV === "production") {
+  app.use(
+    helmet({
+      contentSecurityPolicy: false, // configured at the CDN/proxy layer
+      crossOriginEmbedderPolicy: false,
+    })
+  );
+}
+
+// Rate limiting — all API routes
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many requests, please try again later." },
+});
+
+// Stricter limit for authentication endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many login attempts, please try again later." },
+});
+
+app.use("/api", apiLimiter);
+app.use("/api/super-admin/login", authLimiter);
+app.use("/api/portal/login", authLimiter);
+app.use("/api/portal/register", authLimiter);
 
 // Webhook routes MUST be registered before express.json() to preserve raw body for signature verification
 app.post("/api/stripe/webhooks/master", express.raw({ type: "application/json" }), async (req, res) => {
@@ -114,10 +149,8 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
+  // Bind to process.env.PORT for Render/cloud compatibility; fall back to 5000 for Replit
+  const port = parseInt(process.env.PORT || "5000", 10);
   server.listen({
     port,
     host: "0.0.0.0",
@@ -129,7 +162,7 @@ app.use((req, res, next) => {
     // Without this the dispatcher logs an error on every task mutation in
     // environments where the webhook integration was never provisioned.
     try {
-      const { ensureWebhookTables, ensureCookieConsentPreferenceColumn } = await import('./runMigrations.js');
+      const { ensureWebhookTables, ensureCookieConsentPreferenceColumn, ensureOnboardingProspectsTable } = await import('./runMigrations.js');
       try {
         await ensureWebhookTables();
       } catch (err) {
@@ -140,8 +173,22 @@ app.use((req, res, next) => {
       } catch (err) {
         console.error('Error ensuring cookie-consent preference column:', err);
       }
+      try {
+        await ensureOnboardingProspectsTable();
+      } catch (err) {
+        console.error('Error ensuring onboarding_prospects table:', err);
+      }
     } catch (error) {
       console.error('Error loading startup migrations:', error);
+    }
+
+    // Initialize platform master admin (ADMIN_EMAIL / ADMIN_PASSWORD)
+    try {
+      const { ensurePlatformAdminsTable, initializePlatformAdmin } = await import('./masterAdmin.js');
+      await ensurePlatformAdminsTable();
+      await initializePlatformAdmin();
+    } catch (err) {
+      console.error('Error initializing platform admin:', err);
     }
 
     // Start scheduled background tasks

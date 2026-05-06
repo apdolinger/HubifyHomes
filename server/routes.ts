@@ -91,7 +91,7 @@ import {
   WEBHOOK_EVENT_TYPES
 } from "@shared/schema";
 import { z } from "zod";
-import { createSetupIntentForClient, detachPaymentMethod } from "./stripe";
+import { createSetupIntentForClient, detachPaymentMethod, createPortalPayIntentForInvoice } from "./stripe";
 import { db } from "./db";
 import { eq, lt, and, desc, inArray } from "drizzle-orm";
 import sgMail from "@sendgrid/mail";
@@ -1024,33 +1024,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Super Admin login route (username/password authentication)
+  // Super Admin login route
+  // Accepts either:
+  //   { email, password }    — checked against the platform_admins DB table
+  //                            (seeded from ADMIN_EMAIL / ADMIN_PASSWORD env vars)
+  //   { username, password } — checked against SUPER_ADMIN_USERNAME / SUPER_ADMIN_PASSWORD env vars
+  //                            (legacy; dev fallback superadmin/hubify2025 in development only)
   app.post('/api/super-admin/login', async (req, res) => {
     try {
-      const { username, password } = req.body;
+      const { username, password, email } = req.body;
 
-      // Require environment variables for super admin credentials (security requirement)
+      // ── Path 1: email + password (master admin via platform_admins table) ──
+      if (email) {
+        if (!password) {
+          return res.status(400).json({ message: "Password is required" });
+        }
+
+        const { getPlatformAdmin, verifyPlatformAdminPassword } = await import('./masterAdmin.js');
+        const admin = await getPlatformAdmin(email.trim().toLowerCase());
+
+        const credentialsValid = admin
+          ? await verifyPlatformAdminPassword(admin, password)
+          : false;
+
+        if (!credentialsValid) {
+          await AuditLogger.log({
+            req,
+            action: 'super_admin_login_failed',
+            actionType: 'auth',
+            resource: 'super_admin_authentication',
+            metadata: { email },
+            severity: 'warning',
+            success: false,
+            errorMessage: 'Invalid credentials',
+          });
+          return res.status(401).json({ message: "Invalid credentials" });
+        }
+
+        (req.session as any).superAdmin = {
+          authenticated: true,
+          username: email,
+          loginTime: new Date().toISOString(),
+        };
+
+        await AuditLogger.log({
+          req,
+          action: 'super_admin_login_success',
+          actionType: 'auth',
+          resource: 'super_admin_authentication',
+          metadata: { email },
+          severity: 'info',
+          success: true,
+        });
+
+        return res.json({ message: "Super admin authenticated successfully", username: email });
+      }
+
+      // ── Path 2: username + password (env-var credentials) ──
       const SUPER_ADMIN_USERNAME = process.env.SUPER_ADMIN_USERNAME;
       const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD;
 
-      // For development only: allow defaults
       const isDevelopment = process.env.NODE_ENV === 'development';
-      
       const finalUsername = SUPER_ADMIN_USERNAME || (isDevelopment ? 'superadmin' : null);
       const finalPassword = SUPER_ADMIN_PASSWORD || (isDevelopment ? 'hubify2025' : null);
 
       if (!finalUsername || !finalPassword) {
-        console.error("Super Admin credentials not configured. Set SUPER_ADMIN_USERNAME and SUPER_ADMIN_PASSWORD environment variables.");
+        console.error("Super Admin credentials not configured. Set SUPER_ADMIN_USERNAME / SUPER_ADMIN_PASSWORD or ADMIN_EMAIL / ADMIN_PASSWORD.");
         return res.status(503).json({ message: "Super Admin authentication is not configured" });
       }
 
       if (!username || !password) {
-        return res.status(400).json({ message: "Username and password are required" });
+        return res.status(400).json({ message: "Username/email and password are required" });
       }
 
-      // Validate credentials
       if (username !== finalUsername || password !== finalPassword) {
-        // Log failed attempt
         await AuditLogger.log({
           req,
           action: 'super_admin_login_failed',
@@ -1059,20 +1106,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           metadata: { username },
           severity: 'warning',
           success: false,
-          errorMessage: 'Invalid credentials'
+          errorMessage: 'Invalid credentials',
         });
-        
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      // Set super admin session
       (req.session as any).superAdmin = {
         authenticated: true,
         username,
-        loginTime: new Date().toISOString()
+        loginTime: new Date().toISOString(),
       };
 
-      // Log successful login
       await AuditLogger.log({
         req,
         action: 'super_admin_login_success',
@@ -1080,13 +1124,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resource: 'super_admin_authentication',
         metadata: { username },
         severity: 'info',
-        success: true
+        success: true,
       });
 
-      res.json({ 
-        message: "Super admin authenticated successfully",
-        username 
-      });
+      return res.json({ message: "Super admin authenticated successfully", username });
     } catch (error) {
       console.error("Super admin login error:", error);
       res.status(500).json({ message: "Login failed" });
@@ -2135,6 +2176,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching portal invoices:', error);
       res.status(500).json({ message: 'Failed to fetch invoices' });
+    }
+  });
+
+  // Portal "Pay Now": create or reuse a confirmable PaymentIntent for an
+  // invoice the signed-in portal user is allowed to pay. Returns the client
+  // secret + publishable key so the browser can mount Stripe Elements.
+  app.post('/api/portal/invoices/:id/pay-intent', isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const portalUser = req.portalUser;
+      const { id } = req.params;
+      const invoice = await storage.getClientInvoice(id);
+      if (!invoice || invoice.orgId !== portalUser.orgId) {
+        return res.status(404).json({ message: 'Invoice not found' });
+      }
+      if (invoice.status === 'draft') {
+        return res.status(404).json({ message: 'Invoice not found' });
+      }
+      if (invoice.status === 'paid' || invoice.paymentStatus === 'succeeded') {
+        return res.status(409).json({ message: 'Invoice already paid' });
+      }
+      if (invoice.status === 'void' || invoice.status === 'uncollectible') {
+        return res.status(409).json({ message: 'Invoice is not payable' });
+      }
+
+      // Authorize: invoice's client must match the portal user's client by email+org.
+      const { clients: clientsTable } = await import('@shared/schema');
+      const [client] = await db
+        .select()
+        .from(clientsTable)
+        .where(and(
+          eq(clientsTable.orgId, portalUser.orgId),
+          eq(clientsTable.email, portalUser.email),
+        ));
+      if (!client || client.id !== invoice.clientId) {
+        return res.status(403).json({ message: 'Not authorized to pay this invoice' });
+      }
+
+      const result = await createPortalPayIntentForInvoice(
+        invoice.id,
+        invoice.orgId,
+        client.id,
+        client.email,
+        invoice.amountCents,
+        invoice.currency || 'usd',
+        invoice.invoiceNumber ? `Invoice ${invoice.invoiceNumber}` : undefined,
+      );
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error creating portal pay intent:', error);
+      const msg = error?.message || 'Failed to create payment';
+      if (/Stripe account not configured/i.test(msg)) {
+        return res.status(503).json({ message: 'Online payment is not configured for this organization yet.' });
+      }
+      res.status(500).json({ message: 'Failed to create payment' });
     }
   });
 
@@ -13844,6 +13939,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting email template:", error);
       res.status(500).json({ message: "Failed to delete email template" });
+    }
+  });
+
+  // ── Onboarding Prospects ─────────────────────────────────────────────────
+  app.get("/api/super-admin/onboarding-prospects", isSuperAdmin, requireMFA, async (_req, res) => {
+    try {
+      const prospects = await storage.listOnboardingProspects();
+      res.json(prospects);
+    } catch (error) {
+      console.error("Error fetching onboarding prospects:", error);
+      res.status(500).json({ message: "Failed to fetch onboarding prospects" });
+    }
+  });
+
+  app.post("/api/super-admin/onboarding-prospects", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { insertOnboardingProspectSchema } = await import("@shared/schema");
+      const data = insertOnboardingProspectSchema.parse(req.body);
+      const prospect = await storage.createOnboardingProspect(data);
+      res.status(201).json(prospect);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating onboarding prospect:", error);
+      res.status(500).json({ message: "Failed to create onboarding prospect" });
+    }
+  });
+
+  app.patch("/api/super-admin/onboarding-prospects/:id", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { insertOnboardingProspectSchema } = await import("@shared/schema");
+      const patchSchema = insertOnboardingProspectSchema.partial();
+      const parseResult = patchSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid data", errors: parseResult.error.errors });
+      }
+      const prospect = await storage.updateOnboardingProspect(id, parseResult.data);
+      res.json(prospect);
+    } catch (error) {
+      console.error("Error updating onboarding prospect:", error);
+      res.status(500).json({ message: "Failed to update onboarding prospect" });
+    }
+  });
+
+  app.delete("/api/super-admin/onboarding-prospects/:id", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteOnboardingProspect(id);
+      res.json({ message: "Prospect deleted" });
+    } catch (error) {
+      console.error("Error deleting onboarding prospect:", error);
+      res.status(500).json({ message: "Failed to delete onboarding prospect" });
+    }
+  });
+
+  app.post("/api/super-admin/onboarding-prospects/:id/send-welcome-email", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const prospect = await storage.getOnboardingProspect(id);
+      if (!prospect) return res.status(404).json({ message: "Prospect not found" });
+      if (prospect.stage !== "welcome") {
+        return res.status(400).json({ message: "Prospect must be in the Welcome stage to send the welcome email" });
+      }
+
+      if (!SENDGRID_API_KEY) {
+        return res.status(503).json({
+          message: "Email delivery is not configured (SENDGRID_API_KEY missing). Set the key and try again.",
+          emailSent: false,
+        });
+      }
+
+      const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.SUPPORT_EMAIL_FROM || "noreply@hubify.com";
+      const msg = {
+        to: prospect.email,
+        from: fromEmail,
+        subject: `Welcome to Hubify${prospect.company ? ` — ${prospect.company}` : ""}!`,
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+            <h2 style="color:#4F46E5;">Welcome to Hubify!</h2>
+            <p>Hi ${prospect.name},</p>
+            <p>We're thrilled to have you on board${prospect.company ? ` at <strong>${prospect.company}</strong>` : ""}. Your account is all set up and ready to go.</p>
+            <p>Log in any time at <a href="https://hubify.com">hubify.com</a> to get started.</p>
+            <p style="color:#6b7280;font-size:14px;margin-top:30px;">Best regards,<br>The Hubify Team</p>
+          </div>
+        `,
+        text: `Hi ${prospect.name},\n\nWelcome to Hubify! Your account is all set up. Log in at https://hubify.com.\n\nBest regards,\nThe Hubify Team`,
+      };
+      await sgMail.send(msg);
+
+      const updated = await storage.updateOnboardingProspect(id, {
+        welcomeEmailSentAt: new Date(),
+      });
+      res.json({ ...updated, emailSent: true });
+    } catch (error) {
+      console.error("Error sending welcome email:", error);
+      res.status(500).json({ message: "Failed to send welcome email" });
     }
   });
 

@@ -1,39 +1,31 @@
 #!/usr/bin/env -S npx tsx
 /**
- * Portal Stripe "pay now" e2e (Playwright + Stripe test mode hosted page).
+ * Portal in-app "Pay Now" e2e (Playwright + Stripe test mode).
  *
- * Drives the most revenue-critical portal path end-to-end:
+ * Drives the embedded Stripe Elements Pay Now flow added in task #59:
  *
  *   1. Sign in to /portal as the seeded beta client (real browser).
- *   2. Open My Invoices, locate BETA-OVERDUE-0004, click the "View"
- *      pay action.
- *   3. On the Stripe-hosted invoice page that opens, fill the live
- *      Stripe Elements card form with 4242 4242 4242 4242 and submit.
- *   4. Forward the resulting PaymentIntent to the local org webhook
- *      with a valid Stripe-CLI-style signature (real Stripe webhooks
- *      can't reach localhost in CI).
- *   5. Reload My Invoices in the same browser session and assert the
- *      same row's badge has flipped to Paid.
- *   6. Confirm payment_method=card and payment_status=succeeded on
+ *   2. Open My Invoices, click "Pay Now" on BETA-OVERDUE-0004.
+ *   3. The Pay dialog opens. The portal calls
+ *      POST /api/portal/invoices/:id/pay-intent which creates a real
+ *      PaymentIntent on the org's Stripe account; Stripe Elements
+ *      mounts inside the dialog using its client_secret.
+ *   4. Fill the live Stripe Elements card form with 4242 4242 4242 4242
+ *      and submit (stripe.confirmPayment with redirect:'if_required').
+ *   5. Forward a signed payment_intent.succeeded event to the local
+ *      org webhook (real Stripe webhooks can't reach localhost in CI).
+ *   6. The portal's polling refetch flips the same row to Paid in
+ *      place — assert without a manual reload.
+ *   7. Confirm payment_method=card and payment_status=succeeded on
  *      the persisted DB row.
  *
- * To make step 2 hit a real hosted page, the test creates a fresh
- * Stripe Invoice (test mode) for the demo client, finalizes/sends it,
- * and mirrors hosted_invoice_url + stripe_invoice_id + customer id
- * into BETA-OVERDUE-0004 before driving the browser. After the user
- * pays via the hosted page, the test patches the resulting
- * PaymentIntent with metadata.invoiceId so our existing
- * handlePaymentIntentSucceeded handler can resolve the local invoice
- * (Stripe-created PIs don't carry our invoice id otherwise).
- *
  * Why two env vars (both required, otherwise SKIP):
- *   - STRIPE_SECRET_KEY: the task's stated gate; needed to talk to
- *     Stripe test mode at all and to create the Invoice.
+ *   - STRIPE_SECRET_KEY: needed to talk to Stripe test mode at all and
+ *     to seed the org_stripe_connections row used by the new endpoint.
  *   - STRIPE_ORG_WEBHOOK_SECRET: needed to sign the webhook delivered
  *     to /api/stripe/webhooks/org/:orgId. Without it the server's
  *     `stripe.webhooks.constructEvent` rejects the request, the
  *     invoice never flips to Paid, and the test would always fail.
- *     We skip with a clear message instead.
  *
  * Run:  npx tsx tests/portal-pay-now.e2e.ts
  *
@@ -53,6 +45,7 @@ import {
   type BrowserContext,
   type Page,
   type FrameLocator,
+  type Locator,
 } from 'playwright';
 
 const BASE_URL = (process.env.BASE_URL || 'http://localhost:5000').replace(/\/$/, '');
@@ -64,7 +57,6 @@ const ORG_ID = '00000000-0000-0000-0000-0000000000be';
 const CLIENT_ID = '000000be-0000-0000-0000-000000000010';
 const OVERDUE_INVOICE_ID = '000000be-0000-0000-0000-0000000000d4';
 const OVERDUE_INVOICE_NUMBER = 'BETA-OVERDUE-0004';
-const OVERDUE_AMOUNT_CENTS = 19500;
 
 function skip(reason: string): never {
   console.log(`SKIP: ${reason}`);
@@ -156,56 +148,57 @@ async function openInvoicesTab(page: Page) {
 }
 
 /**
- * Fill the live Stripe-hosted invoice page's Elements card form with the
- * 4242 test card and submit. Stripe ships these inputs in nested iframes;
- * the field names are stable across recent versions of the hosted page.
- * If selectors drift, the test fails loudly with the locator that broke.
+ * Fill the embedded Stripe PaymentElement card form mounted inside the
+ * portal Pay dialog with the 4242 test card. PaymentElement loads its
+ * inputs in nested iframes; the field names are stable across recent
+ * versions. If selectors drift, the test fails loudly.
  */
-async function payOnHostedPage(hostedPage: Page) {
-  await hostedPage.waitForLoadState('domcontentloaded');
-  // Hosted page loads its own SPA; give Elements time to mount.
-  await hostedPage.waitForLoadState('networkidle').catch(() => null);
+async function fillPaymentElement(dialog: Locator) {
+  // Wait for at least one Stripe iframe to appear inside the dialog.
+  await dialog.locator('iframe[name^="__privateStripeFrame"]').first().waitFor({ timeout: 20000 });
 
-  const findInFrames = async (
-    name: 'cardnumber' | 'exp-date' | 'cvc' | 'postal',
+  const findFrame = async (
+    inputName: 'number' | 'expiry' | 'cvc' | 'postalCode',
   ): Promise<FrameLocator> => {
-    const selector = name === 'postal' ? 'input[name="postal"]' : `input[name="${name}"]`;
-    for (const frame of hostedPage.frames()) {
-      const handle = await frame.$(selector).catch(() => null);
-      if (handle) return hostedPage.frameLocator(`iframe[name="${frame.name()}"]`);
+    const frames = dialog.page().frames();
+    for (const frame of frames) {
+      const handle = await frame.$(`input[name="${inputName}"]`).catch(() => null);
+      if (handle) return dialog.page().frameLocator(`iframe[name="${frame.name()}"]`);
     }
-    throw new Error(`Stripe Elements iframe with input ${name} not found on hosted page`);
+    throw new Error(`Stripe Elements input "${inputName}" not found in Pay dialog`);
   };
 
-  const cardFrame = await findInFrames('cardnumber');
-  await cardFrame.locator('input[name="cardnumber"]').fill('4242 4242 4242 4242');
-
-  const expFrame = await findInFrames('exp-date');
-  await expFrame.locator('input[name="exp-date"]').fill('12/34');
-
-  const cvcFrame = await findInFrames('cvc');
-  await cvcFrame.locator('input[name="cvc"]').fill('123');
-
-  // Postal/ZIP is sometimes rendered, sometimes not depending on the hosted
-  // page's collected fields. Best-effort.
-  try {
-    const zipFrame = await findInFrames('postal');
-    await zipFrame.locator('input[name="postal"]').fill('10001');
-  } catch {
-    /* postal field not shown on this hosted invoice */
+  // PaymentElement may need a moment to mount fields after iframe creation.
+  const start = Date.now();
+  while (Date.now() - start < 15000) {
+    const frames = dialog.page().frames();
+    const haveNumber = await Promise.any(
+      frames.map(async (f) => {
+        const h = await f.$('input[name="number"]').catch(() => null);
+        if (!h) throw new Error('no');
+        return true;
+      }),
+    ).catch(() => false);
+    if (haveNumber) break;
+    await new Promise((r) => setTimeout(r, 250));
   }
 
-  const payButton = hostedPage
-    .locator('button[type="submit"]')
-    .filter({ hasText: /pay/i })
-    .first();
-  await payButton.waitFor({ timeout: 10000 });
-  await payButton.click();
+  const numberFrame = await findFrame('number');
+  await numberFrame.locator('input[name="number"]').fill('4242 4242 4242 4242');
 
-  await hostedPage
-    .getByText(/payment received|paid|thank you/i)
-    .first()
-    .waitFor({ timeout: 30000 });
+  const expFrame = await findFrame('expiry');
+  await expFrame.locator('input[name="expiry"]').fill('12 / 34');
+
+  const cvcFrame = await findFrame('cvc');
+  await cvcFrame.locator('input[name="cvc"]').fill('123');
+
+  // Postal/ZIP only renders for some locales/billing setups. Best-effort.
+  try {
+    const zipFrame = await findFrame('postalCode');
+    await zipFrame.locator('input[name="postalCode"]').fill('10001');
+  } catch {
+    /* postal field not shown */
+  }
 }
 
 async function main() {
@@ -222,10 +215,9 @@ async function main() {
   ensureSeed();
   await waitForServer();
 
-  // Lazy-import server modules so the SKIP path never touches the DB or Stripe.
   const Stripe = (await import('stripe')).default;
   const { db } = await import('../server/db');
-  const { clientInvoices, orgStripeConnections, clients } = await import('../shared/schema');
+  const { clientInvoices, orgStripeConnections } = await import('../shared/schema');
   const { eq } = await import('drizzle-orm');
   type SchemaTypes = typeof import('../shared/schema');
   type InsertOrgStripeConnection = SchemaTypes['InsertOrgStripeConnection'] extends never
@@ -237,7 +229,8 @@ async function main() {
     apiVersion: '2024-11-20.acacia',
   });
 
-  // 1. Ensure org_stripe_connections (direct mode) for the demo org.
+  // 1. Ensure org_stripe_connections (direct mode) for the demo org so the
+  //    new /api/portal/invoices/:id/pay-intent route can talk to Stripe.
   const existingConn = await db
     .select()
     .from(orgStripeConnections)
@@ -252,54 +245,33 @@ async function main() {
     };
     await db.insert(orgStripeConnections).values(insert);
     console.log('  +    seeded org_stripe_connections row (direct mode)');
-  } else if (!existingConn[0].isActive) {
+  } else if (!existingConn[0].isActive || !existingConn[0].stripeSecretKey) {
     await db
       .update(orgStripeConnections)
-      .set({ isActive: true, stripeSecretKey: process.env.STRIPE_SECRET_KEY! })
+      .set({
+        isActive: true,
+        stripeSecretKey: process.env.STRIPE_SECRET_KEY!,
+        stripePublishableKey:
+          existingConn[0].stripePublishableKey ||
+          process.env.STRIPE_PUBLISHABLE_KEY ||
+          'pk_test_seed',
+      })
       .where(eq(orgStripeConnections.orgId, ORG_ID));
   }
 
-  // 2. Create a real Stripe Invoice in test mode for the demo client so the
-  //    hostedInvoiceUrl resolves to a real Stripe-hosted payment page that
-  //    Playwright can drive.
-  const [client] = await db.select().from(clients).where(eq(clients.id, CLIENT_ID));
-  if (!client) fail('demo client row missing — run scripts/seed-beta-org.ts');
-
-  const customer = await stripe.customers.create({
-    email: client.email || EMAIL,
-    name: `${client.firstName || ''} ${client.lastName || ''}`.trim() || EMAIL,
-    metadata: { clientId: CLIENT_ID, orgId: ORG_ID, e2e: 'portal-pay-now' },
-  });
-  await stripe.invoiceItems.create({
-    customer: customer.id,
-    amount: OVERDUE_AMOUNT_CENTS,
-    currency: 'usd',
-    description: `${OVERDUE_INVOICE_NUMBER} (e2e portal pay-now)`,
-  });
-  const stripeInvoice = await stripe.invoices.create({
-    customer: customer.id,
-    collection_method: 'send_invoice',
-    days_until_due: 1,
-    metadata: { invoiceId: OVERDUE_INVOICE_ID, orgId: ORG_ID, e2e: 'portal-pay-now' },
-  });
-  const finalized = await stripe.invoices.finalizeInvoice(stripeInvoice.id);
-  if (!finalized.hosted_invoice_url) {
-    fail('Stripe finalizeInvoice returned no hosted_invoice_url');
-  }
-  console.log(`  +    Stripe test invoice ${finalized.id} finalized`);
-
-  // 3. Mirror the real Stripe hosted URL into the local invoice row and
-  //    reset payment fields so the test is idempotent across re-runs.
+  // 2. Reset the local invoice row so the test is idempotent across re-runs
+  //    (clear any prior PI/Stripe customer so the new endpoint creates a
+  //    fresh PaymentIntent we can confirm).
   const reset: Partial<InsertClientInvoice> = {
     status: 'open',
     paymentStatus: null,
     paymentMethod: null,
     paymentDate: null,
     stripePaymentIntentId: null,
+    stripeCustomerId: null,
     paymentError: null,
-    stripeInvoiceId: finalized.id,
-    stripeCustomerId: customer.id,
-    hostedInvoiceUrl: finalized.hosted_invoice_url!,
+    stripeInvoiceId: null,
+    hostedInvoiceUrl: null,
   };
   await db.update(clientInvoices).set(reset).where(eq(clientInvoices.id, OVERDUE_INVOICE_ID));
 
@@ -320,7 +292,7 @@ async function main() {
   try {
     const { ctx, page } = await freshContext(browser);
     try {
-      // 4. Real browser sign-in + navigate to invoices.
+      // 3. Real browser sign-in + navigate to invoices.
       await signIn(page);
       await openInvoicesTab(page);
       const row = page.getByTestId(`invoice-${OVERDUE_INVOICE_NUMBER}`);
@@ -333,46 +305,56 @@ async function main() {
         ok('row shows Overdue badge before payment');
       }
 
-      // 5. Click the user-facing pay action; opens Stripe-hosted page in a
-      //    new tab (the View link uses target=_blank).
-      const newPagePromise = ctx.waitForEvent('page', { timeout: 15000 });
-      await row.getByRole('link', { name: /view/i }).click();
-      const hostedPage = await newPagePromise;
-      await hostedPage.waitForLoadState('domcontentloaded');
-      if (!hostedPage.url().includes('invoice.stripe.com')) {
-        bad('View link did not open a Stripe-hosted invoice page', hostedPage.url());
+      // 4. Click in-app "Pay Now" — opens the embedded Stripe Elements dialog.
+      const payIntentRespPromise = page.waitForResponse(
+        (r) => r.url().includes(`/api/portal/invoices/${OVERDUE_INVOICE_ID}/pay-intent`) &&
+          r.request().method() === 'POST',
+        { timeout: 15000 },
+      );
+      await row.getByTestId(`button-pay-${OVERDUE_INVOICE_NUMBER}`).click();
+      const payIntentResp = await payIntentRespPromise;
+      if (payIntentResp.status() !== 200) {
+        const body = await payIntentResp.text().catch(() => '');
+        fail(`pay-intent POST returned ${payIntentResp.status()}: ${body}`);
+      }
+      const payIntentBody = await payIntentResp.json();
+      if (!payIntentBody?.clientSecret || !payIntentBody?.paymentIntentId) {
+        fail('pay-intent response missing clientSecret/paymentIntentId', payIntentBody);
+      }
+      ok('portal POST /pay-intent returned a Stripe client secret');
+
+      const dialog = page.getByTestId('dialog-pay-invoice');
+      await dialog.waitFor({ timeout: 10000 });
+
+      // 5. Drive the embedded PaymentElement with 4242 and confirm.
+      await fillPaymentElement(dialog);
+      ok('embedded Stripe Elements form filled with 4242 card');
+
+      const confirmBtn = page.getByTestId('button-confirm-pay');
+      await confirmBtn.click();
+
+      // 6. Wait for the Stripe PaymentIntent to actually reach succeeded.
+      //    stripe.confirmPayment with automatic_payment_methods + a card
+      //    typically resolves without needing 3DS for 4242, so the dialog
+      //    closes via onPaid() once confirmation returns.
+      const piId: string = payIntentBody.paymentIntentId;
+      let piStatus = 'unknown';
+      const piDeadline = Date.now() + 30000;
+      while (Date.now() < piDeadline) {
+        const pi = await stripe.paymentIntents.retrieve(piId);
+        piStatus = pi.status;
+        if (piStatus === 'succeeded') break;
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      if (piStatus !== 'succeeded') {
+        bad(`Stripe PaymentIntent did not reach succeeded; last status=${piStatus}`);
       } else {
-        ok('View link opened the Stripe-hosted invoice page');
+        ok(`Stripe PaymentIntent ${piId} succeeded`);
       }
 
-      // 6. Drive the live Stripe Elements card form with 4242 and submit.
-      await payOnHostedPage(hostedPage);
-      ok('hosted Stripe Elements form accepted 4242 card and reported success');
-
-      // 7. Look up the PaymentIntent Stripe created for this invoice and
-      //    patch metadata.invoiceId/orgId so our existing webhook handler
-      //    (handlePaymentIntentSucceeded) can resolve the local invoice
-      //    when we forward the signed event to localhost.
-      const paid = await stripe.invoices.retrieve(finalized.id, {
-        expand: ['payment_intent'],
-      });
-      const piRef = paid.payment_intent;
-      const piId = typeof piRef === 'string' ? piRef : piRef?.id;
-      if (!piId) fail('paid Stripe invoice has no payment_intent');
-      const patchedPi = await stripe.paymentIntents.update(piId, {
-        metadata: {
-          invoiceId: OVERDUE_INVOICE_ID,
-          orgId: ORG_ID,
-          clientId: CLIENT_ID,
-        },
-      });
-      if (patchedPi.status !== 'succeeded') {
-        bad(`Stripe PaymentIntent did not reach succeeded; status=${patchedPi.status}`);
-      } else {
-        ok(`Stripe PaymentIntent ${patchedPi.id} succeeded`);
-      }
-
-      // 8. Forward signed payment_intent.succeeded to the org webhook.
+      // 7. Forward a signed payment_intent.succeeded webhook to the local
+      //    server so handlePaymentIntentSucceeded persists status=paid.
+      const succeededPi = await stripe.paymentIntents.retrieve(piId);
       const event = {
         id: `evt_test_${Date.now()}`,
         object: 'event',
@@ -382,7 +364,7 @@ async function main() {
         livemode: false,
         pending_webhooks: 0,
         request: { id: null, idempotency_key: null },
-        data: { object: patchedPi },
+        data: { object: succeededPi },
       };
       const payload = JSON.stringify(event);
       const header = stripe.webhooks.generateTestHeaderString({
@@ -400,15 +382,13 @@ async function main() {
       }
       ok('org webhook accepted signed payment_intent.succeeded event');
 
-      // 9. Reload My Invoices and assert the row shows the Paid badge.
-      await page.reload({ waitUntil: 'domcontentloaded' });
-      await openInvoicesTab(page);
+      // 8. The portal's polling refetch should flip the row to Paid in
+      //    place, without a manual reload.
       const rowAfter = page.getByTestId(`invoice-${OVERDUE_INVOICE_NUMBER}`);
-      await rowAfter.waitFor({ timeout: 10000 });
-      await rowAfter.getByText(/paid/i).first().waitFor({ timeout: 10000 });
-      ok('reloaded portal UI shows Paid badge for the same invoice row');
+      await rowAfter.getByText(/^paid$/i).first().waitFor({ timeout: 30000 });
+      ok('portal UI flipped the same row to Paid without a manual refresh');
 
-      // 10. Confirm the persisted DB row reflects the same.
+      // 9. Confirm the persisted DB row reflects the same.
       const [persisted] = await db
         .select({
           status: clientInvoices.status,

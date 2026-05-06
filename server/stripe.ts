@@ -850,6 +850,90 @@ export async function detachPaymentMethod(
 }
 
 /**
+ * Create (or reuse) a confirmable PaymentIntent for an invoice for the
+ * portal "Pay Now" flow. Unlike chargeInvoice() — which charges off-session
+ * with a saved payment method — this returns a client_secret the browser
+ * can confirm via Stripe Elements (card or ACH).
+ *
+ * Idempotent: invoices that already have a stripePaymentIntentId in a
+ * usable state (requires_payment_method/confirmation/action) reuse it
+ * instead of creating another PI. Any non-reusable PI is replaced.
+ */
+export async function createPortalPayIntentForInvoice(
+  invoiceId: string,
+  orgId: string,
+  clientId: string,
+  clientEmail: string,
+  amountCents: number,
+  currency: string,
+  description?: string,
+): Promise<{ clientSecret: string; publishableKey: string; paymentIntentId: string }> {
+  const orgStripe = await getOrgStripe(orgId);
+  if (!orgStripe) {
+    throw new Error("Organization Stripe account not configured");
+  }
+
+  const customerId = await ensureStripeCustomerForClient(orgId, clientId, clientEmail);
+  const stripeAccountOpts = orgStripe.accountId ? { stripeAccount: orgStripe.accountId } : undefined;
+
+  // Try to reuse an existing PaymentIntent if it's still confirmable.
+  const existing = await storage.getClientInvoice(invoiceId);
+  if (existing?.stripePaymentIntentId) {
+    try {
+      const pi = await orgStripe.stripe.paymentIntents.retrieve(
+        existing.stripePaymentIntentId,
+        stripeAccountOpts,
+      );
+      const reusable =
+        pi.status === "requires_payment_method" ||
+        pi.status === "requires_confirmation" ||
+        pi.status === "requires_action";
+      if (reusable && pi.amount === amountCents && pi.client_secret) {
+        return {
+          clientSecret: pi.client_secret,
+          publishableKey: orgStripe.publishableKey,
+          paymentIntentId: pi.id,
+        };
+      }
+    } catch {
+      // PI not retrievable (maybe wrong account / deleted) — fall through to create.
+    }
+  }
+
+  const paymentIntent = await orgStripe.stripe.paymentIntents.create(
+    {
+      amount: amountCents,
+      currency: (currency || "usd").toLowerCase(),
+      customer: customerId,
+      automatic_payment_methods: { enabled: true },
+      metadata: {
+        invoiceId,
+        clientId,
+        orgId,
+      },
+      description: description || `Invoice ${invoiceId} payment`,
+    },
+    {
+      ...(stripeAccountOpts || {}),
+      // Per-invoice + amount idempotency key prevents concurrent rapid
+      // "Pay Now" clicks from creating duplicate PaymentIntents.
+      idempotencyKey: `portal-pay-${invoiceId}-${amountCents}`,
+    },
+  );
+
+  await storage.updateClientInvoice(invoiceId, {
+    stripePaymentIntentId: paymentIntent.id,
+    stripeCustomerId: customerId,
+  });
+
+  return {
+    clientSecret: paymentIntent.client_secret!,
+    publishableKey: orgStripe.publishableKey,
+    paymentIntentId: paymentIntent.id,
+  };
+}
+
+/**
  * Charge an invoice using a client's payment method
  * Creates a PaymentIntent which will be confirmed automatically
  * Webhooks will handle updating the invoice status

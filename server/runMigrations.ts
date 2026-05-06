@@ -68,6 +68,40 @@ export async function ensureWebhookTables(): Promise<void> {
  *     and drop `marketing`
  *   - if only `preference` exists, do nothing
  */
+/**
+ * Ensure the onboarding_prospects table exists. Referenced by super-admin
+ * onboarding pipeline routes; missing table causes 500s on first deploy.
+ * Idempotent (CREATE TABLE/INDEX IF NOT EXISTS).
+ */
+export async function ensureOnboardingProspectsTable(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS onboarding_prospects (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR NOT NULL,
+        email VARCHAR NOT NULL,
+        company VARCHAR,
+        phone VARCHAR,
+        stage VARCHAR NOT NULL DEFAULT 'inquiry',
+        stage_history JSONB NOT NULL DEFAULT '[]'::jsonb,
+        dropped_reason TEXT,
+        welcome_email_sent_at TIMESTAMP,
+        notes TEXT,
+        org_id UUID,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS onboarding_prospects_stage_idx ON onboarding_prospects(stage);
+      CREATE INDEX IF NOT EXISTS onboarding_prospects_email_idx ON onboarding_prospects(email);
+    `);
+  } catch (err: unknown) {
+    log(`[MIGRATE] Failed to ensure onboarding_prospects table: ${err instanceof Error ? err.message : String(err)}`);
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensureCookieConsentPreferenceColumn(): Promise<void> {
   const client = await pool.connect();
   try {

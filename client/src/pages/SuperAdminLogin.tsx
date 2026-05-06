@@ -10,7 +10,7 @@ import LegalLinks from "@/components/LegalLinks";
 import { HUBIFY_HOMES_LOGO_URL, HUBIFY_HOMES_LOGO_ALT } from "@/lib/brand";
 
 export default function SuperAdminLogin() {
-  const [username, setUsername] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [, setLocation] = useLocation();
@@ -20,13 +20,17 @@ export default function SuperAdminLogin() {
     e.preventDefault();
     setIsLoading(true);
 
+    // Detect whether the user typed an email address or a plain username
+    const isEmail = identifier.includes("@");
+    const body = isEmail
+      ? { email: identifier, password }
+      : { username: identifier, password };
+
     try {
       const response = await fetch("/api/super-admin/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ username, password }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
       });
 
       const data = await response.json();
@@ -73,15 +77,16 @@ export default function SuperAdminLogin() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username" className="text-slate-200">
-                Username
+              <Label htmlFor="identifier" className="text-slate-200">
+                Username or Email
               </Label>
               <Input
-                id="username"
+                id="identifier"
                 type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter username"
+                autoComplete="username"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="username or admin@example.com"
                 required
                 className="bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500"
                 data-testid="input-username"
@@ -94,6 +99,7 @@ export default function SuperAdminLogin() {
               <Input
                 id="password"
                 type="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter password"
@@ -121,18 +127,18 @@ export default function SuperAdminLogin() {
               )}
             </Button>
           </form>
-          
+
           <div className="mt-6 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
             <p className="text-xs text-yellow-200 text-center">
               <Shield className="w-3 h-3 inline mr-1" />
               This area is restricted to authorized platform administrators only
             </p>
           </div>
-          
+
           <p className="mt-4 text-xs text-slate-400 text-center">
             Forgot your credentials? Contact the platform administrator.
           </p>
-          
+
           <div className="mt-4 text-center">
             <Button
               variant="ghost"

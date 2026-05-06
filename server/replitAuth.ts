@@ -7,10 +7,9 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
+import { log } from "./vite";
 
-if (!process.env.REPLIT_DOMAINS) {
-  throw new Error("Environment variable REPLIT_DOMAINS not provided");
-}
+const replitEnabled = !!process.env.REPLIT_DOMAINS;
 
 const getOidcConfig = memoize(
   async () => {
@@ -24,34 +23,55 @@ const getOidcConfig = memoize(
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
-  
-  // Use memory store for development to avoid PostgreSQL session issues
-  return session({
-    secret: process.env.SESSION_SECRET!,
+
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "SESSION_SECRET environment variable is required in production."
+      );
+    }
+    log("[SESSION] WARNING: SESSION_SECRET not set — using insecure dev default.");
+  }
+
+  const sessionConfig: session.SessionOptions = {
+    secret: secret || "dev-insecure-secret-do-not-use-in-production",
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
       maxAge: sessionTtl,
     },
-  });
+  };
+
+  // Use PostgreSQL session store in production for persistence across restarts
+  if (process.env.NODE_ENV === "production" && process.env.DATABASE_URL) {
+    const PgSession = connectPg(session);
+    sessionConfig.store = new PgSession({
+      conString: process.env.DATABASE_URL,
+      tableName: "session",
+      createTableIfMissing: true,
+      ttl: sessionTtl / 1000,
+    });
+    log("[SESSION] Using PostgreSQL session store.");
+  }
+
+  return session(sessionConfig);
 }
 
 function updateUserSession(
   user: any,
   tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers
 ) {
-  // Spread into a new plain object so we can add orgId/role without hitting a frozen JWT object
   user.claims = { ...tokens.claims() };
   user.access_token = tokens.access_token;
   user.refresh_token = tokens.refresh_token;
   user.expires_at = user.claims?.exp;
 }
 
-async function upsertUser(
-  claims: any,
-) {
+async function upsertUser(claims: any) {
   const orgId = claims["orgId"] || claims["org_id"] || null;
   const userData: any = {
     id: claims["sub"],
@@ -61,18 +81,17 @@ async function upsertUser(
     profileImageUrl: claims["profile_image_url"] || null,
     role: claims["role"] || "staff",
   };
-  // Only include orgId if explicitly provided in claims (avoid overwriting existing DB value with null)
   if (orgId) {
     userData.orgId = orgId;
   }
-  
-  console.log('[OIDC] Upserting user with data:', {
+
+  console.log("[OIDC] Upserting user with data:", {
     id: userData.id,
     email: userData.email,
     role: userData.role,
     orgId: userData.orgId,
   });
-  
+
   await storage.upsertUser(userData);
 }
 
@@ -82,6 +101,28 @@ export async function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
+  passport.serializeUser((user: Express.User, cb) => cb(null, user));
+  passport.deserializeUser((user: Express.User, cb) => cb(null, user));
+
+  if (!replitEnabled) {
+    log(
+      "[AUTH] REPLIT_DOMAINS not set — Replit OIDC is disabled. " +
+        "Staff login via Replit is unavailable. " +
+        "Use /api/super-admin/login with ADMIN_EMAIL + ADMIN_PASSWORD for platform access."
+    );
+    // Provide stub routes so the app doesn't 404
+    app.get("/api/login", (_req, res) =>
+      res
+        .status(503)
+        .json({ message: "Replit OIDC not configured on this deployment." })
+    );
+    app.get("/api/callback", (_req, res) => res.redirect("/"));
+    app.get("/api/logout", (req, res) => {
+      req.logout(() => res.redirect("/"));
+    });
+    return;
+  }
+
   const config = await getOidcConfig();
 
   const verify: VerifyFunction = async (
@@ -90,87 +131,74 @@ export async function setupAuth(app: Express) {
   ) => {
     const claims = tokens.claims();
     const user: any = {
-      id: claims["sub"], // Add user ID for session tracking
+      id: claims["sub"],
     };
     updateUserSession(user, tokens);
-    
+
     try {
-      console.log('[OIDC] Attempting to upsert user:', claims["sub"]);
+      console.log("[OIDC] Attempting to upsert user:", claims["sub"]);
       await upsertUser(claims);
-      console.log('[OIDC] User upserted successfully');
-      
-      // Fetch user from database to get orgId and role
+      console.log("[OIDC] User upserted successfully");
+
       let dbUser = await storage.getUser(claims["sub"]);
-      console.log('[OIDC] Fetched user from database:', dbUser ? 'found' : 'not found');
+      console.log("[OIDC] Fetched user from database:", dbUser ? "found" : "not found");
       if (dbUser) {
-        // If user doesn't have an orgId, assign them to a default organization (DEV ONLY)
         if (!dbUser.orgId) {
-          // SECURITY: Only auto-assign users to organizations in development mode
-          // In production, users must be explicitly invited and assigned to an organization
-          if (process.env.NODE_ENV !== 'production') {
-            console.log('[OIDC] User has no orgId, assigning to default organization (DEV MODE)');
-            
-            // Use the seeded default organization (always created with this fixed ID by seedOrgs.ts)
-            const SEEDED_DEFAULT_ORG_ID = '00000000-0000-0000-0000-000000000001';
+          if (process.env.NODE_ENV !== "production") {
+            console.log("[OIDC] User has no orgId, assigning to default organization (DEV MODE)");
+            const SEEDED_DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
             let defaultOrg = await storage.getOrg(SEEDED_DEFAULT_ORG_ID);
 
             if (!defaultOrg) {
-              // Fall back: any existing active org
               const allOrgs = await storage.getOrgs();
               defaultOrg = allOrgs[0];
             }
 
             if (!defaultOrg) {
-              // Last resort: create a fallback org
               defaultOrg = await storage.createOrg({
-                name: 'Default Organization',
-                contactEmail: dbUser.email || 'test@hubify.com',
-                tier: 'premium',
-                status: 'active'
+                name: "Default Organization",
+                contactEmail: dbUser.email || "test@hubify.com",
+                tier: "premium",
+                status: "active",
               });
-              console.log('[OIDC] Created Default Organization:', defaultOrg.id);
+              console.log("[OIDC] Created Default Organization:", defaultOrg.id);
             }
-            
-            // Update user with orgId
+
             await storage.updateUser(dbUser.id, { orgId: defaultOrg.id });
             dbUser = await storage.getUser(claims["sub"]);
-            console.log('[OIDC] User assigned to default organization:', defaultOrg.name, defaultOrg.id);
+            console.log("[OIDC] User assigned to default organization:", defaultOrg?.name, defaultOrg?.id);
           } else {
-            // In production, log error and continue without orgId
-            // The user will need to be invited to an organization
-            console.error('[OIDC] Production user missing orgId - user must be invited to an organization:', claims["sub"]);
+            console.error(
+              "[OIDC] Production user missing orgId - user must be invited to an organization:",
+              claims["sub"]
+            );
           }
         }
-        
-        // Add orgId and role from database to session claims
-        user.claims.orgId = dbUser.orgId;
-        user.claims.role = dbUser.role;
-        console.log('[OIDC] User session claims updated:', {
+
+        user.claims.orgId = dbUser?.orgId;
+        user.claims.role = dbUser?.role;
+        console.log("[OIDC] User session claims updated:", {
           sub: claims["sub"],
           orgId: user.claims.orgId,
           role: user.claims.role,
         });
       } else {
-        console.error('[OIDC] ERROR: User not found in database after upsert:', claims["sub"]);
-        console.error('[OIDC] This should not happen - upsertUser should have created the user');
+        console.error("[OIDC] ERROR: User not found in database after upsert:", claims["sub"]);
       }
     } catch (error) {
-      console.error('[OIDC] CRITICAL ERROR upserting user:', error);
-      console.error('[OIDC] User claims:', JSON.stringify(claims, null, 2));
-      // Continue anyway - user session will still work with just claims
+      console.error("[OIDC] CRITICAL ERROR upserting user:", error);
     }
-    
-    console.log('[OIDC] Final user object for session:', {
+
+    console.log("[OIDC] Final user object for session:", {
       id: user.id,
       claimsRole: user.claims.role,
       claimsOrgId: user.claims.orgId,
     });
-    
+
     verified(null, user);
   };
 
-  for (const domain of process.env
-    .REPLIT_DOMAINS!.split(",")) {
+  for (const domain of process.env.REPLIT_DOMAINS!.split(",")) {
     const strategy = new Strategy(
       {
         name: `replitauth:${domain}`,
@@ -178,13 +206,10 @@ export async function setupAuth(app: Express) {
         scope: "openid email profile offline_access",
         callbackURL: `https://${domain}/api/callback`,
       },
-      verify,
+      verify
     );
     passport.use(strategy);
   }
-
-  passport.serializeUser((user: Express.User, cb) => cb(null, user));
-  passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
     passport.authenticate(`replitauth:${req.hostname}`, {
@@ -202,31 +227,35 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/logout", (req, res) => {
     req.logout(() => {
-      res.redirect(
-        client.buildEndSessionUrl(config, {
-          client_id: process.env.REPL_ID!,
-          post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
-        }).href
-      );
+      if (replitEnabled) {
+        getOidcConfig().then((cfg) => {
+          res.redirect(
+            client
+              .buildEndSessionUrl(cfg, {
+                client_id: process.env.REPL_ID!,
+                post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
+              })
+              .href
+          );
+        }).catch(() => res.redirect("/"));
+      } else {
+        res.redirect("/");
+      }
     });
   });
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
-  // Check if user is authenticated via passport
   if (!req.isAuthenticated()) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
   const user = req.user as any;
-  
-  // Check if user object has required data
+
   if (!user || !user.expires_at) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  // If orgId or role is missing from session claims, look up from DB
-  // This handles cases where the session was created without these fields
   if (!user.claims?.orgId || !user.claims?.role) {
     const userId = user.claims?.sub || user.id;
     if (userId) {
@@ -238,29 +267,25 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
           if (!user.claims.role && dbUser.role) user.claims.role = dbUser.role;
         }
       } catch (_) {
-        // Non-critical: proceed without orgId lookup
+        // Non-critical
       }
     }
   }
 
-  // Check if token is still valid
   const now = Math.floor(Date.now() / 1000);
   if (now <= user.expires_at) {
     return next();
   }
 
-  // Token expired, try to refresh
   const refreshToken = user.refresh_token;
-  if (!refreshToken) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
+  if (!refreshToken || !replitEnabled) {
+    return res.status(401).json({ message: "Unauthorized" });
   }
 
   try {
     const config = await getOidcConfig();
     const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
     updateUserSession(user, tokenResponse);
-    // Re-apply orgId and role after token refresh (updateUserSession resets claims)
     if (!user.claims?.orgId) {
       const userId = user.claims?.sub || user.id;
       if (userId) {
@@ -273,7 +298,6 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     }
     return next();
   } catch (error) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
+    return res.status(401).json({ message: "Unauthorized" });
   }
 };
