@@ -1,0 +1,98 @@
+name: Portal happy-path e2e
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: portal-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portal-e2e:
+    name: Seed beta org and run portal happy-path
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      # Required: a Neon (or Neon-compatible WebSocket) Postgres URL dedicated
+      # to CI. The app uses @neondatabase/serverless, which talks to Neon over
+      # WebSockets, so a plain `postgres://` from a generic CI Postgres service
+      # will not work. Provision a throwaway Neon branch for CI and put its
+      # connection string in the `CI_DATABASE_URL` repo secret.
+      DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
+      SESSION_SECRET: ci-portal-e2e-session-secret
+      REPL_ID: ci-portal-e2e
+      REPLIT_DOMAINS: localhost:5000
+      ISSUER_URL: https://replit.com/oidc
+      NODE_ENV: development
+      BASE_URL: http://localhost:5000
+      PORTAL_EMAIL: client@beta.hubify.test
+      PORTAL_PASSWORD: HubifyBeta!2025
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify CI_DATABASE_URL secret is configured
+        run: |
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "::error::CI_DATABASE_URL secret is not set."
+            echo "Add a Neon test-branch connection string under repo Settings"
+            echo "→ Secrets and variables → Actions → New repository secret"
+            echo "with name CI_DATABASE_URL."
+            exit 1
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Push database schema
+        run: npx drizzle-kit push --force
+
+      - name: Start dev server
+        run: |
+          npm run dev > /tmp/dev-server.log 2>&1 &
+          echo $! > /tmp/dev-server.pid
+          echo "started dev server, pid=$(cat /tmp/dev-server.pid)"
+
+      - name: Wait for dev server on :5000
+        run: |
+          for i in {1..60}; do
+            if curl -fsS -o /dev/null -X OPTIONS \
+                 "http://localhost:5000/api/portal/login" 2>/dev/null; then
+              echo "dev server is up"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::dev server did not come up within 120s"
+          tail -n 200 /tmp/dev-server.log || true
+          exit 1
+
+      # The e2e script itself runs `scripts/seed-beta-org.ts` (idempotent) at
+      # the top of `main()`, so a separate explicit seed step is unnecessary.
+      - name: Run portal happy-path e2e
+        run: npx tsx tests/portal-happy-path.e2e.ts
+
+      - name: Dump dev server logs on failure
+        if: failure()
+        run: |
+          echo "===== /tmp/dev-server.log (tail) ====="
+          tail -n 500 /tmp/dev-server.log || true
+
+      - name: Stop dev server
+        if: always()
+        run: |
+          if [ -f /tmp/dev-server.pid ]; then
+            kill "$(cat /tmp/dev-server.pid)" 2>/dev/null || true
+          fi

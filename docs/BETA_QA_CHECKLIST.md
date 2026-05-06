@@ -9,6 +9,8 @@ A copy-paste-friendly checklist any teammate can run against a freshly seeded en
 > npx tsx tests/portal-happy-path.e2e.ts
 > ```
 > The script seeds the demo org for you (idempotent) and exercises sign-in → properties → invoices (with the `BETA-DRAFT-0001` negative assertion) → sign-out → re-auth bounce.
+>
+> **CI now gates this on every push and PR.** The GitHub Actions workflow at `.github/workflows/portal-e2e.yml` boots the dev server, runs `scripts/seed-beta-org.ts`, and executes the same `tests/portal-happy-path.e2e.ts` against `http://localhost:5000`. Any assertion failure fails the build, so the portal blockers from the 2026-05-03 QA pass cannot silently regress between manual QA runs. The job needs a `CI_DATABASE_URL` repo secret pointing at a throwaway Neon test branch (the app uses `@neondatabase/serverless`, so a generic CI Postgres service won't work).
 
 1. Reset / seed the demo organization (idempotent — safe to re-run):
    ```bash
