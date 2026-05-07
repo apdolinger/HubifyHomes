@@ -40,6 +40,11 @@ interface PortalInvoice {
   currency: string;
   status: string;
   paymentStatus: string | null;
+  paymentDate: string | null;
+  paymentMethod: string | null;
+  paymentMethodBrand: string | null;
+  paymentMethodLast4: string | null;
+  receiptUrl: string | null;
   dueDate: string | null;
   issuedAt: string | null;
   sentAt: string | null;
@@ -770,13 +775,24 @@ export default function MyInvoices() {
                   className="p-4 flex items-center justify-between gap-4"
                   data-testid={`invoice-${inv.invoiceNumber || inv.id}`}
                 >
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="font-medium truncate">
                       {inv.invoiceNumber || `Invoice ${inv.id.slice(0, 8)}`}
                     </p>
                     <p className="text-xs text-muted-foreground truncate">
                       {inv.description || 'Invoice'}
-                      {inv.dueDate ? ` · Due ${format(new Date(inv.dueDate), 'MMM d, yyyy')}` : ''}
+                      {inv.status === 'paid' && inv.paymentDate
+                        ? ` · Paid ${format(new Date(inv.paymentDate), 'MMM d')}`
+                        : inv.dueDate
+                          ? ` · Due ${format(new Date(inv.dueDate), 'MMM d, yyyy')}`
+                          : ''}
+                      {inv.status === 'paid'
+                        ? inv.paymentMethodBrand && inv.paymentMethodLast4
+                          ? ` · ${inv.paymentMethodBrand.charAt(0).toUpperCase() + inv.paymentMethodBrand.slice(1)} \u00B7\u00B7\u00B7\u00B7${inv.paymentMethodLast4}`
+                          : inv.paymentMethod
+                            ? ` · ${inv.paymentMethod.charAt(0).toUpperCase() + inv.paymentMethod.slice(1)}`
+                            : ' · Card on file'
+                        : ''}
                     </p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
@@ -798,13 +814,27 @@ export default function MyInvoices() {
                         Pay Now
                       </Button>
                     )}
-                    {inv.hostedInvoiceUrl && (
+                    {inv.receiptUrl ? (
+                      <Button asChild variant="outline" size="sm" data-testid={`button-receipt-${inv.invoiceNumber || inv.id}`}>
+                        <a href={inv.receiptUrl} target="_blank" rel="noopener noreferrer">
+                          <Receipt className="h-3 w-3 mr-1" />
+                          Receipt
+                        </a>
+                      </Button>
+                    ) : inv.status === 'paid' && inv.hostedInvoiceUrl ? (
+                      <Button asChild variant="outline" size="sm" data-testid={`button-receipt-${inv.invoiceNumber || inv.id}`}>
+                        <a href={inv.hostedInvoiceUrl} target="_blank" rel="noopener noreferrer">
+                          <Receipt className="h-3 w-3 mr-1" />
+                          Receipt
+                        </a>
+                      </Button>
+                    ) : !inv.receiptUrl && inv.hostedInvoiceUrl ? (
                       <Button asChild variant="outline" size="sm">
                         <a href={inv.hostedInvoiceUrl} target="_blank" rel="noopener noreferrer">
                           View <ExternalLink className="h-3 w-3 ml-1" />
                         </a>
                       </Button>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               );

@@ -405,6 +405,44 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent,
     return;
   }
 
+  // Extract receipt and payment-method details from the attached charge.
+  // In Stripe webhook payloads `latest_charge` is typically a string ID, so we
+  // retrieve the charge explicitly when needed.
+  let receiptUrl: string | null = null;
+  let paymentMethodBrand: string | null = null;
+  let paymentMethodLast4: string | null = null;
+
+  let charge: Stripe.Charge | null = null;
+  const latestChargeField = paymentIntent.latest_charge; // string | Stripe.Charge | null
+
+  if (latestChargeField && typeof latestChargeField === 'object') {
+    // Pre-expanded Charge object (rare but handle it)
+    charge = latestChargeField as Stripe.Charge;
+  } else if (typeof latestChargeField === 'string') {
+    // Common webhook case: latest_charge is a string ID — fetch the Charge
+    const orgStripe = await getOrgStripe(orgId);
+    if (orgStripe) {
+      try {
+        charge = await orgStripe.stripe.charges.retrieve(
+          latestChargeField,
+          {},
+          orgStripe.accountId ? { stripeAccount: orgStripe.accountId } : undefined,
+        );
+      } catch (err) {
+        console.warn(`Could not retrieve charge ${latestChargeField} for invoice ${invoiceId}:`, err);
+      }
+    }
+  }
+
+  if (charge) {
+    receiptUrl = charge.receipt_url ?? null;
+    const cardDetails = charge.payment_method_details?.card;
+    if (cardDetails) {
+      paymentMethodBrand = cardDetails.brand ?? null;
+      paymentMethodLast4 = cardDetails.last4 ?? null;
+    }
+  }
+
   await storage.updateInvoicePaymentStatus(invoiceId, {
     status: "paid",
     paymentStatus: "succeeded",
@@ -412,6 +450,9 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent,
     paymentDate: new Date(),
     stripePaymentIntentId: paymentIntent.id,
     paymentError: null,
+    receiptUrl,
+    paymentMethodBrand,
+    paymentMethodLast4,
   });
 
   // Send notification email about successful payment

@@ -102,6 +102,21 @@ export async function ensureOnboardingProspectsTable(): Promise<void> {
   }
 }
 
+export async function ensureInvoiceReceiptColumns(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE client_invoices ADD COLUMN IF NOT EXISTS receipt_url TEXT;
+      ALTER TABLE client_invoices ADD COLUMN IF NOT EXISTS payment_method_brand VARCHAR;
+      ALTER TABLE client_invoices ADD COLUMN IF NOT EXISTS payment_method_last4 VARCHAR;
+    `);
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add invoice receipt columns: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensureCookieConsentPreferenceColumn(): Promise<void> {
   const client = await pool.connect();
   try {

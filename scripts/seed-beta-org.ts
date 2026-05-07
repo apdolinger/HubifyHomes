@@ -674,6 +674,9 @@ async function ensureInvoice(opts: {
   dueDate?: Date;
   paymentStatus?: "succeeded";
   paymentDate?: Date;
+  receiptUrl?: string;
+  paymentMethodBrand?: string;
+  paymentMethodLast4?: string;
   description?: string;
   metadata?: Record<string, any>;
   invoiceNumber: string;
@@ -684,7 +687,20 @@ async function ensureInvoice(opts: {
     .where(eq(clientInvoices.id, opts.id))
     .limit(1);
   if (existing) {
-    log("skip", `Invoice ${opts.invoiceNumber}`);
+    // Back-fill receipt fields if they are missing (e.g. on re-runs after migration)
+    if (opts.receiptUrl && !existing.receiptUrl) {
+      await db
+        .update(clientInvoices)
+        .set({
+          receiptUrl: opts.receiptUrl,
+          paymentMethodBrand: opts.paymentMethodBrand ?? null,
+          paymentMethodLast4: opts.paymentMethodLast4 ?? null,
+        })
+        .where(eq(clientInvoices.id, opts.id));
+      log("update", `Invoice ${opts.invoiceNumber} — backfilled receipt fields`);
+    } else {
+      log("skip", `Invoice ${opts.invoiceNumber}`);
+    }
     return;
   }
   await db.insert(clientInvoices).values({
@@ -701,6 +717,9 @@ async function ensureInvoice(opts: {
     issuedAt: opts.status === "draft" ? null : days(-3),
     sentAt: opts.status === "draft" ? null : days(-3),
     description: opts.description,
+    receiptUrl: opts.receiptUrl,
+    paymentMethodBrand: opts.paymentMethodBrand,
+    paymentMethodLast4: opts.paymentMethodLast4,
     metadata: opts.metadata ?? {},
     createdBy: USER_IDS.admin,
   });
@@ -1229,6 +1248,9 @@ async function main() {
     paymentDate: days(-2),
     dueDate: days(-7),
     description: "Paid invoice — successful charge",
+    receiptUrl: "https://pay.stripe.com/receipts/payment/demo-receipt-beta-paid-0003",
+    paymentMethodBrand: "visa",
+    paymentMethodLast4: "4242",
   });
   await ensureInvoice({
     id: INVOICE_IDS.overdue,

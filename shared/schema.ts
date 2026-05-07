@@ -251,6 +251,11 @@ export const clientInvoices = pgTable("client_invoices", {
   issuedAt: timestamp("issued_at"),
   sentAt: timestamp("sent_at"), // When invoice was sent to client
   
+  // Payment receipt details (populated from Stripe charge on success)
+  receiptUrl: text("receipt_url"),
+  paymentMethodBrand: varchar("payment_method_brand"),
+  paymentMethodLast4: varchar("payment_method_last4"),
+
   // Links and storage
   hostedInvoiceUrl: text("hosted_invoice_url"),
   pdfStorageKey: text("pdf_storage_key"),
