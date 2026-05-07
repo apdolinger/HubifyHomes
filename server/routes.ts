@@ -14040,6 +14040,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/super-admin/onboarding-prospects/:id/convert-to-org", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const prospect = await storage.getOnboardingProspect(id);
+      if (!prospect) return res.status(404).json({ message: "Prospect not found" });
+      if (prospect.orgId) {
+        return res.status(409).json({ message: "Prospect is already linked to an organization", orgId: prospect.orgId });
+      }
+
+      const { insertOrgSchema, insertOrgSubscriptionSchema } = await import("@shared/schema");
+
+      const orgData = insertOrgSchema.parse({
+        name: prospect.company || prospect.name,
+        phone: prospect.phone || undefined,
+        isActive: true,
+      });
+      const org = await storage.createOrg(orgData);
+
+      const subData = insertOrgSubscriptionSchema.parse({
+        orgId: org.id,
+        tier: "starter",
+        status: "trialing",
+      });
+      await storage.upsertOrgSubscription(subData);
+
+      const updated = await storage.updateOnboardingProspect(id, { orgId: org.id });
+
+      res.status(201).json({ prospect: updated, org });
+    } catch (error) {
+      console.error("Error converting prospect to org:", error);
+      res.status(500).json({ message: "Failed to convert prospect to organization" });
+    }
+  });
+
   // Custom Fields endpoints
   app.get("/api/custom-fields", isAuthenticated, async (req: any, res) => {
     try {

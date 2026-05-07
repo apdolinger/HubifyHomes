@@ -107,6 +107,7 @@ interface Prospect {
   stageHistory: StageHistoryEntry[];
   droppedReason: string | null;
   welcomeEmailSentAt: string | null;
+  orgId: string | null;
   notes: string | null;
   createdAt: string | null;
   updatedAt: string | null;
@@ -157,6 +158,8 @@ function ProspectCard({
   onEdit,
   onSendWelcome,
   sendingEmail,
+  onConvertToOrg,
+  convertingToOrg,
 }: {
   prospect: Prospect;
   stuckDays: number;
@@ -165,7 +168,10 @@ function ProspectCard({
   onEdit: () => void;
   onSendWelcome: () => void;
   sendingEmail: boolean;
+  onConvertToOrg: () => void;
+  convertingToOrg: boolean;
 }) {
+  const [, setLocation] = useLocation();
   const days = stageDays(prospect);
   const stuck = days >= stuckDays;
   const next = nextStage(prospect.stage);
@@ -200,7 +206,7 @@ function ProspectCard({
       </div>
 
       {prospect.stage === "welcome" && (
-        <div className="text-xs">
+        <div className="text-xs space-y-1">
           {prospect.welcomeEmailSentAt ? (
             <span className="text-green-600 flex items-center gap-1">
               <CheckCircle className="w-3 h-3" />
@@ -217,6 +223,30 @@ function ProspectCard({
               {sendingEmail
                 ? <><RefreshCw className="w-3 h-3 mr-1 animate-spin" /> Sending…</>
                 : <><Send className="w-3 h-3 mr-1" /> Send Welcome Email</>
+              }
+            </Button>
+          )}
+          {prospect.orgId ? (
+            <button
+              className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium w-full"
+              onClick={() => setLocation(`/super-admin?tab=organizations`)}
+              title={`Org ID: ${prospect.orgId}`}
+            >
+              <CheckCircle className="w-3 h-3 shrink-0" />
+              <span className="truncate">Org created</span>
+              <ExternalLink className="w-3 h-3 shrink-0 ml-auto" />
+            </button>
+          ) : (
+            <Button
+              size="sm"
+              variant="default"
+              className="h-6 text-xs px-2 w-full bg-indigo-600 hover:bg-indigo-700"
+              onClick={onConvertToOrg}
+              disabled={convertingToOrg}
+            >
+              {convertingToOrg
+                ? <><RefreshCw className="w-3 h-3 mr-1 animate-spin" /> Creating…</>
+                : <><Building2 className="w-3 h-3 mr-1" /> Create Org</>
               }
             </Button>
           )}
@@ -387,6 +417,21 @@ function OnboardingPipelineTab() {
     },
   });
 
+  const convertToOrgMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/convert-to-org`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/organizations"] });
+      toast({ title: "Organization created!", description: "The prospect has been linked to the new org." });
+    },
+    onError: (e: Error) => toast({
+      title: "Conversion failed",
+      description: e?.message || "Could not create organization",
+      variant: "destructive",
+    }),
+  });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -488,6 +533,8 @@ function OnboardingPipelineTab() {
                         onEdit={() => openEdit(p)}
                         onSendWelcome={() => welcomeEmailMutation.mutate(p.id)}
                         sendingEmail={welcomeEmailMutation.isPending && welcomeEmailMutation.variables === p.id}
+                        onConvertToOrg={() => convertToOrgMutation.mutate(p.id)}
+                        convertingToOrg={convertToOrgMutation.isPending && convertToOrgMutation.variables === p.id}
                       />
                     ))
                   )}
