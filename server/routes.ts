@@ -91,7 +91,7 @@ import {
   WEBHOOK_EVENT_TYPES
 } from "@shared/schema";
 import { z } from "zod";
-import { createSetupIntentForClient, detachPaymentMethod, createPortalPayIntentForInvoice } from "./stripe";
+import { createSetupIntentForClient, detachPaymentMethod, createPortalPayIntentForInvoice, chargeInvoice } from "./stripe";
 import { db } from "./db";
 import { eq, lt, and, desc, inArray } from "drizzle-orm";
 import sgMail from "@sendgrid/mail";
@@ -2186,8 +2186,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const portalUser = req.portalUser;
       const { id } = req.params;
-      const invoice = await storage.getClientInvoice(id);
-      if (!invoice || invoice.orgId !== portalUser.orgId) {
+
+      // Use a direct DB query (consistent with other portal routes) so we can
+      // filter by both id AND orgId in a single round-trip without ambiguity.
+      const { clientInvoices: clientInvoicesTable, clients: clientsTable } = await import('@shared/schema');
+      const [invoice] = await db
+        .select()
+        .from(clientInvoicesTable)
+        .where(and(
+          eq(clientInvoicesTable.id, id),
+          eq(clientInvoicesTable.orgId, portalUser.orgId),
+        ));
+      if (!invoice) {
         return res.status(404).json({ message: 'Invoice not found' });
       }
       if (invoice.status === 'draft') {
@@ -2201,7 +2211,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Authorize: invoice's client must match the portal user's client by email+org.
-      const { clients: clientsTable } = await import('@shared/schema');
       const [client] = await db
         .select()
         .from(clientsTable)
@@ -2230,6 +2239,161 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(503).json({ message: 'Online payment is not configured for this organization yet.' });
       }
       res.status(500).json({ message: 'Failed to create payment' });
+    }
+  });
+
+  // Portal payment methods: list saved cards for the portal user's linked client
+  app.get('/api/portal/payment-methods', isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const portalUser = req.portalUser;
+      const { clients: clientsTable } = await import('@shared/schema');
+      const [client] = await db
+        .select()
+        .from(clientsTable)
+        .where(and(
+          eq(clientsTable.orgId, portalUser.orgId),
+          eq(clientsTable.email, portalUser.email)
+        ));
+      if (!client) return res.json([]);
+      const methods = await storage.getClientPaymentMethods(client.id);
+      res.json(methods.map((m) => ({
+        id: m.id,
+        paymentMethodType: m.paymentMethodType,
+        last4: m.last4,
+        brand: m.brand,
+        expMonth: m.expMonth,
+        expYear: m.expYear,
+        bankName: m.bankName,
+        isDefault: m.isDefault,
+      })));
+    } catch (error) {
+      console.error('Error fetching portal payment methods:', error);
+      res.status(500).json({ message: 'Failed to fetch payment methods' });
+    }
+  });
+
+  // Portal: create a SetupIntent so the portal user can add a saved card
+  app.post('/api/portal/payment-methods/setup-intent', isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const portalUser = req.portalUser;
+      const { clients: clientsTable } = await import('@shared/schema');
+      const [client] = await db
+        .select()
+        .from(clientsTable)
+        .where(and(
+          eq(clientsTable.orgId, portalUser.orgId),
+          eq(clientsTable.email, portalUser.email)
+        ));
+      if (!client) {
+        return res.status(404).json({ message: 'Client record not found for this portal user' });
+      }
+      const result = await createSetupIntentForClient(
+        portalUser.orgId,
+        client.id,
+        client.email,
+        ['card']
+      );
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error creating portal setup intent:', error);
+      const msg = error?.message || 'Failed to create setup intent';
+      if (/Stripe account not configured/i.test(msg)) {
+        return res.status(503).json({ message: 'Online payment is not configured for this organization yet.' });
+      }
+      res.status(500).json({ message: 'Failed to create setup intent' });
+    }
+  });
+
+  // Portal: delete a saved payment method (verifying it belongs to the portal user)
+  app.delete('/api/portal/payment-methods/:id', isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const portalUser = req.portalUser;
+      const { id } = req.params;
+      const paymentMethod = await storage.getClientPaymentMethod(id);
+      if (!paymentMethod) {
+        return res.status(404).json({ message: 'Payment method not found' });
+      }
+      // Verify the payment method belongs to a client whose email matches the portal user
+      const { clients: clientsTable } = await import('@shared/schema');
+      const [client] = await db
+        .select()
+        .from(clientsTable)
+        .where(and(
+          eq(clientsTable.orgId, portalUser.orgId),
+          eq(clientsTable.email, portalUser.email)
+        ));
+      if (!client || client.id !== paymentMethod.clientId) {
+        return res.status(403).json({ message: 'Not authorized to delete this payment method' });
+      }
+      await detachPaymentMethod(portalUser.orgId, paymentMethod.stripePaymentMethodId);
+      await storage.deleteClientPaymentMethod(id);
+      res.json({ message: 'Payment method removed' });
+    } catch (error: any) {
+      console.error('Error deleting portal payment method:', error);
+      res.status(500).json({ message: 'Failed to remove payment method' });
+    }
+  });
+
+  // Portal: pay an invoice with a saved payment method (off-session charge)
+  app.post('/api/portal/invoices/:id/pay-saved', isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const portalUser = req.portalUser;
+      const { id } = req.params;
+      const { paymentMethodId } = req.body;
+      if (!paymentMethodId) {
+        return res.status(400).json({ message: 'paymentMethodId is required' });
+      }
+      // Use a direct DB query (consistent with other portal routes) so we can
+      // filter by both id AND orgId in a single round-trip without ambiguity.
+      const { clientInvoices: clientInvoicesTable, clients: clientsTable } = await import('@shared/schema');
+      const [invoice] = await db
+        .select()
+        .from(clientInvoicesTable)
+        .where(and(
+          eq(clientInvoicesTable.id, id),
+          eq(clientInvoicesTable.orgId, portalUser.orgId),
+        ));
+      if (!invoice) {
+        return res.status(404).json({ message: 'Invoice not found' });
+      }
+      if (invoice.status === 'draft') {
+        return res.status(404).json({ message: 'Invoice not found' });
+      }
+      if (invoice.status === 'paid' || invoice.paymentStatus === 'succeeded') {
+        return res.status(409).json({ message: 'Invoice already paid' });
+      }
+      if (invoice.status === 'void' || invoice.status === 'uncollectible') {
+        return res.status(409).json({ message: 'Invoice is not payable' });
+      }
+      // Authorize: invoice client must match this portal user
+      const [client] = await db
+        .select()
+        .from(clientsTable)
+        .where(and(
+          eq(clientsTable.orgId, portalUser.orgId),
+          eq(clientsTable.email, portalUser.email)
+        ));
+      if (!client || client.id !== invoice.clientId) {
+        return res.status(403).json({ message: 'Not authorized to pay this invoice' });
+      }
+      // Verify payment method belongs to this client
+      const paymentMethod = await storage.getClientPaymentMethod(paymentMethodId);
+      if (!paymentMethod || paymentMethod.clientId !== client.id) {
+        return res.status(403).json({ message: 'Payment method not found or not authorized' });
+      }
+      const result = await chargeInvoice(
+        invoice.id,
+        invoice.orgId,
+        client.id,
+        paymentMethod.stripePaymentMethodId,
+        invoice.amountCents,
+        invoice.invoiceNumber ? `Invoice ${invoice.invoiceNumber}` : undefined,
+      );
+      res.json({ paymentIntentId: result.paymentIntentId, status: result.status });
+    } catch (error: any) {
+      console.error('Error paying invoice with saved method:', error);
+      const msg = error?.message || 'Payment failed';
+      res.status(500).json({ message: msg });
     }
   });
 
