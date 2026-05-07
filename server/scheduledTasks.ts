@@ -5,6 +5,7 @@ import { sendEmail, buildMergeFieldData, processMergeFields } from './email-serv
 import { generateInvoicePDF } from './invoiceUtils';
 import { generateInvoiceEmailHTML, sendGenericEmail } from './emailUtils';
 import { chargeInvoice } from './stripe';
+import type { StageHistoryEntry } from '@shared/schema';
 
 // Import conflict detection helper - we'll export this from routes
 export let detectConflictsForEvent: ((event: any, orgId: string, userId: string) => Promise<number>) | null = null;
@@ -309,6 +310,104 @@ export async function runBillingAutomation(): Promise<{
     errors,
     summary,
   };
+}
+
+/** Escape a string for safe insertion into an HTML context. */
+function escapeHtml(raw: string): string {
+  return raw
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+export async function runStuckProspectDigest(): Promise<{ sent: boolean; stuckCount: number; message: string }> {
+  const settings = await storage.getPlatformSettings();
+  const rawThreshold = Number(settings.stuckProspectThresholdDays);
+  // Clamp to a sane integer range; fall back to 7 if the stored value is invalid.
+  const thresholdDays: number =
+    Number.isFinite(rawThreshold) && rawThreshold >= 1
+      ? Math.min(Math.floor(rawThreshold), 365)
+      : 7;
+
+  const prospects = await storage.listOnboardingProspects();
+  const activeProspects = prospects.filter(p => p.stage !== 'dropped');
+
+  const now = Date.now();
+  const stuckProspects: Array<{ name: string; company: string | null; stage: string; daysSince: number }> = [];
+
+  for (const prospect of activeProspects) {
+    const history: StageHistoryEntry[] = prospect.stageHistory ?? [];
+    const lastEntry = [...history].reverse().find(e => e.stage === prospect.stage);
+    const enteredAtRaw: string | Date | null = lastEntry?.enteredAt ?? prospect.updatedAt ?? prospect.createdAt;
+    const enteredAt = enteredAtRaw instanceof Date ? enteredAtRaw.toISOString() : (enteredAtRaw ?? new Date().toISOString());
+    const daysSince = Math.floor((now - new Date(enteredAt).getTime()) / 86400000);
+    if (daysSince >= thresholdDays) {
+      stuckProspects.push({
+        name: prospect.name,
+        company: prospect.company ?? null,
+        stage: prospect.stage,
+        daysSince,
+      });
+    }
+  }
+
+  if (stuckProspects.length === 0) {
+    return { sent: false, stuckCount: 0, message: 'No stuck prospects — digest skipped.' };
+  }
+
+  const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.SUPPORT_EMAIL_FROM || 'noreply@hubify.com';
+  const toEmail = process.env.SUPPORT_EMAIL_FROM || process.env.SENDGRID_FROM_EMAIL || fromEmail;
+
+  const STAGE_LABELS: Record<string, string> = {
+    inquiry: 'Inquiry',
+    agreement: 'Agreement',
+    payment_setup: 'Payment Setup',
+    initial_payment: 'Initial Payment',
+    welcome: 'Welcome',
+  };
+
+  const rows = stuckProspects
+    .map(
+      p =>
+        `<tr>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${escapeHtml(p.name)}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${p.company ? escapeHtml(p.company) : '—'}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${escapeHtml(STAGE_LABELS[p.stage] ?? p.stage)}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#d97706;font-weight:600;">${p.daysSince}d ⚠</td>
+        </tr>`
+    )
+    .join('');
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;">
+      <h2 style="color:#4F46E5;margin-bottom:4px;">Stuck Prospect Alert</h2>
+      <p style="color:#6b7280;margin-top:0;">Daily digest — ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      <p>${stuckProspects.length} prospect${stuckProspects.length !== 1 ? 's have' : ' has'} been in the same stage for <strong>${thresholdDays}+ days</strong> and may need attention.</p>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <thead>
+          <tr style="background:#f3f4f6;">
+            <th style="padding:8px 12px;text-align:left;border-bottom:2px solid #d1d5db;">Name</th>
+            <th style="padding:8px 12px;text-align:left;border-bottom:2px solid #d1d5db;">Company</th>
+            <th style="padding:8px 12px;text-align:left;border-bottom:2px solid #d1d5db;">Stage</th>
+            <th style="padding:8px 12px;text-align:left;border-bottom:2px solid #d1d5db;">Days Stuck</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p style="color:#6b7280;font-size:13px;margin-top:24px;">Review these prospects in the <a href="https://hubify.com/super-admin" style="color:#4F46E5;">Super Admin panel</a>.</p>
+    </div>
+  `;
+
+  await sendGenericEmail({
+    to: toEmail,
+    fromEmail,
+    subject: `⚠ ${stuckProspects.length} Stuck Prospect${stuckProspects.length !== 1 ? 's' : ''} Need Attention`,
+    htmlContent: html,
+  });
+
+  return { sent: true, stuckCount: stuckProspects.length, message: `Digest sent to ${toEmail} — ${stuckProspects.length} stuck prospect(s).` };
 }
 
 export function startScheduledTasks() {
@@ -1359,4 +1458,17 @@ export function startScheduledTasks() {
   });
 
   log('[CRON] Automated inspection task generation initialized - will run daily at 6am');
+
+  // Run stuck-prospect digest daily at 8am
+  cron.schedule('0 8 * * *', async () => {
+    try {
+      log('[CRON] Running stuck-prospect digest...');
+      const result = await runStuckProspectDigest();
+      log(`[CRON] Stuck-prospect digest complete: ${result.message}`);
+    } catch (error) {
+      log(`[CRON] Error in stuck-prospect digest: ${error}`);
+    }
+  });
+
+  log('[CRON] Stuck-prospect digest initialized - will run daily at 8am');
 }

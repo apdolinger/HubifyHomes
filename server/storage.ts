@@ -313,6 +313,9 @@ export const PLATFORM_SETTINGS_DEFAULTS: Record<string, any> = {
 
   // Branding
   brandPrimaryColor: "#4F46E5",
+
+  // Prospect Alerts
+  stuckProspectThresholdDays: 7,
 };
 import { alias } from "drizzle-orm/pg-core";
 import { nanoid } from "nanoid";

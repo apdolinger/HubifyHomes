@@ -14112,6 +14112,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ── Onboarding Prospects ─────────────────────────────────────────────────
+  app.post("/api/super-admin/onboarding-prospects/send-stuck-digest", isSuperAdmin, requireMFA, async (_req, res) => {
+    try {
+      const { runStuckProspectDigest } = await import("./scheduledTasks");
+      const result = await runStuckProspectDigest();
+      res.json(result);
+    } catch (error) {
+      console.error("Error sending stuck-prospect digest:", error);
+      res.status(500).json({ message: "Failed to send digest", error: String(error) });
+    }
+  });
+
   app.get("/api/super-admin/onboarding-prospects", isSuperAdmin, requireMFA, async (_req, res) => {
     try {
       const prospects = await storage.listOnboardingProspects();

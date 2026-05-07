@@ -1644,6 +1644,92 @@ function CommunicationTabContent() {
 }
 
 // ============================================================================
+// Prospect Alert Settings Card — sub-component used inside SettingsTabContent
+
+interface DigestResult {
+  sent: boolean;
+  stuckCount: number;
+  message: string;
+}
+
+interface SaveSectionMutation {
+  mutate: (keys: string[]) => void;
+  isPending: boolean;
+}
+
+interface PlatformSettingsDraft {
+  stuckProspectThresholdDays?: number;
+  [key: string]: unknown;
+}
+
+function ProspectAlertSettingsCard({
+  draft,
+  set,
+  saveSection,
+}: {
+  draft: PlatformSettingsDraft;
+  set: (k: string, v: unknown) => void;
+  saveSection: SaveSectionMutation;
+}) {
+  const { toast } = useToast();
+
+  const sendDigest = useMutation<DigestResult, Error>({
+    mutationFn: () => apiRequest('POST', '/api/super-admin/onboarding-prospects/send-stuck-digest').then(r => r.json() as Promise<DigestResult>),
+    onSuccess: (result) => {
+      if (result.sent) {
+        toast({ title: 'Digest sent', description: `${result.stuckCount} stuck prospect(s) listed in the email.` });
+      } else {
+        toast({ title: 'No stuck prospects', description: 'All active prospects are within the threshold — no email sent.' });
+      }
+    },
+    onError: (e) => toast({ title: 'Failed to send digest', description: e.message, variant: 'destructive' }),
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center"><Bell className="w-5 h-5 mr-2" />Prospect Alerts</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-slate-500">
+          A daily email digest is sent at 8&nbsp;AM listing any prospects that have been stuck in the same pipeline stage for too long. You can also trigger it immediately below.
+        </p>
+        <div className="max-w-xs">
+          <Label htmlFor="stuck-threshold">Stuck after (days)</Label>
+          <Input
+            id="stuck-threshold"
+            type="number"
+            min={1}
+            value={draft.stuckProspectThresholdDays ?? 7}
+            onChange={(e) => set('stuckProspectThresholdDays', parseInt(e.target.value) || 7)}
+            data-testid="input-stuck-threshold"
+          />
+          <p className="text-xs text-slate-500 mt-1">Prospects in the same stage for at least this many days are flagged as stuck.</p>
+        </div>
+        <div className="flex gap-3 flex-wrap">
+          <Button
+            onClick={() => saveSection.mutate(['stuckProspectThresholdDays'])}
+            disabled={saveSection.isPending}
+            data-testid="button-save-stuck-threshold"
+          >
+            <Bell className="w-4 h-4 mr-2" />
+            Save Threshold
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => sendDigest.mutate(undefined)}
+            disabled={sendDigest.isPending}
+            data-testid="button-send-stuck-digest"
+          >
+            <Send className="w-4 h-4 mr-2" />
+            {sendDigest.isPending ? 'Sending…' : 'Send Digest Now'}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // Settings Tab — backed by /api/super-admin/platform-settings
 // ============================================================================
 function SettingsTabContent() {
@@ -1962,6 +2048,8 @@ function SettingsTabContent() {
           </Button>
         </CardContent>
       </Card>
+
+      <ProspectAlertSettingsCard draft={draft} set={set} saveSection={saveSection} />
     </div>
   );
 }
