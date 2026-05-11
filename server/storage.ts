@@ -322,6 +322,9 @@ export const PLATFORM_SETTINGS_DEFAULTS: Record<string, any> = {
 
   // Prospect Alerts
   stuckProspectThresholdDays: 7,
+
+  // Beta Pricing
+  betaPricing: { basePrice: 199, discountPct: 20, clientCap: 50 },
 };
 import { alias } from "drizzle-orm/pg-core";
 import { nanoid } from "nanoid";

@@ -91,11 +91,12 @@ import {
   WEBHOOK_EVENT_TYPES,
   type InsertOnboardingProspect,
   type OnboardingStage,
+  onboardingProspects,
 } from "@shared/schema";
 import { z } from "zod";
 import { createSetupIntentForClient, detachPaymentMethod, createPortalPayIntentForInvoice, chargeInvoice } from "./stripe";
 import { db } from "./db";
-import { eq, lt, and, desc, inArray } from "drizzle-orm";
+import { eq, lt, and, desc, inArray, count } from "drizzle-orm";
 import sgMail from "@sendgrid/mail";
 import { dispatchWebhookEvent, sendTestWebhookEvent, validateWebhookUrlSafe } from "./webhookDispatcher";
 
@@ -14142,6 +14143,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ── Public inquiry form (no auth) ────────────────────────────────────────
+  // Public: current effective pricing (no auth required)
+  app.get("/api/public/pricing", async (_req, res) => {
+    try {
+      const settings = await storage.getPlatformSettings();
+      const bp = settings.betaPricing as { basePrice: number; discountPct: number; clientCap: number } | undefined;
+      const basePrice = Number(bp?.basePrice ?? 199);
+      const discountPct = Number(bp?.discountPct ?? 20);
+      const clientCap = Number(bp?.clientCap ?? 50);
+
+      const [{ welcomeCount }] = await db
+        .select({ welcomeCount: count() })
+        .from(onboardingProspects)
+        .where(eq(onboardingProspects.stage, "welcome"));
+
+      const isBetaOpen = welcomeCount < clientCap;
+      const effectivePrice = isBetaOpen
+        ? Math.round(basePrice * (1 - discountPct / 100) * 100) / 100
+        : basePrice;
+
+      res.json({
+        basePrice,
+        discountPct,
+        clientCap,
+        welcomeCount,
+        isBetaOpen,
+        effectivePrice,
+        currency: "USD",
+        label: isBetaOpen
+          ? `$${effectivePrice.toFixed(2)}/mo (${discountPct}% beta discount)`
+          : `$${basePrice.toFixed(2)}/mo`,
+      });
+    } catch (error) {
+      console.error("Error fetching public pricing:", error);
+      res.status(500).json({ message: "Failed to fetch pricing" });
+    }
+  });
+
   app.post("/api/public/inquire", async (req, res) => {
     try {
       const { insertOnboardingProspectSchema } = await import("@shared/schema");

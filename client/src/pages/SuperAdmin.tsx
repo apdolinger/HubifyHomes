@@ -1014,6 +1014,9 @@ function OnboardingPipelineTab() {
         </SheetContent>
       </Sheet>
 
+      {/* Beta pricing configuration */}
+      <BetaPricingCard />
+
       {/* Stage email templates configuration */}
       <StageEmailTemplatesPanel />
 
@@ -1025,6 +1028,136 @@ function OnboardingPipelineTab() {
           if (droppingProspect) dropMutation.mutate({ id: droppingProspect.id, reason });
         }}
       />
+    </div>
+  );
+}
+
+// ── Beta Pricing Card ────────────────────────────────────────────────────────
+
+function BetaPricingCard() {
+  const { toast } = useToast();
+
+  const { data: platformSettings } = useQuery<Record<string, any>>({
+    queryKey: ["/api/super-admin/platform-settings"],
+  });
+
+  const { data: allProspects = [] } = useQuery<Prospect[]>({
+    queryKey: ["/api/super-admin/onboarding-prospects"],
+  });
+
+  const welcomeCount = allProspects.filter(p => p.stage === "welcome").length;
+
+  type SavedBetaPricing = { basePrice: number; discountPct: number; clientCap: number };
+  const saved = platformSettings?.betaPricing as SavedBetaPricing | undefined;
+
+  const [basePrice, setBasePrice] = useState(199);
+  const [discountPct, setDiscountPct] = useState(20);
+  const [clientCap, setClientCap] = useState(50);
+
+  useEffect(() => {
+    if (saved) {
+      setBasePrice(Number(saved.basePrice ?? 199));
+      setDiscountPct(Number(saved.discountPct ?? 20));
+      setClientCap(Number(saved.clientCap ?? 50));
+    }
+  }, [saved]);
+
+  const isBetaOpen = welcomeCount < clientCap;
+  const discountedPrice = Math.round(basePrice * (1 - discountPct / 100) * 100) / 100;
+  const effectivePrice = isBetaOpen ? discountedPrice : basePrice;
+  const spotsRemaining = Math.max(0, clientCap - welcomeCount);
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("PATCH", "/api/super-admin/platform-settings", {
+        betaPricing: { basePrice, discountPct, clientCap },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/platform-settings"] });
+      toast({ title: "Beta pricing saved" });
+    },
+    onError: (e: any) => toast({ title: "Failed to save", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <div className="border rounded-xl p-4 space-y-4">
+      <div className="flex items-center gap-2 flex-wrap">
+        <DollarSign className="w-4 h-4 text-emerald-600" />
+        <h3 className="font-semibold text-sm text-gray-800">Beta Pricing</h3>
+        <span className="text-xs text-gray-400 ml-1">— Early-adopter discount for onboarding prospects</span>
+        {isBetaOpen ? (
+          <Badge className="ml-auto bg-emerald-100 text-emerald-800 text-xs">Beta Open</Badge>
+        ) : (
+          <Badge className="ml-auto bg-gray-100 text-gray-600 text-xs">Beta Closed</Badge>
+        )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Base monthly price ($)</label>
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={basePrice}
+            onChange={e => setBasePrice(Math.max(0, Number(e.target.value)))}
+            className="w-full border rounded px-2 py-1.5 text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Beta discount (%)</label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step={1}
+            value={discountPct}
+            onChange={e => setDiscountPct(Math.min(100, Math.max(0, Number(e.target.value))))}
+            className="w-full border rounded px-2 py-1.5 text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Beta client cap</label>
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={clientCap}
+            onChange={e => setClientCap(Math.max(1, Number(e.target.value)))}
+            className="w-full border rounded px-2 py-1.5 text-sm"
+          />
+        </div>
+      </div>
+
+      {/* Live preview */}
+      <div className={`rounded-lg p-3 text-sm ${isBetaOpen ? "bg-emerald-50 border border-emerald-200" : "bg-gray-50 border border-gray-200"}`}>
+        <p className="font-semibold text-gray-800">
+          {isBetaOpen
+            ? `Current price: $${effectivePrice.toFixed(2)}/mo (${discountPct}% off — beta rate)`
+            : `Standard price: $${basePrice.toFixed(2)}/mo`}
+        </p>
+        <p className="text-xs text-gray-500 mt-1">
+          {welcomeCount} of {clientCap} beta spot{clientCap !== 1 ? "s" : ""} filled
+          {isBetaOpen
+            ? ` · ${spotsRemaining} spot${spotsRemaining !== 1 ? "s" : ""} remaining`
+            : " · Beta is now closed"}
+        </p>
+        {!isBetaOpen && (
+          <Badge className="mt-2 bg-orange-100 text-orange-800 text-xs">Beta is full — standard pricing applies</Badge>
+        )}
+      </div>
+
+      <div className="flex justify-end">
+        <Button
+          size="sm"
+          onClick={() => saveMutation.mutate()}
+          disabled={saveMutation.isPending}
+        >
+          {saveMutation.isPending
+            ? <><RefreshCw className="w-3 h-3 mr-1.5 animate-spin" /> Saving…</>
+            : "Save Pricing"}
+        </Button>
+      </div>
     </div>
   );
 }
