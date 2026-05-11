@@ -69,21 +69,24 @@ export async function initializePlatformAdmin(): Promise<void> {
 
   const client = await pool.connect();
   try {
-    const existing = await client.query(
-      "SELECT id FROM platform_admins WHERE email = $1",
-      [email]
-    );
-    if (existing.rows.length > 0) {
-      log(`[MASTER ADMIN] Admin account already exists for ${email}.`);
-      return;
-    }
-
     const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-    await client.query(
-      "INSERT INTO platform_admins (email, password_hash) VALUES ($1, $2)",
+
+    // Upsert: create on first boot, update the hash on subsequent boots
+    // so that changing ADMIN_PASSWORD + restarting always takes effect.
+    const result = await client.query(
+      `INSERT INTO platform_admins (email, password_hash)
+       VALUES ($1, $2)
+       ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash
+       RETURNING (xmax = 0) AS inserted`,
       [email, hash]
     );
-    log(`[MASTER ADMIN] Master admin account created for ${email}.`);
+
+    const wasInserted = result.rows[0]?.inserted;
+    if (wasInserted) {
+      log(`[MASTER ADMIN] Master admin account created for ${email}.`);
+    } else {
+      log(`[MASTER ADMIN] Master admin password updated for ${email}.`);
+    }
   } catch (err: unknown) {
     log(
       `[MASTER ADMIN] Error initializing platform admin: ${
