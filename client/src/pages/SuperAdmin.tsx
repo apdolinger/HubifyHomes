@@ -395,7 +395,13 @@ function OnboardingPipelineTab() {
   const saveMutation = useMutation({
     mutationFn: async (values: ProspectFormValues) => {
       if (editingProspect) {
-        return apiRequest("PATCH", `/api/super-admin/onboarding-prospects/${editingProspect.id}`, values);
+        // Strip agreementContent from PATCH payload when the agreement is already
+        // signed — the server guards immutability and would reject unrelated edits.
+        const payload = { ...values };
+        if (editingProspect.agreementSignedAt) {
+          delete (payload as Partial<typeof payload>).agreementContent;
+        }
+        return apiRequest("PATCH", `/api/super-admin/onboarding-prospects/${editingProspect.id}`, payload);
       }
       return apiRequest("POST", "/api/super-admin/onboarding-prospects", values);
     },
@@ -1023,6 +1029,17 @@ function OnboardingPipelineTab() {
   );
 }
 
+// Template panel includes `dropped` so admins can configure a "sorry to see
+// you go" email. Kanban PIPELINE_STAGES intentionally excludes dropped.
+const TEMPLATE_STAGES: { key: OnboardingStage; label: string }[] = [
+  { key: "inquiry",         label: "Inquiry" },
+  { key: "agreement",       label: "Agreement" },
+  { key: "payment_setup",   label: "Payment Setup" },
+  { key: "initial_payment", label: "Initial Payment" },
+  { key: "welcome",         label: "Welcome" },
+  { key: "dropped",         label: "Dropped" },
+];
+
 const PREVIEW_DUMMY = {
   name: "Jane Smith",
   company: "Acme Property Group",
@@ -1098,7 +1115,7 @@ function StageEmailTemplatesPanel() {
         <div className="text-xs text-gray-400">Loading…</div>
       ) : (
         <div className="space-y-2">
-          {PIPELINE_STAGES.map(s => {
+          {TEMPLATE_STAGES.map(s => {
             const draft = getDraft(s.key);
             const isExpanded = expandedStage === s.key;
             const existing = getTemplate(s.key);
