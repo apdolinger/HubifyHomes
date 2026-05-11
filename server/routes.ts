@@ -14321,9 +14321,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const prospect = await storage.getOnboardingProspect(id);
       if (!prospect) return res.status(404).json({ message: "Prospect not found" });
 
+      // Enum mirrors OnboardingStage exactly (shared/schema.ts)
       const ONBOARDING_STAGES = [
-        "inquiry", "qualified", "proposal", "agreement",
-        "payment_setup", "initial_payment", "welcome",
+        "inquiry", "agreement", "payment_setup", "initial_payment", "welcome", "dropped",
       ] as const;
       const sendStageEmailSchema = z.object({
         stage: z.enum(ONBOARDING_STAGES),
@@ -14336,13 +14336,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const { stage, subject, body } = parsed.data;
 
-      // Apply merge tags before sending
+      // Apply merge tags before sending.
+      // Use the selected template stage for {{stage}} so the tag reflects the
+      // stage the template is written for, not the prospect's current stage.
       const mergeContext = {
         name: prospect.name,
         email: prospect.email,
         company: prospect.company ?? "",
         phone: prospect.phone ?? "",
-        stage: prospect.stage.replace(/_/g, " "),
+        stage: stage.replace(/_/g, " "),
       };
       const mergedSubject = applyProspectMergeTags(subject, mergeContext);
       const mergedBody = applyProspectMergeTags(body, mergeContext);
