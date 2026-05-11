@@ -1,7 +1,13 @@
 import {
   onboardingProspects,
+  onboardingStageEmailTemplates,
+  onboardingProspectEmails,
   type OnboardingProspect,
   type InsertOnboardingProspect,
+  type OnboardingStageEmailTemplate,
+  type InsertOnboardingStageEmailTemplate,
+  type OnboardingProspectEmail,
+  type InsertOnboardingProspectEmail,
   users,
   outOfOfficePeriods,
   teams,
@@ -992,6 +998,16 @@ export interface IStorage {
   createOnboardingProspect(data: InsertOnboardingProspect): Promise<OnboardingProspect>;
   updateOnboardingProspect(id: string, patch: Partial<InsertOnboardingProspect>): Promise<OnboardingProspect>;
   deleteOnboardingProspect(id: string): Promise<void>;
+
+  // Stage email template operations
+  listOnboardingStageEmailTemplates(): Promise<OnboardingStageEmailTemplate[]>;
+  getOnboardingStageEmailTemplate(stage: string): Promise<OnboardingStageEmailTemplate | undefined>;
+  upsertOnboardingStageEmailTemplate(data: InsertOnboardingStageEmailTemplate): Promise<OnboardingStageEmailTemplate>;
+  deleteOnboardingStageEmailTemplate(stage: string): Promise<void>;
+
+  // Prospect email log operations
+  listOnboardingProspectEmails(prospectId: string): Promise<OnboardingProspectEmail[]>;
+  createOnboardingProspectEmail(data: InsertOnboardingProspectEmail): Promise<OnboardingProspectEmail>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -7791,6 +7807,55 @@ export class DatabaseStorage implements IStorage {
 
   async deleteOnboardingProspect(id: string): Promise<void> {
     await db.delete(onboardingProspects).where(eq(onboardingProspects.id, id));
+  }
+
+  // ── Stage email template operations ─────────────────────────────────────────
+  async listOnboardingStageEmailTemplates(): Promise<OnboardingStageEmailTemplate[]> {
+    return db.select().from(onboardingStageEmailTemplates).orderBy(onboardingStageEmailTemplates.stage);
+  }
+
+  async getOnboardingStageEmailTemplate(stage: string): Promise<OnboardingStageEmailTemplate | undefined> {
+    const [row] = await db
+      .select()
+      .from(onboardingStageEmailTemplates)
+      .where(eq(onboardingStageEmailTemplates.stage, stage));
+    return row;
+  }
+
+  async upsertOnboardingStageEmailTemplate(data: InsertOnboardingStageEmailTemplate): Promise<OnboardingStageEmailTemplate> {
+    const [row] = await db
+      .insert(onboardingStageEmailTemplates)
+      .values({ ...data, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: onboardingStageEmailTemplates.stage,
+        set: {
+          subject: data.subject,
+          body: data.body,
+          sendAfterDays: data.sendAfterDays,
+          isActive: data.isActive,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return row;
+  }
+
+  async deleteOnboardingStageEmailTemplate(stage: string): Promise<void> {
+    await db.delete(onboardingStageEmailTemplates).where(eq(onboardingStageEmailTemplates.stage, stage));
+  }
+
+  // ── Prospect email log operations ────────────────────────────────────────────
+  async listOnboardingProspectEmails(prospectId: string): Promise<OnboardingProspectEmail[]> {
+    return db
+      .select()
+      .from(onboardingProspectEmails)
+      .where(eq(onboardingProspectEmails.prospectId, prospectId))
+      .orderBy(desc(onboardingProspectEmails.createdAt));
+  }
+
+  async createOnboardingProspectEmail(data: InsertOnboardingProspectEmail): Promise<OnboardingProspectEmail> {
+    const [row] = await db.insert(onboardingProspectEmails).values(data).returning();
+    return row;
   }
 }
 

@@ -14129,6 +14129,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Public inquiry form (no auth) ────────────────────────────────────────
+  app.post("/api/public/inquire", async (req, res) => {
+    try {
+      const { insertOnboardingProspectSchema } = await import("@shared/schema");
+      const schema = insertOnboardingProspectSchema.pick({ name: true, email: true, company: true, phone: true, notes: true });
+      const result = schema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ message: "Invalid data", errors: result.error.errors });
+      }
+      const prospect = await storage.createOnboardingProspect({ ...result.data, stage: "inquiry" });
+      res.status(201).json({ id: prospect.id, message: "Inquiry received" });
+    } catch (error) {
+      console.error("Error handling public inquiry:", error);
+      res.status(500).json({ message: "Failed to submit inquiry" });
+    }
+  });
+
   // ── Onboarding Prospects ─────────────────────────────────────────────────
   app.post("/api/super-admin/onboarding-prospects/send-stuck-digest", isSuperAdmin, requireMFA, async (_req, res) => {
     try {
@@ -14235,6 +14252,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error sending welcome email:", error);
       res.status(500).json({ message: "Failed to send welcome email" });
+    }
+  });
+
+  // ── Stage email templates ────────────────────────────────────────────────
+  app.get("/api/super-admin/stage-email-templates", isSuperAdmin, requireMFA, async (_req, res) => {
+    try {
+      const templates = await storage.listOnboardingStageEmailTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching stage email templates:", error);
+      res.status(500).json({ message: "Failed to fetch stage email templates" });
+    }
+  });
+
+  app.put("/api/super-admin/stage-email-templates/:stage", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { stage } = req.params;
+      const { insertOnboardingStageEmailTemplateSchema } = await import("@shared/schema");
+      const result = insertOnboardingStageEmailTemplateSchema.safeParse({ ...req.body, stage });
+      if (!result.success) {
+        return res.status(400).json({ message: "Invalid data", errors: result.error.errors });
+      }
+      const template = await storage.upsertOnboardingStageEmailTemplate(result.data);
+      res.json(template);
+    } catch (error) {
+      console.error("Error upserting stage email template:", error);
+      res.status(500).json({ message: "Failed to save stage email template" });
+    }
+  });
+
+  app.delete("/api/super-admin/stage-email-templates/:stage", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      await storage.deleteOnboardingStageEmailTemplate(req.params.stage);
+      res.json({ message: "Template deleted" });
+    } catch (error) {
+      console.error("Error deleting stage email template:", error);
+      res.status(500).json({ message: "Failed to delete stage email template" });
+    }
+  });
+
+  // ── Prospect email history ───────────────────────────────────────────────
+  app.get("/api/super-admin/onboarding-prospects/:id/emails", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const emails = await storage.listOnboardingProspectEmails(req.params.id);
+      res.json(emails);
+    } catch (error) {
+      console.error("Error fetching prospect emails:", error);
+      res.status(500).json({ message: "Failed to fetch prospect emails" });
+    }
+  });
+
+  app.post("/api/super-admin/onboarding-prospects/:id/send-stage-email", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const prospect = await storage.getOnboardingProspect(id);
+      if (!prospect) return res.status(404).json({ message: "Prospect not found" });
+
+      const { stage, subject, body } = req.body;
+      if (!stage || !subject || !body) {
+        return res.status(400).json({ message: "stage, subject, and body are required" });
+      }
+
+      const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.SUPPORT_EMAIL_FROM || "noreply@hubify.com";
+
+      if (SENDGRID_API_KEY) {
+        await sgMail.send({
+          to: prospect.email,
+          from: fromEmail,
+          subject,
+          html: body.replace(/\n/g, "<br>"),
+          text: body,
+        });
+      }
+
+      const emailLog = await storage.createOnboardingProspectEmail({
+        prospectId: id,
+        stage,
+        subject,
+        body,
+        sentBy: "manual",
+      });
+
+      res.json({ ...emailLog, emailSent: !!SENDGRID_API_KEY });
+    } catch (error) {
+      console.error("Error sending stage email:", error);
+      res.status(500).json({ message: "Failed to send stage email" });
     }
   });
 

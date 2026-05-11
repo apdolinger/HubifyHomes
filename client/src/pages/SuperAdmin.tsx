@@ -80,6 +80,9 @@ import {
   XCircle,
   Funnel,
   ClipboardList,
+  Link2,
+  PenLine,
+  History,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -109,8 +112,28 @@ interface Prospect {
   welcomeEmailSentAt: string | null;
   orgId: string | null;
   notes: string | null;
+  agreementContent: string | null;
+  agreementSignedAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+}
+
+interface StageEmailTemplate {
+  stage: string;
+  subject: string;
+  body: string;
+  sendAfterDays: number;
+  isActive: boolean;
+}
+
+interface ProspectEmail {
+  id: string;
+  prospectId: string;
+  stage: string;
+  subject: string;
+  body: string;
+  sentBy: "auto" | "manual";
+  createdAt: string | null;
 }
 
 const PIPELINE_STAGES: { key: OnboardingStage; label: string; color: string }[] = [
@@ -147,6 +170,7 @@ const prospectFormSchema = z.object({
   company: z.string().optional(),
   phone: z.string().optional(),
   notes: z.string().optional(),
+  agreementContent: z.string().optional(),
 });
 type ProspectFormValues = z.infer<typeof prospectFormSchema>;
 
@@ -346,12 +370,12 @@ function OnboardingPipelineTab() {
 
   const form = useForm<ProspectFormValues>({
     resolver: zodResolver(prospectFormSchema),
-    defaultValues: { name: "", email: "", company: "", phone: "", notes: "" },
+    defaultValues: { name: "", email: "", company: "", phone: "", notes: "", agreementContent: "" },
   });
 
   const openCreate = () => {
     setEditingProspect(null);
-    form.reset({ name: "", email: "", company: "", phone: "", notes: "" });
+    form.reset({ name: "", email: "", company: "", phone: "", notes: "", agreementContent: "" });
     setSheetOpen(true);
   };
 
@@ -363,6 +387,7 @@ function OnboardingPipelineTab() {
       company: p.company ?? "",
       phone: p.phone ?? "",
       notes: p.notes ?? "",
+      agreementContent: p.agreementContent ?? "",
     });
     setSheetOpen(true);
   };
@@ -438,6 +463,41 @@ function OnboardingPipelineTab() {
     },
   });
 
+  // ── Email history & send-now ─────────────────────────────────────────────
+  const [sendEmailOpen, setSendEmailOpen] = useState(false);
+  const [sendEmailStage, setSendEmailStage] = useState<OnboardingStage>("inquiry");
+  const [sendEmailSubject, setSendEmailSubject] = useState("");
+  const [sendEmailBody, setSendEmailBody] = useState("");
+
+  const { data: prospectEmails = [] } = useQuery<ProspectEmail[]>({
+    queryKey: ["/api/super-admin/onboarding-prospects", editingProspect?.id, "emails"],
+    enabled: !!editingProspect,
+  });
+
+  const { data: stageEmailTemplates = [] } = useQuery<StageEmailTemplate[]>({
+    queryKey: ["/api/super-admin/stage-email-templates"],
+    enabled: sheetOpen,
+  });
+
+  const sendEmailMutation = useMutation({
+    mutationFn: ({ id, stage, subject, body }: { id: string; stage: string; subject: string; body: string }) =>
+      apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/send-stage-email`, { stage, subject, body }),
+    onSuccess: () => {
+      if (editingProspect) {
+        queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects", editingProspect.id, "emails"] });
+      }
+      setSendEmailOpen(false);
+      toast({ title: "Email sent!" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to send email", variant: "destructive" }),
+  });
+
+  const prefillFromTemplate = (stage: OnboardingStage) => {
+    const tpl = stageEmailTemplates.find(t => t.stage === stage);
+    if (tpl) { setSendEmailSubject(tpl.subject); setSendEmailBody(tpl.body); }
+    else { setSendEmailSubject(""); setSendEmailBody(""); }
+  };
+
   const convertToOrgMutation = useMutation({
     mutationFn: (id: string) =>
       apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/convert-to-org`, {}),
@@ -501,6 +561,15 @@ function OnboardingPipelineTab() {
               {saveStuckDaysMutation.isPending ? 'Saving…' : 'Save'}
             </Button>
           </div>
+          <Button
+            variant="outline"
+            onClick={() => {
+              navigator.clipboard.writeText(window.location.origin + "/inquire");
+              toast({ title: "Link copied!", description: "Share /inquire with potential clients." });
+            }}
+          >
+            <Link2 className="w-4 h-4 mr-2" /> Copy Inquiry Link
+          </Button>
           <Button onClick={openCreate}>
             <Plus className="w-4 h-4 mr-2" /> Add Prospect
           </Button>
@@ -722,6 +791,26 @@ function OnboardingPipelineTab() {
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="agreementContent"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-1">
+                      <PenLine className="w-3.5 h-3.5" /> Agreement
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea rows={5} placeholder="Paste or type the agreement text here…" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    {editingProspect?.agreementSignedAt && (
+                      <p className="text-xs text-green-600 font-medium mt-1">
+                        ✓ Signed {new Date(editingProspect.agreementSignedAt).toLocaleDateString()}
+                      </p>
+                    )}
+                  </FormItem>
+                )}
+              />
               <div className="flex gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={() => setSheetOpen(false)} className="flex-1">
                   Cancel
@@ -748,10 +837,124 @@ function OnboardingPipelineTab() {
                   ))}
                 </ol>
               </div>
+
+              <Separator className="my-4" />
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                    <History className="w-3.5 h-3.5" /> Sent Emails
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    onClick={() => {
+                      setSendEmailStage(editingProspect.stage === "dropped" ? "inquiry" : editingProspect.stage as OnboardingStage);
+                      prefillFromTemplate(editingProspect.stage === "dropped" ? "inquiry" : editingProspect.stage as OnboardingStage);
+                      setSendEmailOpen(true);
+                    }}
+                  >
+                    <Send className="w-3 h-3 mr-1" /> Send now
+                  </Button>
+                </div>
+
+                {sendEmailOpen && (
+                  <div className="border rounded-lg p-3 mb-3 space-y-2 bg-gray-50">
+                    <div>
+                      <Label className="text-xs font-medium">Stage</Label>
+                      <Select
+                        value={sendEmailStage}
+                        onValueChange={v => {
+                          setSendEmailStage(v as OnboardingStage);
+                          prefillFromTemplate(v as OnboardingStage);
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-xs mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PIPELINE_STAGES.map(s => (
+                            <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium">Subject</Label>
+                      <Input
+                        className="h-8 text-xs mt-1"
+                        value={sendEmailSubject}
+                        onChange={e => setSendEmailSubject(e.target.value)}
+                        placeholder="Email subject…"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium">Body</Label>
+                      <Textarea
+                        rows={4}
+                        className="text-xs mt-1"
+                        value={sendEmailBody}
+                        onChange={e => setSendEmailBody(e.target.value)}
+                        placeholder="Email body…"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 h-7 text-xs"
+                        onClick={() => setSendEmailOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1 h-7 text-xs"
+                        disabled={!sendEmailSubject || !sendEmailBody || sendEmailMutation.isPending}
+                        onClick={() => {
+                          if (!editingProspect) return;
+                          sendEmailMutation.mutate({
+                            id: editingProspect.id,
+                            stage: sendEmailStage,
+                            subject: sendEmailSubject,
+                            body: sendEmailBody,
+                          });
+                        }}
+                      >
+                        {sendEmailMutation.isPending ? "Sending…" : "Send"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {prospectEmails.length === 0 ? (
+                  <p className="text-xs text-gray-400">No emails sent yet.</p>
+                ) : (
+                  <ol className="space-y-2">
+                    {prospectEmails.map(email => (
+                      <li key={email.id} className="border rounded p-2 text-xs space-y-0.5">
+                        <div className="flex items-center gap-2 justify-between">
+                          <span className="font-medium truncate">{email.subject}</span>
+                          <Badge variant="secondary" className="capitalize shrink-0 text-[10px]">
+                            {email.sentBy}
+                          </Badge>
+                        </div>
+                        <div className="text-gray-400">
+                          Stage: <span className="capitalize">{email.stage.replace(/_/g, " ")}</span>
+                          {email.createdAt && <> · {new Date(email.createdAt).toLocaleString()}</>}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
             </>
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Stage email templates configuration */}
+      <StageEmailTemplatesPanel />
 
       {/* Drop dialog */}
       <DropDialog
@@ -761,6 +964,167 @@ function OnboardingPipelineTab() {
           if (droppingProspect) dropMutation.mutate({ id: droppingProspect.id, reason });
         }}
       />
+    </div>
+  );
+}
+
+function StageEmailTemplatesPanel() {
+  const { toast } = useToast();
+  const [expandedStage, setExpandedStage] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, { subject: string; body: string; sendAfterDays: number; isActive: boolean }>>({});
+
+  const { data: templates = [], isLoading } = useQuery<StageEmailTemplate[]>({
+    queryKey: ["/api/super-admin/stage-email-templates"],
+  });
+
+  const upsertMutation = useMutation({
+    mutationFn: ({ stage, data }: { stage: string; data: Omit<StageEmailTemplate, "stage"> }) =>
+      apiRequest("PUT", `/api/super-admin/stage-email-templates/${stage}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/stage-email-templates"] });
+      toast({ title: "Template saved" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to save template", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (stage: string) => apiRequest("DELETE", `/api/super-admin/stage-email-templates/${stage}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/stage-email-templates"] });
+      toast({ title: "Template removed" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to remove template", variant: "destructive" }),
+  });
+
+  const getTemplate = (stage: string): StageEmailTemplate | undefined =>
+    templates.find(t => t.stage === stage);
+
+  const getDraft = (stage: string) => {
+    if (drafts[stage]) return drafts[stage];
+    const existing = getTemplate(stage);
+    return {
+      subject: existing?.subject ?? "",
+      body: existing?.body ?? "",
+      sendAfterDays: existing?.sendAfterDays ?? 0,
+      isActive: existing?.isActive ?? true,
+    };
+  };
+
+  const setDraft = (stage: string, patch: Partial<{ subject: string; body: string; sendAfterDays: number; isActive: boolean }>) => {
+    setDrafts(d => ({ ...d, [stage]: { ...getDraft(stage), ...patch } }));
+  };
+
+  return (
+    <div className="border rounded-xl p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Mail className="w-4 h-4 text-indigo-600" />
+        <h3 className="font-semibold text-sm text-gray-800">Stage Email Templates</h3>
+        <span className="text-xs text-gray-400 ml-1">— Auto-send emails after N days in each stage</span>
+      </div>
+      {isLoading ? (
+        <div className="text-xs text-gray-400">Loading…</div>
+      ) : (
+        <div className="space-y-2">
+          {PIPELINE_STAGES.map(s => {
+            const draft = getDraft(s.key);
+            const isExpanded = expandedStage === s.key;
+            const existing = getTemplate(s.key);
+
+            return (
+              <div key={s.key} className="border rounded-lg overflow-hidden">
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-gray-50 transition-colors"
+                  onClick={() => setExpandedStage(isExpanded ? null : s.key)}
+                >
+                  <span className="flex items-center gap-2">
+                    {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" /> : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />}
+                    <span className="font-medium capitalize">{s.label}</span>
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {existing
+                      ? existing.sendAfterDays > 0
+                        ? `auto-send after ${existing.sendAfterDays}d`
+                        : "no auto-send"
+                      : "no template"}
+                  </span>
+                </button>
+
+                {isExpanded && (
+                  <div className="border-t p-3 space-y-3 bg-gray-50/50">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs font-medium">Subject</Label>
+                        <Input
+                          className="h-8 text-xs mt-1"
+                          value={draft.subject}
+                          onChange={e => setDraft(s.key, { subject: e.target.value })}
+                          placeholder="Email subject…"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium">Auto-send after (days, 0 = off)</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={365}
+                          className="h-8 text-xs mt-1"
+                          value={draft.sendAfterDays}
+                          onChange={e => setDraft(s.key, { sendAfterDays: Math.max(0, Number(e.target.value)) })}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium">Body</Label>
+                      <Textarea
+                        rows={4}
+                        className="text-xs mt-1"
+                        value={draft.body}
+                        onChange={e => setDraft(s.key, { body: e.target.value })}
+                        placeholder="Email body…"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={draft.isActive}
+                        onCheckedChange={v => setDraft(s.key, { isActive: v })}
+                        id={`active-${s.key}`}
+                      />
+                      <Label htmlFor={`active-${s.key}`} className="text-xs cursor-pointer">Active</Label>
+                    </div>
+                    <div className="flex gap-2">
+                      {existing && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs text-red-500 hover:text-red-700"
+                          disabled={deleteMutation.isPending}
+                          onClick={() => {
+                            if (confirm(`Remove template for ${s.label}?`)) {
+                              deleteMutation.mutate(s.key);
+                              setExpandedStage(null);
+                            }
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3 mr-1" /> Remove
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs ml-auto"
+                        disabled={!draft.subject || !draft.body || upsertMutation.isPending}
+                        onClick={() => upsertMutation.mutate({ stage: s.key, data: draft })}
+                      >
+                        {upsertMutation.isPending ? "Saving…" : "Save template"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

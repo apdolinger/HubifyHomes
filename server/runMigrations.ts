@@ -144,6 +144,49 @@ export async function ensureInvoiceReceiptColumns(): Promise<void> {
   }
 }
 
+/**
+ * Add agreement_content / agreement_signed_at columns to onboarding_prospects
+ * and create the onboarding_stage_email_templates and onboarding_prospect_emails
+ * tables. All DDL is idempotent (ADD COLUMN IF NOT EXISTS / CREATE TABLE IF NOT EXISTS).
+ */
+export async function ensureOnboardingEnhancements(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE onboarding_prospects
+        ADD COLUMN IF NOT EXISTS agreement_content TEXT,
+        ADD COLUMN IF NOT EXISTS agreement_signed_at TIMESTAMP;
+
+      CREATE TABLE IF NOT EXISTS onboarding_stage_email_templates (
+        stage VARCHAR PRIMARY KEY,
+        subject TEXT NOT NULL,
+        body TEXT NOT NULL,
+        send_after_days INTEGER NOT NULL DEFAULT 0,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS onboarding_prospect_emails (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        prospect_id UUID NOT NULL REFERENCES onboarding_prospects(id) ON DELETE CASCADE,
+        stage VARCHAR NOT NULL,
+        subject TEXT NOT NULL,
+        body TEXT NOT NULL,
+        sent_by VARCHAR NOT NULL DEFAULT 'manual',
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS onboarding_prospect_emails_prospect_idx
+        ON onboarding_prospect_emails(prospect_id);
+    `);
+    log("[MIGRATE] Onboarding enhancements (agreement + stage emails) verified.");
+  } catch (err: unknown) {
+    log(`[MIGRATE] Failed to ensure onboarding enhancements: ${err instanceof Error ? err.message : String(err)}`);
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensureCookieConsentPreferenceColumn(): Promise<void> {
   const client = await pool.connect();
   try {

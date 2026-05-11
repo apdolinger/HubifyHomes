@@ -3371,6 +3371,8 @@ export const onboardingProspects = pgTable("onboarding_prospects", {
   droppedReason: text("dropped_reason"),
   welcomeEmailSentAt: timestamp("welcome_email_sent_at"),
   notes: text("notes"),
+  agreementContent: text("agreement_content"),
+  agreementSignedAt: timestamp("agreement_signed_at"),
   orgId: uuid("org_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -3397,3 +3399,41 @@ export const insertOnboardingProspectSchema = createInsertSchema(onboardingProsp
 });
 export type InsertOnboardingProspect = z.infer<typeof insertOnboardingProspectSchema>;
 export type OnboardingProspect = typeof onboardingProspects.$inferSelect;
+
+// Per-stage email template (one per pipeline stage)
+export const onboardingStageEmailTemplates = pgTable("onboarding_stage_email_templates", {
+  stage: varchar("stage").$type<OnboardingStage>().primaryKey(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  sendAfterDays: integer("send_after_days").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertOnboardingStageEmailTemplateSchema = createInsertSchema(onboardingStageEmailTemplates).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertOnboardingStageEmailTemplate = z.infer<typeof insertOnboardingStageEmailTemplateSchema>;
+export type OnboardingStageEmailTemplate = typeof onboardingStageEmailTemplates.$inferSelect;
+
+// Log of emails sent to prospects (automated or manual)
+export const onboardingProspectEmails = pgTable("onboarding_prospect_emails", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  prospectId: uuid("prospect_id").notNull().references(() => onboardingProspects.id, { onDelete: "cascade" }),
+  stage: varchar("stage").$type<OnboardingStage>().notNull(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  sentBy: varchar("sent_by").$type<"auto" | "manual">().notNull().default("manual"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("onboarding_prospect_emails_prospect_idx").on(table.prospectId),
+]);
+
+export const insertOnboardingProspectEmailSchema = createInsertSchema(onboardingProspectEmails).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertOnboardingProspectEmail = z.infer<typeof insertOnboardingProspectEmailSchema>;
+export type OnboardingProspectEmail = typeof onboardingProspectEmails.$inferSelect;

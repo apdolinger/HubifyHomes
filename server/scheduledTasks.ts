@@ -322,6 +322,75 @@ function escapeHtml(raw: string): string {
     .replace(/'/g, '&#39;');
 }
 
+/**
+ * Auto-send stage emails to prospects that have been in a given pipeline stage
+ * for at least `sendAfterDays` days and haven't already received an auto email
+ * for that stage.
+ */
+export async function runStageEmailJob(): Promise<{ sent: number; skipped: number; errors: string[] }> {
+  let sent = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+
+  try {
+    const templates = await storage.listOnboardingStageEmailTemplates();
+    const activeTemplates = templates.filter(t => t.isActive && t.sendAfterDays > 0);
+
+    if (activeTemplates.length === 0) return { sent, skipped, errors };
+
+    const allProspects = await storage.listOnboardingProspects();
+
+    for (const template of activeTemplates) {
+      const prospectsInStage = allProspects.filter(p => p.stage === template.stage);
+
+      for (const prospect of prospectsInStage) {
+        try {
+          const history: StageHistoryEntry[] = (prospect.stageHistory ?? []) as StageHistoryEntry[];
+          const lastEntry = [...history].reverse().find(e => e.stage === prospect.stage);
+          const sinceDate = lastEntry?.enteredAt ?? prospect.updatedAt ?? prospect.createdAt;
+          const days = sinceDate ? Math.floor((Date.now() - new Date(sinceDate).getTime()) / 86_400_000) : 0;
+
+          if (days < template.sendAfterDays) { skipped++; continue; }
+
+          const existingEmails = await storage.listOnboardingProspectEmails(prospect.id);
+          const alreadySent = existingEmails.some(e => e.stage === template.stage && e.sentBy === 'auto');
+          if (alreadySent) { skipped++; continue; }
+
+          try {
+            await sendGenericEmail({
+              to: prospect.email,
+              subject: template.subject,
+              htmlContent: template.body.replace(/\n/g, '<br>'),
+            });
+          } catch (emailErr) {
+            log(`[STAGE-EMAIL] SendGrid error for ${prospect.email}: ${emailErr}`);
+          }
+
+          await storage.createOnboardingProspectEmail({
+            prospectId: prospect.id,
+            stage: template.stage as any,
+            subject: template.subject,
+            body: template.body,
+            sentBy: 'auto',
+          });
+
+          sent++;
+          log(`[STAGE-EMAIL] Sent ${template.stage} email to ${prospect.email}`);
+        } catch (err) {
+          const msg = `Failed for ${prospect.email} (${template.stage}): ${err}`;
+          errors.push(msg);
+          log(`[STAGE-EMAIL] ${msg}`);
+        }
+      }
+    }
+  } catch (err) {
+    errors.push(`Job failed: ${err}`);
+    log(`[STAGE-EMAIL] Job failed: ${err}`);
+  }
+
+  return { sent, skipped, errors };
+}
+
 export async function runStuckProspectDigest(): Promise<{ sent: boolean; stuckCount: number; message: string }> {
   const settings = await storage.getPlatformSettings();
   const rawThreshold = Number(settings.stuckProspectThresholdDays);
@@ -1471,4 +1540,17 @@ export function startScheduledTasks() {
   });
 
   log('[CRON] Stuck-prospect digest initialized - will run daily at 8am');
+
+  // Run stage-email auto-send job daily at 9am
+  cron.schedule('0 9 * * *', async () => {
+    try {
+      log('[CRON] Running stage email auto-send job...');
+      const result = await runStageEmailJob();
+      log(`[CRON] Stage email job complete: ${result.sent} sent, ${result.skipped} skipped.`);
+    } catch (error) {
+      log(`[CRON] Error in stage email job: ${error}`);
+    }
+  });
+
+  log('[CRON] Stage email auto-send job initialized - will run daily at 9am');
 }
