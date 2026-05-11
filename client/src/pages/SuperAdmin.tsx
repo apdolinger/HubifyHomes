@@ -311,6 +311,16 @@ function OnboardingPipelineTab() {
   const [stuckDays, setStuckDays] = useState(7);
   const [dragOverStage, setDragOverStage] = useState<OnboardingStage | null>(null);
 
+  const saveStuckDaysMutation = useMutation({
+    mutationFn: (days: number) =>
+      apiRequest('PATCH', '/api/super-admin/platform-settings', { stuckProspectThresholdDays: days }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/super-admin/platform-settings'] });
+      toast({ title: 'Threshold saved' });
+    },
+    onError: (e: any) => toast({ title: 'Failed to save threshold', description: e.message, variant: 'destructive' }),
+  });
+
   const { data: allProspects = [], isLoading } = useQuery<Prospect[]>({
     queryKey: ["/api/super-admin/onboarding-prospects"],
   });
@@ -473,10 +483,23 @@ function OnboardingPipelineTab() {
               min={1}
               max={90}
               value={stuckDays}
-              onChange={e => setStuckDays(Math.max(1, Number(e.target.value)))}
+              onChange={e => setStuckDays(Math.min(90, Math.max(1, Number(e.target.value))))}
+              onBlur={e => {
+                if (e.relatedTarget && (e.relatedTarget as HTMLElement).dataset.saveBtn === 'stuck') return;
+                saveStuckDaysMutation.mutate(Math.min(90, Math.max(1, Number(e.target.value))));
+              }}
               className="w-14 border rounded px-2 py-1 text-sm text-center"
             />
             <span className="whitespace-nowrap">days</span>
+            <Button
+              size="sm"
+              variant="outline"
+              data-save-btn="stuck"
+              disabled={saveStuckDaysMutation.isPending}
+              onClick={() => saveStuckDaysMutation.mutate(Math.min(90, Math.max(1, stuckDays)))}
+            >
+              {saveStuckDaysMutation.isPending ? 'Saving…' : 'Save'}
+            </Button>
           </div>
           <Button onClick={openCreate}>
             <Plus className="w-4 h-4 mr-2" /> Add Prospect
