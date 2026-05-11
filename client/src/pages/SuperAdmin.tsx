@@ -583,8 +583,13 @@ function OnboardingPipelineTab() {
           <Button
             variant="outline"
             onClick={() => {
-              navigator.clipboard.writeText(window.location.origin + "/inquire");
-              toast({ title: "Link copied!", description: "Share /inquire with potential clients." });
+              const url = window.location.origin + "/inquire";
+              navigator.clipboard.writeText(url).then(
+                () => toast({ title: "Link copied!", description: "Share /inquire with potential clients." }),
+                () => {
+                  toast({ title: "Copy failed", description: `Please copy manually: ${url}`, variant: "destructive" });
+                }
+              );
             }}
           >
             <Link2 className="w-4 h-4 mr-2" /> Copy Inquiry Link

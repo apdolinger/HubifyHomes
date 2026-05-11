@@ -14390,6 +14390,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (prospect.agreementSignedAt) {
         return res.status(409).json({ message: "Agreement already signed" });
       }
+      // Only allow signing at agreement-or-later stages (matches UI eligibility)
+      const AGREEMENT_ELIGIBLE: OnboardingStage[] = ["agreement", "payment_setup", "initial_payment", "welcome"];
+      if (!AGREEMENT_ELIGIBLE.includes(prospect.stage)) {
+        return res.status(422).json({ message: `Agreement can only be signed from the agreement stage or later (current: ${prospect.stage})` });
+      }
       const { agreementContent } = req.body;
       const patch: Partial<InsertOnboardingProspect> = {
         agreementSignedAt: new Date(),
