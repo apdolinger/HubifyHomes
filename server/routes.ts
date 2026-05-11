@@ -14204,6 +14204,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!parseResult.success) {
         return res.status(400).json({ message: "Invalid data", errors: parseResult.error.errors });
       }
+      // Guard: once an agreement is signed, agreementContent is immutable via
+      // generic PATCH. Changes must go through the dedicated sign-agreement
+      // endpoint or an explicit admin override (future).
+      if (parseResult.data.agreementContent !== undefined) {
+        const existing = await storage.getOnboardingProspect(id);
+        if (existing?.agreementSignedAt) {
+          return res.status(422).json({
+            message: "Agreement content cannot be modified after signing. Use the sign-agreement endpoint.",
+          });
+        }
+      }
       const prospect = await storage.updateOnboardingProspect(id, parseResult.data);
       res.json(prospect);
     } catch (error) {

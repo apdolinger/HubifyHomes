@@ -365,6 +365,9 @@ export async function runStageEmailJob(): Promise<{ sent: number; skipped: numbe
           // sent for this stage since the prospect last entered it — manual sends
           // count as "covered" and should not trigger a duplicate auto follow-up.
           const stageEnteredAt = sinceDate ? new Date(sinceDate) : new Date(0);
+          // NOTE: per-prospect email lookup is an N+1 query pattern; acceptable
+          // at current prospect volumes. If scale grows, batch-load all prospect
+          // emails once and filter in-memory.
           const existingEmails = await storage.listOnboardingProspectEmails(prospect.id);
           const alreadySent = existingEmails.some(e =>
             e.stage === template.stage &&
