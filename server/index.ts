@@ -135,8 +135,11 @@ app.use((req, res, next) => {
   // IF NOT EXISTS on both table and index) rather than connect-pg-simple's
   // createTableIfMissing, which crashes when the index already exists.
   try {
-    const { ensureSessionTable, ensureOnboardingEnhancements } = await import('./runMigrations.js');
+    const { ensureSessionTable, ensureOnboardingProspectsTable, ensureOnboardingEnhancements } = await import('./runMigrations.js');
     await ensureSessionTable();
+    // Ensure the prospects table exists BEFORE the enhancement migration runs
+    // ALTER TABLE statements so they never fail on a fresh database.
+    await ensureOnboardingProspectsTable();
     await ensureOnboardingEnhancements();
   } catch (err) {
     console.error('Error ensuring session table:', err);

@@ -88,7 +88,9 @@ import {
   managementNotes,
   isPremiumPropertyType,
   tierAllowsPremiumProperties,
-  WEBHOOK_EVENT_TYPES
+  WEBHOOK_EVENT_TYPES,
+  type InsertOnboardingProspect,
+  type OnboardingStage,
 } from "@shared/schema";
 import { z } from "zod";
 import { createSetupIntentForClient, detachPaymentMethod, createPortalPayIntentForInvoice, chargeInvoice } from "./stripe";
@@ -14337,16 +14339,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.SUPPORT_EMAIL_FROM || "noreply@hubify.com";
 
-      if (SENDGRID_API_KEY) {
-        await sgMail.send({
-          to: prospect.email,
-          from: fromEmail,
-          subject: mergedSubject,
-          html: mergedBody.replace(/\n/g, "<br>"),
-          text: mergedBody,
+      if (!SENDGRID_API_KEY) {
+        return res.status(503).json({
+          message: "Email delivery is not configured (SENDGRID_API_KEY missing). Set the key and try again.",
+          emailSent: false,
         });
       }
 
+      await sgMail.send({
+        to: prospect.email,
+        from: fromEmail,
+        subject: mergedSubject,
+        html: mergedBody.replace(/\n/g, "<br>"),
+        text: mergedBody,
+      });
+
+      // Only log after confirmed delivery
       const emailLog = await storage.createOnboardingProspectEmail({
         prospectId: id,
         stage,
@@ -14355,7 +14363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sentBy: "manual",
       });
 
-      res.json({ ...emailLog, emailSent: !!SENDGRID_API_KEY });
+      res.json({ ...emailLog, emailSent: true });
     } catch (error) {
       console.error("Error sending stage email:", error);
       res.status(500).json({ message: "Failed to send stage email" });
@@ -14370,14 +14378,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (prospect.agreementSignedAt) {
         return res.status(409).json({ message: "Agreement already signed" });
       }
-      const patch: Partial<{ agreementSignedAt: Date; stage: string }> = {
+      const patch: Partial<InsertOnboardingProspect> = {
         agreementSignedAt: new Date(),
       };
       // Auto-advance from agreement to payment_setup
       if (prospect.stage === "agreement") {
-        patch.stage = "payment_setup";
+        patch.stage = "payment_setup" as OnboardingStage;
       }
-      const updated = await storage.updateOnboardingProspect(id, patch as any);
+      const updated = await storage.updateOnboardingProspect(id, patch);
       res.json(updated);
     } catch (error) {
       console.error("Error signing agreement:", error);
