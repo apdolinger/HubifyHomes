@@ -67,6 +67,7 @@ export async function initializePlatformAdmin(): Promise<void> {
     return;
   }
 
+  log(`[MASTER ADMIN] Hashing password (len=${password.length}) for ${email}`);
   const client = await pool.connect();
   try {
     const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
