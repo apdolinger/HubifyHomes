@@ -5,7 +5,16 @@ import { sendEmail, buildMergeFieldData, processMergeFields } from './email-serv
 import { generateInvoicePDF } from './invoiceUtils';
 import { generateInvoiceEmailHTML, sendGenericEmail } from './emailUtils';
 import { chargeInvoice } from './stripe';
-import type { StageHistoryEntry } from '@shared/schema';
+import type { StageHistoryEntry, OnboardingStage } from '@shared/schema';
+
+function applyMergeTags(text: string, p: { name: string; email: string; company: string | null; phone: string | null; stage: string }): string {
+  return text
+    .replace(/\{\{name\}\}/gi, p.name)
+    .replace(/\{\{company\}\}/gi, p.company ?? '')
+    .replace(/\{\{email\}\}/gi, p.email)
+    .replace(/\{\{phone\}\}/gi, p.phone ?? '')
+    .replace(/\{\{stage\}\}/gi, p.stage.replace(/_/g, ' '));
+}
 
 // Import conflict detection helper - we'll export this from routes
 export let detectConflictsForEvent: ((event: any, orgId: string, userId: string) => Promise<number>) | null = null;
@@ -352,25 +361,32 @@ export async function runStageEmailJob(): Promise<{ sent: number; skipped: numbe
 
           if (days < template.sendAfterDays) { skipped++; continue; }
 
+          // Dedupe per stage-entry: ignore auto emails sent BEFORE the prospect last entered this stage
+          const stageEnteredAt = sinceDate ? new Date(sinceDate) : new Date(0);
           const existingEmails = await storage.listOnboardingProspectEmails(prospect.id);
-          const alreadySent = existingEmails.some(e => e.stage === template.stage && e.sentBy === 'auto');
+          const alreadySent = existingEmails.some(e =>
+            e.stage === template.stage &&
+            e.sentBy === 'auto' &&
+            e.createdAt &&
+            new Date(e.createdAt) >= stageEnteredAt
+          );
           if (alreadySent) { skipped++; continue; }
 
-          try {
-            await sendGenericEmail({
-              to: prospect.email,
-              subject: template.subject,
-              htmlContent: template.body.replace(/\n/g, '<br>'),
-            });
-          } catch (emailErr) {
-            log(`[STAGE-EMAIL] SendGrid error for ${prospect.email}: ${emailErr}`);
-          }
+          const mergedSubject = applyMergeTags(template.subject, prospect);
+          const mergedBody = applyMergeTags(template.body, prospect);
+
+          // Only log and count as sent if email delivery succeeds
+          await sendGenericEmail({
+            to: prospect.email,
+            subject: mergedSubject,
+            htmlContent: mergedBody.replace(/\n/g, '<br>'),
+          });
 
           await storage.createOnboardingProspectEmail({
             prospectId: prospect.id,
-            stage: template.stage as any,
-            subject: template.subject,
-            body: template.body,
+            stage: template.stage as OnboardingStage,
+            subject: mergedSubject,
+            body: mergedBody,
             sentBy: 'auto',
           });
 

@@ -103,6 +103,16 @@ if (SENDGRID_API_KEY) {
   sgMail.setApiKey(SENDGRID_API_KEY);
 }
 
+/** Substitute {{name}}, {{company}}, {{email}}, {{phone}}, {{stage}} merge tags. */
+function applyProspectMergeTags(text: string, p: { name: string; email: string; company: string; phone: string; stage: string }): string {
+  return text
+    .replace(/\{\{name\}\}/gi, p.name)
+    .replace(/\{\{company\}\}/gi, p.company)
+    .replace(/\{\{email\}\}/gi, p.email)
+    .replace(/\{\{phone\}\}/gi, p.phone)
+    .replace(/\{\{stage\}\}/gi, p.stage);
+}
+
 // Helper function to send OOO conflict notification email
 async function sendOOOConflictNotification(
   supervisorEmail: string,
@@ -14314,23 +14324,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "stage, subject, and body are required" });
       }
 
+      // Apply merge tags before sending
+      const mergeContext = {
+        name: prospect.name,
+        email: prospect.email,
+        company: prospect.company ?? "",
+        phone: prospect.phone ?? "",
+        stage: prospect.stage.replace(/_/g, " "),
+      };
+      const mergedSubject = applyProspectMergeTags(subject, mergeContext);
+      const mergedBody = applyProspectMergeTags(body, mergeContext);
+
       const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.SUPPORT_EMAIL_FROM || "noreply@hubify.com";
 
       if (SENDGRID_API_KEY) {
         await sgMail.send({
           to: prospect.email,
           from: fromEmail,
-          subject,
-          html: body.replace(/\n/g, "<br>"),
-          text: body,
+          subject: mergedSubject,
+          html: mergedBody.replace(/\n/g, "<br>"),
+          text: mergedBody,
         });
       }
 
       const emailLog = await storage.createOnboardingProspectEmail({
         prospectId: id,
         stage,
-        subject,
-        body,
+        subject: mergedSubject,
+        body: mergedBody,
         sentBy: "manual",
       });
 
@@ -14338,6 +14359,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error sending stage email:", error);
       res.status(500).json({ message: "Failed to send stage email" });
+    }
+  });
+
+  app.post("/api/super-admin/onboarding-prospects/:id/sign-agreement", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const prospect = await storage.getOnboardingProspect(id);
+      if (!prospect) return res.status(404).json({ message: "Prospect not found" });
+      if (prospect.agreementSignedAt) {
+        return res.status(409).json({ message: "Agreement already signed" });
+      }
+      const patch: Partial<{ agreementSignedAt: Date; stage: string }> = {
+        agreementSignedAt: new Date(),
+      };
+      // Auto-advance from agreement to payment_setup
+      if (prospect.stage === "agreement") {
+        patch.stage = "payment_setup";
+      }
+      const updated = await storage.updateOnboardingProspect(id, patch as any);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error signing agreement:", error);
+      res.status(500).json({ message: "Failed to sign agreement" });
     }
   });
 

@@ -498,6 +498,22 @@ function OnboardingPipelineTab() {
     else { setSendEmailSubject(""); setSendEmailBody(""); }
   };
 
+  // ── Agreement sign-off ────────────────────────────────────────────────────
+  const signAgreementMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/sign-agreement`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      setSheetOpen(false);
+      toast({ title: "Agreement signed!", description: "Prospect advanced to Payment Setup." });
+    },
+    onError: (e: Error) => toast({
+      title: "Error",
+      description: e?.message || "Failed to sign agreement",
+      variant: "destructive",
+    }),
+  });
+
   const convertToOrgMutation = useMutation({
     mutationFn: (id: string) =>
       apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/convert-to-org`, {}),
@@ -791,26 +807,57 @@ function OnboardingPipelineTab() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="agreementContent"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-1">
-                      <PenLine className="w-3.5 h-3.5" /> Agreement
-                    </FormLabel>
-                    <FormControl>
-                      <Textarea rows={5} placeholder="Paste or type the agreement text here…" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    {editingProspect?.agreementSignedAt && (
-                      <p className="text-xs text-green-600 font-medium mt-1">
-                        ✓ Signed {new Date(editingProspect.agreementSignedAt).toLocaleDateString()}
-                      </p>
-                    )}
-                  </FormItem>
-                )}
-              />
+              {/* Agreement editor — only shown at Agreement stage and beyond */}
+              {editingProspect && ["agreement", "payment_setup", "initial_payment", "welcome"].includes(editingProspect.stage) && (
+                <FormField
+                  control={form.control}
+                  name="agreementContent"
+                  render={({ field }) => {
+                    const signed = !!editingProspect.agreementSignedAt;
+                    return (
+                      <FormItem>
+                        <div className="flex items-center justify-between">
+                          <FormLabel className="flex items-center gap-1">
+                            <PenLine className="w-3.5 h-3.5" /> Agreement
+                          </FormLabel>
+                          {signed ? (
+                            <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+                              <CheckCircle className="w-3 h-3" />
+                              Signed {new Date(editingProspect.agreementSignedAt!).toLocaleDateString()}
+                            </span>
+                          ) : (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs text-green-700 border-green-300 hover:bg-green-50"
+                              disabled={!field.value || signAgreementMutation.isPending}
+                              onClick={() => {
+                                if (!editingProspect) return;
+                                if (confirm("Mark this agreement as signed? This will lock the agreement and advance the prospect to Payment Setup.")) {
+                                  signAgreementMutation.mutate(editingProspect.id);
+                                }
+                              }}
+                            >
+                              {signAgreementMutation.isPending ? "Signing…" : "Mark as Signed"}
+                            </Button>
+                          )}
+                        </div>
+                        <FormControl>
+                          <Textarea
+                            rows={5}
+                            placeholder="Paste or type the agreement text here…"
+                            disabled={signed}
+                            className={signed ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
+                />
+              )}
               <div className="flex gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={() => setSheetOpen(false)} className="flex-1">
                   Cancel
@@ -968,9 +1015,27 @@ function OnboardingPipelineTab() {
   );
 }
 
+const PREVIEW_DUMMY = {
+  name: "Jane Smith",
+  company: "Acme Property Group",
+  email: "jane@example.com",
+  phone: "+1 555 000 0000",
+  stage: "inquiry",
+};
+
+function applyDummyMergeTags(text: string): string {
+  return text
+    .replace(/\{\{name\}\}/gi, PREVIEW_DUMMY.name)
+    .replace(/\{\{company\}\}/gi, PREVIEW_DUMMY.company)
+    .replace(/\{\{email\}\}/gi, PREVIEW_DUMMY.email)
+    .replace(/\{\{phone\}\}/gi, PREVIEW_DUMMY.phone)
+    .replace(/\{\{stage\}\}/gi, PREVIEW_DUMMY.stage);
+}
+
 function StageEmailTemplatesPanel() {
   const { toast } = useToast();
   const [expandedStage, setExpandedStage] = useState<string | null>(null);
+  const [previewingStage, setPreviewingStage] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, { subject: string; body: string; sendAfterDays: number; isActive: boolean }>>({});
 
   const { data: templates = [], isLoading } = useQuery<StageEmailTemplate[]>({
@@ -1052,46 +1117,85 @@ function StageEmailTemplatesPanel() {
 
                 {isExpanded && (
                   <div className="border-t p-3 space-y-3 bg-gray-50/50">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label className="text-xs font-medium">Subject</Label>
-                        <Input
-                          className="h-8 text-xs mt-1"
-                          value={draft.subject}
-                          onChange={e => setDraft(s.key, { subject: e.target.value })}
-                          placeholder="Email subject…"
-                        />
+                    {/* Edit / Preview toggle */}
+                    <div className="flex gap-1 text-xs">
+                      <button
+                        type="button"
+                        className={`px-2 py-1 rounded font-medium transition-colors ${previewingStage !== s.key ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                        onClick={() => setPreviewingStage(null)}
+                      >Edit</button>
+                      <button
+                        type="button"
+                        className={`px-2 py-1 rounded font-medium transition-colors ${previewingStage === s.key ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                        onClick={() => setPreviewingStage(s.key)}
+                      >Preview</button>
+                    </div>
+
+                    {previewingStage === s.key ? (
+                      /* ── Preview pane ── */
+                      <div className="border rounded bg-white p-3 text-xs space-y-2">
+                        <p className="text-gray-500 text-[10px] italic">Dummy data: {PREVIEW_DUMMY.name} / {PREVIEW_DUMMY.company}</p>
+                        <div>
+                          <p className="font-semibold text-gray-500 text-[10px] uppercase tracking-wide mb-0.5">Subject</p>
+                          <p className="font-medium">{applyDummyMergeTags(draft.subject) || <span className="text-gray-300">—</span>}</p>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-gray-500 text-[10px] uppercase tracking-wide mb-0.5">Body</p>
+                          <div
+                            className="prose prose-xs max-w-none text-gray-700 whitespace-pre-wrap leading-relaxed"
+                            style={{ fontSize: "0.75rem" }}
+                          >
+                            {applyDummyMergeTags(draft.body) || <span className="text-gray-300">—</span>}
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <Label className="text-xs font-medium">Auto-send after (days, 0 = off)</Label>
-                        <Input
-                          type="number"
-                          min={0}
-                          max={365}
-                          className="h-8 text-xs mt-1"
-                          value={draft.sendAfterDays}
-                          onChange={e => setDraft(s.key, { sendAfterDays: Math.max(0, Number(e.target.value)) })}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label className="text-xs font-medium">Body</Label>
-                      <Textarea
-                        rows={4}
-                        className="text-xs mt-1"
-                        value={draft.body}
-                        onChange={e => setDraft(s.key, { body: e.target.value })}
-                        placeholder="Email body…"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={draft.isActive}
-                        onCheckedChange={v => setDraft(s.key, { isActive: v })}
-                        id={`active-${s.key}`}
-                      />
-                      <Label htmlFor={`active-${s.key}`} className="text-xs cursor-pointer">Active</Label>
-                    </div>
+                    ) : (
+                      /* ── Edit pane ── */
+                      <>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label className="text-xs font-medium">Subject</Label>
+                            <Input
+                              className="h-8 text-xs mt-1"
+                              value={draft.subject}
+                              onChange={e => setDraft(s.key, { subject: e.target.value })}
+                              placeholder="Email subject… ({{name}}, {{company}})"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-medium">Auto-send after (days, 0 = off)</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={365}
+                              className="h-8 text-xs mt-1"
+                              value={draft.sendAfterDays}
+                              onChange={e => setDraft(s.key, { sendAfterDays: Math.max(0, Number(e.target.value)) })}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs font-medium">Body</Label>
+                          <p className="text-[10px] text-gray-400 mb-1">Available: {'{{name}} {{company}} {{email}} {{phone}} {{stage}}'}</p>
+                          <Textarea
+                            rows={4}
+                            className="text-xs"
+                            value={draft.body}
+                            onChange={e => setDraft(s.key, { body: e.target.value })}
+                            placeholder="Email body…"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={draft.isActive}
+                            onCheckedChange={v => setDraft(s.key, { isActive: v })}
+                            id={`active-${s.key}`}
+                          />
+                          <Label htmlFor={`active-${s.key}`} className="text-xs cursor-pointer">Active</Label>
+                        </div>
+                      </>
+                    )}
+
                     <div className="flex gap-2">
                       {existing && (
                         <Button
@@ -1103,6 +1207,7 @@ function StageEmailTemplatesPanel() {
                             if (confirm(`Remove template for ${s.label}?`)) {
                               deleteMutation.mutate(s.key);
                               setExpandedStage(null);
+                              setPreviewingStage(null);
                             }
                           }}
                         >
