@@ -1525,8 +1525,8 @@ export const formFields = pgTable("form_fields", {
 export const propertyForms = pgTable("property_forms", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").references(() => orgs.id).notNull(),
-  propertyId: uuid("property_id").references(() => properties.id).notNull(),
-  formId: uuid("form_id").references(() => forms.id).notNull(),
+  propertyId: integer("property_id").references(() => properties.id).notNull(),
+  formId: integer("form_id").references(() => forms.id).notNull(),
   sortOrder: integer("sort_order").default(0),
   isRequired: boolean("is_required").default(false),
   createdAt: timestamp("created_at").defaultNow(),
@@ -1548,7 +1548,7 @@ export const formSubmissions = pgTable("form_submissions", {
 export const propertyPortalSettings = pgTable("property_portal_settings", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").references(() => orgs.id).notNull(),
-  propertyId: uuid("property_id").references(() => properties.id).notNull(),
+  propertyId: integer("property_id").references(() => properties.id).notNull(),
   version: integer("version").notNull().default(1),
   status: varchar("status").notNull().default("draft"), // draft, published, archived
   branding: jsonb("branding").$type<{
