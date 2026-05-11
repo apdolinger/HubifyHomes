@@ -2,6 +2,33 @@ import { pool } from "./db";
 import { log } from "./vite";
 
 /**
+ * Ensure the connect-pg-simple session table exists.
+ * We create it ourselves (with IF NOT EXISTS on BOTH table AND index) so that
+ * connect-pg-simple's createTableIfMissing option can be left off — that
+ * option omits IF NOT EXISTS on the index, causing a hard crash when the
+ * index already exists in the database.
+ */
+export async function ensureSessionTable(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "session" (
+        "sid"    varchar        NOT NULL COLLATE "default",
+        "sess"   json           NOT NULL,
+        "expire" timestamp(6)   NOT NULL,
+        CONSTRAINT "session_pkey" PRIMARY KEY ("sid") NOT DEFERRABLE INITIALLY IMMEDIATE
+      );
+      CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
+    `);
+    log("[SESSION] Session table verified.");
+  } catch (err: unknown) {
+    log(`[SESSION] Failed to ensure session table: ${err instanceof Error ? err.message : String(err)}`);
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Ensure the outbound-webhook tables (webhook_endpoints, webhook_deliveries)
  * exist. These are referenced by the webhook dispatcher on every task
  * mutation; if they're missing, every PATCH /api/tasks/:id logs a noisy

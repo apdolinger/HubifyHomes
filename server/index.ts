@@ -130,14 +130,28 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Ensure the session table exists before the session middleware initialises
+  // the connect-pg-simple store. We use our own idempotent DDL (with
+  // IF NOT EXISTS on both table and index) rather than connect-pg-simple's
+  // createTableIfMissing, which crashes when the index already exists.
+  try {
+    const { ensureSessionTable } = await import('./runMigrations.js');
+    await ensureSessionTable();
+  } catch (err) {
+    console.error('Error ensuring session table:', err);
+  }
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
+    // Guard against double-send (e.g. async session-save errors arriving
+    // after the route handler already flushed a response).
+    if (!res.headersSent) {
+      res.status(status).json({ message });
+    }
   });
 
   // importantly only setup vite in development and after

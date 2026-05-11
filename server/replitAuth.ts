@@ -46,13 +46,17 @@ export function getSession() {
     },
   };
 
-  // Use PostgreSQL session store in production for persistence across restarts
-  if (process.env.NODE_ENV === "production" && process.env.DATABASE_URL) {
+  // Use PostgreSQL session store when DATABASE_URL is available (dev or prod)
+  // so sessions survive server restarts. We pre-create the table ourselves
+  // (with IF NOT EXISTS on both table and index) rather than using
+  // createTableIfMissing, which omits IF NOT EXISTS on the index and throws
+  // when the index already exists in the database.
+  if (process.env.DATABASE_URL) {
     const PgSession = connectPg(session);
     sessionConfig.store = new PgSession({
       conString: process.env.DATABASE_URL,
       tableName: "session",
-      createTableIfMissing: true,
+      createTableIfMissing: false, // we create it ourselves below
       ttl: sessionTtl / 1000,
     });
     log("[SESSION] Using PostgreSQL session store.");

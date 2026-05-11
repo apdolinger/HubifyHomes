@@ -1044,8 +1044,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const lookupEmail = email.trim().toLowerCase();
         const admin = await getPlatformAdmin(lookupEmail);
 
-        console.log(`[SA-LOGIN-DEBUG] lookup="${lookupEmail}" adminFound=${!!admin} hashLen=${admin?.passwordHash?.length ?? 0} passwordLen=${password?.length ?? 0}`);
-
         let credentialsValid = admin
           ? await verifyPlatformAdminPassword(admin, password)
           : false;
@@ -1056,12 +1054,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const envEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
           const envPassword = process.env.ADMIN_PASSWORD?.trim();
           if (envEmail && envPassword && lookupEmail === envEmail && password === envPassword) {
-            console.log(`[SA-LOGIN-DEBUG] Accepted via direct env-var fallback`);
             credentialsValid = true;
           }
         }
-
-        console.log(`[SA-LOGIN-DEBUG] credentialsValid=${credentialsValid}`);
 
         if (!credentialsValid) {
           await AuditLogger.log({
@@ -1082,6 +1077,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           username: email,
           loginTime: new Date().toISOString(),
         };
+
+        // Explicitly persist the session before responding so the browser
+        // always receives a Set-Cookie header even if the async save fires
+        // after the response would otherwise have been flushed.
+        await new Promise<void>((resolve, reject) =>
+          req.session.save((err) => (err ? reject(err) : resolve()))
+        );
 
         await AuditLogger.log({
           req,
