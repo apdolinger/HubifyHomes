@@ -315,6 +315,17 @@ function OnboardingPipelineTab() {
     queryKey: ["/api/super-admin/onboarding-prospects"],
   });
 
+  const { data: platformSettings } = useQuery<Record<string, any>>({
+    queryKey: ["/api/super-admin/platform-settings"],
+  });
+
+  useEffect(() => {
+    const threshold = platformSettings?.stuckProspectThresholdDays;
+    if (typeof threshold === "number" && threshold > 0) {
+      setStuckDays(threshold);
+    }
+  }, [platformSettings]);
+
   const active = allProspects.filter(p => p.stage !== "dropped");
   const dropped = allProspects.filter(p => p.stage === "dropped");
 
