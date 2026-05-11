@@ -361,12 +361,13 @@ export async function runStageEmailJob(): Promise<{ sent: number; skipped: numbe
 
           if (days < template.sendAfterDays) { skipped++; continue; }
 
-          // Dedupe per stage-entry: ignore auto emails sent BEFORE the prospect last entered this stage
+          // Dedupe per stage-entry: skip if ANY email (auto or manual) was already
+          // sent for this stage since the prospect last entered it — manual sends
+          // count as "covered" and should not trigger a duplicate auto follow-up.
           const stageEnteredAt = sinceDate ? new Date(sinceDate) : new Date(0);
           const existingEmails = await storage.listOnboardingProspectEmails(prospect.id);
           const alreadySent = existingEmails.some(e =>
             e.stage === template.stage &&
-            e.sentBy === 'auto' &&
             e.createdAt &&
             new Date(e.createdAt) >= stageEnteredAt
           );

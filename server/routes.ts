@@ -14321,10 +14321,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const prospect = await storage.getOnboardingProspect(id);
       if (!prospect) return res.status(404).json({ message: "Prospect not found" });
 
-      const { stage, subject, body } = req.body;
-      if (!stage || !subject || !body) {
-        return res.status(400).json({ message: "stage, subject, and body are required" });
+      const ONBOARDING_STAGES = [
+        "inquiry", "qualified", "proposal", "agreement",
+        "payment_setup", "initial_payment", "welcome",
+      ] as const;
+      const sendStageEmailSchema = z.object({
+        stage: z.enum(ONBOARDING_STAGES),
+        subject: z.string().min(1),
+        body: z.string().min(1),
+      });
+      const parsed = sendStageEmailSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid payload", errors: parsed.error.flatten() });
       }
+      const { stage, subject, body } = parsed.data;
 
       // Apply merge tags before sending
       const mergeContext = {
