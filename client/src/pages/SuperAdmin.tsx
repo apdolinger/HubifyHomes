@@ -1037,8 +1037,10 @@ function OnboardingPipelineTab() {
 function BetaPricingCard() {
   const { toast } = useToast();
 
-  const { data: platformSettings } = useQuery<Record<string, any>>({
-    queryKey: ["/api/super-admin/platform-settings"],
+  type BetaPricing = { basePrice: number; discountPct: number; clientCap: number };
+
+  const { data: saved } = useQuery<BetaPricing>({
+    queryKey: ["/api/super-admin/beta-pricing"],
   });
 
   const { data: allProspects = [] } = useQuery<Prospect[]>({
@@ -1046,9 +1048,6 @@ function BetaPricingCard() {
   });
 
   const welcomeCount = allProspects.filter(p => p.stage === "welcome").length;
-
-  type SavedBetaPricing = { basePrice: number; discountPct: number; clientCap: number };
-  const saved = platformSettings?.betaPricing as SavedBetaPricing | undefined;
 
   const [basePrice, setBasePrice] = useState(199);
   const [discountPct, setDiscountPct] = useState(20);
@@ -1069,11 +1068,9 @@ function BetaPricingCard() {
 
   const saveMutation = useMutation({
     mutationFn: () =>
-      apiRequest("PATCH", "/api/super-admin/platform-settings", {
-        betaPricing: { basePrice, discountPct, clientCap },
-      }),
+      apiRequest("PATCH", "/api/super-admin/beta-pricing", { basePrice, discountPct, clientCap }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/platform-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/beta-pricing"] });
       toast({ title: "Beta pricing saved" });
     },
     onError: (e: any) => toast({ title: "Failed to save", description: e.message, variant: "destructive" }),

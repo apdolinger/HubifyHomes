@@ -3606,6 +3606,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Beta Pricing (Super Admin) ───────────────────────────────────────────
+  app.get("/api/super-admin/beta-pricing", isSuperAdmin, requireMFA, async (_req, res) => {
+    try {
+      const settings = await storage.getPlatformSettings();
+      const bp = settings.betaPricing as { basePrice: number; discountPct: number; clientCap: number } | undefined;
+      res.json({
+        basePrice: Number(bp?.basePrice ?? 199),
+        discountPct: Number(bp?.discountPct ?? 20),
+        clientCap: Number(bp?.clientCap ?? 50),
+      });
+    } catch (error) {
+      console.error("Error fetching beta pricing:", error);
+      res.status(500).json({ message: "Failed to fetch beta pricing" });
+    }
+  });
+
+  app.patch("/api/super-admin/beta-pricing", isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const schema = z.object({
+        basePrice: z.number().min(0),
+        discountPct: z.number().min(0).max(100),
+        clientCap: z.number().int().min(1),
+      });
+      const result = schema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ message: "Invalid beta pricing data", errors: result.error.errors });
+      }
+      const userId = req.user?.claims?.sub || null;
+      await storage.setPlatformSettings({ betaPricing: result.data }, userId);
+
+      await AuditLogger.log({
+        req,
+        action: "update_beta_pricing",
+        actionType: "update",
+        resource: "platform_settings",
+        severity: "info",
+        success: true,
+        metadata: result.data,
+      });
+
+      res.json(result.data);
+    } catch (error) {
+      console.error("Error updating beta pricing:", error);
+      res.status(500).json({ message: "Failed to update beta pricing" });
+    }
+  });
+
   // Platform alerts CRUD (Super Admin)
   app.get("/api/super-admin/platform-alerts", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
     try {
