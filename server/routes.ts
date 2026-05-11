@@ -14378,8 +14378,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (prospect.agreementSignedAt) {
         return res.status(409).json({ message: "Agreement already signed" });
       }
+      const { agreementContent } = req.body;
       const patch: Partial<InsertOnboardingProspect> = {
         agreementSignedAt: new Date(),
+        // Persist any unsaved agreement text sent alongside the sign action
+        ...(typeof agreementContent === "string" && agreementContent.trim()
+          ? { agreementContent: agreementContent.trim() }
+          : {}),
       };
       // Auto-advance from agreement to payment_setup
       if (prospect.stage === "agreement") {

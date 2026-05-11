@@ -469,9 +469,12 @@ function OnboardingPipelineTab() {
   const [sendEmailSubject, setSendEmailSubject] = useState("");
   const [sendEmailBody, setSendEmailBody] = useState("");
 
+  const prospectEmailsKey = editingProspect?.id
+    ? `/api/super-admin/onboarding-prospects/${editingProspect.id}/emails`
+    : null;
   const { data: prospectEmails = [] } = useQuery<ProspectEmail[]>({
-    queryKey: ["/api/super-admin/onboarding-prospects", editingProspect?.id, "emails"],
-    enabled: !!editingProspect,
+    queryKey: [prospectEmailsKey],
+    enabled: !!prospectEmailsKey,
   });
 
   const { data: stageEmailTemplates = [] } = useQuery<StageEmailTemplate[]>({
@@ -483,8 +486,8 @@ function OnboardingPipelineTab() {
     mutationFn: ({ id, stage, subject, body }: { id: string; stage: string; subject: string; body: string }) =>
       apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/send-stage-email`, { stage, subject, body }),
     onSuccess: () => {
-      if (editingProspect) {
-        queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects", editingProspect.id, "emails"] });
+      if (editingProspect?.id) {
+        queryClient.invalidateQueries({ queryKey: [`/api/super-admin/onboarding-prospects/${editingProspect.id}/emails`] });
       }
       setSendEmailOpen(false);
       toast({ title: "Email sent!" });
@@ -500,8 +503,8 @@ function OnboardingPipelineTab() {
 
   // ── Agreement sign-off ────────────────────────────────────────────────────
   const signAgreementMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/sign-agreement`, {}),
+    mutationFn: ({ id, agreementContent }: { id: string; agreementContent?: string }) =>
+      apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/sign-agreement`, { agreementContent }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
       setSheetOpen(false);
@@ -834,8 +837,8 @@ function OnboardingPipelineTab() {
                               disabled={!field.value || signAgreementMutation.isPending}
                               onClick={() => {
                                 if (!editingProspect) return;
-                                if (confirm("Mark this agreement as signed? This will lock the agreement and advance the prospect to Payment Setup.")) {
-                                  signAgreementMutation.mutate(editingProspect.id);
+                                if (confirm("Mark this agreement as signed? Any unsaved text will be saved automatically. The agreement will then be locked and the prospect advanced to Payment Setup.")) {
+                                  signAgreementMutation.mutate({ id: editingProspect.id, agreementContent: field.value ?? undefined });
                                 }
                               }}
                             >
