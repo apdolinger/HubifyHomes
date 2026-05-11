@@ -1041,11 +1041,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const { getPlatformAdmin, verifyPlatformAdminPassword } = await import('./masterAdmin.js');
-        const admin = await getPlatformAdmin(email.trim().toLowerCase());
+        const lookupEmail = email.trim().toLowerCase();
+        const admin = await getPlatformAdmin(lookupEmail);
+
+        console.log(`[SA-LOGIN-DEBUG] lookup="${lookupEmail}" adminFound=${!!admin} passwordLen=${password?.length ?? 0}`);
 
         const credentialsValid = admin
           ? await verifyPlatformAdminPassword(admin, password)
           : false;
+
+        console.log(`[SA-LOGIN-DEBUG] credentialsValid=${credentialsValid}`);
 
         if (!credentialsValid) {
           await AuditLogger.log({
