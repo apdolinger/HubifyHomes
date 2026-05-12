@@ -2388,6 +2388,203 @@ function ProspectAlertSettingsCard({
   );
 }
 
+// ── Pricing Tiers Card ───────────────────────────────────────────────────────
+
+interface PricingTier {
+  name: string;
+  homesMin: number;
+  homesMax: number;
+  monthlyPrice: number;
+  setupFee: number;
+  startsAt: boolean;
+}
+
+const DEFAULT_TIERS: PricingTier[] = [
+  { name: "Starter Portfolio",      homesMin: 1,   homesMax: 10,  monthlyPrice: 65,  setupFee: 149, startsAt: false },
+  { name: "Growth Portfolio",       homesMin: 11,  homesMax: 25,  monthlyPrice: 145, setupFee: 249, startsAt: false },
+  { name: "Professional Portfolio", homesMin: 26,  homesMax: 50,  monthlyPrice: 295, setupFee: 399, startsAt: false },
+  { name: "Operator Portfolio",     homesMin: 51,  homesMax: 100, monthlyPrice: 495, setupFee: 599, startsAt: false },
+  { name: "Enterprise Portfolio",   homesMin: 101, homesMax: 250, monthlyPrice: 795, setupFee: 999, startsAt: true  },
+];
+
+function PricingTiersCard() {
+  const { toast } = useToast();
+
+  const { data: serverTiers, isLoading } = useQuery<PricingTier[]>({
+    queryKey: ["/api/super-admin/pricing-tiers"],
+  });
+
+  const [tiers, setTiers] = useState<PricingTier[]>(DEFAULT_TIERS);
+
+  useEffect(() => {
+    if (serverTiers && serverTiers.length > 0) {
+      setTiers(serverTiers);
+    }
+  }, [serverTiers]);
+
+  const setTierField = (idx: number, field: keyof PricingTier, value: string | number | boolean) => {
+    setTiers(prev => prev.map((t, i) => i === idx ? { ...t, [field]: value } : t));
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: () => apiRequest("PATCH", "/api/super-admin/pricing-tiers", tiers),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/pricing-tiers"] });
+      toast({ title: "Pricing tiers saved" });
+    },
+    onError: (e: any) => toast({ title: "Failed to save", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <CreditCard className="w-5 h-5" />
+          Pricing Tiers
+        </CardTitle>
+        <p className="text-sm text-slate-500">
+          Edit each tier's name, home volume range, monthly subscription price, and one-time setup fee.
+        </p>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-slate-400 py-4">
+            <RefreshCw className="w-4 h-4 animate-spin" /> Loading…
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {/* Header row */}
+            <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_80px] gap-3 text-xs font-semibold text-slate-500 uppercase tracking-wide px-1">
+              <span>Tier Name</span>
+              <span>Homes Min</span>
+              <span>Homes Max</span>
+              <span>$/mo</span>
+              <span>Setup Fee</span>
+              <span>Starts At</span>
+            </div>
+
+            {tiers.map((tier, idx) => (
+              <div
+                key={idx}
+                className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr_1fr_80px] gap-3 items-center p-3 border rounded-lg bg-slate-50/50"
+              >
+                {/* Name */}
+                <div>
+                  <Label className="md:hidden text-xs text-slate-500 mb-1 block">Tier Name</Label>
+                  <Input
+                    value={tier.name}
+                    onChange={e => setTierField(idx, "name", e.target.value)}
+                    className="h-9 text-sm font-medium"
+                    placeholder="Tier name"
+                  />
+                </div>
+
+                {/* Homes Min */}
+                <div>
+                  <Label className="md:hidden text-xs text-slate-500 mb-1 block">Homes Min</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={tier.homesMin}
+                    onChange={e => setTierField(idx, "homesMin", Math.max(0, parseInt(e.target.value) || 0))}
+                    className="h-9 text-sm"
+                  />
+                </div>
+
+                {/* Homes Max */}
+                <div>
+                  <Label className="md:hidden text-xs text-slate-500 mb-1 block">Homes Max</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={tier.homesMax}
+                    onChange={e => setTierField(idx, "homesMax", Math.max(1, parseInt(e.target.value) || 1))}
+                    className="h-9 text-sm"
+                  />
+                </div>
+
+                {/* Monthly Price */}
+                <div>
+                  <Label className="md:hidden text-xs text-slate-500 mb-1 block">$/mo</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={tier.monthlyPrice}
+                      onChange={e => setTierField(idx, "monthlyPrice", Math.max(0, parseFloat(e.target.value) || 0))}
+                      className="h-9 text-sm pl-6"
+                    />
+                  </div>
+                </div>
+
+                {/* Setup Fee */}
+                <div>
+                  <Label className="md:hidden text-xs text-slate-500 mb-1 block">Setup Fee</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={tier.setupFee}
+                      onChange={e => setTierField(idx, "setupFee", Math.max(0, parseFloat(e.target.value) || 0))}
+                      className="h-9 text-sm pl-6"
+                    />
+                  </div>
+                </div>
+
+                {/* Starts At toggle */}
+                <div className="flex flex-col items-start md:items-center gap-1">
+                  <Label className="md:hidden text-xs text-slate-500">Starts At</Label>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={tier.startsAt}
+                      onCheckedChange={v => setTierField(idx, "startsAt", v)}
+                    />
+                    <span className="text-xs text-slate-500 md:hidden">
+                      {tier.startsAt ? "Yes" : "No"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Summary preview */}
+            <div className="rounded-lg border border-slate-200 bg-white p-3 mt-2">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Preview</p>
+              <div className="space-y-1">
+                {tiers.map((t, i) => (
+                  <div key={i} className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-slate-700">{t.name}</span>
+                    <span className="text-slate-500">
+                      {t.homesMin}–{t.homesMax} homes ·{" "}
+                      <span className="font-semibold text-slate-800">
+                        {t.startsAt ? "Starts at " : ""}${t.monthlyPrice}/mo
+                      </span>
+                      {" · "}
+                      <span className="text-slate-500">${t.setupFee} setup</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+                {saveMutation.isPending
+                  ? <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Saving…</>
+                  : <><CreditCard className="w-4 h-4 mr-2" /> Save Pricing Tiers</>}
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // Settings Tab — backed by /api/super-admin/platform-settings
 // ============================================================================
 function SettingsTabContent() {
@@ -2583,34 +2780,18 @@ function SettingsTabContent() {
         </CardContent>
       </Card>
 
+      <PricingTiersCard />
+
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center"><CreditCard className="w-5 h-5 mr-2" />Billing & Subscription Settings</CardTitle>
+          <CardTitle className="flex items-center"><CreditCard className="w-5 h-5 mr-2" />Billing Settings</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <Label>Starter ($/mo)</Label>
-              <Input type="number" value={draft.starterPlanPrice ?? ''} onChange={(e) => set('starterPlanPrice', parseFloat(e.target.value) || 0)} data-testid="input-price-starter" />
-            </div>
-            <div>
-              <Label>Pro ($/mo)</Label>
-              <Input type="number" value={draft.proPlanPrice ?? ''} onChange={(e) => set('proPlanPrice', parseFloat(e.target.value) || 0)} data-testid="input-price-pro" />
-            </div>
-            <div>
-              <Label>Grow ($/mo)</Label>
-              <Input type="number" value={draft.growPlanPrice ?? ''} onChange={(e) => set('growPlanPrice', parseFloat(e.target.value) || 0)} data-testid="input-price-grow" />
-            </div>
-            <div>
-              <Label>Enterprise ($/mo)</Label>
-              <Input type="number" value={draft.enterprisePlanPrice ?? ''} onChange={(e) => set('enterprisePlanPrice', parseFloat(e.target.value) || 0)} data-testid="input-price-enterprise" />
-            </div>
-          </div>
           <div>
             <Label htmlFor="grace-period">Payment Grace Period (days)</Label>
             <Input id="grace-period" type="number" value={draft.paymentGracePeriodDays ?? ''} onChange={(e) => set('paymentGracePeriodDays', parseInt(e.target.value) || 0)} data-testid="input-grace-period" />
           </div>
-          <Button onClick={() => saveSection.mutate(['starterPlanPrice', 'proPlanPrice', 'growPlanPrice', 'enterprisePlanPrice', 'paymentGracePeriodDays'])} disabled={saveSection.isPending} data-testid="button-save-billing-settings">
+          <Button onClick={() => saveSection.mutate(['paymentGracePeriodDays'])} disabled={saveSection.isPending} data-testid="button-save-billing-settings">
             <CreditCard className="w-4 h-4 mr-2" />
             Save Billing Settings
           </Button>

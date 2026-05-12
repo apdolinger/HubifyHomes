@@ -3606,6 +3606,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Pricing Tiers (Super Admin) ──────────────────────────────────────────
+  app.get("/api/super-admin/pricing-tiers", isSuperAdmin, requireMFA, async (_req, res) => {
+    try {
+      const settings = await storage.getPlatformSettings();
+      res.json(settings.pricingTiers ?? []);
+    } catch (error) {
+      console.error("Error fetching pricing tiers:", error);
+      res.status(500).json({ message: "Failed to fetch pricing tiers" });
+    }
+  });
+
+  app.patch("/api/super-admin/pricing-tiers", isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const tierSchema = z.object({
+        name:         z.string().min(1),
+        homesMin:     z.number().int().min(0),
+        homesMax:     z.number().int().min(1),
+        monthlyPrice: z.number().min(0),
+        setupFee:     z.number().min(0),
+        startsAt:     z.boolean(),
+      });
+      const result = z.array(tierSchema).safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ message: "Invalid pricing tiers data", errors: result.error.errors });
+      }
+      const userId = req.user?.claims?.sub || null;
+      await storage.setPlatformSettings({ pricingTiers: result.data }, userId);
+
+      await AuditLogger.log({
+        req,
+        action: "update_pricing_tiers",
+        actionType: "update",
+        resource: "platform_settings",
+        severity: "info",
+        success: true,
+        metadata: { tierCount: result.data.length },
+      });
+
+      res.json(result.data);
+    } catch (error) {
+      console.error("Error updating pricing tiers:", error);
+      res.status(500).json({ message: "Failed to update pricing tiers" });
+    }
+  });
+
   // ── Beta Pricing (Super Admin) ───────────────────────────────────────────
   app.get("/api/super-admin/beta-pricing", isSuperAdmin, requireMFA, async (_req, res) => {
     try {

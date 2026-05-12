@@ -305,6 +305,15 @@ export const PLATFORM_SETTINGS_DEFAULTS: Record<string, any> = {
   enterprisePlanPrice: 399,
   paymentGracePeriodDays: 3,
 
+  // Pricing tiers (new portfolio-based structure)
+  pricingTiers: [
+    { name: "Starter Portfolio",      homesMin: 1,   homesMax: 10,  monthlyPrice: 65,  setupFee: 149,  startsAt: false },
+    { name: "Growth Portfolio",       homesMin: 11,  homesMax: 25,  monthlyPrice: 145, setupFee: 249,  startsAt: false },
+    { name: "Professional Portfolio", homesMin: 26,  homesMax: 50,  monthlyPrice: 295, setupFee: 399,  startsAt: false },
+    { name: "Operator Portfolio",     homesMin: 51,  homesMax: 100, monthlyPrice: 495, setupFee: 599,  startsAt: false },
+    { name: "Enterprise Portfolio",   homesMin: 101, homesMax: 250, monthlyPrice: 795, setupFee: 999,  startsAt: true  },
+  ],
+
   // System Maintenance
   maintenanceMode: false,
   maintenanceMessage: "We're performing scheduled maintenance. We'll be back shortly!",
