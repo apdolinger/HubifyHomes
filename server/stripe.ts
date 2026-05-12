@@ -524,17 +524,16 @@ async function sendPaymentFailureNotification(invoiceId: string, errorMessage: s
       return;
     }
 
-    // Import SendGrid
-    const sgMail = (await import("@sendgrid/mail")).default;
-    const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-    const supportEmailFrom = process.env.SUPPORT_EMAIL_FROM || "noreply@hubify.app";
+    const { Resend: ResendClass } = await import("resend");
+    const RESEND_API_KEY = process.env.RESEND_API_KEY;
+    const supportEmailFrom = process.env.RESEND_FROM_EMAIL || process.env.SUPPORT_EMAIL_FROM || "noreply@hubify.app";
 
-    if (!SENDGRID_API_KEY) {
-      console.warn("SENDGRID_API_KEY not configured, skipping email notification");
+    if (!RESEND_API_KEY) {
+      console.warn("RESEND_API_KEY not configured, skipping email notification");
       return;
     }
 
-    sgMail.setApiKey(SENDGRID_API_KEY);
+    const resendClient = new ResendClass(RESEND_API_KEY);
 
     // Format amount
     const amountFormatted = `$${(invoice.amountCents / 100).toFixed(2)}`;
@@ -607,14 +606,13 @@ async function sendPaymentFailureNotification(invoiceId: string, errorMessage: s
 </html>
     `;
 
-    const msg = {
+    const { error: payFailError } = await resendClient.emails.send({
       to: client.email,
       from: supportEmailFrom,
       subject: `Payment Failed - Invoice ${invoice.invoiceNumber || invoiceId}`,
       html: htmlContent,
-    };
-
-    await sgMail.send(msg);
+    });
+    if (payFailError) throw new Error(payFailError.message);
     console.log(`Payment failure notification sent to ${client.email} for invoice ${invoiceId}`);
   } catch (error) {
     console.error(`Error sending payment failure notification for invoice ${invoiceId}:`, error);
@@ -652,17 +650,16 @@ async function sendPaymentSuccessNotification(invoiceId: string, amountCents: nu
       return;
     }
 
-    // Import SendGrid
-    const sgMail = (await import("@sendgrid/mail")).default;
-    const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-    const supportEmailFrom = process.env.SUPPORT_EMAIL_FROM || "noreply@hubify.app";
+    const { Resend: ResendClass } = await import("resend");
+    const RESEND_API_KEY = process.env.RESEND_API_KEY;
+    const supportEmailFrom = process.env.RESEND_FROM_EMAIL || process.env.SUPPORT_EMAIL_FROM || "noreply@hubify.app";
 
-    if (!SENDGRID_API_KEY) {
-      console.warn("SENDGRID_API_KEY not configured, skipping email notification");
+    if (!RESEND_API_KEY) {
+      console.warn("RESEND_API_KEY not configured, skipping email notification");
       return;
     }
 
-    sgMail.setApiKey(SENDGRID_API_KEY);
+    const resendClient = new ResendClass(RESEND_API_KEY);
 
     // Format amount
     const amountFormatted = `$${(amountCents / 100).toFixed(2)}`;
@@ -735,14 +732,13 @@ async function sendPaymentSuccessNotification(invoiceId: string, amountCents: nu
 </html>
     `;
 
-    const msg = {
+    const { error: paySuccessError } = await resendClient.emails.send({
       to: client.email,
       from: supportEmailFrom,
       subject: `Payment Received - Invoice ${invoice.invoiceNumber || invoiceId}`,
       html: htmlContent,
-    };
-
-    await sgMail.send(msg);
+    });
+    if (paySuccessError) throw new Error(paySuccessError.message);
     console.log(`Payment success notification sent to ${client.email} for invoice ${invoiceId}`);
   } catch (error) {
     console.error(`Error sending payment success notification for invoice ${invoiceId}:`, error);

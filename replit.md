@@ -65,6 +65,7 @@ A scripted, idempotent demo organization for closed-beta testing and screencasts
 ## External Dependencies
 
 ### Core
+- **resend**: Transactional email delivery (replaces SendGrid)
 - **@neondatabase/serverless**: PostgreSQL serverless connection
 - **drizzle-orm**: Type-safe database operations
 - **better-sqlite3**: Local development database

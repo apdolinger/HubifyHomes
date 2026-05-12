@@ -1,12 +1,9 @@
-import sgMail, { MailDataRequired } from "@sendgrid/mail";
-import type { AttachmentData } from "@sendgrid/helpers/classes/attachment";
+import { Resend } from "resend";
 import ICAL from "ical.js";
 import { getHubifyHomesLogoUrl } from "./brandAsset";
 
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-if (SENDGRID_API_KEY) {
-  sgMail.setApiKey(SENDGRID_API_KEY);
-}
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 interface OrgBranding {
   logo?: string;
@@ -291,48 +288,34 @@ export function generateICalendarFile(data: EventInvitationData, attendeeEmail: 
     organizationName,
   } = data;
 
-  // Create iCalendar component
   const cal = new ICAL.Component(['vcalendar', [], []]);
   cal.updatePropertyWithValue('prodid', '-//Hubify//Event Invitation//EN');
   cal.updatePropertyWithValue('version', '2.0');
   cal.updatePropertyWithValue('method', 'REQUEST');
 
-  // Create event component
   const vevent = new ICAL.Component('vevent');
   const event = new ICAL.Event(vevent);
 
-  // Set basic properties
   event.summary = eventTitle;
   event.description = eventDescription || '';
   event.location = eventLocation || '';
   
-  // Set times (convert to UTC)
   event.startDate = ICAL.Time.fromJSDate(eventStart, true);
   event.endDate = ICAL.Time.fromJSDate(eventEnd, true);
   
-  // Set DTSTAMP (required by RFC 5545)
   vevent.updatePropertyWithValue('dtstamp', ICAL.Time.fromJSDate(new Date(), true));
-  
-  // Set sequence for versioning
   vevent.updatePropertyWithValue('sequence', '0');
   
-  // Set organizer with proper parameters
   const organizer = vevent.addPropertyWithValue('organizer', 'mailto:noreply@hubify.com');
   organizer.setParameter('cn', organizationName);
   
-  // Set attendee with proper parameters
   const attendee = vevent.addPropertyWithValue('attendee', `mailto:${attendeeEmail}`);
   attendee.setParameter('role', 'REQ-PARTICIPANT');
   attendee.setParameter('partstat', 'NEEDS-ACTION');
   attendee.setParameter('rsvp', 'TRUE');
   
-  // Generate unique ID
   event.uid = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}@hubify.com`;
-  
-  // Set status
   vevent.updatePropertyWithValue('status', 'CONFIRMED');
-  
-  // Add event to calendar
   cal.addSubcomponent(vevent);
 
   return cal.toString();
@@ -344,8 +327,8 @@ export async function sendEventInvitationEmail(
   eventData: EventInvitationData,
   organizerName?: string
 ): Promise<void> {
-  if (!SENDGRID_API_KEY) {
-    console.warn("SendGrid API key not configured. Skipping event invitation email.");
+  if (!resend) {
+    console.warn("RESEND_API_KEY not configured. Skipping event invitation email.");
     return;
   }
 
@@ -357,11 +340,9 @@ export async function sendEventInvitationEmail(
     let htmlContent: string;
     let subject: string;
     
-    // Try to load the template from database
     const template = await storage.getPlatformTemplateByType('email_invitation');
     
     if (template) {
-      // Use stored template with variable replacement
       const variables = createEventInvitationVariables({
         organizationName: eventData.organizationName,
         organizationLogoUrl: eventData.organizationBranding?.logo || getHubifyHomesLogoUrl(),
@@ -381,33 +362,30 @@ export async function sendEventInvitationEmail(
       
       htmlContent = processed.htmlContent;
       subject = processed.subject;
-      
       console.log(`Using stored template: ${template.name}`);
     } else {
-      // Fall back to hardcoded template
       htmlContent = generateEventInvitationHTML(eventData);
       subject = `Event Invitation: ${eventData.eventTitle}`;
       console.log('No stored template found, using fallback HTML generation');
     }
     
     const icalContent = generateICalendarFile(eventData, recipientEmail);
-    
-    const msg = {
+    const from = process.env.RESEND_FROM_EMAIL || "noreply@hubify.com";
+
+    const { error } = await resend.emails.send({
       to: recipientEmail,
-      from: process.env.SENDGRID_FROM_EMAIL || "noreply@hubify.com",
+      from,
       subject,
       html: htmlContent,
       attachments: [
         {
-          content: Buffer.from(icalContent).toString('base64'),
           filename: 'event.ics',
-          type: 'text/calendar',
-          disposition: 'attachment',
+          content: Buffer.from(icalContent),
         },
       ],
-    };
+    });
 
-    await sgMail.send(msg);
+    if (error) throw new Error(error.message);
     console.log(`Event invitation email sent to ${recipientEmail} (${recipientName})`);
   } catch (error) {
     console.error("Error sending event invitation email:", error);
@@ -607,14 +585,12 @@ export function generateInvoiceEmailHTML(data: InvoiceEmailData): string {
 </head>
 <body>
   <div class="container">
-    <!-- Header -->
     <div class="header">
       ${logo ? `<img src="${logo}" alt="${logoAlt}" width="200" height="60" class="logo" style="max-width:200px;max-height:80px;height:auto;width:auto;">` : ''}
       <h1 class="header-text">Invoice</h1>
       <p class="invoice-number">#${invoiceNumber}</p>
     </div>
     
-    <!-- Content -->
     <div class="content">
       <p class="greeting">Dear ${clientName},</p>
       
@@ -623,7 +599,6 @@ export function generateInvoiceEmailHTML(data: InvoiceEmailData): string {
         ${dueDate ? `Payment is due by <strong>${dueDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</strong>.` : ''}
       </p>
       
-      <!-- Invoice Details -->
       <div class="invoice-details">
         <div class="detail-row">
           <span class="detail-label">Invoice Number:</span>
@@ -645,7 +620,6 @@ export function generateInvoiceEmailHTML(data: InvoiceEmailData): string {
         </div>
       </div>
       
-      <!-- Amount Due -->
       ${amountDue > 0 ? `
       <div class="amount-due">
         <div class="amount-due-label">Amount Due</div>
@@ -657,14 +631,12 @@ export function generateInvoiceEmailHTML(data: InvoiceEmailData): string {
       </div>
       `}
       
-      <!-- Due Date Notice -->
       ${dueDate && amountDue > 0 ? `
       <div class="due-date-notice">
         <strong>⏰ Payment Reminder:</strong> Please ensure payment is received by ${dueDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} to avoid late fees.
       </div>
       ` : ''}
       
-      <!-- Payment Button -->
       ${paymentUrl && amountDue > 0 ? `
       <div style="text-align: center;">
         <a href="${paymentUrl}" class="cta-button">Pay Now</a>
@@ -673,7 +645,6 @@ export function generateInvoiceEmailHTML(data: InvoiceEmailData): string {
       
       <div class="divider"></div>
       
-      <!-- Notes -->
       ${notes ? `
       <div class="notes">
         <div class="notes-title">Additional Notes:</div>
@@ -692,7 +663,6 @@ export function generateInvoiceEmailHTML(data: InvoiceEmailData): string {
       </p>
     </div>
     
-    <!-- Footer -->
     <div class="footer">
       <p style="margin: 0 0 10px 0;">This is an automated invoice notification from ${organizationName}</p>
       <p style="margin: 0;">Please do not reply directly to this email.</p>
@@ -703,7 +673,7 @@ export function generateInvoiceEmailHTML(data: InvoiceEmailData): string {
 `;
 }
 
-// Generic function to send simple HTML emails
+// Generic function to send simple HTML emails via Resend
 export async function sendGenericEmail({
   to,
   subject,
@@ -717,27 +687,26 @@ export async function sendGenericEmail({
   htmlContent: string;
   fromEmail?: string;
   fromName?: string;
-  attachments?: AttachmentData[];
+  attachments?: Array<{ filename: string; content: Buffer | string }>;
 }): Promise<void> {
-  if (!SENDGRID_API_KEY) {
-    throw new Error("SENDGRID_API_KEY is not configured. Email sending is disabled.");
+  if (!resend) {
+    throw new Error("RESEND_API_KEY is not configured. Email sending is disabled.");
   }
 
-  const msg: MailDataRequired = {
+  const from = fromName
+    ? `${fromName} <${fromEmail || process.env.RESEND_FROM_EMAIL || "noreply@hubify.app"}>`
+    : (fromEmail || process.env.RESEND_FROM_EMAIL || "noreply@hubify.app");
+
+  const { error } = await resend.emails.send({
     to,
-    from: {
-      email: fromEmail || process.env.SUPPORT_EMAIL_FROM || "noreply@hubify.app",
-      name: fromName || "Hubify",
-    },
+    from,
     subject,
     html: htmlContent,
     ...(attachments && attachments.length > 0 ? { attachments } : {}),
-  };
+  });
 
-  try {
-    await sgMail.send(msg);
-  } catch (error: any) {
-    console.error("Error sending email:", error.response?.body || error.message);
+  if (error) {
+    console.error("Error sending email:", error);
     throw new Error("Failed to send email. Please try again later.");
   }
 }

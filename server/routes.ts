@@ -97,14 +97,11 @@ import { z } from "zod";
 import { createSetupIntentForClient, detachPaymentMethod, createPortalPayIntentForInvoice, chargeInvoice } from "./stripe";
 import { db } from "./db";
 import { eq, lt, and, desc, inArray, count } from "drizzle-orm";
-import sgMail from "@sendgrid/mail";
+import { Resend } from "resend";
 import { dispatchWebhookEvent, sendTestWebhookEvent, validateWebhookUrlSafe } from "./webhookDispatcher";
 
-// Initialize SendGrid if API key is available
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-if (SENDGRID_API_KEY) {
-  sgMail.setApiKey(SENDGRID_API_KEY);
-}
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 /** Substitute {{name}}, {{company}}, {{email}}, {{phone}}, {{stage}} merge tags. */
 function applyProspectMergeTags(text: string, p: { name: string; email: string; company: string; phone: string; stage: string }): string {
@@ -127,15 +124,15 @@ async function sendOOOConflictNotification(
   oooEndDate: Date,
   oooReason: string | null
 ) {
-  if (!SENDGRID_API_KEY) {
-    console.warn("SendGrid API key not configured. Skipping email notification.");
+  if (!resend) {
+    console.warn("RESEND_API_KEY not configured. Skipping email notification.");
     return;
   }
 
   try {
     const msg = {
       to: supervisorEmail,
-      from: process.env.SENDGRID_FROM_EMAIL || "noreply@hubify.com",
+      from: process.env.RESEND_FROM_EMAIL || "noreply@hubify.com",
       subject: `Out-of-Office Conflict: Task Assigned to ${assignedUserName}`,
       text: `Hello ${supervisorName},
 
@@ -180,7 +177,8 @@ Hubify Team`,
       `,
     };
 
-    await sgMail.send(msg);
+    const { error } = await resend.emails.send(msg);
+    if (error) throw new Error(error.message);
     console.log(`OOO conflict notification sent to ${supervisorEmail}`);
   } catch (error) {
     console.error("Error sending OOO conflict notification:", error);
@@ -222,15 +220,15 @@ async function sendMentionNotification(
   authorName: string,
   messageContent: string
 ) {
-  if (!SENDGRID_API_KEY) {
-    console.warn("SendGrid API key not configured. Skipping email notification.");
+  if (!resend) {
+    console.warn("RESEND_API_KEY not configured. Skipping email notification.");
     return;
   }
 
   try {
     const msg = {
       to: mentionedUserEmail,
-      from: process.env.SENDGRID_FROM_EMAIL || "noreply@hubify.com",
+      from: process.env.RESEND_FROM_EMAIL || "noreply@hubify.com",
       subject: `${authorName} mentioned you in a team message`,
       text: `Hello ${mentionedUserName},
 
@@ -259,7 +257,8 @@ Hubify Team`,
       `,
     };
 
-    await sgMail.send(msg);
+    const { error: mentionError } = await resend.emails.send(msg);
+    if (mentionError) throw new Error(mentionError.message);
     console.log(`Mention notification sent to ${mentionedUserEmail}`);
   } catch (error) {
     console.error("Error sending mention notification:", error);
@@ -273,15 +272,15 @@ async function sendBroadcastNotification(
   authorName: string,
   messageContent: string
 ) {
-  if (!SENDGRID_API_KEY) {
-    console.warn("SendGrid API key not configured. Skipping email notification.");
+  if (!resend) {
+    console.warn("RESEND_API_KEY not configured. Skipping email notification.");
     return;
   }
 
   try {
     const msg = {
       to: recipientEmail,
-      from: process.env.SENDGRID_FROM_EMAIL || "noreply@hubify.com",
+      from: process.env.RESEND_FROM_EMAIL || "noreply@hubify.com",
       subject: `${authorName} posted a new team message`,
       text: `Hello ${recipientName},
 
@@ -310,7 +309,8 @@ Hubify Team`,
       `,
     };
 
-    await sgMail.send(msg);
+    const { error: broadcastError } = await resend.emails.send(msg);
+    if (broadcastError) throw new Error(broadcastError.message);
     console.log(`Broadcast notification sent to ${recipientEmail}`);
   } catch (error) {
     console.error("Error sending broadcast notification:", error);
@@ -12207,8 +12207,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      if (!SENDGRID_API_KEY) {
-        return res.status(500).json({ message: "Email service not configured. Please set SENDGRID_API_KEY." });
+      if (!resend) {
+        return res.status(500).json({ message: "Email service not configured. Please set RESEND_API_KEY." });
       }
 
       const invoice = await storage.getClientInvoice(orgId, id);
@@ -12262,25 +12262,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const mailData: any = {
+      const mailData: Parameters<typeof resend.emails.send>[0] = {
         to: emailTo,
-        from: process.env.SENDGRID_FROM_EMAIL || "noreply@hubify.com",
+        from: process.env.RESEND_FROM_EMAIL || "noreply@hubify.com",
         subject: `Invoice ${invoiceEmailData.invoiceNumber} from ${org.name}`,
         html: htmlContent,
+        ...(pdfBuffer ? {
+          attachments: [
+            {
+              filename: `invoice-${invoiceEmailData.invoiceNumber}.pdf`,
+              content: pdfBuffer,
+            },
+          ],
+        } : {}),
       };
 
-      if (pdfBuffer) {
-        mailData.attachments = [
-          {
-            content: pdfBuffer.toString('base64'),
-            filename: `invoice-${invoiceEmailData.invoiceNumber}.pdf`,
-            type: 'application/pdf',
-            disposition: 'attachment',
-          },
-        ];
-      }
-
-      await sgMail.send(mailData);
+      const { error: invoiceEmailError } = await resend.emails.send(mailData);
+      if (invoiceEmailError) throw new Error(invoiceEmailError.message);
       
       await storage.updateClientInvoice(orgId, id, { 
         status: invoice.status === 'draft' ? 'open' : invoice.status,
@@ -14373,15 +14371,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Prospect must be in the Welcome stage to send the welcome email" });
       }
 
-      if (!SENDGRID_API_KEY) {
+      if (!resend) {
         return res.status(503).json({
-          message: "Email delivery is not configured (SENDGRID_API_KEY missing). Set the key and try again.",
+          message: "Email delivery is not configured (RESEND_API_KEY missing). Set the key and try again.",
           emailSent: false,
         });
       }
 
-      const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.SUPPORT_EMAIL_FROM || "noreply@hubify.com";
-      const msg = {
+      const fromEmail = process.env.RESEND_FROM_EMAIL || process.env.SUPPORT_EMAIL_FROM || "noreply@hubify.com";
+      const { error: welcomeEmailError } = await resend.emails.send({
         to: prospect.email,
         from: fromEmail,
         subject: `Welcome to Hubify${prospect.company ? ` — ${prospect.company}` : ""}!`,
@@ -14395,8 +14393,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           </div>
         `,
         text: `Hi ${prospect.name},\n\nWelcome to Hubify! Your account is all set up. Log in at https://hubify.com.\n\nBest regards,\nThe Hubify Team`,
-      };
-      await sgMail.send(msg);
+      });
+      if (welcomeEmailError) throw new Error(welcomeEmailError.message);
 
       const updated = await storage.updateOnboardingProspect(id, {
         welcomeEmailSentAt: new Date(),
@@ -14490,22 +14488,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const mergedSubject = applyProspectMergeTags(subject, mergeContext);
       const mergedBody = applyProspectMergeTags(body, mergeContext);
 
-      const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.SUPPORT_EMAIL_FROM || "noreply@hubify.com";
-
-      if (!SENDGRID_API_KEY) {
+      if (!resend) {
         return res.status(503).json({
-          message: "Email delivery is not configured (SENDGRID_API_KEY missing). Set the key and try again.",
+          message: "Email delivery is not configured (RESEND_API_KEY missing). Set the key and try again.",
           emailSent: false,
         });
       }
 
-      await sgMail.send({
+      const fromEmail = process.env.RESEND_FROM_EMAIL || process.env.SUPPORT_EMAIL_FROM || "noreply@hubify.com";
+      const { error: stageEmailError } = await resend.emails.send({
         to: prospect.email,
         from: fromEmail,
         subject: mergedSubject,
         html: mergedBody.replace(/\n/g, "<br>"),
         text: mergedBody,
       });
+      if (stageEmailError) throw new Error(stageEmailError.message);
 
       // Only log after confirmed delivery
       const emailLog = await storage.createOnboardingProspectEmail({

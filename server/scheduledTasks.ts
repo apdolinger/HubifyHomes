@@ -446,8 +446,8 @@ export async function runStuckProspectDigest(): Promise<{ sent: boolean; stuckCo
     return { sent: false, stuckCount: 0, message: 'No stuck prospects — digest skipped.' };
   }
 
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.SUPPORT_EMAIL_FROM || 'noreply@hubify.com';
-  const toEmail = process.env.SUPPORT_EMAIL_FROM || process.env.SENDGRID_FROM_EMAIL || fromEmail;
+  const fromEmail = process.env.RESEND_FROM_EMAIL || process.env.SUPPORT_EMAIL_FROM || 'noreply@hubify.com';
+  const toEmail = process.env.SUPPORT_EMAIL_FROM || process.env.RESEND_FROM_EMAIL || fromEmail;
 
   const STAGE_LABELS: Record<string, string> = {
     inquiry: 'Inquiry',
