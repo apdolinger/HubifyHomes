@@ -2585,6 +2585,174 @@ function PricingTiersCard() {
   );
 }
 
+// ── System Integrations Card ─────────────────────────────────────────────────
+
+interface IntegrationStatus {
+  stripe:            { secretKey: boolean; webhookSecret: boolean };
+  resend:            { apiKey: boolean; fromEmail: boolean };
+  database:          { connected: boolean };
+  objectStorage:     { configured: boolean };
+  replitAuth:        { configured: boolean };
+  billingAutomation: { enabled: boolean };
+  superAdmin:        { usernameSet: boolean; passwordSet: boolean };
+}
+
+type ConnStatus = "connected" | "partial" | "not_configured";
+
+function statusBadge(s: ConnStatus) {
+  if (s === "connected")
+    return <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full"><CheckCircle className="w-3 h-3" />Connected</span>;
+  if (s === "partial")
+    return <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full"><AlertCircle className="w-3 h-3" />Partial</span>;
+  return <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full"><XCircle className="w-3 h-3" />Not configured</span>;
+}
+
+function SystemIntegrationsCard() {
+  const { data, isLoading, refetch, isFetching } = useQuery<IntegrationStatus>({
+    queryKey: ["/api/super-admin/integration-status"],
+    refetchOnWindowFocus: false,
+  });
+
+  const integrations: Array<{
+    key: string;
+    icon: React.ReactNode;
+    name: string;
+    description: string;
+    status: ConnStatus;
+    details: string[];
+  }> = data ? [
+    {
+      key: "stripe",
+      icon: <CreditCard className="w-5 h-5 text-violet-600" />,
+      name: "Stripe",
+      description: "Payment processing and invoice collection",
+      status: data.stripe.secretKey && data.stripe.webhookSecret ? "connected"
+            : data.stripe.secretKey ? "partial"
+            : "not_configured",
+      details: [
+        `Secret key: ${data.stripe.secretKey ? "✓ set" : "✗ missing"}`,
+        `Webhook secret: ${data.stripe.webhookSecret ? "✓ set" : "✗ missing"}`,
+      ],
+    },
+    {
+      key: "resend",
+      icon: <Mail className="w-5 h-5 text-blue-600" />,
+      name: "Resend",
+      description: "Transactional email delivery",
+      status: data.resend.apiKey && data.resend.fromEmail ? "connected"
+            : data.resend.apiKey ? "partial"
+            : "not_configured",
+      details: [
+        `API key: ${data.resend.apiKey ? "✓ set" : "✗ missing"}`,
+        `From email: ${data.resend.fromEmail ? "✓ set" : "✗ missing (using default noreply@hubify.com)"}`,
+      ],
+    },
+    {
+      key: "database",
+      icon: <Database className="w-5 h-5 text-green-600" />,
+      name: "PostgreSQL Database",
+      description: "Primary data store for all tenant data",
+      status: data.database.connected ? "connected" : "not_configured",
+      details: [`Connection string: ${data.database.connected ? "✓ set" : "✗ missing"}`],
+    },
+    {
+      key: "objectStorage",
+      icon: <HardDrive className="w-5 h-5 text-orange-600" />,
+      name: "Object Storage",
+      description: "File and document storage (PDFs, images, exports)",
+      status: data.objectStorage.configured ? "connected" : "not_configured",
+      details: [`Storage paths: ${data.objectStorage.configured ? "✓ configured" : "✗ not configured"}`],
+    },
+    {
+      key: "replitAuth",
+      icon: <Lock className="w-5 h-5 text-indigo-600" />,
+      name: "Replit Auth (OIDC)",
+      description: "User authentication via OpenID Connect",
+      status: data.replitAuth.configured ? "connected" : "not_configured",
+      details: [`Issuer URL: ${data.replitAuth.configured ? "✓ set" : "✗ missing"}`],
+    },
+    {
+      key: "billingAutomation",
+      icon: <Zap className="w-5 h-5 text-yellow-600" />,
+      name: "Billing Automation",
+      description: "Automated invoice generation and payment retries",
+      status: data.billingAutomation.enabled ? "connected" : "not_configured",
+      details: [`BILLING_AUTOMATION_ENABLED: ${data.billingAutomation.enabled ? "✓ true" : "✗ disabled"}`],
+    },
+    {
+      key: "superAdmin",
+      icon: <Shield className="w-5 h-5 text-red-600" />,
+      name: "Super Admin Credentials",
+      description: "Master login for this control panel",
+      status: data.superAdmin.usernameSet && data.superAdmin.passwordSet ? "connected"
+            : data.superAdmin.passwordSet ? "partial"
+            : "not_configured",
+      details: [
+        `Username: ${data.superAdmin.usernameSet ? "✓ set" : "✗ missing (using default)"}`,
+        `Password: ${data.superAdmin.passwordSet ? "✓ set" : "✗ missing"}`,
+      ],
+    },
+  ] : [];
+
+  const connectedCount = integrations.filter(i => i.status === "connected").length;
+  const total = integrations.length;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Server className="w-5 h-5" />
+              System Integrations
+            </CardTitle>
+            {!isLoading && data && (
+              <p className="text-sm text-slate-500 mt-1">
+                {connectedCount} of {total} services fully connected
+              </p>
+            )}
+          </div>
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-slate-400 py-4">
+            <RefreshCw className="w-4 h-4 animate-spin" /> Checking integrations…
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {integrations.map((intg) => (
+              <div key={intg.key} className="flex items-start justify-between gap-4 py-4 first:pt-0 last:pb-0">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="mt-0.5 flex-shrink-0 w-9 h-9 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center">
+                    {intg.icon}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-slate-800 text-sm leading-tight">{intg.name}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{intg.description}</p>
+                    <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5">
+                      {intg.details.map((d, i) => (
+                        <span key={i} className="text-xs text-slate-400 font-mono">{d}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex-shrink-0 mt-0.5">
+                  {statusBadge(intg.status)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // Settings Tab — backed by /api/super-admin/platform-settings
 // ============================================================================
 function SettingsTabContent() {
@@ -2671,6 +2839,8 @@ function SettingsTabContent() {
 
   return (
     <div className="space-y-6">
+      <SystemIntegrationsCard />
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center"><Phone className="w-5 h-5 mr-2" />Support Contact</CardTitle>

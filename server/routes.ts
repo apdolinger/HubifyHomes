@@ -3606,6 +3606,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Integration Status (Super Admin) ─────────────────────────────────────
+  app.get("/api/super-admin/integration-status", isSuperAdmin, requireMFA, async (_req, res) => {
+    try {
+      res.json({
+        stripe: {
+          secretKey:     !!process.env.STRIPE_SECRET_KEY,
+          webhookSecret: !!process.env.STRIPE_WEBHOOK_SECRET,
+        },
+        resend: {
+          apiKey:    !!process.env.RESEND_API_KEY,
+          fromEmail: !!process.env.RESEND_FROM_EMAIL,
+        },
+        database: {
+          connected: !!process.env.DATABASE_URL,
+        },
+        objectStorage: {
+          configured: !!(process.env.PUBLIC_OBJECT_SEARCH_PATHS || process.env.PRIVATE_OBJECT_DIR),
+        },
+        replitAuth: {
+          configured: !!process.env.ISSUER_URL,
+        },
+        billingAutomation: {
+          enabled: process.env.BILLING_AUTOMATION_ENABLED === "true",
+        },
+        superAdmin: {
+          usernameSet: !!process.env.SUPER_ADMIN_USERNAME,
+          passwordSet: !!process.env.SUPER_ADMIN_PASSWORD,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching integration status:", error);
+      res.status(500).json({ message: "Failed to fetch integration status" });
+    }
+  });
+
   // ── Pricing Tiers (Super Admin) ──────────────────────────────────────────
   app.get("/api/super-admin/pricing-tiers", isSuperAdmin, requireMFA, async (_req, res) => {
     try {
