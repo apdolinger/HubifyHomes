@@ -9428,6 +9428,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Org-ownership guard ──────────────────────────────────────────────────
+  // Every authenticated request to /api/orgs/:orgId/* must belong to the
+  // signed-in user's own organisation.  Super-admin sessions are exempt so
+  // they can manage any org via the super-admin panel.
+  app.use('/api/orgs/:orgId', (req: any, res: any, next: any) => {
+    if (!req.user) return next(); // unauthenticated — let isAuthenticated handle 401
+    const orgId = req.params.orgId;
+    const userOrgId = req.user?.claims?.orgId || req.user?.orgId;
+    const isSuperAdmin =
+      (req.session as any)?.superAdmin?.authenticated === true ||
+      req.user?.claims?.role === 'super_admin' ||
+      req.user?.role === 'super_admin';
+    if (!isSuperAdmin && userOrgId !== orgId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    next();
+  });
+
   // Organization and Branding routes
   app.get("/api/orgs/:orgId", isAuthenticated, async (req, res) => {
     try {
@@ -9671,7 +9689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userRole = req.user?.claims?.role || req.user?.role;
       
       // Verify user belongs to org
-      if (userOrgId !== orgId && userRole !== "admin") {
+      if (userOrgId !== orgId) {
         return res.status(403).json({ message: "Access denied" });
       }
       
