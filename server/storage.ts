@@ -3084,7 +3084,7 @@ export class DatabaseStorage implements IStorage {
     .orderBy(desc(tasks.createdAt));
   }
 
-  async getUrgentTasks(): Promise<Task[]> {
+  async getUrgentTasks(orgId: string): Promise<Task[]> {
     return await db.select({
       id: tasks.id,
       title: tasks.title,
@@ -3133,7 +3133,8 @@ export class DatabaseStorage implements IStorage {
     .where(and(
       or(eq(tasks.status, "pending"), eq(tasks.status, "in_progress")),
       eq(tasks.isArchived, false),
-      eq(tasks.priority, "urgent")
+      eq(tasks.priority, "urgent"),
+      eq(tasks.orgId, orgId)
     ))
     .orderBy(desc(tasks.createdAt));
   }
@@ -4977,11 +4978,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Dashboard stats
-  async getDashboardStats() {
+  async getDashboardStats(orgId: string) {
     const [propertiesCount] = await db
       .select({ count: count() })
       .from(properties)
-      .where(eq(properties.isActive, true));
+      .where(and(eq(properties.isActive, true), eq(properties.orgId, orgId)));
 
     const [urgentTasksCount] = await db
       .select({ count: count() })
@@ -4989,7 +4990,8 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         or(eq(tasks.status, "pending"), eq(tasks.status, "in_progress")),
         eq(tasks.isArchived, false),
-        eq(tasks.priority, "urgent")
+        eq(tasks.priority, "urgent"),
+        eq(tasks.orgId, orgId)
       ));
 
     const [overdueTasksCount] = await db
@@ -4998,7 +5000,8 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         or(eq(tasks.status, "pending"), eq(tasks.status, "in_progress")),
         eq(tasks.isArchived, false),
-        sql`DATE(${tasks.dueDate}) < CURRENT_DATE`
+        sql`DATE(${tasks.dueDate}) < CURRENT_DATE`,
+        eq(tasks.orgId, orgId)
       ));
 
     const [activeTeamCount] = await db
@@ -5006,6 +5009,7 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .where(and(
         eq(users.isActive, true),
+        eq(users.orgId, orgId),
         or(
           eq(users.role, "admin"),
           eq(users.role, "supervisor"),
@@ -5022,7 +5026,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Search operations
-  async globalSearch(query: string) {
+  async globalSearch(query: string, orgId: string) {
     const searchTerm = `%${query}%`;
 
     const searchProperties = await db
@@ -5030,6 +5034,7 @@ export class DatabaseStorage implements IStorage {
       .from(properties)
       .where(and(
         eq(properties.isActive, true),
+        eq(properties.orgId, orgId),
         or(
           like(properties.name, searchTerm),
           like(properties.address1, searchTerm)
@@ -5040,9 +5045,12 @@ export class DatabaseStorage implements IStorage {
     const searchTasks = await db
       .select()
       .from(tasks)
-      .where(or(
-        like(tasks.title, searchTerm),
-        like(tasks.description, searchTerm)
+      .where(and(
+        eq(tasks.orgId, orgId),
+        or(
+          like(tasks.title, searchTerm),
+          like(tasks.description, searchTerm)
+        )
       ))
       .limit(5);
 
@@ -5051,6 +5059,7 @@ export class DatabaseStorage implements IStorage {
       .from(contacts)
       .where(and(
         eq(contacts.isActive, true),
+        eq(contacts.orgId, orgId),
         or(
           like(contacts.firstName, searchTerm),
           like(contacts.lastName, searchTerm),

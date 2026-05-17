@@ -2956,9 +2956,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dashboard routes
-  app.get("/api/dashboard/stats", isAuthenticated, async (req, res) => {
+  app.get("/api/dashboard/stats", isAuthenticated, async (req: any, res) => {
     try {
-      const stats = await storage.getDashboardStats();
+      const orgId = req.user.claims?.orgId || req.user.orgId;
+      const stats = await storage.getDashboardStats(orgId);
       res.json(stats);
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
@@ -2966,9 +2967,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/dashboard/urgent-tasks", isAuthenticated, async (req, res) => {
+  app.get("/api/dashboard/urgent-tasks", isAuthenticated, async (req: any, res) => {
     try {
-      const urgentTasks = await storage.getUrgentTasks();
+      const orgId = req.user.claims?.orgId || req.user.orgId;
+      const urgentTasks = await storage.getUrgentTasks(orgId);
       res.json(urgentTasks);
     } catch (error) {
       console.error("Error fetching urgent tasks:", error);
@@ -8314,13 +8316,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Search routes
-  app.get("/api/search", isAuthenticated, async (req, res) => {
+  app.get("/api/search", isAuthenticated, async (req: any, res) => {
     try {
       const { q } = req.query;
       if (!q || typeof q !== "string") {
         return res.status(400).json({ message: "Query parameter 'q' is required" });
       }
-      const results = await storage.globalSearch(q);
+      const orgId = req.user.claims?.orgId || req.user.orgId;
+      const results = await storage.globalSearch(q, orgId);
       res.json(results);
     } catch (error) {
       console.error("Error performing search:", error);
