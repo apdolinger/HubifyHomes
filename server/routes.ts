@@ -4855,8 +4855,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/properties", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      // For dev mode, use the default org. In production, this would come from the user's org
-      const orgId = req.user.orgId || "00000000-0000-0000-0000-000000000000";
+      const orgId = req.user.claims?.orgId || req.user.orgId;
       
       console.log("Property creation request:", {
         body: req.body,
@@ -5004,7 +5003,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid property ID' });
       }
       
-      const orgId = req.user.orgId || "00000000-0000-0000-0000-000000000000";
+      const orgId = req.user.claims?.orgId || req.user.orgId;
       const vendors = await storage.getPropertyVendors(propertyId, orgId);
       res.json(vendors);
     } catch (error) {
@@ -5020,7 +5019,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid property ID' });
       }
 
-      const orgId = req.user.orgId || "00000000-0000-0000-0000-000000000000";
+      const orgId = req.user.claims?.orgId || req.user.orgId;
       const { vendorId, notes } = req.body;
 
       if (!vendorId || isNaN(parseInt(vendorId))) {
@@ -5042,7 +5041,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid property vendor ID' });
       }
 
-      const orgId = req.user.orgId || "00000000-0000-0000-0000-000000000000";
+      const orgId = req.user.claims?.orgId || req.user.orgId;
       await storage.removePropertyVendor(id, orgId);
       res.json({ message: 'Property vendor removed successfully' });
     } catch (error) {
@@ -5060,7 +5059,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid property ID' });
       }
 
-      const orgId = req.user.orgId || "00000000-0000-0000-0000-000000000000";
+      const orgId = req.user.claims?.orgId || req.user.orgId;
       const copiedCount = await storage.copyPropertyVendors(sourcePropertyId, targetPropertyId, orgId);
       
       res.json({ 
@@ -6364,7 +6363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           assignedById: userId,
           dueDate: dueDate ? new Date(dueDate) : null,
           category: category || null,
-          orgId: req.user.orgId,
+          orgId: req.user.claims?.orgId || req.user.orgId,
           isArchived: false,
         };
 
@@ -7345,7 +7344,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/vendor-employees", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const orgId = req.user.orgId || "00000000-0000-0000-0000-000000000000";
+      const orgId = req.user.claims?.orgId || req.user.orgId;
       const validatedData = insertVendorEmployeeSchema.parse({ ...req.body, orgId });
       const employee = await storage.createVendorEmployee(validatedData, userId);
       res.status(201).json(employee);
@@ -11999,7 +11998,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { orgId, clientId } = req.params;
       
       // Verify user belongs to org
-      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+      const userOrgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (userOrgId !== orgId && req.user?.claims?.role !== "admin" && req.user?.role !== "admin") {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -12026,7 +12026,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { orgId, id } = req.params;
       
       // Verify user belongs to org
-      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+      const userOrgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (userOrgId !== orgId && req.user?.claims?.role !== "admin" && req.user?.role !== "admin") {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -12052,7 +12053,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { orgId, id } = req.params;
       
       // Verify user belongs to org
-      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+      const userOrgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (userOrgId !== orgId && req.user?.claims?.role !== "admin" && req.user?.role !== "admin") {
         return res.status(403).json({ message: "Access denied" });
       }
 

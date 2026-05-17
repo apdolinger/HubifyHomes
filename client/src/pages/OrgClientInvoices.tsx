@@ -21,9 +21,9 @@ type ClientInvoice = {
   orgId: string;
   clientId: string;
   invoiceNumber: string;
-  amount: number;
+  amountCents: number;
   currency: string;
-  status: "draft" | "sent" | "paid" | "overdue" | "cancelled";
+  status: "draft" | "open" | "paid" | "void" | "uncollectible";
   description?: string;
   dueDate?: string;
   pdfStorageKey?: string;
@@ -45,8 +45,8 @@ export default function OrgClientInvoices() {
     clientId: "",
     invoiceNumber: "",
     amount: "",
-    currency: "USD",
-    status: "draft" as const,
+    currency: "usd",
+    status: "draft" as "draft" | "open" | "paid" | "void" | "uncollectible",
     description: "",
     dueDate: "",
   });
@@ -54,7 +54,7 @@ export default function OrgClientInvoices() {
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
 
   const { data: clients = [] } = useQuery({
-    queryKey: ['/api/people'],
+    queryKey: [`/api/orgs/${orgId}/clients`],
     enabled: isAuthenticated && !!orgId,
   });
 
@@ -64,7 +64,7 @@ export default function OrgClientInvoices() {
   });
 
   const { data: allInvoices = [], isLoading } = useQuery<ClientInvoice[]>({
-    queryKey: ['/api/orgs', orgId, 'client-invoices'],
+    queryKey: [`/api/orgs/${orgId}/client-invoices`],
     enabled: isAuthenticated && !!orgId,
   });
 
@@ -75,20 +75,25 @@ export default function OrgClientInvoices() {
   const createInvoiceMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const response = await apiRequest("POST", `/api/orgs/${orgId}/clients/${data.clientId}/invoices`, {
-        ...data,
-        amount: parseFloat(data.amount),
+        clientId: data.clientId,
+        invoiceNumber: data.invoiceNumber || undefined,
+        amountCents: Math.round(parseFloat(data.amount) * 100),
+        currency: data.currency,
+        status: data.status,
+        description: data.description || undefined,
+        dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : undefined,
         customFieldValues,
       });
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/orgs', orgId, 'client-invoices'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}/client-invoices`] });
       setIsCreateDialogOpen(false);
       setFormData({
         clientId: "",
         invoiceNumber: "",
         amount: "",
-        currency: "USD",
+        currency: "usd",
         status: "draft",
         description: "",
         dueDate: "",
@@ -127,7 +132,7 @@ export default function OrgClientInvoices() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/orgs', orgId, 'client-invoices'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/orgs/${orgId}/client-invoices`] });
       setUploadDialogOpen(false);
       setUploadFile(null);
       setSelectedInvoiceId("");
@@ -221,10 +226,10 @@ export default function OrgClientInvoices() {
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="sent">Sent</SelectItem>
+                <SelectItem value="open">Open</SelectItem>
                 <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="void">Void</SelectItem>
+                <SelectItem value="uncollectible">Uncollectible</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -262,7 +267,7 @@ export default function OrgClientInvoices() {
                           {client?.name || invoice.clientId}
                         </div>
                       </TableCell>
-                      <TableCell>{invoice.amount.toFixed(2)} {invoice.currency}</TableCell>
+                      <TableCell>${(invoice.amountCents / 100).toFixed(2)} {invoice.currency.toUpperCase()}</TableCell>
                       <TableCell>{getStatusBadge(invoice.status)}</TableCell>
                       <TableCell>
                         {invoice.dueDate ? format(new Date(invoice.dueDate), 'MMM dd, yyyy') : '-'}
@@ -369,9 +374,9 @@ export default function OrgClientInvoices() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="USD">USD</SelectItem>
-                      <SelectItem value="EUR">EUR</SelectItem>
-                      <SelectItem value="GBP">GBP</SelectItem>
+                      <SelectItem value="usd">USD</SelectItem>
+                      <SelectItem value="eur">EUR</SelectItem>
+                      <SelectItem value="gbp">GBP</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -388,10 +393,10 @@ export default function OrgClientInvoices() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="sent">Sent</SelectItem>
+                    <SelectItem value="open">Open</SelectItem>
                     <SelectItem value="paid">Paid</SelectItem>
-                    <SelectItem value="overdue">Overdue</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    <SelectItem value="void">Void</SelectItem>
+                    <SelectItem value="uncollectible">Uncollectible</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
