@@ -1,8 +1,13 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "_tH9RY2LcdQzft9rcChma"
 uri = "file://attached_assets/hubify_homes_logo.png"
 type = "image"
 title = "hubify homes logo"
+
+[[outputs]]
+id = "vrh_52mAh39_NGm0Y5gG7"
+uri = "file://screenshots/Hubify_User_Guide.pdf"
+type = "pdf"
+title = "Hubify User Guide"
