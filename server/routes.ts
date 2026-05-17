@@ -1347,6 +1347,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Invite a new team member ──────────────────────────────────────────────
+  // Creates the user record and sends them an invitation email so they know
+  // to log in and what to expect when they get there.
+  app.post("/api/users", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orgId = req.user?.claims?.orgId;
+      if (!orgId) return res.status(400).json({ message: "Organization not found" });
+
+      const { id, firstName, lastName, email, role = "staff", isActive = true } = req.body;
+      if (!firstName || !lastName || !email) {
+        return res.status(400).json({ message: "firstName, lastName, and email are required" });
+      }
+
+      const normalizedEmail = String(email).trim().toLowerCase();
+      const userId = id || `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      const user = await storage.upsertUser({
+        id: userId,
+        orgId,
+        firstName: String(firstName).trim(),
+        lastName: String(lastName).trim(),
+        email: normalizedEmail,
+        role,
+        isActive,
+      });
+
+      // Fetch org name for the invitation email
+      const org = await storage.getOrg(orgId);
+      const orgName = org?.name ?? "your team";
+      const inviterName = `${req.user?.claims?.first_name ?? ""} ${req.user?.claims?.last_name ?? ""}`.trim() || "Your admin";
+      const roleLabel = role === "admin" ? "Admin" : role === "supervisor" ? "Supervisor" : "Staff";
+      const loginUrl = `${req.protocol}://${req.hostname}/api/login`;
+
+      try {
+        const { sendEmail } = await import("./email-service");
+        await sendEmail({
+          to: normalizedEmail,
+          subject: `You've been added to ${orgName} on Hubify`,
+          html: `
+            <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:600px;margin:0 auto;color:#1e293b;">
+              <div style="background:#2563eb;padding:32px 40px;border-radius:12px 12px 0 0;">
+                <h1 style="color:white;margin:0;font-size:24px;font-weight:700;">You're on the team.</h1>
+              </div>
+              <div style="background:#ffffff;padding:32px 40px;border-radius:0 0 12px 12px;border:1px solid #e2e8f0;border-top:none;">
+                <p style="font-size:16px;margin:0 0 20px;">Hi ${firstName},</p>
+                <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px;">
+                  ${inviterName} has added you to <strong>${orgName}</strong> on Hubify as a <strong>${roleLabel}</strong>.
+                  Hubify is the property management platform your team uses to track tasks, manage properties, and stay coordinated.
+                </p>
+
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px 24px;margin:0 0 28px;">
+                  <p style="font-size:13px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin:0 0 12px;">What you can do in Hubify</p>
+                  <ul style="margin:0;padding-left:20px;color:#475569;font-size:14px;line-height:2;">
+                    <li>See and act on tasks assigned to you</li>
+                    <li>View property details, access codes, and notes</li>
+                    <li>Communicate with your team in real time</li>
+                    <li>Log your work and track time on jobs</li>
+                  </ul>
+                </div>
+
+                <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 28px;">
+                  To get in, click the button below and sign in with the email address this was sent to:
+                  <strong style="color:#1e293b;">${normalizedEmail}</strong>
+                </p>
+
+                <p style="margin:0 0 32px;text-align:center;">
+                  <a href="${loginUrl}"
+                     style="display:inline-block;background:#2563eb;color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">
+                    Log in to Hubify
+                  </a>
+                </p>
+
+                <p style="font-size:13px;color:#94a3b8;margin:0;">
+                  Questions? Reply to this email or reach out to ${inviterName} directly.
+                </p>
+
+                <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;" />
+                <p style="font-size:12px;color:#cbd5e1;margin:0;">
+                  Hubify · <a href="https://hubify.com/privacy" style="color:#cbd5e1;">Privacy Policy</a>
+                </p>
+              </div>
+            </div>
+          `,
+        });
+      } catch (emailErr) {
+        // Don't fail the request if the email can't send — user is still created
+        console.warn("[INVITE] Failed to send invitation email to", normalizedEmail, emailErr);
+      }
+
+      res.status(201).json(user);
+    } catch (error) {
+      console.error("Error inviting team member:", error);
+      res.status(500).json({ message: "Failed to invite team member" });
+    }
+  });
+
   app.get("/api/users/:id", isAuthenticated, async (req, res) => {
     try {
       const userId = req.params.id;
@@ -14395,22 +14491,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const loginUrl = `${req.protocol}://${req.hostname}/api/login`;
         await sendEmail({
           to: normalizedEmail,
-          subject: `Your Hubify account is ready`,
+          subject: `${company} is live on Hubify — here's how to get in`,
           html: `
-            <h2>Welcome to Hubify, ${firstName}!</h2>
-            <p>Your organization <strong>${company}</strong> has been created and is ready to use.</p>
-            <p>To activate your account, click the button below and log in with <strong>${normalizedEmail}</strong>:</p>
-            <p style="margin:24px 0">
-              <a href="${loginUrl}" style="background:#2563eb;color:white;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block">
-                Log in to Hubify
-              </a>
-            </p>
-            <p style="color:#64748b;font-size:14px">
-              Make sure to log in with the email address <strong>${normalizedEmail}</strong> so your account is automatically linked to your organization.
-            </p>
-            <p style="color:#94a3b8;font-size:12px;margin-top:24px;border-top:1px solid #e2e8f0;padding-top:16px;">
-              Hubify · [ADD MAILING ADDRESS] · [City, FL ZIP] · <a href="https://hubify.com/privacy" style="color:#94a3b8;">Privacy Policy</a>
-            </p>
+            <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:600px;margin:0 auto;color:#1e293b;">
+              <div style="background:#2563eb;padding:32px 40px;border-radius:12px 12px 0 0;">
+                <h1 style="color:white;margin:0;font-size:24px;font-weight:700;">Welcome to Hubify, ${firstName}.</h1>
+              </div>
+              <div style="background:#ffffff;padding:32px 40px;border-radius:0 0 12px 12px;border:1px solid #e2e8f0;border-top:none;">
+                <p style="font-size:16px;margin:0 0 20px;">Hi ${firstName},</p>
+                <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px;">
+                  Your organization <strong>${company}</strong> has been created and is ready to use.
+                  Hubify is where your team will manage properties, assign tasks, coordinate schedules, and handle client billing — all in one place.
+                </p>
+
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px 24px;margin:0 0 28px;">
+                  <p style="font-size:13px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin:0 0 14px;">A few things to do first</p>
+                  <table style="width:100%;border-collapse:collapse;">
+                    <tr>
+                      <td style="padding:6px 0;font-size:14px;color:#475569;vertical-align:top;width:24px;">1.</td>
+                      <td style="padding:6px 0;font-size:14px;color:#475569;line-height:1.5;">
+                        <strong style="color:#1e293b;">Add your properties</strong> — import your property list or add them one by one under Properties.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:6px 0;font-size:14px;color:#475569;vertical-align:top;">2.</td>
+                      <td style="padding:6px 0;font-size:14px;color:#475569;line-height:1.5;">
+                        <strong style="color:#1e293b;">Invite your team</strong> — go to Team and add the staff and supervisors who'll be doing the work.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:6px 0;font-size:14px;color:#475569;vertical-align:top;">3.</td>
+                      <td style="padding:6px 0;font-size:14px;color:#475569;line-height:1.5;">
+                        <strong style="color:#1e293b;">Create your first task</strong> — assign it to a property and a team member to see how the workflow feels.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:6px 0;font-size:14px;color:#475569;vertical-align:top;">4.</td>
+                      <td style="padding:6px 0;font-size:14px;color:#475569;line-height:1.5;">
+                        <strong style="color:#1e293b;">Set up your client portal</strong> — give clients a way to view their property, tasks, and invoices (optional).
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+
+                <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 8px;">
+                  To activate your account, log in with <strong style="color:#1e293b;">${normalizedEmail}</strong> — that email address is how Hubify links you to ${company}.
+                </p>
+
+                <p style="margin:28px 0 32px;text-align:center;">
+                  <a href="${loginUrl}"
+                     style="display:inline-block;background:#2563eb;color:white;padding:14px 36px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">
+                    Log in to Hubify
+                  </a>
+                </p>
+
+                <p style="font-size:13px;color:#94a3b8;margin:0;">
+                  Questions? Reply to this email and someone from the Hubify team will get back to you.
+                </p>
+
+                <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;" />
+                <p style="font-size:12px;color:#cbd5e1;margin:0;">
+                  Hubify · <a href="https://hubify.com/privacy" style="color:#cbd5e1;">Privacy Policy</a>
+                </p>
+              </div>
+            </div>
           `,
         });
       } catch (emailErr) {

@@ -37,7 +37,12 @@ import {
   Heart,
   ThumbsUp,
   Smile,
-  Mail
+  Mail,
+  MapPin,
+  ClipboardList,
+  UserPlus,
+  LayoutDashboard,
+  ChevronRight,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { prefStorage } from "@/lib/cookieConsent";
@@ -45,6 +50,122 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { useLocation } from "wouter";
 import DashboardCustomizationModal from "@/components/DashboardCustomizationModal";
 import { CalendarWidget, SupportWidget, DuplicatesWidget, BillingWidget } from "@/components/DashboardWidgets";
+
+// ─── Getting Started Card ─────────────────────────────────────────────────────
+// Shown automatically to users who created their account within the last 14 days.
+// Each step links to the relevant page. Dismisses permanently via localStorage.
+
+const WELCOME_STEPS = [
+  {
+    id: "properties",
+    icon: MapPin,
+    title: "Add your properties",
+    description: "Import a CSV or add properties one by one. Each property becomes the home for tasks, access codes, and client notes.",
+    href: "/properties",
+    cta: "Go to Properties",
+  },
+  {
+    id: "team",
+    icon: UserPlus,
+    title: "Invite your team",
+    description: "Add the staff and supervisors who'll handle day-to-day work. They'll get an email with instructions to log in.",
+    href: "/team",
+    cta: "Go to Team",
+  },
+  {
+    id: "task",
+    icon: ClipboardList,
+    title: "Create your first task",
+    description: "Assign a task to a property and a team member. Tasks are the core of how work gets tracked and reported.",
+    href: "/tasks",
+    cta: "Go to Tasks",
+  },
+  {
+    id: "portal",
+    icon: LayoutDashboard,
+    title: "Set up your client portal",
+    description: "Give clients a private view of their property — tasks, invoices, and documents — without sharing your internal tools.",
+    href: "/admin?tab=portal",
+    cta: "Open Admin Settings",
+  },
+];
+
+function GettingStartedCard({ user }: { user: any }) {
+  const [, setLocation] = useLocation();
+  const DISMISS_KEY = "hubify_welcome_dismissed_v1";
+
+  const [dismissed, setDismissed] = useState(() => {
+    try { return localStorage.getItem(DISMISS_KEY) === "true"; } catch { return false; }
+  });
+
+  // Only show for users created within the last 14 days
+  const isNewUser = (() => {
+    if (!user?.createdAt) return false;
+    const created = new Date(user.createdAt);
+    const ageMs = Date.now() - created.getTime();
+    return ageMs < 14 * 24 * 60 * 60 * 1000;
+  })();
+
+  if (dismissed || !isNewUser) return null;
+
+  const dismiss = () => {
+    try { localStorage.setItem(DISMISS_KEY, "true"); } catch { /* noop */ }
+    setDismissed(true);
+  };
+
+  return (
+    <div className="mb-8 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-6 relative">
+      <button
+        onClick={dismiss}
+        className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
+        aria-label="Dismiss"
+      >
+        <X className="w-5 h-5" />
+      </button>
+
+      <div className="mb-5">
+        <h2 className="text-lg font-semibold text-slate-900">Welcome to Hubify — let's get you set up</h2>
+        <p className="text-sm text-slate-500 mt-1">
+          Four quick steps to get your platform running. You can come back to any of these at any time.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {WELCOME_STEPS.map((step, idx) => {
+          const Icon = step.icon;
+          return (
+            <button
+              key={step.id}
+              onClick={() => setLocation(step.href)}
+              className="group text-left bg-white rounded-xl border border-slate-200 p-4 hover:border-blue-300 hover:shadow-md transition-all duration-150"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 text-blue-600 text-xs font-bold flex-shrink-0">
+                  {idx + 1}
+                </span>
+                <Icon className="w-4 h-4 text-blue-500" />
+              </div>
+              <p className="font-medium text-slate-800 text-sm leading-snug mb-1">{step.title}</p>
+              <p className="text-xs text-slate-500 leading-relaxed mb-3">{step.description}</p>
+              <span className="inline-flex items-center text-xs font-medium text-blue-600 group-hover:gap-1.5 gap-1 transition-all">
+                {step.cta} <ChevronRight className="w-3 h-3" />
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-4 text-right">
+        <button
+          onClick={dismiss}
+          className="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2 transition-colors"
+        >
+          Dismiss — I've already done this
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -593,6 +714,9 @@ function renderMessageWithMentions(content: string) {
           </div>
         </div>
       </div>
+
+      {/* Getting Started welcome card — shown for users created in the last 14 days */}
+      <GettingStartedCard user={user} />
 
       {/* Dashboard Widgets */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
