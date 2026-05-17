@@ -187,6 +187,34 @@ export async function ensureOnboardingEnhancements(): Promise<void> {
   }
 }
 
+/**
+ * Create the org_signup_tokens table used by the self-service signup wizard.
+ * Idempotent (CREATE TABLE / INDEX IF NOT EXISTS).
+ */
+export async function ensureOrgSignupTokensTable(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS org_signup_tokens (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+        email VARCHAR NOT NULL,
+        token VARCHAR(64) NOT NULL UNIQUE,
+        expires_at TIMESTAMP NOT NULL,
+        claimed_at TIMESTAMP,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS org_signup_tokens_email_idx ON org_signup_tokens(email);
+      CREATE INDEX IF NOT EXISTS org_signup_tokens_token_idx ON org_signup_tokens(token);
+    `);
+    log("[MIGRATE] org_signup_tokens table verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to ensure org_signup_tokens table: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensureCookieConsentPreferenceColumn(): Promise<void> {
   const client = await pool.connect();
   try {

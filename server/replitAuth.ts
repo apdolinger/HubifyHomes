@@ -148,7 +148,23 @@ export async function setupAuth(app: Express) {
       console.log("[OIDC] Fetched user from database:", dbUser ? "found" : "not found");
       if (dbUser) {
         if (!dbUser.orgId) {
-          if (process.env.NODE_ENV !== "production") {
+          // 1. Check for a pending self-signup activation token (works in all environments)
+          if (dbUser.email) {
+            try {
+              const signupToken = await storage.getOrgSignupTokenByEmail(dbUser.email.toLowerCase());
+              if (signupToken && !signupToken.claimedAt && signupToken.expiresAt > new Date()) {
+                await storage.updateUser(dbUser.id, { orgId: signupToken.orgId, role: "admin" });
+                await storage.claimOrgSignupToken(signupToken.token);
+                dbUser = await storage.getUser(claims["sub"]);
+                console.log("[OIDC] User activated via self-signup token, assigned to org:", signupToken.orgId);
+              }
+            } catch (tokenErr) {
+              console.error("[OIDC] Error checking self-signup token:", tokenErr);
+            }
+          }
+
+          // 2. Dev fallback: assign to default seeded org if still no orgId
+          if (!dbUser?.orgId && process.env.NODE_ENV !== "production") {
             console.log("[OIDC] User has no orgId, assigning to default organization (DEV MODE)");
             const SEEDED_DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
             let defaultOrg = await storage.getOrg(SEEDED_DEFAULT_ORG_ID);
@@ -161,17 +177,17 @@ export async function setupAuth(app: Express) {
             if (!defaultOrg) {
               defaultOrg = await storage.createOrg({
                 name: "Default Organization",
-                contactEmail: dbUser.email || "test@hubify.com",
+                contactEmail: dbUser?.email || "test@hubify.com",
                 tier: "premium",
                 status: "active",
               });
               console.log("[OIDC] Created Default Organization:", defaultOrg.id);
             }
 
-            await storage.updateUser(dbUser.id, { orgId: defaultOrg.id });
+            await storage.updateUser(dbUser!.id, { orgId: defaultOrg.id });
             dbUser = await storage.getUser(claims["sub"]);
             console.log("[OIDC] User assigned to default organization:", defaultOrg?.name, defaultOrg?.id);
-          } else {
+          } else if (!dbUser?.orgId) {
             console.error(
               "[OIDC] Production user missing orgId - user must be invited to an organization:",
               claims["sub"]

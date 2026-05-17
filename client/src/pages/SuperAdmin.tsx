@@ -2302,6 +2302,95 @@ function CommunicationTabContent() {
 }
 
 // ============================================================================
+// Self-Signup Card — sub-component used inside SettingsTabContent
+
+function SelfSignupCard() {
+  const { toast } = useToast();
+  const { data: settings, isLoading } = useQuery<Record<string, any>>({
+    queryKey: ['/api/super-admin/platform-settings'],
+  });
+
+  const [copied, setCopied] = useState(false);
+  const signupUrl = typeof window !== 'undefined' ? `${window.location.origin}/signup` : '/signup';
+
+  const toggleMutation = useMutation({
+    mutationFn: (enabled: boolean) =>
+      apiRequest('PATCH', '/api/super-admin/platform-settings', { selfSignupEnabled: enabled }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/super-admin/platform-settings'] });
+      toast({ title: 'Self-signup setting saved' });
+    },
+    onError: (e: any) => toast({ title: 'Failed to save', description: e.message, variant: 'destructive' }),
+  });
+
+  const enabled = !!settings?.selfSignupEnabled;
+
+  function copyLink() {
+    navigator.clipboard.writeText(signupUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Link2 className="w-5 h-5" />
+          Self-Service Signup
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between p-4 border rounded-lg bg-slate-50">
+          <div>
+            <div className="font-medium text-slate-800">Allow new organizations to sign up</div>
+            <div className="text-sm text-slate-500 mt-0.5">
+              When enabled, anyone with the link can register a new organization and go through the onboarding flow independently.
+            </div>
+          </div>
+          {isLoading ? (
+            <div className="w-10 h-6 bg-slate-200 rounded-full animate-pulse" />
+          ) : (
+            <Switch
+              checked={enabled}
+              onCheckedChange={(v) => toggleMutation.mutate(v)}
+              disabled={toggleMutation.isPending}
+              data-testid="switch-self-signup"
+            />
+          )}
+        </div>
+
+        {enabled && (
+          <div className="space-y-2">
+            <div className="text-sm font-medium text-slate-700">Shareable signup link</div>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 px-3 py-2 rounded-md border bg-white text-sm text-slate-700 font-mono truncate">
+                {signupUrl}
+              </div>
+              <Button size="sm" variant="outline" onClick={copyLink} data-testid="button-copy-signup-link">
+                {copied ? (
+                  <><CheckCircle className="w-4 h-4 mr-1.5 text-green-600" /> Copied</>
+                ) : (
+                  <><ExternalLink className="w-4 h-4 mr-1.5" /> Copy</>
+                )}
+              </Button>
+              <Button size="sm" variant="outline" asChild>
+                <a href="/signup" target="_blank" rel="noopener noreferrer" data-testid="button-open-signup">
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              </Button>
+            </div>
+            <p className="text-xs text-slate-500">
+              Share this link on your website, email campaigns, or social media. New customers can complete the full signup without any manual steps.
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================================================
 // Prospect Alert Settings Card — sub-component used inside SettingsTabContent
 
 interface DigestResult {
@@ -2840,6 +2929,8 @@ function SettingsTabContent() {
   return (
     <div className="space-y-6">
       <SystemIntegrationsCard />
+
+      <SelfSignupCard />
 
       <Card>
         <CardHeader>

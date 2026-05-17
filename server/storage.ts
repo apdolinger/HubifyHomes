@@ -199,6 +199,8 @@ import {
   type InsertSystemAlertAcknowledgement,
   type PlatformSettings,
   type InsertPlatformSettings,
+  type OrgSignupToken,
+  orgSignupTokens,
   type PlatformAlert,
   type InsertPlatformAlert,
   type PlatformAlertAcknowledgement,
@@ -282,7 +284,7 @@ import {
 } from "@shared/schema";
 
 import { db } from "./db";
-import { eq, desc, asc, and, or, like, count, sql, inArray, isNotNull, lt, lte } from "drizzle-orm";
+import { eq, desc, asc, and, or, like, count, sql, inArray, isNotNull, isNull, lt, lte } from "drizzle-orm";
 
 // Default values for the platform_settings key/value store. Any key not in the DB
 // falls back to the value defined here.
@@ -325,6 +327,9 @@ export const PLATFORM_SETTINGS_DEFAULTS: Record<string, any> = {
   passwordRequireSpecial: true,
   maxSessionLengthHours: 24,
   ipWhitelist: "",
+
+  // Self-signup
+  selfSignupEnabled: false,
 
   // Branding
   brandPrimaryColor: "#4F46E5",
@@ -698,6 +703,12 @@ export interface IStorage {
   deleteFeatureFlag(key: string): Promise<void>;
   getOrgFeatureFlagOverrides(orgId: string): Promise<Record<string, boolean>>;
   setOrgFeatureFlagOverride(orgId: string, key: string, enabled: boolean | null): Promise<Record<string, boolean>>;
+
+  // Org self-signup token operations
+  createOrgSignupToken(data: { orgId: string; email: string; token: string; expiresAt: Date }): Promise<OrgSignupToken>;
+  getOrgSignupTokenByEmail(email: string): Promise<OrgSignupToken | undefined>;
+  getOrgSignupTokenByToken(token: string): Promise<OrgSignupToken | undefined>;
+  claimOrgSignupToken(token: string): Promise<void>;
 
   // Super Admin metrics
   getRevenueMetrics(): Promise<{
@@ -7868,6 +7879,30 @@ export class DatabaseStorage implements IStorage {
   async createOnboardingProspectEmail(data: InsertOnboardingProspectEmail): Promise<OnboardingProspectEmail> {
     const [row] = await db.insert(onboardingProspectEmails).values(data).returning();
     return row;
+  }
+
+  // ── Org signup token operations ───────────────────────────────────────────────
+  async createOrgSignupToken(data: { orgId: string; email: string; token: string; expiresAt: Date }): Promise<OrgSignupToken> {
+    const [row] = await db.insert(orgSignupTokens).values(data).returning();
+    return row;
+  }
+
+  async getOrgSignupTokenByEmail(email: string): Promise<OrgSignupToken | undefined> {
+    const [row] = await db.select()
+      .from(orgSignupTokens)
+      .where(and(eq(orgSignupTokens.email, email.toLowerCase()), isNull(orgSignupTokens.claimedAt)))
+      .orderBy(desc(orgSignupTokens.createdAt))
+      .limit(1);
+    return row;
+  }
+
+  async getOrgSignupTokenByToken(token: string): Promise<OrgSignupToken | undefined> {
+    const [row] = await db.select().from(orgSignupTokens).where(eq(orgSignupTokens.token, token));
+    return row;
+  }
+
+  async claimOrgSignupToken(token: string): Promise<void> {
+    await db.update(orgSignupTokens).set({ claimedAt: new Date() }).where(eq(orgSignupTokens.token, token));
   }
 }
 

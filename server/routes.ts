@@ -14307,6 +14307,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Self-service org signup (public) ─────────────────────────────────────────
+  app.get("/api/signup/config", async (_req, res) => {
+    try {
+      const settings = await storage.getPlatformSettings();
+      res.json({ enabled: !!settings.selfSignupEnabled });
+    } catch {
+      res.status(500).json({ message: "Failed to fetch signup config" });
+    }
+  });
+
+  app.post("/api/signup", async (req: any, res) => {
+    try {
+      const { company, firstName, lastName, email, phone, website } = req.body;
+      if (!company || !firstName || !lastName || !email) {
+        return res.status(400).json({ message: "company, firstName, lastName, and email are required" });
+      }
+
+      const settings = await storage.getPlatformSettings();
+      if (!settings.selfSignupEnabled) {
+        return res.status(403).json({ message: "Self-signup is currently disabled" });
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+
+      const existing = await storage.getOrgSignupTokenByEmail(normalizedEmail);
+      if (existing && existing.expiresAt > new Date()) {
+        return res.status(409).json({ message: "An account with this email is already being set up. Check your inbox or log in." });
+      }
+
+      const { insertOrgSchema, insertOrgSubscriptionSchema } = await import("@shared/schema");
+
+      const prospect = await storage.createOnboardingProspect({
+        name: `${firstName} ${lastName}`,
+        email: normalizedEmail,
+        company,
+        phone: phone || undefined,
+        stage: "welcome",
+      });
+
+      const orgData = insertOrgSchema.parse({
+        name: company,
+        phone: phone || undefined,
+        isActive: true,
+      });
+      const org = await storage.createOrg(orgData);
+
+      const subData = insertOrgSubscriptionSchema.parse({
+        orgId: org.id,
+        tier: "starter",
+        status: "trialing",
+      });
+      await storage.upsertOrgSubscription(org.id, subData);
+      await storage.updateOnboardingProspect(prospect.id, { orgId: org.id });
+
+      const { nanoid } = await import("nanoid");
+      const token = nanoid(32);
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await storage.createOrgSignupToken({ orgId: org.id, email: normalizedEmail, token, expiresAt });
+
+      try {
+        const { sendEmail } = await import("./email-service");
+        const loginUrl = `${req.protocol}://${req.hostname}/api/login`;
+        await sendEmail({
+          to: normalizedEmail,
+          subject: `Your Hubify account is ready`,
+          html: `
+            <h2>Welcome to Hubify, ${firstName}!</h2>
+            <p>Your organization <strong>${company}</strong> has been created and is ready to use.</p>
+            <p>To activate your account, click the button below and log in with <strong>${normalizedEmail}</strong>:</p>
+            <p style="margin:24px 0">
+              <a href="${loginUrl}" style="background:#2563eb;color:white;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block">
+                Log in to Hubify
+              </a>
+            </p>
+            <p style="color:#64748b;font-size:14px">
+              Make sure to log in with the email address <strong>${normalizedEmail}</strong> so your account is automatically linked to your organization.
+            </p>
+          `,
+        });
+      } catch (emailErr) {
+        console.warn("[SIGNUP] Failed to send welcome email:", emailErr);
+      }
+
+      res.status(201).json({
+        success: true,
+        orgId: org.id,
+        orgName: org.name,
+        message: `Organization "${company}" created successfully.`,
+      });
+    } catch (error) {
+      console.error("Error during self-signup:", error);
+      res.status(500).json({ message: "Failed to complete signup" });
+    }
+  });
+
   app.post("/api/public/inquire", async (req, res) => {
     try {
       const { insertOnboardingProspectSchema } = await import("@shared/schema");

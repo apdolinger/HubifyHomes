@@ -3437,3 +3437,21 @@ export const insertOnboardingProspectEmailSchema = createInsertSchema(onboarding
 });
 export type InsertOnboardingProspectEmail = z.infer<typeof insertOnboardingProspectEmailSchema>;
 export type OnboardingProspectEmail = typeof onboardingProspectEmails.$inferSelect;
+
+// ── Org self-signup tokens ─────────────────────────────────────────────────────
+// Created when a prospect completes the self-service signup wizard.
+// On first OIDC login, email is matched → user is assigned as org admin + token claimed.
+export const orgSignupTokens = pgTable("org_signup_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => orgs.id, { onDelete: "cascade" }),
+  email: varchar("email").notNull(),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  claimedAt: timestamp("claimed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("org_signup_tokens_email_idx").on(table.email),
+  index("org_signup_tokens_token_idx").on(table.token),
+]);
+export type OrgSignupToken = typeof orgSignupTokens.$inferSelect;
+export type InsertOrgSignupToken = typeof orgSignupTokens.$inferInsert;
