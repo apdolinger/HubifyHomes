@@ -1879,6 +1879,288 @@ function RevenueTabContent() {
 // ============================================================================
 // Monitoring Tab — real system health data
 // ============================================================================
+type ErrorLogEntry = {
+  id: number;
+  level: string;
+  source: string;
+  route: string | null;
+  method: string | null;
+  statusCode: number | null;
+  message: string;
+  stack: string | null;
+  metadata: Record<string, any> | null;
+  userId: string | null;
+  orgId: string | null;
+  ip: string | null;
+  resolved: boolean;
+  createdAt: string;
+};
+
+function LevelBadge({ level }: { level: string }) {
+  if (level === "critical") return <Badge className="bg-purple-100 text-purple-800 border-purple-200 text-xs">Critical</Badge>;
+  if (level === "error")    return <Badge className="bg-red-100 text-red-800 border-red-200 text-xs">Error</Badge>;
+  return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 text-xs">Warn</Badge>;
+}
+
+function SourceBadge({ source }: { source: string }) {
+  const map: Record<string, string> = {
+    server: "bg-slate-100 text-slate-700",
+    unhandled: "bg-red-100 text-red-700",
+    stripe: "bg-indigo-100 text-indigo-700",
+    email: "bg-blue-100 text-blue-700",
+    cron: "bg-green-100 text-green-700",
+    webhook: "bg-orange-100 text-orange-700",
+  };
+  return <Badge className={`${map[source] ?? "bg-slate-100 text-slate-700"} text-xs border-0`}>{source}</Badge>;
+}
+
+function ErrorDetailSheet({ entry, onClose, onResolve }: { entry: ErrorLogEntry; onClose: () => void; onResolve: () => void }) {
+  const resolveMutation = useMutation({
+    mutationFn: () => apiRequest("PATCH", `/api/super-admin/error-logs/${entry.id}/resolve`, { resolved: !entry.resolved }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/super-admin/error-logs"] }); onResolve(); },
+  });
+  return (
+    <Sheet open onOpenChange={onClose}>
+      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+        <SheetHeader className="mb-4">
+          <SheetTitle className="flex items-center gap-2">
+            <LevelBadge level={entry.level} />
+            <SourceBadge source={entry.source} />
+            <span className="text-sm font-normal text-slate-500">#{entry.id}</span>
+          </SheetTitle>
+          <SheetDescription className="text-left text-base font-medium text-slate-900 break-words">{entry.message}</SheetDescription>
+        </SheetHeader>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            {entry.route && <div><span className="text-slate-500">Route</span><div className="font-mono mt-0.5">{entry.method} {entry.route}</div></div>}
+            {entry.statusCode && <div><span className="text-slate-500">Status</span><div className="mt-0.5">{entry.statusCode}</div></div>}
+            {entry.userId && <div><span className="text-slate-500">User ID</span><div className="font-mono mt-0.5 break-all">{entry.userId}</div></div>}
+            {entry.orgId && <div><span className="text-slate-500">Org ID</span><div className="font-mono mt-0.5 break-all">{entry.orgId}</div></div>}
+            {entry.ip && <div><span className="text-slate-500">IP Address</span><div className="font-mono mt-0.5">{entry.ip}</div></div>}
+            <div><span className="text-slate-500">Timestamp</span><div className="mt-0.5">{new Date(entry.createdAt).toLocaleString()}</div></div>
+          </div>
+          {entry.metadata && Object.keys(entry.metadata).length > 0 && (
+            <div>
+              <div className="text-sm text-slate-500 mb-1">Metadata</div>
+              <pre className="bg-slate-50 border rounded p-3 text-xs overflow-x-auto">{JSON.stringify(entry.metadata, null, 2)}</pre>
+            </div>
+          )}
+          {entry.stack && (
+            <div>
+              <div className="text-sm text-slate-500 mb-1">Stack Trace</div>
+              <pre className="bg-slate-900 text-slate-100 rounded p-3 text-xs overflow-x-auto whitespace-pre-wrap">{entry.stack}</pre>
+            </div>
+          )}
+          <div className="flex gap-2 pt-2">
+            <Button size="sm" variant={entry.resolved ? "outline" : "default"} onClick={() => resolveMutation.mutate()} disabled={resolveMutation.isPending}>
+              <CheckCircle className="w-4 h-4 mr-1" />
+              {entry.resolved ? "Mark Unresolved" : "Mark Resolved"}
+            </Button>
+            <Button size="sm" variant="outline" onClick={onClose}>Close</Button>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function ErrorLogsSection() {
+  const [level, setLevel] = useState("all");
+  const [source, setSource] = useState("all");
+  const [search, setSearch] = useState("");
+  const [showResolved, setShowResolved] = useState(false);
+  const [page, setPage] = useState(0);
+  const [selected, setSelected] = useState<ErrorLogEntry | null>(null);
+  const [clearConfirm, setClearConfirm] = useState(false);
+  const PAGE_SIZE = 50;
+
+  const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(page * PAGE_SIZE) });
+  if (level !== "all") params.set("level", level);
+  if (source !== "all") params.set("source", source);
+  if (search.trim()) params.set("search", search.trim());
+  if (!showResolved) params.set("resolved", "false");
+
+  const { data, isLoading, refetch, isFetching } = useQuery<{ logs: ErrorLogEntry[]; total: number }>({
+    queryKey: ["/api/super-admin/error-logs", level, source, search, showResolved, page],
+    queryFn: async () => {
+      const res = await fetch(`/api/super-admin/error-logs?${params}`);
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    refetchInterval: 60000,
+  });
+
+  const resolveMutation = useMutation({
+    mutationFn: ({ id, resolved }: { id: number; resolved: boolean }) =>
+      apiRequest("PATCH", `/api/super-admin/error-logs/${id}/resolve`, { resolved }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/super-admin/error-logs"] }),
+  });
+
+  const clearMutation = useMutation({
+    mutationFn: () => apiRequest("DELETE", `/api/super-admin/error-logs`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/super-admin/error-logs"] }); setClearConfirm(false); },
+  });
+
+  const logs = data?.logs ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  const criticalCount = logs.filter(l => l.level === "critical").length;
+  const warnCount = logs.filter(l => l.level === "warn").length;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5" />
+            Error Logs
+            {total > 0 && <Badge variant="secondary">{total}</Badge>}
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw className={`w-4 h-4 mr-1 ${isFetching ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+            {!clearConfirm ? (
+              <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => setClearConfirm(true)}>
+                <Trash2 className="w-4 h-4 mr-1" /> Clear All
+              </Button>
+            ) : (
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-red-600">Confirm?</span>
+                <Button size="sm" variant="destructive" onClick={() => clearMutation.mutate()} disabled={clearMutation.isPending}>Yes</Button>
+                <Button size="sm" variant="outline" onClick={() => setClearConfirm(false)}>No</Button>
+              </div>
+            )}
+          </div>
+        </div>
+        {total > 0 && (
+          <div className="flex gap-3 text-sm mt-1">
+            {criticalCount > 0 && <span className="text-purple-700 font-medium">{criticalCount} critical</span>}
+            {warnCount > 0 && <span className="text-yellow-700">{warnCount} warnings</span>}
+          </div>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Filters */}
+        <div className="flex flex-wrap gap-2">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-slate-400" />
+            <Input placeholder="Search message or route…" className="pl-8 h-9" value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} />
+          </div>
+          <Select value={level} onValueChange={v => { setLevel(v); setPage(0); }}>
+            <SelectTrigger className="w-[120px] h-9"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All levels</SelectItem>
+              <SelectItem value="critical">Critical</SelectItem>
+              <SelectItem value="error">Error</SelectItem>
+              <SelectItem value="warn">Warn</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={source} onValueChange={v => { setSource(v); setPage(0); }}>
+            <SelectTrigger className="w-[130px] h-9"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All sources</SelectItem>
+              <SelectItem value="server">Server</SelectItem>
+              <SelectItem value="unhandled">Unhandled</SelectItem>
+              <SelectItem value="stripe">Stripe</SelectItem>
+              <SelectItem value="email">Email</SelectItem>
+              <SelectItem value="cron">Cron</SelectItem>
+              <SelectItem value="webhook">Webhook</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <Switch checked={showResolved} onCheckedChange={v => { setShowResolved(v); setPage(0); }} />
+            <span>Show resolved</span>
+          </div>
+        </div>
+
+        {/* Table */}
+        {isLoading ? (
+          <div className="py-8 text-center text-slate-500">Loading…</div>
+        ) : logs.length === 0 ? (
+          <div className="py-10 text-center" data-testid="text-no-errors">
+            <CheckCircle className="w-10 h-10 mx-auto mb-2 text-green-500" />
+            <div className="text-slate-600 font-medium">No errors found</div>
+            <div className="text-sm text-slate-400 mt-1">The platform is running cleanly.</div>
+          </div>
+        ) : (
+          <>
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-50">
+                    <TableHead className="w-[140px]">Time</TableHead>
+                    <TableHead className="w-[90px]">Level</TableHead>
+                    <TableHead className="w-[100px]">Source</TableHead>
+                    <TableHead className="w-[160px]">Route</TableHead>
+                    <TableHead>Message</TableHead>
+                    <TableHead className="w-[80px] text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {logs.map(log => (
+                    <TableRow
+                      key={log.id}
+                      className={`cursor-pointer hover:bg-slate-50 ${log.resolved ? "opacity-50" : ""}`}
+                      onClick={() => setSelected(log)}
+                    >
+                      <TableCell className="text-xs text-slate-500 whitespace-nowrap">
+                        {new Date(log.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </TableCell>
+                      <TableCell><LevelBadge level={log.level} /></TableCell>
+                      <TableCell><SourceBadge source={log.source} /></TableCell>
+                      <TableCell className="font-mono text-xs text-slate-600 max-w-[160px] truncate">
+                        {log.method && <span className="text-slate-400 mr-1">{log.method}</span>}
+                        {log.route ?? "—"}
+                        {log.statusCode && <span className="ml-1 text-slate-400">[{log.statusCode}]</span>}
+                      </TableCell>
+                      <TableCell className="text-sm max-w-xs">
+                        <span className="line-clamp-1">{log.message}</span>
+                      </TableCell>
+                      <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0"
+                          title={log.resolved ? "Mark unresolved" : "Mark resolved"}
+                          onClick={() => resolveMutation.mutate({ id: log.id, resolved: !log.resolved })}
+                        >
+                          <CheckCircle className={`w-4 h-4 ${log.resolved ? "text-green-500" : "text-slate-300"}`} />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between text-sm text-slate-600">
+                <span>{total} total · page {page + 1} of {totalPages}</span>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage(p => p - 1)}>Previous</Button>
+                  <Button size="sm" variant="outline" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>Next</Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+
+      {selected && (
+        <ErrorDetailSheet
+          entry={selected}
+          onClose={() => setSelected(null)}
+          onResolve={() => setSelected(null)}
+        />
+      )}
+    </Card>
+  );
+}
+
 function MonitoringTabContent() {
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery<{
     uptimeSeconds: number;
@@ -1960,38 +2242,7 @@ function MonitoringTabContent() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center"><AlertTriangle className="w-5 h-5 mr-2" />Recent Errors (last 24h)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {data.recentErrors.length === 0 ? (
-            <div className="py-8 text-center text-slate-500" data-testid="text-no-errors">
-              <CheckCircle className="w-10 h-10 mx-auto mb-2 text-green-500" />
-              No errors in the last 24 hours.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {data.recentErrors.map((err, idx) => {
-                const isCritical = err.severity === 'critical';
-                return (
-                  <div key={idx} className={`flex items-start justify-between p-3 rounded-lg border ${isCritical ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'}`} data-testid={`error-${idx}`}>
-                    <div className="flex items-start space-x-3 flex-1 min-w-0">
-                      {isCritical ? <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" /> : <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />}
-                      <div className="min-w-0 flex-1">
-                        <div className={`font-medium ${isCritical ? 'text-red-900' : 'text-yellow-900'}`}>{err.title}</div>
-                        <div className={`text-sm break-words ${isCritical ? 'text-red-700' : 'text-yellow-700'}`}>{err.message}</div>
-                        {err.orgName && <div className={`text-xs mt-1 ${isCritical ? 'text-red-600' : 'text-yellow-600'}`}>Org: {err.orgName}</div>}
-                      </div>
-                    </div>
-                    <div className={`text-xs ml-2 flex-shrink-0 ${isCritical ? 'text-red-600' : 'text-yellow-600'}`}>{new Date(err.createdAt).toLocaleString()}</div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <ErrorLogsSection />
     </div>
   );
 }

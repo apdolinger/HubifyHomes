@@ -3438,6 +3438,30 @@ export const insertOnboardingProspectEmailSchema = createInsertSchema(onboarding
 export type InsertOnboardingProspectEmail = z.infer<typeof insertOnboardingProspectEmailSchema>;
 export type OnboardingProspectEmail = typeof onboardingProspectEmails.$inferSelect;
 
+// ── Error Logs ────────────────────────────────────────────────────────────────
+// Captures server-side errors for the Super Admin monitoring dashboard.
+export const errorLogs = pgTable("error_logs", {
+  id: serial("id").primaryKey(),
+  level: varchar("level", { length: 20 }).notNull().default("error"), // error | warn | critical
+  source: varchar("source", { length: 50 }).notNull().default("server"), // server | unhandled | stripe | email | cron | webhook
+  route: varchar("route", { length: 500 }),
+  method: varchar("method", { length: 10 }),
+  statusCode: integer("status_code"),
+  message: text("message").notNull(),
+  stack: text("stack"),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  userId: varchar("user_id"),
+  orgId: uuid("org_id"),
+  ip: varchar("ip", { length: 100 }),
+  resolved: boolean("resolved").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("error_logs_level_idx").on(table.level),
+  index("error_logs_created_at_idx").on(table.createdAt),
+  index("error_logs_resolved_idx").on(table.resolved),
+]);
+export type ErrorLog = typeof errorLogs.$inferSelect;
+
 // ── Org self-signup tokens ─────────────────────────────────────────────────────
 // Created when a prospect completes the self-service signup wizard.
 // On first OIDC login, email is matched → user is assigned as org admin + token claimed.

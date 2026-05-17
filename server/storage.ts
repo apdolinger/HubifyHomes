@@ -281,6 +281,8 @@ import {
   type InsertChecklistTemplate,
   type Notification,
   type InsertNotification,
+  errorLogs,
+  type ErrorLog,
 } from "@shared/schema";
 
 import { db } from "./db";
@@ -4389,6 +4391,55 @@ export class DatabaseStorage implements IStorage {
       },
       recentErrors: recentErrors.slice(0, 15),
     };
+  }
+
+  // ── Error Log operations ──────────────────────────────────────────────────
+  async getErrorLogs(opts: {
+    level?: string;
+    source?: string;
+    search?: string;
+    resolved?: boolean;
+    limit?: number;
+    offset?: number;
+    from?: Date;
+  }): Promise<{ logs: ErrorLog[]; total: number }> {
+    const conditions: any[] = [];
+    if (opts.level)    conditions.push(eq(errorLogs.level, opts.level));
+    if (opts.source)   conditions.push(eq(errorLogs.source, opts.source));
+    if (opts.resolved !== undefined) conditions.push(eq(errorLogs.resolved, opts.resolved));
+    if (opts.from)     conditions.push(sql`${errorLogs.createdAt} >= ${opts.from.toISOString()}`);
+    if (opts.search) {
+      const q = `%${opts.search}%`;
+      conditions.push(sql`(${errorLogs.message} ILIKE ${q} OR ${errorLogs.route} ILIKE ${q})`);
+    }
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+    const [{ total }] = await db
+      .select({ total: count() })
+      .from(errorLogs)
+      .where(where);
+    const logs = await db
+      .select()
+      .from(errorLogs)
+      .where(where)
+      .orderBy(desc(errorLogs.createdAt))
+      .limit(opts.limit ?? 100)
+      .offset(opts.offset ?? 0);
+    return { logs, total: Number(total) };
+  }
+
+  async resolveErrorLog(id: number, resolved: boolean): Promise<void> {
+    await db.update(errorLogs).set({ resolved }).where(eq(errorLogs.id, id));
+  }
+
+  async clearErrorLogs(olderThanDays?: number): Promise<number> {
+    const cutoff = olderThanDays
+      ? new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000)
+      : undefined;
+    const result = await db
+      .delete(errorLogs)
+      .where(cutoff ? sql`${errorLogs.createdAt} < ${cutoff.toISOString()}` : undefined)
+      .returning({ id: errorLogs.id });
+    return result.length;
   }
 
   // Contact-Property relationship operations

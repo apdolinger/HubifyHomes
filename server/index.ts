@@ -4,6 +4,7 @@ import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startScheduledTasks } from "./scheduledTasks";
+import { logError } from "./errorLogger";
 
 const app = express();
 
@@ -147,15 +148,43 @@ app.use((req, res, next) => {
 
   const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
+
+    // Persist 5xx errors to the error_logs table for Super Admin monitoring
+    if (status >= 500) {
+      const user = (req as any).user;
+      logError({
+        level: "error",
+        source: "server",
+        route: req.path,
+        method: req.method,
+        statusCode: status,
+        message,
+        stack: err?.stack,
+        userId: user?.claims?.sub || user?.id,
+        orgId: user?.claims?.orgId || user?.orgId,
+        ip: req.ip || (req.headers["x-forwarded-for"] as string),
+        metadata: { url: req.originalUrl },
+      });
+    }
 
     // Guard against double-send (e.g. async session-save errors arriving
     // after the route handler already flushed a response).
     if (!res.headersSent) {
       res.status(status).json({ message });
     }
+  });
+
+  // Capture uncaught process-level errors
+  process.on("uncaughtException", (err: Error) => {
+    logError({ level: "critical", source: "unhandled", message: err.message, stack: err.stack });
+    console.error("[UNCAUGHT EXCEPTION]", err);
+  });
+  process.on("unhandledRejection", (reason: any) => {
+    logError({ level: "critical", source: "unhandled", message: String(reason?.message ?? reason), stack: reason?.stack });
+    console.error("[UNHANDLED REJECTION]", reason);
   });
 
   // importantly only setup vite in development and after
@@ -180,7 +209,7 @@ app.use((req, res, next) => {
     // Without this the dispatcher logs an error on every task mutation in
     // environments where the webhook integration was never provisioned.
     try {
-      const { ensureWebhookTables, ensureCookieConsentPreferenceColumn, ensureOnboardingProspectsTable, ensureInvoiceReceiptColumns, ensureOrgSignupTokensTable } = await import('./runMigrations.js');
+      const { ensureWebhookTables, ensureCookieConsentPreferenceColumn, ensureOnboardingProspectsTable, ensureInvoiceReceiptColumns, ensureOrgSignupTokensTable, ensureErrorLogsTable } = await import('./runMigrations.js');
       try {
         await ensureWebhookTables();
       } catch (err) {
@@ -205,6 +234,11 @@ app.use((req, res, next) => {
         await ensureOrgSignupTokensTable();
       } catch (err) {
         console.error('Error ensuring org_signup_tokens table:', err);
+      }
+      try {
+        await ensureErrorLogsTable();
+      } catch (err) {
+        console.error('Error ensuring error_logs table:', err);
       }
     } catch (error) {
       console.error('Error loading startup migrations:', error);

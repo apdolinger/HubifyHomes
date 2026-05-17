@@ -215,6 +215,38 @@ export async function ensureOrgSignupTokensTable(): Promise<void> {
   }
 }
 
+export async function ensureErrorLogsTable(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS error_logs (
+        id SERIAL PRIMARY KEY,
+        level VARCHAR(20) NOT NULL DEFAULT 'error',
+        source VARCHAR(50) NOT NULL DEFAULT 'server',
+        route VARCHAR(500),
+        method VARCHAR(10),
+        status_code INTEGER,
+        message TEXT NOT NULL,
+        stack TEXT,
+        metadata JSONB,
+        user_id VARCHAR,
+        org_id UUID,
+        ip VARCHAR(100),
+        resolved BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS error_logs_level_idx ON error_logs(level);
+      CREATE INDEX IF NOT EXISTS error_logs_created_at_idx ON error_logs(created_at);
+      CREATE INDEX IF NOT EXISTS error_logs_resolved_idx ON error_logs(resolved);
+    `);
+    log("[MIGRATE] error_logs table verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to ensure error_logs table: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensureCookieConsentPreferenceColumn(): Promise<void> {
   const client = await pool.connect();
   try {

@@ -16493,6 +16493,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Error Log endpoints (Super Admin) ────────────────────────────────────────
+  app.get("/api/super-admin/error-logs", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const level  = req.query.level  as string | undefined;
+      const source = req.query.source as string | undefined;
+      const search = req.query.search as string | undefined;
+      const resolved = req.query.resolved === "true" ? true : req.query.resolved === "false" ? false : undefined;
+      const limit  = Math.min(parseInt(req.query.limit  as string || "100", 10), 500);
+      const offset = parseInt(req.query.offset as string || "0", 10);
+      const from   = req.query.from ? new Date(req.query.from as string) : undefined;
+      const logs   = await storage.getErrorLogs({ level, source, search, resolved, limit, offset, from });
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching error logs:", error);
+      res.status(500).json({ message: "Failed to fetch error logs" });
+    }
+  });
+
+  app.patch("/api/super-admin/error-logs/:id/resolve", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const { resolved } = req.body;
+      await storage.resolveErrorLog(id, resolved !== false);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error resolving error log:", error);
+      res.status(500).json({ message: "Failed to update error log" });
+    }
+  });
+
+  app.delete("/api/super-admin/error-logs", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const olderThanDays = req.query.olderThanDays ? parseInt(req.query.olderThanDays as string, 10) : undefined;
+      const deleted = await storage.clearErrorLogs(olderThanDays);
+      res.json({ deleted });
+    } catch (error) {
+      console.error("Error clearing error logs:", error);
+      res.status(500).json({ message: "Failed to clear error logs" });
+    }
+  });
+
   // Register the conflict detector for scheduled tasks
   const { setConflictDetector } = await import('./scheduledTasks');
   setConflictDetector(detectAndCreateEventConflicts);
