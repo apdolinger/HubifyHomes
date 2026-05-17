@@ -1434,7 +1434,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/teams", isAuthenticated, async (req, res) => {
+  app.post("/api/teams", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const userOrgId = (req.user as any)?.claims?.orgId;
       const userId = (req.user as any)?.claims?.sub;
@@ -1474,7 +1474,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/teams/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/teams/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const teamId = req.params.id;
       const updates = req.body;
@@ -1486,7 +1486,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/teams/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/teams/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const teamId = req.params.id;
       await storage.deleteTeam(teamId);
@@ -1497,7 +1497,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/teams/:teamId/members", isAuthenticated, async (req, res) => {
+  app.post("/api/teams/:teamId/members", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { teamId } = req.params;
       const result = insertTeamMemberSchema.safeParse({
@@ -1517,7 +1517,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/teams/:teamId/members/:userId", isAuthenticated, async (req, res) => {
+  app.delete("/api/teams/:teamId/members/:userId", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { teamId, userId } = req.params;
       await storage.removeTeamMember(teamId, userId);
@@ -1539,7 +1539,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/teams/:teamId/members/:userId/role", isAuthenticated, async (req, res) => {
+  app.patch("/api/teams/:teamId/members/:userId/role", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { teamId, userId } = req.params;
       const { role } = req.body;
@@ -1569,7 +1569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Send email to entire team
-  app.post("/api/teams/send-email", isAuthenticated, async (req: any, res) => {
+  app.post("/api/teams/send-email", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const { processMergeFields, buildMergeFieldData, sendEmail } = await import('./email-service');
       
@@ -3038,8 +3038,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid community ID' });
       }
 
-      // Get all properties filtered by community ID
-      const allProperties = await storage.getProperties();
+      // Get all properties filtered by community ID (org-scoped)
+      const communityOrgId = (req as any).user?.claims?.orgId || (req as any).user?.orgId;
+      const allProperties = await storage.getProperties(false, communityOrgId);
       const communityProperties = allProperties.filter((p: any) => p.communityId === id);
       
       res.json(communityProperties);
@@ -4669,9 +4670,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // SECURITY: Verify user's org has at least one property in this community
-        const allProperties = await storage.getProperties(true);
+        const allProperties = await storage.getProperties(true, userOrgId);
         const orgCommunityProperties = allProperties.filter(
-          p => p.communityId === communityId && p.orgId === userOrgId
+          p => p.communityId === communityId
         );
         
         if (orgCommunityProperties.length === 0) {
@@ -4758,9 +4759,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else {
         // For community-wide documents, verify user's org has at least one property in this community
-        const allProperties = await storage.getProperties(true); // Include inactive
+        const allProperties = await storage.getProperties(true, userOrgId);
         const orgCommunityProperties = allProperties.filter(
-          p => p.communityId === document.communityId && p.orgId === userOrgId
+          p => p.communityId === document.communityId
         );
         
         if (orgCommunityProperties.length === 0) {
@@ -4822,7 +4823,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { includeInactive, managerId } = req.query;
       const includeInactiveFlag = includeInactive === 'true';
-      let properties = await storage.getProperties(includeInactiveFlag);
+      const orgId = (req as any).user?.claims?.orgId || (req as any).user?.orgId;
+      let properties = await storage.getProperties(includeInactiveFlag, orgId);
       
       // Filter by managerId if provided
       if (managerId) {
@@ -6193,7 +6195,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/tasks", isAuthenticated, async (req, res) => {
     try {
       const { assignedTo, limit, showArchived } = req.query;
-      let tasks = await storage.getTasks();
+      const tasksOrgId = (req as any).user?.claims?.orgId || (req as any).user?.orgId;
+      let tasks = await storage.getTasks(tasksOrgId);
       
       console.log(`[TASKS DEBUG] Total tasks: ${tasks.length}, showArchived: ${showArchived}, archived count: ${tasks.filter(t => t.isArchived).length}`);
       
@@ -6229,7 +6232,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get task templates (tasks marked as templates)
   app.get("/api/tasks/templates", isAuthenticated, async (req, res) => {
     try {
-      const tasks = await storage.getTasks();
+      const templatesOrgId = (req as any).user?.claims?.orgId || (req as any).user?.orgId;
+      const tasks = await storage.getTasks(templatesOrgId);
       const templates = tasks.filter(task => task.isTemplate && !task.isArchived);
       res.json(templates);
     } catch (error) {
@@ -6832,12 +6836,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return true;
       });
 
-      const [allUsers, allPropertiesGlobal] = await Promise.all([
+      const [allUsers, allProperties] = await Promise.all([
         storage.getUsersByOrg(orgId),
-        storage.getProperties(true),
+        storage.getProperties(true, orgId),
       ]);
-      // Strict multi-tenant boundary: only resolve labels for this org's properties.
-      const allProperties = allPropertiesGlobal.filter((p) => p.orgId === orgId);
       const userMap = new Map<string, string>(
         allUsers.map((u) => [u.id, `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || u.email || u.id])
       );
@@ -7110,7 +7112,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/contacts", isAuthenticated, async (req, res) => {
     try {
       const includeInactive = req.query.includeInactive === 'true';
-      const contacts = await storage.getContacts(includeInactive);
+      const orgId = (req as any).user?.claims?.orgId || (req as any).user?.orgId;
+      const contacts = await storage.getContacts(includeInactive, orgId);
       res.json(contacts);
     } catch (error) {
       console.error("Error fetching contacts:", error);
@@ -10718,20 +10721,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
       
-      // Fetch all tasks and filter to this organization's tasks with due dates
-      const allTasks = await storage.getTasks();
-      const orgTasks = allTasks.filter(task => 
-        task.property?.id && 
-        task.dueDate && 
+      // Fetch tasks and properties scoped to this org
+      const [allTasks, orgPropertiesList] = await Promise.all([
+        storage.getTasks(orgId),
+        storage.getProperties(true, orgId),
+      ]);
+      const orgTasks = allTasks.filter(task =>
+        task.property?.id &&
+        task.dueDate &&
         !task.isArchived &&
         task.status !== 'completed' &&
         task.status !== 'cancelled'
       );
-      
-      // Get properties for this org to filter tasks
-      const allProperties = await storage.getProperties();
-      const orgProperties = allProperties.filter(p => p.orgId === orgId);
-      const propertyIds = new Set(orgProperties.map(p => p.id));
+      const propertyIds = new Set(orgPropertiesList.map(p => p.id));
       
       // Filter tasks to only those belonging to this org's properties
       const orgTasksFiltered = orgTasks.filter(task => 
@@ -11678,7 +11680,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Platform Invoice routes (Admin → Organizations)
   const statusEnum = z.enum(["draft", "open", "paid", "void", "uncollectible"]);
   
-  app.get("/api/admin/invoices", isAuthenticated, async (req, res) => {
+  app.get("/api/admin/invoices", isAuthenticated, isAdmin, async (req, res) => {
     try {
       if (req.user?.role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
@@ -11703,7 +11705,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/invoices/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/admin/invoices/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       if (req.user?.role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
@@ -11720,7 +11722,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/invoices", isAuthenticated, async (req, res) => {
+  app.post("/api/admin/invoices", isAuthenticated, isAdmin, async (req, res) => {
     try {
       if (req.user?.role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
@@ -11738,7 +11740,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/admin/invoices/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/admin/invoices/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       if (req.user?.role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
@@ -11761,7 +11763,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/admin/invoices/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/admin/invoices/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       if (req.user?.role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
@@ -11781,7 +11783,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin Notes Search - Search across all note types in the system
-  app.get("/api/admin/notes/search", isAuthenticated, async (req, res) => {
+  app.get("/api/admin/notes/search", isAuthenticated, isAdmin, async (req, res) => {
     try {
       if (req.user?.role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
@@ -11803,7 +11805,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Upload/Download endpoints for admin platform invoices
-  app.post("/api/admin/invoices/:id/upload", uploadInvoice.single('file'), isAuthenticated, async (req, res) => {
+  app.post("/api/admin/invoices/:id/upload", uploadInvoice.single('file'), isAuthenticated, isAdmin, async (req, res) => {
     try {
       if (req.user?.role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
@@ -11847,7 +11849,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/invoices/:id/download", isAuthenticated, async (req, res) => {
+  app.get("/api/admin/invoices/:id/download", isAuthenticated, isAdmin, async (req, res) => {
     try {
       if (req.user?.role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
@@ -12356,7 +12358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // CSV Import history endpoint
-  app.get("/api/admin/import/history", isAuthenticated, async (req, res) => {
+  app.get("/api/admin/import/history", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const user = req.user as any;
       const userRole = user?.claims?.role || user?.role;
@@ -12386,7 +12388,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     fieldMapping: z.record(z.string()),
   });
 
-  app.post("/api/admin/import/execute", isAuthenticated, async (req, res) => {
+  app.post("/api/admin/import/execute", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const user = req.user as any;
       const userId = user?.claims?.sub || user?.id;

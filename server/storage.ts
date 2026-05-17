@@ -2404,11 +2404,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Property operations
-  async getProperties(includeInactive: boolean = false): Promise<Property[]> {
-    if (includeInactive) {
-      return await db.select().from(properties).orderBy(desc(properties.createdAt));
-    }
-    return await db.select().from(properties).where(eq(properties.isActive, true)).orderBy(desc(properties.createdAt));
+  async getProperties(includeInactive: boolean = false, orgId?: string): Promise<Property[]> {
+    const conditions: any[] = [];
+    if (!includeInactive) conditions.push(eq(properties.isActive, true));
+    if (orgId) conditions.push(eq(properties.orgId, orgId));
+    return await db
+      .select()
+      .from(properties)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(properties.createdAt));
   }
 
   async getProperty(id: number): Promise<Property | undefined> {
@@ -2971,7 +2975,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Task operations
-  async getTasks(): Promise<Task[]> {
+  async getTasks(orgId?: string): Promise<Task[]> {
     return await db.select({
       id: tasks.id,
       title: tasks.title,
@@ -3022,7 +3026,9 @@ export class DatabaseStorage implements IStorage {
     .leftJoin(properties, eq(tasks.propertyId, properties.id))
     .leftJoin(contacts, eq(tasks.contactId, contacts.id))
     .leftJoin(users, eq(tasks.assignedToId, users.id))
-    .where(eq(tasks.isArchived, false))
+    .where(orgId
+      ? and(eq(tasks.isArchived, false), eq(properties.orgId, orgId))
+      : eq(tasks.isArchived, false))
     .orderBy(desc(tasks.createdAt));
   }
 
@@ -3696,10 +3702,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Contact operations
-  async getContacts(includeInactive: boolean = false): Promise<Contact[]> {
-    const contactsQuery = includeInactive 
-      ? db.select().from(contacts).orderBy(desc(contacts.createdAt))
-      : db.select().from(contacts).where(eq(contacts.isActive, true)).orderBy(desc(contacts.createdAt));
+  async getContacts(includeInactive: boolean = false, orgId?: string): Promise<Contact[]> {
+    const conditions: any[] = [];
+    if (!includeInactive) conditions.push(eq(contacts.isActive, true));
+    if (orgId) conditions.push(eq(contacts.orgId, orgId));
+    const contactsQuery = db
+      .select()
+      .from(contacts)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(contacts.createdAt));
     
     const contactsList = await contactsQuery;
     
