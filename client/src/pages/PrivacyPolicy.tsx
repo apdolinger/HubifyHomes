@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { openCookiePreferences } from "@/lib/cookieConsent";
 
 export default function PrivacyPolicy() {
-  const lastUpdated = "October 2, 2025";
+  const lastUpdated = "May 17, 2026";
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -116,7 +116,7 @@ export default function PrivacyPolicy() {
                 <ul className="list-disc list-inside text-slate-700 space-y-1 ml-4">
                   <li><strong>Cloud Hosting:</strong> Replit, Google Cloud Platform (data storage and infrastructure)</li>
                   <li><strong>Payment Processing:</strong> Stripe (credit card processing, subscription billing)</li>
-                  <li><strong>Email Services:</strong> SendGrid (transactional and marketing emails)</li>
+                  <li><strong>Email Services:</strong> Resend (transactional and marketing emails)</li>
                   <li><strong>Authentication:</strong> Replit Auth, Google OAuth (identity verification)</li>
                   <li><strong>Analytics:</strong> Aggregated usage analytics (no personally identifiable information shared)</li>
                   <li><strong>Object Storage:</strong> Google Cloud Storage (file uploads, documents, images)</li>
@@ -215,7 +215,7 @@ export default function PrivacyPolicy() {
                 <ul className="list-disc list-inside text-slate-700 space-y-1 ml-4">
                   <li><strong>Email:</strong> privacy@hubify.com</li>
                   <li><strong>Web Form:</strong> Available in your account settings</li>
-                  <li><strong>Mail:</strong> Hubify Privacy Officer, [Business Address]</li>
+                  <li><strong>Mail:</strong> Hubify Privacy Officer, [ADD MAILING ADDRESS]</li>
                 </ul>
                 <p className="text-slate-700 mt-2">
                   We will respond within 45 days (CCPA), 30 days (GDPR), or as required by applicable law.
@@ -318,8 +318,8 @@ export default function PrivacyPolicy() {
                 <p><strong>Privacy Officer:</strong> Hubify Privacy Team</p>
                 <p><strong>Email:</strong> privacy@hubify.com</p>
                 <p><strong>Mail:</strong> Hubify Privacy Officer<br />
-                [Business Address]<br />
-                [City, State ZIP]</p>
+                [ADD MAILING ADDRESS]<br />
+                [City, FL — add ZIP]</p>
                 <p><strong>Response Time:</strong> We respond to privacy requests within 30-45 days</p>
               </div>
             </div>

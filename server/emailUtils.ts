@@ -271,6 +271,7 @@ export function generateEventInvitationHTML(data: EventInvitationData): string {
     <div class="footer">
       <p class="footer-text">Sent by <strong>${organizationName}</strong></p>
       <p class="footer-text">This is an automated event invitation from your property management team.</p>
+      <p class="footer-text" style="margin-top:8px;font-size:12px;color:#999999;">Hubify · [ADD MAILING ADDRESS] · [City, FL ZIP] · <a href="https://hubify.com/privacy" style="color:#999999;">Privacy Policy</a></p>
     </div>
   </div>
 </body>
@@ -666,6 +667,7 @@ export function generateInvoiceEmailHTML(data: InvoiceEmailData): string {
     <div class="footer">
       <p style="margin: 0 0 10px 0;">This is an automated invoice notification from ${organizationName}</p>
       <p style="margin: 0;">Please do not reply directly to this email.</p>
+      <p style="margin: 10px 0 0 0; font-size: 12px; color: #999999;">Hubify · [ADD MAILING ADDRESS] · [City, FL ZIP] · <a href="https://hubify.com/privacy" style="color:#999999;">Privacy Policy</a></p>
     </div>
   </div>
 </body>

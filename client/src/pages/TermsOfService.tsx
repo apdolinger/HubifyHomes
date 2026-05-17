@@ -2,7 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { FileText, Scale, Shield, AlertTriangle, Users, Ban } from "lucide-react";
 
 export default function TermsOfService() {
-  const lastUpdated = "October 2, 2025";
+  const lastUpdated = "May 17, 2026";
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -342,7 +342,7 @@ export default function TermsOfService() {
               <div>
                 <h3 className="font-semibold mb-2">12.1 Governing Law</h3>
                 <p className="text-slate-700">
-                  These Terms shall be governed by and construed in accordance with the laws of [Your State/Province], without regard to conflict of law principles.
+                  These Terms shall be governed by and construed in accordance with the laws of the State of Florida, without regard to conflict of law principles.
                 </p>
               </div>
 
@@ -496,8 +496,8 @@ export default function TermsOfService() {
                 <p><strong>Support:</strong> support@hubify.com</p>
                 <p><strong>DMCA Notices:</strong> dmca@hubify.com</p>
                 <p><strong>Mail:</strong> Hubify Legal Department<br />
-                [Business Address]<br />
-                [City, State ZIP]</p>
+                [ADD MAILING ADDRESS]<br />
+                [City, FL — add ZIP]</p>
               </div>
             </div>
           </section>

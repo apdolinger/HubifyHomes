@@ -7472,6 +7472,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     </div>
     <div class="footer">
       <p class="footer-text">This message was sent from ${organizationName}</p>
+      <p class="footer-text" style="font-size:12px;color:#999999;margin-top:8px;">Hubify · [ADD MAILING ADDRESS] · [City, FL ZIP] · <a href="https://hubify.com/privacy" style="color:#999999;">Privacy Policy</a></p>
     </div>
   </div>
 </body>
@@ -14401,6 +14402,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             </p>
             <p style="color:#64748b;font-size:14px">
               Make sure to log in with the email address <strong>${normalizedEmail}</strong> so your account is automatically linked to your organization.
+            </p>
+            <p style="color:#94a3b8;font-size:12px;margin-top:24px;border-top:1px solid #e2e8f0;padding-top:16px;">
+              Hubify · [ADD MAILING ADDRESS] · [City, FL ZIP] · <a href="https://hubify.com/privacy" style="color:#94a3b8;">Privacy Policy</a>
             </p>
           `,
         });
