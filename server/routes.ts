@@ -92,6 +92,7 @@ import {
   type InsertOnboardingProspect,
   type OnboardingStage,
   onboardingProspects,
+  type InsertDiscountCode,
 } from "@shared/schema";
 import { z } from "zod";
 import { createSetupIntentForClient, detachPaymentMethod, createPortalPayIntentForInvoice, chargeInvoice } from "./stripe";
@@ -16719,7 +16720,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/super-admin/discount-codes", isSuperAdmin, requireMFA, async (req: any, res) => {
+  app.post("/api/super-admin/discount-codes", isSuperAdmin, requireMFA, async (req, res) => {
     try {
       const schema = z.object({
         code:            z.string().min(1).max(64),
@@ -16739,14 +16740,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiresAt: expiresAt ? new Date(expiresAt) : null,
       });
       res.status(201).json(code);
-    } catch (error: any) {
-      if (error?.code === "23505") return res.status(409).json({ message: "A code with that name already exists" });
+    } catch (error) {
+      const dbErr = error as { code?: string };
+      if (dbErr?.code === "23505") return res.status(409).json({ message: "A code with that name already exists" });
       console.error("Error creating discount code:", error);
       res.status(500).json({ message: "Failed to create discount code" });
     }
   });
 
-  app.patch("/api/super-admin/discount-codes/:id", isSuperAdmin, requireMFA, async (req: any, res) => {
+  app.patch("/api/super-admin/discount-codes/:id", isSuperAdmin, requireMFA, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const schema = z.object({
@@ -16761,19 +16763,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       const result = schema.safeParse(req.body);
       if (!result.success) return res.status(400).json({ message: "Invalid data", errors: result.error.errors });
-      const { expiresAt, ...rest } = result.data;
-      const updates: any = { ...rest };
-      if (expiresAt !== undefined) updates.expiresAt = expiresAt ? new Date(expiresAt) : null;
+      const { expiresAt, code: rawCode, ...rest } = result.data;
+      const updates: Partial<InsertDiscountCode> = {
+        ...rest,
+        ...(rawCode !== undefined && { code: rawCode.toUpperCase().trim() }),
+        ...(expiresAt !== undefined && { expiresAt: expiresAt ? new Date(expiresAt) : null }),
+      };
       const updated = await storage.updateDiscountCode(id, updates);
       res.json(updated);
-    } catch (error: any) {
-      if (error?.code === "23505") return res.status(409).json({ message: "A code with that name already exists" });
+    } catch (error) {
+      const dbErr = error as { code?: string };
+      if (dbErr?.code === "23505") return res.status(409).json({ message: "A code with that name already exists" });
       console.error("Error updating discount code:", error);
       res.status(500).json({ message: "Failed to update discount code" });
     }
   });
 
-  app.delete("/api/super-admin/discount-codes/:id", isSuperAdmin, requireMFA, async (req: any, res) => {
+  app.delete("/api/super-admin/discount-codes/:id", isSuperAdmin, requireMFA, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteDiscountCode(id);

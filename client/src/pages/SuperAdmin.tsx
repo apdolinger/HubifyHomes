@@ -2989,7 +2989,7 @@ function DiscountCodesCard() {
       setShowDialog(false);
       setForm(blankForm);
     },
-    onError: (e: any) => toast({ title: "Failed to create code", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: "Failed to create code", description: e.message, variant: "destructive" }),
   });
 
   const toggleMutation = useMutation({
@@ -2998,7 +2998,7 @@ function DiscountCodesCard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/discount-codes"] });
     },
-    onError: (e: any) => toast({ title: "Failed to update code", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: "Failed to update code", description: e.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -3008,7 +3008,7 @@ function DiscountCodesCard() {
       toast({ title: "Discount code deleted" });
       setDeleteId(null);
     },
-    onError: (e: any) => toast({ title: "Failed to delete code", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: "Failed to delete code", description: e.message, variant: "destructive" }),
   });
 
   const isExpired = (code: DiscountCode) =>
@@ -3056,31 +3056,32 @@ function DiscountCodesCard() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Code</TableHead>
-                  <TableHead>Discount</TableHead>
-                  <TableHead>Tiers</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Value</TableHead>
+                  <TableHead>Applies To</TableHead>
                   <TableHead>Uses</TableHead>
                   <TableHead>Expires</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="w-20"></TableHead>
+                  <TableHead className="w-24">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {codes.map(code => (
                   <TableRow key={code.id}>
                     <TableCell>
-                      <div>
-                        <p className="font-mono font-semibold text-sm">{code.code}</p>
-                        {code.description && (
-                          <p className="text-xs text-slate-500 mt-0.5">{code.description}</p>
-                        )}
-                      </div>
+                      <span className="font-mono font-semibold text-sm">{code.code}</span>
                     </TableCell>
-                    <TableCell className="font-medium">
+                    <TableCell className="text-sm text-slate-500 max-w-[160px] truncate">
+                      {code.description ?? <span className="italic text-slate-300">—</span>}
+                    </TableCell>
+                    <TableCell className="text-sm capitalize">{code.discountType}</TableCell>
+                    <TableCell className="font-medium text-sm">
                       {code.discountType === "percent"
-                        ? `${code.discountValue}% off`
-                        : `$${(code.discountValue / 100).toFixed(2)} off`}
+                        ? `${code.discountValue}%`
+                        : `$${(code.discountValue / 100).toFixed(2)}`}
                     </TableCell>
-                    <TableCell className="text-sm text-slate-600">
+                    <TableCell className="text-sm text-slate-600 max-w-[180px]">
                       {code.applicableTiers.length === 0
                         ? "All tiers"
                         : code.applicableTiers.join(", ")}
