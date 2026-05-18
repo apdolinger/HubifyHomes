@@ -16731,6 +16731,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         maxUses:         z.number().int().min(1).optional().nullable(),
         expiresAt:       z.string().optional().nullable(),
         isActive:        z.boolean().default(true),
+      }).superRefine((val, ctx) => {
+        if (val.discountType === "percent" && val.discountValue > 100) {
+          ctx.addIssue({ code: "too_big", maximum: 100, type: "number", inclusive: true, path: ["discountValue"], message: "Percent discount cannot exceed 100" });
+        }
       });
       const result = schema.safeParse(req.body);
       if (!result.success) return res.status(400).json({ message: "Invalid data", errors: result.error.errors });
@@ -16751,6 +16755,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/super-admin/discount-codes/:id", isSuperAdmin, requireMFA, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      if (isNaN(id) || id <= 0) return res.status(400).json({ message: "Invalid discount code id" });
       const schema = z.object({
         code:            z.string().min(1).max(64).optional(),
         description:     z.string().optional().nullable(),
@@ -16760,6 +16765,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         maxUses:         z.number().int().min(1).optional().nullable(),
         expiresAt:       z.string().optional().nullable(),
         isActive:        z.boolean().optional(),
+      }).superRefine((val, ctx) => {
+        if (val.discountType === "percent" && val.discountValue !== undefined && val.discountValue > 100) {
+          ctx.addIssue({ code: "too_big", maximum: 100, type: "number", inclusive: true, path: ["discountValue"], message: "Percent discount cannot exceed 100" });
+        }
       });
       const result = schema.safeParse(req.body);
       if (!result.success) return res.status(400).json({ message: "Invalid data", errors: result.error.errors });
@@ -16782,6 +16791,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/super-admin/discount-codes/:id", isSuperAdmin, requireMFA, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      if (isNaN(id) || id <= 0) return res.status(400).json({ message: "Invalid discount code id" });
       await storage.deleteDiscountCode(id);
       res.json({ success: true });
     } catch (error) {
