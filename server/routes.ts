@@ -16678,6 +16678,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Public: validate a discount code (no auth required) ───────────────────
+  app.get("/api/discount-codes/validate", async (req, res) => {
+    try {
+      const code = (req.query.code as string || "").trim();
+      if (!code) return res.status(400).json({ message: "code is required" });
+
+      const row = await storage.getDiscountCodeByCode(code);
+      if (!row || !row.isActive) {
+        return res.status(404).json({ message: "Invalid or inactive discount code" });
+      }
+      if (row.expiresAt && new Date(row.expiresAt) < new Date()) {
+        return res.status(410).json({ message: "This discount code has expired" });
+      }
+      if (row.maxUses !== null && row.usedCount >= row.maxUses) {
+        return res.status(410).json({ message: "This discount code has reached its usage limit" });
+      }
+
+      res.json({
+        code: row.code,
+        description: row.description,
+        discountType: row.discountType,
+        discountValue: row.discountValue,
+        applicableTiers: row.applicableTiers,
+      });
+    } catch (error) {
+      console.error("Error validating discount code:", error);
+      res.status(500).json({ message: "Failed to validate code" });
+    }
+  });
+
+  // ── Super Admin: discount code CRUD ────────────────────────────────────────
+  app.get("/api/super-admin/discount-codes", isSuperAdmin, requireMFA, async (_req, res) => {
+    try {
+      const codes = await storage.listDiscountCodes();
+      res.json(codes);
+    } catch (error) {
+      console.error("Error fetching discount codes:", error);
+      res.status(500).json({ message: "Failed to fetch discount codes" });
+    }
+  });
+
+  app.post("/api/super-admin/discount-codes", isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const schema = z.object({
+        code:            z.string().min(1).max(64),
+        description:     z.string().optional().nullable(),
+        discountType:    z.enum(["percent", "fixed"]),
+        discountValue:   z.number().int().min(0),
+        applicableTiers: z.array(z.string()).default([]),
+        maxUses:         z.number().int().min(1).optional().nullable(),
+        expiresAt:       z.string().optional().nullable(),
+        isActive:        z.boolean().default(true),
+      });
+      const result = schema.safeParse(req.body);
+      if (!result.success) return res.status(400).json({ message: "Invalid data", errors: result.error.errors });
+      const { expiresAt, ...rest } = result.data;
+      const code = await storage.createDiscountCode({
+        ...rest,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+      });
+      res.status(201).json(code);
+    } catch (error: any) {
+      if (error?.code === "23505") return res.status(409).json({ message: "A code with that name already exists" });
+      console.error("Error creating discount code:", error);
+      res.status(500).json({ message: "Failed to create discount code" });
+    }
+  });
+
+  app.patch("/api/super-admin/discount-codes/:id", isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const schema = z.object({
+        code:            z.string().min(1).max(64).optional(),
+        description:     z.string().optional().nullable(),
+        discountType:    z.enum(["percent", "fixed"]).optional(),
+        discountValue:   z.number().int().min(0).optional(),
+        applicableTiers: z.array(z.string()).optional(),
+        maxUses:         z.number().int().min(1).optional().nullable(),
+        expiresAt:       z.string().optional().nullable(),
+        isActive:        z.boolean().optional(),
+      });
+      const result = schema.safeParse(req.body);
+      if (!result.success) return res.status(400).json({ message: "Invalid data", errors: result.error.errors });
+      const { expiresAt, ...rest } = result.data;
+      const updates: any = { ...rest };
+      if (expiresAt !== undefined) updates.expiresAt = expiresAt ? new Date(expiresAt) : null;
+      const updated = await storage.updateDiscountCode(id, updates);
+      res.json(updated);
+    } catch (error: any) {
+      if (error?.code === "23505") return res.status(409).json({ message: "A code with that name already exists" });
+      console.error("Error updating discount code:", error);
+      res.status(500).json({ message: "Failed to update discount code" });
+    }
+  });
+
+  app.delete("/api/super-admin/discount-codes/:id", isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteDiscountCode(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting discount code:", error);
+      res.status(500).json({ message: "Failed to delete discount code" });
+    }
+  });
+
   // Register the conflict detector for scheduled tasks
   const { setConflictDetector } = await import('./scheduledTasks');
   setConflictDetector(detectAndCreateEventConflicts);

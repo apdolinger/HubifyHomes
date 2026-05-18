@@ -3462,6 +3462,28 @@ export const errorLogs = pgTable("error_logs", {
 ]);
 export type ErrorLog = typeof errorLogs.$inferSelect;
 
+// ── Discount Codes ────────────────────────────────────────────────────────────
+// Platform-wide promotional codes managed by super admin.
+export const discountCodes = pgTable("discount_codes", {
+  id: serial("id").primaryKey(),
+  code: varchar("code", { length: 64 }).notNull().unique(),
+  description: text("description"),
+  discountType: varchar("discount_type").$type<"percent" | "fixed">().notNull().default("percent"),
+  discountValue: integer("discount_value").notNull(), // percent: 0-100, fixed: cents
+  applicableTiers: jsonb("applicable_tiers").$type<string[]>().notNull().default([]), // empty = all tiers
+  maxUses: integer("max_uses"), // null = unlimited
+  usedCount: integer("used_count").notNull().default(0),
+  expiresAt: timestamp("expires_at"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("discount_codes_code_idx").on(table.code),
+  index("discount_codes_active_idx").on(table.isActive),
+]);
+export type DiscountCode = typeof discountCodes.$inferSelect;
+export type InsertDiscountCode = typeof discountCodes.$inferInsert;
+export const insertDiscountCodeSchema = createInsertSchema(discountCodes).omit({ id: true, usedCount: true, createdAt: true });
+
 // ── Org self-signup tokens ─────────────────────────────────────────────────────
 // Created when a prospect completes the self-service signup wizard.
 // On first OIDC login, email is matched → user is assigned as org admin + token claimed.

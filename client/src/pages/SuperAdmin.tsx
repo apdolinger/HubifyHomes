@@ -2925,6 +2925,367 @@ function PricingTiersCard() {
   );
 }
 
+// ── Discount Codes Card ───────────────────────────────────────────────────────
+
+interface DiscountCode {
+  id: number;
+  code: string;
+  description: string | null;
+  discountType: "percent" | "fixed";
+  discountValue: number;
+  applicableTiers: string[];
+  maxUses: number | null;
+  usedCount: number;
+  expiresAt: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
+const TIER_OPTIONS = [
+  "Starter Portfolio",
+  "Growth Portfolio",
+  "Professional Portfolio",
+  "Operator Portfolio",
+  "Enterprise Portfolio",
+];
+
+function DiscountCodesCard() {
+  const { toast } = useToast();
+  const [showDialog, setShowDialog] = useState(false);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+
+  const blankForm = {
+    code: "",
+    description: "",
+    discountType: "percent" as "percent" | "fixed",
+    discountValue: 10,
+    allTiers: true,
+    applicableTiers: [] as string[],
+    maxUses: "",
+    expiresAt: "",
+    isActive: true,
+  };
+  const [form, setForm] = useState(blankForm);
+
+  const { data: codes = [], isLoading } = useQuery<DiscountCode[]>({
+    queryKey: ["/api/super-admin/discount-codes"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", "/api/super-admin/discount-codes", {
+        code: form.code.toUpperCase().trim(),
+        description: form.description || null,
+        discountType: form.discountType,
+        discountValue: Number(form.discountValue),
+        applicableTiers: form.allTiers ? [] : form.applicableTiers,
+        maxUses: form.maxUses ? Number(form.maxUses) : null,
+        expiresAt: form.expiresAt || null,
+        isActive: form.isActive,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/discount-codes"] });
+      toast({ title: "Discount code created" });
+      setShowDialog(false);
+      setForm(blankForm);
+    },
+    onError: (e: any) => toast({ title: "Failed to create code", description: e.message, variant: "destructive" }),
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) =>
+      apiRequest("PATCH", `/api/super-admin/discount-codes/${id}`, { isActive }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/discount-codes"] });
+    },
+    onError: (e: any) => toast({ title: "Failed to update code", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/super-admin/discount-codes/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/discount-codes"] });
+      toast({ title: "Discount code deleted" });
+      setDeleteId(null);
+    },
+    onError: (e: any) => toast({ title: "Failed to delete code", description: e.message, variant: "destructive" }),
+  });
+
+  const isExpired = (code: DiscountCode) =>
+    code.expiresAt ? new Date(code.expiresAt) < new Date() : false;
+  const isExhausted = (code: DiscountCode) =>
+    code.maxUses !== null && code.usedCount >= code.maxUses;
+
+  const statusBadge = (code: DiscountCode) => {
+    if (!code.isActive) return <Badge variant="secondary">Inactive</Badge>;
+    if (isExpired(code)) return <Badge variant="destructive">Expired</Badge>;
+    if (isExhausted(code)) return <Badge variant="destructive">Exhausted</Badge>;
+    return <Badge className="bg-green-100 text-green-800">Active</Badge>;
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="w-5 h-5" />
+            Discount Codes
+          </CardTitle>
+          <Button size="sm" onClick={() => setShowDialog(true)}>
+            <Plus className="w-4 h-4 mr-1" /> New Code
+          </Button>
+        </div>
+        <p className="text-sm text-slate-500">
+          Create promotional codes to share with prospects. Codes can be validated publicly at{" "}
+          <code className="text-xs bg-slate-100 px-1 rounded">/api/discount-codes/validate?code=XXX</code>
+        </p>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-slate-400 py-4">
+            <RefreshCw className="w-4 h-4 animate-spin" /> Loading…
+          </div>
+        ) : codes.length === 0 ? (
+          <div className="text-center py-8 text-slate-400">
+            <DollarSign className="w-8 h-8 mx-auto mb-2 opacity-40" />
+            <p className="text-sm">No discount codes yet. Create your first one.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Discount</TableHead>
+                  <TableHead>Tiers</TableHead>
+                  <TableHead>Uses</TableHead>
+                  <TableHead>Expires</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-20"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {codes.map(code => (
+                  <TableRow key={code.id}>
+                    <TableCell>
+                      <div>
+                        <p className="font-mono font-semibold text-sm">{code.code}</p>
+                        {code.description && (
+                          <p className="text-xs text-slate-500 mt-0.5">{code.description}</p>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {code.discountType === "percent"
+                        ? `${code.discountValue}% off`
+                        : `$${(code.discountValue / 100).toFixed(2)} off`}
+                    </TableCell>
+                    <TableCell className="text-sm text-slate-600">
+                      {code.applicableTiers.length === 0
+                        ? "All tiers"
+                        : code.applicableTiers.join(", ")}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {code.usedCount}
+                      {code.maxUses !== null ? ` / ${code.maxUses}` : " / ∞"}
+                    </TableCell>
+                    <TableCell className="text-sm text-slate-500">
+                      {code.expiresAt
+                        ? new Date(code.expiresAt).toLocaleDateString()
+                        : "Never"}
+                    </TableCell>
+                    <TableCell>{statusBadge(code)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Switch
+                          checked={code.isActive}
+                          onCheckedChange={v => toggleMutation.mutate({ id: code.id, isActive: v })}
+                          className="scale-75"
+                        />
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-red-500 hover:text-red-700"
+                          onClick={() => setDeleteId(code.id)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+
+      {/* Create dialog */}
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>New Discount Code</DialogTitle>
+            <DialogDescription>Create a promotional code to share with prospects.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Code *</Label>
+                <Input
+                  placeholder="e.g. LAUNCH25"
+                  value={form.code}
+                  onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
+                  className="font-mono"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Discount Type *</Label>
+                <Select
+                  value={form.discountType}
+                  onValueChange={v => setForm(f => ({ ...f, discountType: v as "percent" | "fixed" }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percent">Percentage (% off)</SelectItem>
+                    <SelectItem value="fixed">Fixed Amount ($ off)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>
+                  {form.discountType === "percent" ? "Percent Off (0–100)" : "Amount Off (cents)"}
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={form.discountType === "percent" ? 100 : undefined}
+                  value={form.discountValue}
+                  onChange={e => setForm(f => ({ ...f, discountValue: Number(e.target.value) }))}
+                />
+                {form.discountType === "percent" && (
+                  <p className="text-xs text-slate-500">e.g. 25 = 25% off monthly price</p>
+                )}
+                {form.discountType === "fixed" && (
+                  <p className="text-xs text-slate-500">e.g. 1000 = $10.00 off</p>
+                )}
+              </div>
+              <div className="space-y-1">
+                <Label>Max Uses (blank = unlimited)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="Unlimited"
+                  value={form.maxUses}
+                  onChange={e => setForm(f => ({ ...f, maxUses: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label>Description (optional)</Label>
+              <Input
+                placeholder="e.g. Launch special — 25% off first 3 months"
+                value={form.description}
+                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label>Expiry Date (optional)</Label>
+              <Input
+                type="date"
+                value={form.expiresAt}
+                onChange={e => setForm(f => ({ ...f, expiresAt: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={form.allTiers}
+                  onCheckedChange={v => setForm(f => ({ ...f, allTiers: v, applicableTiers: [] }))}
+                  id="all-tiers"
+                />
+                <Label htmlFor="all-tiers">Apply to all tiers</Label>
+              </div>
+              {!form.allTiers && (
+                <div className="pl-2 space-y-1">
+                  {TIER_OPTIONS.map(tier => (
+                    <div key={tier} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id={`tier-${tier}`}
+                        checked={form.applicableTiers.includes(tier)}
+                        onChange={e => {
+                          setForm(f => ({
+                            ...f,
+                            applicableTiers: e.target.checked
+                              ? [...f.applicableTiers, tier]
+                              : f.applicableTiers.filter(t => t !== tier),
+                          }));
+                        }}
+                        className="rounded"
+                      />
+                      <Label htmlFor={`tier-${tier}`} className="font-normal text-sm">{tier}</Label>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={form.isActive}
+                onCheckedChange={v => setForm(f => ({ ...f, isActive: v }))}
+                id="is-active"
+              />
+              <Label htmlFor="is-active">Active immediately</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowDialog(false); setForm(blankForm); }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createMutation.mutate()}
+              disabled={createMutation.isPending || !form.code.trim()}
+            >
+              {createMutation.isPending ? (
+                <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Creating…</>
+              ) : (
+                "Create Code"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation */}
+      <Dialog open={deleteId !== null} onOpenChange={open => !open && setDeleteId(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete discount code?</DialogTitle>
+            <DialogDescription>This cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteId !== null && deleteMutation.mutate(deleteId)}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Deleting…" : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
 // ── System Integrations Card ─────────────────────────────────────────────────
 
 interface IntegrationStatus {
@@ -3293,6 +3654,8 @@ function SettingsTabContent() {
       </Card>
 
       <PricingTiersCard />
+
+      <DiscountCodesCard />
 
       <Card>
         <CardHeader>

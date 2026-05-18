@@ -283,6 +283,9 @@ import {
   type InsertNotification,
   errorLogs,
   type ErrorLog,
+  discountCodes,
+  type DiscountCode,
+  type InsertDiscountCode,
 } from "@shared/schema";
 
 import { db } from "./db";
@@ -4440,6 +4443,40 @@ export class DatabaseStorage implements IStorage {
       .where(cutoff ? sql`${errorLogs.createdAt} < ${cutoff.toISOString()}` : undefined)
       .returning({ id: errorLogs.id });
     return result.length;
+  }
+
+  // ── Discount Code operations ──────────────────────────────────────────────
+  async listDiscountCodes(): Promise<DiscountCode[]> {
+    return db.select().from(discountCodes).orderBy(desc(discountCodes.createdAt));
+  }
+
+  async getDiscountCodeByCode(code: string): Promise<DiscountCode | undefined> {
+    const [row] = await db
+      .select()
+      .from(discountCodes)
+      .where(eq(discountCodes.code, code.toUpperCase().trim()));
+    return row;
+  }
+
+  async createDiscountCode(data: InsertDiscountCode): Promise<DiscountCode> {
+    const [row] = await db
+      .insert(discountCodes)
+      .values({ ...data, code: data.code.toUpperCase().trim() })
+      .returning();
+    return row;
+  }
+
+  async updateDiscountCode(id: number, updates: Partial<InsertDiscountCode>): Promise<DiscountCode> {
+    const [row] = await db
+      .update(discountCodes)
+      .set(updates)
+      .where(eq(discountCodes.id, id))
+      .returning();
+    return row;
+  }
+
+  async deleteDiscountCode(id: number): Promise<void> {
+    await db.delete(discountCodes).where(eq(discountCodes.id, id));
   }
 
   // Contact-Property relationship operations
