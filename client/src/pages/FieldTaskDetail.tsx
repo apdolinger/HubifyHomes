@@ -176,7 +176,7 @@ export default function FieldTaskDetail() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
       </div>
     );
   }
@@ -191,7 +191,7 @@ export default function FieldTaskDetail() {
 
   const statusOptions = [
     { value: "pending", label: "Open", color: "border-slate-400 bg-slate-100 text-slate-700" },
-    { value: "in_progress", label: "In Progress", color: "border-blue-400 bg-blue-50 text-blue-700" },
+    { value: "in_progress", label: "In Progress", color: "border-teal-400 bg-teal-50 text-teal-700" },
     { value: "completed", label: "Done", color: "border-green-400 bg-green-50 text-green-700" },
   ];
 
@@ -205,7 +205,7 @@ export default function FieldTaskDetail() {
       {/* Back button */}
       <button
         onClick={() => navigate("/field")}
-        className="flex items-center gap-1 text-blue-600 font-medium text-sm pt-2"
+        className="flex items-center gap-1 text-teal-600 font-medium text-sm pt-2"
       >
         <ArrowLeft className="w-4 h-4" />
         Back to Home
@@ -256,7 +256,7 @@ export default function FieldTaskDetail() {
           ))}
         </div>
         {updateStatusMutation.isPending && (
-          <div className="flex items-center gap-2 text-xs text-blue-600">
+          <div className="flex items-center gap-2 text-xs text-teal-600">
             <Loader2 className="w-3 h-3 animate-spin" />
             Saving...
           </div>
@@ -275,7 +275,7 @@ export default function FieldTaskDetail() {
 
           {checklistLoading ? (
             <div className="flex justify-center py-4">
-              <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+              <Loader2 className="w-5 h-5 animate-spin text-teal-500" />
             </div>
           ) : (
             <div className="space-y-3">
@@ -343,12 +343,12 @@ export default function FieldTaskDetail() {
 
         {/* Preview of photo being uploaded */}
         {isUploadingPhoto && previewPhoto && (
-          <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-100 border-2 border-blue-300 border-dashed">
+          <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-100 border-2 border-teal-300 border-dashed">
             <img src={previewPhoto} alt="Uploading..." className="w-full h-full object-cover opacity-60" />
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="bg-white/90 rounded-lg px-3 py-2 flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                <span className="text-sm font-medium text-blue-600">Uploading...</span>
+                <Loader2 className="w-4 h-4 animate-spin text-teal-600" />
+                <span className="text-sm font-medium text-teal-600">Uploading...</span>
               </div>
             </div>
           </div>
@@ -365,7 +365,7 @@ export default function FieldTaskDetail() {
         />
         <Button
           variant="outline"
-          className="w-full h-14 text-base font-medium border-dashed border-2 border-blue-200 text-blue-600 hover:bg-blue-50"
+          className="w-full h-14 text-base font-medium border-dashed border-2 border-teal-200 text-teal-600 hover:bg-teal-50"
           onClick={() => fileInputRef.current?.click()}
           disabled={isUploadingPhoto}
         >

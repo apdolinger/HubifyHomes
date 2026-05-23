@@ -9,7 +9,7 @@ import { format, isPast } from "date-fns";
 function getStatusColor(status: string) {
   switch (status) {
     case "completed": return "bg-green-100 text-green-700 border-green-200";
-    case "in_progress": return "bg-blue-100 text-blue-700 border-blue-200";
+    case "in_progress": return "bg-teal-100 text-teal-700 border-teal-200";
     case "pending": return "bg-slate-100 text-slate-600 border-slate-200";
     case "cancelled": return "bg-red-100 text-red-700 border-red-200";
     default: return "bg-slate-100 text-slate-600 border-slate-200";
@@ -58,7 +58,7 @@ export default function FieldTasks() {
 
       {isLoading ? (
         <div className="flex justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+          <Loader2 className="w-6 h-6 animate-spin text-teal-600" />
         </div>
       ) : myTasks.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
@@ -72,7 +72,7 @@ export default function FieldTasks() {
             return (
               <button
                 key={task.id}
-                className="w-full bg-white rounded-xl border border-slate-200 p-4 text-left flex items-start gap-3 hover:border-blue-200 active:bg-slate-50 transition-colors"
+                className="w-full bg-white rounded-xl border border-slate-200 p-4 text-left flex items-start gap-3 hover:border-teal-200 active:bg-slate-50 transition-colors"
                 onClick={() => navigate(`/field/task/${task.id}`)}
               >
                 <div className="flex-1 min-w-0 space-y-2">

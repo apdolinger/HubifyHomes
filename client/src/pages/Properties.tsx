@@ -1381,7 +1381,7 @@ export default function Properties() {
                         <div
                           className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
                             isDragOver
-                              ? 'border-blue-400 bg-blue-50'
+                              ? 'border-teal-400 bg-teal-50'
                               : 'border-slate-300 hover:border-slate-400'
                           }`}
                           onDragOver={handleImageDragOver}
@@ -1390,7 +1390,7 @@ export default function Properties() {
                         >
                           {isImageUploading ? (
                             <div className="flex flex-col items-center py-4">
-                              <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mb-2" />
+                              <RefreshCw className="w-8 h-8 text-teal-500 animate-spin mb-2" />
                               <p className="text-sm text-slate-600">Uploading image...</p>
                             </div>
                           ) : propertyImageUrl ? (
@@ -1539,11 +1539,11 @@ export default function Properties() {
 
       {/* Bulk Actions Toolbar */}
       {selectedProperties.size > 0 && (
-        <Card className="mb-4 bg-blue-50 border-blue-200">
+        <Card className="mb-4 bg-teal-50 border-teal-200">
           <CardContent className="py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <span className="text-sm font-medium text-blue-900">
+                <span className="text-sm font-medium text-teal-900">
                   {selectedProperties.size} {selectedProperties.size === 1 ? 'property' : 'properties'} selected
                 </span>
                 <div className="flex items-center gap-2">
@@ -1551,7 +1551,7 @@ export default function Properties() {
                     size="sm"
                     variant="outline"
                     onClick={handleGenerateReport}
-                    className="bg-white hover:bg-blue-50"
+                    className="bg-white hover:bg-teal-50"
                   >
                     <FileText className="w-4 h-4 mr-2" />
                     Generate Report
@@ -1560,7 +1560,7 @@ export default function Properties() {
                     size="sm"
                     variant="outline"
                     onClick={handleBulkEmail}
-                    className="bg-white hover:bg-blue-50"
+                    className="bg-white hover:bg-teal-50"
                   >
                     <Mail className="w-4 h-4 mr-2" />
                     Email Owners
@@ -1570,7 +1570,7 @@ export default function Properties() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="bg-white hover:bg-blue-50"
+                        className="bg-white hover:bg-teal-50"
                         data-testid="button-more-actions"
                       >
                         More Actions
@@ -1665,7 +1665,7 @@ export default function Properties() {
                   <TableRow 
                     key={property.id}
                     className={`cursor-pointer hover:bg-slate-50 ${
-                      selectedProperties.has(property.id) ? 'bg-blue-50' : ''
+                      selectedProperties.has(property.id) ? 'bg-teal-50' : ''
                     }`}
                     onClick={() => setLocation(`/property-profile/${property.id}`)}
                   >

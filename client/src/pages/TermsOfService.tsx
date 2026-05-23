@@ -6,16 +6,16 @@ export default function TermsOfService() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="bg-blue-600 py-12">
+      <div className="bg-teal-600 py-12">
         <div className="max-w-4xl mx-auto px-6">
           <div className="flex items-center mb-4">
             <Scale className="w-8 h-8 text-white mr-3" />
             <h1 className="text-3xl font-bold text-white">Terms of Service</h1>
           </div>
-          <p className="text-blue-100">
+          <p className="text-teal-100">
             Last Updated: {lastUpdated}
           </p>
-          <p className="text-blue-100 mt-2">
+          <p className="text-teal-100 mt-2">
             Please read these Terms of Service carefully before using Hubify. By accessing or using our services, you agree to be bound by these terms.
           </p>
         </div>
@@ -49,7 +49,7 @@ export default function TermsOfService() {
 
           <section>
             <h2 className="text-2xl font-bold mb-4 flex items-center">
-              <Users className="w-6 h-6 mr-2 text-blue-600" />
+              <Users className="w-6 h-6 mr-2 text-teal-600" />
               2. Eligibility & Account Registration
             </h2>
             
@@ -150,7 +150,7 @@ export default function TermsOfService() {
 
           <section>
             <h2 className="text-2xl font-bold mb-4 flex items-center">
-              <Shield className="w-6 h-6 mr-2 text-blue-600" />
+              <Shield className="w-6 h-6 mr-2 text-teal-600" />
               5. License Grant & Restrictions
             </h2>
             
@@ -255,7 +255,7 @@ export default function TermsOfService() {
           <section>
             <h2 className="text-2xl font-bold mb-4">8. Privacy & Data Protection</h2>
             <p className="text-slate-700">
-              Our collection, use, and protection of your personal information is governed by our <a href="/privacy" className="text-blue-600 hover:underline">Privacy Policy</a>, which is incorporated into these Terms by reference. By using the Service, you consent to our privacy practices as described in the Privacy Policy.
+              Our collection, use, and protection of your personal information is governed by our <a href="/privacy" className="text-teal-600 hover:underline">Privacy Policy</a>, which is incorporated into these Terms by reference. By using the Service, you consent to our privacy practices as described in the Privacy Policy.
             </p>
           </section>
 
@@ -483,7 +483,7 @@ export default function TermsOfService() {
 
           <section>
             <h2 className="text-2xl font-bold mb-4 flex items-center">
-              <FileText className="w-6 h-6 mr-2 text-blue-600" />
+              <FileText className="w-6 h-6 mr-2 text-teal-600" />
               16. Contact Information
             </h2>
             <div className="bg-slate-100 p-6 rounded-lg">
@@ -503,7 +503,7 @@ export default function TermsOfService() {
           </section>
         </div>
 
-        <div className="mt-12 p-6 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="mt-12 p-6 bg-teal-50 border border-teal-200 rounded-lg">
           <p className="text-sm text-slate-600">
             <strong>Effective Date:</strong> {lastUpdated}
           </p>
@@ -517,9 +517,9 @@ export default function TermsOfService() {
         <div className="max-w-4xl mx-auto px-6 text-center text-sm text-slate-600">
           <p>© 2025 Hubify. All rights reserved.</p>
           <p className="mt-2">
-            <a href="/privacy" className="text-blue-600 hover:underline">Privacy Policy</a>
+            <a href="/privacy" className="text-teal-600 hover:underline">Privacy Policy</a>
             {' · '}
-            <a href="/terms" className="text-blue-600 hover:underline">Terms of Service</a>
+            <a href="/terms" className="text-teal-600 hover:underline">Terms of Service</a>
           </p>
         </div>
       </footer>

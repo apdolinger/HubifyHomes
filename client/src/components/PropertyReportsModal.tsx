@@ -447,7 +447,7 @@ export function PropertyReportsModal({
   const getTypeColor = (type: string) => {
     const typeMap: { [key: string]: string } = {
       lightbulb: "bg-yellow-100 text-yellow-800",
-      filter: "bg-blue-100 text-blue-800",
+      filter: "bg-teal-100 text-teal-800",
       paint: "bg-purple-100 text-purple-800",
       battery: "bg-green-100 text-green-800",
       cleaning: "bg-cyan-100 text-cyan-800",
@@ -462,7 +462,7 @@ export function PropertyReportsModal({
   const getSurfaceCategoryColor = (category: string) => {
     const categoryMap: { [key: string]: string } = {
       flooring: "bg-amber-100 text-amber-800",
-      wall: "bg-blue-100 text-blue-800",
+      wall: "bg-teal-100 text-teal-800",
       ceiling: "bg-sky-100 text-sky-800",
       countertop: "bg-purple-100 text-purple-800",
       trim: "bg-green-100 text-green-800",
@@ -749,7 +749,7 @@ export function PropertyReportsModal({
                                     ? "bg-red-100 text-red-800"
                                     : isDateSoon(device.nextServiceDue, 30)
                                     ? "bg-yellow-100 text-yellow-800"
-                                    : "bg-blue-100 text-blue-800"
+                                    : "bg-teal-100 text-teal-800"
                                 }>
                                   <Calendar className="w-3 h-3 mr-1" />
                                   {format(new Date(device.nextServiceDue), "MM/dd/yyyy")}
@@ -764,7 +764,7 @@ export function PropertyReportsModal({
                                   href={device.link}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-blue-600 hover:text-blue-800"
+                                  className="text-teal-600 hover:text-teal-800"
                                 >
                                   <ExternalLink className="w-4 h-4" />
                                 </a>
@@ -974,7 +974,7 @@ export function PropertyReportsModal({
                                 href={link.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800 flex items-center gap-1 max-w-[300px] truncate"
+                                className="text-teal-600 hover:text-teal-800 flex items-center gap-1 max-w-[300px] truncate"
                               >
                                 {link.url}
                                 <ExternalLink className="w-3 h-3 flex-shrink-0" />

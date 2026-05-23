@@ -314,7 +314,7 @@ export default function DuplicatesManagement() {
 
   const getContactTypeColor = (type: string) => {
     switch (type) {
-      case 'owner': return 'bg-blue-100 text-blue-800';
+      case 'owner': return 'bg-teal-100 text-teal-800';
       case 'tenant': return 'bg-green-100 text-green-800';
       case 'vendor': return 'bg-purple-100 text-purple-800';
       case 'emergency': return 'bg-red-100 text-red-800';
@@ -326,7 +326,7 @@ export default function DuplicatesManagement() {
     return (
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="flex items-center justify-center h-96">
-          <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
+          <RefreshCw className="w-8 h-8 animate-spin text-teal-600" />
         </div>
       </div>
     );
@@ -375,7 +375,7 @@ export default function DuplicatesManagement() {
             <Button
               onClick={handleQuickScan}
               disabled={isScanning}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-teal-600 hover:bg-teal-700"
               data-testid="button-quick-scan"
             >
               {isScanning ? (
@@ -449,7 +449,7 @@ export default function DuplicatesManagement() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-4">
                             <div className="flex items-center space-x-2">
-                              <Users className="w-5 h-5 text-blue-600" />
+                              <Users className="w-5 h-5 text-teal-600" />
                               <Badge className={getConfidenceColor(group.confidence)}>
                                 {group.confidence}% {getConfidenceLevel(group.confidence)}
                               </Badge>
@@ -617,7 +617,7 @@ export default function DuplicatesManagement() {
                   <Card className="border-2">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-4">
-                        <History className="w-8 h-8 text-blue-500" />
+                        <History className="w-8 h-8 text-teal-500" />
                         <Badge variant="secondary">History</Badge>
                       </div>
                       <h3 className="font-semibold mb-2">Action History</h3>
@@ -757,7 +757,7 @@ export default function DuplicatesManagement() {
                       </div>
                     </div>
                     {entry.notes && (
-                      <div className="mt-2 text-sm text-gray-700 bg-blue-50 border-l-4 border-blue-500 p-3 rounded">
+                      <div className="mt-2 text-sm text-gray-700 bg-teal-50 border-l-4 border-teal-500 p-3 rounded">
                         <strong>Notes:</strong> {entry.notes}
                       </div>
                     )}
@@ -796,7 +796,7 @@ export default function DuplicatesManagement() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold flex items-center">
-                    <Crown className="w-5 h-5 text-blue-600 mr-2" />
+                    <Crown className="w-5 h-5 text-teal-600 mr-2" />
                     Primary Record
                   </h3>
                   {selectedPrimary && (
@@ -821,7 +821,7 @@ export default function DuplicatesManagement() {
                   )}
                 </div>
                 
-                <Card className="border-2 border-blue-200 bg-blue-50">
+                <Card className="border-2 border-teal-200 bg-teal-50">
                   <CardContent className="p-4">
                     {selectedDuplicateGroup?.type === 'contact' && selectedPrimary ? (
                       <div className="space-y-3">
@@ -1106,7 +1106,7 @@ export default function DuplicatesManagement() {
               </Button>
               <Button
                 onClick={handleMerge}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-teal-600 hover:bg-teal-700"
               >
                 <Merge className="w-4 h-4 mr-1" />
                 Merge Records

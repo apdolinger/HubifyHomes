@@ -12,7 +12,7 @@ import { format, isToday, isPast, startOfDay, endOfDay } from "date-fns";
 function getStatusColor(status: string) {
   switch (status) {
     case "completed": return "bg-green-100 text-green-700 border-green-200";
-    case "in_progress": return "bg-blue-100 text-blue-700 border-blue-200";
+    case "in_progress": return "bg-teal-100 text-teal-700 border-teal-200";
     case "pending": return "bg-slate-100 text-slate-600 border-slate-200";
     case "cancelled": return "bg-red-100 text-red-700 border-red-200";
     default: return "bg-slate-100 text-slate-600 border-slate-200";
@@ -145,7 +145,7 @@ export default function FieldHome() {
       {/* Stats bar */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-white rounded-xl border border-slate-200 p-3 flex flex-col items-center">
-          <div className="text-2xl font-bold text-blue-600">{stats.done}/{stats.total}</div>
+          <div className="text-2xl font-bold text-teal-600">{stats.done}/{stats.total}</div>
           <div className="text-xs text-slate-500 mt-0.5 text-center">Tasks Done</div>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-3 flex flex-col items-center">
@@ -166,7 +166,7 @@ export default function FieldHome() {
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+            <Loader2 className="w-6 h-6 animate-spin text-teal-600" />
           </div>
         ) : groupedByProperty.length === 0 ? (
           <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
@@ -244,7 +244,7 @@ export default function FieldHome() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="text-xs h-8 px-3 font-medium border-blue-200 text-blue-600 hover:bg-blue-50"
+                              className="text-xs h-8 px-3 font-medium border-teal-200 text-teal-600 hover:bg-teal-50"
                               disabled={advanceStatusMutation.isPending}
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -274,10 +274,10 @@ export default function FieldHome() {
 
       {/* Today's Summary — only shows when there's something to celebrate */}
       {todaySummary && todaySummary.tasksCompleted > 0 && (
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100 p-4 space-y-3" data-testid="today-summary">
+        <div className="bg-gradient-to-br from-teal-50 to-indigo-50 rounded-xl border border-teal-100 p-4 space-y-3" data-testid="today-summary">
           <div className="flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-blue-600" />
-            <h2 className="text-sm font-semibold text-blue-900 uppercase tracking-wider">Today's Summary</h2>
+            <TrendingUp className="w-4 h-4 text-teal-600" />
+            <h2 className="text-sm font-semibold text-teal-900 uppercase tracking-wider">Today's Summary</h2>
           </div>
 
           {/* Progress bar */}
@@ -291,7 +291,7 @@ export default function FieldHome() {
               </div>
               <div className="w-full bg-white rounded-full h-2 overflow-hidden">
                 <div
-                  className="bg-blue-600 h-full transition-all"
+                  className="bg-teal-600 h-full transition-all"
                   style={{ width: `${Math.min(100, (todaySummary.tasksCompleted / todaySummary.tasksTotal) * 100)}%` }}
                   data-testid="summary-progress-bar"
                 />
@@ -306,7 +306,7 @@ export default function FieldHome() {
               <div className="text-[10px] text-slate-500 uppercase tracking-wide">Done</div>
             </div>
             <div className="bg-white rounded-lg p-3 text-center">
-              <ListChecks className="w-4 h-4 text-blue-600 mx-auto mb-1" />
+              <ListChecks className="w-4 h-4 text-teal-600 mx-auto mb-1" />
               <div className="text-lg font-bold text-slate-900" data-testid="summary-checklist-count">
                 {todaySummary.checklistPass + todaySummary.checklistFail + todaySummary.checklistNa}
               </div>

@@ -48,14 +48,14 @@ const FREQUENCY_LABELS: Record<string, string> = {
 };
 
 const FREQUENCY_COLORS: Record<string, string> = {
-  weekly: "bg-blue-100 text-blue-800",
+  weekly: "bg-teal-100 text-teal-800",
   monthly: "bg-green-100 text-green-800",
   quarterly: "bg-purple-100 text-purple-800",
   annually: "bg-orange-100 text-orange-800",
 };
 
 const PROPERTY_PALETTE = [
-  "bg-blue-500",
+  "bg-teal-500",
   "bg-emerald-500",
   "bg-violet-500",
   "bg-amber-500",
@@ -228,7 +228,7 @@ export default function InspectionSchedules() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
+        <RefreshCw className="w-8 h-8 animate-spin text-teal-600" />
       </div>
     );
   }
@@ -237,7 +237,7 @@ export default function InspectionSchedules() {
     <div className="max-w-7xl mx-auto px-6 py-8">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <ClipboardCheck className="w-7 h-7 text-blue-600" />
+          <ClipboardCheck className="w-7 h-7 text-teal-600" />
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Inspection Schedules</h1>
             <p className="text-sm text-slate-500">All recurring inspection schedules across your portfolio</p>
@@ -355,7 +355,7 @@ export default function InspectionSchedules() {
           <CardContent className="p-0">
             {schedulesLoading ? (
               <div className="flex items-center justify-center py-16">
-                <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
+                <RefreshCw className="w-6 h-6 animate-spin text-teal-600" />
               </div>
             ) : filtered.length === 0 ? (
               <div className="text-center py-16">
@@ -527,7 +527,7 @@ export default function InspectionSchedules() {
 
               {schedulesLoading ? (
                 <div className="flex items-center justify-center py-16">
-                  <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
+                  <RefreshCw className="w-6 h-6 animate-spin text-teal-600" />
                 </div>
               ) : (
                 <>
@@ -557,7 +557,7 @@ export default function InspectionSchedules() {
                               className={`min-h-[100px] p-1.5 ${wi < calendarWeeks.length - 1 ? "border-b border-slate-200" : ""} ${isCurrentMonth ? "bg-white" : "bg-slate-50"}`}
                               data-testid={`cal-day-${dateKey}`}
                             >
-                              <div className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full ${isToday ? "bg-blue-600 text-white" : isCurrentMonth ? "text-slate-700" : "text-slate-300"}`}>
+                              <div className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full ${isToday ? "bg-teal-600 text-white" : isCurrentMonth ? "text-slate-700" : "text-slate-300"}`}>
                                 {format(day, "d")}
                               </div>
                               <div className="space-y-0.5">

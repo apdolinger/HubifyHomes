@@ -30,7 +30,7 @@ export default function FieldProfile() {
           </p>
           <p className="text-sm text-slate-500">{u?.email}</p>
           {u?.role && (
-            <span className="inline-block mt-2 text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-3 py-1 capitalize">
+            <span className="inline-block mt-2 text-xs font-medium bg-teal-50 text-teal-700 border border-teal-200 rounded-full px-3 py-1 capitalize">
               {u.role}
             </span>
           )}

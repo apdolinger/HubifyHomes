@@ -75,11 +75,11 @@ export default function FieldModeLayout({ children }: FieldModeLayoutProps) {
               alt={HUBIFY_HOMES_LOGO_ALT}
               className="h-7 w-auto"
             />
-            <span className="text-xs bg-blue-100 text-blue-700 rounded-full px-2 py-0.5 font-medium">Field</span>
+            <span className="text-xs bg-teal-100 text-teal-700 rounded-full px-2 py-0.5 font-medium">Field</span>
           </a>
         </Link>
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold">
+          <div className="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center text-sm font-bold">
             {getUserInitials()}
           </div>
         </div>
@@ -100,9 +100,9 @@ export default function FieldModeLayout({ children }: FieldModeLayoutProps) {
               <Link key={tab.href} href={tab.href}>
                 <a className={cn(
                   "flex-1 flex flex-col items-center justify-center py-3 gap-1 text-xs font-medium transition-colors",
-                  isActive ? "text-blue-600" : "text-slate-500 hover:text-slate-700"
+                  isActive ? "text-teal-600" : "text-slate-500 hover:text-slate-700"
                 )}>
-                  <Icon className={cn("w-6 h-6", isActive && "text-blue-600")} />
+                  <Icon className={cn("w-6 h-6", isActive && "text-teal-600")} />
                   {tab.label}
                 </a>
               </Link>

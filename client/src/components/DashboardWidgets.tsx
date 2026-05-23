@@ -30,7 +30,7 @@ interface ColorPreferences {
 }
 
 const DEFAULT_COLOR_PREFERENCES: ColorPreferences = {
-  events: '#3b82f6',      // Blue
+  events: '#14b8a6',      // Teal
   taskUrgent: '#ef4444',  // Red
   taskHigh: '#f59e0b',    // Orange
   taskNormalLow: '#10b981' // Green
@@ -298,14 +298,14 @@ export function DuplicatesWidget({ className }: DuplicatesWidgetProps) {
     if (confidence >= 95) return 'bg-red-50 border-red-500 text-red-900';
     if (confidence >= 85) return 'bg-orange-50 border-orange-500 text-orange-900';
     if (confidence >= 70) return 'bg-yellow-50 border-yellow-500 text-yellow-900';
-    return 'bg-blue-50 border-blue-500 text-blue-900';
+    return 'bg-teal-50 border-teal-500 text-teal-900';
   };
 
   const getConfidenceBadgeColor = (confidence: number) => {
     if (confidence >= 95) return 'bg-red-100 text-red-800';
     if (confidence >= 85) return 'bg-orange-100 text-orange-800';
     if (confidence >= 70) return 'bg-yellow-100 text-yellow-800';
-    return 'bg-blue-100 text-blue-800';
+    return 'bg-teal-100 text-teal-800';
   };
 
   const formatDuplicateLabel = (group: any) => {

@@ -114,7 +114,7 @@ function GettingStartedCard({ user }: { user: any }) {
   };
 
   return (
-    <div className="mb-8 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-6 relative">
+    <div className="mb-8 bg-gradient-to-br from-teal-50 to-indigo-50 border border-teal-100 rounded-2xl p-6 relative">
       <button
         onClick={dismiss}
         className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
@@ -137,17 +137,17 @@ function GettingStartedCard({ user }: { user: any }) {
             <button
               key={step.id}
               onClick={() => setLocation(step.href)}
-              className="group text-left bg-white rounded-xl border border-slate-200 p-4 hover:border-blue-300 hover:shadow-md transition-all duration-150"
+              className="group text-left bg-white rounded-xl border border-slate-200 p-4 hover:border-teal-300 hover:shadow-md transition-all duration-150"
             >
               <div className="flex items-center gap-2 mb-2">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 text-blue-600 text-xs font-bold flex-shrink-0">
+                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-teal-100 text-teal-600 text-xs font-bold flex-shrink-0">
                   {idx + 1}
                 </span>
-                <Icon className="w-4 h-4 text-blue-500" />
+                <Icon className="w-4 h-4 text-teal-500" />
               </div>
               <p className="font-medium text-slate-800 text-sm leading-snug mb-1">{step.title}</p>
               <p className="text-xs text-slate-500 leading-relaxed mb-3">{step.description}</p>
-              <span className="inline-flex items-center text-xs font-medium text-blue-600 group-hover:gap-1.5 gap-1 transition-all">
+              <span className="inline-flex items-center text-xs font-medium text-teal-600 group-hover:gap-1.5 gap-1 transition-all">
                 {step.cta} <ChevronRight className="w-3 h-3" />
               </span>
             </button>
@@ -300,7 +300,7 @@ function renderMessageWithMentions(content: string) {
     parts.push(
       <span
         key={`mention-${key++}`}
-        className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 px-1 rounded font-medium"
+        className="bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300 px-1 rounded font-medium"
       >
         @{match[1]}
       </span>
@@ -827,7 +827,7 @@ function renderMessageWithMentions(content: string) {
                           onClick={() => setLocation('/team')}
                           data-testid="stat-team-members"
                         >
-                          <div className="text-2xl font-bold text-blue-600">{(stats as any)?.activeTeam || 0}</div>
+                          <div className="text-2xl font-bold text-teal-600">{(stats as any)?.activeTeam || 0}</div>
                           <div className="text-xs text-slate-600">Team Members</div>
                         </div>
                       </div>
@@ -988,7 +988,7 @@ function renderMessageWithMentions(content: string) {
                                             size="sm"
                                             variant={userReacted ? "default" : "outline"}
                                             onClick={() => handleReaction(message.id, emoji)}
-                                            className={`h-5 text-xs px-1 ${userReacted ? 'bg-blue-100 border-blue-300' : ''}`}
+                                            className={`h-5 text-xs px-1 ${userReacted ? 'bg-teal-100 border-teal-300' : ''}`}
                                           >
                                             {emoji} {(reactions as any[]).length}
                                           </Button>

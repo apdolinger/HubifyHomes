@@ -8,16 +8,16 @@ export default function PrivacyPolicy() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="bg-blue-600 py-12">
+      <div className="bg-teal-600 py-12">
         <div className="max-w-4xl mx-auto px-6">
           <div className="flex items-center mb-4">
             <Shield className="w-8 h-8 text-white mr-3" />
             <h1 className="text-3xl font-bold text-white">Privacy Policy</h1>
           </div>
-          <p className="text-blue-100">
+          <p className="text-teal-100">
             Last Updated: {lastUpdated}
           </p>
-          <p className="text-blue-100 mt-2">
+          <p className="text-teal-100 mt-2">
             This Privacy Policy describes how Hubify collects, uses, and protects your personal information in compliance with US and Canadian privacy laws.
           </p>
         </div>
@@ -27,7 +27,7 @@ export default function PrivacyPolicy() {
         <Card className="mb-6">
           <CardContent className="pt-6">
             <div className="flex items-start mb-4">
-              <AlertCircle className="w-5 h-5 text-blue-600 mr-3 mt-1 flex-shrink-0" />
+              <AlertCircle className="w-5 h-5 text-teal-600 mr-3 mt-1 flex-shrink-0" />
               <div>
                 <h3 className="font-semibold mb-2">Your Privacy Rights</h3>
                 <p className="text-sm text-slate-600">
@@ -41,7 +41,7 @@ export default function PrivacyPolicy() {
         <div className="space-y-8">
           <section>
             <h2 className="text-2xl font-bold mb-4 flex items-center">
-              <FileText className="w-6 h-6 mr-2 text-blue-600" />
+              <FileText className="w-6 h-6 mr-2 text-teal-600" />
               1. Information We Collect
             </h2>
             
@@ -85,7 +85,7 @@ export default function PrivacyPolicy() {
 
           <section>
             <h2 className="text-2xl font-bold mb-4 flex items-center">
-              <Lock className="w-6 h-6 mr-2 text-blue-600" />
+              <Lock className="w-6 h-6 mr-2 text-teal-600" />
               2. How We Use Your Information
             </h2>
             
@@ -105,7 +105,7 @@ export default function PrivacyPolicy() {
 
           <section>
             <h2 className="text-2xl font-bold mb-4 flex items-center">
-              <Users className="w-6 h-6 mr-2 text-blue-600" />
+              <Users className="w-6 h-6 mr-2 text-teal-600" />
               3. How We Share Your Information
             </h2>
             
@@ -307,7 +307,7 @@ export default function PrivacyPolicy() {
 
           <section>
             <h2 className="text-2xl font-bold mb-4 flex items-center">
-              <Mail className="w-6 h-6 mr-2 text-blue-600" />
+              <Mail className="w-6 h-6 mr-2 text-teal-600" />
               11. Contact Us
             </h2>
             <div className="bg-slate-100 p-6 rounded-lg">
@@ -344,7 +344,7 @@ export default function PrivacyPolicy() {
           </section>
         </div>
 
-        <div className="mt-12 p-6 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="mt-12 p-6 bg-teal-50 border border-teal-200 rounded-lg">
           <p className="text-sm text-slate-600">
             <strong>Effective Date:</strong> {lastUpdated}
           </p>
@@ -358,14 +358,14 @@ export default function PrivacyPolicy() {
         <div className="max-w-4xl mx-auto px-6 text-center text-sm text-slate-600">
           <p>© 2025 Hubify. All rights reserved.</p>
           <p className="mt-2">
-            <a href="/privacy" className="text-blue-600 hover:underline">Privacy Policy</a>
+            <a href="/privacy" className="text-teal-600 hover:underline">Privacy Policy</a>
             {' · '}
-            <a href="/terms" className="text-blue-600 hover:underline">Terms of Service</a>
+            <a href="/terms" className="text-teal-600 hover:underline">Terms of Service</a>
             {' · '}
             <button
               type="button"
               onClick={openCookiePreferences}
-              className="text-blue-600 hover:underline"
+              className="text-teal-600 hover:underline"
               data-testid="link-cookie-preferences-footer"
             >
               Cookie preferences

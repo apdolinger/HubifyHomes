@@ -138,7 +138,7 @@ function Router() {
       {isLoading ? (
         <Route>
           <div className="min-h-screen flex items-center justify-center">
-            <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
+            <RefreshCw className="w-8 h-8 animate-spin text-teal-600" />
           </div>
         </Route>
       ) : !isAuthenticated ? (
@@ -159,7 +159,7 @@ function Router() {
                     <div>
                       <Button 
                         onClick={() => window.location.href = "/api/login"}
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        className="bg-teal-600 hover:bg-teal-700 text-white"
                       >
                         Login
                       </Button>
@@ -176,7 +176,7 @@ function Router() {
                 </p>
                 <Button 
                   onClick={() => window.location.href = "/api/login"}
-                  className="bg-blue-600 hover:bg-blue-700"
+                  className="bg-teal-600 hover:bg-teal-700"
                 >
                   Login to Continue
                 </Button>
@@ -311,18 +311,18 @@ function AuthenticatedAppContent() {
         <div className="text-sm text-slate-600">
           © 2025 Hubify. All rights reserved.
           <span className="mx-2">·</span>
-          <a href="/privacy" className="text-blue-600 hover:underline" data-testid="link-privacy">
+          <a href="/privacy" className="text-teal-600 hover:underline" data-testid="link-privacy">
             Privacy Policy
           </a>
           <span className="mx-2">·</span>
-          <a href="/terms" className="text-blue-600 hover:underline" data-testid="link-terms">
+          <a href="/terms" className="text-teal-600 hover:underline" data-testid="link-terms">
             Terms of Service
           </a>
           <span className="mx-2">·</span>
           <button
             type="button"
             onClick={openCookiePreferences}
-            className="text-blue-600 hover:underline"
+            className="text-teal-600 hover:underline"
             data-testid="link-cookie-preferences"
           >
             Cookie preferences

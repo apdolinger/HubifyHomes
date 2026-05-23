@@ -540,7 +540,7 @@ export default function EnhancedChecklist({ items, onItemsChange, users, taskDue
       {totalCount > 0 && (
         <div className="w-full bg-slate-200 rounded-full h-2">
           <div 
-            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+            className="bg-teal-600 h-2 rounded-full transition-all duration-300"
             style={{ width: `${(completedCount / totalCount) * 100}%` }}
           />
         </div>

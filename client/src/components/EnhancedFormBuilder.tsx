@@ -150,12 +150,12 @@ export function EnhancedFormBuilder({ initialFields = [], onSave }: EnhancedForm
                   rows={3}
                 />
               </div>
-              <div className="bg-blue-50 p-4 rounded-lg">
+              <div className="bg-teal-50 p-4 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">Step 1</span>
-                  <span className="text-sm font-medium text-blue-900">Form Contexts</span>
+                  <span className="bg-teal-100 text-teal-800 text-xs font-medium px-2.5 py-0.5 rounded">Step 1</span>
+                  <span className="text-sm font-medium text-teal-900">Form Contexts</span>
                 </div>
-                <p className="text-sm text-blue-700 mb-3">Select one or more contexts to determine available fields and submission processing.</p>
+                <p className="text-sm text-teal-700 mb-3">Select one or more contexts to determine available fields and submission processing.</p>
                 <div className="space-y-2">
                   {contexts.map(context => (
                     <div key={context.value} className="flex items-center space-x-3 p-2 bg-white rounded border">
@@ -307,12 +307,12 @@ export function EnhancedFormBuilder({ initialFields = [], onSave }: EnhancedForm
             <div
               key={step}
               className={`flex items-center space-x-2 ${
-                step === currentStep ? 'text-blue-600' : 
+                step === currentStep ? 'text-teal-600' : 
                 step < currentStep ? 'text-green-600' : 'text-gray-400'
               }`}
             >
               <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${
-                step === currentStep ? 'border-blue-600 bg-blue-50' : 
+                step === currentStep ? 'border-teal-600 bg-teal-50' : 
                 step < currentStep ? 'border-green-600 bg-green-50' : 'border-gray-300'
               }`}>
                 {step}
@@ -472,7 +472,7 @@ export function EnhancedFormBuilder({ initialFields = [], onSave }: EnhancedForm
               Next
             </Button>
           ) : (
-            <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleSave} className="bg-teal-600 hover:bg-teal-700">
               Save Form
             </Button>
           )}

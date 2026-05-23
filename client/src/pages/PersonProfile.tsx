@@ -339,7 +339,7 @@ function BillingSettingsTab({ person, personId, orgId }: { person: any; personId
                 className="sr-only peer"
                 data-testid="input-billing-enabled"
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
             </label>
           </div>
 
@@ -469,8 +469,8 @@ function BillingSettingsTab({ person, personId, orgId }: { person: any; personId
                   )}
                   
                   {(invoiceFrequency === "weekly" || invoiceFrequency === "biweekly" || invoiceFrequency === "monthly") && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <p className="text-sm text-blue-900">
+                    <div className="bg-teal-50 border border-teal-200 rounded-lg p-3">
+                      <p className="text-sm text-teal-900">
                         <strong>Automated Batching:</strong> All pending billing submissions will automatically be consolidated into a single invoice on the scheduled day.
                       </p>
                     </div>
@@ -1486,7 +1486,7 @@ export default function PersonProfile() {
                 </Badge>
                 {(person as any)?.email && (
                   <div 
-                    className="flex items-center text-slate-600 cursor-pointer hover:text-blue-600 transition-colors" 
+                    className="flex items-center text-slate-600 cursor-pointer hover:text-teal-600 transition-colors" 
                     onClick={() => setIsEmailModalOpen(true)}
                     data-testid="client-email-link"
                   >
@@ -1641,7 +1641,7 @@ export default function PersonProfile() {
                               onClick={() => setCurrentPropertyIndex(index)}
                               className={`w-2 h-2 rounded-full transition-colors ${
                                 index === currentPropertyIndex 
-                                  ? 'bg-blue-500' 
+                                  ? 'bg-teal-500' 
                                   : 'bg-slate-300 hover:bg-slate-400'
                               }`}
                             />
@@ -1883,7 +1883,7 @@ export default function PersonProfile() {
                 </div>
                 
                 <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-lg">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
                   <div className="flex-1">
                     <p className="text-sm font-medium">Payment received</p>
                     <p className="text-xs text-slate-500">1 week ago</p>
@@ -2224,7 +2224,7 @@ export default function PersonProfile() {
                       onClick={() => togglePropertySelection(property)}
                       className={`p-3 rounded-lg border cursor-pointer transition-colors ${
                         isSelected
-                          ? "border-blue-500 bg-blue-50"
+                          ? "border-teal-500 bg-teal-50"
                           : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
                       }`}
                     >
@@ -2247,7 +2247,7 @@ export default function PersonProfile() {
                             {property.type?.replace('_', ' ') || 'Property'}
                           </Badge>
                           {isSelected && (
-                            <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                            <div className="w-5 h-5 bg-teal-500 rounded-full flex items-center justify-center">
                               <CheckSquare className="w-3 h-3 text-white" />
                             </div>
                           )}
@@ -2297,16 +2297,16 @@ export default function PersonProfile() {
             </div>
 
             {selectedProperties.length > 0 && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm font-medium text-blue-900">
+              <div className="p-3 bg-teal-50 border border-teal-200 rounded-lg">
+                <p className="text-sm font-medium text-teal-900">
                   Selected Properties ({selectedProperties.length}):
                 </p>
                 <div className="space-y-1 mt-2">
                   {selectedProperties.map((property: any) => (
                     <div key={property.id} className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-blue-700">{property.name}</p>
-                        <p className="text-xs text-blue-600 flex items-center">
+                        <p className="text-sm text-teal-700">{property.name}</p>
+                        <p className="text-xs text-teal-600 flex items-center">
                           <MapPin className="w-3 h-3 mr-1" />
                           {[
                             property.address1,
@@ -2324,7 +2324,7 @@ export default function PersonProfile() {
                           e.stopPropagation();
                           togglePropertySelection(property);
                         }}
-                        className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
+                        className="h-6 w-6 p-0 text-teal-600 hover:text-teal-800"
                       >
                         ×
                       </Button>
@@ -2766,7 +2766,7 @@ export default function PersonProfile() {
                     selectedEmailHistory.status === "sent" 
                       ? "bg-green-500 hover:bg-green-600" 
                       : selectedEmailHistory.status === "scheduled" 
-                        ? "bg-blue-500 hover:bg-blue-600 text-white" 
+                        ? "bg-teal-500 hover:bg-teal-600 text-white" 
                         : ""
                   }
                   data-testid="modal-badge-status"

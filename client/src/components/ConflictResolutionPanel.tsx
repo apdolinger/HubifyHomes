@@ -193,7 +193,7 @@ export function ConflictResolutionPanel({
       case "staff":
         return <AlertTriangle className="h-5 w-5 text-orange-500" />;
       case "property":
-        return <AlertTriangle className="h-5 w-5 text-blue-500" />;
+        return <AlertTriangle className="h-5 w-5 text-teal-500" />;
       case "resource":
         return <AlertTriangle className="h-5 w-5 text-purple-500" />;
       default:
@@ -210,7 +210,7 @@ export function ConflictResolutionPanel({
       case "rejected":
         return <Badge variant="outline" className="bg-red-50">Rejected</Badge>;
       case "resolved":
-        return <Badge variant="outline" className="bg-blue-50">Resolved</Badge>;
+        return <Badge variant="outline" className="bg-teal-50">Resolved</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }

@@ -156,11 +156,11 @@ export default function HubifyConsole() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <Card>
           <CardContent className="p-6 text-center">
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Home className="w-6 h-6 text-blue-600" />
+            <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Home className="w-6 h-6 text-teal-600" />
             </div>
             <h3 className="text-lg font-semibold text-slate-900">Properties</h3>
-            <p className="text-3xl font-bold text-blue-600">
+            <p className="text-3xl font-bold text-teal-600">
               {propertiesLoading ? "..." : Array.isArray(properties) ? properties.length : 0}
             </p>
           </CardContent>
@@ -210,8 +210,8 @@ export default function HubifyConsole() {
                 <CardHeader className="bg-slate-50 border-b">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <Home className="w-5 h-5 text-blue-600" />
+                      <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center">
+                        <Home className="w-5 h-5 text-teal-600" />
                       </div>
                       <div>
                         <CardTitle className="text-xl">{property.name}</CardTitle>
@@ -391,7 +391,7 @@ export default function HubifyConsole() {
       <Card className="mt-8">
         <CardContent className="p-6">
           <div className="text-center">
-            <MessageCircle className="w-8 h-8 text-blue-600 mx-auto mb-3" />
+            <MessageCircle className="w-8 h-8 text-teal-600 mx-auto mb-3" />
             <h3 className="text-lg font-medium text-slate-900 mb-2">
               Need Help or Have Questions?
             </h3>

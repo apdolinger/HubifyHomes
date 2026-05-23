@@ -65,7 +65,7 @@ const getNavigationItems = (user: any) => {
 };
 
 const notificationTypeConfig: Record<string, { icon: any; color: string; label: string }> = {
-  task_assigned: { icon: CheckSquare, color: "text-blue-500", label: "Task Assigned" },
+  task_assigned: { icon: CheckSquare, color: "text-teal-500", label: "Task Assigned" },
   task_overdue: { icon: AlertCircle, color: "text-red-500", label: "Task Overdue" },
   inspection_due: { icon: ClipboardCheck, color: "text-orange-500", label: "Inspection Due" },
   invoice_due: { icon: FileText, color: "text-yellow-600", label: "Invoice Due" },
@@ -190,7 +190,7 @@ export default function Navigation() {
     <nav className="bg-white border-b border-slate-200 sticky top-0 z-50">
       {/* Field Mode Banner */}
       {showFieldModeBanner && (
-        <div className="bg-blue-600 text-white px-4 py-2.5 flex items-center justify-between gap-3">
+        <div className="bg-teal-600 text-white px-4 py-2.5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <Smartphone className="w-4 h-4 flex-shrink-0" />
             <span className="text-sm font-medium truncate">Try Field Mode for a better mobile experience</span>
@@ -198,11 +198,11 @@ export default function Navigation() {
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={enterFieldMode}
-              className="text-xs font-semibold bg-white text-blue-600 rounded-full px-3 py-1 hover:bg-blue-50 transition-colors"
+              className="text-xs font-semibold bg-white text-teal-600 rounded-full px-3 py-1 hover:bg-teal-50 transition-colors"
             >
               Try it
             </button>
-            <button onClick={dismissBanner} className="text-blue-200 hover:text-white transition-colors">
+            <button onClick={dismissBanner} className="text-teal-200 hover:text-white transition-colors">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -286,7 +286,7 @@ export default function Navigation() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-xs h-7 px-2 text-blue-600 hover:text-blue-700"
+                      className="text-xs h-7 px-2 text-teal-600 hover:text-teal-700"
                       onClick={() => markAllReadMutation.mutate()}
                       disabled={markAllReadMutation.isPending}
                     >
@@ -316,7 +316,7 @@ export default function Navigation() {
                             key={notif.id}
                             onClick={() => handleNotificationClick(notif)}
                             className={`flex gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors ${
-                              !notif.isRead ? "bg-blue-50/50" : ""
+                              !notif.isRead ? "bg-teal-50/50" : ""
                             }`}
                           >
                             <div className={`mt-0.5 flex-shrink-0 ${config.color}`}>
@@ -328,7 +328,7 @@ export default function Navigation() {
                                   {notif.title}
                                 </p>
                                 {!notif.isRead && (
-                                  <span className="flex-shrink-0 w-2 h-2 rounded-full bg-blue-500 mt-1.5" />
+                                  <span className="flex-shrink-0 w-2 h-2 rounded-full bg-teal-500 mt-1.5" />
                                 )}
                               </div>
                               <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{notif.body}</p>
@@ -425,7 +425,7 @@ export default function Navigation() {
                         <a
                           className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
                             isActive
-                              ? "bg-blue-50 text-blue-700"
+                              ? "bg-teal-50 text-teal-700"
                               : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                           }`}
                           onClick={() => setIsMobileMenuOpen(false)}
@@ -447,7 +447,7 @@ export default function Navigation() {
                     <a
                       className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
                         location === '/settings/stripe'
-                          ? "bg-blue-50 text-blue-700"
+                          ? "bg-teal-50 text-teal-700"
                           : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                       }`}
                       onClick={() => setIsMobileMenuOpen(false)}
@@ -469,7 +469,7 @@ export default function Navigation() {
                         <a
                           className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
                             location === routes.hubifyConsole()
-                              ? "bg-blue-50 text-blue-700"
+                              ? "bg-teal-50 text-teal-700"
                               : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                           }`}
                           onClick={() => setIsMobileMenuOpen(false)}
@@ -484,7 +484,7 @@ export default function Navigation() {
                           <a
                             className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
                               location === '/admin/billing'
-                                ? "bg-blue-50 text-blue-700"
+                                ? "bg-teal-50 text-teal-700"
                                 : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                             }`}
                             onClick={() => setIsMobileMenuOpen(false)}

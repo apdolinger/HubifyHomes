@@ -41,7 +41,7 @@ function renderMessageWithMentions(content: string) {
     parts.push(
       <span 
         key={`mention-${key++}`}
-        className="bg-blue-100 text-blue-800 px-1 rounded"
+        className="bg-teal-100 text-teal-800 px-1 rounded"
       >
         @{match[1]}
       </span>
@@ -544,7 +544,7 @@ export default function TeamMessages() {
                                   size="sm"
                                   variant={userReacted ? "default" : "outline"}
                                   onClick={() => handleReaction(message.id, emoji)}
-                                  className={`h-7 text-sm px-2 ${userReacted ? 'bg-blue-100 border-blue-300 text-blue-800 hover:bg-blue-200' : ''}`}
+                                  className={`h-7 text-sm px-2 ${userReacted ? 'bg-teal-100 border-teal-300 text-teal-800 hover:bg-teal-200' : ''}`}
                                   data-testid={`reaction-${emoji}-${message.id}`}
                                 >
                                   {emoji} {(reactions as any[]).length}

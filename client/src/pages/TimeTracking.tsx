@@ -515,7 +515,7 @@ export default function TimeTracking() {
             <DialogTitle className="flex items-center gap-2">
               Edit Time Entry
               {canFullyEditTimeEntries && (
-                <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
+                <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-teal-100 text-teal-700 rounded-full">
                   <Shield className="w-3 h-3 mr-1" />
                   Full Edit Access
                 </span>

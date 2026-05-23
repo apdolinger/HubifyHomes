@@ -73,7 +73,7 @@ export default function OrganizationProfile() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
       </div>
     );
   }
@@ -96,7 +96,7 @@ export default function OrganizationProfile() {
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'active': return 'bg-green-100 text-green-800';
-      case 'trial': return 'bg-blue-100 text-blue-800';
+      case 'trial': return 'bg-teal-100 text-teal-800';
       case 'suspended': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
@@ -105,7 +105,7 @@ export default function OrganizationProfile() {
   const getPlanColor = (plan: string) => {
     switch (plan.toLowerCase()) {
       case 'enterprise': return 'bg-purple-100 text-purple-800';
-      case 'professional': return 'bg-blue-100 text-blue-800';
+      case 'professional': return 'bg-teal-100 text-teal-800';
       case 'starter': return 'bg-green-100 text-green-800';
       default: return 'bg-gray-100 text-gray-800';
     }
@@ -129,7 +129,7 @@ export default function OrganizationProfile() {
             <div className="flex items-center space-x-4">
               <Avatar className="h-16 w-16">
                 <AvatarImage src={organization.logo} />
-                <AvatarFallback className="text-lg font-semibold bg-blue-100 text-blue-600">
+                <AvatarFallback className="text-lg font-semibold bg-teal-100 text-teal-600">
                   {organization.name.split(' ').map(n => n[0]).join('')}
                 </AvatarFallback>
               </Avatar>
@@ -171,7 +171,7 @@ export default function OrganizationProfile() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-3">
-                <Building2 className="h-8 w-8 text-blue-600" />
+                <Building2 className="h-8 w-8 text-teal-600" />
                 <div>
                   <p className="text-2xl font-bold">{organization.properties}</p>
                   <p className="text-sm text-gray-600">Properties</p>
@@ -372,7 +372,7 @@ export default function OrganizationProfile() {
                       <span>{mockUsage.storageUsed} / {mockUsage.storageLimit}</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: '23%' }}></div>
+                      <div className="bg-teal-600 h-2 rounded-full" style={{ width: '23%' }}></div>
                     </div>
                   </div>
                   <div>
@@ -407,7 +407,7 @@ export default function OrganizationProfile() {
                 <div className="space-y-4">
                   {mockActivity.map((activity, index) => (
                     <div key={index} className="flex items-start space-x-3 p-3 border rounded-lg">
-                      <Activity className="h-4 w-4 text-blue-600 mt-1" />
+                      <Activity className="h-4 w-4 text-teal-600 mt-1" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium">{activity.action}</p>
                         <p className="text-sm text-gray-600">{activity.details}</p>

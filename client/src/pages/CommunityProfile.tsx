@@ -239,7 +239,7 @@ export default function CommunityProfile() {
                     {community.propertyCount || properties.length || 0}
                   </p>
                 </div>
-                <Home className="w-8 h-8 text-blue-500" />
+                <Home className="w-8 h-8 text-teal-500" />
               </div>
             </CardContent>
           </Card>
@@ -321,7 +321,7 @@ export default function CommunityProfile() {
                       {community.email && (
                         <p className="text-sm" data-testid="text-email">
                           <span className="text-slate-500">Email:</span>{' '}
-                          <a href={`mailto:${community.email}`} className="text-blue-600 hover:underline">
+                          <a href={`mailto:${community.email}`} className="text-teal-600 hover:underline">
                             {community.email}
                           </a>
                         </p>
@@ -333,7 +333,7 @@ export default function CommunityProfile() {
                             href={community.website} 
                             target="_blank" 
                             rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline"
+                            className="text-teal-600 hover:underline"
                           >
                             {community.website}
                           </a>
@@ -361,7 +361,7 @@ export default function CommunityProfile() {
                       {community.emergencyContactEmail && (
                         <p className="text-sm" data-testid="text-emergency-email">
                           <span className="text-slate-500">Email:</span>{' '}
-                          <a href={`mailto:${community.emergencyContactEmail}`} className="text-blue-600 hover:underline">
+                          <a href={`mailto:${community.emergencyContactEmail}`} className="text-teal-600 hover:underline">
                             {community.emergencyContactEmail}
                           </a>
                         </p>
@@ -409,7 +409,7 @@ export default function CommunityProfile() {
                         href={community.websiteUrl} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline"
+                        className="text-teal-600 hover:underline"
                         data-testid="link-website"
                       >
                         {community.websiteUrl}
@@ -511,7 +511,7 @@ export default function CommunityProfile() {
                       <div key={doc.id} className="p-4 border rounded-lg" data-testid={`document-${doc.id}`}>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
-                            <FileText className="w-5 h-5 text-blue-500 mr-3" />
+                            <FileText className="w-5 h-5 text-teal-500 mr-3" />
                             <div>
                               <h4 className="font-medium">{doc.name}</h4>
                               <p className="text-sm text-slate-500">{doc.documentType}</p>

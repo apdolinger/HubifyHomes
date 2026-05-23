@@ -202,7 +202,7 @@ export function TimeTrackingDropdownItems() {
                 <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer">
                   <RadioGroupItem value="client" id="client" data-testid="radio-client" />
                   <Label htmlFor="client" className="flex items-center cursor-pointer flex-1">
-                    <Users className="w-4 h-4 mr-2 text-blue-500" />
+                    <Users className="w-4 h-4 mr-2 text-teal-500" />
                     <div>
                       <div className="font-medium">Client Work</div>
                       <div className="text-xs text-slate-500">Billable time for properties and tasks</div>

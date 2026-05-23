@@ -83,8 +83,8 @@ function CascadedClientAlertsDisplay({ taskId }: { taskId: string }) {
   const severityConfig = {
     info: {
       icon: Info,
-      className: "border-blue-500 bg-blue-50 text-blue-900 dark:bg-blue-950 dark:text-blue-100",
-      iconClassName: "text-blue-500",
+      className: "border-teal-500 bg-teal-50 text-teal-900 dark:bg-teal-950 dark:text-teal-100",
+      iconClassName: "text-teal-500",
     },
     warning: {
       icon: AlertTriangle,
@@ -395,7 +395,7 @@ function VendorInformationCard({ task, onUpdate }: { task: any; onUpdate: () => 
                   <Label className="text-sm font-medium text-slate-500">Vendor</Label>
                   <Button
                     variant="link"
-                    className="p-0 h-auto font-medium text-blue-600 hover:text-blue-800"
+                    className="p-0 h-auto font-medium text-teal-600 hover:text-teal-800"
                     onClick={() => navigate(`/person-profile/${task.vendor.id}`)}
                     data-testid="link-task-vendor"
                   >
@@ -414,7 +414,7 @@ function VendorInformationCard({ task, onUpdate }: { task: any; onUpdate: () => 
                   <div>
                     <Label className="text-sm font-medium text-slate-500">Email</Label>
                     <p className="text-slate-700 text-sm">
-                      <a href={`mailto:${task.vendor.email}`} className="text-blue-600 hover:text-blue-800">
+                      <a href={`mailto:${task.vendor.email}`} className="text-teal-600 hover:text-teal-800">
                         {task.vendor.email}
                       </a>
                     </p>
@@ -424,7 +424,7 @@ function VendorInformationCard({ task, onUpdate }: { task: any; onUpdate: () => 
                   <div>
                     <Label className="text-sm font-medium text-slate-500">Phone</Label>
                     <p className="text-slate-700 text-sm">
-                      <a href={`tel:${task.vendor.phone}`} className="text-blue-600 hover:text-blue-800">
+                      <a href={`tel:${task.vendor.phone}`} className="text-teal-600 hover:text-teal-800">
                         {task.vendor.phone}
                       </a>
                     </p>
@@ -1889,7 +1889,7 @@ export default function TaskProfile() {
                     </Badge>
                   )}
                   {(task as any).templateTaskId && !(task as any).isTemplate && (
-                    <Badge variant="secondary" className="shrink-0 bg-blue-100 text-blue-700 hover:bg-blue-100">
+                    <Badge variant="secondary" className="shrink-0 bg-teal-100 text-teal-700 hover:bg-teal-100">
                       Instance
                     </Badge>
                   )}
@@ -2617,7 +2617,7 @@ export default function TaskProfile() {
                           tag.trim() && (
                             <span 
                               key={index} 
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800"
                               data-testid={`tag-${tag.trim()}`}
                             >
                               {tag.trim()}
@@ -2665,7 +2665,7 @@ export default function TaskProfile() {
                     <div
                       className={`border-2 border-dashed rounded-lg p-3 text-center transition-colors ${
                         isDragOverPhotos
-                          ? 'border-blue-400 bg-blue-50'
+                          ? 'border-teal-400 bg-teal-50'
                           : 'border-slate-300 hover:border-slate-400'
                       }`}
                       onDragOver={handlePhotoDragOver}
@@ -2674,7 +2674,7 @@ export default function TaskProfile() {
                     >
                       {isPhotoUploading ? (
                         <div className="flex flex-col items-center py-2">
-                          <RefreshCw className="w-6 h-6 text-blue-500 animate-spin mb-1" />
+                          <RefreshCw className="w-6 h-6 text-teal-500 animate-spin mb-1" />
                           <p className="text-sm text-slate-600">Uploading photos...</p>
                         </div>
                       ) : (
@@ -2855,7 +2855,7 @@ export default function TaskProfile() {
                                               onClick={() => setAnnotatingPhoto({ url: attachment.url, source: "task", index })}
                                               data-testid={`button-annotate-uncategorized-${index}`}
                                             >
-                                              <Pencil className="w-3 h-3 text-blue-500" />
+                                              <Pencil className="w-3 h-3 text-teal-500" />
                                             </Button>
                                             <Button
                                               variant="ghost"
@@ -2952,7 +2952,7 @@ export default function TaskProfile() {
                           <Label className="text-sm font-medium text-slate-500">Property</Label>
                           <Button
                             variant="link"
-                            className="p-0 h-auto font-medium text-blue-600 hover:text-blue-800"
+                            className="p-0 h-auto font-medium text-teal-600 hover:text-teal-800"
                             onClick={() => navigate(`/property-profile?id=${(task as any).property.id}`)}
                             data-testid="link-task-property"
                           >
@@ -3002,7 +3002,7 @@ export default function TaskProfile() {
                           <Label className="text-sm font-medium text-slate-500">Name</Label>
                           <Button
                             variant="link"
-                            className="p-0 h-auto font-medium text-blue-600 hover:text-blue-800"
+                            className="p-0 h-auto font-medium text-teal-600 hover:text-teal-800"
                             onClick={() => navigate(`/person-profile?id=${(task as any).contact.id}`)}
                             data-testid="link-task-owner"
                           >
@@ -3013,7 +3013,7 @@ export default function TaskProfile() {
                           <div>
                             <Label className="text-sm font-medium text-slate-500">Email</Label>
                             <p className="text-slate-700 text-sm">
-                              <a href={`mailto:${(task as any).contact.email}`} className="text-blue-600 hover:text-blue-800">
+                              <a href={`mailto:${(task as any).contact.email}`} className="text-teal-600 hover:text-teal-800">
                                 {(task as any).contact.email}
                               </a>
                             </p>
@@ -3023,7 +3023,7 @@ export default function TaskProfile() {
                           <div>
                             <Label className="text-sm font-medium text-slate-500">Phone</Label>
                             <p className="text-slate-700 text-sm">
-                              <a href={`tel:${(task as any).contact.phone}`} className="text-blue-600 hover:text-blue-800">
+                              <a href={`tel:${(task as any).contact.phone}`} className="text-teal-600 hover:text-teal-800">
                                 {(task as any).contact.phone}
                               </a>
                             </p>
@@ -3061,7 +3061,7 @@ export default function TaskProfile() {
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <CardTitle className="flex items-center gap-2 text-base">
-                        <ClipboardCheck className="w-5 h-5 text-blue-600" />
+                        <ClipboardCheck className="w-5 h-5 text-teal-600" />
                         Inspection Checklist
                       </CardTitle>
                       <div className="flex items-center gap-2">
@@ -3190,7 +3190,7 @@ export default function TaskProfile() {
                                           </a>
                                           <div className="absolute inset-0 flex items-end justify-center gap-0.5 pb-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button
-                                              className="bg-blue-600/90 text-white rounded px-1 py-0.5 flex items-center gap-0.5 text-xs"
+                                              className="bg-teal-600/90 text-white rounded px-1 py-0.5 flex items-center gap-0.5 text-xs"
                                               title="Annotate photo"
                                               onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAnnotatingPhoto({ url, source: "checklist", itemId: String(item.id), currentUrls: allPhotos, currentThumbnailUrls: allThumbnails }); }}
                                             >
@@ -3241,7 +3241,7 @@ export default function TaskProfile() {
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  className="h-7 w-7 p-0 text-slate-400 hover:text-blue-500"
+                                  className="h-7 w-7 p-0 text-slate-400 hover:text-teal-500"
                                   title={item.resultNote ? "Edit note" : "Add note"}
                                   onClick={() => {
                                     if (editingNoteItemId === item.id) {
@@ -3258,7 +3258,7 @@ export default function TaskProfile() {
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  className={`h-7 w-7 p-0 hover:text-blue-500 ${(item.photoUrls?.length > 0 || item.photoUrl) ? "text-blue-400" : "text-slate-400"}`}
+                                  className={`h-7 w-7 p-0 hover:text-teal-500 ${(item.photoUrls?.length > 0 || item.photoUrl) ? "text-teal-400" : "text-slate-400"}`}
                                   title={(item.photoUrls?.length > 0 || item.photoUrl) ? "Add another photo" : "Attach photo"}
                                   disabled={uploadingPhotoItemId === item.id}
                                   onClick={() => {
@@ -3278,7 +3278,7 @@ export default function TaskProfile() {
                                   ].length;
                                   return photoCount > 0 ? (
                                     <Badge
-                                      className="h-5 px-1.5 text-xs bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100 pointer-events-none"
+                                      className="h-5 px-1.5 text-xs bg-teal-100 text-teal-700 border-teal-200 hover:bg-teal-100 pointer-events-none"
                                       title={`${photoCount} ${photoCount === 1 ? "photo" : "photos"}`}
                                       aria-label={`${photoCount} ${photoCount === 1 ? "photo" : "photos"}`}
                                     >
@@ -3485,11 +3485,11 @@ export default function TaskProfile() {
                       {quickLinks.map((link) => (
                         <div key={link.id} className="flex items-center justify-between p-3 border rounded-lg">
                           <div className="flex items-center space-x-3">
-                            <Link className="w-4 h-4 text-blue-500" />
+                            <Link className="w-4 h-4 text-teal-500" />
                             <div>
                               <p className="font-medium text-sm">{link.label}</p>
                               <a href={link.url} target="_blank" rel="noopener noreferrer" 
-                                 className="text-xs text-blue-500 hover:text-blue-700 underline">
+                                 className="text-xs text-teal-500 hover:text-teal-700 underline">
                                 {link.url}
                               </a>
                             </div>
@@ -4093,12 +4093,12 @@ export default function TaskProfile() {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-900">
+            <div className="p-3 bg-teal-50 border border-teal-200 rounded-lg">
+              <p className="text-sm text-teal-900">
                 <strong>Task:</strong> {editForm.title}
               </p>
               {linkedClient && (
-                <p className="text-sm text-blue-900 mt-1">
+                <p className="text-sm text-teal-900 mt-1">
                   <strong>Client:</strong> {(linkedClient as any).firstName} {(linkedClient as any).lastName}
                 </p>
               )}
@@ -4433,11 +4433,11 @@ export default function TaskProfile() {
               </ul>
             </div>
 
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="font-medium text-sm text-blue-900 mb-2">
+            <div className="p-4 bg-teal-50 border border-teal-200 rounded-lg">
+              <h4 className="font-medium text-sm text-teal-900 mb-2">
                 The following fields will be preserved:
               </h4>
-              <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+              <ul className="text-sm text-teal-800 space-y-1 list-disc list-inside">
                 <li>Status</li>
                 <li>Due date</li>
                 <li>Team/Staff assignment</li>

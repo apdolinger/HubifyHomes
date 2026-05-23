@@ -137,7 +137,7 @@ interface ProspectEmail {
 }
 
 const PIPELINE_STAGES: { key: OnboardingStage; label: string; color: string }[] = [
-  { key: "inquiry",         label: "Inquiry",         color: "border-blue-400 bg-blue-50" },
+  { key: "inquiry",         label: "Inquiry",         color: "border-teal-400 bg-teal-50" },
   { key: "agreement",       label: "Agreement",        color: "border-yellow-400 bg-yellow-50" },
   { key: "payment_setup",   label: "Payment Setup",    color: "border-orange-400 bg-orange-50" },
   { key: "initial_payment", label: "Initial Payment",  color: "border-purple-400 bg-purple-50" },
@@ -1866,7 +1866,7 @@ function RevenueTabContent() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex justify-between"><span className="text-sm text-slate-600">Active</span><span className="font-semibold text-green-600" data-testid="text-active-orgs">{data.activeOrgs}</span></div>
-          <div className="flex justify-between"><span className="text-sm text-slate-600">Trialing</span><span className="font-semibold text-blue-600" data-testid="text-trialing-orgs">{data.trialingOrgs}</span></div>
+          <div className="flex justify-between"><span className="text-sm text-slate-600">Trialing</span><span className="font-semibold text-teal-600" data-testid="text-trialing-orgs">{data.trialingOrgs}</span></div>
           <div className="flex justify-between"><span className="text-sm text-slate-600">Past Due</span><span className={`font-semibold ${data.pastDueOrgs > 0 ? 'text-yellow-600' : 'text-slate-600'}`} data-testid="text-pastdue-orgs">{data.pastDueOrgs}</span></div>
           <div className="flex justify-between"><span className="text-sm text-slate-600">Canceled (30d)</span><span className="font-semibold text-slate-600" data-testid="text-canceled-orgs">{data.canceledLast30Days}</span></div>
           <div className="text-xs text-slate-500 pt-2 border-t">MRR/ARR/ARPU include both Active and Past Due (still being billed).</div>
@@ -1907,7 +1907,7 @@ function SourceBadge({ source }: { source: string }) {
     server: "bg-slate-100 text-slate-700",
     unhandled: "bg-red-100 text-red-700",
     stripe: "bg-indigo-100 text-indigo-700",
-    email: "bg-blue-100 text-blue-700",
+    email: "bg-teal-100 text-teal-700",
     cron: "bg-green-100 text-green-700",
     webhook: "bg-orange-100 text-orange-700",
   };
@@ -2378,7 +2378,7 @@ function CommunicationTabContent() {
   };
 
   const severityBadge = (sev: string) => {
-    const color = sev === 'critical' ? 'bg-red-100 text-red-800' : sev === 'warning' ? 'bg-yellow-100 text-yellow-800' : sev === 'success' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800';
+    const color = sev === 'critical' ? 'bg-red-100 text-red-800' : sev === 'warning' ? 'bg-yellow-100 text-yellow-800' : sev === 'success' ? 'bg-green-100 text-green-800' : 'bg-teal-100 text-teal-800';
     return <Badge variant="outline" className={color}>{sev}</Badge>;
   };
 
@@ -2472,7 +2472,7 @@ function CommunicationTabContent() {
                     onClick={() => toggleRole(role)}
                     className={`px-2.5 py-1 rounded-md border text-xs font-medium transition-colors ${
                       checked
-                        ? 'bg-blue-600 text-white border-blue-600'
+                        ? 'bg-teal-600 text-white border-teal-600'
                         : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                     }`}
                     data-testid={`role-toggle-${role}`}
@@ -2514,7 +2514,7 @@ function CommunicationTabContent() {
           ) : (
             alerts.map((a: any) => {
               const sev = a.severity || 'info';
-              const bgClass = sev === 'critical' ? 'border-red-200 bg-red-50' : sev === 'warning' ? 'border-yellow-200 bg-yellow-50' : sev === 'success' ? 'border-green-200 bg-green-50' : 'border-blue-200 bg-blue-50';
+              const bgClass = sev === 'critical' ? 'border-red-200 bg-red-50' : sev === 'warning' ? 'border-yellow-200 bg-yellow-50' : sev === 'success' ? 'border-green-200 bg-green-50' : 'border-teal-200 bg-teal-50';
               return (
                 <div key={a.id} className={`p-4 border rounded-lg ${bgClass}`} data-testid={`alert-row-${a.id}`}>
                   <div className="flex items-start justify-between">
@@ -3338,7 +3338,7 @@ function SystemIntegrationsCard() {
     },
     {
       key: "resend",
-      icon: <Mail className="w-5 h-5 text-blue-600" />,
+      icon: <Mail className="w-5 h-5 text-teal-600" />,
       name: "Resend",
       description: "Transactional email delivery",
       status: data.resend.apiKey && data.resend.fromEmail ? "connected"
@@ -4144,8 +4144,8 @@ function EmailTemplates() {
             </div>
 
             {formData.type && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <Label className="text-sm font-medium text-blue-900">Available Variables</Label>
+              <div className="p-3 bg-teal-50 border border-teal-200 rounded-lg">
+                <Label className="text-sm font-medium text-teal-900">Available Variables</Label>
                 <div className="flex flex-wrap gap-2 mt-2">
                   {getVariableHints(formData.type).map((variable) => (
                     <Badge key={variable} variant="secondary" className="text-xs font-mono">
@@ -4153,7 +4153,7 @@ function EmailTemplates() {
                     </Badge>
                   ))}
                 </div>
-                <p className="text-xs text-blue-700 mt-2">
+                <p className="text-xs text-teal-700 mt-2">
                   Use these variables in your subject and body to personalize emails. They will be replaced with actual values when emails are sent.
                 </p>
               </div>
@@ -4367,7 +4367,7 @@ function SupportTickets() {
       case 'low':
         return 'bg-slate-100 text-slate-700';
       case 'medium':
-        return 'bg-blue-100 text-blue-700';
+        return 'bg-teal-100 text-teal-700';
       case 'high':
         return 'bg-orange-100 text-orange-700';
       case 'critical':
@@ -4639,7 +4639,7 @@ function SupportTickets() {
                 <p className="text-sm mt-1">
                   <a 
                     href={`mailto:${selectedRequest?.email}`}
-                    className="text-blue-600 hover:underline"
+                    className="text-teal-600 hover:underline"
                   >
                     {selectedRequest?.email}
                   </a>
@@ -4671,7 +4671,7 @@ function SupportTickets() {
                       href={link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
+                      className="flex items-center gap-2 text-sm text-teal-600 hover:underline"
                       data-testid={`link-hyperlink-${index}`}
                     >
                       <ExternalLink className="w-4 h-4" />
@@ -5503,7 +5503,7 @@ function PlatformOverviewCards() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Total Organizations</CardTitle>
-          <Building2 className="h-4 w-4 text-blue-600" />
+          <Building2 className="h-4 w-4 text-teal-600" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold" data-testid="text-total-orgs">{totalOrgs}</div>
@@ -5977,7 +5977,7 @@ function ComplianceTab() {
                 <p className="text-sm text-slate-600">Privileged Users</p>
                 <p className="text-3xl font-bold" data-testid="text-active-admins">{adminUsers.length}</p>
               </div>
-              <Users className="w-12 h-12 text-blue-500" />
+              <Users className="w-12 h-12 text-teal-500" />
             </div>
           </CardContent>
         </Card>

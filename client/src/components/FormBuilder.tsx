@@ -771,11 +771,11 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
 
       {/* Public Link Section */}
       {persistedSlug && (
-        <Card className="bg-blue-50 border-blue-200">
+        <Card className="bg-teal-50 border-teal-200">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <Link className="w-5 h-5 text-blue-600" />
+                <Link className="w-5 h-5 text-teal-600" />
                 <div>
                   <p className="text-sm font-medium text-slate-700">Public Form Link</p>
                   <p className="text-sm text-slate-600 font-mono">
@@ -847,7 +847,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
                                   {...provided.draggableProps}
                                   {...provided.dragHandleProps}
                                   className={`flex items-center p-2.5 border rounded-lg cursor-move hover:bg-slate-50 ${
-                                    snapshot.isDragging ? 'bg-blue-50 border-blue-200' : 'bg-white'
+                                    snapshot.isDragging ? 'bg-teal-50 border-teal-200' : 'bg-white'
                                   }`}
                                 >
                                   <GripVertical className="w-4 h-4 text-slate-400 mr-2" />
@@ -909,7 +909,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
                                   {...provided.draggableProps}
                                   {...provided.dragHandleProps}
                                   className={`flex items-center p-2.5 border rounded-lg cursor-move hover:bg-slate-50 ${
-                                    snapshot.isDragging ? 'bg-blue-50 border-blue-200' : 'bg-white'
+                                    snapshot.isDragging ? 'bg-teal-50 border-teal-200' : 'bg-white'
                                   }`}
                                 >
                                   <GripVertical className="w-4 h-4 text-slate-400 mr-2" />
@@ -952,7 +952,7 @@ export default function FormBuilder({ onSave, initialForm }: FormBuilderProps) {
                       ref={provided.innerRef}
                       className={`min-h-96 space-y-3 p-4 border-2 border-dashed rounded-lg ${
                         snapshot.isDraggingOver 
-                          ? 'border-blue-400 bg-blue-50' 
+                          ? 'border-teal-400 bg-teal-50' 
                           : 'border-slate-200'
                       } ${formSchema.fields.length === 0 ? 'flex items-center justify-center' : ''}`}
                     >

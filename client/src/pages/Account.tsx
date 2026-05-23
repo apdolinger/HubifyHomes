@@ -774,7 +774,7 @@ function BrandingTab({ orgId, orgName }: { orgId: string; orgName: string }) {
             <div className="px-12 pt-10 pb-6">
               <div className="flex items-start justify-between gap-6">
                 <div>
-                  <h3 className="text-2xl font-semibold m-0" style={{ color: "#1e40af" }}>
+                  <h3 className="text-2xl font-semibold m-0" style={{ color: "#0f766e" }}>
                     Inspection Report
                   </h3>
                   <p className="text-xs mt-1 m-0" style={{ color: "#64748b" }}>
@@ -1070,7 +1070,7 @@ export default function Account() {
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+          <Badge variant="outline" className="bg-teal-50 text-teal-700 border-teal-200">
             <Shield className="w-3 h-3 mr-1" />
             Admin Access
           </Badge>
@@ -2550,7 +2550,7 @@ function BillingSettingsForm({ orgId, onClose }: { orgId: string; onClose: () =>
               className={`
                 p-4 rounded-lg border-2 cursor-pointer transition-all
                 ${selectedTemplate === template.id 
-                  ? 'border-blue-500 bg-blue-50' 
+                  ? 'border-teal-500 bg-teal-50' 
                   : 'border-slate-200 hover:border-slate-300 bg-white'
                 }
               `}
@@ -2562,7 +2562,7 @@ function BillingSettingsForm({ orgId, onClose }: { orgId: string; onClose: () =>
                   <p className="text-sm text-slate-600 mt-1">{template.description}</p>
                 </div>
                 {selectedTemplate === template.id && (
-                  <CheckCircle className="w-5 h-5 text-blue-500" />
+                  <CheckCircle className="w-5 h-5 text-teal-500" />
                 )}
               </div>
             </div>

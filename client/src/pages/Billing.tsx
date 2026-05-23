@@ -429,7 +429,7 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
                         <div key={group.groupKey || idx} className="border rounded-lg p-4 bg-slate-50">
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold">
+                              <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center text-teal-600 font-semibold">
                                 {initials}
                               </div>
                               <div>
@@ -449,7 +449,7 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
                             </div>
                             <Button
                               variant="default"
-                              className="bg-blue-600 hover:bg-blue-700"
+                              className="bg-teal-600 hover:bg-teal-700"
                               onClick={() => {
                                 setBatchClient(group.client);
                                 setBatchSubmissions(group.submissions);
@@ -738,7 +738,7 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
           </DialogHeader>
           {batchClient && (
             <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
                 <h4 className="font-semibold mb-2">Client: {batchClient.firstName} {batchClient.lastName}</h4>
                 <p className="text-sm text-slate-600 mb-3">
                   {batchSubmissions.length} submission{batchSubmissions.length > 1 ? 's' : ''} will be consolidated into one invoice
@@ -750,7 +750,7 @@ export default function Billing({ embedded = false }: { embedded?: boolean }) {
                       <span className="font-medium">${(sub.amountCents / 100).toFixed(2)}</span>
                     </div>
                   ))}
-                  <div className="flex justify-between text-base font-semibold pt-2 border-t border-blue-300">
+                  <div className="flex justify-between text-base font-semibold pt-2 border-t border-teal-300">
                     <span>Total:</span>
                     <span>${(batchSubmissions.reduce((sum: number, s: any) => sum + s.amountCents, 0) / 100).toFixed(2)}</span>
                   </div>
@@ -1188,7 +1188,7 @@ function InvoicesTab() {
                           className={
                             invoice.paymentStatus === "succeeded" ? "bg-green-600" :
                             invoice.paymentStatus === "failed" ? "bg-red-600" :
-                            invoice.paymentStatus === "processing" ? "bg-blue-600" :
+                            invoice.paymentStatus === "processing" ? "bg-teal-600" :
                             invoice.paymentStatus === "refunded" ? "bg-gray-600" :
                             ""
                           }
@@ -1667,7 +1667,7 @@ function InvoiceTemplateSelector({ orgId }: { orgId: string }) {
             key={template.id}
             className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
               selectedTemplate === template.id
-                ? "border-blue-500 bg-blue-50"
+                ? "border-teal-500 bg-teal-50"
                 : "border-slate-200 hover:border-slate-300"
             }`}
             onClick={() => handleTemplateSelect(template.id)}
@@ -1676,7 +1676,7 @@ function InvoiceTemplateSelector({ orgId }: { orgId: string }) {
             <div className="flex items-start justify-between mb-2">
               <span className="text-2xl">{template.icon}</span>
               {selectedTemplate === template.id && (
-                <CheckCircle className="w-5 h-5 text-blue-500" />
+                <CheckCircle className="w-5 h-5 text-teal-500" />
               )}
             </div>
             <h5 className="font-medium mb-1">{template.name}</h5>
@@ -2399,7 +2399,7 @@ function SubmissionDetailDialog({
             <div
               className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
                 isDragOverPhotos
-                  ? 'border-blue-400 bg-blue-50'
+                  ? 'border-teal-400 bg-teal-50'
                   : 'border-slate-300 hover:border-slate-400'
               }`}
               onDragOver={handlePhotoDragOver}
@@ -2409,7 +2409,7 @@ function SubmissionDetailDialog({
             >
               {isPhotoUploading ? (
                 <div className="flex flex-col items-center py-4">
-                  <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mb-2" />
+                  <RefreshCw className="w-8 h-8 text-teal-500 animate-spin mb-2" />
                   <p className="text-sm text-slate-600">Uploading photos...</p>
                 </div>
               ) : (

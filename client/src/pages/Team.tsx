@@ -143,8 +143,8 @@ export default function Team() {
       return <ArrowUpDown className="w-4 h-4 text-slate-400" />;
     }
     return sortDirection === "asc" 
-      ? <ArrowUp className="w-4 h-4 text-blue-600" />
-      : <ArrowDown className="w-4 h-4 text-blue-600" />;
+      ? <ArrowUp className="w-4 h-4 text-teal-600" />
+      : <ArrowDown className="w-4 h-4 text-teal-600" />;
   };
 
   // Handle team card click - open communication modal
@@ -611,7 +611,7 @@ export default function Team() {
                                 </div>
                                 {teamLead && (
                                   <div className="flex items-center gap-2 text-sm">
-                                    <ShieldCheck className="w-4 h-4 text-blue-600" />
+                                    <ShieldCheck className="w-4 h-4 text-teal-600" />
                                     <span className="text-slate-600">Lead:</span>
                                     <span className="font-medium">{teamLead.firstName} {teamLead.lastName}</span>
                                   </div>
@@ -619,7 +619,7 @@ export default function Team() {
                                 {team.members && team.members.length > 0 && (
                                   <div className="flex -space-x-2 mt-2">
                                     {team.members.slice(0, 5).map((member: any) => (
-                                      <Avatar key={member.userId} className={`h-8 w-8 border-2 ${member.role === 'lead' ? 'border-blue-600' : 'border-white'}`}>
+                                      <Avatar key={member.userId} className={`h-8 w-8 border-2 ${member.role === 'lead' ? 'border-teal-600' : 'border-white'}`}>
                                         <AvatarFallback className="text-xs">
                                           {getUserInitials(member.firstName || '', member.lastName || '')}
                                         </AvatarFallback>
@@ -710,7 +710,7 @@ export default function Team() {
                                 </div>
                                 {teamLead && (
                                   <div className="flex items-center gap-2 text-sm">
-                                    <ShieldCheck className="w-4 h-4 text-blue-600" />
+                                    <ShieldCheck className="w-4 h-4 text-teal-600" />
                                     <span className="text-slate-600">Lead:</span>
                                     <span className="font-medium">{teamLead.firstName} {teamLead.lastName}</span>
                                   </div>
@@ -718,7 +718,7 @@ export default function Team() {
                                 {team.members && team.members.length > 0 && (
                                   <div className="flex -space-x-2 mt-2">
                                     {team.members.slice(0, 5).map((member: any) => (
-                                      <Avatar key={member.userId} className={`h-8 w-8 border-2 ${member.role === 'lead' ? 'border-blue-600' : 'border-white'}`}>
+                                      <Avatar key={member.userId} className={`h-8 w-8 border-2 ${member.role === 'lead' ? 'border-teal-600' : 'border-white'}`}>
                                         <AvatarFallback className="text-xs">
                                           {getUserInitials(member.firstName || '', member.lastName || '')}
                                         </AvatarFallback>
@@ -787,8 +787,8 @@ export default function Team() {
                   testId: 'stat-total-members'
                 },
                 admins: {
-                  bgColor: 'bg-blue-100',
-                  iconColor: 'text-blue-600',
+                  bgColor: 'bg-teal-100',
+                  iconColor: 'text-teal-600',
                   label: 'Admins',
                   value: teamMembers.filter((m: any) => m.role === 'admin').length,
                   icon: ShieldCheck,

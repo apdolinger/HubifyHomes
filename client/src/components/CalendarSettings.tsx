@@ -44,7 +44,7 @@ const DEFAULT_SETTINGS: CalendarDisplaySettings = {
   filterEventType: 'all',
   filterPriority: 'all',
   colorPreferences: {
-    events: '#3b82f6',      // Blue
+    events: '#14b8a6',      // Teal
     taskUrgent: '#ef4444',  // Red
     taskHigh: '#f59e0b',    // Orange
     taskNormalLow: '#10b981' // Green
@@ -836,9 +836,9 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
               </div>
 
               {/* Important Notes */}
-              <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-2">
-                <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">Important Notes:</p>
-                <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
+              <div className="bg-teal-50 dark:bg-teal-950 border border-teal-200 dark:border-teal-800 rounded-lg p-4 space-y-2">
+                <p className="text-sm font-semibold text-teal-900 dark:text-teal-100">Important Notes:</p>
+                <ul className="text-sm text-teal-800 dark:text-teal-200 space-y-1 list-disc list-inside">
                   <li>This is a one-way sync from Hubify to Google Calendar</li>
                   <li>Changes in Hubify will appear in Google Calendar automatically</li>
                   <li>Changes made in Google Calendar will NOT sync back to Hubify</li>
@@ -952,9 +952,9 @@ export function CalendarSettings({ open, onOpenChange, orgId, onSettingsChange }
               )}
 
               {/* Help Text */}
-              <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-2">
-                <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">Export Options:</p>
-                <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
+              <div className="bg-teal-50 dark:bg-teal-950 border border-teal-200 dark:border-teal-800 rounded-lg p-4 space-y-2">
+                <p className="text-sm font-semibold text-teal-900 dark:text-teal-100">Export Options:</p>
+                <ul className="text-sm text-teal-800 dark:text-teal-200 space-y-1 list-disc list-inside">
                   <li>CSV: Downloads a spreadsheet file with event details</li>
                   <li>PDF: Generates a professionally formatted report document</li>
                   <li>Templates control which fields are included and how data is organized</li>

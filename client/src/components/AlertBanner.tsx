@@ -46,8 +46,8 @@ export interface AlertBannerRef {
 const severityConfig = {
   info: {
     icon: Info,
-    className: "border-blue-500 bg-blue-50 text-blue-900 dark:bg-blue-950 dark:text-blue-100",
-    iconClassName: "text-blue-500",
+    className: "border-teal-500 bg-teal-50 text-teal-900 dark:bg-teal-950 dark:text-teal-100",
+    iconClassName: "text-teal-500",
   },
   warning: {
     icon: AlertTriangle,

@@ -84,7 +84,7 @@ export default function QuickSearchModal({ isOpen, onClose }: QuickSearchModalPr
                       onClick={() => handleResultClick("property", property.id)}
                     >
                       <div className="flex items-center space-x-3">
-                        <Building className="w-4 h-4 text-blue-600" />
+                        <Building className="w-4 h-4 text-teal-600" />
                         <div>
                           <div className="text-sm font-medium text-slate-900">
                             {property.name}

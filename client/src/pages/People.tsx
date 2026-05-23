@@ -460,8 +460,8 @@ export default function People() {
       return <ArrowUpDown className="w-4 h-4 text-slate-400" />;
     }
     return sortDirection === "asc" 
-      ? <ArrowUp className="w-4 h-4 text-blue-600" />
-      : <ArrowDown className="w-4 h-4 text-blue-600" />;
+      ? <ArrowUp className="w-4 h-4 text-teal-600" />
+      : <ArrowDown className="w-4 h-4 text-teal-600" />;
   };
 
   // Selection handlers
@@ -796,8 +796,8 @@ export default function People() {
             .map((widget) => {
               const widgetConfigs = {
                 total: {
-                  bgColor: 'bg-blue-100',
-                  iconColor: 'text-blue-600',
+                  bgColor: 'bg-teal-100',
+                  iconColor: 'text-teal-600',
                   label: 'Total Clients',
                   value: stats.total,
                   onClick: () => {
@@ -974,17 +974,17 @@ export default function People() {
             <div className="rounded-md border">
               {/* Bulk Actions Toolbar */}
               {selectedContacts.size > 0 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 mb-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <span className="text-sm font-medium text-blue-900">
+                      <span className="text-sm font-medium text-teal-900">
                         {selectedContacts.size} client{selectedContacts.size === 1 ? '' : 's'} selected
                       </span>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={clearSelection}
-                        className="text-blue-700 border-blue-300 hover:bg-blue-100"
+                        className="text-teal-700 border-teal-300 hover:bg-teal-100"
                       >
                         Clear Selection
                       </Button>
@@ -1098,7 +1098,7 @@ export default function People() {
                   {paginatedGroups.map((group: any) => (
                     <TableRow 
                       key={group.id}
-                      className={`hover:bg-slate-50 ${selectedContacts.has(group.id) ? 'bg-blue-50' : ''}`}
+                      className={`hover:bg-slate-50 ${selectedContacts.has(group.id) ? 'bg-teal-50' : ''}`}
                     >
                       <TableCell
                         onClick={(e) => {
@@ -1189,7 +1189,7 @@ export default function People() {
                                 group.properties.map((property: any, index: number) => (
                                   <div key={property.propertyId} className="flex items-center space-x-1">
                                     <span 
-                                      className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer underline"
+                                      className="text-sm text-teal-600 hover:text-teal-800 cursor-pointer underline"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setLocation(`/property-profile/${property.propertyId}`);

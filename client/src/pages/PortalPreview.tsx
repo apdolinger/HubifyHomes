@@ -64,7 +64,7 @@ export default function PortalPreview() {
                   : 'w-full'
               }`}
             >
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 overflow-auto" style={{ height: deviceView === 'mobile' ? '667px' : 'auto' }}>
+              <div className="bg-gradient-to-br from-teal-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 overflow-auto" style={{ height: deviceView === 'mobile' ? '667px' : 'auto' }}>
                 <div className="bg-white dark:bg-gray-800 border-b">
                   <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Hubify Portal</h2>
@@ -91,10 +91,10 @@ export default function PortalPreview() {
           </CardContent>
         </Card>
 
-        <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-          <p className="text-sm text-blue-800 dark:text-blue-200">
+        <div className="mt-6 p-4 bg-teal-50 dark:bg-teal-900/20 rounded-lg border border-teal-200 dark:border-teal-800">
+          <p className="text-sm text-teal-800 dark:text-teal-200">
             <strong>Note:</strong> This is a static preview. The live client portal at{' '}
-            <code className="px-1 py-0.5 bg-blue-100 dark:bg-blue-800 rounded">/portal</code> renders real data for the
+            <code className="px-1 py-0.5 bg-teal-100 dark:bg-teal-800 rounded">/portal</code> renders real data for the
             authenticated portal user.
           </p>
         </div>

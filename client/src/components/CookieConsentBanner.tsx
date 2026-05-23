@@ -197,14 +197,14 @@ export default function CookieConsentBanner() {
           <div className="mx-auto max-w-4xl rounded-lg border border-slate-200 bg-white shadow-lg pointer-events-auto dark:bg-gray-900 dark:border-gray-700">
             <div className="p-4 sm:p-5">
               <div className="flex items-start gap-3">
-                <div className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-300">
+                <div className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-600 dark:bg-teal-950 dark:text-teal-300">
                   <Cookie className="h-5 w-5" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h2 className="text-sm font-semibold text-slate-900 dark:text-white">We use cookies</h2>
                   <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
                     We use essential cookies to run Hubify. With your permission, we'd also like to use preference and analytics cookies to remember your settings and improve the product. You can change your choice anytime from "Cookie preferences" in the footer. See our{" "}
-                    <a href="/privacy" className="text-blue-600 hover:underline">Privacy Policy</a>.
+                    <a href="/privacy" className="text-teal-600 hover:underline">Privacy Policy</a>.
                   </p>
 
                   <div className="mt-4 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2">
@@ -227,7 +227,7 @@ export default function CookieConsentBanner() {
                     <Button
                       size="sm"
                       onClick={handleAcceptAll}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      className="bg-teal-600 hover:bg-teal-700 text-white"
                       data-testid="button-cookie-accept"
                     >
                       Accept all
@@ -258,7 +258,7 @@ export default function CookieConsentBanner() {
             </DialogTitle>
             <DialogDescription>
               Choose which categories of cookies Hubify can use. Essential cookies are always on. See our{" "}
-              <a href="/privacy" className="text-blue-600 hover:underline">Privacy Policy</a> for details.
+              <a href="/privacy" className="text-teal-600 hover:underline">Privacy Policy</a> for details.
             </DialogDescription>
           </DialogHeader>
 
@@ -316,7 +316,7 @@ export default function CookieConsentBanner() {
             <Button
               size="sm"
               onClick={handleAcceptAll}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-teal-600 hover:bg-teal-700 text-white"
               data-testid="button-cookie-accept"
             >
               Accept all

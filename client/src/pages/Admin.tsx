@@ -276,9 +276,9 @@ function InvoiceTemplatePreview({ templateId }: { templateId: string }) {
   const getTemplateStyles = (id: string) => {
     const styles = {
       modern: {
-        header: "bg-gradient-to-r from-blue-600 to-purple-600 text-white",
-        accent: "text-blue-600",
-        border: "border-blue-200"
+        header: "bg-gradient-to-r from-teal-600 to-purple-600 text-white",
+        accent: "text-teal-600",
+        border: "border-teal-200"
       },
       minimal: {
         header: "bg-gray-50 text-gray-900 border-b-2 border-gray-200",
@@ -490,7 +490,7 @@ function InvoiceTemplateSelector({ orgId }: { orgId: string }) {
             key={template.id}
             className={`p-4 border-2 rounded-lg transition-all ${
               selectedTemplate === template.id
-                ? "border-blue-500 bg-blue-50"
+                ? "border-teal-500 bg-teal-50"
                 : "border-slate-200 hover:border-slate-300"
             }`}
             data-testid={`template-${template.id}`}
@@ -498,7 +498,7 @@ function InvoiceTemplateSelector({ orgId }: { orgId: string }) {
             <div className="flex items-start justify-between mb-2">
               <span className="text-2xl">{template.icon}</span>
               {selectedTemplate === template.id && (
-                <CheckCircle className="w-5 h-5 text-blue-500" />
+                <CheckCircle className="w-5 h-5 text-teal-500" />
               )}
             </div>
             <h5 className="font-semibold text-slate-900 mb-1">{template.name}</h5>
@@ -529,8 +529,8 @@ function InvoiceTemplateSelector({ orgId }: { orgId: string }) {
       </div>
 
       {selectedTemplate && (
-        <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <p className="text-sm text-blue-800">
+        <div className="mt-4 p-4 bg-teal-50 rounded-lg border border-teal-200">
+          <p className="text-sm text-teal-800">
             <strong>Selected:</strong> {templates.find(t => t.id === selectedTemplate)?.name} template
           </p>
         </div>
@@ -1346,7 +1346,7 @@ function DocumentTemplatesManager() {
           {templates.map((template: any) => (
             <div key={template.id} className="p-4 flex items-start justify-between hover:bg-slate-50">
               <div className="flex items-start gap-3 flex-1">
-                <FileText className="w-5 h-5 text-blue-500 mt-0.5" />
+                <FileText className="w-5 h-5 text-teal-500 mt-0.5" />
                 <div className="flex-1">
                   <h4 className="font-medium">{template.name}</h4>
                   <div className="flex items-center gap-2 mt-1">
@@ -1368,7 +1368,7 @@ function DocumentTemplatesManager() {
                   data-testid={`button-duplicate-template-${template.id}`}
                   title="Duplicate template"
                 >
-                  <Copy className="w-4 h-4 text-blue-500" />
+                  <Copy className="w-4 h-4 text-teal-500" />
                 </Button>
                 <Button
                   variant="ghost"
@@ -3072,7 +3072,7 @@ export default function Admin() {
                           <TableCell key={column.id} className={column.id === 'name' ? 'font-medium' : ''}>
                             {column.id === 'name' && (
                               <Link href={`/communities/${community.id}`}>
-                                <span className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer" data-testid={`link-community-${community.id}`}>
+                                <span className="text-teal-600 hover:text-teal-800 hover:underline cursor-pointer" data-testid={`link-community-${community.id}`}>
                                   {community.name}
                                 </span>
                               </Link>
@@ -3132,7 +3132,7 @@ export default function Admin() {
             <Card>
               <CardContent className="pt-6">
                 <h5 className="font-medium text-slate-900">Total Communities</h5>
-                <p className="text-2xl font-bold text-blue-600 mt-1">{communities.length}</p>
+                <p className="text-2xl font-bold text-teal-600 mt-1">{communities.length}</p>
                 <p className="text-xs text-slate-500 mt-1">Active organizations</p>
               </CardContent>
             </Card>
@@ -3505,8 +3505,8 @@ export default function Admin() {
 
           <Form {...communityForm}>
             <form onSubmit={communityForm.handleSubmit((data) => createCommunityMutation.mutate(data))} className="space-y-6">
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-4">
-                <p className="text-sm text-blue-800">
+              <div className="p-4 bg-teal-50 border border-teal-200 rounded-lg mb-4">
+                <p className="text-sm text-teal-800">
                   <strong>Note:</strong> Currently only basic community information (Profile tab) is saved to the database. 
                   Extended features like Rules, Schedules, and Financial info will be fully implemented in upcoming updates.
                 </p>
@@ -4020,9 +4020,9 @@ export default function Admin() {
 
                 {/* Documents Tab */}
                 <TabsContent value="documents" className="space-y-4">
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <h4 className="font-medium text-blue-900 mb-2">Document Management</h4>
-                    <p className="text-sm text-blue-700">
+                  <div className="p-4 bg-teal-50 border border-teal-200 rounded-lg">
+                    <h4 className="font-medium text-teal-900 mb-2">Document Management</h4>
+                    <p className="text-sm text-teal-700">
                       Select existing document templates to link to this community, or upload new documents after creation.
                     </p>
                   </div>
@@ -4064,7 +4064,7 @@ export default function Admin() {
                               className="mr-3"
                               data-testid={`checkbox-template-${template.id}`}
                             />
-                            <FileText className="w-5 h-5 text-blue-500 mr-3" />
+                            <FileText className="w-5 h-5 text-teal-500 mr-3" />
                             <div className="flex-1">
                               <p className="font-medium text-sm">{template.name}</p>
                               <div className="flex items-center gap-2 mt-1">

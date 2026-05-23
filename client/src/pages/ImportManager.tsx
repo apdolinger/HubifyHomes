@@ -595,7 +595,7 @@ export default function ImportManager() {
       <div className="flex items-center gap-2 justify-center" data-testid="step-indicator">
         <div className="flex items-center gap-2">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            currentStep === 'upload' ? 'bg-blue-600 text-white' : 'bg-green-600 text-white'
+            currentStep === 'upload' ? 'bg-teal-600 text-white' : 'bg-green-600 text-white'
           }`}>
             {currentStep === 'upload' ? '1' : <CheckCircle2 className="w-5 h-5" />}
           </div>
@@ -604,7 +604,7 @@ export default function ImportManager() {
         <ArrowRight className="text-slate-400" />
         <div className="flex items-center gap-2">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            currentStep === 'map' ? 'bg-blue-600 text-white' : 
+            currentStep === 'map' ? 'bg-teal-600 text-white' : 
             currentStep === 'validate' || currentStep === 'preview' || currentStep === 'importing' || currentStep === 'complete' ? 'bg-green-600 text-white' : 
             'bg-slate-300 text-slate-600'
           }`}>
@@ -615,7 +615,7 @@ export default function ImportManager() {
         <ArrowRight className="text-slate-400" />
         <div className="flex items-center gap-2">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            currentStep === 'validate' ? 'bg-blue-600 text-white' : 
+            currentStep === 'validate' ? 'bg-teal-600 text-white' : 
             currentStep === 'preview' || currentStep === 'importing' || currentStep === 'complete' ? 'bg-green-600 text-white' : 
             'bg-slate-300 text-slate-600'
           }`}>
@@ -626,7 +626,7 @@ export default function ImportManager() {
         <ArrowRight className="text-slate-400" />
         <div className="flex items-center gap-2">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            currentStep === 'preview' ? 'bg-blue-600 text-white' : 
+            currentStep === 'preview' ? 'bg-teal-600 text-white' : 
             currentStep === 'importing' || currentStep === 'complete' ? 'bg-green-600 text-white' : 
             'bg-slate-300 text-slate-600'
           }`}>
@@ -637,7 +637,7 @@ export default function ImportManager() {
         <ArrowRight className="text-slate-400" />
         <div className="flex items-center gap-2">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            currentStep === 'importing' ? 'bg-blue-600 text-white' : 
+            currentStep === 'importing' ? 'bg-teal-600 text-white' : 
             currentStep === 'complete' ? 'bg-green-600 text-white' : 
             'bg-slate-300 text-slate-600'
           }`}>
@@ -1067,10 +1067,10 @@ export default function ImportManager() {
           <CardContent className="space-y-6">
             {/* Summary Statistics */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+              <Card className="bg-teal-50 dark:bg-teal-950/20 border-teal-200 dark:border-teal-800">
                 <CardContent className="pt-6">
                   <div className="text-center">
-                    <p className="text-3xl font-bold text-blue-600 dark:text-blue-400" data-testid="stat-total-records">
+                    <p className="text-3xl font-bold text-teal-600 dark:text-teal-400" data-testid="stat-total-records">
                       {importSummary.totalRecords}
                     </p>
                     <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
@@ -1190,7 +1190,7 @@ export default function ImportManager() {
         <Card data-testid="card-importing-progress">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <div className="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full" />
+              <div className="animate-spin h-5 w-5 border-2 border-teal-600 border-t-transparent rounded-full" />
               Importing Data...
             </CardTitle>
             <CardDescription>
@@ -1198,7 +1198,7 @@ export default function ImportManager() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-blue-50 dark:bg-blue-950 p-6 rounded-lg text-center">
+            <div className="bg-teal-50 dark:bg-teal-950 p-6 rounded-lg text-center">
               <p className="text-slate-600 dark:text-slate-400">
                 Processing {importSummary?.totalRecords || 0} records...
               </p>
@@ -1225,8 +1225,8 @@ export default function ImportManager() {
           <CardContent className="space-y-6">
             {/* Summary Statistics */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg" data-testid="result-total">
-                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+              <div className="bg-teal-50 dark:bg-teal-950 p-4 rounded-lg" data-testid="result-total">
+                <div className="text-2xl font-bold text-teal-600 dark:text-teal-400">
                   {importResults.summary.total}
                 </div>
                 <div className="text-sm text-slate-600 dark:text-slate-400">Total Records</div>
@@ -1300,7 +1300,7 @@ export default function ImportManager() {
                 }>
                   <Button
                     variant="outline"
-                    className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900"
+                    className="bg-teal-50 dark:bg-teal-950 border-teal-200 dark:border-teal-800 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900"
                     data-testid="button-view-imported-records"
                   >
                     <Eye className="w-4 h-4 mr-2" />

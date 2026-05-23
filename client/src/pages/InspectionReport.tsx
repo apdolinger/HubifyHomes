@@ -148,7 +148,7 @@ export default function InspectionReport() {
           </Link>
           <div>
             <div className="flex items-center gap-2">
-              <ClipboardCheck className="w-6 h-6 text-blue-600" />
+              <ClipboardCheck className="w-6 h-6 text-teal-600" />
               <h1 className="text-2xl font-bold text-slate-900">Inspection Report</h1>
             </div>
             <p className="text-slate-500 text-sm mt-0.5">
@@ -266,7 +266,7 @@ export default function InspectionReport() {
                             ...(item.photoUrl && !(item.photoUrls || []).includes(item.photoUrl) ? [item.photoUrl] : []),
                           ].length;
                           return photoCount > 0 ? (
-                            <Badge className="h-5 px-1.5 text-xs bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100">
+                            <Badge className="h-5 px-1.5 text-xs bg-teal-100 text-teal-700 border-teal-200 hover:bg-teal-100">
                               {photoCount} {photoCount === 1 ? "photo" : "photos"}
                             </Badge>
                           ) : null;
@@ -358,7 +358,7 @@ export default function InspectionReport() {
                                     ...(item.photoUrl && !(item.photoUrls || []).includes(item.photoUrl) ? [item.photoUrl] : []),
                                   ].length;
                                   return photoCount > 0 ? (
-                                    <Badge className="h-5 px-1.5 text-xs bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100">
+                                    <Badge className="h-5 px-1.5 text-xs bg-teal-100 text-teal-700 border-teal-200 hover:bg-teal-100">
                                       {photoCount} {photoCount === 1 ? "photo" : "photos"}
                                     </Badge>
                                   ) : null;

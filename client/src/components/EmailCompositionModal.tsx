@@ -313,7 +313,7 @@ export function EmailCompositionModal({
 
           {/* Scheduling Inputs */}
           {isScheduled && (
-            <div className="space-y-3 pl-4 border-l-2 border-blue-200">
+            <div className="space-y-3 pl-4 border-l-2 border-teal-200">
               <div>
                 <Label htmlFor="scheduled-date">Date</Label>
                 <Popover>

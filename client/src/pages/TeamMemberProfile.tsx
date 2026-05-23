@@ -448,7 +448,7 @@ export default function TeamMemberProfile() {
       parts.push(
         <span
           key={`mention-${key++}`}
-          className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 px-1 rounded font-medium"
+          className="bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300 px-1 rounded font-medium"
         >
           @{match[1]}
         </span>
@@ -584,8 +584,8 @@ export default function TeamMemberProfile() {
                   testId: 'active-tasks'
                 },
                 managedProperties: {
-                  bgColor: 'bg-blue-100',
-                  iconColor: 'text-blue-600',
+                  bgColor: 'bg-teal-100',
+                  iconColor: 'text-teal-600',
                   label: 'Properties Managed',
                   value: managedProperties.length,
                   icon: Building,

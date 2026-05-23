@@ -263,7 +263,7 @@ export default function DashboardCustomizationModal({
                         : 'hover:shadow-md opacity-100 scale-100 rotate-0'
                       }
                       ${isDraggedOver && !isBeingDragged
-                        ? 'border-2 border-blue-400 border-dashed bg-blue-50' 
+                        ? 'border-2 border-teal-400 border-dashed bg-teal-50' 
                         : 'border border-slate-200'
                       }
                     `}
@@ -278,7 +278,7 @@ export default function DashboardCustomizationModal({
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
                           <GripVertical className={`w-4 h-4 transition-colors ${
-                            isBeingDragged ? 'text-blue-500' : 'text-slate-400'
+                            isBeingDragged ? 'text-teal-500' : 'text-slate-400'
                           }`} />
                           <div className="flex items-center space-x-2">
                             {widget.icon}
@@ -341,10 +341,10 @@ export default function DashboardCustomizationModal({
 
           {/* Drag Status */}
           {isDragging && draggedItem && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
               <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium text-blue-700">
+                <div className="w-2 h-2 bg-teal-500 rounded-full animate-pulse"></div>
+                <span className="text-sm font-medium text-teal-700">
                   Moving "{widgets.find(w => w.id === draggedItem)?.name}" widget...
                 </span>
               </div>

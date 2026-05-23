@@ -275,7 +275,7 @@ export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
                 </SelectItem>
                 <SelectItem value="medium" data-testid="urgency-medium">
                   <div className="flex items-center space-x-2">
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-700">Medium</Badge>
+                    <Badge variant="secondary" className="bg-teal-100 text-teal-700">Medium</Badge>
                     <span className="text-sm text-slate-600">- Needs attention soon</span>
                   </div>
                 </SelectItem>
@@ -332,7 +332,7 @@ export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
                 variant="outline"
                 size="sm"
                 onClick={addHyperlink}
-                className="text-blue-600 hover:text-blue-800"
+                className="text-teal-600 hover:text-teal-800"
               >
                 <Link className="w-4 h-4 mr-2" />
                 Add Another Link
@@ -354,7 +354,7 @@ export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
             <div
               className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
                 isDragOver 
-                  ? 'border-blue-400 bg-blue-50' 
+                  ? 'border-teal-400 bg-teal-50' 
                   : 'border-slate-300 hover:border-slate-400'
               }`}
               onDragOver={handleDragOver}
@@ -399,7 +399,7 @@ export default function SupportModal({ isOpen, onClose }: SupportModalProps) {
                         {file.type.startsWith('image/') ? (
                           <Image className="w-4 h-4 text-green-600" />
                         ) : (
-                          <FileText className="w-4 h-4 text-blue-600" />
+                          <FileText className="w-4 h-4 text-teal-600" />
                         )}
                         <span className="text-sm text-slate-700">{file.name}</span>
                         <span className="text-xs text-slate-500">

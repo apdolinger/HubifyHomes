@@ -389,7 +389,7 @@ export default function Tasks() {
                 </span>
               )}
               {task.templateTaskId && !task.isTemplate && (
-                <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium" title="Instance of recurring task">
+                <span className="text-xs px-2 py-0.5 bg-teal-100 text-teal-700 rounded-full font-medium" title="Instance of recurring task">
                   Instance
                 </span>
               )}

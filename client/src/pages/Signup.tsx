@@ -95,7 +95,7 @@ export default function Signup() {
   if (configLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+        <Loader2 className="w-6 h-6 animate-spin text-teal-600" />
       </div>
     );
   }
@@ -137,11 +137,11 @@ export default function Signup() {
               Log in with that same email address to activate your account.
             </p>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left mb-8 space-y-2">
-              <p className="text-sm font-semibold text-blue-800 flex items-center gap-1.5">
+            <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 text-left mb-8 space-y-2">
+              <p className="text-sm font-semibold text-teal-800 flex items-center gap-1.5">
                 <LogIn className="w-4 h-4" /> Next steps
               </p>
-              <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
+              <ol className="text-sm text-teal-700 space-y-1 list-decimal list-inside">
                 <li>Click the button below to log in with Replit</li>
                 <li>Use the email address <span className="font-medium">{form.email.toLowerCase()}</span></li>
                 <li>Your organization will be ready immediately</li>
@@ -169,7 +169,7 @@ export default function Signup() {
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4 py-12">
       <div className="mb-8 text-center">
         <div className="flex items-center justify-center gap-2 mb-2">
-          <Building2 className="w-7 h-7 text-blue-600" />
+          <Building2 className="w-7 h-7 text-teal-600" />
           <span className="text-2xl font-bold text-slate-800">Hubify</span>
         </div>
         <p className="text-slate-500 text-sm">Create your organization account</p>
@@ -186,7 +186,7 @@ export default function Signup() {
               <div
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                   isActive
-                    ? "bg-blue-600 text-white"
+                    ? "bg-teal-600 text-white"
                     : isDone
                     ? "bg-green-100 text-green-700"
                     : "bg-slate-100 text-slate-500"
@@ -213,7 +213,7 @@ export default function Signup() {
           <>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-blue-600" /> Company Details
+                <Building2 className="w-5 h-5 text-teal-600" /> Company Details
               </CardTitle>
               <CardDescription>Tell us about the company you're setting up</CardDescription>
             </CardHeader>
@@ -264,7 +264,7 @@ export default function Signup() {
           <>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <User className="w-5 h-5 text-blue-600" /> Your Account
+                <User className="w-5 h-5 text-teal-600" /> Your Account
               </CardTitle>
               <CardDescription>
                 You'll be the admin for <span className="font-medium">{form.company}</span>
@@ -323,7 +323,7 @@ export default function Signup() {
           <>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-blue-600" /> Review & Create
+                <CheckCircle className="w-5 h-5 text-teal-600" /> Review & Create
               </CardTitle>
               <CardDescription>Everything look right? We'll create your account now.</CardDescription>
             </CardHeader>
@@ -378,7 +378,7 @@ export default function Signup() {
 
       <p className="mt-6 text-xs text-slate-400">
         Already have an account?{" "}
-        <a href="/api/login" className="text-blue-600 hover:underline">Log in</a>
+        <a href="/api/login" className="text-teal-600 hover:underline">Log in</a>
       </p>
     </div>
   );

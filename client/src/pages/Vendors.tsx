@@ -435,8 +435,8 @@ export default function Vendors() {
           <CardContent className="p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                  <Building className="w-4 h-4 text-blue-600" />
+                <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center">
+                  <Building className="w-4 h-4 text-teal-600" />
                 </div>
               </div>
               <div className="ml-4">
@@ -520,7 +520,7 @@ export default function Vendors() {
                             return (
                               <TableCell key={col.id} className="font-medium">
                                 <RouterLink href={`/admin/vendors/${vendor.id}`}>
-                                  <span className="text-blue-600 hover:underline cursor-pointer">
+                                  <span className="text-teal-600 hover:underline cursor-pointer">
                                     {vendor.firstName} {vendor.lastName}
                                   </span>
                                 </RouterLink>
@@ -532,7 +532,7 @@ export default function Vendors() {
                                 {vendor.email ? (
                                   <div className="flex items-center gap-2">
                                     <Mail className="w-4 h-4 text-slate-400" />
-                                    <a href={`mailto:${vendor.email}`} className="text-blue-600 hover:underline">
+                                    <a href={`mailto:${vendor.email}`} className="text-teal-600 hover:underline">
                                       {vendor.email}
                                     </a>
                                   </div>
@@ -547,7 +547,7 @@ export default function Vendors() {
                                 {vendor.phone ? (
                                   <div className="flex items-center gap-2">
                                     <Phone className="w-4 h-4 text-slate-400" />
-                                    <a href={`tel:${vendor.phone}`} className="text-blue-600 hover:underline">
+                                    <a href={`tel:${vendor.phone}`} className="text-teal-600 hover:underline">
                                       {vendor.phone}
                                     </a>
                                   </div>

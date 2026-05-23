@@ -23,7 +23,7 @@ function buildMapsUrl(address: string): string {
 function statusColor(status: string) {
   switch (status) {
     case "completed": return "bg-green-100 text-green-700 border-green-200";
-    case "in_progress": return "bg-blue-100 text-blue-700 border-blue-200";
+    case "in_progress": return "bg-teal-100 text-teal-700 border-teal-200";
     case "pending": return "bg-slate-100 text-slate-600 border-slate-200";
     case "cancelled": return "bg-red-100 text-red-700 border-red-200";
     default: return "bg-slate-100 text-slate-600 border-slate-200";
@@ -80,7 +80,7 @@ export default function FieldPropertyDetail() {
   if (propLoading) {
     return (
       <div className="p-6 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+        <Loader2 className="w-6 h-6 animate-spin text-teal-600" />
       </div>
     );
   }
@@ -126,7 +126,7 @@ export default function FieldPropertyDetail() {
       {/* Property header */}
       <div className="bg-white rounded-xl border border-slate-200 p-4">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 bg-teal-100 text-teal-600 rounded-lg flex items-center justify-center flex-shrink-0">
             <Building className="w-5 h-5" />
           </div>
           <div className="min-w-0 flex-1">
@@ -147,7 +147,7 @@ export default function FieldPropertyDetail() {
             href={mapsUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-4 w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl"
+            className="mt-4 w-full flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 rounded-xl"
             data-testid="link-get-directions"
           >
             <NavigationIcon className="w-5 h-5" />
@@ -168,14 +168,14 @@ export default function FieldPropertyDetail() {
           )}
           {ownerPhone && (
             <a href={`tel:${ownerPhone}`} className="flex items-center gap-3" data-testid="link-property-contact-phone">
-              <Phone className="w-4 h-4 text-blue-600" />
-              <span className="text-sm text-blue-600 font-medium">{ownerPhone}</span>
+              <Phone className="w-4 h-4 text-teal-600" />
+              <span className="text-sm text-teal-600 font-medium">{ownerPhone}</span>
             </a>
           )}
           {ownerEmail && (
             <a href={`mailto:${ownerEmail}`} className="flex items-center gap-3" data-testid="link-property-contact-email">
-              <Mail className="w-4 h-4 text-blue-600" />
-              <span className="text-sm text-blue-600 font-medium break-all">{ownerEmail}</span>
+              <Mail className="w-4 h-4 text-teal-600" />
+              <span className="text-sm text-teal-600 font-medium break-all">{ownerEmail}</span>
             </a>
           )}
         </div>
@@ -188,7 +188,7 @@ export default function FieldPropertyDetail() {
         </h2>
         {tasksLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+            <Loader2 className="w-5 h-5 animate-spin text-teal-600" />
           </div>
         ) : activeTasks.length === 0 ? (
           <div className="bg-white rounded-xl border border-slate-200 p-6 text-center">

@@ -56,10 +56,10 @@ const SEVERITY_CONFIG: Record<AlertSeverity, {
 }> = {
   info: {
     icon: Info,
-    bgColor: "bg-blue-50 dark:bg-blue-950",
-    iconColor: "text-blue-600 dark:text-blue-400",
-    titleColor: "text-blue-900 dark:text-blue-100",
-    borderColor: "border-blue-200 dark:border-blue-800",
+    bgColor: "bg-teal-50 dark:bg-teal-950",
+    iconColor: "text-teal-600 dark:text-teal-400",
+    titleColor: "text-teal-900 dark:text-teal-100",
+    borderColor: "border-teal-200 dark:border-teal-800",
   },
   warning: {
     icon: AlertTriangle,

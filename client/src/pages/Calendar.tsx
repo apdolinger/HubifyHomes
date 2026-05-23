@@ -40,7 +40,7 @@ const DEFAULT_SETTINGS: CalendarDisplaySettings = {
   filterEventType: 'all',
   filterPriority: 'all',
   colorPreferences: {
-    events: '#3b82f6',      // Blue
+    events: '#14b8a6',      // Teal
     taskUrgent: '#ef4444',  // Red
     taskHigh: '#f59e0b',    // Orange
     taskNormalLow: '#10b981' // Green
@@ -172,7 +172,7 @@ export default function CalendarPage() {
     return (
       <div className="container mx-auto p-6">
         <Card className="p-8 text-center">
-          <Calendar className="w-16 h-16 mx-auto mb-4 text-blue-500" />
+          <Calendar className="w-16 h-16 mx-auto mb-4 text-teal-500" />
           <h2 className="text-2xl font-bold mb-2">Super Admin Calendar Access</h2>
           <p className="text-muted-foreground mb-4">
             As a Super Admin, you manage platform-wide settings. Organization-specific calendars are managed within each organization's dashboard.

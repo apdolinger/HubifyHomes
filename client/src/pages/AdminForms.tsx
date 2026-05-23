@@ -457,7 +457,7 @@ export default function AdminForms() {
                     <TableCell>
                       <div>
                         <RouterLink href={`/admin/forms/${form.id}`}>
-                          <div className="font-medium text-blue-600 hover:text-blue-800 cursor-pointer hover:underline" data-testid={`form-title-${form.id}`}>
+                          <div className="font-medium text-teal-600 hover:text-teal-800 cursor-pointer hover:underline" data-testid={`form-title-${form.id}`}>
                             {form.formTitle || form.form_title || 'Untitled Form'}
                           </div>
                         </RouterLink>

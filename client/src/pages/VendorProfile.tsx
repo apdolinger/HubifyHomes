@@ -395,7 +395,7 @@ export default function VendorProfile() {
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4">
                   <Avatar className="h-16 w-16">
-                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-xl">
+                    <AvatarFallback className="bg-gradient-to-br from-teal-500 to-purple-600 text-white text-xl">
                       {vendor.firstName?.[0]}{vendor.lastName?.[0]}
                     </AvatarFallback>
                   </Avatar>
@@ -424,12 +424,12 @@ export default function VendorProfile() {
                 <div className="grid gap-4 md:grid-cols-2">
                   {vendor.email && (
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-blue-50 rounded-lg">
-                        <Mail className="w-4 h-4 text-blue-600" />
+                      <div className="p-2 bg-teal-50 rounded-lg">
+                        <Mail className="w-4 h-4 text-teal-600" />
                       </div>
                       <div>
                         <p className="text-sm text-slate-600">Email</p>
-                        <a href={`mailto:${vendor.email}`} className="text-sm font-medium text-blue-600 hover:underline">
+                        <a href={`mailto:${vendor.email}`} className="text-sm font-medium text-teal-600 hover:underline">
                           {vendor.email}
                         </a>
                       </div>
@@ -573,7 +573,7 @@ export default function VendorProfile() {
                             >
                               <div className="flex items-start gap-3 flex-1">
                                 <Avatar className="h-10 w-10">
-                                  <AvatarFallback className="bg-gradient-to-br from-green-500 to-blue-600 text-white">
+                                  <AvatarFallback className="bg-gradient-to-br from-green-500 to-teal-600 text-white">
                                     {employee.firstName[0]}{employee.lastName[0]}
                                   </AvatarFallback>
                                 </Avatar>
@@ -592,7 +592,7 @@ export default function VendorProfile() {
                                     {employee.email && (
                                       <div className="flex items-center gap-2 text-sm text-slate-600">
                                         <Mail className="w-3 h-3" />
-                                        <a href={`mailto:${employee.email}`} className="hover:text-blue-600 hover:underline">
+                                        <a href={`mailto:${employee.email}`} className="hover:text-teal-600 hover:underline">
                                           {employee.email}
                                         </a>
                                       </div>

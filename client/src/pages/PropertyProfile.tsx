@@ -98,8 +98,8 @@ function CascadedClientAlertsDisplay({ propertyId }: { propertyId: string }) {
   const severityConfig = {
     info: {
       icon: Info,
-      className: "border-blue-500 bg-blue-50 text-blue-900 dark:bg-blue-950 dark:text-blue-100",
-      iconClassName: "text-blue-500",
+      className: "border-teal-500 bg-teal-50 text-teal-900 dark:bg-teal-950 dark:text-teal-100",
+      iconClassName: "text-teal-500",
     },
     warning: {
       icon: AlertTriangle,
@@ -157,7 +157,7 @@ const FREQ_LABELS: Record<string, string> = {
 };
 
 const FREQ_COLORS: Record<string, string> = {
-  weekly: "bg-blue-100 text-blue-800",
+  weekly: "bg-teal-100 text-teal-800",
   monthly: "bg-green-100 text-green-800",
   quarterly: "bg-purple-100 text-purple-800",
   annually: "bg-orange-100 text-orange-800",
@@ -280,7 +280,7 @@ function InspectionScheduleSection({ propertyId }: { propertyId: string }) {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-blue-600" />
+              <Calendar className="w-5 h-5 text-teal-600" />
               Inspection Schedules
             </CardTitle>
             <p className="text-sm text-slate-500 mt-1">Automated recurring inspections for this property.</p>
@@ -293,7 +293,7 @@ function InspectionScheduleSection({ propertyId }: { propertyId: string }) {
       <CardContent>
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <RefreshCw className="w-5 h-5 animate-spin text-blue-600" />
+            <RefreshCw className="w-5 h-5 animate-spin text-teal-600" />
           </div>
         ) : (schedules as any[]).length === 0 ? (
           <div className="text-center py-8 border-2 border-dashed border-slate-200 rounded-lg">
@@ -3459,10 +3459,10 @@ export default function PropertyProfile() {
                         )}
                       </div>
                       {selectedCommunity && (
-                        <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
-                          <div className="font-medium text-blue-900">Selected: {selectedCommunity.name}</div>
+                        <div className="mt-2 p-2 bg-teal-50 border border-teal-200 rounded text-sm">
+                          <div className="font-medium text-teal-900">Selected: {selectedCommunity.name}</div>
                           {selectedCommunity.city && selectedCommunity.state && (
-                            <div className="text-blue-700">
+                            <div className="text-teal-700">
                               {selectedCommunity.city}, {selectedCommunity.state}
                             </div>
                           )}
@@ -3524,7 +3524,7 @@ export default function PropertyProfile() {
                   {(property as any)?.name && (
                     <button 
                       onClick={() => setIsNavigationModalOpen(true)}
-                      className="text-slate-600 flex items-center mb-3 hover:text-blue-600 transition-colors cursor-pointer text-left underline-offset-4 hover:underline"
+                      className="text-slate-600 flex items-center mb-3 hover:text-teal-600 transition-colors cursor-pointer text-left underline-offset-4 hover:underline"
                     >
                       <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
                       <span className="break-words">{formatFullAddress(property)}</span>
@@ -3740,7 +3740,7 @@ export default function PropertyProfile() {
                     {propertyTasks.map((task: any) => (
                       <div
                         key={task.id}
-                        className="p-4 rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-blue-50 cursor-pointer transition-all"
+                        className="p-4 rounded-lg border border-slate-200 hover:border-teal-300 hover:bg-teal-50 cursor-pointer transition-all"
                         onClick={() => setLocation(`/task-profile/${task.id}`)}
                         data-testid={`task-item-${task.id}`}
                       >
@@ -3845,7 +3845,7 @@ export default function PropertyProfile() {
                                 key={contact.id}
                                 className={`p-3 rounded-lg border transition-colors ${
                                   selectedContact?.id === contact.id
-                                    ? "border-blue-200 bg-blue-50"
+                                    ? "border-teal-200 bg-teal-50"
                                     : "border-green-200 bg-green-50 hover:border-green-300"
                                 }`}
                               >
@@ -3891,7 +3891,7 @@ export default function PropertyProfile() {
                                 key={contact.id}
                                 className={`p-3 rounded-lg border transition-colors mb-2 ${
                                   selectedContact?.id === contact.id
-                                    ? "border-blue-200 bg-blue-50"
+                                    ? "border-teal-200 bg-teal-50"
                                     : "border-slate-200 hover:border-slate-300"
                                 }`}
                               >
@@ -4107,7 +4107,7 @@ export default function PropertyProfile() {
                         key={room.id} 
                         className={`border rounded-lg p-4 transition-all cursor-pointer ${
                           selectedRoom?.id === room.id 
-                            ? 'border-blue-500 bg-blue-50 shadow-md' 
+                            ? 'border-teal-500 bg-teal-50 shadow-md' 
                             : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
                         }`}
                         onClick={() => setSelectedRoom(room)}
@@ -4557,7 +4557,7 @@ export default function PropertyProfile() {
                                     href={link.url} 
                                     target="_blank" 
                                     rel="noopener noreferrer"
-                                    className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1 mb-2"
+                                    className="text-sm text-teal-600 hover:text-teal-800 flex items-center gap-1 mb-2"
                                     data-testid={`link-url-${link.id}`}
                                   >
                                     <ExternalLink className="w-3 h-3" />
@@ -4753,7 +4753,7 @@ export default function PropertyProfile() {
                               key={vehicle.id}
                               className={`p-3 rounded-lg border cursor-pointer transition-colors ${
                                 selectedVehicle?.id === vehicle.id
-                                  ? "border-blue-200 bg-blue-50"
+                                  ? "border-teal-200 bg-teal-50"
                                   : "border-slate-200 hover:border-slate-300"
                               }`}
                               onClick={() => setSelectedVehicle(vehicle)}
@@ -5521,12 +5521,12 @@ export default function PropertyProfile() {
                             <div className="flex items-center justify-between">
                               <div>
                                 <CardTitle className="text-lg flex items-center gap-2">
-                                  <Building className="w-5 h-5 text-blue-600" />
+                                  <Building className="w-5 h-5 text-teal-600" />
                                   Community Documents (Inherited)
                                 </CardTitle>
                                 <p className="text-sm text-slate-500 mt-1">Documents inherited from {community.name}</p>
                               </div>
-                              <Badge variant="secondary" className="bg-blue-50 text-blue-700">Read-Only</Badge>
+                              <Badge variant="secondary" className="bg-teal-50 text-teal-700">Read-Only</Badge>
                             </div>
                           </CardHeader>
                           <CardContent>
@@ -5540,15 +5540,15 @@ export default function PropertyProfile() {
                               return communityWideDocuments.length > 0 ? (
                                 <div className="space-y-3">
                                   {communityWideDocuments.map((doc: any) => (
-                                    <div key={doc.id} className="flex items-center justify-between p-4 border border-blue-100 bg-blue-50/50 rounded-lg hover:bg-blue-50 transition-colors">
+                                    <div key={doc.id} className="flex items-center justify-between p-4 border border-teal-100 bg-teal-50/50 rounded-lg hover:bg-teal-50 transition-colors">
                                       <div className="flex items-center gap-3 flex-1">
-                                        <FileText className="w-5 h-5 text-blue-600" />
+                                        <FileText className="w-5 h-5 text-teal-600" />
                                         <div className="flex-1">
                                           <a
                                             href={`/api/download-document?path=${encodeURIComponent(doc.fileUrl)}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="text-blue-700 hover:text-blue-800 font-medium hover:underline"
+                                            className="text-teal-700 hover:text-teal-800 font-medium hover:underline"
                                             data-testid={`link-community-doc-${doc.id}`}
                                           >
                                             {doc.fileName}
@@ -5614,7 +5614,7 @@ export default function PropertyProfile() {
                                             href={`/api/download-document?path=${encodeURIComponent(doc.fileUrl)}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="text-slate-900 hover:text-blue-600 font-medium hover:underline"
+                                            className="text-slate-900 hover:text-teal-600 font-medium hover:underline"
                                             data-testid={`link-property-doc-${doc.id}`}
                                           >
                                             {doc.fileName}
@@ -6046,7 +6046,7 @@ export default function PropertyProfile() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <ClipboardCheck className="w-5 h-5 text-blue-600" />
+                  <ClipboardCheck className="w-5 h-5 text-teal-600" />
                   Inspection History
                 </CardTitle>
                 <p className="text-sm text-slate-500">All inspection tasks for this property, most recent first.</p>
@@ -6061,7 +6061,7 @@ export default function PropertyProfile() {
                 ) : (
                   <div className="space-y-3">
                     {(inspectionHistory as any[]).map((inspection: any) => {
-                      const statusColor = inspection.status === "completed" ? "text-green-600" : inspection.status === "in_progress" ? "text-blue-600" : "text-slate-500";
+                      const statusColor = inspection.status === "completed" ? "text-green-600" : inspection.status === "in_progress" ? "text-teal-600" : "text-slate-500";
                       const summary = inspection.checklistSummary;
                       return (
                         <div key={inspection.id} className="flex items-start justify-between p-4 border rounded-lg hover:bg-slate-50 transition-colors">
@@ -6708,7 +6708,7 @@ export default function PropertyProfile() {
                             href={selectedDevice.link} 
                             target="_blank" 
                             rel="noopener noreferrer"
-                            className="font-medium text-blue-600 hover:underline flex items-center gap-1"
+                            className="font-medium text-teal-600 hover:underline flex items-center gap-1"
                             data-testid="device-details-link"
                           >
                             {selectedDevice.link.length > 50 ? selectedDevice.link.substring(0, 50) + '...' : selectedDevice.link}
@@ -6753,7 +6753,7 @@ export default function PropertyProfile() {
                           <div>
                             <Label className="text-slate-600">Requires Servicing</Label>
                             <p className="font-medium">
-                              <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-100">
+                              <Badge variant="secondary" className="bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-100">
                                 Every {selectedDevice.serviceInterval} {selectedDevice.serviceIntervalUnit}
                               </Badge>
                             </p>
@@ -8307,10 +8307,10 @@ export default function PropertyProfile() {
                     )}
                   </div>
                   {selectedCommunity && (
-                    <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
-                      <div className="font-medium text-blue-900">Selected: {selectedCommunity.name}</div>
+                    <div className="mt-2 p-2 bg-teal-50 border border-teal-200 rounded text-sm">
+                      <div className="font-medium text-teal-900">Selected: {selectedCommunity.name}</div>
                       {selectedCommunity.city && selectedCommunity.state && (
-                        <div className="text-blue-700">
+                        <div className="text-teal-700">
                           {selectedCommunity.city}, {selectedCommunity.state}
                         </div>
                       )}
@@ -8335,7 +8335,7 @@ export default function PropertyProfile() {
                   <div
                     className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
                       isDragOver
-                        ? 'border-blue-400 bg-blue-50'
+                        ? 'border-teal-400 bg-teal-50'
                         : 'border-slate-300 hover:border-slate-400'
                     }`}
                     onDragOver={handleImageDragOver}
@@ -8344,7 +8344,7 @@ export default function PropertyProfile() {
                   >
                     {isImageUploading ? (
                       <div className="flex flex-col items-center py-4">
-                        <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mb-2" />
+                        <RefreshCw className="w-8 h-8 text-teal-500 animate-spin mb-2" />
                         <p className="text-sm text-slate-600">Uploading image...</p>
                       </div>
                     ) : propertyImageUrl ? (
@@ -8694,7 +8694,7 @@ export default function PropertyProfile() {
                             key={prop.id}
                             className={`p-3 border-b cursor-pointer transition-colors ${
                               moveToPropertyId === prop.id
-                                ? "bg-blue-50 border-blue-200"
+                                ? "bg-teal-50 border-teal-200"
                                 : "hover:bg-slate-50"
                             }`}
                             onClick={() => setMoveToPropertyId(prop.id)}
@@ -8776,8 +8776,8 @@ export default function PropertyProfile() {
                 }}
               >
                 <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <span className="text-blue-600 font-semibold text-sm">G</span>
+                  <div className="w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center">
+                    <span className="text-teal-600 font-semibold text-sm">G</span>
                   </div>
                   <div className="text-left">
                     <div className="font-medium">Google Maps</div>
@@ -9350,8 +9350,8 @@ export default function PropertyProfile() {
 
                   if (documentForm.classification === "community-wide" && communityWideExists && user?.role === "admin") {
                     return (
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                        <p className="text-sm text-blue-800">
+                      <div className="bg-teal-50 border border-teal-200 rounded-lg p-3">
+                        <p className="text-sm text-teal-800">
                           <strong>Note:</strong> Uploading will replace the existing community-wide document of this type.
                         </p>
                       </div>

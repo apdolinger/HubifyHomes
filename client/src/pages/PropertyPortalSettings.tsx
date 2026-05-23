@@ -51,8 +51,8 @@ export default function PropertyPortalSettings() {
   const [formData, setFormData] = useState({
     branding: {
       logoUrl: '',
-      primaryColor: '#3b82f6',
-      secondaryColor: '#1e40af',
+      primaryColor: '#14b8a6',
+      secondaryColor: '#0f766e',
       companyName: ''
     },
     theme: {
@@ -258,7 +258,7 @@ export default function PropertyPortalSettings() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-teal-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading client portal settings...</p>
         </div>
       </div>

@@ -317,7 +317,7 @@ export default function AdminEmailTemplates() {
                         <TableCell className="font-medium" data-testid={`text-name-${template.id}`}>
                           <button
                             onClick={() => setViewingTemplate(template)}
-                            className="text-blue-600 hover:text-blue-800 hover:underline text-left"
+                            className="text-teal-600 hover:text-teal-800 hover:underline text-left"
                             data-testid={`link-template-${template.id}`}
                           >
                             {template.name}

@@ -63,7 +63,7 @@ export default function Landing() {
             <div>
               <Button 
                 onClick={handleLogin}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="bg-teal-600 hover:bg-teal-700 text-white"
               >
                 Login
               </Button>
@@ -138,7 +138,7 @@ export default function Landing() {
             href="https://hubifyhomes.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium text-sm border border-blue-200 hover:border-blue-400 rounded-lg px-5 py-2.5 transition-colors hover:bg-blue-50"
+            className="inline-flex items-center gap-2 text-teal-600 hover:text-teal-700 font-medium text-sm border border-teal-200 hover:border-teal-400 rounded-lg px-5 py-2.5 transition-colors hover:bg-teal-50"
           >
             Visit hubifyhomes.com
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
@@ -174,18 +174,18 @@ export default function Landing() {
               <p>
                 © 2025 Hubify. All rights reserved.
                 {' '}
-                <a href="/privacy" className="text-blue-600 hover:underline" data-testid="link-privacy">
+                <a href="/privacy" className="text-teal-600 hover:underline" data-testid="link-privacy">
                   Privacy Policy
                 </a>
                 {' · '}
-                <a href="/terms" className="text-blue-600 hover:underline" data-testid="link-terms">
+                <a href="/terms" className="text-teal-600 hover:underline" data-testid="link-terms">
                   Terms of Service
                 </a>
                 {' · '}
                 <button
                   type="button"
                   onClick={openCookiePreferences}
-                  className="text-blue-600 hover:underline"
+                  className="text-teal-600 hover:underline"
                   data-testid="link-cookie-preferences"
                 >
                   Cookie preferences
@@ -195,7 +195,7 @@ export default function Landing() {
             <div>
               <a 
                 href="/super-admin/login" 
-                className="text-blue-600 hover:underline"
+                className="text-teal-600 hover:underline"
                 data-testid="link-super-admin"
               >
                 Super Admin
