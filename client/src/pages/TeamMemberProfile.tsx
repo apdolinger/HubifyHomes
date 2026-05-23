@@ -180,7 +180,7 @@ export default function TeamMemberProfile() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/staff/login";
       }, 500);
       return;
     }
@@ -256,7 +256,7 @@ export default function TeamMemberProfile() {
           description: "Please log in again",
           variant: "destructive",
         });
-        setTimeout(() => window.location.href = "/api/login", 1000);
+        setTimeout(() => window.location.href = "/staff/login", 1000);
         return;
       }
       

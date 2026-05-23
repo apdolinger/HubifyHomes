@@ -709,7 +709,7 @@ export default function TaskProfile() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/staff/login";
       }, 500);
       return;
     }

@@ -20,7 +20,7 @@ export default function Landing() {
         console.error('Login failed:', error);
       }
     } else {
-      window.location.href = "/api/login";
+      window.location.href = "/staff/login";
     }
   };
 

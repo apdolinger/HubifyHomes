@@ -640,6 +640,7 @@ export const users = pgTable("users", {
   isActive: boolean("is_active").notNull().default(true),
   lastActiveAt: timestamp("last_active_at"),
   iCalFeedToken: varchar("ical_feed_token"), // Secret token for personal iCal feed subscription
+  passwordHash: varchar("password_hash"), // nullable — only set when using email+password login
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

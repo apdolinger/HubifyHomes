@@ -151,7 +151,7 @@ export default function Signup() {
             <div className="flex flex-col gap-3">
               <Button
                 className="w-full"
-                onClick={() => { window.location.href = "/api/login"; }}
+                onClick={() => { window.location.href = "/staff/login"; }}
               >
                 <LogIn className="w-4 h-4 mr-2" /> Log in to Hubify
               </Button>
@@ -378,7 +378,7 @@ export default function Signup() {
 
       <p className="mt-6 text-xs text-slate-400">
         Already have an account?{" "}
-        <a href="/api/login" className="text-teal-600 hover:underline">Log in</a>
+        <a href="/staff/login" className="text-teal-600 hover:underline">Log in</a>
       </p>
     </div>
   );

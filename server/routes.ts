@@ -1009,29 +1009,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update user with orgId
       await storage.updateUser(user.id, { orgId: testOrg.id });
       
-      // Create a Passport-compatible user object
-      const passportUser = {
+      // Set staff session for dev login
+      (req.session as any).staffUser = {
         id: user.id,
-        claims: { 
-          sub: user.id,
-          email: user.email,
-          first_name: user.firstName,
-          last_name: user.lastName,
-          profile_image_url: user.profileImageUrl,
-          role: user.role,
-          orgId: testOrg.id // Add orgId to claims
-        },
-        expires_at: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60) // 7 days
+        email: user.email,
+        orgId: testOrg.id,
+        role: user.role,
+        firstName: user.firstName,
+        lastName: user.lastName,
       };
-      
-      // Use Passport's login method to properly authenticate
-      req.login(passportUser, (err) => {
-        if (err) {
-          console.error("Error logging in:", err);
-          return res.status(500).json({ message: "Failed to login" });
-        }
-        res.json({ message: "Logged in as test user", user });
-      });
+      res.json({ message: "Logged in as test user", user });
     } catch (error) {
       console.error("Error creating test user:", error);
       res.status(500).json({ message: "Failed to create test user" });
@@ -1251,17 +1238,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Check for regular OIDC authentication
-      if (!req.isAuthenticated()) {
+      // Check for regular staff session
+      const staffUser = (req.session as any)?.staffUser;
+      if (!staffUser?.id) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const userId = req.user.claims.sub;
+      const userId = staffUser.id;
       const user = await storage.getUser(userId);
 
-      // Include orgId and role — DB is source of truth, fall back to claims
-      const orgId = user?.orgId || req.user.claims.orgId || req.user.claims.org_id;
-      const role = user?.role || req.user.claims.role;
+      // Include orgId and role — DB is source of truth, fall back to session
+      const orgId = user?.orgId || staffUser.orgId;
+      const role = user?.role || staffUser.role;
 
       // Include effective feature flags so the canonical /api/auth/user response
       // is the single source of truth for feature gating decisions on the client.
@@ -1282,10 +1270,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (superAdmin?.authenticated) {
         return res.json(null);
       }
-      if (!req.isAuthenticated || !req.isAuthenticated()) {
+      const staffUserGet = (req.session as any)?.staffUser;
+      if (!staffUserGet?.id) {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      const userId = req.user.claims.sub;
+      const userId = staffUserGet.id;
       const consent = await storage.getUserCookieConsent(userId);
       res.json(consent || null);
     } catch (error) {
@@ -1301,10 +1290,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Super admin choice is held in localStorage only.
         return res.json({ ok: true, persisted: false });
       }
-      if (!req.isAuthenticated || !req.isAuthenticated()) {
+      const staffUserPost = (req.session as any)?.staffUser;
+      if (!staffUserPost?.id) {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      const userId = req.user.claims.sub;
+      const userId = staffUserPost.id;
       const { version, analytics, preference } = req.body || {};
       const consent = await storage.upsertUserCookieConsent({
         userId,
@@ -1379,7 +1369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const orgName = org?.name ?? "your team";
       const inviterName = `${req.user?.claims?.first_name ?? ""} ${req.user?.claims?.last_name ?? ""}`.trim() || "Your admin";
       const roleLabel = role === "admin" ? "Admin" : role === "supervisor" ? "Supervisor" : "Staff";
-      const loginUrl = `${req.protocol}://${req.hostname}/api/login`;
+      const loginUrl = `${req.protocol}://${req.hostname}/staff/login`;
 
       try {
         const { sendEmail } = await import("./email-service");
@@ -14519,7 +14509,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         const { sendEmail } = await import("./email-service");
-        const loginUrl = `${req.protocol}://${req.hostname}/api/login`;
+        const loginUrl = `${req.protocol}://${req.hostname}/staff/login`;
         await sendEmail({
           to: normalizedEmail,
           subject: `${company} is live on Hubify — here's how to get in`,

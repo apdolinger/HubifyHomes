@@ -358,7 +358,7 @@ function renderMessageWithMentions(content: string) {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/staff/login";
       }, 500);
       return;
     }
@@ -416,7 +416,7 @@ function renderMessageWithMentions(content: string) {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/staff/login";
         }, 500);
         return;
       }
@@ -450,7 +450,7 @@ function renderMessageWithMentions(content: string) {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/staff/login";
         }, 500);
         return;
       }
@@ -482,7 +482,7 @@ function renderMessageWithMentions(content: string) {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/staff/login";
         }, 500);
         return;
       }
@@ -538,7 +538,7 @@ function renderMessageWithMentions(content: string) {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/staff/login";
         }, 500);
         return;
       }
@@ -573,7 +573,7 @@ function renderMessageWithMentions(content: string) {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/staff/login";
         }, 500);
         return;
       }

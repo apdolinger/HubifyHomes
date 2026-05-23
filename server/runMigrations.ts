@@ -269,6 +269,21 @@ export async function ensureDiscountCodeUsagesTable(): Promise<void> {
   }
 }
 
+export async function ensureStaffPasswordHashColumn(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS password_hash VARCHAR;
+    `);
+    log("[MIGRATE] users.password_hash column verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add password_hash column to users: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensureProspectDiscountCodeColumn(): Promise<void> {
   const client = await pool.connect();
   try {

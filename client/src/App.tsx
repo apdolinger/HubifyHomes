@@ -38,6 +38,7 @@ import Admin from "@/pages/Admin";
 import Account from "@/pages/Account";
 import SuperAdmin from "@/pages/SuperAdmin";
 import SuperAdminLogin from "@/pages/SuperAdminLogin";
+import StaffLogin from "@/pages/StaffLogin";
 import PortalLogin from "@/pages/PortalLogin";
 import PortalRegister from "@/pages/PortalRegister";
 import PortalForgotPassword from "@/pages/PortalForgotPassword";
@@ -129,6 +130,7 @@ function Router() {
       <Route path="/signup" component={Signup} />
       
       {/* Portal routes (separate auth system) */}
+      <Route path="/staff/login" component={StaffLogin} />
       <Route path="/portal/login" component={PortalLogin} />
       <Route path="/portal/register" component={PortalRegister} />
       <Route path="/portal/forgot-password" component={PortalForgotPassword} />
@@ -160,7 +162,7 @@ function Router() {
                     </div>
                     <div>
                       <Button 
-                        onClick={() => window.location.href = "/api/login"}
+                        onClick={() => window.location.href = "/staff/login"}
                         className="bg-teal-600 hover:bg-teal-700 text-white"
                       >
                         Login
@@ -177,7 +179,7 @@ function Router() {
                   You need to be logged in to access this page.
                 </p>
                 <Button 
-                  onClick={() => window.location.href = "/api/login"}
+                  onClick={() => window.location.href = "/staff/login"}
                   className="bg-teal-600 hover:bg-teal-700"
                 >
                   Login to Continue
