@@ -247,6 +247,43 @@ export async function ensureErrorLogsTable(): Promise<void> {
   }
 }
 
+export async function ensureDiscountCodeUsagesTable(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS discount_code_usages (
+        id SERIAL PRIMARY KEY,
+        discount_code_id INTEGER NOT NULL REFERENCES discount_codes(id) ON DELETE CASCADE,
+        org_id UUID REFERENCES orgs(id) ON DELETE SET NULL,
+        org_name VARCHAR(255),
+        plan_name VARCHAR(128),
+        used_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS discount_code_usages_code_idx ON discount_code_usages(discount_code_id);
+    `);
+    log("[MIGRATE] discount_code_usages table verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to ensure discount_code_usages table: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
+export async function ensureProspectDiscountCodeColumn(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE onboarding_prospects
+        ADD COLUMN IF NOT EXISTS discount_code VARCHAR(64);
+    `);
+    log("[MIGRATE] onboarding_prospects.discount_code column verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add discount_code column to onboarding_prospects: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensureCookieConsentPreferenceColumn(): Promise<void> {
   const client = await pool.connect();
   try {

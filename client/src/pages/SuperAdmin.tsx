@@ -2955,6 +2955,15 @@ interface DiscountCode {
   createdAt: string;
 }
 
+interface DiscountCodeUsage {
+  id: number;
+  discountCodeId: number;
+  orgId: string | null;
+  orgName: string | null;
+  planName: string | null;
+  usedAt: string;
+}
+
 const TIER_OPTIONS = [
   "Starter Portfolio",
   "Growth Portfolio",
@@ -2968,6 +2977,7 @@ function DiscountCodesCard() {
   const [showDialog, setShowDialog] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [historyCode, setHistoryCode] = useState<DiscountCode | null>(null);
 
   const blankForm = {
     code: "",
@@ -3006,6 +3016,11 @@ function DiscountCodesCard() {
 
   const { data: codes = [], isLoading } = useQuery<DiscountCode[]>({
     queryKey: ["/api/super-admin/discount-codes"],
+  });
+
+  const { data: usages = [], isLoading: usagesLoading } = useQuery<DiscountCodeUsage[]>({
+    queryKey: [`/api/super-admin/discount-codes/${historyCode?.id}/usages`],
+    enabled: historyCode !== null,
   });
 
   const buildPayload = () => ({
@@ -3153,6 +3168,15 @@ function DiscountCodesCard() {
                           onCheckedChange={v => toggleMutation.mutate({ id: code.id, isActive: v })}
                           className="scale-75"
                         />
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-slate-500 hover:text-slate-700"
+                          title="Usage history"
+                          onClick={() => setHistoryCode(code)}
+                        >
+                          <History className="w-3.5 h-3.5" />
+                        </Button>
                         <Button
                           size="icon"
                           variant="ghost"
@@ -3356,6 +3380,70 @@ function DiscountCodesCard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Usage history sheet */}
+      <Sheet open={historyCode !== null} onOpenChange={open => !open && setHistoryCode(null)}>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <History className="w-4 h-4 text-slate-500" />
+              Usage History
+            </SheetTitle>
+            <SheetDescription>
+              {historyCode && (
+                <span>
+                  Redemptions of code{" "}
+                  <span className="font-mono font-semibold text-slate-700">{historyCode.code}</span>
+                  {" "}({historyCode.usedCount} total)
+                </span>
+              )}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-6">
+            {usagesLoading ? (
+              <div className="flex items-center gap-2 text-sm text-slate-400 py-8 justify-center">
+                <RefreshCw className="w-4 h-4 animate-spin" /> Loading…
+              </div>
+            ) : usages.length === 0 ? (
+              <div className="text-center py-12 text-slate-400">
+                <History className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                <p className="text-sm">No uses recorded yet.</p>
+                <p className="text-xs mt-1 text-slate-300">
+                  Usage entries are created when a code is applied during signup.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {usages.map(usage => (
+                  <div
+                    key={usage.id}
+                    className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3 space-y-1"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-sm text-slate-800 truncate">
+                        {usage.orgName ?? <span className="italic text-slate-400">Unknown org</span>}
+                      </span>
+                      <span className="text-xs text-slate-400 shrink-0">
+                        {new Date(usage.usedAt).toLocaleDateString(undefined, {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                    </div>
+                    {usage.planName && (
+                      <div className="flex items-center gap-1 text-xs text-slate-500">
+                        <CreditCard className="w-3 h-3" />
+                        {usage.planName}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </Card>
   );
 }

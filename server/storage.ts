@@ -286,6 +286,9 @@ import {
   discountCodes,
   type DiscountCode,
   type InsertDiscountCode,
+  discountCodeUsages,
+  type DiscountCodeUsage,
+  type InsertDiscountCodeUsage,
 } from "@shared/schema";
 
 import { db } from "./db";
@@ -4477,6 +4480,40 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDiscountCode(id: number): Promise<void> {
     await db.delete(discountCodes).where(eq(discountCodes.id, id));
+  }
+
+  async getDiscountCodeUsages(discountCodeId: number): Promise<DiscountCodeUsage[]> {
+    return db
+      .select()
+      .from(discountCodeUsages)
+      .where(eq(discountCodeUsages.discountCodeId, discountCodeId))
+      .orderBy(desc(discountCodeUsages.usedAt));
+  }
+
+  async createDiscountCodeUsage(data: InsertDiscountCodeUsage): Promise<DiscountCodeUsage> {
+    const [row] = await db.insert(discountCodeUsages).values(data).returning();
+    return row;
+  }
+
+  /** Atomically increments usedCount and appends a discount_code_usages row. */
+  async applyDiscountCode(
+    id: number,
+    usage: { orgId?: string | null; orgName?: string | null; planName?: string | null },
+  ): Promise<DiscountCode> {
+    return db.transaction(async (tx) => {
+      const [updated] = await tx
+        .update(discountCodes)
+        .set({ usedCount: sql`${discountCodes.usedCount} + 1` })
+        .where(eq(discountCodes.id, id))
+        .returning();
+      await tx.insert(discountCodeUsages).values({
+        discountCodeId: id,
+        orgId: usage.orgId ?? null,
+        orgName: usage.orgName ?? null,
+        planName: usage.planName ?? null,
+      });
+      return updated;
+    });
   }
 
   // Contact-Property relationship operations

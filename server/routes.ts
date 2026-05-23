@@ -14440,7 +14440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/signup", async (req: any, res) => {
     try {
-      const { company, firstName, lastName, email, phone, website } = req.body;
+      const { company, firstName, lastName, email, phone, website, discountCode: rawDiscountCode } = req.body;
       if (!company || !firstName || !lastName || !email) {
         return res.status(400).json({ message: "company, firstName, lastName, and email are required" });
       }
@@ -14451,6 +14451,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const normalizedEmail = email.toLowerCase().trim();
+      const discountCodeStr: string | null = rawDiscountCode ? String(rawDiscountCode).toUpperCase().trim() : null;
+
+      // Validate discount code if provided
+      let discountCodeRow: Awaited<ReturnType<typeof storage.getDiscountCodeByCode>> | null = null;
+      if (discountCodeStr) {
+        discountCodeRow = await storage.getDiscountCodeByCode(discountCodeStr) ?? null;
+        if (!discountCodeRow || !discountCodeRow.isActive) {
+          return res.status(400).json({ message: "Invalid or inactive discount code" });
+        }
+        if (discountCodeRow.expiresAt && new Date(discountCodeRow.expiresAt) < new Date()) {
+          return res.status(400).json({ message: "Discount code has expired" });
+        }
+        if (discountCodeRow.maxUses !== null && discountCodeRow.usedCount >= discountCodeRow.maxUses) {
+          return res.status(400).json({ message: "Discount code has reached its usage limit" });
+        }
+      }
 
       const existing = await storage.getOrgSignupTokenByEmail(normalizedEmail);
       if (existing && existing.expiresAt > new Date()) {
@@ -14465,6 +14481,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         company,
         phone: phone || undefined,
         stage: "welcome",
+        ...(discountCodeStr ? { discountCode: discountCodeStr } : {}),
       });
 
       const orgData = insertOrgSchema.parse({
@@ -14481,6 +14498,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       await storage.upsertOrgSubscription(org.id, subData);
       await storage.updateOnboardingProspect(prospect.id, { orgId: org.id });
+
+      // Record discount code usage atomically (increment usedCount + log entry)
+      if (discountCodeRow) {
+        try {
+          await storage.applyDiscountCode(discountCodeRow.id, {
+            orgId: org.id,
+            orgName: org.name,
+            planName: "starter",
+          });
+        } catch (dcErr) {
+          console.warn("[SIGNUP] Failed to record discount code usage:", dcErr);
+        }
+      }
 
       const { nanoid } = await import("nanoid");
       const token = nanoid(32);
@@ -16842,6 +16872,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting discount code:", error);
       res.status(500).json({ message: "Failed to delete discount code" });
+    }
+  });
+
+  app.get("/api/super-admin/discount-codes/:id/usages", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id) || id <= 0) return res.status(400).json({ message: "Invalid discount code id" });
+      const usages = await storage.getDiscountCodeUsages(id);
+      res.json(usages);
+    } catch (error) {
+      console.error("Error fetching discount code usages:", error);
+      res.status(500).json({ message: "Failed to fetch usage history" });
     }
   });
 

@@ -209,7 +209,7 @@ app.use((req, res, next) => {
     // Without this the dispatcher logs an error on every task mutation in
     // environments where the webhook integration was never provisioned.
     try {
-      const { ensureWebhookTables, ensureCookieConsentPreferenceColumn, ensureOnboardingProspectsTable, ensureInvoiceReceiptColumns, ensureOrgSignupTokensTable, ensureErrorLogsTable } = await import('./runMigrations.js');
+      const { ensureWebhookTables, ensureCookieConsentPreferenceColumn, ensureOnboardingProspectsTable, ensureInvoiceReceiptColumns, ensureOrgSignupTokensTable, ensureErrorLogsTable, ensureDiscountCodeUsagesTable, ensureProspectDiscountCodeColumn } = await import('./runMigrations.js');
       try {
         await ensureWebhookTables();
       } catch (err) {
@@ -239,6 +239,16 @@ app.use((req, res, next) => {
         await ensureErrorLogsTable();
       } catch (err) {
         console.error('Error ensuring error_logs table:', err);
+      }
+      try {
+        await ensureDiscountCodeUsagesTable();
+      } catch (err) {
+        console.error('Error ensuring discount_code_usages table:', err);
+      }
+      try {
+        await ensureProspectDiscountCodeColumn();
+      } catch (err) {
+        console.error('Error ensuring discount_code column on onboarding_prospects:', err);
       }
     } catch (error) {
       console.error('Error loading startup migrations:', error);

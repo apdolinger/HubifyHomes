@@ -3374,6 +3374,7 @@ export const onboardingProspects = pgTable("onboarding_prospects", {
   agreementContent: text("agreement_content"),
   agreementSignedAt: timestamp("agreement_signed_at"),
   orgId: uuid("org_id"),
+  discountCode: varchar("discount_code", { length: 64 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
@@ -3484,6 +3485,21 @@ export const discountCodes = pgTable("discount_codes", {
 export type DiscountCode = typeof discountCodes.$inferSelect;
 export type InsertDiscountCode = typeof discountCodes.$inferInsert;
 export const insertDiscountCodeSchema = createInsertSchema(discountCodes).omit({ id: true, usedCount: true, createdAt: true });
+
+// ── Discount Code Usage Log ─────────────────────────────────────────────────
+// Records each time a discount code is applied to an org or prospect.
+export const discountCodeUsages = pgTable("discount_code_usages", {
+  id: serial("id").primaryKey(),
+  discountCodeId: integer("discount_code_id").notNull().references(() => discountCodes.id, { onDelete: "cascade" }),
+  orgId: uuid("org_id").references(() => orgs.id, { onDelete: "set null" }),
+  orgName: varchar("org_name", { length: 255 }),
+  planName: varchar("plan_name", { length: 128 }),
+  usedAt: timestamp("used_at").defaultNow().notNull(),
+}, (table) => [
+  index("discount_code_usages_code_idx").on(table.discountCodeId),
+]);
+export type DiscountCodeUsage = typeof discountCodeUsages.$inferSelect;
+export type InsertDiscountCodeUsage = typeof discountCodeUsages.$inferInsert;
 
 // ── Org self-signup tokens ─────────────────────────────────────────────────────
 // Created when a prospect completes the self-service signup wizard.
