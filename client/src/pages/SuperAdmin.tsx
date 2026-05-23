@@ -97,7 +97,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 // Onboarding Pipeline Tab
 // ============================================================================
 
-type OnboardingStage = "inquiry" | "agreement" | "payment_setup" | "initial_payment" | "welcome" | "dropped";
+type OnboardingStage = "contact" | "inquiry" | "agreement" | "payment_setup" | "initial_payment" | "welcome" | "dropped";
 
 interface StageHistoryEntry { stage: OnboardingStage; enteredAt: string; }
 
@@ -138,14 +138,15 @@ interface ProspectEmail {
 }
 
 const PIPELINE_STAGES: { key: OnboardingStage; label: string; color: string }[] = [
-  { key: "inquiry",         label: "Inquiry",         color: "border-teal-400 bg-teal-50" },
+  { key: "contact",         label: "Contact",          color: "border-slate-400 bg-slate-50" },
+  { key: "inquiry",         label: "Inquiry",          color: "border-teal-400 bg-teal-50" },
   { key: "agreement",       label: "Agreement",        color: "border-yellow-400 bg-yellow-50" },
   { key: "payment_setup",   label: "Payment Setup",    color: "border-orange-400 bg-orange-50" },
   { key: "initial_payment", label: "Initial Payment",  color: "border-purple-400 bg-purple-50" },
   { key: "welcome",         label: "Welcome",          color: "border-green-400 bg-green-50" },
 ];
 
-const STAGE_ORDER: OnboardingStage[] = ["inquiry", "agreement", "payment_setup", "initial_payment", "welcome"];
+const STAGE_ORDER: OnboardingStage[] = ["contact", "inquiry", "agreement", "payment_setup", "initial_payment", "welcome"];
 
 function nextStage(current: OnboardingStage): OnboardingStage | null {
   const idx = STAGE_ORDER.indexOf(current);
@@ -590,16 +591,27 @@ function OnboardingPipelineTab() {
           <Button
             variant="outline"
             onClick={() => {
-              const url = window.location.origin + "/inquire";
-              navigator.clipboard.writeText(url).then(
-                () => toast({ title: "Link copied!", description: "Share /inquire with potential clients." }),
-                () => {
-                  toast({ title: "Copy failed", description: `Please copy manually: ${url}`, variant: "destructive" });
-                }
+              const embedUrl = window.location.origin + "/contact?embed=true";
+              const snippet = `<!-- Hubify Homes Contact Form Popup -->\n<button id="hf-contact-btn" style="background:#0d9488;color:#fff;padding:12px 28px;border:none;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;">Get in Touch</button>\n<div id="hf-contact-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'">\n  <div style="position:relative;width:90%;max-width:580px;">\n    <iframe src="${embedUrl}" style="width:100%;height:680px;border:none;border-radius:16px;display:block;" title="Contact Hubify Homes" loading="lazy"></iframe>\n    <button onclick="document.getElementById('hf-contact-modal').style.display='none'" style="position:absolute;top:-14px;right:-14px;background:#fff;border:1px solid #e2e8f0;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:18px;line-height:1;box-shadow:0 2px 8px rgba(0,0,0,0.15);">×</button>\n  </div>\n</div>\n<script>document.getElementById('hf-contact-btn').onclick=function(){var m=document.getElementById('hf-contact-modal');m.style.display='flex';}<\/script>`;
+              navigator.clipboard.writeText(snippet).then(
+                () => toast({ title: "Embed snippet copied!", description: "Paste this HTML into your marketing site." }),
+                () => toast({ title: "Copy failed", description: "Please copy the embed snippet manually.", variant: "destructive" })
               );
             }}
           >
-            <Link2 className="w-4 h-4 mr-2" /> Copy Inquiry Link
+            <Link2 className="w-4 h-4 mr-2" /> Copy Embed Snippet
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              const url = window.location.origin + "/contact";
+              navigator.clipboard.writeText(url).then(
+                () => toast({ title: "Link copied!", description: "Share this contact form link directly." }),
+                () => toast({ title: "Copy failed", description: `Please copy manually: ${url}`, variant: "destructive" })
+              );
+            }}
+          >
+            <Link2 className="w-4 h-4 mr-2" /> Copy Contact Link
           </Button>
           <Button onClick={openCreate}>
             <Plus className="w-4 h-4 mr-2" /> Add Prospect
@@ -1163,6 +1175,7 @@ function BetaPricingCard() {
 // Template panel includes `dropped` so admins can configure a "sorry to see
 // you go" email. Kanban PIPELINE_STAGES intentionally excludes dropped.
 const TEMPLATE_STAGES: { key: OnboardingStage; label: string }[] = [
+  { key: "contact",         label: "Contact" },
   { key: "inquiry",         label: "Inquiry" },
   { key: "agreement",       label: "Agreement" },
   { key: "payment_setup",   label: "Payment Setup" },

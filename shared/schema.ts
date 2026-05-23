@@ -3382,6 +3382,7 @@ export const onboardingProspects = pgTable("onboarding_prospects", {
 ]);
 
 export const onboardingStageEnum = z.enum([
+  "contact",
   "inquiry",
   "agreement",
   "payment_setup",

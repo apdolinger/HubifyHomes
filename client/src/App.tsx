@@ -56,6 +56,7 @@ import ImportManager from "@/pages/ImportManager";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfService from "@/pages/TermsOfService";
 import Inquire from "@/pages/Inquire";
+import Contact from "@/pages/Contact";
 import Signup from "@/pages/Signup";
 import Billing from "@/pages/Billing";
 import PaymentCollectionPage from "@/pages/PaymentCollectionPage";
@@ -124,6 +125,7 @@ function Router() {
       <Route path="/super-admin" component={SuperAdmin} />
       <Route path="/payment-collection/:token" component={PaymentCollectionPage} />
       <Route path="/inquire" component={Inquire} />
+      <Route path="/contact" component={Contact} />
       <Route path="/signup" component={Signup} />
       
       {/* Portal routes (separate auth system) */}

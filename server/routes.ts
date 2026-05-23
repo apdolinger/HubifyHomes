@@ -14590,6 +14590,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/public/contact", async (req, res) => {
+    try {
+      const { insertOnboardingProspectSchema } = await import("@shared/schema");
+      const schema = insertOnboardingProspectSchema.pick({ name: true, email: true, company: true, phone: true, notes: true });
+      const result = schema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ message: "Invalid data", errors: result.error.errors });
+      }
+      const prospect = await storage.createOnboardingProspect({ ...result.data, stage: "contact" });
+
+      // Send notification email to the Hubify Homes contact inbox
+      if (resend) {
+        const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@hubifyhomes.com";
+        const { name, email, company, phone, notes } = result.data;
+        await resend.emails.send({
+          from: fromEmail,
+          to: "contact@hubifyhomes.com",
+          replyTo: email,
+          subject: `New contact form submission from ${name}`,
+          html: `
+            <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
+              <h2 style="color:#0d9488;margin-bottom:4px">New Contact Submission</h2>
+              <p style="color:#64748b;font-size:14px;margin-top:0">Submitted via the Hubify Homes contact form</p>
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0"/>
+              <table style="width:100%;border-collapse:collapse;font-size:14px">
+                <tr><td style="padding:6px 0;color:#64748b;width:100px">Name</td><td style="padding:6px 0;color:#0f172a;font-weight:600">${name}</td></tr>
+                <tr><td style="padding:6px 0;color:#64748b">Email</td><td style="padding:6px 0"><a href="mailto:${email}" style="color:#0d9488">${email}</a></td></tr>
+                ${company ? `<tr><td style="padding:6px 0;color:#64748b">Company</td><td style="padding:6px 0;color:#0f172a">${company}</td></tr>` : ""}
+                ${phone ? `<tr><td style="padding:6px 0;color:#64748b">Phone</td><td style="padding:6px 0;color:#0f172a">${phone}</td></tr>` : ""}
+              </table>
+              ${notes ? `<div style="margin-top:16px;padding:14px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0"><p style="margin:0 0 6px;color:#64748b;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Message</p><p style="margin:0;color:#0f172a;font-size:14px;white-space:pre-wrap">${notes}</p></div>` : ""}
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0"/>
+              <p style="font-size:12px;color:#94a3b8">This lead has been added to your Hubify onboarding pipeline in the <strong>Contact</strong> stage.</p>
+            </div>
+          `,
+        }).catch((err: any) => console.warn("[contact-form] email send failed:", err));
+      }
+
+      res.status(201).json({ id: prospect.id, message: "Message received" });
+    } catch (error) {
+      console.error("Error handling public contact form:", error);
+      res.status(500).json({ message: "Failed to submit contact form" });
+    }
+  });
+
   // ── Onboarding Prospects ─────────────────────────────────────────────────
   app.post("/api/super-admin/onboarding-prospects/send-stuck-digest", isSuperAdmin, requireMFA, async (_req, res) => {
     try {
