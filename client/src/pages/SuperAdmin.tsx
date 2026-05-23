@@ -83,6 +83,7 @@ import {
   Link2,
   PenLine,
   History,
+  Pencil,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -2952,6 +2953,7 @@ const TIER_OPTIONS = [
 function DiscountCodesCard() {
   const { toast } = useToast();
   const [showDialog, setShowDialog] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
   const blankForm = {
@@ -2967,22 +2969,45 @@ function DiscountCodesCard() {
   };
   const [form, setForm] = useState(blankForm);
 
+  const openCreate = () => {
+    setEditId(null);
+    setForm(blankForm);
+    setShowDialog(true);
+  };
+
+  const openEdit = (code: DiscountCode) => {
+    setEditId(code.id);
+    setForm({
+      code: code.code,
+      description: code.description ?? "",
+      discountType: code.discountType as "percent" | "fixed",
+      discountValue: code.discountValue,
+      allTiers: code.applicableTiers.length === 0,
+      applicableTiers: code.applicableTiers,
+      maxUses: code.maxUses !== null ? String(code.maxUses) : "",
+      expiresAt: code.expiresAt ? code.expiresAt.slice(0, 10) : "",
+      isActive: code.isActive,
+    });
+    setShowDialog(true);
+  };
+
   const { data: codes = [], isLoading } = useQuery<DiscountCode[]>({
     queryKey: ["/api/super-admin/discount-codes"],
   });
 
+  const buildPayload = () => ({
+    code: form.code.toUpperCase().trim(),
+    description: form.description || null,
+    discountType: form.discountType,
+    discountValue: Number(form.discountValue),
+    applicableTiers: form.allTiers ? [] : form.applicableTiers,
+    maxUses: form.maxUses ? Number(form.maxUses) : null,
+    expiresAt: form.expiresAt || null,
+    isActive: form.isActive,
+  });
+
   const createMutation = useMutation({
-    mutationFn: () =>
-      apiRequest("POST", "/api/super-admin/discount-codes", {
-        code: form.code.toUpperCase().trim(),
-        description: form.description || null,
-        discountType: form.discountType,
-        discountValue: Number(form.discountValue),
-        applicableTiers: form.allTiers ? [] : form.applicableTiers,
-        maxUses: form.maxUses ? Number(form.maxUses) : null,
-        expiresAt: form.expiresAt || null,
-        isActive: form.isActive,
-      }),
+    mutationFn: () => apiRequest("POST", "/api/super-admin/discount-codes", buildPayload()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/discount-codes"] });
       toast({ title: "Discount code created" });
@@ -2990,6 +3015,18 @@ function DiscountCodesCard() {
       setForm(blankForm);
     },
     onError: (e: Error) => toast({ title: "Failed to create code", description: e.message, variant: "destructive" }),
+  });
+
+  const editMutation = useMutation({
+    mutationFn: () => apiRequest("PATCH", `/api/super-admin/discount-codes/${editId}`, buildPayload()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/discount-codes"] });
+      toast({ title: "Discount code updated" });
+      setShowDialog(false);
+      setEditId(null);
+      setForm(blankForm);
+    },
+    onError: (e: Error) => toast({ title: "Failed to update code", description: e.message, variant: "destructive" }),
   });
 
   const toggleMutation = useMutation({
@@ -3031,7 +3068,7 @@ function DiscountCodesCard() {
             <DollarSign className="w-5 h-5" />
             Discount Codes
           </CardTitle>
-          <Button size="sm" onClick={() => setShowDialog(true)}>
+          <Button size="sm" onClick={openCreate}>
             <Plus className="w-4 h-4 mr-1" /> New Code
           </Button>
         </div>
@@ -3106,6 +3143,14 @@ function DiscountCodesCard() {
                         <Button
                           size="icon"
                           variant="ghost"
+                          className="h-7 w-7 text-slate-500 hover:text-slate-700"
+                          onClick={() => openEdit(code)}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
                           className="h-7 w-7 text-red-500 hover:text-red-700"
                           onClick={() => setDeleteId(code.id)}
                         >
@@ -3121,12 +3166,14 @@ function DiscountCodesCard() {
         )}
       </CardContent>
 
-      {/* Create dialog */}
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+      {/* Create / Edit dialog */}
+      <Dialog open={showDialog} onOpenChange={open => { if (!open) { setShowDialog(false); setEditId(null); setForm(blankForm); } }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>New Discount Code</DialogTitle>
-            <DialogDescription>Create a promotional code to share with prospects.</DialogDescription>
+            <DialogTitle>{editId ? "Edit Discount Code" : "New Discount Code"}</DialogTitle>
+            <DialogDescription>
+              {editId ? "Update the details for this discount code." : "Create a promotional code to share with prospects."}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-3">
@@ -3247,19 +3294,32 @@ function DiscountCodesCard() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowDialog(false); setForm(blankForm); }}>
+            <Button variant="outline" onClick={() => { setShowDialog(false); setEditId(null); setForm(blankForm); }}>
               Cancel
             </Button>
-            <Button
-              onClick={() => createMutation.mutate()}
-              disabled={createMutation.isPending || !form.code.trim()}
-            >
-              {createMutation.isPending ? (
-                <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Creating…</>
-              ) : (
-                "Create Code"
-              )}
-            </Button>
+            {editId ? (
+              <Button
+                onClick={() => editMutation.mutate()}
+                disabled={editMutation.isPending || !form.code.trim()}
+              >
+                {editMutation.isPending ? (
+                  <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Saving…</>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
+            ) : (
+              <Button
+                onClick={() => createMutation.mutate()}
+                disabled={createMutation.isPending || !form.code.trim()}
+              >
+                {createMutation.isPending ? (
+                  <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Creating…</>
+                ) : (
+                  "Create Code"
+                )}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
