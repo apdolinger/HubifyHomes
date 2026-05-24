@@ -50,6 +50,19 @@ Core features include:
 ### System Design Choices
 The database uses PostgreSQL with Drizzle ORM (Better SQLite3 for local development). The architecture is multi-tenant and organization-scoped, utilizing UUID-based primary keys and JSONB for flexible data structures.
 
+## Demo Tenant (Sales Demo Environment)
+A dedicated demo organization for sales demos and client walkthroughs. Fully resettable from the Super Admin panel.
+
+- **Seed command**: `npx tsx scripts/seed-demo-tenant.ts` (production requires `--force`). Re-running is safe — idempotent.
+- **Reset command**: `npx tsx scripts/seed-demo-tenant.ts --reset` — wipes all mutable demo data and reseeds.
+- **Org**: "Hubify Demo Portfolio" — `orgId = 00000000-0000-0000-0000-000000000de0`
+- **Domain**: `demo.hubifyhomesonline.com`
+- **Staff admin**: `demo@hubifyhomesonline.com` / `Demo2026!` (login at `/staff/login`)
+- **Portal client**: `client@demo.hubifyhomesonline.com` / `DemoClient2026!` (login at `/portal/login`)
+- **Seeded content**: 10 properties (FL, mixed types), 4 owners + 3 vendors + 2 tenants + 1 emergency contact, 3 staff users + supervisor, 3 inspections with checklists, 2 recurring tasks, 20 mixed-status tasks, 5 calendar events, 5 invoices (draft/sent/paid/overdue/consolidated), portal client linked to 2 properties, 5 in-app notifications.
+- **Super Admin reset**: Go to Super Admin → Demo tab → "Reset Demo Data" to wipe and reseed from the UI. The org record and admin login are preserved; production orgs are never touched.
+- **Core module**: `server/demoSeed.ts` — exports `seedDemoTenant()` and `resetDemoTenant()`. API routes: `GET /api/super-admin/demo/info`, `POST /api/super-admin/demo/seed`, `POST /api/super-admin/demo/reset` (all gated by `isSuperAdmin + requireMFA`).
+
 ## Beta Demo Org
 A scripted, idempotent demo organization for closed-beta testing and screencasts.
 

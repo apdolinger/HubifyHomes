@@ -1,0 +1,85 @@
+Set up a dedicated demo tenant for Hubify Homes.
+
+Requirements:
+
+1. Demo domain
+Create/support a tenant accessible at:
+demo.hubifyhomesonline.com
+
+This should resolve to the Hubify Homes app and load the demo organization automatically.
+
+2. Demo organization
+Create a dedicated organization/tenant:
+
+Organization name: Hubify Demo Portfolio
+Tenant slug: demo
+Domain: demo.hubifyhomesonline.com
+Status: active
+Plan/tier: Demo
+Billing status: demo/free
+
+3. Demo login credentials
+Create a fake demo admin user:
+
+Name: Demo Admin
+Email/Username: demo@hubifyhomesonline.com
+Password: Demo2026!
+
+Role: Admin
+Organization: Hubify Demo Portfolio
+
+The password should be stored securely using the same password hashing flow as normal users.
+
+4. Super Admin demo access
+In the Super Admin console, add a section or action for the demo tenant:
+
+- View Demo Site
+- Login/View as Demo Admin if supported
+- Reset Demo Data
+
+The “View Demo Site” button should link to:
+https://demo.hubifyhomesonline.com
+
+5. Demo reset feature
+Add a Super Admin-only action called:
+Reset Demo Data
+
+When clicked, it should:
+- delete all existing demo tenant data that may have been changed during demos
+- preserve the demo organization record
+- preserve the demo admin login
+- reseed the demo account with the default demo dataset
+- return the demo account to a clean starting state
+
+Protect this action so only Super Admin users can run it.
+
+6. Reset safety
+The reset must only affect the demo tenant/organization.
+
+Do not allow the reset function to touch production client organizations, users, properties, clients, tasks, vendors, or reports.
+
+Use the demo organization ID or tenant slug to scope every delete/reseed operation.
+
+7. Initial seed data
+For now, create the structure for the seed file/function, even if the full demo data comes later.
+
+Create something like:
+
+seedDemoTenant()
+resetDemoTenant()
+
+The seed should eventually include:
+- 10 demo properties
+- demo clients
+- demo tasks
+- recurring tasks
+- team members
+- different property scenarios
+- inspection/report-ready records
+
+8. Expected result
+After implementation:
+- visiting demo.hubifyhomesonline.com shows the demo environment
+- logging in with demo@hubifyhomesonline.com / Demo2026! works
+- Super Admin can open the demo tenant directly
+- Super Admin can reset the demo tenant after testing or client demos

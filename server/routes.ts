@@ -100,6 +100,7 @@ import { db } from "./db";
 import { eq, lt, and, desc, inArray, count } from "drizzle-orm";
 import { Resend } from "resend";
 import { dispatchWebhookEvent, sendTestWebhookEvent, validateWebhookUrlSafe } from "./webhookDispatcher";
+import { seedDemoTenant, resetDemoTenant, DEMO_ORG_ID, DEMO_DOMAIN, DEMO_ADMIN_EMAIL } from "./demoSeed";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
@@ -3824,6 +3825,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating beta pricing:", error);
       res.status(500).json({ message: "Failed to update beta pricing" });
+    }
+  });
+
+  // ── Demo Tenant (Super Admin) ─────────────────────────────────────────────
+
+  // GET /api/super-admin/demo/info — basic stats for the demo tenant
+  app.get("/api/super-admin/demo/info", isSuperAdmin, requireMFA, async (_req, res) => {
+    try {
+      const [orgRow] = await db.select().from(orgs).where(eq(orgs.id, DEMO_ORG_ID)).limit(1);
+      if (!orgRow) {
+        return res.json({ exists: false });
+      }
+
+      const [[{ userCount }], [{ propertyCount }], [{ contactCount }], [{ tc }]] = await Promise.all([
+        db.select({ userCount: count() }).from(users).where(eq(users.orgId, DEMO_ORG_ID)),
+        db.select({ propertyCount: count() }).from(properties).where(eq(properties.orgId, DEMO_ORG_ID)),
+        db.select({ contactCount: count() }).from(contacts).where(eq(contacts.orgId, DEMO_ORG_ID)),
+        db.select({ tc: count() }).from(tasks)
+          .innerJoin(properties, eq(tasks.propertyId, properties.id))
+          .where(eq(properties.orgId, DEMO_ORG_ID)),
+      ]);
+
+      res.json({
+        exists: true,
+        orgId: DEMO_ORG_ID,
+        orgName: orgRow.name,
+        domain: DEMO_DOMAIN,
+        adminEmail: DEMO_ADMIN_EMAIL,
+        adminPassword: "Demo2026!",
+        portalEmail: "client@demo.hubifyhomesonline.com",
+        portalPassword: "DemoClient2026!",
+        userCount: Number(userCount),
+        propertyCount: Number(propertyCount),
+        contactCount: Number(contactCount),
+        taskCount: Number(tc),
+        demoSiteUrl: `https://${DEMO_DOMAIN}`,
+      });
+    } catch (error) {
+      console.error("Error fetching demo info:", error);
+      res.status(500).json({ message: "Failed to fetch demo info" });
+    }
+  });
+
+  // POST /api/super-admin/demo/seed — seed the demo tenant (idempotent)
+  app.post("/api/super-admin/demo/seed", isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const result = await seedDemoTenant();
+      await AuditLogger.log({ req, action: "demo_seed", metadata: result });
+      res.json({ ok: true, ...result });
+    } catch (error: any) {
+      console.error("Demo seed error:", error);
+      res.status(500).json({ message: error.message || "Failed to seed demo tenant" });
+    }
+  });
+
+  // POST /api/super-admin/demo/reset — wipe and reseed the demo tenant
+  app.post("/api/super-admin/demo/reset", isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const result = await resetDemoTenant();
+      await AuditLogger.log({ req, action: "demo_reset", metadata: result });
+      res.json({ ok: true, ...result });
+    } catch (error: any) {
+      console.error("Demo reset error:", error);
+      res.status(500).json({ message: error.message || "Failed to reset demo tenant" });
     }
   });
 

@@ -84,6 +84,9 @@ import {
   PenLine,
   History,
   Pencil,
+  RotateCcw,
+  MonitorPlay,
+  KeyRound,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -1875,6 +1878,265 @@ function BetaPricingCard() {
             : "Save Pricing"}
         </Button>
       </div>
+    </div>
+  );
+}
+
+// ── Demo Tenant Tab ──────────────────────────────────────────────────────────
+
+function DemoTenantTab() {
+  const { toast } = useToast();
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [seedConfirmOpen, setSeedConfirmOpen] = useState(false);
+
+  type DemoInfo = {
+    exists: boolean;
+    orgId?: string;
+    orgName?: string;
+    domain?: string;
+    adminEmail?: string;
+    adminPassword?: string;
+    portalEmail?: string;
+    portalPassword?: string;
+    userCount?: number;
+    propertyCount?: number;
+    contactCount?: number;
+    taskCount?: number;
+    demoSiteUrl?: string;
+  };
+
+  const { data: info, isLoading, refetch } = useQuery<DemoInfo>({
+    queryKey: ["/api/super-admin/demo/info"],
+  });
+
+  const seedMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/super-admin/demo/seed", {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/demo/info"] });
+      setSeedConfirmOpen(false);
+      toast({ title: "Demo tenant seeded", description: "Demo data has been created successfully." });
+    },
+    onError: (e: any) => toast({ title: "Seed failed", description: e.message, variant: "destructive" }),
+  });
+
+  const resetMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/super-admin/demo/reset", {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/demo/info"] });
+      setResetConfirmOpen(false);
+      toast({ title: "Demo tenant reset", description: "All demo data has been wiped and reseeded." });
+    },
+    onError: (e: any) => toast({ title: "Reset failed", description: e.message, variant: "destructive" }),
+  });
+
+  const isPending = seedMutation.isPending || resetMutation.isPending;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Demo Tenant</h2>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Manage the Hubify Demo Portfolio — a dedicated demo environment for sales demos and client walkthroughs.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[1, 2].map(i => <div key={i} className="h-40 bg-gray-100 animate-pulse rounded-xl" />)}
+        </div>
+      ) : !info?.exists ? (
+        /* Not seeded yet */
+        <div className="border-2 border-dashed border-gray-200 rounded-xl p-10 text-center">
+          <MonitorPlay className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <h3 className="font-semibold text-gray-700 mb-1">Demo tenant not yet created</h3>
+          <p className="text-sm text-gray-500 mb-5">
+            Click below to seed the Hubify Demo Portfolio with 10 properties, realistic tasks, invoices, and sample data.
+          </p>
+          <Button onClick={() => setSeedConfirmOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Create Demo Tenant
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-5">
+          {/* Status cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { label: "Properties", value: info.propertyCount ?? 0, color: "text-blue-700" },
+              { label: "Staff Users", value: info.userCount ?? 0, color: "text-violet-700" },
+              { label: "Contacts", value: info.contactCount ?? 0, color: "text-emerald-700" },
+              { label: "Tasks", value: info.taskCount ?? 0, color: "text-orange-700" },
+            ].map(stat => (
+              <div key={stat.label} className="border rounded-lg p-3 bg-white">
+                <p className="text-xs text-gray-500">{stat.label}</p>
+                <p className={`text-2xl font-bold mt-0.5 ${stat.color}`}>{stat.value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Org details */}
+            <div className="border rounded-xl p-4 space-y-3 bg-white">
+              <div className="flex items-center gap-2 mb-1">
+                <Building2 className="w-4 h-4 text-teal-600" />
+                <h3 className="font-semibold text-sm text-gray-800">Organization</h3>
+                <Badge className="ml-auto bg-teal-100 text-teal-800 text-xs">Active</Badge>
+              </div>
+              <div className="space-y-1.5 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Name</span>
+                  <span className="font-medium text-gray-800">{info.orgName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Org ID</span>
+                  <span className="font-mono text-xs text-gray-600">{info.orgId?.slice(0, 22)}…</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Domain</span>
+                  <span className="font-medium text-gray-700">{info.domain}</span>
+                </div>
+              </div>
+              <div className="pt-1">
+                <a
+                  href={info.demoSiteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-teal-600 hover:text-teal-800 border border-teal-200 hover:border-teal-400 rounded px-3 py-1.5 transition-colors hover:bg-teal-50"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  View Demo Site
+                </a>
+              </div>
+            </div>
+
+            {/* Login credentials */}
+            <div className="border rounded-xl p-4 space-y-3 bg-white">
+              <div className="flex items-center gap-2 mb-1">
+                <KeyRound className="w-4 h-4 text-slate-600" />
+                <h3 className="font-semibold text-sm text-gray-800">Login Credentials</h3>
+              </div>
+              <div className="space-y-3 text-sm">
+                <div className="bg-slate-50 rounded-lg p-3 space-y-1.5">
+                  <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Staff Admin</p>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Email</span>
+                    <span className="font-mono text-xs text-gray-800">{info.adminEmail}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Password</span>
+                    <span className="font-mono text-xs text-gray-800">{info.adminPassword}</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Login at <span className="font-mono">/staff/login</span></p>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-3 space-y-1.5">
+                  <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Portal Client</p>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Email</span>
+                    <span className="font-mono text-xs text-gray-800">{info.portalEmail}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Password</span>
+                    <span className="font-mono text-xs text-gray-800">{info.portalPassword}</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Login at <span className="font-mono">/portal/login</span></p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="border rounded-xl p-4 bg-white">
+            <h3 className="font-semibold text-sm text-gray-800 mb-3">Actions</h3>
+            <div className="flex flex-wrap gap-3">
+              <a
+                href={info.demoSiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md transition-colors font-medium"
+              >
+                <ExternalLink className="w-4 h-4" />
+                View Demo Site
+              </a>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSeedConfirmOpen(true)}
+                disabled={isPending}
+              >
+                <Plus className="w-4 h-4 mr-1.5" />
+                Re-seed Demo Data
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-red-200 text-red-700 hover:bg-red-50"
+                onClick={() => setResetConfirmOpen(true)}
+                disabled={isPending}
+              >
+                <RotateCcw className="w-4 h-4 mr-1.5" />
+                Reset Demo Data
+              </Button>
+            </div>
+            <p className="text-xs text-gray-400 mt-3">
+              <strong>Re-seed</strong> adds any missing data without deleting anything.{" "}
+              <strong>Reset</strong> deletes all existing demo data and rebuilds from scratch — the org record and admin login are preserved.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Seed confirmation dialog */}
+      <Dialog open={seedConfirmOpen} onOpenChange={setSeedConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Re-seed Demo Data</DialogTitle>
+            <DialogDescription>
+              This will add any missing demo data (properties, tasks, contacts, invoices) to the demo tenant without deleting existing records. Safe to run anytime.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSeedConfirmOpen(false)}>Cancel</Button>
+            <Button onClick={() => seedMutation.mutate()} disabled={seedMutation.isPending}>
+              {seedMutation.isPending ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Seeding…</> : "Confirm Seed"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset confirmation dialog */}
+      <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-700">Reset Demo Data</DialogTitle>
+            <DialogDescription>
+              This will <strong>permanently delete all existing demo tenant data</strong> — properties, tasks, contacts, invoices, calendar events, and team members — then rebuild everything from scratch.
+              <br /><br />
+              The demo organization record and the admin login (<code>demo@hubifyhomesonline.com</code>) are preserved. Production client organizations are never touched.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetConfirmOpen(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => resetMutation.mutate()}
+              disabled={resetMutation.isPending}
+            >
+              {resetMutation.isPending
+                ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Resetting…</>
+                : "Reset Demo Data"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -7194,6 +7456,7 @@ export default function SuperAdmin() {
           <TabsTrigger value="features">Feature Flags</TabsTrigger>
           <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
           <TabsTrigger value="platform">Platform</TabsTrigger>
+          <TabsTrigger value="demo">Demo</TabsTrigger>
           <TabsTrigger value="compliance">Compliance</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
@@ -7307,6 +7570,11 @@ export default function SuperAdmin() {
         {/* Platform Tab */}
         <TabsContent value="platform">
           <TemplateManagement />
+        </TabsContent>
+
+        {/* Demo Tenant Tab */}
+        <TabsContent value="demo">
+          <DemoTenantTab />
         </TabsContent>
 
         <TabsContent value="compliance">
