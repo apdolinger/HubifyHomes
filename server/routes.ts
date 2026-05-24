@@ -3942,7 +3942,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================
   // Feature Flags (Super Admin owns flags; orgs override per-org)
   // ============================================================
-  app.get("/api/super-admin/feature-flags", isAuthenticated, isSuperAdmin, requireMFA, async (_req, res) => {
+  app.get("/api/super-admin/feature-flags", isSuperAdmin, requireMFA, async (_req, res) => {
     try {
       const flags = await storage.getAllFeatureFlags();
       res.json(flags);
@@ -3952,7 +3952,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/super-admin/feature-flags", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+  app.post("/api/super-admin/feature-flags", isSuperAdmin, requireMFA, async (req, res) => {
     try {
       const { insertFeatureFlagSchema } = await import("@shared/schema");
       const data = insertFeatureFlagSchema.parse(req.body);
@@ -3981,7 +3981,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/super-admin/feature-flags/:key", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+  app.patch("/api/super-admin/feature-flags/:key", isSuperAdmin, requireMFA, async (req, res) => {
     try {
       const key = req.params.key;
       const existing = await storage.getFeatureFlag(key);
@@ -4011,7 +4011,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/super-admin/feature-flags/:key", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
+  app.delete("/api/super-admin/feature-flags/:key", isSuperAdmin, requireMFA, async (req, res) => {
     try {
       const key = req.params.key;
       const existing = await storage.getFeatureFlag(key);
@@ -4036,7 +4036,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Per-org effective flag map (override merged with defaults)
   app.get(
     "/api/super-admin/orgs/:orgId/feature-flags",
-    isAuthenticated, isSuperAdmin, requireMFA,
+    isSuperAdmin, requireMFA,
     async (req, res) => {
       try {
         const { getEffectiveFeatureFlags } = await import("./featureFlags");
@@ -4055,7 +4055,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch(
     "/api/super-admin/orgs/:orgId/feature-flags",
-    isAuthenticated, isSuperAdmin, requireMFA,
+    isSuperAdmin, requireMFA,
     async (req, res) => {
       try {
         const orgId = req.params.orgId;
