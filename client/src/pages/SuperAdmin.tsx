@@ -357,11 +357,12 @@ function SubmissionStatusBadge({ status }: { status: string | null }) {
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${opt.color}`}>{opt.label}</span>;
 }
 
-function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesChange }: {
+function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesChange, onMoveToPipeline }: {
   submission: Prospect;
   onClose: () => void;
   onStatusChange: (id: string, status: string) => void;
   onNotesChange: (id: string, notes: string) => void;
+  onMoveToPipeline?: (submission: Prospect) => void;
 }) {
   const { toast } = useToast();
   const [notesValue, setNotesValue] = useState(submission.notes ?? "");
@@ -545,12 +546,36 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
             )}
           </div>
         </div>
+
+        {onMoveToPipeline && submission.submissionStatus !== "converted" && (
+          <div className="pt-4 mt-4 border-t">
+            <Button
+              className="w-full bg-teal-600 hover:bg-teal-700 text-white"
+              onClick={() => onMoveToPipeline(submission)}
+            >
+              <ArrowRight className="h-4 w-4 mr-2" />
+              Move to Pipeline
+            </Button>
+            <p className="text-xs text-muted-foreground text-center mt-1.5">
+              Creates a prospect pre-filled with this submission's data
+            </p>
+          </div>
+        )}
+
+        {submission.submissionStatus === "converted" && (
+          <div className="pt-4 mt-4 border-t">
+            <div className="flex items-center justify-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+              <CheckCircle className="h-4 w-4 shrink-0" />
+              Already moved to pipeline
+            </div>
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   );
 }
 
-function SubmissionsTab() {
+function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: Prospect) => void }) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [selectedSubmission, setSelectedSubmission] = useState<Prospect | null>(null);
@@ -705,13 +730,18 @@ function SubmissionsTab() {
             queryClient.invalidateQueries({ queryKey: ["/api/super-admin/submissions"] });
             setSelectedSubmission(prev => prev ? { ...prev, notes } : prev);
           }}
+          onMoveToPipeline={onMoveToPipeline ? (sub) => {
+            statusMutation.mutate({ id: sub.id, status: "converted" });
+            setSelectedSubmission(prev => prev ? { ...prev, submissionStatus: "converted" } : prev);
+            onMoveToPipeline(sub);
+          } : undefined}
         />
       )}
     </div>
   );
 }
 
-function OnboardingPipelineTab() {
+function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: ProspectFormValues | null; onPrefillConsumed?: () => void }) {
   const { toast } = useToast();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingProspect, setEditingProspect] = useState<Prospect | null>(null);
@@ -744,6 +774,23 @@ function OnboardingPipelineTab() {
       setStuckDays(threshold);
     }
   }, [platformSettings]);
+
+  useEffect(() => {
+    if (prefill) {
+      setEditingProspect(null);
+      form.reset({
+        name: prefill.name ?? "",
+        email: prefill.email ?? "",
+        company: prefill.company ?? "",
+        phone: prefill.phone ?? "",
+        notes: prefill.notes ?? "",
+        agreementContent: "",
+      });
+      setSheetOpen(true);
+      onPrefillConsumed?.();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill]);
 
   const active = allProspects.filter(p => p.stage !== "dropped");
   const dropped = allProspects.filter(p => p.stage === "dropped");
@@ -6780,6 +6827,7 @@ export default function SuperAdmin() {
   const [activeTab, setActiveTab] = useState("organizations");
   const [isSuperAdminAuthenticated, setIsSuperAdminAuthenticated] = useState<boolean | null>(null);
   const [superAdminUsername, setSuperAdminUsername] = useState<string>("");
+  const [pipelinePrefill, setPipelinePrefill] = useState<ProspectFormValues | null>(null);
 
   const { data: submissionsData = [] } = useQuery<Prospect[]>({
     queryKey: ["/api/super-admin/submissions"],
@@ -6915,12 +6963,31 @@ export default function SuperAdmin() {
 
         {/* Onboarding Pipeline Tab */}
         <TabsContent value="onboarding">
-          <OnboardingPipelineTab />
+          <OnboardingPipelineTab
+            prefill={pipelinePrefill}
+            onPrefillConsumed={() => setPipelinePrefill(null)}
+          />
         </TabsContent>
 
         {/* Submissions Tab */}
         <TabsContent value="submissions">
-          <SubmissionsTab />
+          <SubmissionsTab
+            onMoveToPipeline={(submission) => {
+              const displayName = submission.firstName && submission.lastName
+                ? `${submission.firstName} ${submission.lastName}`
+                : submission.name;
+              setPipelinePrefill({
+                name: displayName ?? "",
+                email: submission.email ?? "",
+                company: submission.company ?? "",
+                phone: submission.phone ?? "",
+                notes: submission.notes ?? "",
+                agreementContent: "",
+              });
+              setActiveTab("onboarding");
+              toast({ title: "Opening pipeline", description: `Pre-filled with ${displayName}'s data.` });
+            }}
+          />
         </TabsContent>
 
         {/* Organizations Tab */}
