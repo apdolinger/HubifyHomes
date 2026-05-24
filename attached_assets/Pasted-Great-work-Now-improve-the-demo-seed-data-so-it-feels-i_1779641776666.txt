@@ -1,0 +1,84 @@
+Great work. Now improve the demo seed data so it feels intentional for a live client demo.
+
+Please update server/demoSeed.ts so the 10 demo properties each have a distinct operational scenario.
+
+For each property, include:
+- realistic property name
+- realistic Florida address
+- client/contact
+- property type
+- status
+- square footage
+- billing type
+- assigned staff member
+- scenario summary
+- 3–6 tasks connected to the scenario
+- at least 1 inspection record
+- notes/activity entries if supported by the schema
+- calendar events if supported
+- invoices if supported
+
+Target demo totals:
+- 10 properties
+- 10 primary clients/contacts
+- 4 staff users
+- 40–60 tasks
+- 12–18 inspections
+- 5–8 invoices
+- 6–10 calendar events
+- recurring tasks for weekly inspections, monthly maintenance, and seasonal prep
+
+Property scenarios should include:
+
+1. Beachside Breeze
+Standard Home Watch
+Scenario: HVAC not cooling before owner arrival
+Tasks: schedule HVAC vendor, inspect thermostat, confirm owner arrival prep, follow up with client
+
+2. Sunset Key Villa
+Luxury Estate Management
+Scenario: pool heater failure and smart-home system offline
+Tasks: pool vendor service, smart-home reset, estate walkthrough, vendor follow-up
+
+3. Coconut Harbor Retreat
+Seasonal/Snowbird
+Scenario: hurricane prep required
+Tasks: install shutters, secure lanai furniture, test generator, photograph exterior condition
+
+4. Pelican Point Cottage
+Problem/Emergency
+Scenario: water leak discovered during inspection
+Tasks: shut off water, call plumber, document damage, notify client, schedule remediation
+
+5. Royal Palm Estate
+VIP Luxury Estate
+Scenario: owner event preparation with multiple vendors
+Tasks: deep cleaning, landscaping, vehicle detailing, grocery/wine delivery, final walkthrough
+
+6. Marina Bay Condo
+Rental/Guest Use
+Scenario: guest turnover and smart lock reset
+Tasks: cleaning, linen refresh, restock supplies, reset lock code, inspect after guest departure
+
+7. Gulfstream Manor
+High Maintenance
+Scenario: recurring irrigation failure and HOA violation risk
+Tasks: irrigation repair, landscaping follow-up, HOA photo documentation, supervisor review
+
+8. The Sandpiper
+Seasonal Arrival
+Scenario: owner arriving earlier than expected
+Tasks: rush inspection, refrigerator stocking, vehicle battery check, AC pre-cool, arrival confirmation
+
+9. Lighthouse Point
+Storm Damage
+Scenario: roof leak after storm
+Tasks: roofing inspection, moisture check, insurance photos, tarp installation, client update
+
+10. Oceanfront Oasis
+Stable Premium Account
+Scenario: healthy recurring maintenance account
+Tasks: weekly home watch, monthly report, preventative AC service, pool check, security system test
+
+Please make the seeded demo data easy to reset through the existing Super Admin Demo tab.
+Make sure every task, inspection, invoice, and event is scoped only to the demo organization.
