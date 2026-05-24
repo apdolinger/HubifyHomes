@@ -14683,6 +14683,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Prospect confirmation email
+      if (resend && process.env.RESEND_FROM_EMAIL) {
+        const fromEmail = process.env.RESEND_FROM_EMAIL;
+        const tierSection = suggestedTier
+          ? `<tr>
+               <td style="padding:8px 0;color:#64748b;font-size:14px;width:160px;vertical-align:top">Suggested plan</td>
+               <td style="padding:8px 0;font-size:14px;vertical-align:top">
+                 <span style="display:inline-block;background:#ccfbf1;color:#0d9488;font-weight:700;padding:3px 10px;border-radius:20px">${suggestedTier}</span>
+               </td>
+             </tr>`
+          : "";
+        resend.emails.send({
+          from: fromEmail,
+          to: data.email,
+          subject: `We received your Hubify inquiry — here's what happens next`,
+          html: `
+            <div style="font-family:sans-serif;max-width:580px;margin:0 auto;padding:32px 24px;background:#ffffff">
+              <!-- Logo -->
+              <div style="text-align:center;margin-bottom:28px">
+                <img src="https://hubifyhomes.com/hubify-logo.png"
+                     alt="Hubify"
+                     width="130"
+                     style="height:auto;display:inline-block"
+                     onerror="this.style.display='none'" />
+                <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px;margin-top:4px">Hubify</div>
+              </div>
+
+              <!-- Greeting -->
+              <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${data.firstName}, thanks for reaching out!</h1>
+              <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
+                We've received your inquiry for <strong>${data.company}</strong> and our team will be in touch shortly.
+                Here's a summary of what you submitted:
+              </p>
+
+              <!-- Summary card -->
+              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px;margin-bottom:28px">
+                <table style="width:100%;border-collapse:collapse">
+                  <tr>
+                    <td style="padding:8px 0;color:#64748b;font-size:14px;width:160px;vertical-align:top">Name</td>
+                    <td style="padding:8px 0;color:#0f172a;font-size:14px;font-weight:600;vertical-align:top">${data.firstName} ${data.lastName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;color:#64748b;font-size:14px;vertical-align:top">Organization</td>
+                    <td style="padding:8px 0;color:#0f172a;font-size:14px;vertical-align:top">${data.company}</td>
+                  </tr>
+                  ${data.estimatedHomes ? `<tr>
+                    <td style="padding:8px 0;color:#64748b;font-size:14px;vertical-align:top">Properties managed</td>
+                    <td style="padding:8px 0;color:#0f172a;font-size:14px;vertical-align:top">${data.estimatedHomes}</td>
+                  </tr>` : ""}
+                  ${tierSection}
+                </table>
+              </div>
+
+              <!-- Next steps -->
+              <h2 style="font-size:16px;font-weight:700;color:#0f172a;margin:0 0 12px">What happens next?</h2>
+              <ol style="padding-left:20px;margin:0 0 28px;color:#475569;font-size:14px;line-height:1.8">
+                <li>A member of our team will review your submission — usually within one business day.</li>
+                <li>We'll reach out to schedule a short discovery call so we can tailor Hubify to your workflow.</li>
+                <li>You'll receive access to a personalized trial environment matched to your suggested plan.</li>
+              </ol>
+
+              <!-- CTA -->
+              <div style="text-align:center;margin-bottom:32px">
+                <a href="https://hubifyhomes.com"
+                   style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
+                  Learn more about Hubify
+                </a>
+              </div>
+
+              <!-- Footer -->
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
+              <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
+                You received this email because you submitted an inquiry at Hubify Homes.<br/>
+                If you didn't submit this form, you can safely ignore this message.
+              </p>
+            </div>
+          `,
+        }).catch((err: any) => console.warn("[submission-form] prospect confirmation email failed:", err));
+      }
+
       res.status(201).json({ id: prospect.id, message: "Submission received" });
     } catch (error) {
       console.error("Error handling public submission:", error);
