@@ -892,6 +892,30 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
     }),
   });
 
+  const resendConfirmationEmailMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/send-confirmation-email`, {})
+        .then(r => r.json() as Promise<Prospect & { emailSent: boolean; message?: string }>),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      setEditingProspect(result);
+      if (result.emailSent) {
+        toast({ title: "Confirmation email sent!" });
+      } else {
+        toast({
+          title: "Email not sent",
+          description: result.message || result.confirmationEmailStatus || "Could not send confirmation email",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (e: Error) => toast({
+      title: "Email failed",
+      description: e?.message || "Could not send confirmation email",
+      variant: "destructive",
+    }),
+  });
+
   const restoreMutation = useMutation({
     mutationFn: (id: string) =>
       apiRequest("PATCH", `/api/super-admin/onboarding-prospects/${id}`, { stage: "inquiry", droppedReason: null }),
@@ -1330,9 +1354,21 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
             <>
               <Separator className="my-4" />
               <div>
-                <p className="text-sm font-medium mb-2 text-gray-700 flex items-center gap-1">
-                  <Mail className="w-3.5 h-3.5" /> Confirmation Email
-                </p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                    <Mail className="w-3.5 h-3.5" /> Confirmation Email
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    disabled={resendConfirmationEmailMutation.isPending}
+                    onClick={() => resendConfirmationEmailMutation.mutate(editingProspect.id)}
+                  >
+                    {resendConfirmationEmailMutation.isPending ? "Sending…" : "Resend"}
+                  </Button>
+                </div>
                 {editingProspect.confirmationEmailStatus ? (
                   <div className={`flex items-start gap-2 text-xs rounded-md px-3 py-2 ${
                     editingProspect.confirmationEmailStatus === "sent"
