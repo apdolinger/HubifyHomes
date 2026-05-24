@@ -87,6 +87,13 @@ import {
   RotateCcw,
   MonitorPlay,
   KeyRound,
+  Copy,
+  Check,
+  Terminal,
+  Home,
+  Layers,
+  FileCheck,
+  LogOut,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -1884,6 +1891,36 @@ function BetaPricingCard() {
 
 // ── Demo Tenant Tab ──────────────────────────────────────────────────────────
 
+const DEMO_SCENARIOS = [
+  { name: "Beachside Breeze",       type: "Single Family",  location: "Naples, FL",       highlight: "Hurricane prep tasks + seasonal checklist" },
+  { name: "Sunset Key Villa",        type: "Villa",          location: "Key West, FL",      highlight: "Pool & landscaping recurring tasks" },
+  { name: "Coconut Harbor Retreat",  type: "Single Family",  location: "Coconut Grove, FL", highlight: "Water intrusion inspection scenario" },
+  { name: "Pelican Point Cottage",   type: "Cottage",        location: "Sanibel, FL",       highlight: "Post-storm damage assessment flow" },
+  { name: "Royal Palm Estate",       type: "Estate",         location: "Palm Beach, FL",    highlight: "Vendor management + priority tasks" },
+  { name: "Marina Bay Condo",        type: "Condo",          location: "Miami, FL",         highlight: "Multi-unit condo with HOA integration" },
+  { name: "Gulfstream Manor",        type: "Single Family",  location: "Boca Raton, FL",    highlight: "Luxury estate full inspection schedule" },
+  { name: "The Sandpiper",           type: "Vacation Home",  location: "Siesta Key, FL",    highlight: "Short-term rental turnover tasks" },
+  { name: "Lighthouse Point",        type: "Single Family",  location: "Lighthouse Point, FL", highlight: "Roof & HVAC warranty tracking" },
+  { name: "Oceanfront Oasis",        type: "Estate",         location: "Delray Beach, FL",  highlight: "Full invoice + client portal demo" },
+];
+
+function CopyButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        navigator.clipboard.writeText(value);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1800);
+      }}
+      className="ml-1.5 text-gray-400 hover:text-teal-600 transition-colors"
+      title="Copy"
+    >
+      {copied ? <Check className="w-3.5 h-3.5 text-teal-500" /> : <Copy className="w-3.5 h-3.5" />}
+    </button>
+  );
+}
+
 function DemoTenantTab() {
   const { toast } = useToast();
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
@@ -1898,10 +1935,16 @@ function DemoTenantTab() {
     adminPassword?: string;
     portalEmail?: string;
     portalPassword?: string;
+    staffLoginUrl?: string;
+    portalLoginUrl?: string;
     userCount?: number;
     propertyCount?: number;
     contactCount?: number;
     taskCount?: number;
+    invoiceCount?: number;
+    eventCount?: number;
+    inspectionCount?: number;
+    notificationCount?: number;
     demoSiteUrl?: string;
   };
 
@@ -1933,168 +1976,282 @@ function DemoTenantTab() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">Demo Tenant</h2>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Manage the Hubify Demo Portfolio — a dedicated demo environment for sales demos and client walkthroughs.
-          </p>
+
+      {/* ── Page header ── */}
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div className="flex items-start gap-3">
+          <div className="p-2 rounded-lg bg-teal-50 border border-teal-100">
+            <MonitorPlay className="w-5 h-5 text-teal-600" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-gray-900">Demo Environment</h2>
+              <Badge className="bg-teal-100 text-teal-800 text-xs font-medium">Sales Demo</Badge>
+            </div>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Hubify Demo Portfolio — a dedicated, fully-resettable environment for sales walkthroughs and screencasts.
+            </p>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
-            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
+          <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[1, 2].map(i => <div key={i} className="h-40 bg-gray-100 animate-pulse rounded-xl" />)}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[1,2,3,4,5,6,7,8].map(i => <div key={i} className="h-20 bg-gray-100 animate-pulse rounded-xl" />)}
         </div>
       ) : !info?.exists ? (
-        /* Not seeded yet */
-        <div className="border-2 border-dashed border-gray-200 rounded-xl p-10 text-center">
-          <MonitorPlay className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+
+        /* ── Not seeded yet ── */
+        <div className="border-2 border-dashed border-gray-200 rounded-xl p-12 text-center">
+          <MonitorPlay className="w-12 h-12 text-gray-300 mx-auto mb-4" />
           <h3 className="font-semibold text-gray-700 mb-1">Demo tenant not yet created</h3>
-          <p className="text-sm text-gray-500 mb-5">
-            Click below to seed the Hubify Demo Portfolio with 10 properties, realistic tasks, invoices, and sample data.
+          <p className="text-sm text-gray-500 mb-6 max-w-sm mx-auto">
+            Seed the Hubify Demo Portfolio with 10 Florida properties, realistic tasks, invoices, inspections, and sample data ready for walkthroughs.
           </p>
-          <Button onClick={() => setSeedConfirmOpen(true)}>
+          <Button onClick={() => setSeedConfirmOpen(true)} className="bg-teal-600 hover:bg-teal-700 text-white">
             <Plus className="w-4 h-4 mr-2" />
             Create Demo Tenant
           </Button>
         </div>
+
       ) : (
-        <div className="space-y-5">
-          {/* Status cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="space-y-6">
+
+          {/* ── Stat grid ── */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: "Properties", value: info.propertyCount ?? 0, color: "text-blue-700" },
-              { label: "Staff Users", value: info.userCount ?? 0, color: "text-violet-700" },
-              { label: "Contacts", value: info.contactCount ?? 0, color: "text-emerald-700" },
-              { label: "Tasks", value: info.taskCount ?? 0, color: "text-orange-700" },
+              { label: "Properties",   value: info.propertyCount   ?? 0, icon: <Building2 className="w-4 h-4" />,    color: "text-blue-700",   bg: "bg-blue-50",    border: "border-blue-100" },
+              { label: "Staff Users",  value: info.userCount       ?? 0, icon: <Users className="w-4 h-4" />,        color: "text-violet-700", bg: "bg-violet-50",  border: "border-violet-100" },
+              { label: "Contacts",     value: info.contactCount    ?? 0, icon: <Phone className="w-4 h-4" />,        color: "text-emerald-700",bg: "bg-emerald-50", border: "border-emerald-100" },
+              { label: "Tasks",        value: info.taskCount       ?? 0, icon: <ClipboardList className="w-4 h-4" />,color: "text-orange-700", bg: "bg-orange-50",  border: "border-orange-100" },
+              { label: "Invoices",     value: info.invoiceCount    ?? 0, icon: <DollarSign className="w-4 h-4" />,   color: "text-green-700",  bg: "bg-green-50",   border: "border-green-100" },
+              { label: "Events",       value: info.eventCount      ?? 0, icon: <Calendar className="w-4 h-4" />,     color: "text-sky-700",    bg: "bg-sky-50",     border: "border-sky-100" },
+              { label: "Inspections",  value: info.inspectionCount ?? 0, icon: <FileCheck className="w-4 h-4" />,    color: "text-rose-700",   bg: "bg-rose-50",    border: "border-rose-100" },
+              { label: "Notifications",value: info.notificationCount ?? 0, icon: <Bell className="w-4 h-4" />,      color: "text-amber-700",  bg: "bg-amber-50",   border: "border-amber-100" },
             ].map(stat => (
-              <div key={stat.label} className="border rounded-lg p-3 bg-white">
-                <p className="text-xs text-gray-500">{stat.label}</p>
-                <p className={`text-2xl font-bold mt-0.5 ${stat.color}`}>{stat.value}</p>
+              <div key={stat.label} className={`border ${stat.border} rounded-xl p-3 bg-white flex items-center gap-3`}>
+                <div className={`p-2 rounded-lg ${stat.bg} ${stat.color}`}>{stat.icon}</div>
+                <div>
+                  <p className="text-xs text-gray-500">{stat.label}</p>
+                  <p className={`text-xl font-bold ${stat.color}`}>{stat.value}</p>
+                </div>
               </div>
             ))}
           </div>
 
+          {/* ── Two-column: org details + credentials ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
             {/* Org details */}
-            <div className="border rounded-xl p-4 space-y-3 bg-white">
-              <div className="flex items-center gap-2 mb-1">
+            <div className="border rounded-xl p-5 bg-white space-y-4">
+              <div className="flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-teal-600" />
                 <h3 className="font-semibold text-sm text-gray-800">Organization</h3>
                 <Badge className="ml-auto bg-teal-100 text-teal-800 text-xs">Active</Badge>
               </div>
-              <div className="space-y-1.5 text-sm">
-                <div className="flex justify-between">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between items-center">
                   <span className="text-gray-500">Name</span>
                   <span className="font-medium text-gray-800">{info.orgName}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Org ID</span>
-                  <span className="font-mono text-xs text-gray-600">{info.orgId?.slice(0, 22)}…</span>
-                </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-gray-500">Domain</span>
                   <span className="font-medium text-gray-700">{info.domain}</span>
                 </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Org ID</span>
+                  <div className="flex items-center">
+                    <span className="font-mono text-xs text-gray-500">{info.orgId?.slice(0, 20)}…</span>
+                    <CopyButton value={info.orgId ?? ""} />
+                  </div>
+                </div>
               </div>
-              <div className="pt-1">
+
+              {/* Quick launch links */}
+              <div className="pt-1 flex flex-wrap gap-2">
                 <a
                   href={info.demoSiteUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs text-teal-600 hover:text-teal-800 border border-teal-200 hover:border-teal-400 rounded px-3 py-1.5 transition-colors hover:bg-teal-50"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium bg-teal-600 hover:bg-teal-700 text-white rounded-md px-3 py-1.5 transition-colors"
                 >
-                  <ExternalLink className="w-3 h-3" />
-                  View Demo Site
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Open Demo App
+                </a>
+                <a
+                  href="/staff/login"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md px-3 py-1.5 transition-colors"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  Staff Login
+                </a>
+                <a
+                  href="/portal/login"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md px-3 py-1.5 transition-colors"
+                >
+                  <Home className="w-3.5 h-3.5" />
+                  Portal Login
                 </a>
               </div>
             </div>
 
-            {/* Login credentials */}
-            <div className="border rounded-xl p-4 space-y-3 bg-white">
-              <div className="flex items-center gap-2 mb-1">
+            {/* Credentials */}
+            <div className="border rounded-xl p-5 bg-white space-y-4">
+              <div className="flex items-center gap-2">
                 <KeyRound className="w-4 h-4 text-slate-600" />
                 <h3 className="font-semibold text-sm text-gray-800">Login Credentials</h3>
               </div>
-              <div className="space-y-3 text-sm">
-                <div className="bg-slate-50 rounded-lg p-3 space-y-1.5">
+
+              {/* Staff admin creds */}
+              <div className="bg-slate-50 rounded-lg p-3 space-y-2 text-sm">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <Shield className="w-3.5 h-3.5 text-slate-500" />
                   <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Staff Admin</p>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Email</span>
-                    <span className="font-mono text-xs text-gray-800">{info.adminEmail}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Password</span>
-                    <span className="font-mono text-xs text-gray-800">{info.adminPassword}</span>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">Login at <span className="font-mono">/staff/login</span></p>
+                  <a href="/staff/login" target="_blank" rel="noopener noreferrer" className="ml-auto text-teal-600 hover:text-teal-800">
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
-                <div className="bg-slate-50 rounded-lg p-3 space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Email</span>
+                  <div className="flex items-center">
+                    <span className="font-mono text-xs text-gray-800">{info.adminEmail}</span>
+                    <CopyButton value={info.adminEmail ?? ""} />
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Password</span>
+                  <div className="flex items-center">
+                    <span className="font-mono text-xs text-gray-800">{info.adminPassword}</span>
+                    <CopyButton value={info.adminPassword ?? ""} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Portal client creds */}
+              <div className="bg-slate-50 rounded-lg p-3 space-y-2 text-sm">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <Home className="w-3.5 h-3.5 text-slate-500" />
                   <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Portal Client</p>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Email</span>
+                  <a href="/portal/login" target="_blank" rel="noopener noreferrer" className="ml-auto text-teal-600 hover:text-teal-800">
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Email</span>
+                  <div className="flex items-center">
                     <span className="font-mono text-xs text-gray-800">{info.portalEmail}</span>
+                    <CopyButton value={info.portalEmail ?? ""} />
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Password</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Password</span>
+                  <div className="flex items-center">
                     <span className="font-mono text-xs text-gray-800">{info.portalPassword}</span>
+                    <CopyButton value={info.portalPassword ?? ""} />
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">Login at <span className="font-mono">/portal/login</span></p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="border rounded-xl p-4 bg-white">
-            <h3 className="font-semibold text-sm text-gray-800 mb-3">Actions</h3>
-            <div className="flex flex-wrap gap-3">
-              <a
-                href={info.demoSiteUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md transition-colors font-medium"
-              >
-                <ExternalLink className="w-4 h-4" />
-                View Demo Site
-              </a>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSeedConfirmOpen(true)}
-                disabled={isPending}
-              >
-                <Plus className="w-4 h-4 mr-1.5" />
-                Re-seed Demo Data
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-red-200 text-red-700 hover:bg-red-50"
-                onClick={() => setResetConfirmOpen(true)}
-                disabled={isPending}
-              >
-                <RotateCcw className="w-4 h-4 mr-1.5" />
-                Reset Demo Data
-              </Button>
+          {/* ── 10 Property scenarios ── */}
+          <div className="border rounded-xl bg-white overflow-hidden">
+            <div className="flex items-center gap-2 px-5 py-4 border-b bg-gray-50">
+              <Layers className="w-4 h-4 text-teal-600" />
+              <h3 className="font-semibold text-sm text-gray-800">Demo Property Scenarios</h3>
+              <Badge variant="outline" className="ml-auto text-xs">{DEMO_SCENARIOS.length} properties</Badge>
             </div>
-            <p className="text-xs text-gray-400 mt-3">
-              <strong>Re-seed</strong> adds any missing data without deleting anything.{" "}
-              <strong>Reset</strong> deletes all existing demo data and rebuilds from scratch — the org record and admin login are preserved.
-            </p>
+            <div className="divide-y">
+              {DEMO_SCENARIOS.map((s, i) => (
+                <div key={s.name} className="flex items-start gap-4 px-5 py-3 hover:bg-gray-50 transition-colors">
+                  <span className="text-xs font-mono text-gray-400 pt-0.5 w-5 shrink-0">{String(i + 1).padStart(2, "0")}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-sm text-gray-800">{s.name}</span>
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">{s.type}</Badge>
+                    </div>
+                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                      <span className="text-xs text-gray-400 flex items-center gap-1">
+                        <MapPin className="w-3 h-3" />{s.location}
+                      </span>
+                      <span className="text-xs text-teal-600">{s.highlight}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
+
+          {/* ── Actions / controls ── */}
+          <div className="border rounded-xl bg-white overflow-hidden">
+            <div className="flex items-center gap-2 px-5 py-4 border-b bg-gray-50">
+              <Zap className="w-4 h-4 text-amber-500" />
+              <h3 className="font-semibold text-sm text-gray-800">Demo Controls</h3>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="flex flex-wrap gap-3">
+                <a
+                  href={info.demoSiteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm font-medium bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md transition-colors"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Open Demo Site
+                </a>
+                <Button variant="outline" size="sm" onClick={() => setSeedConfirmOpen(true)} disabled={isPending}>
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  Re-seed Demo Data
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-red-200 text-red-700 hover:bg-red-50"
+                  onClick={() => setResetConfirmOpen(true)}
+                  disabled={isPending}
+                >
+                  <RotateCcw className="w-4 h-4 mr-1.5" />
+                  Full Reset
+                </Button>
+              </div>
+              <div className="text-xs text-gray-400 space-y-1 bg-gray-50 rounded-lg p-3">
+                <p><strong className="text-gray-600">Re-seed</strong> — adds any missing demo records without touching existing data. Safe to run anytime.</p>
+                <p><strong className="text-gray-600">Full Reset</strong> — wipes all demo properties, tasks, contacts, invoices, and events, then rebuilds from scratch. The org record and admin login are preserved. Production orgs are never affected.</p>
+              </div>
+
+              {/* CLI reference */}
+              <div className="border border-gray-100 rounded-lg p-3 bg-gray-50">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Terminal className="w-3.5 h-3.5 text-gray-400" />
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">CLI Commands</p>
+                </div>
+                <div className="space-y-1">
+                  {[
+                    { label: "Seed",  cmd: "npx tsx scripts/seed-demo-tenant.ts" },
+                    { label: "Reset", cmd: "npx tsx scripts/seed-demo-tenant.ts --reset" },
+                  ].map(({ label, cmd }) => (
+                    <div key={label} className="flex items-center justify-between gap-2">
+                      <code className="text-xs text-gray-700 font-mono">{cmd}</code>
+                      <CopyButton value={cmd} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       )}
 
-      {/* Seed confirmation dialog */}
+      {/* ── Seed confirmation ── */}
       <Dialog open={seedConfirmOpen} onOpenChange={setSeedConfirmOpen}>
         <DialogContent>
           <DialogHeader>
@@ -2106,17 +2263,17 @@ function DemoTenantTab() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setSeedConfirmOpen(false)}>Cancel</Button>
             <Button onClick={() => seedMutation.mutate()} disabled={seedMutation.isPending}>
-              {seedMutation.isPending ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Seeding…</> : "Confirm Seed"}
+              {seedMutation.isPending ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Seeding…</> : "Confirm Seed"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Reset confirmation dialog */}
+      {/* ── Reset confirmation ── */}
       <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-red-700">Reset Demo Data</DialogTitle>
+            <DialogTitle className="text-red-700">Full Reset — Demo Data</DialogTitle>
             <DialogDescription>
               This will <strong>permanently delete all existing demo tenant data</strong> — properties, tasks, contacts, invoices, calendar events, and team members — then rebuild everything from scratch.
               <br /><br />
@@ -2125,18 +2282,15 @@ function DemoTenantTab() {
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setResetConfirmOpen(false)}>Cancel</Button>
-            <Button
-              variant="destructive"
-              onClick={() => resetMutation.mutate()}
-              disabled={resetMutation.isPending}
-            >
+            <Button variant="destructive" onClick={() => resetMutation.mutate()} disabled={resetMutation.isPending}>
               {resetMutation.isPending
-                ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Resetting…</>
+                ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Resetting…</>
                 : "Reset Demo Data"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }
@@ -7446,6 +7600,10 @@ export default function SuperAdmin() {
               </span>
             )}
           </TabsTrigger>
+          <TabsTrigger value="demo" className="relative data-[state=active]:bg-teal-600 data-[state=active]:text-white">
+            <MonitorPlay className="w-3.5 h-3.5 mr-1.5" />
+            Demo
+          </TabsTrigger>
           <TabsTrigger value="organizations">Organizations</TabsTrigger>
           <TabsTrigger value="users">All Users</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
@@ -7456,7 +7614,6 @@ export default function SuperAdmin() {
           <TabsTrigger value="features">Feature Flags</TabsTrigger>
           <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
           <TabsTrigger value="platform">Platform</TabsTrigger>
-          <TabsTrigger value="demo">Demo</TabsTrigger>
           <TabsTrigger value="compliance">Compliance</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>

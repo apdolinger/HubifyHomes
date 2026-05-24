@@ -86,6 +86,10 @@ import {
   duplicateHistory,
   customFields,
   managementNotes,
+  inspectionSchedules,
+  clientInvoices,
+  events,
+  notifications,
   isPremiumPropertyType,
   tierAllowsPremiumProperties,
   WEBHOOK_EVENT_TYPES,
@@ -3838,13 +3842,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ exists: false });
       }
 
-      const [[{ userCount }], [{ propertyCount }], [{ contactCount }], [{ tc }]] = await Promise.all([
+      const [
+        [{ userCount }],
+        [{ propertyCount }],
+        [{ contactCount }],
+        [{ tc }],
+        [{ invoiceCount }],
+        [{ eventCount }],
+        [{ inspectionCount }],
+        [{ notificationCount }],
+      ] = await Promise.all([
         db.select({ userCount: count() }).from(users).where(eq(users.orgId, DEMO_ORG_ID)),
         db.select({ propertyCount: count() }).from(properties).where(eq(properties.orgId, DEMO_ORG_ID)),
         db.select({ contactCount: count() }).from(contacts).where(eq(contacts.orgId, DEMO_ORG_ID)),
         db.select({ tc: count() }).from(tasks)
           .innerJoin(properties, eq(tasks.propertyId, properties.id))
           .where(eq(properties.orgId, DEMO_ORG_ID)),
+        db.select({ invoiceCount: count() }).from(clientInvoices).where(eq(clientInvoices.orgId, DEMO_ORG_ID)),
+        db.select({ eventCount: count() }).from(events).where(eq(events.orgId, DEMO_ORG_ID)),
+        db.select({ inspectionCount: count() }).from(inspectionSchedules).where(eq(inspectionSchedules.orgId, DEMO_ORG_ID)),
+        db.select({ notificationCount: count() }).from(notifications).where(eq(notifications.orgId, DEMO_ORG_ID)),
       ]);
 
       res.json({
@@ -3856,10 +3873,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         adminPassword: "Demo2026!",
         portalEmail: "client@demo.hubifyhomesonline.com",
         portalPassword: "DemoClient2026!",
+        staffLoginUrl: "/staff/login",
+        portalLoginUrl: "/portal/login",
         userCount: Number(userCount),
         propertyCount: Number(propertyCount),
         contactCount: Number(contactCount),
         taskCount: Number(tc),
+        invoiceCount: Number(invoiceCount),
+        eventCount: Number(eventCount),
+        inspectionCount: Number(inspectionCount),
+        notificationCount: Number(notificationCount),
         demoSiteUrl: `https://${DEMO_DOMAIN}`,
       });
     } catch (error) {
