@@ -1686,7 +1686,7 @@ function buildTrialExpiredEmail(prospect: { name: string; email: string; company
         </div>
         <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${escapeHtml(firstName)}, your 30-day demo has ended.</h1>
         <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
-          Your 30-day Hubify Homes demo${prospect.company ? ` for <strong>${escapeHtml(prospect.company)}</strong>` : ''} has ended. Your organization is now ready to transition into billing activation and full onboarding.
+          Your 30-day trial has ended, and your organization is now ready to transition into billing activation and full onboarding.
         </p>
         <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px;margin-bottom:28px">
           <p style="font-size:14px;font-weight:700;color:#0f172a;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.05em">Next steps</p>
@@ -1747,12 +1747,14 @@ export async function runTrialLifecycleJob(): Promise<{ warningSent: number; exp
           const { subject, html } = buildTrialExpiredEmail(prospect);
           await resendClient.emails.send({ from: fromEmail, to: prospect.email, subject, html });
           log(`[TRIAL] Expired email sent to ${prospect.email}`);
+          await storage.updateOnboardingProspect(prospect.id, {
+            trialStatus: 'expired',
+            trialExpiredEmailSentAt: now,
+          } as any);
+          expiredSent++;
+        } else {
+          log(`[TRIAL] Skipping expired email for ${prospect.email} — Resend not configured`);
         }
-        await storage.updateOnboardingProspect(prospect.id, {
-          trialStatus: 'expired',
-          trialExpiredEmailSentAt: now,
-        } as any);
-        expiredSent++;
       } catch (err) {
         log(`[TRIAL] Failed to process expiry for ${prospect.email}: ${err}`);
       }
@@ -1772,12 +1774,14 @@ export async function runTrialLifecycleJob(): Promise<{ warningSent: number; exp
           const { subject, html } = buildTrialExpiringEmail(prospect, daysLeft);
           await resendClient.emails.send({ from: fromEmail, to: prospect.email, subject, html });
           log(`[TRIAL] Warning email sent to ${prospect.email} (${daysLeft}d remaining)`);
+          await storage.updateOnboardingProspect(prospect.id, {
+            trialStatus: 'expiring_soon',
+            trialWarningSentAt: now,
+          } as any);
+          warningSent++;
+        } else {
+          log(`[TRIAL] Skipping warning email for ${prospect.email} — Resend not configured`);
         }
-        await storage.updateOnboardingProspect(prospect.id, {
-          trialStatus: 'expiring_soon',
-          trialWarningSentAt: now,
-        } as any);
-        warningSent++;
       } catch (err) {
         log(`[TRIAL] Failed to process warning for ${prospect.email}: ${err}`);
       }
