@@ -314,7 +314,7 @@ function AuthenticatedAppContent() {
     <footer className="bg-white border-t border-slate-200 py-4">
       <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
         <div className="text-sm text-slate-600">
-          © 2025 Hubify. All rights reserved.
+          © {new Date().getFullYear()} Hubify. All rights reserved.
           <span className="mx-2">·</span>
           <a href="/privacy" className="text-teal-600 hover:underline" data-testid="link-privacy">
             Privacy Policy

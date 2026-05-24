@@ -57,7 +57,7 @@ export default function FieldProfile() {
       </div>
 
       <p className="text-center text-xs text-slate-400">
-        Field Mode — Hubify © 2025
+        Field Mode — Hubify © {new Date().getFullYear()}
       </p>
     </div>
   );

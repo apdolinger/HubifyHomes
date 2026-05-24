@@ -356,7 +356,7 @@ export default function PrivacyPolicy() {
 
       <footer className="bg-white border-t border-slate-200 py-6 mt-12">
         <div className="max-w-4xl mx-auto px-6 text-center text-sm text-slate-600">
-          <p>© 2025 Hubify. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Hubify. All rights reserved.</p>
           <p className="mt-2">
             <a href="/privacy" className="text-teal-600 hover:underline">Privacy Policy</a>
             {' · '}

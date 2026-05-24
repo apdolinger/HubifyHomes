@@ -185,7 +185,7 @@ export default function Landing() {
           <div className="flex justify-between items-center text-sm text-slate-600">
             <div className="flex-1">
               <p>
-                © 2025 Hubify. All rights reserved.
+                © {new Date().getFullYear()} Hubify. All rights reserved.
                 {' '}
                 <a href="/privacy" className="text-teal-600 hover:underline" data-testid="link-privacy">
                   Privacy Policy
