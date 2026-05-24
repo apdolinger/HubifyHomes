@@ -355,9 +355,166 @@ function SubmissionStatusBadge({ status }: { status: string | null }) {
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${opt.color}`}>{opt.label}</span>;
 }
 
+function SubmissionDetailSheet({ submission, onClose, onStatusChange }: {
+  submission: Prospect;
+  onClose: () => void;
+  onStatusChange: (id: string, status: string) => void;
+}) {
+  const displayName = submission.firstName && submission.lastName
+    ? `${submission.firstName} ${submission.lastName}`
+    : submission.name;
+
+  return (
+    <Sheet open onOpenChange={onClose}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader className="mb-4">
+          <SheetTitle className="text-xl">{displayName}</SheetTitle>
+          <SheetDescription className="text-left">
+            Submitted {submission.createdAt ? new Date(submission.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "—"}
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="space-y-6">
+          {/* Status */}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Status</p>
+            <Select
+              value={submission.submissionStatus ?? "new"}
+              onValueChange={(val) => onStatusChange(submission.id, val)}
+            >
+              <SelectTrigger className="w-48">
+                <SubmissionStatusBadge status={submission.submissionStatus} />
+              </SelectTrigger>
+              <SelectContent>
+                {SUBMISSION_STATUS_OPTIONS.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${opt.color}`}>
+                      {opt.label}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Separator />
+
+          {/* Contact Info */}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Contact Information</p>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                <a href={`mailto:${submission.email}`} className="text-teal-600 hover:underline break-all">{submission.email}</a>
+              </div>
+              {submission.phone && (
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span>{submission.phone}</span>
+                </div>
+              )}
+              {submission.preferredContactMethod && (
+                <div className="flex items-start gap-2">
+                  <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                  <span className="text-muted-foreground">Prefers <span className="text-foreground font-medium capitalize">{submission.preferredContactMethod}</span></span>
+                </div>
+              )}
+              {submission.website && (
+                <div className="flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <a href={submission.website.startsWith("http") ? submission.website : `https://${submission.website}`} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline break-all">{submission.website}</a>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Organization Details */}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Organization</p>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              {submission.company && (
+                <div className="col-span-2">
+                  <p className="text-muted-foreground text-xs mb-0.5">Company</p>
+                  <p className="font-medium">{submission.company}</p>
+                </div>
+              )}
+              {submission.businessType && (
+                <div>
+                  <p className="text-muted-foreground text-xs mb-0.5">Business Type</p>
+                  <p className="font-medium capitalize">{submission.businessType.replace(/_/g, " ")}</p>
+                </div>
+              )}
+              {submission.serviceArea && (
+                <div>
+                  <p className="text-muted-foreground text-xs mb-0.5">Service Area</p>
+                  <p className="font-medium">{submission.serviceArea}</p>
+                </div>
+              )}
+              {submission.estimatedHomes != null && (
+                <div>
+                  <p className="text-muted-foreground text-xs mb-0.5">Est. Properties</p>
+                  <p className="font-medium">{submission.estimatedHomes}</p>
+                </div>
+              )}
+              {submission.teamSize != null && (
+                <div>
+                  <p className="text-muted-foreground text-xs mb-0.5">Team Size</p>
+                  <p className="font-medium">{submission.teamSize}</p>
+                </div>
+              )}
+              {submission.currentMgmtMethod && (
+                <div className="col-span-2">
+                  <p className="text-muted-foreground text-xs mb-0.5">Current Management Method</p>
+                  <p className="font-medium capitalize">{submission.currentMgmtMethod.replace(/_/g, " ")}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Tier & Intent */}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Tier & Intent</p>
+            <div className="flex items-center gap-4 flex-wrap text-sm">
+              {submission.suggestedTier ? (
+                <div>
+                  <p className="text-muted-foreground text-xs mb-1">Suggested Tier</p>
+                  <span className="text-xs font-medium text-teal-700 bg-teal-50 border border-teal-200 rounded-full px-2.5 py-1">
+                    {submission.suggestedTier}
+                  </span>
+                </div>
+              ) : null}
+              {submission.trialIntent ? (
+                <div>
+                  <p className="text-muted-foreground text-xs mb-1">Trial Intent</p>
+                  <span className="capitalize font-medium">{submission.trialIntent.replace(/_/g, " ")}</span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          {submission.notes && (
+            <>
+              <Separator />
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Notes</p>
+                <p className="text-sm whitespace-pre-wrap text-foreground/80 bg-muted/50 rounded-md p-3">{submission.notes}</p>
+              </div>
+            </>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 function SubmissionsTab() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [selectedSubmission, setSelectedSubmission] = useState<Prospect | null>(null);
 
   const { data: submissions = [], isLoading } = useQuery<Prospect[]>({
     queryKey: ["/api/super-admin/submissions"],
@@ -429,12 +586,20 @@ function SubmissionsTab() {
                 </TableHeader>
                 <TableBody>
                   {filtered.map(s => (
-                    <TableRow key={s.id}>
+                    <TableRow
+                      key={s.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => setSelectedSubmission(s)}
+                    >
                       <TableCell className="font-medium whitespace-nowrap">
                         {s.firstName && s.lastName ? `${s.firstName} ${s.lastName}` : s.name}
                       </TableCell>
                       <TableCell className="text-sm">
-                        <a href={`mailto:${s.email}`} className="text-teal-600 hover:underline">{s.email}</a>
+                        <a
+                          href={`mailto:${s.email}`}
+                          className="text-teal-600 hover:underline"
+                          onClick={e => e.stopPropagation()}
+                        >{s.email}</a>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                         {s.phone ?? "—"}
@@ -458,7 +623,7 @@ function SubmissionsTab() {
                           <span className="capitalize">{s.trialIntent.replace(/_/g, " ")}</span>
                         ) : <span className="text-muted-foreground">—</span>}
                       </TableCell>
-                      <TableCell>
+                      <TableCell onClick={e => e.stopPropagation()}>
                         <Select
                           value={s.submissionStatus ?? "new"}
                           onValueChange={(val) => statusMutation.mutate({ id: s.id, status: val })}
@@ -488,6 +653,17 @@ function SubmissionsTab() {
           )}
         </CardContent>
       </Card>
+
+      {selectedSubmission && (
+        <SubmissionDetailSheet
+          submission={selectedSubmission}
+          onClose={() => setSelectedSubmission(null)}
+          onStatusChange={(id, status) => {
+            statusMutation.mutate({ id, status });
+            setSelectedSubmission(prev => prev ? { ...prev, submissionStatus: status } : prev);
+          }}
+        />
+      )}
     </div>
   );
 }
