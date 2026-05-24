@@ -2095,6 +2095,69 @@ function DemoTenantTab() {
         </Button>
       </div>
 
+      {/* ── Demo credentials — always visible ── */}
+      <div className="border rounded-xl bg-white overflow-hidden">
+        <div className="flex items-center gap-2 px-5 py-3 border-b bg-gray-50">
+          <KeyRound className="w-4 h-4 text-teal-600" />
+          <h3 className="font-semibold text-sm text-gray-800">Demo Login Credentials</h3>
+          <span className="text-xs text-gray-400 ml-1">— share these with anyone you're walking through the demo</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x">
+          {/* Staff / Admin */}
+          <div className="p-4 space-y-2">
+            <div className="flex items-center gap-1.5 mb-3">
+              <Shield className="w-3.5 h-3.5 text-teal-600" />
+              <span className="text-xs font-semibold text-teal-700 uppercase tracking-wide">Staff / Admin</span>
+              <a href="/staff/login" target="_blank" rel="noopener noreferrer" className="ml-auto text-teal-500 hover:text-teal-700">
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+            {[
+              { label: "URL",      value: "/staff/login",               href: "/staff/login" },
+              { label: "Email",    value: "demo@hubifyhomesonline.com",  href: null },
+              { label: "Password", value: "Demo2026!",                  href: null },
+            ].map(row => (
+              <div key={row.label} className="flex items-center justify-between gap-2 text-sm">
+                <span className="text-gray-400 text-xs w-16 shrink-0">{row.label}</span>
+                <div className="flex items-center gap-1 min-w-0">
+                  {row.href
+                    ? <a href={row.href} target="_blank" rel="noopener noreferrer" className="font-mono text-xs text-teal-600 hover:underline truncate">{row.value}</a>
+                    : <span className="font-mono text-xs text-gray-800 truncate">{row.value}</span>
+                  }
+                  <CopyButton value={row.value} />
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Portal / Client */}
+          <div className="p-4 space-y-2">
+            <div className="flex items-center gap-1.5 mb-3">
+              <Home className="w-3.5 h-3.5 text-slate-500" />
+              <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Client Portal</span>
+              <a href="/portal/login" target="_blank" rel="noopener noreferrer" className="ml-auto text-teal-500 hover:text-teal-700">
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+            {[
+              { label: "URL",      value: "/portal/login",                         href: "/portal/login" },
+              { label: "Email",    value: "client@demo.hubifyhomesonline.com",      href: null },
+              { label: "Password", value: "DemoClient2026!",                       href: null },
+            ].map(row => (
+              <div key={row.label} className="flex items-center justify-between gap-2 text-sm">
+                <span className="text-gray-400 text-xs w-16 shrink-0">{row.label}</span>
+                <div className="flex items-center gap-1 min-w-0">
+                  {row.href
+                    ? <a href={row.href} target="_blank" rel="noopener noreferrer" className="font-mono text-xs text-teal-600 hover:underline truncate">{row.value}</a>
+                    : <span className="font-mono text-xs text-gray-800 truncate">{row.value}</span>
+                  }
+                  <CopyButton value={row.value} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {isLoading ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[1,2,3,4,5,6,7,8].map(i => <div key={i} className="h-20 bg-gray-100 animate-pulse rounded-xl" />)}
