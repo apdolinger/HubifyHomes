@@ -3454,6 +3454,21 @@ export const insertOnboardingProspectEmailSchema = createInsertSchema(onboarding
 export type InsertOnboardingProspectEmail = z.infer<typeof insertOnboardingProspectEmailSchema>;
 export type OnboardingProspectEmail = typeof onboardingProspectEmails.$inferSelect;
 
+// Single-row config: custom subject/body for the prospect confirmation email
+// sent after a public inquiry submission. id is always 'default'.
+export const prospectConfirmationEmailTemplate = pgTable("prospect_confirmation_email_template", {
+  id: varchar("id").primaryKey().default("default"),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertProspectConfirmationEmailTemplateSchema = createInsertSchema(prospectConfirmationEmailTemplate).omit({
+  updatedAt: true,
+});
+export type InsertProspectConfirmationEmailTemplate = z.infer<typeof insertProspectConfirmationEmailTemplateSchema>;
+export type ProspectConfirmationEmailTemplate = typeof prospectConfirmationEmailTemplate.$inferSelect;
+
 // ── Error Logs ────────────────────────────────────────────────────────────────
 // Captures server-side errors for the Super Admin monitoring dashboard.
 export const errorLogs = pgTable("error_logs", {

@@ -2,12 +2,14 @@ import {
   onboardingProspects,
   onboardingStageEmailTemplates,
   onboardingProspectEmails,
+  prospectConfirmationEmailTemplate,
   type OnboardingProspect,
   type InsertOnboardingProspect,
   type OnboardingStageEmailTemplate,
   type InsertOnboardingStageEmailTemplate,
   type OnboardingProspectEmail,
   type InsertOnboardingProspectEmail,
+  type ProspectConfirmationEmailTemplate,
   users,
   outOfOfficePeriods,
   teams,
@@ -1039,6 +1041,11 @@ export interface IStorage {
   // Prospect email log operations
   listOnboardingProspectEmails(prospectId: string): Promise<OnboardingProspectEmail[]>;
   createOnboardingProspectEmail(data: InsertOnboardingProspectEmail): Promise<OnboardingProspectEmail>;
+
+  // Prospect confirmation email template (single row)
+  getProspectConfirmationEmailTemplate(): Promise<ProspectConfirmationEmailTemplate | undefined>;
+  upsertProspectConfirmationEmailTemplate(data: { subject: string; body: string }): Promise<ProspectConfirmationEmailTemplate>;
+  deleteProspectConfirmationEmailTemplate(): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -8024,6 +8031,28 @@ export class DatabaseStorage implements IStorage {
   async createOnboardingProspectEmail(data: InsertOnboardingProspectEmail): Promise<OnboardingProspectEmail> {
     const [row] = await db.insert(onboardingProspectEmails).values(data).returning();
     return row;
+  }
+
+  // ── Prospect confirmation email template ──────────────────────────────────────
+  async getProspectConfirmationEmailTemplate(): Promise<ProspectConfirmationEmailTemplate | undefined> {
+    const [row] = await db.select().from(prospectConfirmationEmailTemplate).where(eq(prospectConfirmationEmailTemplate.id, "default"));
+    return row;
+  }
+
+  async upsertProspectConfirmationEmailTemplate(data: { subject: string; body: string }): Promise<ProspectConfirmationEmailTemplate> {
+    const [row] = await db
+      .insert(prospectConfirmationEmailTemplate)
+      .values({ id: "default", subject: data.subject, body: data.body, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: prospectConfirmationEmailTemplate.id,
+        set: { subject: data.subject, body: data.body, updatedAt: new Date() },
+      })
+      .returning();
+    return row;
+  }
+
+  async deleteProspectConfirmationEmailTemplate(): Promise<void> {
+    await db.delete(prospectConfirmationEmailTemplate).where(eq(prospectConfirmationEmailTemplate.id, "default"));
   }
 
   // ── Org signup token operations ───────────────────────────────────────────────

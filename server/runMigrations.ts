@@ -325,6 +325,25 @@ export async function ensureProspectDiscountCodeColumn(): Promise<void> {
   }
 }
 
+export async function ensureProspectConfirmationEmailTemplateTable(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS prospect_confirmation_email_template (
+        id VARCHAR PRIMARY KEY DEFAULT 'default',
+        subject TEXT NOT NULL,
+        body TEXT NOT NULL,
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+    log("[MIGRATE] prospect_confirmation_email_template table verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to ensure prospect_confirmation_email_template table: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensureCookieConsentPreferenceColumn(): Promise<void> {
   const client = await pool.connect();
   try {

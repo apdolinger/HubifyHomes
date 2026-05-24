@@ -1373,6 +1373,9 @@ function OnboardingPipelineTab() {
       {/* Stage email templates configuration */}
       <StageEmailTemplatesPanel />
 
+      {/* Prospect confirmation email template */}
+      <ProspectConfirmationEmailPanel />
+
       {/* Drop dialog */}
       <DropDialog
         open={!!droppingProspect}
@@ -1737,6 +1740,199 @@ function StageEmailTemplatesPanel() {
               </div>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Prospect Confirmation Email Panel ───────────────────────────────────────
+const CONFIRMATION_PREVIEW_DUMMY = {
+  firstName: "Jane",
+  lastName: "Smith",
+  name: "Jane Smith",
+  company: "Acme Property Group",
+  email: "jane@example.com",
+  suggestedTier: "Growth Portfolio",
+  estimatedHomes: "18",
+};
+
+function applyConfirmationMergeTags(text: string): string {
+  return text
+    .replace(/\{\{firstName\}\}/gi, CONFIRMATION_PREVIEW_DUMMY.firstName)
+    .replace(/\{\{lastName\}\}/gi, CONFIRMATION_PREVIEW_DUMMY.lastName)
+    .replace(/\{\{name\}\}/gi, CONFIRMATION_PREVIEW_DUMMY.name)
+    .replace(/\{\{company\}\}/gi, CONFIRMATION_PREVIEW_DUMMY.company)
+    .replace(/\{\{email\}\}/gi, CONFIRMATION_PREVIEW_DUMMY.email)
+    .replace(/\{\{suggestedTier\}\}/gi, CONFIRMATION_PREVIEW_DUMMY.suggestedTier)
+    .replace(/\{\{estimatedHomes\}\}/gi, CONFIRMATION_PREVIEW_DUMMY.estimatedHomes);
+}
+
+interface ProspectConfirmationTemplate {
+  id: string;
+  subject: string;
+  body: string;
+  updatedAt: string;
+}
+
+function ProspectConfirmationEmailPanel() {
+  const { toast } = useToast();
+  const [expanded, setExpanded] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [draft, setDraft] = useState({ subject: "", body: "" });
+
+  const { data: template, isLoading } = useQuery<ProspectConfirmationTemplate | null>({
+    queryKey: ["/api/super-admin/prospect-confirmation-template"],
+  });
+
+  useEffect(() => {
+    if (template) {
+      setDraft({ subject: template.subject, body: template.body });
+    } else {
+      setDraft({ subject: "", body: "" });
+    }
+  }, [template]);
+
+  const saveMutation = useMutation({
+    mutationFn: (data: { subject: string; body: string }) =>
+      apiRequest("PUT", "/api/super-admin/prospect-confirmation-template", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/prospect-confirmation-template"] });
+      toast({ title: "Confirmation email template saved" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to save template", variant: "destructive" }),
+  });
+
+  const resetMutation = useMutation({
+    mutationFn: () => apiRequest("DELETE", "/api/super-admin/prospect-confirmation-template"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/prospect-confirmation-template"] });
+      toast({ title: "Template reset", description: "The hardcoded default will be used for new submissions." });
+      setDraft({ subject: "", body: "" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to reset template", variant: "destructive" }),
+  });
+
+  const hasCustomTemplate = !!template;
+
+  return (
+    <div className="border rounded-xl p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Send className="w-4 h-4 text-teal-600" />
+        <h3 className="font-semibold text-sm text-gray-800">Prospect Confirmation Email</h3>
+        <span className="text-xs text-gray-400 ml-1">— Sent to prospects after form submission</span>
+        {hasCustomTemplate && (
+          <span className="ml-auto text-[10px] bg-teal-100 text-teal-700 font-semibold px-2 py-0.5 rounded-full">Custom template active</span>
+        )}
+      </div>
+      <p className="text-xs text-gray-500">
+        Override the default confirmation email sent to prospects who submit the inquiry form.
+        When no override is set, the built-in Hubify template is used.
+      </p>
+
+      {!expanded ? (
+        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setExpanded(true)}>
+          {hasCustomTemplate ? "Edit template" : "Customize template"}
+        </Button>
+      ) : (
+        <div className="space-y-3">
+          {isLoading ? (
+            <p className="text-xs text-gray-400">Loading…</p>
+          ) : (
+            <>
+              {/* Edit / Preview toggle */}
+              <div className="flex gap-1 text-xs">
+                <button
+                  type="button"
+                  className={`px-2 py-1 rounded font-medium transition-colors ${!previewing ? "bg-teal-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                  onClick={() => setPreviewing(false)}
+                >Edit</button>
+                <button
+                  type="button"
+                  className={`px-2 py-1 rounded font-medium transition-colors ${previewing ? "bg-teal-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                  onClick={() => setPreviewing(true)}
+                >Preview</button>
+              </div>
+
+              {previewing ? (
+                <div className="border rounded bg-white p-3 text-xs space-y-2">
+                  <p className="text-gray-500 text-[10px] italic">Dummy data: {CONFIRMATION_PREVIEW_DUMMY.name} / {CONFIRMATION_PREVIEW_DUMMY.company}</p>
+                  <div>
+                    <p className="font-semibold text-gray-500 text-[10px] uppercase tracking-wide mb-0.5">Subject</p>
+                    <p className="font-medium">{applyConfirmationMergeTags(draft.subject) || <span className="text-gray-300">—</span>}</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-500 text-[10px] uppercase tracking-wide mb-0.5">Body (HTML rendered)</p>
+                    <div
+                      className="border rounded p-2 bg-gray-50 overflow-auto max-h-60"
+                      dangerouslySetInnerHTML={{ __html: applyConfirmationMergeTags(draft.body) || "<span style='color:#ccc'>—</span>" }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <Label className="text-xs font-medium">Subject</Label>
+                    <Input
+                      className="h-8 text-xs mt-1"
+                      value={draft.subject}
+                      onChange={e => setDraft(d => ({ ...d, subject: e.target.value }))}
+                      placeholder="e.g. We received your inquiry — here's what happens next"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-medium">Body (HTML)</Label>
+                    <p className="text-[10px] text-gray-400 mb-1">
+                      {"Available merge tags: {{firstName}} {{lastName}} {{name}} {{company}} {{email}} {{suggestedTier}} {{estimatedHomes}}"}
+                    </p>
+                    <Textarea
+                      rows={8}
+                      className="text-xs font-mono"
+                      value={draft.body}
+                      onChange={e => setDraft(d => ({ ...d, body: e.target.value }))}
+                      placeholder="<div>Hi {{firstName}}, thanks for reaching out…</div>"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="flex gap-2 items-center">
+                {hasCustomTemplate && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs text-red-500 hover:text-red-700"
+                    disabled={resetMutation.isPending}
+                    onClick={() => {
+                      if (confirm("Reset to the default built-in template? Your custom template will be deleted.")) {
+                        resetMutation.mutate();
+                        setExpanded(false);
+                        setPreviewing(false);
+                      }
+                    }}
+                  >
+                    <Trash2 className="w-3 h-3 mr-1" /> Reset to default
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs"
+                  onClick={() => { setExpanded(false); setPreviewing(false); }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-7 text-xs ml-auto"
+                  disabled={!draft.subject.trim() || !draft.body.trim() || saveMutation.isPending}
+                  onClick={() => saveMutation.mutate(draft)}
+                >
+                  {saveMutation.isPending ? "Saving…" : "Save template"}
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

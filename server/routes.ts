@@ -14686,6 +14686,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Prospect confirmation email
       if (resend && process.env.RESEND_FROM_EMAIL) {
         const fromEmail = process.env.RESEND_FROM_EMAIL;
+
+        // Check for a super-admin override template
+        const customTpl = await storage.getProspectConfirmationEmailTemplate().catch(() => undefined);
+
+        if (customTpl) {
+          // Apply merge tags to the custom template
+          const applyMergeTags = (text: string) =>
+            text
+              .replace(/\{\{firstName\}\}/gi, data.firstName)
+              .replace(/\{\{lastName\}\}/gi, data.lastName)
+              .replace(/\{\{name\}\}/gi, `${data.firstName} ${data.lastName}`.trim())
+              .replace(/\{\{company\}\}/gi, data.company)
+              .replace(/\{\{email\}\}/gi, data.email)
+              .replace(/\{\{suggestedTier\}\}/gi, suggestedTier || "")
+              .replace(/\{\{estimatedHomes\}\}/gi, String(data.estimatedHomes ?? ""));
+
+          resend.emails.send({
+            from: fromEmail,
+            to: data.email,
+            subject: applyMergeTags(customTpl.subject),
+            html: applyMergeTags(customTpl.body),
+          }).catch((err: any) => console.warn("[submission-form] prospect confirmation email (custom) failed:", err));
+        } else {
         const tierSection = suggestedTier
           ? `<tr>
                <td style="padding:8px 0;color:#64748b;font-size:14px;width:160px;vertical-align:top">Suggested plan</td>
@@ -14761,6 +14784,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             </div>
           `,
         }).catch((err: any) => console.warn("[submission-form] prospect confirmation email failed:", err));
+        } // end else (no custom template)
       }
 
       res.status(201).json({ id: prospect.id, message: "Submission received" });
@@ -14997,6 +15021,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting stage email template:", error);
       res.status(500).json({ message: "Failed to delete stage email template" });
+    }
+  });
+
+  // ── Prospect confirmation email template ─────────────────────────────────
+  app.get("/api/super-admin/prospect-confirmation-template", isSuperAdmin, requireMFA, async (_req, res) => {
+    try {
+      const template = await storage.getProspectConfirmationEmailTemplate();
+      res.json(template ?? null);
+    } catch (error) {
+      console.error("Error fetching prospect confirmation template:", error);
+      res.status(500).json({ message: "Failed to fetch template" });
+    }
+  });
+
+  app.put("/api/super-admin/prospect-confirmation-template", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const result = z.object({
+        subject: z.string().min(1, "Subject is required"),
+        body: z.string().min(1, "Body is required"),
+      }).safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ message: "Invalid data", errors: result.error.errors });
+      }
+      const template = await storage.upsertProspectConfirmationEmailTemplate(result.data);
+      res.json(template);
+    } catch (error) {
+      console.error("Error saving prospect confirmation template:", error);
+      res.status(500).json({ message: "Failed to save template" });
+    }
+  });
+
+  app.delete("/api/super-admin/prospect-confirmation-template", isSuperAdmin, requireMFA, async (_req, res) => {
+    try {
+      await storage.deleteProspectConfirmationEmailTemplate();
+      res.json({ message: "Template reset to default" });
+    } catch (error) {
+      console.error("Error resetting prospect confirmation template:", error);
+      res.status(500).json({ message: "Failed to reset template" });
     }
   });
 
