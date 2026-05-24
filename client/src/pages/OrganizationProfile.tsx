@@ -1,79 +1,75 @@
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Building2, Users, DollarSign, Calendar, Mail, Phone, Globe, MapPin, Settings, Activity, BarChart3, Shield, AlertCircle } from "lucide-react";
+import { ArrowLeft, Building2, Users, DollarSign, Activity, Mail, Settings, Shield, AlertCircle, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 
-interface Organization {
+interface OrgOverviewRow {
   id: string;
   name: string;
-  adminContact: string;
-  plan: string;
-  status: string;
-  properties: number;
-  users: number;
-  mrr: string;
-  createdAt: string;
-  lastActive: string;
-  billingEmail: string;
-  phone: string;
-  website: string;
-  address: string;
-  logo?: string;
+  isActive: boolean;
+  primaryAdminEmail: string | null;
+  tier: string;
+  subscriptionStatus: string;
+  propertyCount: number;
+  userCount: number;
+  mrrCents: number;
+  createdAt: string | null;
 }
-
-// Mock data for organization details
-const mockOrganization: Organization = {
-  id: "sterling-pm",
-  name: "Sterling Property Management",
-  adminContact: "andrew.dolinger@gmail.com",
-  plan: "Professional",
-  status: "Active",
-  properties: 45,
-  users: 12,
-  mrr: "$149",
-  createdAt: "2023-01-15",
-  lastActive: "2 hours ago",
-  billingEmail: "billing@sterlingpm.com",
-  phone: "(555) 123-4567",
-  website: "www.sterlingpm.com",
-  address: "123 Business St, Suite 100, Miami, FL 33101"
-};
-
-const mockUsage = {
-  storageUsed: "2.3 GB",
-  storageLimit: "10 GB",
-  apiCalls: 1250,
-  apiLimit: 5000,
-  activeUsers: 8,
-  userLimit: 15
-};
-
-const mockActivity = [
-  { date: "2025-01-24", action: "User login", user: "john.manager@sterling.com", details: "Successful login from mobile app" },
-  { date: "2025-01-24", action: "Property added", user: "sarah.admin@sterling.com", details: "Added new property: Ocean View Condos" },
-  { date: "2025-01-23", action: "Task completed", user: "mike.staff@sterling.com", details: "Completed maintenance task #1847" },
-  { date: "2025-01-23", action: "Invoice generated", user: "System", details: "Monthly invoice generated for January 2025" }
-];
 
 export default function OrganizationProfile() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
 
-  // In a real app, this would fetch organization data by ID
-  const { data: organization, isLoading } = useQuery({
-    queryKey: ['/api/super-admin/organizations', id],
-    queryFn: () => Promise.resolve(mockOrganization), // Mock for now
+  const { data: orgs = [], isLoading } = useQuery<OrgOverviewRow[]>({
+    queryKey: ["/api/super-admin/orgs-overview"],
   });
+
+  const { data: auditLogs = [], isLoading: auditLoading } = useQuery<any[]>({
+    queryKey: ["/api/super-admin/audit-logs"],
+    select: (data: any) => {
+      const list = Array.isArray(data) ? data : (data?.logs ?? []);
+      return list.filter((l: any) => l.orgId === id).slice(0, 20);
+    },
+  });
+
+  const organization = orgs.find(o => o.id === id);
+
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'active': return 'bg-green-100 text-green-800';
+      case 'trial': return 'bg-teal-100 text-teal-800';
+      case 'suspended': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getTierColor = (tier: string) => {
+    switch (tier?.toLowerCase()) {
+      case 'enterprise': return 'bg-purple-100 text-purple-800';
+      case 'professional': return 'bg-teal-100 text-teal-800';
+      case 'starter': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const formatMrr = (cents: number) => {
+    if (!cents) return '$0';
+    return `$${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+      <div className="max-w-7xl mx-auto p-6 space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-24 w-full" />
+        <div className="grid grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
+        </div>
       </div>
     );
   }
@@ -83,8 +79,8 @@ export default function OrganizationProfile() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h2 className="text-2xl font-semibold mb-2">Organization Not Found</h2>
-          <p className="text-gray-600 mb-4">The organization you're looking for doesn't exist.</p>
-          <Button onClick={() => setLocation('/nestive-admin')}>
+          <p className="text-gray-600 mb-4">The organization you're looking for doesn't exist or has been removed.</p>
+          <Button onClick={() => setLocation('/hubify-admin')}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Organizations
           </Button>
@@ -93,34 +89,14 @@ export default function OrganizationProfile() {
     );
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'active': return 'bg-green-100 text-green-800';
-      case 'trial': return 'bg-teal-100 text-teal-800';
-      case 'suspended': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getPlanColor = (plan: string) => {
-    switch (plan.toLowerCase()) {
-      case 'enterprise': return 'bg-purple-100 text-purple-800';
-      case 'professional': return 'bg-teal-100 text-teal-800';
-      case 'starter': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const initials = organization.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
         <div className="mb-6">
-          <Button 
-            variant="ghost" 
-            onClick={() => setLocation('/hubify-admin')}
-            className="mb-4"
-          >
+          <Button variant="ghost" onClick={() => setLocation('/hubify-admin')} className="mb-4">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Organizations
           </Button>
@@ -128,40 +104,24 @@ export default function OrganizationProfile() {
           <div className="flex items-start justify-between">
             <div className="flex items-center space-x-4">
               <Avatar className="h-16 w-16">
-                <AvatarImage src={organization.logo} />
                 <AvatarFallback className="text-lg font-semibold bg-teal-100 text-teal-600">
-                  {organization.name.split(' ').map(n => n[0]).join('')}
+                  {initials}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                  {organization.name}
-                </h1>
+                <h1 className="text-3xl font-bold text-gray-900">{organization.name}</h1>
                 <div className="flex items-center space-x-3 mt-2">
-                  <Badge className={getPlanColor(organization.plan)}>
-                    {organization.plan}
+                  <Badge className={getTierColor(organization.tier)}>{organization.tier || 'No Plan'}</Badge>
+                  <Badge className={getStatusColor(organization.subscriptionStatus)}>
+                    {organization.isActive ? 'Active' : 'Inactive'}
                   </Badge>
-                  <Badge className={getStatusColor(organization.status)}>
-                    {organization.status}
-                  </Badge>
-                  <span className="text-sm text-gray-500">
-                    Member since {new Date(organization.createdAt).toLocaleDateString()}
-                  </span>
+                  {organization.createdAt && (
+                    <span className="text-sm text-gray-500">
+                      Member since {new Date(organization.createdAt).toLocaleDateString()}
+                    </span>
+                  )}
                 </div>
               </div>
-            </div>
-
-            <div className="flex space-x-2">
-              <Button variant="outline" size="sm">
-                <Settings className="w-4 h-4 mr-2" />
-                Manage Account
-              </Button>
-              <Button variant="outline" size="sm">
-                Login As
-              </Button>
-              <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
-                Suspend
-              </Button>
             </div>
           </div>
         </div>
@@ -173,44 +133,43 @@ export default function OrganizationProfile() {
               <div className="flex items-center space-x-3">
                 <Building2 className="h-8 w-8 text-teal-600" />
                 <div>
-                  <p className="text-2xl font-bold">{organization.properties}</p>
+                  <p className="text-2xl font-bold">{organization.propertyCount}</p>
                   <p className="text-sm text-gray-600">Properties</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-3">
                 <Users className="h-8 w-8 text-green-600" />
                 <div>
-                  <p className="text-2xl font-bold">{organization.users}</p>
+                  <p className="text-2xl font-bold">{organization.userCount}</p>
                   <p className="text-sm text-gray-600">Users</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-3">
                 <DollarSign className="h-8 w-8 text-emerald-600" />
                 <div>
-                  <p className="text-2xl font-bold">{organization.mrr}</p>
+                  <p className="text-2xl font-bold">{formatMrr(organization.mrrCents)}</p>
                   <p className="text-sm text-gray-600">Monthly Revenue</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-3">
                 <Activity className="h-8 w-8 text-purple-600" />
                 <div>
-                  <p className="text-2xl font-bold text-green-600">Online</p>
-                  <p className="text-sm text-gray-600">Last active {organization.lastActive}</p>
+                  <p className={`text-2xl font-bold ${organization.isActive ? 'text-green-600' : 'text-red-500'}`}>
+                    {organization.isActive ? 'Active' : 'Inactive'}
+                  </p>
+                  <p className="text-sm text-gray-600">Account status</p>
                 </div>
               </div>
             </CardContent>
@@ -219,18 +178,17 @@ export default function OrganizationProfile() {
 
         {/* Tabs */}
         <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="billing">Billing</TabsTrigger>
-            <TabsTrigger value="usage">Usage</TabsTrigger>
+            <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
+          {/* Overview */}
           <TabsContent value="overview" className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Contact Information */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
@@ -242,42 +200,27 @@ export default function OrganizationProfile() {
                   <div className="flex items-center space-x-3">
                     <Mail className="h-4 w-4 text-gray-400" />
                     <div>
-                      <p className="font-medium">Admin Contact</p>
-                      <p className="text-sm text-gray-600">{organization.adminContact}</p>
+                      <p className="font-medium">Primary Admin</p>
+                      <p className="text-sm text-gray-600">{organization.primaryAdminEmail ?? '—'}</p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <Mail className="h-4 w-4 text-gray-400" />
+                    <Building2 className="h-4 w-4 text-gray-400" />
                     <div>
-                      <p className="font-medium">Billing Email</p>
-                      <p className="text-sm text-gray-600">{organization.billingEmail}</p>
+                      <p className="font-medium">Plan</p>
+                      <p className="text-sm text-gray-600">{organization.tier || 'None'}</p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <Phone className="h-4 w-4 text-gray-400" />
+                    <Activity className="h-4 w-4 text-gray-400" />
                     <div>
-                      <p className="font-medium">Phone</p>
-                      <p className="text-sm text-gray-600">{organization.phone}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <Globe className="h-4 w-4 text-gray-400" />
-                    <div>
-                      <p className="font-medium">Website</p>
-                      <p className="text-sm text-gray-600">{organization.website}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <MapPin className="h-4 w-4 text-gray-400" />
-                    <div>
-                      <p className="font-medium">Address</p>
-                      <p className="text-sm text-gray-600">{organization.address}</p>
+                      <p className="font-medium">Subscription Status</p>
+                      <p className="text-sm text-gray-600">{organization.subscriptionStatus || '—'}</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Account Health */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
@@ -287,48 +230,35 @@ export default function OrganizationProfile() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Payment Status</span>
-                    <Badge className="bg-green-100 text-green-800">Current</Badge>
+                    <span className="text-sm font-medium">Account Active</span>
+                    {organization.isActive
+                      ? <Badge className="bg-green-100 text-green-800 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Active</Badge>
+                      : <Badge className="bg-red-100 text-red-800 flex items-center gap-1"><XCircle className="w-3 h-3" /> Inactive</Badge>}
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Support Tickets</span>
-                    <span className="text-sm text-gray-600">2 Open</span>
+                    <span className="text-sm font-medium">Subscription</span>
+                    <span className="text-sm text-gray-600">{organization.subscriptionStatus || '—'}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">API Health</span>
-                    <Badge className="bg-green-100 text-green-800">Healthy</Badge>
+                    <span className="text-sm font-medium">Properties</span>
+                    <span className="text-sm text-gray-600">{organization.propertyCount}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Data Backup</span>
-                    <span className="text-sm text-gray-600">Last: 2 hours ago</span>
+                    <span className="text-sm font-medium">Users</span>
+                    <span className="text-sm text-gray-600">{organization.userCount}</span>
                   </div>
-                  <Separator />
-                  <div className="flex items-center space-x-2">
-                    <AlertCircle className="h-4 w-4 text-yellow-500" />
-                    <span className="text-sm text-yellow-600">
-                      Storage usage at 80% capacity
-                    </span>
-                  </div>
+                  {!organization.isActive && (
+                    <div className="flex items-center space-x-2 pt-1">
+                      <AlertCircle className="h-4 w-4 text-yellow-500" />
+                      <span className="text-sm text-yellow-600">This organization account is currently inactive.</span>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
 
-          <TabsContent value="users">
-            <Card>
-              <CardHeader>
-                <CardTitle>User Management</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600 mb-4">Manage users and their permissions for this organization.</p>
-                <div className="text-center py-8">
-                  <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-sm text-gray-500">Manage users from the Team page or Super Admin Console.</p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
+          {/* Billing */}
           <TabsContent value="billing">
             <Card>
               <CardHeader>
@@ -338,92 +268,94 @@ export default function OrganizationProfile() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="font-medium">Current Plan</span>
-                    <Badge className={getPlanColor(organization.plan)}>
-                      {organization.plan}
-                    </Badge>
+                    <Badge className={getTierColor(organization.tier)}>{organization.tier || 'None'}</Badge>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="font-medium">Monthly Revenue</span>
-                    <span className="text-lg font-bold text-green-600">{organization.mrr}</span>
+                    <span className="text-lg font-bold text-green-600">{formatMrr(organization.mrrCents)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Subscription Status</span>
+                    <span className="text-sm text-gray-600">{organization.subscriptionStatus || '—'}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="font-medium">Next Billing Date</span>
-                    <span>February 15, 2025</span>
+                    <span className="text-sm text-gray-500 italic">Managed via Stripe</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="font-medium">Payment Method</span>
-                    <span>•••• •••• •••• 4242</span>
+                    <span className="text-sm text-gray-500 italic">Managed via Stripe</span>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="usage">
+          {/* Users */}
+          <TabsContent value="users">
             <Card>
               <CardHeader>
-                <CardTitle>Usage Analytics</CardTitle>
+                <CardTitle>User Management</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-6">
-                  <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span>Storage Used</span>
-                      <span>{mockUsage.storageUsed} / {mockUsage.storageLimit}</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-teal-600 h-2 rounded-full" style={{ width: '23%' }}></div>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span>API Calls (This Month)</span>
-                      <span>{mockUsage.apiCalls} / {mockUsage.apiLimit}</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-green-600 h-2 rounded-full" style={{ width: '25%' }}></div>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span>Active Users</span>
-                      <span>{mockUsage.activeUsers} / {mockUsage.userLimit}</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-purple-600 h-2 rounded-full" style={{ width: '53%' }}></div>
-                    </div>
-                  </div>
+                <p className="text-gray-600 mb-4">
+                  This organization has <strong>{organization.userCount}</strong> user{organization.userCount !== 1 ? 's' : ''}. Manage them from the All Users tab in the super admin panel.
+                </p>
+                <div className="text-center py-8">
+                  <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-sm text-gray-500">Use the All Users tab to filter by this organization.</p>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
+          {/* Activity */}
           <TabsContent value="activity">
             <Card>
               <CardHeader>
                 <CardTitle>Recent Activity</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {mockActivity.map((activity, index) => (
-                    <div key={index} className="flex items-start space-x-3 p-3 border rounded-lg">
-                      <Activity className="h-4 w-4 text-teal-600 mt-1" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">{activity.action}</p>
-                        <p className="text-sm text-gray-600">{activity.details}</p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <span className="text-xs text-gray-500">{activity.user}</span>
-                          <span className="text-xs text-gray-400">•</span>
-                          <span className="text-xs text-gray-500">{activity.date}</span>
+                {auditLoading ? (
+                  <div className="space-y-3">
+                    {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+                  </div>
+                ) : auditLogs.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Activity className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-sm">No audit events recorded for this organization yet.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {auditLogs.map((log: any) => (
+                      <div key={log.id} className="flex items-start space-x-3 p-3 border rounded-lg">
+                        <Activity className="h-4 w-4 text-teal-600 mt-1 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium capitalize">{log.action?.replace(/_/g, ' ')}</p>
+                          <p className="text-sm text-gray-600">{log.resource}</p>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <span className="text-xs text-gray-500">{log.userEmail ?? 'System'}</span>
+                            <span className="text-xs text-gray-400">•</span>
+                            <span className="text-xs text-gray-500">
+                              {log.createdAt ? new Date(log.createdAt).toLocaleString() : ''}
+                            </span>
+                          </div>
                         </div>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs flex-shrink-0 ${log.severity === 'critical' ? 'border-red-300 text-red-600' : log.severity === 'warning' ? 'border-yellow-300 text-yellow-600' : 'border-gray-200 text-gray-500'}`}
+                        >
+                          {log.severity}
+                        </Badge>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
 
+          {/* Settings */}
           <TabsContent value="settings">
             <Card>
               <CardHeader>
@@ -436,21 +368,19 @@ export default function OrganizationProfile() {
                       <h3 className="font-medium">Feature Flags</h3>
                       <p className="text-sm text-gray-600">Manage beta features for this organization</p>
                     </div>
-                    <Button variant="outline" size="sm">Manage</Button>
+                    <Button variant="outline" size="sm" onClick={() => setLocation('/hubify-admin?tab=feature-flags')}>
+                      <Settings className="w-4 h-4 mr-2" />
+                      Manage
+                    </Button>
                   </div>
                   <div className="flex items-center justify-between p-4 border rounded-lg">
                     <div>
-                      <h3 className="font-medium">API Access</h3>
-                      <p className="text-sm text-gray-600">Configure API keys and rate limits</p>
+                      <h3 className="font-medium">Suspend / Reactivate</h3>
+                      <p className="text-sm text-gray-600">Control this organization's platform access</p>
                     </div>
-                    <Button variant="outline" size="sm">Configure</Button>
-                  </div>
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h3 className="font-medium">Data Export</h3>
-                      <p className="text-sm text-gray-600">Export organization data</p>
-                    </div>
-                    <Button variant="outline" size="sm">Export</Button>
+                    <Badge className={organization.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                      {organization.isActive ? 'Active' : 'Suspended'}
+                    </Badge>
                   </div>
                 </div>
               </CardContent>

@@ -9564,6 +9564,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/orgs/:orgId/audit-logs", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = req.params.orgId;
+      const userOrgId = req.user?.claims?.orgId;
+      const userRole = req.user?.claims?.role;
+      if (userOrgId !== orgId) return res.status(403).json({ message: "Access denied" });
+      if (!["admin", "manager"].includes(userRole)) return res.status(403).json({ message: "Admin access required" });
+      const { securityAuditLogs } = await import("@shared/schema");
+      const { desc, eq } = await import("drizzle-orm");
+      const logs = await db
+        .select({
+          id: securityAuditLogs.id,
+          userEmail: securityAuditLogs.userEmail,
+          action: securityAuditLogs.action,
+          actionType: securityAuditLogs.actionType,
+          resource: securityAuditLogs.resource,
+          severity: securityAuditLogs.severity,
+          success: securityAuditLogs.success,
+          ipAddress: securityAuditLogs.ipAddress,
+          createdAt: securityAuditLogs.createdAt,
+        })
+        .from(securityAuditLogs)
+        .where(eq(securityAuditLogs.orgId, orgId))
+        .orderBy(desc(securityAuditLogs.createdAt))
+        .limit(100);
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching org audit logs:", error);
+      res.status(500).json({ message: "Failed to fetch audit logs" });
+    }
+  });
+
   app.patch("/api/orgs/:orgId", isAuthenticated, async (req, res) => {
     try {
       const orgId = req.params.orgId;

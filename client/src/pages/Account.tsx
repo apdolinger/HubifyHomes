@@ -369,6 +369,70 @@ const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
   billing_summary: "Billing Summary",
 };
 
+function AuditLogTab({ orgId }: { orgId: string }) {
+  const { data: logs = [], isLoading } = useQuery<any[]>({
+    queryKey: [`/api/orgs/${orgId}/audit-logs`],
+    enabled: !!orgId,
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center">
+          <Activity className="w-5 h-5 mr-2" />
+          Audit Log
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="text-sm text-slate-600">System activity log — read only. Showing last 100 events.</div>
+          {isLoading ? (
+            <div className="py-8 text-center text-slate-500 text-sm">Loading audit log…</div>
+          ) : logs.length === 0 ? (
+            <div className="py-8 text-center text-slate-500 text-sm">No audit events recorded yet.</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Timestamp</TableHead>
+                  <TableHead>User</TableHead>
+                  <TableHead>Action</TableHead>
+                  <TableHead>Resource</TableHead>
+                  <TableHead>Severity</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {logs.map((log: any) => (
+                  <TableRow key={log.id}>
+                    <TableCell className="text-sm text-slate-500 whitespace-nowrap">
+                      {log.createdAt ? new Date(log.createdAt).toLocaleString() : '—'}
+                    </TableCell>
+                    <TableCell className="text-sm">{log.userEmail ?? 'System'}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs capitalize">
+                        {log.action?.replace(/_/g, ' ')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-slate-600 capitalize">{log.resource}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${log.severity === 'critical' ? 'border-red-300 text-red-600' : log.severity === 'warning' ? 'border-yellow-300 text-yellow-600' : 'border-slate-200 text-slate-500'}`}
+                      >
+                        {log.severity}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function NotificationLogTab() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
 
@@ -1648,54 +1712,7 @@ export default function Account() {
 
         {/* Audit Log Tab */}
         <TabsContent value="audit-log">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Activity className="w-5 h-5 mr-2" />
-                Audit Log
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-slate-600">
-                    System activity log - read only
-                  </div>
-                  <Button size="sm" variant="outline" data-testid="button-export-log">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export Log
-                  </Button>
-                </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Timestamp</TableHead>
-                      <TableHead>User</TableHead>
-                      <TableHead>Action</TableHead>
-                      <TableHead>Details</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {[
-                      { time: '2025-07-24 17:15:23', user: 'andrew.dolinger@gmail.com', action: 'Task Created', details: 'Created task "Finishing painting living room"' },
-                      { time: '2025-07-24 16:42:15', user: 'andrew.dolinger@gmail.com', action: 'Property Added', details: 'Added property "141 E Riverside"' },
-                      { time: '2025-07-24 15:30:08', user: 'andrew.dolinger@gmail.com', action: 'User Login', details: 'Successful login from IP 192.168.1.100' },
-                      { time: '2025-07-24 14:25:42', user: 'andrew.dolinger@gmail.com', action: 'Task Completed', details: 'Completed task "Flush toilets"' }
-                    ].map((log, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="text-sm">{log.time}</TableCell>
-                        <TableCell className="text-sm">{log.user}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{log.action}</Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-slate-600">{log.details}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+          <AuditLogTab orgId={orgId} />
         </TabsContent>
 
         {/* Notification Log Tab */}
