@@ -1,0 +1,42 @@
+Let me check what's already in place before touching anything.
+
+8 actions
+Everything is already working — /submit loads the form, /inquire redirects, the Landing hero "Get Started" opens the modal, and both the page and modal share the same SubmissionFormContent. The only gap is that the form logic lives inside SubmissionModal.tsx rather than a dedicated SubmissionForm.tsx file. Let me check the Landing import to confirm the full picture before refactoring.
+
+2 actions
+Everything is already functional — /submit works, /inquire redirects, Landing's "Get Started" opens the modal, and both share the same form component. The one piece missing is the explicit SubmissionForm.tsx file. Right now the form logic lives inside SubmissionModal.tsx. I'll extract it into its own file and update the imports.
+
+2 actions
+Now update SubmissionModal.tsx to import from the new file, and update Submissions.tsx the same way — both in parallel.
+
+6 actions
+No errors — Vite picked up both files cleanly. Let me take a quick screenshot to verify both entry points.
+
+2 actions
+/submit looks great. Let me verify the Landing page hero button too.
+
+2 actions
+Everything is working correctly. Here's the full picture:
+
+What was already in place (no changes needed):
+
+/submit — already a working route in App.tsx
+/inquire — already redirects to /submit
+Landing page "Get Started" button — already opens SubmissionModal
+The modal and page already shared the same form component (SubmissionFormContent)
+What I just did:
+
+Extracted all the form logic into its own dedicated file: client/src/components/SubmissionForm.tsx — this exports SubmissionForm (and submissionSchema, SubmissionValues) as its own clean module
+Slimmed down SubmissionModal.tsx to just the dialog wrapper, importing SubmissionForm from the new file (also re-exports SubmissionFormContent as an alias for backward compatibility with any other files that use that name)
+Updated Submissions.tsx to import directly from SubmissionForm.tsx
+Result:
+
+Visit /submit directly → full submission form on a branded standalone page ✅
+Visit /inquire → redirects to /submit ✅
+Click "Get Started" on the marketing page → opens the modal with the same form ✅
+All three share exactly the same SubmissionForm component — no duplication ✅
+
+Checkpoint made
+35 minutes ago
+
+Worked for 2 minutes

@@ -4702,7 +4702,7 @@ function SettingsTabContent() {
           <div>
             <Label htmlFor="brand-color">Default Brand Color</Label>
             <div className="flex items-center space-x-2">
-              <Input id="brand-color" type="color" value={draft.brandPrimaryColor || '#4F46E5'} onChange={(e) => set('brandPrimaryColor', e.target.value)} className="w-20 h-10" data-testid="input-default-color" />
+              <Input id="brand-color" type="color" value={draft.brandPrimaryColor || '#0d9488'} onChange={(e) => set('brandPrimaryColor', e.target.value)} className="w-20 h-10" data-testid="input-default-color" />
               <Input type="text" value={draft.brandPrimaryColor || ''} onChange={(e) => set('brandPrimaryColor', e.target.value)} className="flex-1" data-testid="input-default-color-hex" />
             </div>
           </div>

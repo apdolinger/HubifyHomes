@@ -342,7 +342,7 @@ export const PLATFORM_SETTINGS_DEFAULTS: Record<string, any> = {
   selfSignupEnabled: false,
 
   // Branding
-  brandPrimaryColor: "#4F46E5",
+  brandPrimaryColor: "#0d9488",
 
   // Prospect Alerts
   stuckProspectThresholdDays: 7,

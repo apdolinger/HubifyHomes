@@ -3715,14 +3715,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           configured: !!(process.env.PUBLIC_OBJECT_SEARCH_PATHS || process.env.PRIVATE_OBJECT_DIR),
         },
         replitAuth: {
-          configured: !!process.env.ISSUER_URL,
+          configured: !!(process.env.ISSUER_URL || process.env.REPL_ID),
         },
         billingAutomation: {
           enabled: process.env.BILLING_AUTOMATION_ENABLED === "true",
         },
         superAdmin: {
-          usernameSet: !!process.env.SUPER_ADMIN_USERNAME,
-          passwordSet: !!process.env.SUPER_ADMIN_PASSWORD,
+          usernameSet: !!(process.env.SUPER_ADMIN_USERNAME || process.env.ADMIN_EMAIL),
+          passwordSet: !!(process.env.SUPER_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD),
         },
       });
     } catch (error) {
