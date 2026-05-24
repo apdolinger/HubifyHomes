@@ -366,30 +366,63 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
 }) {
   const { toast } = useToast();
   const [notesValue, setNotesValue] = useState(submission.notes ?? "");
-  const [notesSaved, setNotesSaved] = useState(true);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "pending" | "saving" | "saved">("idle");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notesValueRef = useRef(notesValue);
+  const saveStatusRef = useRef(saveStatus);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => () => { isMountedRef.current = false; }, []);
 
   const notesMutation = useMutation({
     mutationFn: ({ id, notes }: { id: string; notes: string }) =>
       apiRequest("PATCH", `/api/super-admin/submissions/${id}/notes`, { notes }),
     onSuccess: (_, vars) => {
       onNotesChange(vars.id, vars.notes);
-      setNotesSaved(true);
-      toast({ title: "Notes saved" });
+      if (isMountedRef.current) setSaveStatus("saved");
     },
-    onError: () => toast({ title: "Error", description: "Failed to save notes", variant: "destructive" }),
+    onError: () => {
+      if (isMountedRef.current) setSaveStatus("idle");
+      toast({ title: "Error", description: "Failed to save notes", variant: "destructive" });
+    },
   });
 
   const handleNotesChange = (val: string) => {
     setNotesValue(val);
-    setNotesSaved(val === (submission.notes ?? ""));
+    notesValueRef.current = val;
+    saveStatusRef.current = "pending";
+    setSaveStatus("pending");
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      saveStatusRef.current = "saving";
+      if (isMountedRef.current) setSaveStatus("saving");
+      notesMutation.mutate({ id: submission.id, notes: notesValueRef.current });
+    }, 1000);
   };
+
+  const flushNotesSave = () => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    if (saveStatusRef.current === "pending") {
+      notesMutation.mutate({ id: submission.id, notes: notesValueRef.current });
+    }
+  };
+
+  useEffect(() => () => { flushNotesSave(); }, []);
 
   const displayName = submission.firstName && submission.lastName
     ? `${submission.firstName} ${submission.lastName}`
     : submission.name;
 
+  const handleClose = () => {
+    flushNotesSave();
+    onClose();
+  };
+
   return (
-    <Sheet open onOpenChange={onClose}>
+    <Sheet open onOpenChange={handleClose}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader className="mb-4">
           <SheetTitle className="text-xl">{displayName}</SheetTitle>
@@ -524,15 +557,14 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Internal Notes</p>
-              {!notesSaved && (
-                <Button
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => notesMutation.mutate({ id: submission.id, notes: notesValue })}
-                  disabled={notesMutation.isPending}
-                >
-                  {notesMutation.isPending ? "Saving…" : "Save"}
-                </Button>
+              {saveStatus === "pending" && (
+                <span className="text-xs text-muted-foreground">Unsaved…</span>
+              )}
+              {saveStatus === "saving" && (
+                <span className="text-xs text-muted-foreground animate-pulse">Saving…</span>
+              )}
+              {saveStatus === "saved" && (
+                <span className="text-xs text-teal-600">Saved</span>
               )}
             </div>
             <Textarea
@@ -541,9 +573,6 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
               placeholder="Add call notes, follow-up reminders, or any context…"
               className="text-sm min-h-[120px] resize-y"
             />
-            {notesSaved && notesValue && (
-              <p className="text-xs text-muted-foreground mt-1">Saved</p>
-            )}
           </div>
         </div>
 
