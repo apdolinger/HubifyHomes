@@ -14649,11 +14649,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         submissionStatus: "new",
       });
 
-      // Admin notification email
-      if (resend) {
-        const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@hubifyhomes.com";
+      // Admin notification email — only send when all three env vars are set
+      if (resend && process.env.RESEND_FROM_EMAIL && process.env.SUPPORT_EMAIL) {
+        const fromEmail = process.env.RESEND_FROM_EMAIL;
         const toEmail = process.env.SUPPORT_EMAIL;
-        if (toEmail) {
+        {
           resend.emails.send({
             from: fromEmail,
             to: toEmail,

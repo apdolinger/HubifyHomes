@@ -111,9 +111,9 @@ export function SubmissionFormContent({ onSuccess, compact }: SubmissionFormCont
     return (
       <div className="text-center space-y-4 py-10">
         <CheckCircle className="w-16 h-16 text-green-500 mx-auto" />
-        <h2 className="text-2xl font-bold text-gray-900">Thanks for reaching out!</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Thank you!</h2>
         <p className="text-gray-600 max-w-sm mx-auto">
-          We've received your submission and will be in touch within one business day.
+          Your submission has been received. Our team will review your information and follow up shortly.
         </p>
         {tier && (
           <p className="text-sm text-gray-500">

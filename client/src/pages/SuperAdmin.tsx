@@ -418,6 +418,7 @@ function SubmissionsTab() {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
                     <TableHead>Organization</TableHead>
                     <TableHead>Tier</TableHead>
                     <TableHead>Est. Homes</TableHead>
@@ -434,6 +435,9 @@ function SubmissionsTab() {
                       </TableCell>
                       <TableCell className="text-sm">
                         <a href={`mailto:${s.email}`} className="text-teal-600 hover:underline">{s.email}</a>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {s.phone ?? "—"}
                       </TableCell>
                       <TableCell className="text-sm">
                         <div>{s.company}</div>
@@ -931,7 +935,7 @@ function OnboardingPipelineTab() {
           <SheetHeader>
             <SheetTitle>{editingProspect ? "Edit Prospect" : "Add New Prospect"}</SheetTitle>
             <SheetDescription>
-              {editingProspect ? "Update contact details and notes." : "This will place them in the Inquiry stage."}
+              {editingProspect ? "Update contact details and notes." : "This will place them in the Submission stage."}
             </SheetDescription>
           </SheetHeader>
           <Separator className="my-4" />
