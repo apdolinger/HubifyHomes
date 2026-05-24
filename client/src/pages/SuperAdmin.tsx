@@ -87,6 +87,7 @@ import {
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -673,6 +674,7 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
                     <TableHead>Tier</TableHead>
                     <TableHead>Est. Homes</TableHead>
                     <TableHead>Intent</TableHead>
+                    <TableHead>Notes</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Submitted</TableHead>
                   </TableRow>
@@ -715,6 +717,20 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
                         {s.trialIntent ? (
                           <span className="capitalize">{s.trialIntent.replace(/_/g, " ")}</span>
                         ) : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {s.notes ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <MessageSquare className="h-4 w-4 text-teal-600 mx-auto cursor-default" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs whitespace-pre-wrap text-xs">
+                              {s.notes}
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
                       </TableCell>
                       <TableCell onClick={e => e.stopPropagation()}>
                         <Select
