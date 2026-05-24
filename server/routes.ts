@@ -14987,8 +14987,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/super-admin/onboarding-prospects", isSuperAdmin, requireMFA, async (req, res) => {
     try {
-      const { insertOnboardingProspectSchema } = await import("@shared/schema");
+      const { insertOnboardingProspectSchema, onboardingProspects } = await import("@shared/schema");
       const data = insertOnboardingProspectSchema.parse(req.body);
+      const { ilike } = await import("drizzle-orm");
+      const existing = await db
+        .select({ id: onboardingProspects.id })
+        .from(onboardingProspects)
+        .where(ilike(onboardingProspects.email, data.email))
+        .limit(1);
+      if (existing.length > 0) {
+        return res.status(409).json({ message: "A prospect with this email already exists in the pipeline." });
+      }
       const prospect = await storage.createOnboardingProspect(data);
       res.status(201).json(prospect);
     } catch (error) {

@@ -887,7 +887,19 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
       setSheetOpen(false);
       toast({ title: editingProspect ? "Prospect updated" : "Prospect added to Submission" });
     },
-    onError: () => toast({ title: "Error", description: "Failed to save prospect", variant: "destructive" }),
+    onError: (error: Error) => {
+      const match = error.message.match(/^\d+: (.+)$/);
+      let description = "Failed to save prospect";
+      if (match) {
+        try {
+          const parsed = JSON.parse(match[1]);
+          if (parsed?.message) description = parsed.message;
+        } catch {
+          description = match[1];
+        }
+      }
+      toast({ title: "Error", description, variant: "destructive" });
+    },
   });
 
   const advanceMutation = useMutation({
