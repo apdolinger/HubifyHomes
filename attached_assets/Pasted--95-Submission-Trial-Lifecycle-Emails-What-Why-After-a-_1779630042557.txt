@@ -1,0 +1,157 @@
+#95 - Submission Trial Lifecycle Emails
+
+What & Why
+
+After a user submits the Client Submission Form and starts a 30-day demo/trial experience, Hubify Homes should automatically communicate key milestones in the trial lifecycle.
+
+This includes:
+- immediate welcome/activation email,
+- 7-day expiration warning,
+- trial expiration + billing activation notice.
+
+The goal is to create a professional onboarding flow and improve conversion from trial to paid client.
+
+Done looks like
+
+- A welcome email is automatically sent immediately after a successful submission when the user selects:
+  - “Interested in 30-day free trial”
+  OR
+  - “Ready to start onboarding”
+
+- A scheduled email sends 7 days before trial expiration
+- A scheduled email sends when the trial expires
+- Trial dates are stored in the database
+- Emails use the existing email provider configuration (Resend or SendGrid)
+- Emails use branded Hubify Homes styling and professional formatting
+- Failed email sends are logged safely without breaking submission flow
+
+Out of scope
+
+- Stripe billing automation
+- Subscription cancellation logic
+- Customer self-service billing portal
+- In-app notifications
+- SMS notifications
+
+Steps
+
+1. Database Changes
+
+Extend onboarding_prospects with:
+
+- trialStartedAt (timestamp)
+- trialEndsAt (timestamp)
+- trialStatus (varchar)
+
+Trial statuses:
+- inactive
+- active
+- expiring_soon
+- expired
+- converted
+
+If submission intent includes:
+- “Interested in 30-day free trial”
+OR
+- “Ready to start onboarding”
+
+Then:
+- automatically set:
+  - trialStartedAt = now()
+  - trialEndsAt = now() + 30 days
+  - trialStatus = "active"
+
+2. Welcome Email
+
+Immediately after successful submission:
+Send a welcome email to the submitter.
+
+Subject:
+Welcome to Hubify Homes — Your 30-Day Demo Has Started
+
+Email content should:
+- thank them for their submission,
+- confirm their 30-day demo access,
+- explain that the team will review their submission,
+- explain onboarding/demo next steps,
+- reinforce the platform value,
+- provide support contact information,
+- encourage replying with questions.
+
+Suggested messaging tone:
+Professional, modern SaaS onboarding experience.
+
+3. 7-Day Expiration Warning
+
+Create a scheduled job/cron process that runs daily.
+
+When:
+- current date is within 7 days of trialEndsAt
+AND
+- trialStatus = active
+
+Then:
+- send warning email,
+- update trialStatus = expiring_soon
+
+Subject:
+Your Hubify Homes Demo Ends Soon
+
+Email should explain:
+- their demo expires in 7 days,
+- onboarding/billing will begin afterward,
+- encourage them to finalize setup,
+- encourage contacting support with questions.
+
+4. Trial Expired Email
+
+When:
+- current date >= trialEndsAt
+AND
+- trialStatus IN ("active", "expiring_soon")
+
+Then:
+- send expiration email,
+- update trialStatus = expired
+
+Subject:
+Your Hubify Homes Demo Has Ended
+
+Email should explain:
+- their 30-day demo period has ended,
+- their organization is now transitioning into billing/onboarding,
+- support is available for questions,
+- next steps if billing/setup is incomplete.
+
+5. Email Templates
+
+Create reusable email template helpers:
+- sendTrialWelcomeEmail()
+- sendTrialExpiringEmail()
+- sendTrialExpiredEmail()
+
+Use existing branded email styling if available.
+
+6. Scheduler
+
+Implement a lightweight daily scheduler:
+- node-cron or existing scheduled task system
+- runs once daily
+- safely processes trial lifecycle emails
+- prevents duplicate sends
+
+7. Logging
+
+Add server logging for:
+- email send success/failure
+- scheduled task execution
+- number of trials processed
+
+Relevant files
+
+shared/schema.ts
+server/routes.ts
+server/runMigrations.ts
+server/index.ts
+server/email.ts (or equivalent)
+server/jobs/trialLifecycle.ts (new)
