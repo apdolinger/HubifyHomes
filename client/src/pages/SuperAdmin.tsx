@@ -247,6 +247,19 @@ function ProspectCard({
         </Badge>
       </div>
 
+      {prospect.confirmationEmailStatus && prospect.confirmationEmailStatus !== "sent" && (
+        <button
+          className="flex items-center gap-1 w-full text-left"
+          onClick={onEdit}
+          title={`Confirmation email failed: ${prospect.confirmationEmailStatus}`}
+        >
+          <Badge className="bg-amber-100 text-amber-800 border border-amber-300 text-xs flex items-center gap-1 px-1.5 py-0.5 font-medium w-full justify-center">
+            <AlertCircle className="w-3 h-3 shrink-0" />
+            Email failed — click to resend
+          </Badge>
+        </button>
+      )}
+
       {prospect.stage === "welcome" && (
         <div className="text-xs space-y-1">
           {prospect.welcomeEmailSentAt ? (
