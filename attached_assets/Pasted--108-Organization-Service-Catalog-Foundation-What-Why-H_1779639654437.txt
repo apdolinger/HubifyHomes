@@ -1,0 +1,150 @@
+#108 - Organization Service Catalog Foundation
+
+What & Why
+
+Hubify Homes needs a reusable Service Catalog so organizations can define the services they offer, how they charge for them, and whether those services should generate operational tasks.
+
+This is the missing foundation for the future guided setup wizard.
+
+Instead of creating recurring billing schedules and tasks from scratch for every client/property, an organization should be able to define a service once, such as:
+- Welcome Home Service
+- Home Watch Visit
+- Storm Check
+- Vendor Coordination
+- Keyholder Service
+- Maintenance Visit
+- Departure Close-Up
+- Arrival Preparation
+- Mail / Package Check
+- Concierge Request
+
+Then that service can later be applied to clients/properties and used to create recurring tasks or billing records.
+
+Done looks like
+
+- Admins can access a new Service Catalog page inside the app
+- Admins can create, edit, activate/deactivate, and delete/archive services
+- Services are scoped to the organization
+- Each service can store:
+  - name
+  - description
+  - category
+  - default price
+  - billing frequency
+  - is billable
+  - creates tasks automatically
+  - default task category
+  - recurrence rule
+  - estimated duration
+  - active/inactive status
+- Service data is saved in the database, not mock data
+- Service Catalog appears in the admin navigation
+- No existing task, billing, inspection, or import flows are broken
+
+Out of scope
+
+- Applying services to properties
+- Automatically creating tasks from services
+- Automatically creating billing schedules from services
+- Client-facing service selection
+- Setup wizard UI
+- Stripe changes
+- Invoice automation changes
+
+Steps
+
+1. Schema
+
+Create a new table called organization_services.
+
+Suggested fields:
+- id
+- organizationId
+- name
+- description
+- category
+- defaultPriceCents
+- billingFrequency
+- isBillable
+- createsTasks
+- defaultTaskCategory
+- recurrenceRule
+- estimatedDurationMinutes
+- isActive
+- createdAt
+- updatedAt
+
+Billing frequency options:
+- one_time
+- weekly
+- biweekly
+- monthly
+- quarterly
+- annually
+- per_visit
+- custom
+
+2. Migration
+
+Add ensureOrganizationServicesTable() to server/runMigrations.ts.
+
+Wire it into the startup migration flow in server/index.ts.
+
+3. Backend API
+
+Add organization-scoped admin routes:
+
+GET /api/admin/services
+POST /api/admin/services
+PATCH /api/admin/services/:id
+DELETE /api/admin/services/:id
+
+Use existing admin auth middleware and organization scoping.
+
+DELETE can soft-delete by setting isActive = false if that is safer.
+
+4. Frontend Page
+
+Create:
+
+client/src/pages/ServiceCatalog.tsx
+
+The page should include:
+- services table/cards
+- create service button
+- edit dialog/form
+- active/inactive toggle
+- filters by category/status
+- empty state explaining what services are
+
+5. Navigation
+
+Add Service Catalog to the admin navigation.
+
+Suggested label:
+Services
+
+or:
+Service Catalog
+
+6. Validation
+
+Use Zod validation on both frontend and backend if that is the existing app pattern.
+
+7. Future Compatibility
+
+Design this so a future setup wizard can use these services to:
+- apply service to a property/client
+- generate task templates
+- generate recurring tasks
+- generate recurring billing schedules
+
+Do not implement those future automations yet.
+
+Relevant existing concepts to review before implementing:
+- tasks table with isTemplate and recurrenceRule
+- recurring_billing_schedules
+- checklist_templates
+- inspection_schedules
+- billing task fields
+- admin navigation structure

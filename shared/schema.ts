@@ -3554,3 +3554,38 @@ export const orgSignupTokens = pgTable("org_signup_tokens", {
 ]);
 export type OrgSignupToken = typeof orgSignupTokens.$inferSelect;
 export type InsertOrgSignupToken = typeof orgSignupTokens.$inferInsert;
+
+// ── Organization Service Catalog ──────────────────────────────────────────────
+// Reusable services an organization offers, with pricing and task defaults.
+// Future: apply services to properties/clients to auto-generate tasks and billing.
+export const organizationServices = pgTable("organization_services", {
+  id: serial("id").primaryKey(),
+  orgId: uuid("org_id").notNull().references(() => orgs.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 128 }),
+  defaultPriceCents: integer("default_price_cents"),
+  billingFrequency: varchar("billing_frequency", { length: 64 }).$type<
+    "one_time" | "weekly" | "biweekly" | "monthly" | "quarterly" | "annually" | "per_visit" | "custom"
+  >().default("monthly"),
+  isBillable: boolean("is_billable").notNull().default(true),
+  createsTasks: boolean("creates_tasks").notNull().default(false),
+  defaultTaskCategory: varchar("default_task_category", { length: 128 }),
+  recurrenceRule: text("recurrence_rule"),
+  estimatedDurationMinutes: integer("estimated_duration_minutes"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("org_services_org_id_idx").on(table.orgId),
+  index("org_services_active_idx").on(table.isActive),
+  index("org_services_category_idx").on(table.category),
+]);
+
+export type OrganizationService = typeof organizationServices.$inferSelect;
+export type InsertOrganizationService = typeof organizationServices.$inferInsert;
+export const insertOrganizationServiceSchema = createInsertSchema(organizationServices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});

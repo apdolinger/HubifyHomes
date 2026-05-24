@@ -54,6 +54,7 @@ import OrgBillingInvoices from "@/pages/OrgBillingInvoices";
 import OrgClientInvoices from "@/pages/OrgClientInvoices";
 import OrgStripeSettings from "@/pages/OrgStripeSettings";
 import ImportManager from "@/pages/ImportManager";
+import ServiceCatalog from "@/pages/ServiceCatalog";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfService from "@/pages/TermsOfService";
 import Submissions from "@/pages/Submissions";
@@ -218,6 +219,7 @@ function Router() {
           
           {/* Admin Routes */}
           <Route path="/admin/import" component={ImportManager} />
+          <Route path="/admin/services" component={ServiceCatalog} />
           <Route path="/admin/vendors" component={Vendors} />
           <Route path="/admin/vendors/:id" component={VendorProfile} />
           <Route path="/admin/notes/search" component={AdminNoteSearch} />

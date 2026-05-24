@@ -379,6 +379,39 @@ export async function ensureProspectConfirmationEmailColumns(): Promise<void> {
   }
 }
 
+export async function ensureOrganizationServicesTable(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS organization_services (
+        id SERIAL PRIMARY KEY,
+        org_id UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        category VARCHAR(128),
+        default_price_cents INTEGER,
+        billing_frequency VARCHAR(64) DEFAULT 'monthly',
+        is_billable BOOLEAN NOT NULL DEFAULT TRUE,
+        creates_tasks BOOLEAN NOT NULL DEFAULT FALSE,
+        default_task_category VARCHAR(128),
+        recurrence_rule TEXT,
+        estimated_duration_minutes INTEGER,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS org_services_org_id_idx ON organization_services(org_id);
+      CREATE INDEX IF NOT EXISTS org_services_active_idx ON organization_services(is_active);
+      CREATE INDEX IF NOT EXISTS org_services_category_idx ON organization_services(category);
+    `);
+    log("[MIGRATE] organization_services table verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to ensure organization_services table: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensureCookieConsentPreferenceColumn(): Promise<void> {
   const client = await pool.connect();
   try {

@@ -11796,6 +11796,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Organization Service Catalog ─────────────────────────────────────────────
+  {
+    const { organizationServices, insertOrganizationServiceSchema } = await import("@shared/schema");
+    const { eq, and, desc } = await import("drizzle-orm");
+
+    app.get("/api/admin/services", isAuthenticated, isAdmin, async (req: any, res) => {
+      try {
+        const orgId = req.user?.claims?.orgId;
+        if (!orgId) return res.status(403).json({ message: "No organization context" });
+        const services = await db
+          .select()
+          .from(organizationServices)
+          .where(eq(organizationServices.orgId, orgId))
+          .orderBy(desc(organizationServices.createdAt));
+        res.json(services);
+      } catch (err) {
+        console.error("GET /api/admin/services error:", err);
+        res.status(500).json({ message: "Failed to fetch services" });
+      }
+    });
+
+    app.post("/api/admin/services", isAuthenticated, isAdmin, async (req: any, res) => {
+      try {
+        const orgId = req.user?.claims?.orgId;
+        if (!orgId) return res.status(403).json({ message: "No organization context" });
+        const parsed = insertOrganizationServiceSchema.safeParse({ ...req.body, orgId });
+        if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten() });
+        const [created] = await db
+          .insert(organizationServices)
+          .values(parsed.data)
+          .returning();
+        res.status(201).json(created);
+      } catch (err) {
+        console.error("POST /api/admin/services error:", err);
+        res.status(500).json({ message: "Failed to create service" });
+      }
+    });
+
+    app.patch("/api/admin/services/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+      try {
+        const orgId = req.user?.claims?.orgId;
+        const serviceId = parseInt(req.params.id, 10);
+        if (!orgId) return res.status(403).json({ message: "No organization context" });
+        const [existing] = await db
+          .select()
+          .from(organizationServices)
+          .where(and(eq(organizationServices.id, serviceId), eq(organizationServices.orgId, orgId)));
+        if (!existing) return res.status(404).json({ message: "Service not found" });
+        const allowedFields = ["name", "description", "category", "defaultPriceCents", "billingFrequency",
+          "isBillable", "createsTasks", "defaultTaskCategory", "recurrenceRule", "estimatedDurationMinutes", "isActive"];
+        const updates: Record<string, any> = { updatedAt: new Date() };
+        for (const key of allowedFields) {
+          if (req.body[key] !== undefined) updates[key] = req.body[key];
+        }
+        const [updated] = await db
+          .update(organizationServices)
+          .set(updates)
+          .where(and(eq(organizationServices.id, serviceId), eq(organizationServices.orgId, orgId)))
+          .returning();
+        res.json(updated);
+      } catch (err) {
+        console.error("PATCH /api/admin/services/:id error:", err);
+        res.status(500).json({ message: "Failed to update service" });
+      }
+    });
+
+    app.delete("/api/admin/services/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+      try {
+        const orgId = req.user?.claims?.orgId;
+        const serviceId = parseInt(req.params.id, 10);
+        if (!orgId) return res.status(403).json({ message: "No organization context" });
+        const [existing] = await db
+          .select()
+          .from(organizationServices)
+          .where(and(eq(organizationServices.id, serviceId), eq(organizationServices.orgId, orgId)));
+        if (!existing) return res.status(404).json({ message: "Service not found" });
+        // Soft delete: set isActive = false
+        const [updated] = await db
+          .update(organizationServices)
+          .set({ isActive: false, updatedAt: new Date() })
+          .where(and(eq(organizationServices.id, serviceId), eq(organizationServices.orgId, orgId)))
+          .returning();
+        res.json({ message: "Service deactivated", service: updated });
+      } catch (err) {
+        console.error("DELETE /api/admin/services/:id error:", err);
+        res.status(500).json({ message: "Failed to deactivate service" });
+      }
+    });
+  }
+
   // Platform Invoice routes (Admin → Organizations)
   const statusEnum = z.enum(["draft", "open", "paid", "void", "uncollectible"]);
   
