@@ -1991,6 +1991,271 @@ function CopyButton({ value }: { value: string }) {
   );
 }
 
+// ============================================================================
+// Platform Admins Tab
+// ============================================================================
+
+function PlatformAdminsTab() {
+  const { toast } = useToast();
+
+  type PlatformAdmin = { id: string; email: string; createdAt: string };
+
+  const { data: admins = [], isLoading, refetch } = useQuery<PlatformAdmin[]>({
+    queryKey: ["/api/super-admin/admins"],
+  });
+
+  // ── Add admin form state ──
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+
+  // ── Change password dialog state ──
+  const [changePwTarget, setChangePwTarget] = useState<PlatformAdmin | null>(null);
+  const [changePw, setChangePw] = useState("");
+  const [showChangePw, setShowChangePw] = useState(false);
+
+  // ── Delete confirmation state ──
+  const [deleteTarget, setDeleteTarget] = useState<PlatformAdmin | null>(null);
+
+  // ── Mutations ──
+  const createMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/super-admin/admins", { email: newEmail.trim(), password: newPassword }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/admins"] });
+      toast({ title: "Admin created", description: `${newEmail.trim()} can now log in.` });
+      setNewEmail(""); setNewPassword("");
+    },
+    onError: (e: any) => toast({ title: "Failed to create admin", description: e.message, variant: "destructive" }),
+  });
+
+  const changePwMutation = useMutation({
+    mutationFn: () => apiRequest("PATCH", `/api/super-admin/admins/${changePwTarget?.id}/password`, { password: changePw }),
+    onSuccess: () => {
+      toast({ title: "Password updated" });
+      setChangePwTarget(null); setChangePw("");
+    },
+    onError: (e: any) => toast({ title: "Failed to update password", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/super-admin/admins/${id}`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/admins"] });
+      toast({ title: "Admin removed" });
+      setDeleteTarget(null);
+    },
+    onError: (e: any) => toast({ title: "Failed to remove admin", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+
+      {/* Header */}
+      <div className="flex items-start gap-3">
+        <div className="p-2 rounded-lg bg-violet-50 border border-violet-100">
+          <Shield className="w-5 h-5 text-violet-600" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Super Admin Accounts</h2>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Manage who can log in to the Super Admin console. Each account signs in with their own email and password.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" className="ml-auto shrink-0" onClick={() => refetch()} disabled={isLoading}>
+          <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Admin list */}
+      <div className="border rounded-xl bg-white overflow-hidden">
+        <div className="flex items-center gap-2 px-5 py-3 border-b bg-gray-50">
+          <Users className="w-4 h-4 text-gray-500" />
+          <h3 className="font-semibold text-sm text-gray-800">Current Admins</h3>
+          <Badge variant="outline" className="ml-auto text-xs">{admins.length} account{admins.length !== 1 ? "s" : ""}</Badge>
+        </div>
+        {isLoading ? (
+          <div className="p-6 space-y-3">
+            {[1, 2].map(i => <div key={i} className="h-10 bg-gray-100 animate-pulse rounded-lg" />)}
+          </div>
+        ) : admins.length === 0 ? (
+          <p className="p-6 text-sm text-gray-400 text-center">No admins found.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Email</TableHead>
+                <TableHead>Added</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {admins.map(admin => (
+                <TableRow key={admin.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-violet-100 flex items-center justify-center shrink-0">
+                        <Shield className="w-3.5 h-3.5 text-violet-600" />
+                      </div>
+                      <span className="font-medium text-sm text-gray-800">{admin.email}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm text-gray-400">
+                    {new Date(admin.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center gap-2 justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs px-2"
+                        onClick={() => { setChangePwTarget(admin); setChangePw(""); setShowChangePw(false); }}
+                      >
+                        <Key className="w-3 h-3 mr-1" />
+                        Change Password
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs px-2 border-red-200 text-red-600 hover:bg-red-50"
+                        onClick={() => setDeleteTarget(admin)}
+                        disabled={admins.length <= 1}
+                        title={admins.length <= 1 ? "Cannot delete the only admin account" : "Remove this admin"}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </div>
+
+      {/* Add new admin */}
+      <div className="border rounded-xl bg-white overflow-hidden">
+        <div className="flex items-center gap-2 px-5 py-3 border-b bg-gray-50">
+          <UserPlus className="w-4 h-4 text-gray-500" />
+          <h3 className="font-semibold text-sm text-gray-800">Add New Admin</h3>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1.5 block">Email Address <span className="text-red-400">*</span></label>
+              <Input
+                type="email"
+                placeholder="admin@example.com"
+                value={newEmail}
+                onChange={e => setNewEmail(e.target.value)}
+                className="h-9"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1.5 block">Password <span className="text-gray-400 font-normal">(min 8 chars)</span> <span className="text-red-400">*</span></label>
+              <div className="relative">
+                <Input
+                  type={showNewPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  className="h-9 pr-9"
+                  onKeyDown={e => { if (e.key === "Enter" && newEmail && newPassword.length >= 8) createMutation.mutate(); }}
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-2 flex items-center text-gray-400 hover:text-gray-600"
+                  onClick={() => setShowNewPassword(v => !v)}
+                >
+                  {showNewPassword ? <Eye className="w-4 h-4" /> : <Eye className="w-4 h-4 opacity-50" />}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              size="sm"
+              className="bg-violet-600 hover:bg-violet-700 text-white"
+              disabled={!newEmail.trim() || newPassword.length < 8 || createMutation.isPending}
+              onClick={() => createMutation.mutate()}
+            >
+              {createMutation.isPending
+                ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Creating…</>
+                : <><UserPlus className="w-3.5 h-3.5 mr-1.5" />Add Admin</>
+              }
+            </Button>
+            <p className="text-xs text-gray-400">The new admin can log in immediately at <span className="font-mono">/super-admin/login</span>.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Change password dialog */}
+      <Dialog open={!!changePwTarget} onOpenChange={open => { if (!open) { setChangePwTarget(null); setChangePw(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Password</DialogTitle>
+            <DialogDescription>
+              Set a new password for <strong>{changePwTarget?.email}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <label className="text-xs font-medium text-gray-600 block">New Password <span className="text-gray-400">(min 8 chars)</span></label>
+            <div className="relative">
+              <Input
+                type={showChangePw ? "text" : "password"}
+                placeholder="••••••••"
+                value={changePw}
+                onChange={e => setChangePw(e.target.value)}
+                className="pr-9"
+                onKeyDown={e => { if (e.key === "Enter" && changePw.length >= 8) changePwMutation.mutate(); }}
+                autoFocus
+              />
+              <button
+                type="button"
+                className="absolute inset-y-0 right-2 flex items-center text-gray-400 hover:text-gray-600"
+                onClick={() => setShowChangePw(v => !v)}
+              >
+                <Eye className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setChangePwTarget(null); setChangePw(""); }}>Cancel</Button>
+            <Button
+              disabled={changePw.length < 8 || changePwMutation.isPending}
+              onClick={() => changePwMutation.mutate()}
+            >
+              {changePwMutation.isPending ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Saving…</> : "Update Password"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={open => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-700">Remove Admin Account</DialogTitle>
+            <DialogDescription>
+              This will permanently remove <strong>{deleteTarget?.email}</strong> from Super Admin access. They will no longer be able to log in.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+            >
+              {deleteMutation.isPending ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Removing…</> : "Remove Admin"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 function DemoTenantTab() {
   const { toast } = useToast();
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
@@ -7891,6 +8156,7 @@ export default function SuperAdmin() {
           <TabsTrigger value="features">Feature Flags</TabsTrigger>
           <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
           <TabsTrigger value="platform">Platform</TabsTrigger>
+          <TabsTrigger value="admins">Admins</TabsTrigger>
           <TabsTrigger value="compliance">Compliance</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
@@ -8009,6 +8275,11 @@ export default function SuperAdmin() {
         {/* Demo Tenant Tab */}
         <TabsContent value="demo">
           <DemoTenantTab />
+        </TabsContent>
+
+        {/* Platform Admins Tab */}
+        <TabsContent value="admins">
+          <PlatformAdminsTab />
         </TabsContent>
 
         <TabsContent value="compliance">

@@ -1179,6 +1179,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ message: "Logged out successfully" });
   });
 
+  // ── Platform Admin Management ──────────────────────────────────────────────
+
+  // GET /api/super-admin/admins — list all platform admins
+  app.get('/api/super-admin/admins', isSuperAdmin, requireMFA, async (_req, res) => {
+    try {
+      const { listPlatformAdmins } = await import('./masterAdmin.js');
+      const admins = await listPlatformAdmins();
+      res.json(admins);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || 'Failed to list admins' });
+    }
+  });
+
+  // POST /api/super-admin/admins — create a new platform admin
+  app.post('/api/super-admin/admins', isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const schema = z.object({
+        email: z.string().email(),
+        password: z.string().min(8, 'Password must be at least 8 characters'),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+
+      const { createPlatformAdminAccount } = await import('./masterAdmin.js');
+      const admin = await createPlatformAdminAccount(parsed.data.email, parsed.data.password);
+      await AuditLogger.log({ req, action: 'platform_admin_created', metadata: { email: parsed.data.email } });
+      res.status(201).json(admin);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message || 'Failed to create admin' });
+    }
+  });
+
+  // PATCH /api/super-admin/admins/:id/password — change password
+  app.patch('/api/super-admin/admins/:id/password', isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const schema = z.object({ password: z.string().min(8, 'Password must be at least 8 characters') });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+
+      const { changePlatformAdminPassword } = await import('./masterAdmin.js');
+      await changePlatformAdminPassword(req.params.id, parsed.data.password);
+      await AuditLogger.log({ req, action: 'platform_admin_password_changed', metadata: { id: req.params.id } });
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(400).json({ message: err.message || 'Failed to change password' });
+    }
+  });
+
+  // DELETE /api/super-admin/admins/:id — remove a platform admin
+  app.delete('/api/super-admin/admins/:id', isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      // Prevent self-deletion by matching the session email
+      const sessionEmail = (req.session as any)?.superAdmin?.username;
+      const { listPlatformAdmins, deletePlatformAdminById } = await import('./masterAdmin.js');
+      const all = await listPlatformAdmins();
+      const target = all.find(a => a.id === req.params.id);
+      if (!target) return res.status(404).json({ message: 'Admin not found' });
+      if (target.email === sessionEmail) return res.status(400).json({ message: 'You cannot delete your own account' });
+      if (all.length <= 1) return res.status(400).json({ message: 'Cannot delete the last admin account' });
+
+      await deletePlatformAdminById(req.params.id);
+      await AuditLogger.log({ req, action: 'platform_admin_deleted', metadata: { email: target.email } });
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || 'Failed to delete admin' });
+    }
+  });
+
   // Super Admin session check route
   app.get('/api/super-admin/session', (req, res) => {
     const superAdmin = (req.session as any).superAdmin;

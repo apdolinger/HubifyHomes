@@ -129,3 +129,62 @@ export async function verifyPlatformAdminPassword(
 ): Promise<boolean> {
   return bcrypt.compare(plaintext, admin.passwordHash);
 }
+
+/** Lists all platform admins ordered by created_at. */
+export async function listPlatformAdmins(): Promise<Omit<PlatformAdmin, "passwordHash">[]> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      "SELECT id, email, created_at FROM platform_admins ORDER BY created_at ASC"
+    );
+    return result.rows.map(r => ({ id: r.id, email: r.email, createdAt: r.created_at }));
+  } finally {
+    client.release();
+  }
+}
+
+/** Creates a new platform admin. Throws if the email is already taken. */
+export async function createPlatformAdminAccount(email: string, password: string): Promise<Omit<PlatformAdmin, "passwordHash">> {
+  const client = await pool.connect();
+  try {
+    const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    const result = await client.query(
+      `INSERT INTO platform_admins (email, password_hash)
+       VALUES ($1, $2)
+       ON CONFLICT (email) DO NOTHING
+       RETURNING id, email, created_at`,
+      [email.trim().toLowerCase(), hash]
+    );
+    if (result.rows.length === 0) throw new Error(`An admin with email "${email}" already exists.`);
+    const r = result.rows[0];
+    return { id: r.id, email: r.email, createdAt: r.created_at };
+  } finally {
+    client.release();
+  }
+}
+
+/** Changes the password for an existing platform admin. */
+export async function changePlatformAdminPassword(id: string, newPassword: string): Promise<void> {
+  const client = await pool.connect();
+  try {
+    const hash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    const result = await client.query(
+      "UPDATE platform_admins SET password_hash = $1 WHERE id = $2",
+      [hash, id]
+    );
+    if (result.rowCount === 0) throw new Error("Admin not found.");
+  } finally {
+    client.release();
+  }
+}
+
+/** Deletes a platform admin by ID. Returns false if not found. */
+export async function deletePlatformAdminById(id: string): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query("DELETE FROM platform_admins WHERE id = $1", [id]);
+    return (result.rowCount ?? 0) > 0;
+  } finally {
+    client.release();
+  }
+}
