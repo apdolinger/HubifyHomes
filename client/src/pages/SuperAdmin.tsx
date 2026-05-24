@@ -357,11 +357,32 @@ function SubmissionStatusBadge({ status }: { status: string | null }) {
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${opt.color}`}>{opt.label}</span>;
 }
 
-function SubmissionDetailSheet({ submission, onClose, onStatusChange }: {
+function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesChange }: {
   submission: Prospect;
   onClose: () => void;
   onStatusChange: (id: string, status: string) => void;
+  onNotesChange: (id: string, notes: string) => void;
 }) {
+  const { toast } = useToast();
+  const [notesValue, setNotesValue] = useState(submission.notes ?? "");
+  const [notesSaved, setNotesSaved] = useState(true);
+
+  const notesMutation = useMutation({
+    mutationFn: ({ id, notes }: { id: string; notes: string }) =>
+      apiRequest("PATCH", `/api/super-admin/submissions/${id}/notes`, { notes }),
+    onSuccess: (_, vars) => {
+      onNotesChange(vars.id, vars.notes);
+      setNotesSaved(true);
+      toast({ title: "Notes saved" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to save notes", variant: "destructive" }),
+  });
+
+  const handleNotesChange = (val: string) => {
+    setNotesValue(val);
+    setNotesSaved(val === (submission.notes ?? ""));
+  };
+
   const displayName = submission.firstName && submission.lastName
     ? `${submission.firstName} ${submission.lastName}`
     : submission.name;
@@ -498,15 +519,31 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange }: {
             </div>
           </div>
 
-          {submission.notes && (
-            <>
-              <Separator />
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Notes</p>
-                <p className="text-sm whitespace-pre-wrap text-foreground/80 bg-muted/50 rounded-md p-3">{submission.notes}</p>
-              </div>
-            </>
-          )}
+          <Separator />
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Internal Notes</p>
+              {!notesSaved && (
+                <Button
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => notesMutation.mutate({ id: submission.id, notes: notesValue })}
+                  disabled={notesMutation.isPending}
+                >
+                  {notesMutation.isPending ? "Saving…" : "Save"}
+                </Button>
+              )}
+            </div>
+            <Textarea
+              value={notesValue}
+              onChange={e => handleNotesChange(e.target.value)}
+              placeholder="Add call notes, follow-up reminders, or any context…"
+              className="text-sm min-h-[120px] resize-y"
+            />
+            {notesSaved && notesValue && (
+              <p className="text-xs text-muted-foreground mt-1">Saved</p>
+            )}
+          </div>
         </div>
       </SheetContent>
     </Sheet>
@@ -663,6 +700,10 @@ function SubmissionsTab() {
           onStatusChange={(id, status) => {
             statusMutation.mutate({ id, status });
             setSelectedSubmission(prev => prev ? { ...prev, submissionStatus: status } : prev);
+          }}
+          onNotesChange={(id, notes) => {
+            queryClient.invalidateQueries({ queryKey: ["/api/super-admin/submissions"] });
+            setSelectedSubmission(prev => prev ? { ...prev, notes } : prev);
           }}
         />
       )}

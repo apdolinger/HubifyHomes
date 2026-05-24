@@ -14970,6 +14970,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/super-admin/submissions/:id/notes", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { notes } = req.body;
+      if (notes !== undefined && typeof notes !== "string" && notes !== null) {
+        return res.status(400).json({ message: "notes must be a string or null" });
+      }
+      const updated = await storage.updateOnboardingProspect(id, { notes: notes ?? null });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating submission notes:", error);
+      res.status(500).json({ message: "Failed to update notes" });
+    }
+  });
+
   app.post("/api/super-admin/onboarding-prospects", isSuperAdmin, requireMFA, async (req, res) => {
     try {
       const { insertOnboardingProspectSchema } = await import("@shared/schema");
