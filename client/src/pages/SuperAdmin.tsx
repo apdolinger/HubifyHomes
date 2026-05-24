@@ -115,6 +115,19 @@ interface Prospect {
   notes: string | null;
   agreementContent: string | null;
   agreementSignedAt: string | null;
+  // Submission-specific fields
+  firstName: string | null;
+  lastName: string | null;
+  website: string | null;
+  businessType: string | null;
+  serviceArea: string | null;
+  estimatedHomes: number | null;
+  currentMgmtMethod: string | null;
+  teamSize: number | null;
+  suggestedTier: string | null;
+  trialIntent: string | null;
+  preferredContactMethod: string | null;
+  submissionStatus: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -139,7 +152,7 @@ interface ProspectEmail {
 
 const PIPELINE_STAGES: { key: OnboardingStage; label: string; color: string }[] = [
   { key: "contact",         label: "Contact",          color: "border-slate-400 bg-slate-50" },
-  { key: "inquiry",         label: "Inquiry",          color: "border-teal-400 bg-teal-50" },
+  { key: "inquiry",         label: "Submission",        color: "border-teal-400 bg-teal-50" },
   { key: "agreement",       label: "Agreement",        color: "border-yellow-400 bg-yellow-50" },
   { key: "payment_setup",   label: "Payment Setup",    color: "border-orange-400 bg-orange-50" },
   { key: "initial_payment", label: "Initial Payment",  color: "border-purple-400 bg-purple-50" },
@@ -328,6 +341,153 @@ function DropDialog({
   );
 }
 
+const SUBMISSION_STATUS_OPTIONS = [
+  { value: "new",            label: "New",            color: "bg-slate-100 text-slate-700" },
+  { value: "contacted",      label: "Contacted",      color: "bg-blue-100 text-blue-700" },
+  { value: "demo_scheduled", label: "Demo Scheduled", color: "bg-yellow-100 text-yellow-700" },
+  { value: "trial_started",  label: "Trial Started",  color: "bg-purple-100 text-purple-700" },
+  { value: "converted",      label: "Converted",      color: "bg-green-100 text-green-700" },
+  { value: "not_a_fit",      label: "Not a Fit",      color: "bg-red-100 text-red-700" },
+];
+
+function SubmissionStatusBadge({ status }: { status: string | null }) {
+  const opt = SUBMISSION_STATUS_OPTIONS.find(o => o.value === (status ?? "new")) ?? SUBMISSION_STATUS_OPTIONS[0];
+  return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${opt.color}`}>{opt.label}</span>;
+}
+
+function SubmissionsTab() {
+  const { toast } = useToast();
+  const [search, setSearch] = useState("");
+
+  const { data: submissions = [], isLoading } = useQuery<Prospect[]>({
+    queryKey: ["/api/super-admin/submissions"],
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      apiRequest("PATCH", `/api/super-admin/submissions/${id}/status`, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/submissions"] });
+      toast({ title: "Status updated" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to update status", variant: "destructive" }),
+  });
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return submissions.filter(s =>
+      !q ||
+      s.name?.toLowerCase().includes(q) ||
+      s.email?.toLowerCase().includes(q) ||
+      s.company?.toLowerCase().includes(q) ||
+      s.serviceArea?.toLowerCase().includes(q) ||
+      s.suggestedTier?.toLowerCase().includes(q)
+    );
+  }, [submissions, search]);
+
+  const fromFormCount = submissions.filter(s => s.firstName || s.estimatedHomes).length;
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg">Client Submissions</CardTitle>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Leads submitted via the public form — {fromFormCount} rich submission{fromFormCount !== 1 ? "s" : ""} out of {submissions.length} total.
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Input
+            placeholder="Search by name, email, company, area…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="max-w-sm"
+          />
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12 text-muted-foreground">Loading…</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground text-sm">No submissions found.</div>
+          ) : (
+            <div className="rounded-lg border overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Organization</TableHead>
+                    <TableHead>Tier</TableHead>
+                    <TableHead>Est. Homes</TableHead>
+                    <TableHead>Intent</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Submitted</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map(s => (
+                    <TableRow key={s.id}>
+                      <TableCell className="font-medium whitespace-nowrap">
+                        {s.firstName && s.lastName ? `${s.firstName} ${s.lastName}` : s.name}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        <a href={`mailto:${s.email}`} className="text-teal-600 hover:underline">{s.email}</a>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        <div>{s.company}</div>
+                        {s.serviceArea && <div className="text-xs text-muted-foreground">{s.serviceArea}</div>}
+                      </TableCell>
+                      <TableCell>
+                        {s.suggestedTier ? (
+                          <span className="text-xs font-medium text-teal-700 bg-teal-50 border border-teal-200 rounded-full px-2 py-0.5 whitespace-nowrap">
+                            {s.suggestedTier}
+                          </span>
+                        ) : <span className="text-muted-foreground text-xs">—</span>}
+                      </TableCell>
+                      <TableCell className="text-sm text-center">
+                        {s.estimatedHomes ?? <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {s.trialIntent ? (
+                          <span className="capitalize">{s.trialIntent.replace(/_/g, " ")}</span>
+                        ) : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={s.submissionStatus ?? "new"}
+                          onValueChange={(val) => statusMutation.mutate({ id: s.id, status: val })}
+                        >
+                          <SelectTrigger className="h-7 text-xs w-36 border-0 p-0 shadow-none focus:ring-0">
+                            <SubmissionStatusBadge status={s.submissionStatus} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SUBMISSION_STATUS_OPTIONS.map(opt => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${opt.color}`}>
+                                  {opt.label}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                        {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function OnboardingPipelineTab() {
   const { toast } = useToast();
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -410,7 +570,7 @@ function OnboardingPipelineTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
       setSheetOpen(false);
-      toast({ title: editingProspect ? "Prospect updated" : "Prospect added to Inquiry" });
+      toast({ title: editingProspect ? "Prospect updated" : "Prospect added to Submission" });
     },
     onError: () => toast({ title: "Error", description: "Failed to save prospect", variant: "destructive" }),
   });
@@ -467,7 +627,7 @@ function OnboardingPipelineTab() {
       apiRequest("PATCH", `/api/super-admin/onboarding-prospects/${id}`, { stage: "inquiry", droppedReason: null }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
-      toast({ title: "Prospect restored to Inquiry" });
+      toast({ title: "Prospect restored to Submission" });
     },
   });
 
@@ -1176,7 +1336,7 @@ function BetaPricingCard() {
 // you go" email. Kanban PIPELINE_STAGES intentionally excludes dropped.
 const TEMPLATE_STAGES: { key: OnboardingStage; label: string }[] = [
   { key: "contact",         label: "Contact" },
-  { key: "inquiry",         label: "Inquiry" },
+  { key: "inquiry",         label: "Submission" },
   { key: "agreement",       label: "Agreement" },
   { key: "payment_setup",   label: "Payment Setup" },
   { key: "initial_payment", label: "Initial Payment" },
@@ -6269,6 +6429,7 @@ export default function SuperAdmin() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="flex w-full overflow-x-auto h-auto flex-wrap gap-1 justify-start bg-muted p-1">
           <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
+          <TabsTrigger value="submissions">Submissions</TabsTrigger>
           <TabsTrigger value="organizations">Organizations</TabsTrigger>
           <TabsTrigger value="users">All Users</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
@@ -6286,6 +6447,11 @@ export default function SuperAdmin() {
         {/* Onboarding Pipeline Tab */}
         <TabsContent value="onboarding">
           <OnboardingPipelineTab />
+        </TabsContent>
+
+        {/* Submissions Tab */}
+        <TabsContent value="submissions">
+          <SubmissionsTab />
         </TabsContent>
 
         {/* Organizations Tab */}

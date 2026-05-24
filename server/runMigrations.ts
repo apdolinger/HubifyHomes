@@ -269,6 +269,32 @@ export async function ensureDiscountCodeUsagesTable(): Promise<void> {
   }
 }
 
+export async function ensureSubmissionColumns(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE onboarding_prospects
+        ADD COLUMN IF NOT EXISTS first_name VARCHAR,
+        ADD COLUMN IF NOT EXISTS last_name VARCHAR,
+        ADD COLUMN IF NOT EXISTS website VARCHAR,
+        ADD COLUMN IF NOT EXISTS business_type VARCHAR,
+        ADD COLUMN IF NOT EXISTS service_area VARCHAR,
+        ADD COLUMN IF NOT EXISTS estimated_homes INTEGER,
+        ADD COLUMN IF NOT EXISTS current_mgmt_method VARCHAR,
+        ADD COLUMN IF NOT EXISTS team_size INTEGER,
+        ADD COLUMN IF NOT EXISTS suggested_tier VARCHAR,
+        ADD COLUMN IF NOT EXISTS trial_intent VARCHAR,
+        ADD COLUMN IF NOT EXISTS preferred_contact_method VARCHAR,
+        ADD COLUMN IF NOT EXISTS submission_status VARCHAR DEFAULT 'new';
+    `);
+    log("[MIGRATE] onboarding_prospects submission columns verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add submission columns to onboarding_prospects: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensureStaffPasswordHashColumn(): Promise<void> {
   const client = await pool.connect();
   try {

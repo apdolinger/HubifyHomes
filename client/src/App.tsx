@@ -56,7 +56,7 @@ import OrgStripeSettings from "@/pages/OrgStripeSettings";
 import ImportManager from "@/pages/ImportManager";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfService from "@/pages/TermsOfService";
-import Inquire from "@/pages/Inquire";
+import Submissions from "@/pages/Submissions";
 import Contact from "@/pages/Contact";
 import Signup from "@/pages/Signup";
 import Billing from "@/pages/Billing";
@@ -125,7 +125,8 @@ function Router() {
       <Route path="/super-admin/login" component={SuperAdminLogin} />
       <Route path="/super-admin" component={SuperAdmin} />
       <Route path="/payment-collection/:token" component={PaymentCollectionPage} />
-      <Route path="/inquire" component={Inquire} />
+      <Route path="/submit" component={Submissions} />
+      <Route path="/inquire">{() => { window.location.replace("/submit"); return null; }}</Route>
       <Route path="/contact" component={Contact} />
       <Route path="/signup" component={Signup} />
       

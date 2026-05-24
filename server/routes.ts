@@ -14596,17 +14596,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/public/inquire", async (req, res) => {
     try {
-      const { insertOnboardingProspectSchema } = await import("@shared/schema");
-      const schema = insertOnboardingProspectSchema.pick({ name: true, email: true, company: true, phone: true, notes: true });
-      const result = schema.safeParse(req.body);
+      const { z } = await import("zod");
+      const submissionSchema = z.object({
+        firstName: z.string().min(1, "First name is required"),
+        lastName: z.string().min(1, "Last name is required"),
+        email: z.string().email("A valid email is required"),
+        phone: z.string().optional(),
+        preferredContactMethod: z.string().optional(),
+        company: z.string().min(1, "Organization name is required"),
+        website: z.string().optional(),
+        businessType: z.string().optional(),
+        serviceArea: z.string().optional(),
+        estimatedHomes: z.coerce.number().min(1).optional(),
+        currentMgmtMethod: z.string().optional(),
+        teamSize: z.coerce.number().optional(),
+        trialIntent: z.string().optional(),
+        notes: z.string().optional(),
+      });
+      const result = submissionSchema.safeParse(req.body);
       if (!result.success) {
         return res.status(400).json({ message: "Invalid data", errors: result.error.errors });
       }
-      const prospect = await storage.createOnboardingProspect({ ...result.data, stage: "inquiry" });
-      res.status(201).json({ id: prospect.id, message: "Inquiry received" });
+      const data = result.data;
+
+      // Compute suggested tier from estimated homes
+      const homes = data.estimatedHomes ?? 0;
+      let suggestedTier = "";
+      if (homes >= 1 && homes <= 10) suggestedTier = "Starter Portfolio";
+      else if (homes <= 25) suggestedTier = "Growth Portfolio";
+      else if (homes <= 50) suggestedTier = "Professional Portfolio";
+      else if (homes <= 100) suggestedTier = "Operator Portfolio";
+      else if (homes > 100) suggestedTier = "Enterprise Portfolio";
+
+      const prospect = await storage.createOnboardingProspect({
+        name: `${data.firstName} ${data.lastName}`.trim(),
+        email: data.email,
+        phone: data.phone ?? null,
+        company: data.company,
+        notes: data.notes ?? null,
+        stage: "inquiry",
+        firstName: data.firstName,
+        lastName: data.lastName,
+        website: data.website ?? null,
+        businessType: data.businessType ?? null,
+        serviceArea: data.serviceArea ?? null,
+        estimatedHomes: data.estimatedHomes ?? null,
+        currentMgmtMethod: data.currentMgmtMethod ?? null,
+        teamSize: data.teamSize ?? null,
+        suggestedTier: suggestedTier || null,
+        trialIntent: data.trialIntent ?? null,
+        preferredContactMethod: data.preferredContactMethod ?? null,
+        submissionStatus: "new",
+      });
+
+      // Admin notification email
+      if (resend) {
+        const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@hubifyhomes.com";
+        const toEmail = process.env.SUPPORT_EMAIL;
+        if (toEmail) {
+          resend.emails.send({
+            from: fromEmail,
+            to: toEmail,
+            replyTo: data.email,
+            subject: `New submission from ${data.firstName} ${data.lastName} — ${data.company}`,
+            html: `
+              <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
+                <h2 style="color:#0d9488;margin-bottom:4px">New Client Submission</h2>
+                <p style="color:#64748b;font-size:14px;margin-top:0">Submitted via the Hubify Homes submission form</p>
+                <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0"/>
+                <table style="width:100%;border-collapse:collapse;font-size:14px">
+                  <tr><td style="padding:6px 0;color:#64748b;width:150px">Name</td><td style="padding:6px 0;color:#0f172a;font-weight:600">${data.firstName} ${data.lastName}</td></tr>
+                  <tr><td style="padding:6px 0;color:#64748b">Email</td><td style="padding:6px 0"><a href="mailto:${data.email}" style="color:#0d9488">${data.email}</a></td></tr>
+                  ${data.phone ? `<tr><td style="padding:6px 0;color:#64748b">Phone</td><td style="padding:6px 0;color:#0f172a">${data.phone}</td></tr>` : ""}
+                  <tr><td style="padding:6px 0;color:#64748b">Organization</td><td style="padding:6px 0;color:#0f172a">${data.company}</td></tr>
+                  ${data.businessType ? `<tr><td style="padding:6px 0;color:#64748b">Business Type</td><td style="padding:6px 0;color:#0f172a">${data.businessType.replace(/_/g, " ")}</td></tr>` : ""}
+                  ${data.estimatedHomes ? `<tr><td style="padding:6px 0;color:#64748b">Est. Homes</td><td style="padding:6px 0;color:#0f172a">${data.estimatedHomes}</td></tr>` : ""}
+                  ${suggestedTier ? `<tr><td style="padding:6px 0;color:#64748b">Suggested Tier</td><td style="padding:6px 0;color:#0d9488;font-weight:600">${suggestedTier}</td></tr>` : ""}
+                  ${data.trialIntent ? `<tr><td style="padding:6px 0;color:#64748b">Trial Intent</td><td style="padding:6px 0;color:#0f172a">${data.trialIntent.replace(/_/g, " ")}</td></tr>` : ""}
+                </table>
+                ${data.notes ? `<div style="margin-top:16px;padding:14px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0"><p style="margin:0 0 6px;color:#64748b;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Additional Notes</p><p style="margin:0;color:#0f172a;font-size:14px;white-space:pre-wrap">${data.notes}</p></div>` : ""}
+                <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0"/>
+                <p style="font-size:12px;color:#94a3b8">This lead has been added to the Hubify onboarding pipeline as a <strong>Submission</strong>.</p>
+              </div>
+            `,
+          }).catch((err: any) => console.warn("[submission-form] email send failed:", err));
+        }
+      }
+
+      res.status(201).json({ id: prospect.id, message: "Submission received" });
     } catch (error) {
-      console.error("Error handling public inquiry:", error);
-      res.status(500).json({ message: "Failed to submit inquiry" });
+      console.error("Error handling public submission:", error);
+      res.status(500).json({ message: "Failed to submit" });
     }
   });
 
@@ -14674,6 +14754,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching onboarding prospects:", error);
       res.status(500).json({ message: "Failed to fetch onboarding prospects" });
+    }
+  });
+
+  // ── Client Submissions (public-form leads, richly detailed) ──────────────
+  app.get("/api/super-admin/submissions", isSuperAdmin, requireMFA, async (_req, res) => {
+    try {
+      const prospects = await storage.listOnboardingProspects();
+      res.json(prospects);
+    } catch (error) {
+      console.error("Error fetching submissions:", error);
+      res.status(500).json({ message: "Failed to fetch submissions" });
+    }
+  });
+
+  const VALID_SUBMISSION_STATUSES = ["new", "contacted", "demo_scheduled", "trial_started", "converted", "not_a_fit"] as const;
+
+  app.patch("/api/super-admin/submissions/:id/status", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      if (!VALID_SUBMISSION_STATUSES.includes(status)) {
+        return res.status(400).json({ message: "Invalid status value" });
+      }
+      const updated = await storage.updateOnboardingProspect(id, { submissionStatus: status });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating submission status:", error);
+      res.status(500).json({ message: "Failed to update status" });
     }
   });
 

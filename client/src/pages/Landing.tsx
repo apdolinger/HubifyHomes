@@ -1,10 +1,14 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building, Users, CheckSquare, BarChart3 } from "lucide-react";
 import { openCookiePreferences } from "@/lib/cookieConsent";
 import { HUBIFY_HOMES_LOGO_URL, HUBIFY_HOMES_LOGO_ALT } from "@/lib/brand";
+import SubmissionModal from "@/components/SubmissionModal";
 
 export default function Landing() {
+  const [isSubmitOpen, setIsSubmitOpen] = useState(false);
+
   const handleLogin = async () => {
     // For development, use the dev login endpoint
     if (import.meta.env.DEV) {
@@ -98,13 +102,21 @@ export default function Landing() {
           <p className="mt-4 text-xl text-slate-600 max-w-3xl mx-auto">
             Manage properties, coordinate tasks, collaborate with your team, and deliver exceptional service to your clients.
           </p>
-          <div className="mt-8">
-            <Button 
-              onClick={handleLogin}
+          <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+            <Button
+              onClick={() => setIsSubmitOpen(true)}
               size="lg"
-              className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-3 text-lg"
+              className="bg-teal-600 hover:bg-teal-700 text-white px-8 py-3 text-lg"
             >
               Get Started
+            </Button>
+            <Button
+              onClick={handleLogin}
+              size="lg"
+              variant="outline"
+              className="border-slate-300 text-slate-700 hover:bg-slate-50 px-8 py-3 text-lg"
+            >
+              Sign In
             </Button>
           </div>
         </div>
@@ -154,17 +166,18 @@ export default function Landing() {
             Join professional property managers who trust Hubify
           </p>
           <div className="mt-8">
-            <Button 
-              onClick={handleLogin}
+            <Button
+              onClick={() => setIsSubmitOpen(true)}
               size="lg"
-              variant="outline"
-              className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+              className="bg-teal-600 hover:bg-teal-700 text-white"
             >
-              Sign In to Continue
+              Request Access
             </Button>
           </div>
         </div>
       </div>
+
+      <SubmissionModal open={isSubmitOpen} onOpenChange={setIsSubmitOpen} />
 
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200 py-6 mt-12">
