@@ -1,0 +1,56 @@
+Before implementing a new onboarding wizard, please inspect the existing codebase and report back on what already exists.
+
+Goal:
+We want to build a Guided Client Ramp-Up / Setup Wizard for new organizations.
+
+The wizard should eventually help a new client:
+- set up organization basics
+- define services they offer
+- define how they charge for those services
+- create recurring/default task templates from those services
+- import properties quickly
+- invite team members
+- complete their first operational workflow
+
+Please inspect and answer:
+
+1. Existing onboarding
+- Is there already an onboarding checklist, setup wizard, getting started page, or organization setup flow?
+- Where is it located?
+- Is it wired to real database data or mock UI?
+
+2. Existing services/pricing
+- Is there already a services table, service catalog, pricing table, recurring services model, or task template model?
+- Can an organization define services like “Welcome Home Service,” “Home Watch Visit,” “Storm Check,” “Maintenance Coordination,” etc.?
+- Can pricing be attached to services?
+
+3. Existing tasks/workflows
+- Is there already a task model, recurring task model, inspection template model, checklist model, or workflow template model?
+- Can tasks be created automatically from templates?
+- Can services generate default tasks?
+
+4. Existing property import
+- Is there already a CSV import or bulk property import feature?
+- Is there a property table/model already available for organizations?
+- Are property owners/clients attached to properties?
+
+5. Existing organization provisioning
+- When a submission is approved, is there already a way to create an organization/tenant/client account?
+- Is there a button/action in Super Admin to activate or provision an organization from a submission?
+
+6. Existing user/team invites
+- Is there already a team member invite system?
+- Are roles/permissions already defined?
+
+7. Existing billing setup
+- Is Stripe already connected to organizations?
+- Is there any billing status stored per organization?
+
+8. Recommended implementation path
+After inspecting, recommend the safest next build:
+Option A: Build a lightweight Getting Started Checklist first
+Option B: Build a full multi-step setup wizard
+Option C: Build service catalog + task template automation first
+Option D: Build property import first
+
+Do not implement yet. Just inspect and report what exists, what is real, what is mock, and what files are relevant.
