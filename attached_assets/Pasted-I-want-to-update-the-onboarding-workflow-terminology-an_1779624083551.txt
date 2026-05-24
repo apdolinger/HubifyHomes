@@ -1,0 +1,116 @@
+I want to update the onboarding workflow terminology and add a new client submission flow.
+
+Current state:
+- The platform has Contact and Inquiries.
+- I want to rename or replace “Inquiries” with “Submissions.”
+- Submissions should represent potential clients who are ready to take the next step toward using Hubify Homes.
+
+Build a “Client Submission Form” that is hosted inside the platform but can be launched from the marketing website as a modal/window when a button is clicked.
+
+Requirements:
+
+1. Rename Inquiries to Submissions
+- Update frontend labels from “Inquiries” to “Submissions.”
+- Update navigation, page titles, buttons, and empty states.
+- Do not break existing contact functionality.
+- If the backend table is currently called inquiries, either keep the database table name and only change the UI wording, or safely migrate it if already supported.
+
+2. Create a Client Submission Form
+The form should collect:
+
+Contact Information:
+- First name
+- Last name
+- Email
+- Phone number
+- Preferred contact method
+
+Organization Information:
+- Organization / business name
+- Website
+- Business type:
+  - Home Watch Company
+  - Estate Management Company
+  - Property Management Company
+  - Other
+- Service area / market location
+
+Portfolio Information:
+- Estimated number of homes/properties
+- Current method of managing properties:
+  - Spreadsheets
+  - Paper/manual process
+  - Existing software
+  - Other
+- Number of team members/users expected
+
+Plan Selection:
+Automatically suggest a Hubify Homes tier based on number of homes:
+- Starter Portfolio: 1–10 homes
+- Growth Portfolio: 11–25 homes
+- Professional Portfolio: 26–50 homes
+- Operator Portfolio: 51–100 homes
+- Enterprise Portfolio: 101+ homes
+
+The user should be able to see the suggested tier before submitting.
+
+Trial / Payment Intent:
+Add a section asking:
+- Interested in 30-day free trial
+- Ready to start onboarding
+- Need a demo first
+- Have pricing questions
+
+Submission Notes:
+- Anything else we should know?
+
+3. Marketing Page Modal
+Create a reusable modal/window component that can be triggered from the marketing page with a button like:
+“Start Free Trial”
+“Submit Your Company”
+“Get Started”
+
+When clicked:
+- The submission form opens in a modal or embedded window.
+- User can complete the form without leaving the marketing page.
+- On submit, data is saved into the platform as a Submission.
+
+4. Admin / Super Admin View
+Create or update a Submissions page where I can view:
+- Contact name
+- Organization name
+- Email
+- Phone
+- Estimated homes
+- Suggested tier
+- Trial/payment intent
+- Status
+- Date submitted
+
+Statuses should include:
+- New
+- Contacted
+- Demo Scheduled
+- Trial Started
+- Converted
+- Not a Fit
+
+Allow status updates from the admin page.
+
+5. Backend
+Create the necessary API routes for:
+- Creating a submission
+- Listing submissions
+- Updating submission status
+- Viewing submission details
+
+6. Confirmation
+After submission:
+- Show a success message:
+“Thank you. Your submission has been received. Our team will review your information and follow up shortly.”
+- Do not expose my personal email address on the public page.
+
+7. Optional Email Notification
+If email service is already configured, send a notification to the support/admin email when a new submission is received.
+
+Please inspect the current codebase first, identify where Contact/Inquiries currently live, and implement this in the safest way without breaking existing workflows.
