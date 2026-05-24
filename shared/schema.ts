@@ -3394,6 +3394,8 @@ export const onboardingProspects = pgTable("onboarding_prospects", {
   trialStatus: varchar("trial_status").default("inactive"),
   trialWarningSentAt: timestamp("trial_warning_sent_at"),
   trialExpiredEmailSentAt: timestamp("trial_expired_email_sent_at"),
+  confirmationEmailSentAt: timestamp("confirmation_email_sent_at"),
+  confirmationEmailStatus: varchar("confirmation_email_status"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [

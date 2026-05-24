@@ -128,6 +128,8 @@ interface Prospect {
   trialIntent: string | null;
   preferredContactMethod: string | null;
   submissionStatus: string | null;
+  confirmationEmailSentAt: string | null;
+  confirmationEmailStatus: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -1238,6 +1240,43 @@ function OnboardingPipelineTab() {
 
           {editingProspect && (
             <>
+              <Separator className="my-4" />
+              <div>
+                <p className="text-sm font-medium mb-2 text-gray-700 flex items-center gap-1">
+                  <Mail className="w-3.5 h-3.5" /> Confirmation Email
+                </p>
+                {editingProspect.confirmationEmailStatus ? (
+                  <div className={`flex items-start gap-2 text-xs rounded-md px-3 py-2 ${
+                    editingProspect.confirmationEmailStatus === "sent"
+                      ? "bg-green-50 text-green-700"
+                      : "bg-red-50 text-red-700"
+                  }`}>
+                    {editingProspect.confirmationEmailStatus === "sent" ? (
+                      <CheckCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    ) : (
+                      <XCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    )}
+                    <div>
+                      <span className="font-medium capitalize">
+                        {editingProspect.confirmationEmailStatus === "sent" ? "Delivered" : "Failed"}
+                      </span>
+                      {editingProspect.confirmationEmailSentAt && (
+                        <span className="text-gray-500 ml-1">
+                          — {new Date(editingProspect.confirmationEmailSentAt).toLocaleString()}
+                        </span>
+                      )}
+                      {editingProspect.confirmationEmailStatus !== "sent" && (
+                        <p className="mt-0.5 text-red-600 break-words">
+                          {editingProspect.confirmationEmailStatus.replace(/^failed:\s*/i, "")}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400">No confirmation email recorded.</p>
+                )}
+              </div>
+
               <Separator className="my-4" />
               <div>
                 <p className="text-sm font-medium mb-2 text-gray-700">Stage History</p>

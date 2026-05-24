@@ -363,6 +363,22 @@ export async function ensureTrialColumns(): Promise<void> {
   }
 }
 
+export async function ensureProspectConfirmationEmailColumns(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE onboarding_prospects
+        ADD COLUMN IF NOT EXISTS confirmation_email_sent_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS confirmation_email_status VARCHAR;
+    `);
+    log("[MIGRATE] onboarding_prospects confirmation email columns verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add confirmation email columns to onboarding_prospects: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensureCookieConsentPreferenceColumn(): Promise<void> {
   const client = await pool.connect();
   try {
