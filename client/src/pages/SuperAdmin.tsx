@@ -6505,6 +6505,12 @@ export default function SuperAdmin() {
   const [isSuperAdminAuthenticated, setIsSuperAdminAuthenticated] = useState<boolean | null>(null);
   const [superAdminUsername, setSuperAdminUsername] = useState<string>("");
 
+  const { data: submissionsData = [] } = useQuery<Prospect[]>({
+    queryKey: ["/api/super-admin/submissions"],
+    enabled: isSuperAdminAuthenticated === true,
+  });
+  const newSubmissionsCount = submissionsData.filter(s => (s.submissionStatus ?? "new") === "new").length;
+
   // Check super admin session
   useEffect(() => {
     const checkSession = async () => {
@@ -6609,7 +6615,14 @@ export default function SuperAdmin() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="flex w-full overflow-x-auto h-auto flex-wrap gap-1 justify-start bg-muted p-1">
           <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
-          <TabsTrigger value="submissions">Submissions</TabsTrigger>
+          <TabsTrigger value="submissions" className="relative">
+            Submissions
+            {newSubmissionsCount > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none min-w-[16px] h-4 px-1">
+                {newSubmissionsCount}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="organizations">Organizations</TabsTrigger>
           <TabsTrigger value="users">All Users</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
