@@ -963,13 +963,22 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
   });
 
   const resendConfirmationEmailMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/send-confirmation-email`, {})
-        .then(r => r.json() as Promise<Prospect & { emailSent: boolean; message?: string }>),
+    mutationFn: async (id: string) => {
+      const r = await fetch(`/api/super-admin/onboarding-prospects/${id}/send-confirmation-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+        credentials: "include",
+      });
+      const body = await r.json() as Prospect & { emailSent: boolean; message?: string; retryAfterSeconds?: number };
+      if (!r.ok) throw Object.assign(new Error(body.message || `Error ${r.status}`), { retryAfterSeconds: body.retryAfterSeconds });
+      return body;
+    },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
       setEditingProspect(result);
       if (result.emailSent) {
+        setConfirmEmailCooldownUntil(Date.now() + 60_000);
         toast({ title: "Confirmation email sent!" });
       } else {
         toast({
@@ -979,8 +988,8 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
         });
       }
     },
-    onError: (e: Error) => toast({
-      title: "Email failed",
+    onError: (e: any) => toast({
+      title: "Email not sent",
       description: e?.message || "Could not send confirmation email",
       variant: "destructive",
     }),
@@ -996,6 +1005,16 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
   });
 
   // ── Email history & send-now ─────────────────────────────────────────────
+  const [confirmEmailCooldownUntil, setConfirmEmailCooldownUntil] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (confirmEmailCooldownUntil === null) return;
+    const remaining = confirmEmailCooldownUntil - Date.now();
+    if (remaining <= 0) { setConfirmEmailCooldownUntil(null); return; }
+    const t = setTimeout(() => setConfirmEmailCooldownUntil(null), remaining);
+    return () => clearTimeout(t);
+  }, [confirmEmailCooldownUntil]);
+
   const [sendEmailOpen, setSendEmailOpen] = useState(false);
   const [sendEmailStage, setSendEmailStage] = useState<OnboardingStage>("inquiry");
   const [sendEmailSubject, setSendEmailSubject] = useState("");
@@ -1433,10 +1452,10 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
                     size="sm"
                     variant="outline"
                     className="h-7 text-xs"
-                    disabled={resendConfirmationEmailMutation.isPending}
+                    disabled={resendConfirmationEmailMutation.isPending || (confirmEmailCooldownUntil !== null && Date.now() < confirmEmailCooldownUntil)}
                     onClick={() => resendConfirmationEmailMutation.mutate(editingProspect.id)}
                   >
-                    {resendConfirmationEmailMutation.isPending ? "Sending…" : "Resend"}
+                    {resendConfirmationEmailMutation.isPending ? "Sending…" : (confirmEmailCooldownUntil !== null && Date.now() < confirmEmailCooldownUntil) ? "Just sent…" : "Resend"}
                   </Button>
                 </div>
                 {editingProspect.confirmationEmailStatus ? (

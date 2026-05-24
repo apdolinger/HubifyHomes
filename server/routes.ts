@@ -15092,9 +15092,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const confirmationEmailCooldowns = new Map<string, number>();
+  const CONFIRMATION_EMAIL_COOLDOWN_MS = 60_000;
+
   app.post("/api/super-admin/onboarding-prospects/:id/send-confirmation-email", isSuperAdmin, requireMFA, async (req, res) => {
     try {
       const { id } = req.params;
+
+      const lastSent = confirmationEmailCooldowns.get(id);
+      if (lastSent !== undefined) {
+        const elapsed = Date.now() - lastSent;
+        if (elapsed < CONFIRMATION_EMAIL_COOLDOWN_MS) {
+          const remaining = Math.ceil((CONFIRMATION_EMAIL_COOLDOWN_MS - elapsed) / 1000);
+          return res.status(429).json({
+            message: `A confirmation email was just sent. Please wait ${remaining} more second${remaining === 1 ? "" : "s"} before sending again.`,
+            retryAfterSeconds: remaining,
+          });
+        }
+      }
+      confirmationEmailCooldowns.set(id, Date.now());
+
       const prospect = await storage.getOnboardingProspect(id);
       if (!prospect) return res.status(404).json({ message: "Prospect not found" });
 
@@ -15209,6 +15226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (err: any) {
         console.warn("[send-confirmation-email] failed:", err);
         emailStatus = `failed: ${err?.message ?? String(err)}`.slice(0, 255);
+        confirmationEmailCooldowns.delete(id);
       }
 
       const updated = await storage.updateOnboardingProspect(id, {
