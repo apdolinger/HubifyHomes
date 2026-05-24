@@ -3918,6 +3918,116 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/super-admin/demo/send-invite — email demo credentials to a recipient
+  app.post("/api/super-admin/demo/send-invite", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const schema = z.object({
+        recipientEmail: z.string().email(),
+        recipientName: z.string().min(1).optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid request", errors: parsed.error.errors });
+
+      const { recipientEmail, recipientName } = parsed.data;
+      const firstName = recipientName ? recipientName.split(" ")[0] : "there";
+      const displayName = recipientName || recipientEmail;
+
+      const fromEmail = process.env.RESEND_FROM_EMAIL;
+      if (!resend || !fromEmail) {
+        return res.status(503).json({ message: "Email not configured (RESEND_FROM_EMAIL / RESEND_API_KEY missing)" });
+      }
+
+      const staffUrl = `${process.env.APP_URL || "https://hubifyhomesonline.com"}/staff/login`;
+      const portalUrl = `${process.env.APP_URL || "https://hubifyhomesonline.com"}/portal/login`;
+
+      const html = `
+        <div style="font-family:sans-serif;max-width:580px;margin:0 auto;padding:32px 24px;background:#ffffff">
+          <div style="text-align:center;margin-bottom:28px">
+            <div style="font-size:24px;font-weight:800;color:#0d9488;letter-spacing:-0.5px">Hubify Homes</div>
+            <div style="font-size:13px;color:#94a3b8;margin-top:2px">Property Management Platform</div>
+          </div>
+
+          <h1 style="font-size:21px;font-weight:700;color:#0f172a;margin:0 0 10px">Hi ${firstName}, here's your Hubify demo access.</h1>
+          <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 28px">
+            We've set up a fully loaded demo environment for <strong>${displayName}</strong> so you can explore everything Hubify Homes has to offer. Use the credentials below to log in and take a look around.
+          </p>
+
+          <!-- Staff / Admin access -->
+          <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;padding:20px 24px;margin-bottom:16px">
+            <div style="font-size:11px;font-weight:700;color:#0d9488;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:10px">Staff / Admin Login</div>
+            <table style="width:100%;border-collapse:collapse;font-size:14px">
+              <tr>
+                <td style="color:#64748b;padding:4px 0;width:80px">URL</td>
+                <td><a href="${staffUrl}" style="color:#0d9488;font-weight:600">${staffUrl}</a></td>
+              </tr>
+              <tr>
+                <td style="color:#64748b;padding:4px 0">Email</td>
+                <td style="font-family:monospace;color:#0f172a">demo@hubifyhomesonline.com</td>
+              </tr>
+              <tr>
+                <td style="color:#64748b;padding:4px 0">Password</td>
+                <td style="font-family:monospace;color:#0f172a">Demo2026!</td>
+              </tr>
+            </table>
+          </div>
+
+          <!-- Portal / Client access -->
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px 24px;margin-bottom:28px">
+            <div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:10px">Client Portal Login</div>
+            <table style="width:100%;border-collapse:collapse;font-size:14px">
+              <tr>
+                <td style="color:#64748b;padding:4px 0;width:80px">URL</td>
+                <td><a href="${portalUrl}" style="color:#0d9488;font-weight:600">${portalUrl}</a></td>
+              </tr>
+              <tr>
+                <td style="color:#64748b;padding:4px 0">Email</td>
+                <td style="font-family:monospace;color:#0f172a">client@demo.hubifyhomesonline.com</td>
+              </tr>
+              <tr>
+                <td style="color:#64748b;padding:4px 0">Password</td>
+                <td style="font-family:monospace;color:#0f172a">DemoClient2026!</td>
+              </tr>
+            </table>
+          </div>
+
+          <p style="font-size:14px;color:#475569;line-height:1.7;margin:0 0 24px">
+            The demo includes 10 sample properties, realistic tasks, invoices, inspections, and a full client portal view. Feel free to click around — nothing you do will affect any real data.
+          </p>
+
+          <div style="text-align:center;margin-bottom:32px">
+            <a href="${staffUrl}" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
+              Open Demo
+            </a>
+          </div>
+
+          <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
+          <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
+            Questions? Reply to this email and we'll get back to you.<br/>
+            Hubify Homes · Property Management Platform
+          </p>
+        </div>
+      `;
+
+      const { error } = await resend.emails.send({
+        from: fromEmail,
+        to: recipientEmail,
+        subject: `Your Hubify Homes Demo Access`,
+        html,
+      });
+
+      if (error) {
+        console.error("[demo-invite] Resend error:", error);
+        return res.status(500).json({ message: "Failed to send invite email", detail: error.message });
+      }
+
+      await AuditLogger.log({ req, action: "demo_invite_sent", metadata: { recipientEmail, recipientName } });
+      res.json({ ok: true, recipientEmail });
+    } catch (error: any) {
+      console.error("Error sending demo invite:", error);
+      res.status(500).json({ message: error.message || "Failed to send demo invite" });
+    }
+  });
+
   // POST /api/super-admin/demo/seed — seed the demo tenant (idempotent)
   app.post("/api/super-admin/demo/seed", isSuperAdmin, requireMFA, async (req: any, res) => {
     try {

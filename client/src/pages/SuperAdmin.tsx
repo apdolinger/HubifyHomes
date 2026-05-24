@@ -1995,6 +1995,8 @@ function DemoTenantTab() {
   const { toast } = useToast();
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [seedConfirmOpen, setSeedConfirmOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
 
   type DemoInfo = {
     exists: boolean;
@@ -2051,6 +2053,19 @@ function DemoTenantTab() {
       toast({ title: "Demo tenant reset", description: "All demo data has been wiped and reseeded." });
     },
     onError: (e: any) => toast({ title: "Reset failed", description: e.message, variant: "destructive" }),
+  });
+
+  const inviteMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/super-admin/demo/send-invite", {
+      recipientEmail: inviteEmail.trim(),
+      recipientName: inviteName.trim() || undefined,
+    }),
+    onSuccess: () => {
+      toast({ title: "Demo invite sent!", description: `Credentials emailed to ${inviteEmail.trim()}` });
+      setInviteEmail("");
+      setInviteName("");
+    },
+    onError: (e: any) => toast({ title: "Failed to send invite", description: e.message, variant: "destructive" }),
   });
 
   const isPending = seedMutation.isPending || resetMutation.isPending;
@@ -2339,6 +2354,53 @@ function DemoTenantTab() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* ── Send Demo Invite ── */}
+          <div className="border rounded-xl bg-white overflow-hidden">
+            <div className="flex items-center gap-2 px-5 py-4 border-b bg-gray-50">
+              <Mail className="w-4 h-4 text-sky-600" />
+              <h3 className="font-semibold text-sm text-gray-800">Send Demo Invite</h3>
+              <span className="text-xs text-gray-400 ml-1">— email credentials directly to a prospect</span>
+            </div>
+            <div className="p-5 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Recipient Name <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <Input
+                    placeholder="Jane Smith"
+                    value={inviteName}
+                    onChange={e => setInviteName(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Recipient Email <span className="text-red-400">*</span></label>
+                  <Input
+                    type="email"
+                    placeholder="jane@example.com"
+                    value={inviteEmail}
+                    onChange={e => setInviteEmail(e.target.value)}
+                    className="h-8 text-sm"
+                    onKeyDown={e => { if (e.key === "Enter" && inviteEmail.trim()) inviteMutation.mutate(); }}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button
+                  size="sm"
+                  className="bg-sky-600 hover:bg-sky-700 text-white"
+                  disabled={!inviteEmail.trim() || inviteMutation.isPending}
+                  onClick={() => inviteMutation.mutate()}
+                >
+                  {inviteMutation.isPending
+                    ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Sending…</>
+                    : <><Send className="w-3.5 h-3.5 mr-1.5" />Send Invite</>
+                  }
+                </Button>
+                <p className="text-xs text-gray-400">Sends staff + portal credentials with login links in a branded email.</p>
+              </div>
             </div>
           </div>
 
