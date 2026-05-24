@@ -1674,7 +1674,13 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
 function BetaPricingCard() {
   const { toast } = useToast();
 
-  type BetaPricing = { basePrice: number; discountPct: number; clientCap: number };
+  type BetaPricing = {
+    basePrice: number;
+    tier1DiscountPct: number;
+    tier1Cap: number;
+    tier2DiscountPct: number;
+    tier2Cap: number;
+  };
 
   const { data: saved } = useQuery<BetaPricing>({
     queryKey: ["/api/super-admin/beta-pricing"],
@@ -1687,25 +1693,40 @@ function BetaPricingCard() {
   const welcomeCount = allProspects.filter(p => p.stage === "welcome").length;
 
   const [basePrice, setBasePrice] = useState(199);
-  const [discountPct, setDiscountPct] = useState(20);
-  const [clientCap, setClientCap] = useState(50);
+  const [tier1DiscountPct, setTier1DiscountPct] = useState(50);
+  const [tier1Cap, setTier1Cap] = useState(10);
+  const [tier2DiscountPct, setTier2DiscountPct] = useState(25);
+  const [tier2Cap, setTier2Cap] = useState(10);
 
   useEffect(() => {
     if (saved) {
       setBasePrice(Number(saved.basePrice ?? 199));
-      setDiscountPct(Number(saved.discountPct ?? 20));
-      setClientCap(Number(saved.clientCap ?? 50));
+      setTier1DiscountPct(Number(saved.tier1DiscountPct ?? 50));
+      setTier1Cap(Number(saved.tier1Cap ?? 10));
+      setTier2DiscountPct(Number(saved.tier2DiscountPct ?? 25));
+      setTier2Cap(Number(saved.tier2Cap ?? 10));
     }
   }, [saved]);
 
-  const isBetaOpen = welcomeCount < clientCap;
-  const discountedPrice = Math.round(basePrice * (1 - discountPct / 100) * 100) / 100;
-  const effectivePrice = isBetaOpen ? discountedPrice : basePrice;
-  const spotsRemaining = Math.max(0, clientCap - welcomeCount);
+  const totalCap = tier1Cap + tier2Cap;
+  const inTier1 = welcomeCount < tier1Cap;
+  const inTier2 = !inTier1 && welcomeCount < totalCap;
+  const isBetaOpen = welcomeCount < totalCap;
+  const currentDiscountPct = inTier1 ? tier1DiscountPct : inTier2 ? tier2DiscountPct : 0;
+  const effectivePrice = isBetaOpen
+    ? Math.round(basePrice * (1 - currentDiscountPct / 100) * 100) / 100
+    : basePrice;
+
+  const tier1Filled = Math.min(welcomeCount, tier1Cap);
+  const tier2Filled = Math.max(0, Math.min(welcomeCount - tier1Cap, tier2Cap));
+  const tier1Remaining = Math.max(0, tier1Cap - tier1Filled);
+  const tier2Remaining = Math.max(0, tier2Cap - tier2Filled);
 
   const saveMutation = useMutation({
     mutationFn: () =>
-      apiRequest("PATCH", "/api/super-admin/beta-pricing", { basePrice, discountPct, clientCap }),
+      apiRequest("PATCH", "/api/super-admin/beta-pricing", {
+        basePrice, tier1DiscountPct, tier1Cap, tier2DiscountPct, tier2Cap,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/beta-pricing"] });
       toast({ title: "Beta pricing saved" });
@@ -1715,10 +1736,11 @@ function BetaPricingCard() {
 
   return (
     <div className="border rounded-xl p-4 space-y-4">
+      {/* Header */}
       <div className="flex items-center gap-2 flex-wrap">
         <DollarSign className="w-4 h-4 text-emerald-600" />
         <h3 className="font-semibold text-sm text-gray-800">Beta Pricing</h3>
-        <span className="text-xs text-gray-400 ml-1">— Early-adopter discount for onboarding prospects</span>
+        <span className="text-xs text-gray-400 ml-1">— Two-tier early-adopter discounts for onboarding prospects</span>
         {isBetaOpen ? (
           <Badge className="ml-auto bg-emerald-100 text-emerald-800 text-xs">Beta Open</Badge>
         ) : (
@@ -1726,58 +1748,119 @@ function BetaPricingCard() {
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
-        <div>
-          <label className="text-xs text-gray-500 block mb-1">Base monthly price ($)</label>
-          <input
-            type="number"
-            min={0}
-            step={1}
-            value={basePrice}
-            onChange={e => setBasePrice(Math.max(0, Number(e.target.value)))}
-            className="w-full border rounded px-2 py-1.5 text-sm"
-          />
+      {/* Base price */}
+      <div className="max-w-[180px]">
+        <label className="text-xs text-gray-500 block mb-1">Base monthly price ($)</label>
+        <input
+          type="number"
+          min={0}
+          step={1}
+          value={basePrice}
+          onChange={e => setBasePrice(Math.max(0, Number(e.target.value)))}
+          className="w-full border rounded px-2 py-1.5 text-sm"
+        />
+      </div>
+
+      {/* Two-tier grid */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* Tier 1 */}
+        <div className="border rounded-lg p-3 space-y-3 bg-slate-50">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Tier 1 — Founding Members</span>
+            <Badge className={`text-xs ${tier1Remaining > 0 ? "bg-emerald-100 text-emerald-800" : "bg-gray-100 text-gray-500"}`}>
+              {tier1Filled}/{tier1Cap} filled
+            </Badge>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Discount (%)</label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={tier1DiscountPct}
+                onChange={e => setTier1DiscountPct(Math.min(100, Math.max(0, Number(e.target.value))))}
+                className="w-full border rounded px-2 py-1.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Member cap</label>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={tier1Cap}
+                onChange={e => setTier1Cap(Math.max(1, Number(e.target.value)))}
+                className="w-full border rounded px-2 py-1.5 text-sm"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-slate-500">
+            Price: <strong className="text-slate-700">${(basePrice * (1 - tier1DiscountPct / 100)).toFixed(2)}/mo</strong>
+            {" "}({tier1DiscountPct}% off)
+            {tier1Remaining > 0 ? ` · ${tier1Remaining} spot${tier1Remaining !== 1 ? "s" : ""} left` : " · Full"}
+          </p>
         </div>
-        <div>
-          <label className="text-xs text-gray-500 block mb-1">Beta discount (%)</label>
-          <input
-            type="number"
-            min={0}
-            max={100}
-            step={1}
-            value={discountPct}
-            onChange={e => setDiscountPct(Math.min(100, Math.max(0, Number(e.target.value))))}
-            className="w-full border rounded px-2 py-1.5 text-sm"
-          />
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 block mb-1">Beta client cap</label>
-          <input
-            type="number"
-            min={1}
-            step={1}
-            value={clientCap}
-            onChange={e => setClientCap(Math.max(1, Number(e.target.value)))}
-            className="w-full border rounded px-2 py-1.5 text-sm"
-          />
+
+        {/* Tier 2 */}
+        <div className="border rounded-lg p-3 space-y-3 bg-slate-50">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Tier 2 — Early Access</span>
+            <Badge className={`text-xs ${tier2Remaining > 0 ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-500"}`}>
+              {tier2Filled}/{tier2Cap} filled
+            </Badge>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Discount (%)</label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={tier2DiscountPct}
+                onChange={e => setTier2DiscountPct(Math.min(100, Math.max(0, Number(e.target.value))))}
+                className="w-full border rounded px-2 py-1.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Member cap</label>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={tier2Cap}
+                onChange={e => setTier2Cap(Math.max(0, Number(e.target.value)))}
+                className="w-full border rounded px-2 py-1.5 text-sm"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-slate-500">
+            Price: <strong className="text-slate-700">${(basePrice * (1 - tier2DiscountPct / 100)).toFixed(2)}/mo</strong>
+            {" "}({tier2DiscountPct}% off)
+            {tier2Remaining > 0 ? ` · ${tier2Remaining} spot${tier2Remaining !== 1 ? "s" : ""} left` : " · Full"}
+          </p>
         </div>
       </div>
 
-      {/* Live preview */}
+      {/* Live status preview */}
       <div className={`rounded-lg p-3 text-sm ${isBetaOpen ? "bg-emerald-50 border border-emerald-200" : "bg-gray-50 border border-gray-200"}`}>
         <p className="font-semibold text-gray-800">
-          {isBetaOpen
-            ? `Current price: $${effectivePrice.toFixed(2)}/mo (${discountPct}% off — beta rate)`
-            : `Standard price: $${basePrice.toFixed(2)}/mo`}
+          {inTier1
+            ? `Current: $${effectivePrice.toFixed(2)}/mo (${tier1DiscountPct}% off — Tier 1 Founding Member)`
+            : inTier2
+            ? `Current: $${effectivePrice.toFixed(2)}/mo (${tier2DiscountPct}% off — Tier 2 Early Access)`
+            : `Standard price: $${basePrice.toFixed(2)}/mo — beta program full`}
         </p>
         <p className="text-xs text-gray-500 mt-1">
-          {welcomeCount} of {clientCap} beta spot{clientCap !== 1 ? "s" : ""} filled
+          {welcomeCount} of {totalCap} total beta spot{totalCap !== 1 ? "s" : ""} filled
           {isBetaOpen
-            ? ` · ${spotsRemaining} spot${spotsRemaining !== 1 ? "s" : ""} remaining`
+            ? ` · ${totalCap - welcomeCount} spot${totalCap - welcomeCount !== 1 ? "s" : ""} remaining`
             : " · Beta is now closed"}
         </p>
         {!isBetaOpen && (
-          <Badge className="mt-2 bg-orange-100 text-orange-800 text-xs">Beta is full — standard pricing applies</Badge>
+          <Badge className="mt-2 bg-orange-100 text-orange-800 text-xs">Beta full — standard pricing applies to new signups</Badge>
         )}
       </div>
 

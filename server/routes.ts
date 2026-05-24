@@ -3780,12 +3780,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/super-admin/beta-pricing", isSuperAdmin, requireMFA, async (_req, res) => {
     try {
       const settings = await storage.getPlatformSettings();
-      const bp = settings.betaPricing as { basePrice: number; discountPct: number; clientCap: number } | undefined;
-      res.json({
-        basePrice: Number(bp?.basePrice ?? 199),
-        discountPct: Number(bp?.discountPct ?? 20),
-        clientCap: Number(bp?.clientCap ?? 50),
-      });
+      const bp = settings.betaPricing as any | undefined;
+      // Support legacy single-tier format by mapping to two-tier
+      const basePrice = Number(bp?.basePrice ?? 199);
+      const tier1DiscountPct = Number(bp?.tier1DiscountPct ?? bp?.discountPct ?? 50);
+      const tier1Cap = Number(bp?.tier1Cap ?? 10);
+      const tier2DiscountPct = Number(bp?.tier2DiscountPct ?? 25);
+      const tier2Cap = Number(bp?.tier2Cap ?? 10);
+      res.json({ basePrice, tier1DiscountPct, tier1Cap, tier2DiscountPct, tier2Cap });
     } catch (error) {
       console.error("Error fetching beta pricing:", error);
       res.status(500).json({ message: "Failed to fetch beta pricing" });
@@ -3796,8 +3798,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const schema = z.object({
         basePrice: z.number().min(0),
-        discountPct: z.number().min(0).max(100),
-        clientCap: z.number().int().min(1),
+        tier1DiscountPct: z.number().min(0).max(100),
+        tier1Cap: z.number().int().min(1),
+        tier2DiscountPct: z.number().min(0).max(100),
+        tier2Cap: z.number().int().min(0),
       });
       const result = schema.safeParse(req.body);
       if (!result.success) {
@@ -14507,31 +14511,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/public/pricing", async (_req, res) => {
     try {
       const settings = await storage.getPlatformSettings();
-      const bp = settings.betaPricing as { basePrice: number; discountPct: number; clientCap: number } | undefined;
+      const bp = settings.betaPricing as any | undefined;
       const basePrice = Number(bp?.basePrice ?? 199);
-      const discountPct = Number(bp?.discountPct ?? 20);
-      const clientCap = Number(bp?.clientCap ?? 50);
+      const tier1DiscountPct = Number(bp?.tier1DiscountPct ?? bp?.discountPct ?? 50);
+      const tier1Cap = Number(bp?.tier1Cap ?? 10);
+      const tier2DiscountPct = Number(bp?.tier2DiscountPct ?? 25);
+      const tier2Cap = Number(bp?.tier2Cap ?? 10);
+      const totalCap = tier1Cap + tier2Cap;
 
       const [{ welcomeCount }] = await db
         .select({ welcomeCount: count() })
         .from(onboardingProspects)
         .where(eq(onboardingProspects.stage, "welcome"));
 
-      const isBetaOpen = welcomeCount < clientCap;
+      const inTier1 = welcomeCount < tier1Cap;
+      const inTier2 = !inTier1 && welcomeCount < totalCap;
+      const isBetaOpen = welcomeCount < totalCap;
+      const currentDiscountPct = inTier1 ? tier1DiscountPct : inTier2 ? tier2DiscountPct : 0;
       const effectivePrice = isBetaOpen
-        ? Math.round(basePrice * (1 - discountPct / 100) * 100) / 100
+        ? Math.round(basePrice * (1 - currentDiscountPct / 100) * 100) / 100
         : basePrice;
+      const currentTier = inTier1 ? 1 : inTier2 ? 2 : null;
 
       res.json({
         basePrice,
-        discountPct,
-        clientCap,
+        tier1DiscountPct,
+        tier1Cap,
+        tier2DiscountPct,
+        tier2Cap,
+        totalCap,
         welcomeCount,
         isBetaOpen,
+        currentTier,
+        currentDiscountPct,
         effectivePrice,
         currency: "USD",
-        label: isBetaOpen
-          ? `$${effectivePrice.toFixed(2)}/mo (${discountPct}% beta discount)`
+        label: inTier1
+          ? `$${effectivePrice.toFixed(2)}/mo (${tier1DiscountPct}% off — Founding Member)`
+          : inTier2
+          ? `$${effectivePrice.toFixed(2)}/mo (${tier2DiscountPct}% off — Early Access)`
           : `$${basePrice.toFixed(2)}/mo`,
       });
     } catch (error) {
