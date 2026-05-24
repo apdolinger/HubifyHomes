@@ -3389,6 +3389,11 @@ export const onboardingProspects = pgTable("onboarding_prospects", {
   trialIntent: varchar("trial_intent"),
   preferredContactMethod: varchar("preferred_contact_method"),
   submissionStatus: varchar("submission_status").default("new"),
+  trialStartedAt: timestamp("trial_started_at"),
+  trialEndsAt: timestamp("trial_ends_at"),
+  trialStatus: varchar("trial_status").default("inactive"),
+  trialWarningSentAt: timestamp("trial_warning_sent_at"),
+  trialExpiredEmailSentAt: timestamp("trial_expired_email_sent_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [

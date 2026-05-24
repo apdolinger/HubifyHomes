@@ -14649,6 +14649,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
         submissionStatus: "new",
       });
 
+      // Start trial if intent qualifies
+      const TRIAL_INTENTS = ["free_trial", "ready_onboarding"];
+      if (data.trialIntent && TRIAL_INTENTS.includes(data.trialIntent)) {
+        const now = new Date();
+        const trialEndsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+        try {
+          await storage.updateOnboardingProspect(prospect.id, {
+            trialStartedAt: now,
+            trialEndsAt,
+            trialStatus: "active",
+          } as any);
+        } catch (err) {
+          console.warn("[submission-form] Failed to set trial fields:", err);
+        }
+
+        // Welcome email
+        if (resend && process.env.RESEND_FROM_EMAIL) {
+          const fromEmail = process.env.RESEND_FROM_EMAIL;
+          const trialEndFormatted = trialEndsAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+          resend.emails.send({
+            from: fromEmail,
+            to: data.email,
+            subject: `Welcome to Hubify Homes — Your 30-Day Demo Has Started`,
+            html: `
+              <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
+                <div style="text-align:center;margin-bottom:28px">
+                  <img src="https://hubifyhomes.com/hubify-logo.png" alt="Hubify" width="130" style="height:auto;display:inline-block" onerror="this.style.display='none'" />
+                  <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px;margin-top:4px">Hubify Homes</div>
+                </div>
+                <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Welcome, ${data.firstName}! Your 30-day demo is live.</h1>
+                <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
+                  Thank you for submitting your information for <strong>${data.company}</strong>. Your 30-day demo access has been activated and runs through <strong>${trialEndFormatted}</strong>.
+                </p>
+                <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;padding:20px;margin-bottom:28px">
+                  <p style="font-size:14px;font-weight:700;color:#0d9488;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.05em">What happens next</p>
+                  <ol style="padding-left:18px;margin:0;color:#0f172a;font-size:14px;line-height:1.9">
+                    <li>Our team will review your submission — typically within one business day.</li>
+                    <li>We'll reach out to schedule a short discovery call and tailor your demo environment.</li>
+                    <li>You'll receive your personalized access details once your workspace is configured.</li>
+                  </ol>
+                </div>
+                <h2 style="font-size:16px;font-weight:700;color:#0f172a;margin:0 0 10px">Why Hubify Homes?</h2>
+                <p style="font-size:14px;color:#475569;line-height:1.7;margin:0 0 24px">
+                  Hubify is built specifically for home watch and estate management companies — streamlining everything from invoice batching and client billing to team scheduling, task management, and property documentation, all in one place.
+                </p>
+                <div style="text-align:center;margin-bottom:32px">
+                  <a href="https://hubifyhomes.com" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
+                    Explore Hubify Homes
+                  </a>
+                </div>
+                <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
+                <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
+                  Questions? Simply reply to this email — we're happy to help.<br/>
+                  You received this because you submitted an inquiry at Hubify Homes.
+                </p>
+              </div>
+            `,
+          }).catch((err: any) => console.warn("[submission-form] trial welcome email failed:", err));
+        }
+      }
+
       // Admin notification email — only send when all three env vars are set
       if (resend && process.env.RESEND_FROM_EMAIL && process.env.SUPPORT_EMAIL) {
         const fromEmail = process.env.RESEND_FROM_EMAIL;

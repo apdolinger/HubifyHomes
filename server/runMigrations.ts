@@ -344,6 +344,25 @@ export async function ensureProspectConfirmationEmailTemplateTable(): Promise<vo
   }
 }
 
+export async function ensureTrialColumns(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE onboarding_prospects
+        ADD COLUMN IF NOT EXISTS trial_started_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS trial_status VARCHAR DEFAULT 'inactive',
+        ADD COLUMN IF NOT EXISTS trial_warning_sent_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS trial_expired_email_sent_at TIMESTAMP;
+    `);
+    log("[MIGRATE] onboarding_prospects trial columns verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add trial columns to onboarding_prospects: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensureCookieConsentPreferenceColumn(): Promise<void> {
   const client = await pool.connect();
   try {

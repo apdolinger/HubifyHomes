@@ -1573,4 +1573,217 @@ export function startScheduledTasks() {
   });
 
   log('[CRON] Stage email auto-send job initialized - will run daily at 9am');
+
+  // Run trial lifecycle job daily at 7am
+  cron.schedule('0 7 * * *', async () => {
+    try {
+      log('[CRON] Running trial lifecycle job...');
+      const result = await runTrialLifecycleJob();
+      log(`[CRON] Trial lifecycle job complete: ${result.warningSent} warning(s) sent, ${result.expiredSent} expiration(s) sent.`);
+    } catch (error) {
+      log(`[CRON] Error in trial lifecycle job: ${error}`);
+    }
+  });
+
+  log('[CRON] Trial lifecycle job initialized - will run daily at 7am');
+}
+
+// ─── Trial lifecycle helpers ────────────────────────────────────────────────
+
+function buildTrialWelcomeEmail(prospect: { name: string; email: string; company: string | null; trialEndsAt: Date | null }): { subject: string; html: string } {
+  const trialEndFormatted = prospect.trialEndsAt
+    ? prospect.trialEndsAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    : '30 days from today';
+  const firstName = prospect.name.split(' ')[0] || prospect.name;
+  return {
+    subject: 'Welcome to Hubify Homes — Your 30-Day Demo Has Started',
+    html: `
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
+        <div style="text-align:center;margin-bottom:28px">
+          <img src="https://hubifyhomes.com/hubify-logo.png" alt="Hubify" width="130" style="height:auto;display:inline-block" onerror="this.style.display='none'" />
+          <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px;margin-top:4px">Hubify Homes</div>
+        </div>
+        <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Welcome, ${escapeHtml(firstName)}! Your 30-day demo is live.</h1>
+        <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
+          Thank you for submitting your information${prospect.company ? ` for <strong>${escapeHtml(prospect.company)}</strong>` : ''}. Your 30-day demo access has been activated and runs through <strong>${trialEndFormatted}</strong>.
+        </p>
+        <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;padding:20px;margin-bottom:28px">
+          <p style="font-size:14px;font-weight:700;color:#0d9488;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.05em">What happens next</p>
+          <ol style="padding-left:18px;margin:0;color:#0f172a;font-size:14px;line-height:1.9">
+            <li>Our team will review your submission — typically within one business day.</li>
+            <li>We'll reach out to schedule a short discovery call and tailor your demo environment.</li>
+            <li>You'll receive your personalized access details once your workspace is configured.</li>
+          </ol>
+        </div>
+        <h2 style="font-size:16px;font-weight:700;color:#0f172a;margin:0 0 10px">Why Hubify Homes?</h2>
+        <p style="font-size:14px;color:#475569;line-height:1.7;margin:0 0 24px">
+          Hubify is built specifically for home watch and estate management companies — streamlining invoice batching, client billing, team scheduling, task management, and property documentation, all in one place.
+        </p>
+        <div style="text-align:center;margin-bottom:32px">
+          <a href="https://hubifyhomes.com" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
+            Explore Hubify Homes
+          </a>
+        </div>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
+        <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
+          Questions? Simply reply to this email — we're happy to help.<br/>
+          You received this because you submitted an inquiry at Hubify Homes.
+        </p>
+      </div>
+    `,
+  };
+}
+
+function buildTrialExpiringEmail(prospect: { name: string; email: string; company: string | null }, daysLeft: number): { subject: string; html: string } {
+  const firstName = prospect.name.split(' ')[0] || prospect.name;
+  return {
+    subject: 'Your Hubify Homes Demo Ends Soon',
+    html: `
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
+        <div style="text-align:center;margin-bottom:28px">
+          <img src="https://hubifyhomes.com/hubify-logo.png" alt="Hubify" width="130" style="height:auto;display:inline-block" onerror="this.style.display='none'" />
+          <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px;margin-top:4px">Hubify Homes</div>
+        </div>
+        <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${escapeHtml(firstName)}, your demo ends in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}.</h1>
+        <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
+          Your 30-day Hubify Homes demo${prospect.company ? ` for <strong>${escapeHtml(prospect.company)}</strong>` : ''} is coming to a close. Here's what you should know before it ends.
+        </p>
+        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:20px;margin-bottom:28px">
+          <p style="font-size:14px;font-weight:700;color:#d97706;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.05em">Action recommended</p>
+          <ul style="padding-left:18px;margin:0;color:#0f172a;font-size:14px;line-height:1.9">
+            <li>Finalize any setup or configuration you'd like completed during the demo period.</li>
+            <li>Reach out to our team if you have questions about onboarding or next steps.</li>
+            <li>After your demo ends, our team will be in touch to discuss moving forward.</li>
+          </ul>
+        </div>
+        <p style="font-size:14px;color:#475569;line-height:1.7;margin:0 0 24px">
+          We want to make sure your transition to Hubify is as smooth as possible. If there's anything we can help with before your demo expires, don't hesitate to reply to this email.
+        </p>
+        <div style="text-align:center;margin-bottom:32px">
+          <a href="https://hubifyhomes.com" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
+            Contact Us
+          </a>
+        </div>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
+        <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
+          You received this because you started a demo at Hubify Homes.<br/>
+          Questions? Reply to this email and our team will get back to you.
+        </p>
+      </div>
+    `,
+  };
+}
+
+function buildTrialExpiredEmail(prospect: { name: string; email: string; company: string | null }): { subject: string; html: string } {
+  const firstName = prospect.name.split(' ')[0] || prospect.name;
+  return {
+    subject: 'Your Hubify Homes Demo Has Ended',
+    html: `
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
+        <div style="text-align:center;margin-bottom:28px">
+          <img src="https://hubifyhomes.com/hubify-logo.png" alt="Hubify" width="130" style="height:auto;display:inline-block" onerror="this.style.display='none'" />
+          <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px;margin-top:4px">Hubify Homes</div>
+        </div>
+        <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${escapeHtml(firstName)}, your 30-day demo has ended.</h1>
+        <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
+          Your 30-day Hubify Homes demo${prospect.company ? ` for <strong>${escapeHtml(prospect.company)}</strong>` : ''} has ended. Your organization is now ready to transition into billing activation and full onboarding.
+        </p>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px;margin-bottom:28px">
+          <p style="font-size:14px;font-weight:700;color:#0f172a;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.05em">Next steps</p>
+          <ol style="padding-left:18px;margin:0;color:#0f172a;font-size:14px;line-height:1.9">
+            <li>A member of our team will reach out to guide you through the full onboarding process.</li>
+            <li>If you have any outstanding setup questions, reply to this email and we'll help you get sorted.</li>
+            <li>We're excited to support ${prospect.company ? escapeHtml(prospect.company) : 'your organization'} as you move forward with Hubify.</li>
+          </ol>
+        </div>
+        <p style="font-size:14px;color:#475569;line-height:1.7;margin:0 0 24px">
+          If your billing or setup is still in progress, don't worry — our team is here to help you complete the process. Simply reply to this email or reach out directly.
+        </p>
+        <div style="text-align:center;margin-bottom:32px">
+          <a href="https://hubifyhomes.com" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
+            Get in Touch
+          </a>
+        </div>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
+        <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
+          You received this because you started a demo at Hubify Homes.<br/>
+          Questions? Reply to this email and our team will get back to you.
+        </p>
+      </div>
+    `,
+  };
+}
+
+export async function runTrialLifecycleJob(): Promise<{ warningSent: number; expiredSent: number }> {
+  const prospects = await storage.listOnboardingProspects();
+  const now = new Date();
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+
+  const fromEmail = process.env.RESEND_FROM_EMAIL;
+  let resendClient: import('resend').Resend | null = null;
+  if (process.env.RESEND_API_KEY && fromEmail) {
+    const { Resend } = await import('resend');
+    resendClient = new Resend(process.env.RESEND_API_KEY);
+  }
+
+  let warningSent = 0;
+  let expiredSent = 0;
+
+  for (const prospect of prospects) {
+    const endsAt: Date | null = prospect.trialEndsAt ? new Date(prospect.trialEndsAt as any) : null;
+    if (!endsAt) continue;
+
+    const status = prospect.trialStatus ?? 'inactive';
+    const msUntilExpiry = endsAt.getTime() - now.getTime();
+
+    // Expiration check first (takes precedence over warning)
+    if (
+      ['active', 'expiring_soon'].includes(status) &&
+      !prospect.trialExpiredEmailSentAt &&
+      msUntilExpiry <= 0
+    ) {
+      try {
+        if (resendClient && fromEmail) {
+          const { subject, html } = buildTrialExpiredEmail(prospect);
+          await resendClient.emails.send({ from: fromEmail, to: prospect.email, subject, html });
+          log(`[TRIAL] Expired email sent to ${prospect.email}`);
+        }
+        await storage.updateOnboardingProspect(prospect.id, {
+          trialStatus: 'expired',
+          trialExpiredEmailSentAt: now,
+        } as any);
+        expiredSent++;
+      } catch (err) {
+        log(`[TRIAL] Failed to process expiry for ${prospect.email}: ${err}`);
+      }
+      continue; // skip warning check for this prospect
+    }
+
+    // 7-day warning check
+    if (
+      status === 'active' &&
+      !prospect.trialWarningSentAt &&
+      msUntilExpiry > 0 &&
+      msUntilExpiry <= sevenDaysMs
+    ) {
+      const daysLeft = Math.ceil(msUntilExpiry / (24 * 60 * 60 * 1000));
+      try {
+        if (resendClient && fromEmail) {
+          const { subject, html } = buildTrialExpiringEmail(prospect, daysLeft);
+          await resendClient.emails.send({ from: fromEmail, to: prospect.email, subject, html });
+          log(`[TRIAL] Warning email sent to ${prospect.email} (${daysLeft}d remaining)`);
+        }
+        await storage.updateOnboardingProspect(prospect.id, {
+          trialStatus: 'expiring_soon',
+          trialWarningSentAt: now,
+        } as any);
+        warningSent++;
+      } catch (err) {
+        log(`[TRIAL] Failed to process warning for ${prospect.email}: ${err}`);
+      }
+    }
+  }
+
+  log(`[TRIAL] Lifecycle job done — ${warningSent} warning(s), ${expiredSent} expired notice(s).`);
+  return { warningSent, expiredSent };
 }
