@@ -1,4 +1,4 @@
-import { SubmissionFormContent } from "@/components/SubmissionModal";
+import { SubmissionForm } from "@/components/SubmissionForm";
 import { HUBIFY_HOMES_LOGO_URL, HUBIFY_HOMES_LOGO_ALT } from "@/lib/brand";
 
 export default function Submissions() {
@@ -20,7 +20,7 @@ export default function Submissions() {
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
-            <SubmissionFormContent />
+            <SubmissionForm />
           </div>
         </div>
       </main>
