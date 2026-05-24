@@ -412,6 +412,24 @@ export async function ensureOrganizationServicesTable(): Promise<void> {
   }
 }
 
+export async function ensureDemoProspectColumns(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE onboarding_prospects
+        ADD COLUMN IF NOT EXISTS source VARCHAR,
+        ADD COLUMN IF NOT EXISTS demo_access_sent BOOLEAN NOT NULL DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS demo_email_sent_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS demo_email_error TEXT;
+    `);
+    log("[MIGRATE] onboarding_prospects demo columns verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add demo columns to onboarding_prospects: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensureCookieConsentPreferenceColumn(): Promise<void> {
   const client = await pool.connect();
   try {

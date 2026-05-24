@@ -3357,7 +3357,13 @@ export type OnboardingStage =
   | "payment_setup"
   | "initial_payment"
   | "welcome"
-  | "dropped";
+  | "dropped"
+  | "demo_requested"
+  | "demo_sent"
+  | "demo_completed"
+  | "follow_up_needed"
+  | "converted"
+  | "not_a_fit";
 
 export type StageHistoryEntry = { stage: OnboardingStage; enteredAt: string };
 
@@ -3396,6 +3402,10 @@ export const onboardingProspects = pgTable("onboarding_prospects", {
   trialExpiredEmailSentAt: timestamp("trial_expired_email_sent_at"),
   confirmationEmailSentAt: timestamp("confirmation_email_sent_at"),
   confirmationEmailStatus: varchar("confirmation_email_status"),
+  source: varchar("source"),
+  demoAccessSent: boolean("demo_access_sent").notNull().default(false),
+  demoEmailSentAt: timestamp("demo_email_sent_at"),
+  demoEmailError: text("demo_email_error"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
@@ -3411,6 +3421,12 @@ export const onboardingStageEnum = z.enum([
   "initial_payment",
   "welcome",
   "dropped",
+  "demo_requested",
+  "demo_sent",
+  "demo_completed",
+  "follow_up_needed",
+  "converted",
+  "not_a_fit",
 ]);
 
 export const insertOnboardingProspectSchema = createInsertSchema(onboardingProspects).omit({

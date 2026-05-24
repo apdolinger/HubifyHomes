@@ -8,6 +8,7 @@ import SubmissionModal from "@/components/SubmissionModal";
 
 export default function Landing() {
   const [isSubmitOpen, setIsSubmitOpen] = useState(false);
+  const [isDemoOpen, setIsDemoOpen] = useState(false);
 
   const handleLogin = async () => {
     // For development, use the dev login endpoint
@@ -111,6 +112,14 @@ export default function Landing() {
               Get Started
             </Button>
             <Button
+              onClick={() => setIsDemoOpen(true)}
+              size="lg"
+              variant="outline"
+              className="border-teal-500 text-teal-700 hover:bg-teal-50 px-8 py-3 text-lg"
+            >
+              Request a Demo
+            </Button>
+            <Button
               onClick={handleLogin}
               size="lg"
               variant="outline"
@@ -165,7 +174,7 @@ export default function Landing() {
           <p className="mt-4 text-lg text-slate-600">
             Join professional property managers who trust Hubify
           </p>
-          <div className="mt-8">
+          <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
             <Button
               onClick={() => setIsSubmitOpen(true)}
               size="lg"
@@ -173,11 +182,20 @@ export default function Landing() {
             >
               Request Access
             </Button>
+            <Button
+              onClick={() => setIsDemoOpen(true)}
+              size="lg"
+              variant="outline"
+              className="border-teal-500 text-teal-700 hover:bg-teal-50"
+            >
+              Request a Demo
+            </Button>
           </div>
         </div>
       </div>
 
       <SubmissionModal open={isSubmitOpen} onOpenChange={setIsSubmitOpen} />
+      <SubmissionModal open={isDemoOpen} onOpenChange={setIsDemoOpen} initialIntent="need_demo" />
 
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200 py-6 mt-12">

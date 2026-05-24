@@ -1,0 +1,119 @@
+Build a Demo Request / Onboarding flow connected to the marketing page and Super Admin.
+
+Goal:
+A visitor on hubifyhomes.com clicks “Request Demo,” fills out a simple form, and that submission appears inside Super Admin as a new onboarding/demo lead. Demo should become a phase/status in the onboarding flow. After submission, the system should send the prospect an email with demo access instructions.
+
+Flow:
+
+1. Marketing page form
+Create or connect a “Request Demo” form on hubifyhomes.com.
+
+Fields:
+- First name
+- Last name
+- Company name
+- Email
+- Phone
+- Business type
+- Number of properties managed
+- Message / notes
+- Requested demo access checkbox or hidden source field
+
+Submit button:
+Request Demo
+
+2. Backend endpoint
+Create an API endpoint such as:
+
+POST /api/demo-request
+
+This endpoint should:
+- validate required fields
+- save the person/company as a lead or onboarding record
+- mark source as “Marketing Demo Request”
+- set onboarding phase/status to “Demo Requested”
+- create a timestamp
+- optionally create a note saying “Demo access requested from marketing site”
+
+3. Super Admin onboarding integration
+In Super Admin, add these records into the onboarding flow.
+
+Add or support onboarding phases:
+- New Lead
+- Demo Requested
+- Demo Sent
+- Demo Completed
+- Follow-Up Needed
+- Converted
+- Not a Fit
+
+The new demo request should appear in Super Admin with:
+- contact name
+- company
+- email
+- phone
+- property count
+- request date
+- onboarding phase
+- notes/message
+- actions
+
+4. Super Admin actions
+For each demo lead, add actions:
+- View details
+- Mark Demo Sent
+- Mark Demo Completed
+- Send Demo Access Email
+- Convert to Client / Organization
+- Archive / Not a Fit
+
+5. Demo access email
+When a demo request is submitted, send an email to the prospect using the existing email system.
+
+Email should include:
+- thank you message
+- demo site link: https://demo.hubifyhomesonline.com
+- staff demo login:
+  demo@hubifyhomesonline.com
+  Demo2026!
+- optional portal client login:
+  client@demo.hubifyhomesonline.com
+  DemoClient2026!
+- short explanation that this is a sample demo environment
+
+Also send an internal notification/email to Drew with the lead details.
+
+6. Email state tracking
+After the email is sent:
+- update onboarding phase to “Demo Sent”
+- save email_sent_at timestamp
+- save demo_access_sent = true
+
+If the email fails:
+- keep the phase as “Demo Requested”
+- show email error in Super Admin
+- allow Super Admin to manually resend
+
+7. Super Admin Demo tab connection
+On the existing Super Admin Demo tab, add a section called “Demo Requests” or link to onboarding leads filtered by Demo Requested/Demo Sent.
+
+This section should show:
+- total demo requests
+- demo sent count
+- demo completed count
+- follow-up needed count
+- most recent requests
+
+8. Security and safety
+Do not create a new demo tenant for every request.
+All prospects should receive access to the shared demo environment:
+https://demo.hubifyhomesonline.com
+
+The demo reset feature should remain Super Admin-only.
+
+9. Expected result
+A visitor can request demo access from hubifyhomes.com.
+Their information is saved into Super Admin onboarding.
+They receive the demo access email.
+Drew can track them through the onboarding phases.
+Drew can follow up, mark demo complete, or convert them into a real client later.

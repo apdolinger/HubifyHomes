@@ -105,6 +105,7 @@ import { eq, lt, and, desc, inArray, count } from "drizzle-orm";
 import { Resend } from "resend";
 import { dispatchWebhookEvent, sendTestWebhookEvent, validateWebhookUrlSafe } from "./webhookDispatcher";
 import { seedDemoTenant, resetDemoTenant, DEMO_ORG_ID, DEMO_DOMAIN, DEMO_ADMIN_EMAIL } from "./demoSeed";
+import { buildTrialWelcomeEmail } from "./scheduledTasks";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
@@ -3888,6 +3889,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching demo info:", error);
       res.status(500).json({ message: "Failed to fetch demo info" });
+    }
+  });
+
+  // GET /api/super-admin/demo/requests-summary — demo lead funnel stats
+  app.get("/api/super-admin/demo/requests-summary", isSuperAdmin, requireMFA, async (_req, res) => {
+    try {
+      const DEMO_STAGES = ["demo_requested", "demo_sent", "demo_completed", "follow_up_needed", "converted", "not_a_fit"];
+      const rows = await db
+        .select({ stage: onboardingProspects.stage, id: onboardingProspects.id, name: onboardingProspects.name, company: onboardingProspects.company, email: onboardingProspects.email, demoAccessSent: onboardingProspects.demoAccessSent, demoEmailSentAt: onboardingProspects.demoEmailSentAt, demoEmailError: onboardingProspects.demoEmailError, createdAt: onboardingProspects.createdAt })
+        .from(onboardingProspects)
+        .where(inArray(onboardingProspects.stage as any, DEMO_STAGES))
+        .orderBy(desc(onboardingProspects.createdAt));
+
+      const stageCounts = DEMO_STAGES.reduce<Record<string, number>>((acc, s) => {
+        acc[s] = rows.filter(r => r.stage === s).length;
+        return acc;
+      }, {});
+
+      const total = rows.length;
+      const sent = (stageCounts.demo_sent ?? 0) + (stageCounts.demo_completed ?? 0) + (stageCounts.follow_up_needed ?? 0) + (stageCounts.converted ?? 0);
+      const recent = rows.slice(0, 10);
+
+      res.json({ total, stageCounts, sent, recent });
+    } catch (error) {
+      console.error("Error fetching demo requests summary:", error);
+      res.status(500).json({ message: "Failed to fetch demo requests summary" });
     }
   });
 
@@ -14862,7 +14889,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         phone: data.phone ?? null,
         company: data.company,
         notes: data.notes ?? null,
-        stage: "inquiry",
+        stage: data.trialIntent === "need_demo" ? "demo_requested" : "inquiry",
         firstName: data.firstName,
         lastName: data.lastName,
         website: data.website ?? null,
@@ -14875,7 +14902,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
         trialIntent: data.trialIntent ?? null,
         preferredContactMethod: data.preferredContactMethod ?? null,
         submissionStatus: "new",
-      });
+        source: data.trialIntent === "need_demo" ? "marketing_demo_request" : null,
+      } as any);
+
+      // ── Demo request flow ─────────────────────────────────────────────────
+      if (data.trialIntent === "need_demo") {
+        const fromEmail = process.env.RESEND_FROM_EMAIL;
+        let demoEmailSent = false;
+        let demoEmailError: string | null = null;
+
+        if (resend && fromEmail) {
+          try {
+            await resend.emails.send({
+              from: fromEmail,
+              to: data.email,
+              subject: `Your Hubify demo request has been received`,
+              html: `
+                <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
+                  <div style="text-align:center;margin-bottom:28px">
+                    <img src="https://hubifyhomes.com/hubify-logo.png" alt="Hubify" width="130" style="height:auto;display:inline-block" onerror="this.style.display='none'" />
+                    <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px;margin-top:4px">Hubify Homes</div>
+                  </div>
+                  <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${data.firstName}, your demo request is in!</h1>
+                  <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
+                    Thanks for your interest in Hubify Homes. We received your demo request for <strong>${data.company}</strong>
+                    and our team will be in touch within one business day to schedule a personalized walkthrough.
+                  </p>
+                  <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;padding:20px;margin-bottom:28px">
+                    <p style="font-size:14px;font-weight:700;color:#0d9488;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.05em">While you wait, try our shared demo</p>
+                    <table style="width:100%;font-size:14px;border-collapse:collapse">
+                      <tr>
+                        <td style="padding:4px 0;color:#64748b;width:130px">Demo URL</td>
+                        <td style="padding:4px 0"><a href="https://demo.hubifyhomesonline.com" style="color:#0d9488;font-weight:600">demo.hubifyhomesonline.com</a></td>
+                      </tr>
+                      <tr>
+                        <td style="padding:4px 0;color:#64748b">Staff login</td>
+                        <td style="padding:4px 0;color:#0f172a;font-weight:600">demo@hubifyhomesonline.com</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:4px 0;color:#64748b">Password</td>
+                        <td style="padding:4px 0;color:#0f172a;font-weight:600">Demo2026!</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:4px 0;color:#64748b;vertical-align:top">Portal client</td>
+                        <td style="padding:4px 0;color:#0f172a">client@demo.hubifyhomesonline.com<br/>DemoClient2026!</td>
+                      </tr>
+                    </table>
+                  </div>
+                  <p style="font-size:14px;color:#475569;line-height:1.7;margin:0 0 24px">
+                    The shared demo environment includes 10 sample properties, real task and invoice workflows, staff scheduling, client portal access, and more — so you can explore Hubify at your own pace.
+                  </p>
+                  <div style="text-align:center;margin-bottom:32px">
+                    <a href="https://demo.hubifyhomesonline.com" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
+                      Explore the Demo
+                    </a>
+                  </div>
+                  <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
+                  <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
+                    Questions? Simply reply to this email — we're happy to help.<br/>
+                    You received this because you submitted a demo request at Hubify Homes.
+                  </p>
+                </div>
+              `,
+            });
+            demoEmailSent = true;
+          } catch (err: any) {
+            console.warn("[demo-request] prospect email failed:", err);
+            demoEmailError = `failed: ${err?.message ?? String(err)}`.slice(0, 255);
+          }
+        } else {
+          demoEmailError = "failed: email service not configured";
+        }
+
+        // Internal alert to Drew
+        const alertTo = process.env.SUPPORT_EMAIL || process.env.ADMIN_EMAIL;
+        if (resend && fromEmail && alertTo) {
+          resend.emails.send({
+            from: fromEmail,
+            to: alertTo,
+            replyTo: data.email,
+            subject: `New demo request — ${data.firstName} ${data.lastName} (${data.company})`,
+            html: `
+              <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
+                <h2 style="color:#0d9488;margin-bottom:4px">New Demo Request</h2>
+                <p style="color:#64748b;font-size:14px;margin-top:0">Submitted via the Hubify Homes marketing site</p>
+                <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0"/>
+                <table style="width:100%;border-collapse:collapse;font-size:14px">
+                  <tr><td style="padding:6px 0;color:#64748b;width:150px">Name</td><td style="padding:6px 0;color:#0f172a;font-weight:600">${data.firstName} ${data.lastName}</td></tr>
+                  <tr><td style="padding:6px 0;color:#64748b">Email</td><td style="padding:6px 0"><a href="mailto:${data.email}" style="color:#0d9488">${data.email}</a></td></tr>
+                  ${data.phone ? `<tr><td style="padding:6px 0;color:#64748b">Phone</td><td style="padding:6px 0;color:#0f172a">${data.phone}</td></tr>` : ""}
+                  <tr><td style="padding:6px 0;color:#64748b">Organization</td><td style="padding:6px 0;color:#0f172a">${data.company}</td></tr>
+                  ${data.estimatedHomes ? `<tr><td style="padding:6px 0;color:#64748b">Est. Homes</td><td style="padding:6px 0;color:#0f172a">${data.estimatedHomes}</td></tr>` : ""}
+                  ${suggestedTier ? `<tr><td style="padding:6px 0;color:#64748b">Suggested Tier</td><td style="padding:6px 0;color:#0d9488;font-weight:600">${suggestedTier}</td></tr>` : ""}
+                  <tr><td style="padding:6px 0;color:#64748b">Demo email</td><td style="padding:6px 0">${demoEmailSent ? '<span style="color:#16a34a;font-weight:600">Sent ✓</span>' : `<span style="color:#dc2626">Failed — ${demoEmailError ?? "unknown"}</span>`}</td></tr>
+                </table>
+                ${data.notes ? `<div style="margin-top:16px;padding:14px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0"><p style="margin:0 0 6px;color:#64748b;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Notes</p><p style="margin:0;color:#0f172a;font-size:14px;white-space:pre-wrap">${data.notes}</p></div>` : ""}
+                <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0"/>
+                <p style="font-size:12px;color:#94a3b8">Lead added to the Hubify onboarding pipeline as <strong>Demo Requested</strong>. Log in to Super Admin → Onboarding to manage this lead.</p>
+              </div>
+            `,
+          }).catch((err: any) => console.warn("[demo-request] admin alert failed:", err));
+        }
+
+        // Update prospect with email outcome
+        await storage.updateOnboardingProspect(prospect.id, {
+          stage: demoEmailSent ? "demo_sent" : "demo_requested",
+          demoAccessSent: demoEmailSent,
+          demoEmailSentAt: demoEmailSent ? new Date() : undefined,
+          demoEmailError: demoEmailError ?? undefined,
+        } as any).catch((e: any) => console.warn("[demo-request] failed to update prospect:", e));
+
+        return res.status(201).json({ id: prospect.id, message: "Demo request received" });
+      }
 
       // Start trial if intent qualifies
       const TRIAL_INTENTS = ["free_trial", "ready_onboarding"];
@@ -14892,49 +15030,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.warn("[submission-form] Failed to set trial fields:", err);
         }
 
-        // Welcome email
+        // Welcome email — use shared builder from scheduledTasks.ts
         if (resend && process.env.RESEND_FROM_EMAIL) {
           const fromEmail = process.env.RESEND_FROM_EMAIL;
-          const trialEndFormatted = trialEndsAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-          resend.emails.send({
-            from: fromEmail,
-            to: data.email,
-            subject: `Welcome to Hubify Homes — Your 30-Day Demo Has Started`,
-            html: `
-              <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
-                <div style="text-align:center;margin-bottom:28px">
-                  <img src="https://hubifyhomes.com/hubify-logo.png" alt="Hubify" width="130" style="height:auto;display:inline-block" onerror="this.style.display='none'" />
-                  <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px;margin-top:4px">Hubify Homes</div>
-                </div>
-                <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Welcome, ${data.firstName}! Your 30-day demo is live.</h1>
-                <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
-                  Thank you for submitting your information for <strong>${data.company}</strong>. Your 30-day demo access has been activated and runs through <strong>${trialEndFormatted}</strong>.
-                </p>
-                <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;padding:20px;margin-bottom:28px">
-                  <p style="font-size:14px;font-weight:700;color:#0d9488;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.05em">What happens next</p>
-                  <ol style="padding-left:18px;margin:0;color:#0f172a;font-size:14px;line-height:1.9">
-                    <li>Our team will review your submission — typically within one business day.</li>
-                    <li>We'll reach out to schedule a short discovery call and tailor your demo environment.</li>
-                    <li>You'll receive your personalized access details once your workspace is configured.</li>
-                  </ol>
-                </div>
-                <h2 style="font-size:16px;font-weight:700;color:#0f172a;margin:0 0 10px">Why Hubify Homes?</h2>
-                <p style="font-size:14px;color:#475569;line-height:1.7;margin:0 0 24px">
-                  Hubify is built specifically for home watch and estate management companies — streamlining everything from invoice batching and client billing to team scheduling, task management, and property documentation, all in one place.
-                </p>
-                <div style="text-align:center;margin-bottom:32px">
-                  <a href="https://hubifyhomes.com" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
-                    Explore Hubify Homes
-                  </a>
-                </div>
-                <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
-                <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
-                  Questions? Simply reply to this email — we're happy to help.<br/>
-                  You received this because you submitted an inquiry at Hubify Homes.
-                </p>
-              </div>
-            `,
-          }).catch((err: any) => console.warn("[submission-form] trial welcome email failed:", err));
+          const welcomeProspect = {
+            name: `${data.firstName} ${data.lastName ?? ""}`.trim(),
+            email: data.email,
+            company: data.company ?? null,
+            trialEndsAt,
+          };
+          const { subject: welcomeSubject, html: welcomeHtml } = buildTrialWelcomeEmail(welcomeProspect);
+          resend.emails.send({ from: fromEmail, to: data.email, subject: welcomeSubject, html: welcomeHtml })
+            .catch((err: any) => console.warn("[submission-form] trial welcome email failed:", err));
         }
       }
 
@@ -15466,6 +15573,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error sending confirmation email:", error);
       res.status(500).json({ message: "Failed to send confirmation email" });
+    }
+  });
+
+  // ── Send demo access email (resend / first-time) ─────────────────────────
+  app.post("/api/super-admin/onboarding-prospects/:id/send-demo-email", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const prospect = await storage.getOnboardingProspect(id);
+      if (!prospect) return res.status(404).json({ message: "Prospect not found" });
+
+      const fromEmail = process.env.RESEND_FROM_EMAIL;
+      if (!resend || !fromEmail) {
+        return res.status(503).json({ message: "Email service not configured", emailSent: false });
+      }
+
+      const firstName = (prospect.firstName ?? prospect.name?.split(" ")[0]) || "there";
+      const company = prospect.company || "your company";
+
+      try {
+        await resend.emails.send({
+          from: fromEmail,
+          to: prospect.email,
+          subject: `Your Hubify demo access`,
+          html: `
+            <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
+              <div style="text-align:center;margin-bottom:28px">
+                <img src="https://hubifyhomes.com/hubify-logo.png" alt="Hubify" width="130" style="height:auto;display:inline-block" onerror="this.style.display='none'" />
+                <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px;margin-top:4px">Hubify Homes</div>
+              </div>
+              <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${firstName}, your demo is ready!</h1>
+              <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
+                Here are your credentials to explore the Hubify demo environment for <strong>${company}</strong>.
+                Feel free to click around — everything is pre-loaded with sample data.
+              </p>
+              <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;padding:20px;margin-bottom:28px">
+                <p style="font-size:14px;font-weight:700;color:#0d9488;margin:0 0 12px;text-transform:uppercase;letter-spacing:0.05em">Demo access credentials</p>
+                <table style="width:100%;font-size:14px;border-collapse:collapse">
+                  <tr>
+                    <td style="padding:5px 0;color:#64748b;width:140px">Demo URL</td>
+                    <td style="padding:5px 0"><a href="https://demo.hubifyhomesonline.com" style="color:#0d9488;font-weight:600">demo.hubifyhomesonline.com</a></td>
+                  </tr>
+                  <tr>
+                    <td style="padding:5px 0;color:#64748b">Staff login</td>
+                    <td style="padding:5px 0;color:#0f172a;font-weight:600">demo@hubifyhomesonline.com</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:5px 0;color:#64748b">Password</td>
+                    <td style="padding:5px 0;color:#0f172a;font-weight:600">Demo2026!</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:5px 0;color:#64748b;vertical-align:top">Client portal</td>
+                    <td style="padding:5px 0;color:#0f172a">client@demo.hubifyhomesonline.com<br/><span style="font-weight:600">DemoClient2026!</span></td>
+                  </tr>
+                </table>
+              </div>
+              <p style="font-size:14px;color:#475569;line-height:1.7;margin:0 0 24px">
+                The demo includes 10 FL properties, task and invoice workflows, client portal access, staff scheduling, and more. It's a shared environment — your session won't affect others.
+              </p>
+              <div style="text-align:center;margin-bottom:32px">
+                <a href="https://demo.hubifyhomesonline.com" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
+                  Launch Demo
+                </a>
+              </div>
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
+              <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
+                Questions? Simply reply — we're happy to walk you through anything.<br/>
+                You received this because you requested a demo at Hubify Homes.
+              </p>
+            </div>
+          `,
+        });
+      } catch (err: any) {
+        const errMsg = `failed: ${err?.message ?? String(err)}`.slice(0, 255);
+        await storage.updateOnboardingProspect(id, { demoEmailError: errMsg } as any)
+          .catch(() => {});
+        return res.status(500).json({ message: "Failed to send demo email", emailSent: false });
+      }
+
+      const updated = await storage.updateOnboardingProspect(id, {
+        demoAccessSent: true,
+        demoEmailSentAt: new Date(),
+        demoEmailError: null,
+        stage: (prospect.stage === "demo_requested" ? "demo_sent" : prospect.stage) as any,
+      } as any);
+      res.json({ ...updated, emailSent: true });
+    } catch (error) {
+      console.error("Error sending demo email:", error);
+      res.status(500).json({ message: "Failed to send demo email" });
     }
   });
 

@@ -59,10 +59,12 @@ const SectionHeader = ({ icon: Icon, title }: { icon: React.ElementType; title: 
 export interface SubmissionFormProps {
   onSuccess?: () => void;
   compact?: boolean;
+  initialIntent?: "need_demo";
 }
 
-export function SubmissionForm({ onSuccess, compact }: SubmissionFormProps) {
+export function SubmissionForm({ onSuccess, compact, initialIntent }: SubmissionFormProps) {
   const [submitted, setSubmitted] = useState(false);
+  const isDemo = initialIntent === "need_demo";
 
   const form = useForm<SubmissionValues>({
     resolver: zodResolver(submissionSchema),
@@ -79,7 +81,7 @@ export function SubmissionForm({ onSuccess, compact }: SubmissionFormProps) {
       estimatedHomes: undefined as unknown as number,
       currentMgmtMethod: undefined,
       teamSize: undefined,
-      trialIntent: undefined,
+      trialIntent: initialIntent ?? undefined,
       notes: "",
     },
   });
@@ -110,11 +112,15 @@ export function SubmissionForm({ onSuccess, compact }: SubmissionFormProps) {
     return (
       <div className="text-center space-y-4 py-10">
         <CheckCircle className="w-16 h-16 text-green-500 mx-auto" />
-        <h2 className="text-2xl font-bold text-gray-900">Thank you!</h2>
+        <h2 className="text-2xl font-bold text-gray-900">
+          {isDemo ? "Demo request received!" : "Thank you!"}
+        </h2>
         <p className="text-gray-600 max-w-sm mx-auto">
-          Your submission has been received. Our team will review your information and follow up shortly.
+          {isDemo
+            ? "We'll review your information and send you access to the Hubify demo environment shortly. Check your inbox!"
+            : "Your submission has been received. Our team will review your information and follow up shortly."}
         </p>
-        {tier && (
+        {!isDemo && tier && (
           <p className="text-sm text-gray-500">
             Based on your portfolio, you look like a great fit for the{" "}
             <span className="font-semibold text-teal-700">{tier}</span>.
@@ -363,40 +369,44 @@ export function SubmissionForm({ onSuccess, compact }: SubmissionFormProps) {
         </div>
 
         {/* Section 4 — Intent */}
-        <div>
-          <SectionHeader icon={ClipboardList} title="How Can We Help?" />
-          <FormField
-            control={form.control}
-            name="trialIntent"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>What are you looking for? *</FormLabel>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { value: "free_trial", label: "Start a Free Trial" },
-                    { value: "need_demo", label: "See a Demo First" },
-                    { value: "ready_onboarding", label: "Ready to Onboard" },
-                    { value: "pricing_questions", label: "Pricing Questions" },
-                  ].map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => field.onChange(opt.value)}
-                      className={`px-4 py-2.5 rounded-lg text-sm font-medium border text-left transition-colors ${
-                        field.value === opt.value
-                          ? "bg-teal-600 text-white border-teal-600"
-                          : "bg-white text-slate-600 border-slate-200 hover:border-teal-400 hover:bg-teal-50"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+        {isDemo ? (
+          <input type="hidden" {...form.register("trialIntent")} value="need_demo" />
+        ) : (
+          <div>
+            <SectionHeader icon={ClipboardList} title="How Can We Help?" />
+            <FormField
+              control={form.control}
+              name="trialIntent"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>What are you looking for? *</FormLabel>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { value: "free_trial", label: "Start a Free Trial" },
+                      { value: "need_demo", label: "See a Demo First" },
+                      { value: "ready_onboarding", label: "Ready to Onboard" },
+                      { value: "pricing_questions", label: "Pricing Questions" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => field.onChange(opt.value)}
+                        className={`px-4 py-2.5 rounded-lg text-sm font-medium border text-left transition-colors ${
+                          field.value === opt.value
+                            ? "bg-teal-600 text-white border-teal-600"
+                            : "bg-white text-slate-600 border-slate-200 hover:border-teal-400 hover:bg-teal-50"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        )}
 
         {/* Section 5 — Notes */}
         <FormField
@@ -424,6 +434,8 @@ export function SubmissionForm({ onSuccess, compact }: SubmissionFormProps) {
         >
           {submitMutation.isPending ? (
             <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Submitting…</>
+          ) : isDemo ? (
+            "Request My Demo"
           ) : (
             "Submit My Interest"
           )}

@@ -1590,7 +1590,7 @@ export function startScheduledTasks() {
 
 // ─── Trial lifecycle helpers ────────────────────────────────────────────────
 
-function buildTrialWelcomeEmail(prospect: { name: string; email: string; company: string | null; trialEndsAt: Date | null }): { subject: string; html: string } {
+export function buildTrialWelcomeEmail(prospect: { name: string; email: string; company: string | null; trialEndsAt: Date | null }): { subject: string; html: string } {
   const trialEndFormatted = prospect.trialEndsAt
     ? prospect.trialEndsAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     : '30 days from today';

@@ -108,7 +108,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 // Onboarding Pipeline Tab
 // ============================================================================
 
-type OnboardingStage = "contact" | "inquiry" | "agreement" | "payment_setup" | "initial_payment" | "welcome" | "dropped";
+type OnboardingStage = "contact" | "inquiry" | "agreement" | "payment_setup" | "initial_payment" | "welcome" | "dropped" | "demo_requested" | "demo_sent" | "demo_completed" | "follow_up_needed" | "converted" | "not_a_fit";
 
 interface StageHistoryEntry { stage: OnboardingStage; enteredAt: string; }
 
@@ -141,6 +141,11 @@ interface Prospect {
   submissionStatus: string | null;
   confirmationEmailSentAt: string | null;
   confirmationEmailStatus: string | null;
+  // Demo fields
+  source: string | null;
+  demoAccessSent: boolean | null;
+  demoEmailSentAt: string | null;
+  demoEmailError: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -164,17 +169,28 @@ interface ProspectEmail {
 }
 
 const PIPELINE_STAGES: { key: OnboardingStage; label: string; color: string }[] = [
-  { key: "contact",         label: "Contact",          color: "border-slate-400 bg-slate-50" },
-  { key: "inquiry",         label: "Submission",        color: "border-teal-400 bg-teal-50" },
-  { key: "agreement",       label: "Agreement",        color: "border-yellow-400 bg-yellow-50" },
-  { key: "payment_setup",   label: "Payment Setup",    color: "border-orange-400 bg-orange-50" },
-  { key: "initial_payment", label: "Initial Payment",  color: "border-purple-400 bg-purple-50" },
-  { key: "welcome",         label: "Welcome",          color: "border-green-400 bg-green-50" },
+  { key: "contact",          label: "Contact",          color: "border-slate-400 bg-slate-50" },
+  { key: "inquiry",          label: "Submission",       color: "border-teal-400 bg-teal-50" },
+  { key: "agreement",        label: "Agreement",        color: "border-yellow-400 bg-yellow-50" },
+  { key: "payment_setup",    label: "Payment Setup",    color: "border-orange-400 bg-orange-50" },
+  { key: "initial_payment",  label: "Initial Payment",  color: "border-purple-400 bg-purple-50" },
+  { key: "welcome",          label: "Welcome",          color: "border-green-400 bg-green-50" },
+  { key: "demo_requested",   label: "Demo Requested",   color: "border-sky-400 bg-sky-50" },
+  { key: "demo_sent",        label: "Demo Sent",        color: "border-blue-400 bg-blue-50" },
+  { key: "demo_completed",   label: "Demo Completed",   color: "border-violet-400 bg-violet-50" },
+  { key: "follow_up_needed", label: "Follow-Up",        color: "border-amber-400 bg-amber-50" },
+  { key: "converted",        label: "Converted",        color: "border-emerald-400 bg-emerald-50" },
+  { key: "not_a_fit",        label: "Not a Fit",        color: "border-red-300 bg-red-50" },
 ];
 
 const STAGE_ORDER: OnboardingStage[] = ["contact", "inquiry", "agreement", "payment_setup", "initial_payment", "welcome"];
+const DEMO_STAGE_ORDER: OnboardingStage[] = ["demo_requested", "demo_sent", "demo_completed", "follow_up_needed", "converted"];
 
 function nextStage(current: OnboardingStage): OnboardingStage | null {
+  const demoIdx = DEMO_STAGE_ORDER.indexOf(current);
+  if (demoIdx !== -1) {
+    return demoIdx < DEMO_STAGE_ORDER.length - 1 ? DEMO_STAGE_ORDER[demoIdx + 1] : null;
+  }
   const idx = STAGE_ORDER.indexOf(current);
   if (idx === -1 || idx === STAGE_ORDER.length - 1) return null;
   return STAGE_ORDER[idx + 1];
@@ -202,6 +218,8 @@ const prospectFormSchema = z.object({
 });
 type ProspectFormValues = z.infer<typeof prospectFormSchema>;
 
+const DEMO_STAGES_SET = new Set<OnboardingStage>(["demo_requested", "demo_sent", "demo_completed", "follow_up_needed", "converted", "not_a_fit"]);
+
 function ProspectCard({
   prospect,
   stuckDays,
@@ -212,6 +230,8 @@ function ProspectCard({
   sendingEmail,
   onConvertToOrg,
   convertingToOrg,
+  onSendDemoEmail,
+  sendingDemoEmail,
 }: {
   prospect: Prospect;
   stuckDays: number;
@@ -222,6 +242,8 @@ function ProspectCard({
   sendingEmail: boolean;
   onConvertToOrg: () => void;
   convertingToOrg: boolean;
+  onSendDemoEmail?: () => void;
+  sendingDemoEmail?: boolean;
 }) {
   const [, setLocation] = useLocation();
   const days = stageDays(prospect);
@@ -257,7 +279,7 @@ function ProspectCard({
         </Badge>
       </div>
 
-      {prospect.confirmationEmailStatus && prospect.confirmationEmailStatus !== "sent" && (
+      {prospect.confirmationEmailStatus && prospect.confirmationEmailStatus !== "sent" && !DEMO_STAGES_SET.has(prospect.stage) && (
         <button
           className="flex items-center gap-1 w-full text-left"
           onClick={onEdit}
@@ -268,6 +290,38 @@ function ProspectCard({
             Email failed — click to resend
           </Badge>
         </button>
+      )}
+
+      {/* ── Demo pipeline actions ── */}
+      {DEMO_STAGES_SET.has(prospect.stage) && onSendDemoEmail && (
+        <div className="text-xs space-y-1">
+          {prospect.demoEmailError && (
+            <Badge className="bg-red-100 text-red-700 border border-red-200 text-xs w-full justify-center gap-1 px-1.5 py-0.5">
+              <AlertCircle className="w-3 h-3 shrink-0" />
+              Email failed
+            </Badge>
+          )}
+          {prospect.demoAccessSent && prospect.demoEmailSentAt ? (
+            <span className="text-green-600 flex items-center gap-1">
+              <CheckCircle className="w-3 h-3" />
+              Demo sent {new Date(prospect.demoEmailSentAt).toLocaleDateString()}
+            </span>
+          ) : null}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 text-xs px-2 w-full"
+            onClick={onSendDemoEmail}
+            disabled={sendingDemoEmail}
+          >
+            {sendingDemoEmail
+              ? <><RefreshCw className="w-3 h-3 mr-1 animate-spin" /> Sending…</>
+              : prospect.demoAccessSent
+                ? <><Send className="w-3 h-3 mr-1" /> Resend Demo Email</>
+                : <><Send className="w-3 h-3 mr-1" /> Send Demo Email</>
+            }
+          </Button>
+        </div>
       )}
 
       {prospect.stage === "welcome" && (
@@ -1001,6 +1055,20 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
     }),
   });
 
+  const demoEmailMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/send-demo-email`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      toast({ title: "Demo email sent!" });
+    },
+    onError: (e: Error) => toast({
+      title: "Demo email failed",
+      description: e?.message || "Could not send demo access email",
+      variant: "destructive",
+    }),
+  });
+
   const resendConfirmationEmailMutation = useMutation({
     mutationFn: async (id: string) => {
       const r = await fetch(`/api/super-admin/onboarding-prospects/${id}/send-confirmation-email`, {
@@ -1263,6 +1331,8 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
                         sendingEmail={welcomeEmailMutation.isPending && welcomeEmailMutation.variables === p.id}
                         onConvertToOrg={() => convertToOrgMutation.mutate(p.id)}
                         convertingToOrg={convertToOrgMutation.isPending && convertToOrgMutation.variables === p.id}
+                        onSendDemoEmail={() => demoEmailMutation.mutate(p.id)}
+                        sendingDemoEmail={demoEmailMutation.isPending && demoEmailMutation.variables === p.id}
                       />
                     ))
                   )}
@@ -1952,6 +2022,17 @@ function DemoTenantTab() {
     queryKey: ["/api/super-admin/demo/info"],
   });
 
+  type DemoRequestsSummary = {
+    total: number;
+    sent: number;
+    stageCounts: Record<string, number>;
+    recent: Array<{ id: string; name: string; company: string | null; email: string; stage: string; demoAccessSent: boolean | null; demoEmailSentAt: string | null; demoEmailError: string | null; createdAt: string | null }>;
+  };
+
+  const { data: requestsSummary } = useQuery<DemoRequestsSummary>({
+    queryKey: ["/api/super-admin/demo/requests-summary"],
+  });
+
   const seedMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/super-admin/demo/seed", {}),
     onSuccess: () => {
@@ -2042,6 +2123,77 @@ function DemoTenantTab() {
               </div>
             ))}
           </div>
+
+          {/* ── Demo Requests summary ── */}
+          {requestsSummary !== undefined && (
+            <div className="border rounded-xl bg-white overflow-hidden">
+              <div className="flex items-center gap-2 px-5 py-4 border-b bg-gray-50">
+                <ClipboardList className="w-4 h-4 text-sky-600" />
+                <h3 className="font-semibold text-sm text-gray-800">Demo Requests</h3>
+                <Badge className="ml-auto bg-sky-100 text-sky-800 text-xs">{requestsSummary.total} total</Badge>
+              </div>
+              <div className="p-5 space-y-4">
+                {/* Stage funnel */}
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { key: "demo_requested",   label: "Requested",  color: "border-sky-300 bg-sky-50 text-sky-800" },
+                    { key: "demo_sent",        label: "Sent",       color: "border-blue-300 bg-blue-50 text-blue-800" },
+                    { key: "demo_completed",   label: "Completed",  color: "border-violet-300 bg-violet-50 text-violet-800" },
+                    { key: "follow_up_needed", label: "Follow-Up",  color: "border-amber-300 bg-amber-50 text-amber-800" },
+                    { key: "converted",        label: "Converted",  color: "border-emerald-300 bg-emerald-50 text-emerald-800" },
+                    { key: "not_a_fit",        label: "Not a Fit",  color: "border-red-300 bg-red-50 text-red-700" },
+                  ].map((s, i, arr) => (
+                    <div key={s.key} className="flex items-center gap-1">
+                      <div className={`rounded-full px-3 py-1 text-xs font-medium border ${s.color}`}>
+                        {s.label}: <span className="font-bold">{requestsSummary.stageCounts[s.key] ?? 0}</span>
+                      </div>
+                      {i < arr.length - 1 && <ChevronRight className="w-3 h-3 text-gray-400" />}
+                    </div>
+                  ))}
+                </div>
+                {/* Recent leads */}
+                {requestsSummary.recent.length > 0 ? (
+                  <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs">Name</TableHead>
+                          <TableHead className="text-xs">Company</TableHead>
+                          <TableHead className="text-xs">Stage</TableHead>
+                          <TableHead className="text-xs">Email Status</TableHead>
+                          <TableHead className="text-xs">Received</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {requestsSummary.recent.map(r => (
+                          <TableRow key={r.id}>
+                            <TableCell className="font-medium text-sm">{r.name}</TableCell>
+                            <TableCell className="text-sm text-gray-500">{r.company ?? "—"}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs capitalize">{r.stage.replace(/_/g, " ")}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              {r.demoAccessSent
+                                ? <span className="text-green-600 text-xs flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Sent</span>
+                                : r.demoEmailError
+                                  ? <span className="text-red-600 text-xs flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Failed</span>
+                                  : <span className="text-gray-400 text-xs">Pending</span>
+                              }
+                            </TableCell>
+                            <TableCell className="text-xs text-gray-400">
+                              {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400 text-center py-4">No demo requests yet. Share the landing page to get started.</p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* ── Two-column: org details + credentials ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
