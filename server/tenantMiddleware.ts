@@ -39,7 +39,11 @@ export async function tenantMiddleware(
   _res: Response,
   next: NextFunction
 ): Promise<void> {
+  // Use Host header first (always contains the exact domain the client
+  // requested, preserved by Cloudflare and Render). Fall back to
+  // X-Forwarded-Host (set by CDN), then Express's computed req.hostname.
   const rawHost =
+    (req.headers["host"] as string)?.split(":")[0]?.trim() ||
     (req.headers["x-forwarded-host"] as string)?.split(",")[0]?.trim() ||
     req.hostname;
 
