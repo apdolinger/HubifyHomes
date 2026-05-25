@@ -105,11 +105,24 @@ const log = (action: "create" | "skip" | "info", msg: string) => {
 
 async function ensureOrg() {
   const [ex] = await db.select().from(orgs).where(eq(orgs.id, DEMO_ORG_ID)).limit(1);
-  if (ex) { log("skip", `Org "${DEMO_ORG_NAME}"`); return; }
+  if (ex) {
+    // Ensure slug and orgStatus are set on already-existing demo org
+    if (!ex.slug || ex.orgStatus !== "active") {
+      await db.update(orgs)
+        .set({ slug: "demo", orgStatus: "active" })
+        .where(eq(orgs.id, DEMO_ORG_ID));
+      log("info", `Org "${DEMO_ORG_NAME}" slug/orgStatus updated`);
+    } else {
+      log("skip", `Org "${DEMO_ORG_NAME}"`);
+    }
+    return;
+  }
   await db.insert(orgs).values({
     id: DEMO_ORG_ID,
     name: DEMO_ORG_NAME,
     domain: DEMO_DOMAIN,
+    slug: "demo",
+    orgStatus: "active",
     isActive: true,
     timezone: "America/New_York",
     currency: "USD",

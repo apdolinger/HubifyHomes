@@ -5,6 +5,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startScheduledTasks } from "./scheduledTasks";
 import { logError } from "./errorLogger";
+import { tenantMiddleware } from "./tenantMiddleware";
 
 const app = express();
 
@@ -99,6 +100,9 @@ app.post("/api/stripe/webhooks/org/:orgId", express.raw({ type: "application/jso
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Tenant subdomain resolution — runs on every request before any route
+app.use(tenantMiddleware);
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -284,6 +288,12 @@ app.use((req, res, next) => {
         await ensureDemoProspectColumns();
       } catch (err) {
         console.error('Error ensuring demo columns on onboarding_prospects:', err);
+      }
+      try {
+        const { ensureOrgSlugAndStatusColumns } = await import('./runMigrations.js');
+        await ensureOrgSlugAndStatusColumns();
+      } catch (err) {
+        console.error('Error ensuring orgs slug/status columns:', err);
       }
     } catch (error) {
       console.error('Error loading startup migrations:', error);

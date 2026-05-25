@@ -75,6 +75,8 @@ import { HUBIFY_HOMES_LOGO_URL, HUBIFY_HOMES_LOGO_ALT } from "@/lib/brand";
 import { GlobalAlertModal } from "@/components/GlobalAlertModal";
 import { TaskModalProvider, useTaskModal } from "@/contexts/TaskModalContext";
 import { PortalAuthProvider } from "@/contexts/PortalAuthContext";
+import { TenantProvider, useTenant } from "@/contexts/TenantContext";
+import TenantStatusPage from "@/pages/TenantStatusPage";
 import { routes } from "@/lib/routes";
 import { useState, useEffect } from "react";
 
@@ -411,12 +413,47 @@ function AuthWrapper() {
   );
 }
 
+function TenantGate({ children }: { children: React.ReactNode }) {
+  const { tenant, isLoading } = useTenant();
+
+  // Still resolving tenant — show spinner
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <RefreshCw className="w-8 h-8 animate-spin text-teal-600" />
+      </div>
+    );
+  }
+
+  // On a subdomain that maps to a real org — gate on orgStatus
+  if (!tenant.isPublicDomain && tenant.subdomain) {
+    if (!tenant.found) {
+      return <TenantStatusPage status="not_found" orgName={tenant.subdomain} />;
+    }
+    if (tenant.orgStatus === "suspended") {
+      return <TenantStatusPage status="suspended" orgName={tenant.name ?? tenant.subdomain} />;
+    }
+    if (tenant.orgStatus === "archived") {
+      return <TenantStatusPage status="archived" orgName={tenant.name ?? tenant.subdomain} />;
+    }
+    if (tenant.orgStatus === "pending" || tenant.orgStatus === "onboarding") {
+      return <TenantStatusPage status="pending" orgName={tenant.name ?? tenant.subdomain} />;
+    }
+  }
+
+  return <>{children}</>;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <PortalAuthProvider>
-        <AuthWrapper />
-      </PortalAuthProvider>
+      <TenantProvider>
+        <TenantGate>
+          <PortalAuthProvider>
+            <AuthWrapper />
+          </PortalAuthProvider>
+        </TenantGate>
+      </TenantProvider>
     </QueryClientProvider>
   );
 }

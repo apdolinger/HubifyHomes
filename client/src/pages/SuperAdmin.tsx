@@ -7454,6 +7454,8 @@ type OrgOverviewRow = {
   id: string;
   name: string;
   isActive: boolean;
+  slug: string | null;
+  orgStatus: string | null;
   primaryAdminEmail: string | null;
   tier: string;
   subscriptionStatus: string;
@@ -7563,23 +7565,46 @@ function PlatformOverviewCards() {
   );
 }
 
+const ORG_STATUSES = ["pending", "onboarding", "active", "suspended", "archived"] as const;
+type OrgStatusValue = typeof ORG_STATUSES[number];
+
+const ORG_STATUS_BADGE: Record<OrgStatusValue, { label: string; className: string }> = {
+  pending:    { label: "Pending",    className: "bg-yellow-100 text-yellow-800 border-yellow-200" },
+  onboarding: { label: "Onboarding", className: "bg-blue-100 text-blue-800 border-blue-200" },
+  active:     { label: "Active",     className: "bg-green-100 text-green-800 border-green-200" },
+  suspended:  { label: "Suspended",  className: "bg-red-100 text-red-800 border-red-200" },
+  archived:   { label: "Archived",   className: "bg-slate-100 text-slate-600 border-slate-200" },
+};
+
 function OrganizationsTab() {
   const { toast } = useToast();
   const { data: orgs = [], isLoading } = useQuery<OrgOverviewRow[]>({
     queryKey: ["/api/super-admin/orgs-overview"],
   });
 
-  const setStatusMut = useMutation({
-    mutationFn: async ({ orgId, isActive }: { orgId: string; isActive: boolean }) =>
-      apiRequest("PATCH", `/api/super-admin/orgs/${orgId}/status`, { isActive }),
-    onSuccess: (_d, vars) => {
+  // Inline slug editing state: orgId -> draft value (null = not editing)
+  const [slugDraft, setSlugDraft] = useState<Record<string, string>>({});
+  const [slugEditing, setSlugEditing] = useState<string | null>(null);
+
+  const updateOrgMut = useMutation({
+    mutationFn: async ({ orgId, payload }: { orgId: string; payload: Record<string, unknown> }) =>
+      apiRequest("PATCH", `/api/super-admin/orgs/${orgId}/status`, payload),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/orgs-overview"] });
-      toast({ title: vars.isActive ? "Organization activated" : "Organization suspended" });
+      toast({ title: "Organization updated" });
     },
     onError: (err: any) => {
-      toast({ title: "Update failed", description: err?.message || "Could not update status", variant: "destructive" });
+      toast({ title: "Update failed", description: err?.message || "Could not update", variant: "destructive" });
     },
   });
+
+  function saveSlug(orgId: string) {
+    const slug = (slugDraft[orgId] ?? "").trim().toLowerCase();
+    if (!slug) { setSlugEditing(null); return; }
+    updateOrgMut.mutate({ orgId, payload: { slug } }, {
+      onSettled: () => setSlugEditing(null),
+    });
+  }
 
   return (
     <Card>
@@ -7589,12 +7614,7 @@ function OrganizationsTab() {
             <Building2 className="w-5 h-5 mr-2" />
             Organizations Management
           </CardTitle>
-          <Button
-            size="sm"
-            variant="outline"
-            asChild
-            data-testid="button-export-orgs"
-          >
+          <Button size="sm" variant="outline" asChild data-testid="button-export-orgs">
             <a href="/api/super-admin/orgs-overview.csv">
               <Download className="w-4 h-4 mr-2" />
               Export CSV
@@ -7608,81 +7628,154 @@ function OrganizationsTab() {
         ) : orgs.length === 0 ? (
           <div className="text-sm text-slate-500">No organizations yet.</div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Organization</TableHead>
-                <TableHead>Primary Admin</TableHead>
-                <TableHead>Plan</TableHead>
-                <TableHead>Subscription</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Properties</TableHead>
-                <TableHead className="text-right">Users</TableHead>
-                <TableHead className="text-right">MRR</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orgs.map((o) => (
-                <TableRow key={o.id} data-testid={`row-org-${o.id}`}>
-                  <TableCell className="font-medium">{o.name}</TableCell>
-                  <TableCell className="text-sm">{o.primaryAdminEmail || <span className="text-slate-400">—</span>}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="capitalize">{o.tier}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={o.subscriptionStatus === "active" ? "default" :
-                        o.subscriptionStatus === "trialing" ? "secondary" : "destructive"}
-                      className="capitalize"
-                    >
-                      {o.subscriptionStatus.replace("_", " ")}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={o.isActive ? "default" : "destructive"}
-                      data-testid={`badge-org-status-${o.id}`}
-                    >
-                      {o.isActive ? "Active" : "Suspended"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">{o.propertyCount}</TableCell>
-                  <TableCell className="text-right">{o.userCount}</TableCell>
-                  <TableCell className="text-right">${(o.mrrCents / 100).toFixed(0)}</TableCell>
-                  <TableCell>
-                    {o.isActive ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        title="Suspend organization"
-                        disabled={setStatusMut.isPending}
-                        onClick={() => {
-                          if (confirm(`Suspend ${o.name}? Users will lose access until reactivated.`)) {
-                            setStatusMut.mutate({ orgId: o.id, isActive: false });
-                          }
-                        }}
-                        data-testid={`button-suspend-${o.id}`}
-                      >
-                        <Pause className="w-4 h-4" />
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        title="Reactivate organization"
-                        disabled={setStatusMut.isPending}
-                        onClick={() => setStatusMut.mutate({ orgId: o.id, isActive: true })}
-                        data-testid={`button-activate-${o.id}`}
-                      >
-                        <Play className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Organization</TableHead>
+                  <TableHead>Slug</TableHead>
+                  <TableHead>Primary Admin</TableHead>
+                  <TableHead>Plan</TableHead>
+                  <TableHead>Subscription</TableHead>
+                  <TableHead>Org Status</TableHead>
+                  <TableHead className="text-right">Properties</TableHead>
+                  <TableHead className="text-right">Users</TableHead>
+                  <TableHead className="text-right">MRR</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {orgs.map((o) => {
+                  const isEditingSlug = slugEditing === o.id;
+                  const currentStatus = (o.orgStatus ?? (o.isActive ? "active" : "suspended")) as OrgStatusValue;
+                  const statusConfig = ORG_STATUS_BADGE[currentStatus] ?? ORG_STATUS_BADGE.active;
+                  return (
+                    <TableRow key={o.id} data-testid={`row-org-${o.id}`}>
+                      <TableCell className="font-medium whitespace-nowrap">{o.name}</TableCell>
+
+                      {/* Slug — inline edit */}
+                      <TableCell className="min-w-[140px]">
+                        {isEditingSlug ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              className="h-7 text-xs font-mono w-28"
+                              value={slugDraft[o.id] ?? o.slug ?? ""}
+                              autoFocus
+                              onChange={(e) => setSlugDraft(d => ({ ...d, [o.id]: e.target.value }))}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") saveSlug(o.id);
+                                if (e.key === "Escape") setSlugEditing(null);
+                              }}
+                            />
+                            <Button size="sm" variant="ghost" className="h-7 px-1.5 text-xs text-teal-700"
+                              onClick={() => saveSlug(o.id)} disabled={updateOrgMut.isPending}>
+                              Save
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 px-1.5 text-xs"
+                              onClick={() => setSlugEditing(null)}>
+                              ✕
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 group">
+                            <span className="text-xs font-mono text-slate-600">
+                              {o.slug ?? <span className="text-slate-400 italic">—</span>}
+                            </span>
+                            <Button
+                              size="sm" variant="ghost"
+                              className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => {
+                                setSlugDraft(d => ({ ...d, [o.id]: o.slug ?? "" }));
+                                setSlugEditing(o.id);
+                              }}
+                              title="Edit slug"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
+
+                      <TableCell className="text-sm">{o.primaryAdminEmail || <span className="text-slate-400">—</span>}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="capitalize">{o.tier}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={o.subscriptionStatus === "active" ? "default" :
+                            o.subscriptionStatus === "trialing" ? "secondary" : "destructive"}
+                          className="capitalize"
+                        >
+                          {o.subscriptionStatus.replace("_", " ")}
+                        </Badge>
+                      </TableCell>
+
+                      {/* Org Status — inline dropdown */}
+                      <TableCell>
+                        <Select
+                          value={currentStatus}
+                          onValueChange={(val) => {
+                            if (val === currentStatus) return;
+                            if ((val === "suspended" || val === "archived") &&
+                              !confirm(`Set "${o.name}" to ${val}? Users will lose access.`)) return;
+                            updateOrgMut.mutate({
+                              orgId: o.id,
+                              payload: {
+                                orgStatus: val,
+                                isActive: val === "active" || val === "onboarding",
+                              },
+                            });
+                          }}
+                          disabled={updateOrgMut.isPending}
+                        >
+                          <SelectTrigger
+                            className={`h-7 text-xs border w-[120px] ${statusConfig.className}`}
+                            data-testid={`badge-org-status-${o.id}`}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ORG_STATUSES.map((s) => (
+                              <SelectItem key={s} value={s} className="text-xs capitalize">{s}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+
+                      <TableCell className="text-right">{o.propertyCount}</TableCell>
+                      <TableCell className="text-right">{o.userCount}</TableCell>
+                      <TableCell className="text-right">${(o.mrrCents / 100).toFixed(0)}</TableCell>
+                      <TableCell>
+                        {o.isActive ? (
+                          <Button
+                            size="sm" variant="ghost" title="Suspend organization"
+                            disabled={updateOrgMut.isPending}
+                            onClick={() => {
+                              if (confirm(`Suspend ${o.name}? Users will lose access until reactivated.`)) {
+                                updateOrgMut.mutate({ orgId: o.id, payload: { isActive: false, orgStatus: "suspended" } });
+                              }
+                            }}
+                            data-testid={`button-suspend-${o.id}`}
+                          >
+                            <Pause className="w-4 h-4" />
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm" variant="ghost" title="Reactivate organization"
+                            disabled={updateOrgMut.isPending}
+                            onClick={() => updateOrgMut.mutate({ orgId: o.id, payload: { isActive: true, orgStatus: "active" } })}
+                            data-testid={`button-activate-${o.id}`}
+                          >
+                            <Play className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </CardContent>
     </Card>

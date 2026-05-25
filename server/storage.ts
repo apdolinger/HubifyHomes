@@ -398,6 +398,8 @@ export interface IStorage {
     id: string;
     name: string;
     isActive: boolean;
+    slug: string | null;
+    orgStatus: string | null;
     primaryAdminEmail: string | null;
     tier: string;
     subscriptionStatus: string;
@@ -1346,6 +1348,8 @@ export class DatabaseStorage implements IStorage {
         id: orgs.id,
         name: orgs.name,
         isActive: orgs.isActive,
+        slug: orgs.slug,
+        orgStatus: orgs.orgStatus,
         createdAt: orgs.createdAt,
       })
       .from(orgs)
@@ -1392,6 +1396,8 @@ export class DatabaseStorage implements IStorage {
         id: o.id,
         name: o.name,
         isActive: o.isActive,
+        slug: o.slug ?? null,
+        orgStatus: o.orgStatus ?? null,
         primaryAdminEmail: adminByOrg.get(o.id) ?? null,
         tier,
         subscriptionStatus: status,

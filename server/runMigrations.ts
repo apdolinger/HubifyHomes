@@ -2,6 +2,73 @@ import { pool } from "./db";
 import { log } from "./vite";
 
 /**
+ * Add `slug` (unique) and `org_status` columns to the orgs table, then
+ * backfill slugs from org names and set org_status from is_active.
+ * Safe to run multiple times (fully idempotent).
+ */
+export async function ensureOrgSlugAndStatusColumns(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    // 1. Add columns if they don't exist
+    await client.query(`
+      ALTER TABLE orgs ADD COLUMN IF NOT EXISTS slug VARCHAR;
+      ALTER TABLE orgs ADD COLUMN IF NOT EXISTS org_status VARCHAR NOT NULL DEFAULT 'active';
+    `);
+
+    // 2. Unique index on slug (only non-null values)
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS orgs_slug_unique_idx
+        ON orgs (slug) WHERE slug IS NOT NULL;
+    `);
+
+    // 3. Backfill org_status from is_active for rows still at the column default
+    await client.query(`
+      UPDATE orgs
+        SET org_status = CASE WHEN is_active THEN 'active' ELSE 'suspended' END
+      WHERE org_status = 'active' AND NOT is_active;
+    `);
+
+    // 4. Backfill slugs for orgs that don't have one yet
+    await client.query(`
+      DO $$
+      DECLARE
+        r RECORD;
+        base_slug TEXT;
+        candidate TEXT;
+        suffix INT;
+      BEGIN
+        FOR r IN SELECT id, name FROM orgs WHERE slug IS NULL ORDER BY created_at ASC LOOP
+          -- Normalise: lowercase, collapse non-alphanum to hyphen, trim hyphens, max 63 chars
+          base_slug := lower(
+            regexp_replace(
+              regexp_replace(r.name, '[^a-zA-Z0-9]+', '-', 'g'),
+              '^-+|-+$', '', 'g'
+            )
+          );
+          base_slug := left(base_slug, 63);
+          IF base_slug = '' THEN base_slug := 'org'; END IF;
+
+          candidate := base_slug;
+          suffix := 2;
+          WHILE EXISTS (SELECT 1 FROM orgs WHERE slug = candidate) LOOP
+            candidate := left(base_slug, 60) || '-' || suffix;
+            suffix := suffix + 1;
+          END LOOP;
+
+          UPDATE orgs SET slug = candidate WHERE id = r.id;
+        END LOOP;
+      END $$;
+    `);
+
+    log("[MIGRATE] orgs.slug + orgs.org_status columns verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to ensure orgs slug/status columns: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Ensure the connect-pg-simple session table exists.
  * We create it ourselves (with IF NOT EXISTS on BOTH table AND index) so that
  * connect-pg-simple's createTableIfMissing option can be left off — that

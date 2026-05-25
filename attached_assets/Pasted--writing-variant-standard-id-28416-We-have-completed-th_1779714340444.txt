@@ -1,0 +1,147 @@
+:::writing{variant=“standard” id=“28416”}
+We have completed the wildcard subdomain infrastructure and now need the application-level multi-tenant routing implemented.
+
+Current infrastructure status:
+	•	*.hubifyhomesonline.com is fully VERIFIED in Render
+	•	Wildcard SSL certificate is VERIFIED / ISSUED
+	•	Wildcard DNS routing is working
+	•	Any subdomain now routes to the Render deployment automatically
+
+Examples:
+	•	demo.hubifyhomesonline.com
+	•	test.hubifyhomesonline.com
+	•	anything.hubifyhomesonline.com
+
+Right now all subdomains load the public landing page because the app has no tenant/subdomain logic yet.
+
+We are NOT manually creating DNS records or Render custom domains per client anymore.
+
+We now need true multi-tenant subdomain routing.
+
+Please implement the following:
+
+⸻
+
+MULTI-TENANT SUBDOMAIN ROUTING
+
+Behavior rules:
+	1.	Public domains:
+
+	•	hubifyhomesonline.com
+	•	www.hubifyhomesonline.com
+
+These should continue loading the public marketing/landing page.
+	2.	Reserved system subdomains:
+Prevent organizations from using:
+
+	•	www
+	•	admin
+	•	api
+	•	app
+	•	support
+	•	demo
+
+	3.	Wildcard tenant routing:
+For:
+{slug}.hubifyhomesonline.com
+
+The app should:
+	•	detect hostname
+	•	extract subdomain slug
+	•	look up organization by slug
+	•	determine organization status
+	•	load the correct tenant/app experience
+
+⸻
+
+ORGANIZATION STATUS LOGIC
+
+If organization does NOT exist:
+→ show:
+“Workspace Not Active”
+OR redirect to the public landing page
+
+If organization exists but:
+status = pending
+→ show:
+“Workspace Setup In Progress”
+
+If organization exists and:
+status = active
+→ load tenant/app normally
+
+⸻
+
+DEMO TENANT
+
+Create/use a real organization:
+slug = demo
+
+Behavior:
+demo.hubifyhomesonline.com
+should:
+	•	NOT load the public landing page
+	•	load the demo tenant/app experience
+	•	use demo org data/settings
+
+⸻
+
+SUPER ADMIN / ONBOARDING LOGIC
+
+New operational model:
+
+We are no longer provisioning DNS manually.
+
+Instead:
+	•	organizations control subdomain activation
+	•	wildcard DNS handles all routing automatically
+
+Future onboarding flow:
+	1.	Lead submits form
+	2.	Agreement signed
+	3.	Stripe/payment completed
+	4.	Super Admin approves/provisions organization
+	5.	Organization status set to active
+	6.	Subdomain instantly becomes usable
+
+Example:
+slug = palmbeach
+
+Automatically works:
+https://palmbeach.hubifyhomesonline.com
+
+No DNS work required.
+
+⸻
+
+DATABASE / MODEL REQUIREMENTS
+
+Organizations table should support:
+	•	slug
+	•	status
+	•	onboarding state
+	•	branding/settings
+	•	active/inactive state
+
+Suggested statuses:
+	•	pending
+	•	onboarding
+	•	active
+	•	suspended
+	•	archived
+
+⸻
+
+IMPLEMENTATION REQUEST
+
+Please implement:
+	•	hostname/subdomain parsing
+	•	tenant resolution middleware
+	•	tenant-aware routing
+	•	tenant context/provider
+	•	reserved subdomain protection
+	•	inactive tenant handling
+	•	demo tenant routing
+	•	organization status gating
+
+This is now an application routing problem, NOT a DNS problem.

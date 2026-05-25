@@ -914,6 +914,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Global security middlewares
   app.use(trackSession);
   app.use(auditMiddleware);
+
+  // ── Tenant resolution (public, no auth) ──────────────────────────────────
+  // Returns the resolved tenant for the current hostname so the frontend
+  // can gate on org status before rendering any routes.
+  app.get("/api/tenant", (req, res) => {
+    res.json(req.tenant ?? {
+      isPublicDomain: true,
+      subdomain: null,
+      found: false,
+      orgId: null,
+      name: null,
+      orgStatus: null,
+    });
+  });
   
   // Serve uploaded photos
   app.use('/uploads', (req, res, next) => {
@@ -3642,35 +3656,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/super-admin/orgs/:orgId/status", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
     try {
       const { orgId } = req.params;
-      const { isActive } = req.body ?? {};
-      if (typeof isActive !== 'boolean') {
-        return res.status(400).json({ message: "isActive (boolean) required" });
+      const { isActive, slug, orgStatus } = req.body ?? {};
+
+      const RESERVED = new Set(["www", "admin", "api", "app", "support"]);
+      const VALID_STATUSES = new Set(["pending", "onboarding", "active", "suspended", "archived"]);
+
+      const updates: Record<string, any> = {};
+
+      if (typeof isActive === 'boolean') {
+        updates.isActive = isActive;
+        // Keep orgStatus in sync when toggling via legacy boolean
+        if (!orgStatus) {
+          updates.orgStatus = isActive ? "active" : "suspended";
+        }
       }
-      const updated = await storage.updateOrg(orgId, { isActive });
+
+      if (slug !== undefined) {
+        if (typeof slug !== 'string') return res.status(400).json({ message: "slug must be a string" });
+        const slugClean = slug.toLowerCase().trim();
+        if (!/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(slugClean)) {
+          return res.status(400).json({ message: "slug must be 3–63 chars: lowercase letters, numbers, hyphens (not at start/end)" });
+        }
+        if (RESERVED.has(slugClean)) {
+          return res.status(400).json({ message: `"${slugClean}" is a reserved slug` });
+        }
+        updates.slug = slugClean;
+      }
+
+      if (orgStatus !== undefined) {
+        if (!VALID_STATUSES.has(orgStatus)) {
+          return res.status(400).json({ message: `orgStatus must be one of: ${[...VALID_STATUSES].join(", ")}` });
+        }
+        updates.orgStatus = orgStatus;
+      }
+
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ message: "At least one of isActive, slug, or orgStatus is required" });
+      }
+
+      const updated = await storage.updateOrg(orgId, updates as any);
       if (!updated) {
-        await AuditLogger.log({
-          req,
-          action: isActive ? "activate_organization" : "suspend_organization",
-          actionType: "admin",
-          resource: "organization",
-          resourceId: orgId,
-          severity: "warning",
-          success: false,
-          errorMessage: "Organization not found",
-        });
         return res.status(404).json({ message: "Organization not found" });
       }
+
+      const action = updates.isActive === true ? "activate_organization"
+        : updates.isActive === false ? "suspend_organization"
+        : "update_organization";
+
       await AuditLogger.log({
         req,
-        action: isActive ? "activate_organization" : "suspend_organization",
+        action,
         actionType: "admin",
         resource: "organization",
         resourceId: orgId,
         severity: "warning",
         success: true,
       });
+
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.code === "23505") {
+        return res.status(409).json({ message: "That slug is already in use by another organization" });
+      }
       console.error("Error updating org status:", error);
       res.status(500).json({ message: "Failed to update organization status" });
     }
