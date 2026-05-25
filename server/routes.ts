@@ -4005,8 +4005,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(503).json({ message: "Email not configured (RESEND_FROM_EMAIL / RESEND_API_KEY missing)" });
       }
 
-      const staffUrl = `${process.env.APP_URL || "https://hubifyhomesonline.com"}/staff/login`;
-      const portalUrl = `${process.env.APP_URL || "https://hubifyhomesonline.com"}/portal/login`;
+      const { DEMO_DOMAIN } = await import('./demoSeed.js');
+      const staffUrl  = `https://${DEMO_DOMAIN}/staff/login`;
+      const portalUrl = `https://${DEMO_DOMAIN}/portal/login`;
 
       const html = `
         <div style="font-family:sans-serif;max-width:580px;margin:0 auto;padding:32px 24px;background:#ffffff">

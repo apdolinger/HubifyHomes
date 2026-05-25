@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building, Users, CheckSquare, BarChart3 } from "lucide-react";
+import { Building, Users, CheckSquare, BarChart3, Menu, X } from "lucide-react";
 import { openCookiePreferences } from "@/lib/cookieConsent";
 import { HUBIFY_HOMES_LOGO_URL, HUBIFY_HOMES_LOGO_ALT } from "@/lib/brand";
 import SubmissionModal from "@/components/SubmissionModal";
@@ -9,9 +9,9 @@ import SubmissionModal from "@/components/SubmissionModal";
 export default function Landing() {
   const [isSubmitOpen, setIsSubmitOpen] = useState(false);
   const [isDemoOpen, setIsDemoOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogin = async () => {
-    // For development, use the dev login endpoint
     if (import.meta.env.DEV) {
       try {
         const response = await fetch('/api/dev/login', {
@@ -28,6 +28,8 @@ export default function Landing() {
       window.location.href = "/staff/login";
     }
   };
+
+  const closeMobile = () => setMobileMenuOpen(false);
 
   const features = [
     {
@@ -54,10 +56,11 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      {/* Top Header with Login */}
-      <header className="bg-white border-b border-slate-200 shadow-sm">
+      {/* Top Header */}
+      <header className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
+            {/* Logo */}
             <div className="flex items-center">
               <img
                 src={HUBIFY_HOMES_LOGO_URL}
@@ -65,16 +68,70 @@ export default function Landing() {
                 className="h-9 w-auto"
               />
             </div>
-            <div>
-              <Button 
-                onClick={handleLogin}
+
+            {/* Desktop nav */}
+            <div className="hidden sm:flex items-center gap-3">
+              <Button
+                onClick={() => setIsSubmitOpen(true)}
                 className="bg-teal-600 hover:bg-teal-700 text-white"
               >
-                Login
+                Get Started
+              </Button>
+              <Button
+                onClick={() => setIsDemoOpen(true)}
+                variant="outline"
+                className="border-teal-500 text-teal-700 hover:bg-teal-50"
+              >
+                Request a Demo
+              </Button>
+              <Button
+                onClick={handleLogin}
+                variant="outline"
+                className="border-slate-300 text-slate-700 hover:bg-slate-50"
+              >
+                Sign In
               </Button>
             </div>
+
+            {/* Mobile hamburger */}
+            <button
+              className="sm:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
+              onClick={() => setMobileMenuOpen(v => !v)}
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            >
+              {mobileMenuOpen
+                ? <X className="w-6 h-6" />
+                : <Menu className="w-6 h-6" />
+              }
+            </button>
           </div>
         </div>
+
+        {/* Mobile dropdown */}
+        {mobileMenuOpen && (
+          <div className="sm:hidden border-t border-slate-100 bg-white shadow-lg">
+            <div className="px-4 py-3 space-y-2">
+              <button
+                onClick={() => { setIsSubmitOpen(true); closeMobile(); }}
+                className="w-full text-left px-4 py-3 rounded-lg bg-teal-600 text-white font-semibold text-base hover:bg-teal-700 transition-colors"
+              >
+                Get Started
+              </button>
+              <button
+                onClick={() => { setIsDemoOpen(true); closeMobile(); }}
+                className="w-full text-left px-4 py-3 rounded-lg border border-teal-500 text-teal-700 font-semibold text-base hover:bg-teal-50 transition-colors"
+              >
+                Request a Demo
+              </button>
+              <button
+                onClick={() => { handleLogin(); closeMobile(); }}
+                className="w-full text-left px-4 py-3 rounded-lg border border-slate-200 text-slate-700 font-semibold text-base hover:bg-slate-50 transition-colors"
+              >
+                Sign In
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -200,8 +257,8 @@ export default function Landing() {
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200 py-6 mt-12">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="flex justify-between items-center text-sm text-slate-600">
-            <div className="flex-1">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 text-sm text-slate-600">
+            <div className="text-center sm:text-left">
               <p>
                 © {new Date().getFullYear()} Hubify. All rights reserved.
                 {' '}
@@ -224,8 +281,8 @@ export default function Landing() {
               </p>
             </div>
             <div>
-              <a 
-                href="/super-admin/login" 
+              <a
+                href="/super-admin/login"
                 className="text-teal-600 hover:underline"
                 data-testid="link-super-admin"
               >
