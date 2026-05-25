@@ -60,6 +60,15 @@ export async function ensureOrgSlugAndStatusColumns(): Promise<void> {
       END $$;
     `);
 
+    // 5. Ensure the hardcoded demo org always has slug='demo'
+    //    (migration backfill may have set it from the org name instead)
+    await client.query(`
+      UPDATE orgs
+        SET slug = 'demo'
+      WHERE id = '00000000-0000-0000-0000-000000000de0'
+        AND (slug IS NULL OR slug <> 'demo');
+    `);
+
     log("[MIGRATE] orgs.slug + orgs.org_status columns verified.");
   } catch (err: any) {
     log(`[MIGRATE] Failed to ensure orgs slug/status columns: ${err?.message ?? err}`);
