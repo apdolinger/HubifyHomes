@@ -2,6 +2,9 @@ import { Request, Response, NextFunction } from "express";
 import { pool } from "./db";
 
 const BASE_DOMAIN = process.env.BASE_DOMAIN || "hubifyhomesonline.com";
+// "demo" is intentionally NOT reserved in routing — demo.hubifyhomesonline.com
+// maps to the real demo org. It IS reserved in the PATCH endpoint so no
+// customer org can ever claim it.
 const RESERVED_SLUGS = new Set(["www", "admin", "api", "app", "support"]);
 
 export interface TenantInfo {

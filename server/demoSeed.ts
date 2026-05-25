@@ -106,8 +106,8 @@ const log = (action: "create" | "skip" | "info", msg: string) => {
 async function ensureOrg() {
   const [ex] = await db.select().from(orgs).where(eq(orgs.id, DEMO_ORG_ID)).limit(1);
   if (ex) {
-    // Ensure slug and orgStatus are set on already-existing demo org
-    if (!ex.slug || ex.orgStatus !== "active") {
+    // Ensure slug is 'demo' and orgStatus is 'active' on already-existing demo org
+    if (ex.slug !== "demo" || ex.orgStatus !== "active") {
       await db.update(orgs)
         .set({ slug: "demo", orgStatus: "active" })
         .where(eq(orgs.id, DEMO_ORG_ID));

@@ -3658,7 +3658,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { orgId } = req.params;
       const { isActive, slug, orgStatus } = req.body ?? {};
 
-      const RESERVED = new Set(["www", "admin", "api", "app", "support"]);
+      const RESERVED = new Set(["www", "admin", "api", "app", "support", "demo"]);
       const VALID_STATUSES = new Set(["pending", "onboarding", "active", "suspended", "archived"]);
 
       const updates: Record<string, any> = {};
