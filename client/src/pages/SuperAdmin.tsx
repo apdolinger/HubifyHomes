@@ -2373,14 +2373,14 @@ function DemoTenantTab() {
             <div className="flex items-center gap-1.5 mb-3">
               <Shield className="w-3.5 h-3.5 text-teal-600" />
               <span className="text-xs font-semibold text-teal-700 uppercase tracking-wide">Staff / Admin</span>
-              <a href="/staff/login" target="_blank" rel="noopener noreferrer" className="ml-auto text-teal-500 hover:text-teal-700">
+              <a href="https://demo.hubifyhomesonline.com/staff/login" target="_blank" rel="noopener noreferrer" className="ml-auto text-teal-500 hover:text-teal-700">
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
             </div>
             {[
-              { label: "URL",      value: "/staff/login",               href: "/staff/login" },
-              { label: "Email",    value: "demo@hubifyhomesonline.com",  href: null },
-              { label: "Password", value: "Demo2026!",                  href: null },
+              { label: "URL",      value: "https://demo.hubifyhomesonline.com/staff/login",  href: "https://demo.hubifyhomesonline.com/staff/login" },
+              { label: "Email",    value: "demo@hubifyhomesonline.com",                      href: null },
+              { label: "Password", value: "Demo2026!",                                       href: null },
             ].map(row => (
               <div key={row.label} className="flex items-center justify-between gap-2 text-sm">
                 <span className="text-gray-400 text-xs w-16 shrink-0">{row.label}</span>
@@ -2399,14 +2399,14 @@ function DemoTenantTab() {
             <div className="flex items-center gap-1.5 mb-3">
               <Home className="w-3.5 h-3.5 text-slate-500" />
               <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Client Portal</span>
-              <a href="/portal/login" target="_blank" rel="noopener noreferrer" className="ml-auto text-teal-500 hover:text-teal-700">
+              <a href="https://demo.hubifyhomesonline.com/portal/login" target="_blank" rel="noopener noreferrer" className="ml-auto text-teal-500 hover:text-teal-700">
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
             </div>
             {[
-              { label: "URL",      value: "/portal/login",                         href: "/portal/login" },
-              { label: "Email",    value: "client@demo.hubifyhomesonline.com",      href: null },
-              { label: "Password", value: "DemoClient2026!",                       href: null },
+              { label: "URL",      value: "https://demo.hubifyhomesonline.com/portal/login",  href: "https://demo.hubifyhomesonline.com/portal/login" },
+              { label: "Email",    value: "client@demo.hubifyhomesonline.com",                href: null },
+              { label: "Password", value: "DemoClient2026!",                                  href: null },
             ].map(row => (
               <div key={row.label} className="flex items-center justify-between gap-2 text-sm">
                 <span className="text-gray-400 text-xs w-16 shrink-0">{row.label}</span>
