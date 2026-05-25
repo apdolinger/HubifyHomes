@@ -2569,7 +2569,7 @@ function DemoTenantTab() {
               {/* Quick launch links */}
               <div className="pt-1 flex flex-wrap gap-2">
                 <a
-                  href={info.demoSiteUrl}
+                  href={`${info.demoSiteUrl}/staff/login`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-xs font-medium bg-teal-600 hover:bg-teal-700 text-white rounded-md px-3 py-1.5 transition-colors"
@@ -2578,7 +2578,7 @@ function DemoTenantTab() {
                   Open Demo App
                 </a>
                 <a
-                  href="/staff/login"
+                  href={`${info.demoSiteUrl}/staff/login`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md px-3 py-1.5 transition-colors"
@@ -2587,7 +2587,7 @@ function DemoTenantTab() {
                   Staff Login
                 </a>
                 <a
-                  href="/portal/login"
+                  href={`${info.demoSiteUrl}/portal/login`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-xs font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md px-3 py-1.5 transition-colors"
@@ -2741,7 +2741,7 @@ function DemoTenantTab() {
             <div className="p-5 space-y-4">
               <div className="flex flex-wrap gap-3">
                 <a
-                  href={info.demoSiteUrl}
+                  href={`${info.demoSiteUrl}/staff/login`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 text-sm font-medium bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md transition-colors"
