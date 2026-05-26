@@ -12749,21 +12749,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Organization not found" });
       }
 
-      const submissions = await storage.getBillingSubmissionsByInvoice(invoice.id);
-      
-      const lineItems = submissions.map((submission: any) => ({
-        description: submission.description || `${submission.sourceType} - ${submission.sourceId}`,
-        quantity: 1,
-        unitPrice: submission.amountCents,
-        total: submission.amountCents
+      // Build line items: prefer the invoice's stored lineItems JSONB; fall back to
+      // a single line from the invoice description, or a generic placeholder.
+      const rawLineItems: Array<{ description: string; quantity: number; unitAmountCents: number; totalCents: number }> =
+        Array.isArray(invoice.lineItems) && invoice.lineItems.length > 0
+          ? invoice.lineItems as any[]
+          : invoice.description
+            ? [{ description: invoice.description, quantity: 1, unitAmountCents: invoice.amountCents, totalCents: invoice.amountCents }]
+            : [{ description: `Invoice ${invoice.invoiceNumber || invoice.id.slice(0, 8)}`, quantity: 1, unitAmountCents: invoice.amountCents, totalCents: invoice.amountCents }];
+
+      const lineItems = rawLineItems.map((item: any) => ({
+        description: item.description || 'Service',
+        quantity: item.quantity ?? 1,
+        unitPrice: item.unitAmountCents ?? item.unitPrice ?? invoice.amountCents,
+        total: item.totalCents ?? item.total ?? invoice.amountCents,
       }));
 
       // Fetch custom fields for invoice entity type
       const customFields = await storage.getCustomFields(orgId, "invoice");
 
+      const isPaid = invoice.paymentStatus === 'succeeded';
+      const amountCents = invoice.amountCents ?? 0;
+      const amountPaid = isPaid ? amountCents : 0;
+      const amountDue = isPaid ? 0 : amountCents;
+
       const invoiceData = {
         invoiceNumber: invoice.invoiceNumber || `INV-${invoice.id.slice(0, 8)}`,
-        invoiceDate: invoice.invoiceDate || invoice.createdAt || new Date(),
+        invoiceDate: invoice.issuedAt || invoice.createdAt || new Date(),
         dueDate: invoice.dueDate,
         
         organizationName: org.name,
@@ -12779,21 +12791,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         lineItems,
         
-        subtotal: invoice.subtotalCents,
-        taxRate: invoice.taxRate || undefined,
-        taxAmount: invoice.taxCents || undefined,
-        total: invoice.totalCents,
-        amountPaid: invoice.paidCents || 0,
-        amountDue: invoice.totalCents - (invoice.paidCents || 0),
+        subtotal: amountCents,
+        total: amountCents,
+        amountPaid,
+        amountDue,
         
-        notes: invoice.notes || undefined,
-        paymentTerms: invoice.paymentTerms || undefined,
         currency: invoice.currency || 'usd',
         
         primaryColor: org.branding?.primaryColor,
         secondaryColor: org.branding?.secondaryColor,
         
-        attachments: (invoice as any).attachments || undefined,
+        attachments: invoice.attachments || undefined,
         
         customFieldValues: invoice.customFieldValues || {},
         customFields: customFields.map(cf => ({
