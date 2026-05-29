@@ -926,6 +926,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       orgId: null,
       name: null,
       orgStatus: null,
+      logoUrl: null,
     });
   });
   

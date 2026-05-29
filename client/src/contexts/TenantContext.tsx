@@ -8,6 +8,7 @@ export interface TenantInfo {
   orgId: string | null;
   name: string | null;
   orgStatus: string | null;
+  logoUrl: string | null;
 }
 
 const DEFAULT_TENANT: TenantInfo = {
@@ -17,6 +18,7 @@ const DEFAULT_TENANT: TenantInfo = {
   orgId: null,
   name: null,
   orgStatus: null,
+  logoUrl: null,
 };
 
 const TenantContext = createContext<{

@@ -14,6 +14,7 @@ export interface TenantInfo {
   orgId: string | null;
   name: string | null;
   orgStatus: string | null;
+  logoUrl: string | null;
 }
 
 declare global {
@@ -57,6 +58,7 @@ export async function tenantMiddleware(
       orgId: null,
       name: null,
       orgStatus: null,
+      logoUrl: null,
     };
     return next();
   }
@@ -68,8 +70,9 @@ export async function tenantMiddleware(
         id: string;
         name: string;
         org_status: string | null;
+        branding: { logo?: string } | null;
       }>(
-        `SELECT id, name, org_status FROM orgs WHERE slug = $1 LIMIT 1`,
+        `SELECT id, name, org_status, branding FROM orgs WHERE slug = $1 LIMIT 1`,
         [subdomain]
       );
       if (result.rows.length === 0) {
@@ -80,6 +83,7 @@ export async function tenantMiddleware(
           orgId: null,
           name: null,
           orgStatus: null,
+          logoUrl: null,
         };
       } else {
         const row = result.rows[0];
@@ -90,6 +94,7 @@ export async function tenantMiddleware(
           orgId: row.id,
           name: row.name,
           orgStatus: row.org_status ?? "active",
+          logoUrl: row.branding?.logo ?? null,
         };
       }
     } finally {
@@ -104,6 +109,7 @@ export async function tenantMiddleware(
       orgId: null,
       name: null,
       orgStatus: null,
+      logoUrl: null,
     };
   }
 

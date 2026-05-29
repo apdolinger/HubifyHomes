@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { HUBIFY_HOMES_LOGO_URL, HUBIFY_HOMES_LOGO_ALT } from '@/lib/brand';
+import { useTenant } from '@/contexts/TenantContext';
 
 export default function StaffLogin() {
   const [email, setEmail] = useState('');
@@ -14,6 +15,12 @@ export default function StaffLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { tenant } = useTenant();
+
+  const isBranded = !tenant.isPublicDomain && tenant.found;
+  const logoSrc = isBranded && tenant.logoUrl ? tenant.logoUrl : HUBIFY_HOMES_LOGO_URL;
+  const logoAlt = isBranded && tenant.name ? tenant.name : HUBIFY_HOMES_LOGO_ALT;
+  const orgName = isBranded && tenant.name ? tenant.name : 'Hubify';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,10 +60,10 @@ export default function StaffLogin() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="h-14 w-auto" />
+            <img src={logoSrc} alt={logoAlt} className="h-14 w-auto" />
           </div>
           <CardTitle className="text-2xl font-bold">Staff Login</CardTitle>
-          <CardDescription>Sign in to your Hubify account</CardDescription>
+          <CardDescription>Sign in to your {orgName} account</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
