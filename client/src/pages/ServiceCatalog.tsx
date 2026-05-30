@@ -513,6 +513,8 @@ function BulkRemoveModal({
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [progress, setProgress] = useState<{ processed: number; total: number; removed: number; skipped: number; failed: number } | null>(null);
+  const esRef = useRef<EventSource | null>(null);
 
   const { data: assignments = [], isLoading: assignmentsLoading } = useQuery<any[]>({
     queryKey: [`/api/admin/services/${service?.id}/assignments`],
@@ -550,39 +552,78 @@ function BulkRemoveModal({
     }
   }
 
-  const removeMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/admin/services/${service!.id}/bulk-remove`, {
-        propertyIds: Array.from(selected),
-      });
-      return res.json() as Promise<{ removed: number; notFound: number; failed: number }>;
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/services"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/admin/services/${service!.id}/assignments`] });
-      const { removed = 0, notFound = 0, failed = 0 } = data ?? {};
-      const parts: string[] = [];
-      if (notFound > 0) parts.push(`${notFound} not found — skipped`);
-      if (failed > 0) parts.push(`${failed} failed`);
-      toast({
-        title: removed > 0
-          ? `Removed from ${removed} ${removed === 1 ? "property" : "properties"}`
-          : "No assignments removed",
-        description: parts.length > 0 ? parts.join(" · ") : undefined,
-      });
-      setSelected(new Set());
-      onOpenChange(false);
-    },
-    onError: () => {
+  function stopBulkRemove() {
+    if (!esRef.current || !service) return;
+    esRef.current.close();
+    esRef.current = null;
+    const current = progress;
+    setProgress(null);
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/services"] });
+    queryClient.invalidateQueries({ queryKey: [`/api/admin/services/${service.id}/assignments`] });
+    toast({
+      title: "Removal stopped",
+      description: current
+        ? `Stopped after ${current.processed} of ${current.total} — ${current.removed} removed`
+        : "No assignments were removed",
+    });
+    setSelected(new Set());
+    onOpenChange(false);
+  }
+
+  function startBulkRemove() {
+    if (!service || selected.size === 0) return;
+    const params = new URLSearchParams();
+    params.set("propertyIds", Array.from(selected).join(","));
+    const url = `/api/admin/services/${service.id}/bulk-remove/progress?${params.toString()}`;
+    const es = new EventSource(url);
+    esRef.current = es;
+    es.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      if (data.error) {
+        es.close();
+        esRef.current = null;
+        setProgress(null);
+        toast({ title: "Error", description: data.error, variant: "destructive" });
+        return;
+      }
+      setProgress({ processed: data.processed, total: data.total, removed: data.removed, skipped: data.skipped, failed: data.failed });
+      if (data.done) {
+        es.close();
+        esRef.current = null;
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/services"] });
+        queryClient.invalidateQueries({ queryKey: [`/api/admin/services/${service.id}/assignments`] });
+        const { removed = 0, skipped = 0, failed = 0 } = data;
+        const parts: string[] = [];
+        if (skipped > 0) parts.push(`${skipped} not found — skipped`);
+        if (failed > 0) parts.push(`${failed} failed`);
+        toast({
+          title: removed > 0
+            ? `Removed from ${removed} ${removed === 1 ? "property" : "properties"}`
+            : "No assignments removed",
+          description: parts.length > 0 ? parts.join(" · ") : undefined,
+        });
+        setProgress(null);
+        setSelected(new Set());
+        onOpenChange(false);
+      }
+    };
+    es.onerror = () => {
+      es.close();
+      esRef.current = null;
+      setProgress(null);
       toast({ title: "Error", description: "Failed to remove service assignments", variant: "destructive" });
-    },
-  });
+    };
+  }
 
   function handleClose() {
+    if (esRef.current) { esRef.current.close(); esRef.current = null; }
+    setProgress(null);
     setSelected(new Set());
     setSearch("");
     onOpenChange(false);
   }
+
+  const isRemoving = progress !== null;
 
   const allFilteredSelected =
     filtered.length > 0 && filtered.every((a: any) => selected.has(a.propertyId));
@@ -679,17 +720,27 @@ function BulkRemoveModal({
             )}
           </ScrollArea>
 
-          {removeMutation.isPending ? (
-            <div className="space-y-2 pt-1">
-              <p className="text-sm text-red-600 font-medium text-center">
-                Removing from {selected.size} {selected.size === 1 ? "property" : "properties"}…
-              </p>
+          {isRemoving && progress ? (
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span className="text-red-700 font-medium">
+                  {progress.processed} of {progress.total} processed
+                </span>
+                <span className="flex gap-2">
+                  {progress.removed > 0 && <span className="text-red-600">{progress.removed} removed</span>}
+                  {progress.skipped > 0 && <span className="text-slate-400">{progress.skipped} skipped</span>}
+                  {progress.failed > 0 && <span className="text-red-500">{progress.failed} failed</span>}
+                </span>
+              </div>
               <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
                 <div
-                  className="h-full w-1/3 bg-red-400 rounded-full"
-                  style={{ animation: "progress-indeterminate 1.4s ease-in-out infinite" }}
+                  className="h-full bg-red-500 rounded-full transition-all duration-200"
+                  style={{ width: progress.total > 0 ? `${Math.round((progress.processed / progress.total) * 100)}%` : "0%" }}
                 />
               </div>
+              <p className="text-xs text-slate-400 text-center">
+                {Math.round((progress.processed / progress.total) * 100)}% complete
+              </p>
             </div>
           ) : selected.size > 0 ? (
             <p className="text-sm text-red-600 font-medium text-center">
@@ -699,16 +750,22 @@ function BulkRemoveModal({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={removeMutation.isPending}>Cancel</Button>
-          <Button
-            variant="destructive"
-            disabled={selected.size === 0 || removeMutation.isPending}
-            onClick={() => removeMutation.mutate()}
-          >
-            {removeMutation.isPending
-              ? "Removing…"
-              : `Remove from ${selected.size} ${selected.size === 1 ? "property" : "properties"}`}
-          </Button>
+          {isRemoving ? (
+            <Button variant="outline" onClick={stopBulkRemove}>
+              Stop
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={handleClose}>Cancel</Button>
+              <Button
+                variant="destructive"
+                disabled={selected.size === 0}
+                onClick={startBulkRemove}
+              >
+                {`Remove from ${selected.size} ${selected.size === 1 ? "property" : "properties"}`}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -12720,6 +12720,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
 
+    // GET /api/admin/services/:serviceId/bulk-remove/progress — SSE progress stream for bulk-remove
+    app.get("/api/admin/services/:serviceId/bulk-remove/progress", isAuthenticated, isAdmin, async (req: any, res) => {
+      const orgId = req.user?.claims?.orgId;
+      const serviceId = parseInt(req.params.serviceId, 10);
+      if (!orgId) { res.status(403).json({ message: "No organization context" }); return; }
+
+      const rawIds = typeof req.query.propertyIds === "string" ? req.query.propertyIds : "";
+      const propertyIds = rawIds.split(",").map((s: string) => parseInt(s.trim(), 10)).filter((n: number) => !isNaN(n) && n > 0);
+      if (propertyIds.length === 0) { res.status(400).json({ message: "propertyIds query param required" }); return; }
+
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.flushHeaders();
+
+      function send(data: object) {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+        if (typeof (res as any).flush === "function") (res as any).flush();
+      }
+
+      const total = propertyIds.length;
+      const counters = { processed: 0, removed: 0, skipped: 0, failed: 0 };
+
+      try {
+        const [service] = await db.select().from(orgSvcTable).where(and(eq(orgSvcTable.id, serviceId), eq(orgSvcTable.orgId, orgId)));
+        if (!service) { send({ error: "Service not found" }); res.end(); return; }
+
+        send({ processed: 0, total, removed: 0, skipped: 0, failed: 0 });
+
+        for (const propertyId of propertyIds) {
+          const existing = await db
+            .select({ id: propertyServiceAssignments.id })
+            .from(propertyServiceAssignments)
+            .where(
+              and(
+                eq(propertyServiceAssignments.serviceId, serviceId),
+                eq(propertyServiceAssignments.propertyId, propertyId),
+                eq(propertyServiceAssignments.orgId, orgId),
+              )
+            );
+          if (existing.length === 0) {
+            counters.skipped++;
+          } else {
+            try {
+              await db
+                .delete(propertyServiceAssignments)
+                .where(
+                  and(
+                    eq(propertyServiceAssignments.serviceId, serviceId),
+                    eq(propertyServiceAssignments.propertyId, propertyId),
+                    eq(propertyServiceAssignments.orgId, orgId),
+                  )
+                );
+              counters.removed++;
+            } catch {
+              counters.failed++;
+            }
+          }
+          counters.processed++;
+          send({ processed: counters.processed, total, removed: counters.removed, skipped: counters.skipped, failed: counters.failed });
+        }
+        send({ processed: total, total, removed: counters.removed, skipped: counters.skipped, failed: counters.failed, done: true });
+      } catch (err) {
+        console.error("GET /api/admin/services/:serviceId/bulk-remove/progress error:", err);
+        send({ error: "Internal error during bulk-remove" });
+      } finally {
+        res.end();
+      }
+    });
+
     // POST /api/admin/services/:serviceId/bulk-remove — remove service from multiple properties at once
     app.post("/api/admin/services/:serviceId/bulk-remove", isAuthenticated, isAdmin, async (req: any, res) => {
       try {
