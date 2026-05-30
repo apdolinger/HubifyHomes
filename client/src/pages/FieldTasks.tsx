@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, CheckCircle2, Clock, AlertCircle, ChevronRight } from "lucide-react";
+import FieldServicesBadge from "@/components/FieldServicesBadge";
 import { format, isPast } from "date-fns";
 
 function getStatusColor(status: string) {
@@ -94,6 +95,12 @@ export default function FieldTasks() {
                         <Clock className="w-3 h-3" />
                         {format(new Date(task.dueDate), "MMM d")}
                       </span>
+                    )}
+                    {task.property?.id && (
+                      <FieldServicesBadge
+                        propertyId={task.property.id}
+                        propertyName={task.property.name}
+                      />
                     )}
                   </div>
                 </div>

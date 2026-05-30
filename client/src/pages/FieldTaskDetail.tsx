@@ -9,6 +9,7 @@ import {
   ArrowLeft, Clock, Building, Camera,
   Loader2, ImageIcon, AlertCircle
 } from "lucide-react";
+import FieldServicesBadge from "@/components/FieldServicesBadge";
 import { format, isPast } from "date-fns";
 
 type ChecklistResult = "pass" | "fail" | "na";
@@ -216,12 +217,22 @@ export default function FieldTaskDetail() {
         <h1 className="text-lg font-bold text-slate-900 leading-snug">{task.title}</h1>
 
         {task.property && (
-          <div className="flex items-center gap-2 text-sm text-slate-600">
-            <Building className="w-4 h-4 flex-shrink-0 text-slate-400" />
-            <span>
-              {task.property.name}
-              {task.property.address1 && ` — ${task.property.address1}`}
-            </span>
+          <div className="flex items-start gap-2 text-sm text-slate-600">
+            <Building className="w-4 h-4 flex-shrink-0 text-slate-400 mt-0.5" />
+            <div className="flex-1 min-w-0 space-y-1.5">
+              <span>
+                {task.property.name}
+                {task.property.address1 && ` — ${task.property.address1}`}
+              </span>
+              {task.property.id && (
+                <div>
+                  <FieldServicesBadge
+                    propertyId={task.property.id}
+                    propertyName={task.property.name}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         )}
 
