@@ -692,6 +692,8 @@ const SOURCE_META: Record<string, { label: string; color: string }> = {
   pricing_starter:       { label: "Pricing · Starter",     color: "bg-purple-100 text-purple-800" },
   pricing_growth:        { label: "Pricing · Growth",      color: "bg-purple-100 text-purple-800" },
   pricing_professional:  { label: "Pricing · Professional",color: "bg-purple-100 text-purple-800" },
+  pricing_operator:      { label: "Pricing · Operator",    color: "bg-purple-100 text-purple-800" },
+  pricing_enterprise:    { label: "Pricing · Enterprise",  color: "bg-purple-100 text-purple-800" },
 };
 
 function ProspectSourceBadge({ source }: { source: string | null }) {
@@ -710,9 +712,11 @@ const SOURCE_FILTER_OPTIONS = [
   { value: "demo_request", label: "Demo Request" },
   { value: "beta_application", label: "Beta Application" },
   { value: "contact_form", label: "Contact Form" },
-  { value: "pricing_starter", label: "Pricing · Starter" },
-  { value: "pricing_growth", label: "Pricing · Growth" },
+  { value: "pricing_starter",      label: "Pricing · Starter" },
+  { value: "pricing_growth",       label: "Pricing · Growth" },
   { value: "pricing_professional", label: "Pricing · Professional" },
+  { value: "pricing_operator",     label: "Pricing · Operator" },
+  { value: "pricing_enterprise",   label: "Pricing · Enterprise" },
 ];
 
 function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: Prospect) => void }) {

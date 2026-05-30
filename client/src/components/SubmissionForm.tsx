@@ -21,7 +21,9 @@ export type SubmissionIntent =
   | "contact"
   | "pricing_starter"
   | "pricing_growth"
-  | "pricing_professional";
+  | "pricing_professional"
+  | "pricing_operator"
+  | "pricing_enterprise";
 
 export interface SubmissionFormProps {
   onSuccess?: () => void;
@@ -32,9 +34,11 @@ export interface SubmissionFormProps {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const PRICING_TIER_MAP: Record<string, string> = {
-  pricing_starter: "Starter Portfolio",
-  pricing_growth: "Growth Portfolio",
+  pricing_starter:      "Starter Portfolio",
+  pricing_growth:       "Growth Portfolio",
   pricing_professional: "Professional Portfolio",
+  pricing_operator:     "Operator Portfolio",
+  pricing_enterprise:   "Enterprise Portfolio",
 };
 
 function suggestTier(homes: number): string {
@@ -437,7 +441,7 @@ export const submissionSchema = z.object({
 });
 export type SubmissionValues = z.infer<typeof submissionSchema>;
 
-const PRICING_INTENTS = new Set<SubmissionIntent>(["pricing_starter", "pricing_growth", "pricing_professional"]);
+const PRICING_INTENTS = new Set<SubmissionIntent>(["pricing_starter", "pricing_growth", "pricing_professional", "pricing_operator", "pricing_enterprise"]);
 
 function FullInquiryForm({
   onSuccess,

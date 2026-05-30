@@ -1,13 +1,36 @@
-import { SubmissionForm } from "@/components/SubmissionForm";
+import { SubmissionForm, type SubmissionIntent } from "@/components/SubmissionForm";
 import { HUBIFY_HOMES_LOGO_URL, HUBIFY_HOMES_LOGO_ALT } from "@/lib/brand";
 
-function useEmbedMode() {
+const VALID_INTENTS = new Set<string>([
+  "get_started", "need_demo", "beta_application",
+  "pricing_starter", "pricing_growth", "pricing_professional",
+  "pricing_operator", "pricing_enterprise",
+]);
+
+const INTENT_LABELS: Record<string, string> = {
+  get_started:           "Get Started",
+  need_demo:             "Request a Demo",
+  beta_application:      "Apply for Beta",
+  pricing_starter:       "Starter Portfolio",
+  pricing_growth:        "Growth Portfolio",
+  pricing_professional:  "Professional Portfolio",
+  pricing_operator:      "Operator Portfolio",
+  pricing_enterprise:    "Enterprise Portfolio",
+};
+
+function useQueryParams() {
   const params = new URLSearchParams(window.location.search);
-  return params.get("embed") === "true";
+  const embed = params.get("embed") === "true";
+  const rawIntent = params.get("intent") ?? "";
+  const intent: SubmissionIntent | undefined = VALID_INTENTS.has(rawIntent)
+    ? (rawIntent as SubmissionIntent)
+    : undefined;
+  return { embed, intent };
 }
 
 export default function Submissions() {
-  const embed = useEmbedMode();
+  const { embed, intent } = useQueryParams();
+  const headerLabel = intent ? (INTENT_LABELS[intent] ?? "Get Started") : "Get Started";
 
   if (embed) {
     return (
@@ -22,10 +45,10 @@ export default function Submissions() {
               alt={HUBIFY_HOMES_LOGO_ALT}
               className="h-7 w-auto brightness-0 invert"
             />
-            <span className="text-white/80 text-xs font-medium tracking-wide uppercase">Get Started</span>
+            <span className="text-white/80 text-xs font-medium tracking-wide uppercase">{headerLabel}</span>
           </div>
           <div className="p-6">
-            <SubmissionForm />
+            <SubmissionForm initialIntent={intent} />
           </div>
         </div>
       </div>
@@ -50,7 +73,7 @@ export default function Submissions() {
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
-            <SubmissionForm />
+            <SubmissionForm initialIntent={intent} />
           </div>
         </div>
       </main>

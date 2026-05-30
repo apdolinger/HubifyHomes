@@ -15476,6 +15476,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (intent === "pricing_professional") {
         prospectStage = "inquiry";
         prospectSource = "pricing_professional";
+      } else if (intent === "pricing_operator") {
+        prospectStage = "inquiry";
+        prospectSource = "pricing_operator";
+      } else if (intent === "pricing_enterprise") {
+        prospectStage = "inquiry";
+        prospectSource = "pricing_enterprise";
       } else {
         prospectStage = "inquiry";
         prospectSource = "get_started";
