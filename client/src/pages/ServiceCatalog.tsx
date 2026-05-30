@@ -3,9 +3,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useLocation } from "wouter";
 import {
   Plus, Pencil, Trash2, Tag, DollarSign, Clock, RefreshCw,
-  CheckCircle2, XCircle, ChevronDown, Briefcase,
+  CheckCircle2, XCircle, ChevronDown, Briefcase, Building, ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,9 +18,68 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { OrganizationService } from "@shared/schema";
+
+// ── Service property assignment popover ───────────────────────────────────────
+function ServicePropertyBadge({ serviceId, count }: { serviceId: number; count: number }) {
+  const [open, setOpen] = useState(false);
+  const [, navigate] = useLocation();
+
+  const { data: assignments = [], isLoading } = useQuery<any[]>({
+    queryKey: [`/api/admin/services/${serviceId}/assignments`],
+    enabled: open,
+  });
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Badge
+          variant="outline"
+          className="text-xs border-blue-200 text-blue-700 bg-blue-50 cursor-pointer hover:bg-blue-100 transition-colors"
+        >
+          <Building className="w-2.5 h-2.5 mr-1" />
+          {count} {count === 1 ? "property" : "properties"}
+        </Badge>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-3" align="start">
+        <p className="text-xs font-semibold text-slate-700 mb-2">
+          Assigned to {count} {count === 1 ? "property" : "properties"}
+        </p>
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-full" />
+            <Skeleton className="h-5 w-3/4" />
+          </div>
+        ) : (assignments as any[]).length === 0 ? (
+          <p className="text-xs text-slate-400">No active assignments found.</p>
+        ) : (
+          <div className="space-y-1 max-h-48 overflow-y-auto">
+            {(assignments as any[]).map((a: any) => (
+              <button
+                key={a.id}
+                onClick={() => { setOpen(false); navigate(`/properties/${a.propertyId}`); }}
+                className="w-full flex items-center justify-between text-left px-2 py-1.5 rounded hover:bg-slate-100 transition-colors group"
+              >
+                <span className="text-xs text-slate-800 truncate flex-1 mr-2">
+                  {a.propertyName || `Property #${a.propertyId}`}
+                </span>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <span className={`text-xs font-medium ${a.status === "active" ? "text-emerald-600" : a.status === "paused" ? "text-yellow-600" : "text-slate-400"}`}>
+                    {a.status}
+                  </span>
+                  <ExternalLink className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 const BILLING_FREQUENCIES = [
   { value: "one_time", label: "One-time" },
@@ -458,9 +518,10 @@ export default function ServiceCatalog() {
                           <Badge variant="outline" className="text-xs border-slate-300 text-slate-500">Inactive</Badge>
                         )}
                         {(service as any).assignedPropertyCount > 0 && (
-                          <Badge variant="outline" className="text-xs border-blue-200 text-blue-700 bg-blue-50">
-                            {(service as any).assignedPropertyCount} {(service as any).assignedPropertyCount === 1 ? "property" : "properties"}
-                          </Badge>
+                          <ServicePropertyBadge
+                            serviceId={service.id}
+                            count={(service as any).assignedPropertyCount}
+                          />
                         )}
                       </div>
 

@@ -12259,6 +12259,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const {
       propertyServiceAssignments,
       organizationServices: orgSvcTable,
+      properties: propertiesTable,
+      contacts: contactsTable,
       insertPropertyServiceAssignmentSchema,
     } = await import("@shared/schema");
     const { eq, and, desc, sql: sqlFn2 } = await import("drizzle-orm");
@@ -12317,11 +12319,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const orgId = req.user?.claims?.orgId;
         const propertyId = parseInt(req.params.propertyId, 10);
         if (!orgId) return res.status(403).json({ message: "No organization context" });
+        // Verify property belongs to caller's org
+        const [property] = await db
+          .select()
+          .from(propertiesTable)
+          .where(and(eq(propertiesTable.id, propertyId), eq(propertiesTable.orgId, orgId)));
+        if (!property) return res.status(404).json({ message: "Property not found" });
+        // Verify service belongs to same org
         const [service] = await db
           .select()
           .from(orgSvcTable)
           .where(and(eq(orgSvcTable.id, req.body.serviceId), eq(orgSvcTable.orgId, orgId)));
         if (!service) return res.status(404).json({ message: "Service not found in your catalog" });
+        // Verify contact (if provided) belongs to same org
+        if (req.body.clientContactId != null) {
+          const [contact] = await db
+            .select()
+            .from(contactsTable)
+            .where(and(eq(contactsTable.id, req.body.clientContactId), eq(contactsTable.orgId, orgId)));
+          if (!contact) return res.status(404).json({ message: "Contact not found" });
+        }
         const parsed = insertPropertyServiceAssignmentSchema.safeParse({ ...req.body, orgId, propertyId });
         if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten() });
         const [created] = await db.insert(propertyServiceAssignments).values(parsed.data).returning();
@@ -12337,11 +12354,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const orgId = req.user?.claims?.orgId;
         const assignmentId = req.params.id;
+        const propertyId = parseInt(req.params.propertyId, 10);
         if (!orgId) return res.status(403).json({ message: "No organization context" });
         const [existing] = await db
           .select()
           .from(propertyServiceAssignments)
-          .where(and(eq(propertyServiceAssignments.id, assignmentId), eq(propertyServiceAssignments.orgId, orgId)));
+          .where(
+            and(
+              eq(propertyServiceAssignments.id, assignmentId),
+              eq(propertyServiceAssignments.orgId, orgId),
+              eq(propertyServiceAssignments.propertyId, propertyId),
+            )
+          );
         if (!existing) return res.status(404).json({ message: "Assignment not found" });
         const allowed = ["status", "customPriceCents", "billingFrequencyOverride", "endDate", "notes", "startDate", "clientContactId"];
         const updates: Record<string, any> = { updatedAt: new Date() };
@@ -12351,7 +12375,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const [updated] = await db
           .update(propertyServiceAssignments)
           .set(updates)
-          .where(and(eq(propertyServiceAssignments.id, assignmentId), eq(propertyServiceAssignments.orgId, orgId)))
+          .where(
+            and(
+              eq(propertyServiceAssignments.id, assignmentId),
+              eq(propertyServiceAssignments.orgId, orgId),
+              eq(propertyServiceAssignments.propertyId, propertyId),
+            )
+          )
           .returning();
         res.json(updated);
       } catch (err) {
@@ -12365,15 +12395,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const orgId = req.user?.claims?.orgId;
         const assignmentId = req.params.id;
+        const propertyId = parseInt(req.params.propertyId, 10);
         if (!orgId) return res.status(403).json({ message: "No organization context" });
         const [existing] = await db
           .select()
           .from(propertyServiceAssignments)
-          .where(and(eq(propertyServiceAssignments.id, assignmentId), eq(propertyServiceAssignments.orgId, orgId)));
+          .where(
+            and(
+              eq(propertyServiceAssignments.id, assignmentId),
+              eq(propertyServiceAssignments.orgId, orgId),
+              eq(propertyServiceAssignments.propertyId, propertyId),
+            )
+          );
         if (!existing) return res.status(404).json({ message: "Assignment not found" });
         await db
           .delete(propertyServiceAssignments)
-          .where(and(eq(propertyServiceAssignments.id, assignmentId), eq(propertyServiceAssignments.orgId, orgId)));
+          .where(
+            and(
+              eq(propertyServiceAssignments.id, assignmentId),
+              eq(propertyServiceAssignments.orgId, orgId),
+              eq(propertyServiceAssignments.propertyId, propertyId),
+            )
+          );
         res.json({ message: "Assignment removed" });
       } catch (err) {
         console.error("DELETE /api/properties/:propertyId/service-assignments/:id error:", err);
