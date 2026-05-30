@@ -7,7 +7,7 @@ import { useLocation } from "wouter";
 import {
   Plus, Pencil, Trash2, Tag, DollarSign, Clock, RefreshCw,
   CheckCircle2, XCircle, ChevronDown, Briefcase, Building, ExternalLink,
-  ListChecks, Search,
+  ListChecks, Search, MinusCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -339,6 +339,222 @@ function BulkAssignModal({
   );
 }
 
+// ── Bulk-remove modal ─────────────────────────────────────────────────────────
+function BulkRemoveModal({
+  service,
+  open,
+  onOpenChange,
+}: {
+  service: OrganizationService | null;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+
+  const { data: assignments = [], isLoading: assignmentsLoading } = useQuery<any[]>({
+    queryKey: [`/api/admin/services/${service?.id}/assignments`],
+    enabled: open && !!service,
+  });
+
+  const filtered = assignments.filter((a: any) =>
+    (a.propertyName ?? "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  function toggle(id: number) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    const allIds = filtered.map((a: any) => a.propertyId);
+    const allSelected = allIds.every(id => selected.has(id));
+    if (allSelected) {
+      setSelected(prev => {
+        const next = new Set(prev);
+        allIds.forEach(id => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelected(prev => {
+        const next = new Set(prev);
+        allIds.forEach(id => next.add(id));
+        return next;
+      });
+    }
+  }
+
+  const removeMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/admin/services/${service!.id}/bulk-remove`, {
+        propertyIds: Array.from(selected),
+      });
+      return res.json() as Promise<{ removed: number; notFound: number; failed: number }>;
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/services"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/services/${service!.id}/assignments`] });
+      const { removed = 0, notFound = 0, failed = 0 } = data ?? {};
+      const parts: string[] = [];
+      if (notFound > 0) parts.push(`${notFound} not found — skipped`);
+      if (failed > 0) parts.push(`${failed} failed`);
+      toast({
+        title: removed > 0
+          ? `Removed from ${removed} ${removed === 1 ? "property" : "properties"}`
+          : "No assignments removed",
+        description: parts.length > 0 ? parts.join(" · ") : undefined,
+      });
+      setSelected(new Set());
+      onOpenChange(false);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to remove service assignments", variant: "destructive" });
+    },
+  });
+
+  function handleClose() {
+    setSelected(new Set());
+    setSearch("");
+    onOpenChange(false);
+  }
+
+  const allFilteredSelected =
+    filtered.length > 0 && filtered.every((a: any) => selected.has(a.propertyId));
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <MinusCircle className="w-5 h-5 text-red-500" />
+            Remove from Properties
+          </DialogTitle>
+          {service && (
+            <p className="text-sm text-slate-500 mt-1">
+              Remove <strong>{service.name}</strong> from selected properties
+            </p>
+          )}
+        </DialogHeader>
+
+        <div className="space-y-3">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input
+              placeholder="Search assigned properties…"
+              className="pl-9"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Select-all row */}
+          {!assignmentsLoading && filtered.length > 0 && (
+            <div className="flex items-center gap-2 px-1">
+              <Checkbox
+                id="remove-select-all"
+                checked={allFilteredSelected}
+                onCheckedChange={toggleAll}
+              />
+              <label htmlFor="remove-select-all" className="text-xs text-slate-500 cursor-pointer select-none">
+                Select all ({filtered.length})
+              </label>
+            </div>
+          )}
+
+          {/* Assignment list */}
+          <ScrollArea className="h-72 rounded-md border">
+            {assignmentsLoading ? (
+              <div className="p-3 space-y-2">
+                {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+              </div>
+            ) : assignments.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full py-10 text-slate-400 text-sm">
+                <Building className="w-8 h-8 mb-2 opacity-40" />
+                This service is not assigned to any properties.
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full py-10 text-slate-400 text-sm">
+                <Building className="w-8 h-8 mb-2 opacity-40" />
+                No properties match your search.
+              </div>
+            ) : (
+              <div className="p-2 space-y-1">
+                {filtered.map((assignment: any) => {
+                  const isChecked = selected.has(assignment.propertyId);
+                  return (
+                    <label
+                      key={assignment.id}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-colors ${
+                        isChecked
+                          ? "bg-red-50 border border-red-200"
+                          : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <Checkbox
+                        checked={isChecked}
+                        onCheckedChange={() => toggle(assignment.propertyId)}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-800 truncate">
+                          {assignment.propertyName || `Property #${assignment.propertyId}`}
+                        </p>
+                      </div>
+                      <span className={`text-xs font-medium flex-shrink-0 ${
+                        assignment.status === "active" ? "text-emerald-600" :
+                        assignment.status === "paused" ? "text-yellow-600" : "text-slate-400"
+                      }`}>
+                        {assignment.status}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </ScrollArea>
+
+          {removeMutation.isPending ? (
+            <div className="space-y-2 pt-1">
+              <p className="text-sm text-red-600 font-medium text-center">
+                Removing from {selected.size} {selected.size === 1 ? "property" : "properties"}…
+              </p>
+              <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                <div
+                  className="h-full w-1/3 bg-red-400 rounded-full"
+                  style={{ animation: "progress-indeterminate 1.4s ease-in-out infinite" }}
+                />
+              </div>
+            </div>
+          ) : selected.size > 0 ? (
+            <p className="text-sm text-red-600 font-medium text-center">
+              {selected.size} {selected.size === 1 ? "property" : "properties"} selected for removal
+            </p>
+          ) : null}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={handleClose} disabled={removeMutation.isPending}>Cancel</Button>
+          <Button
+            variant="destructive"
+            disabled={selected.size === 0 || removeMutation.isPending}
+            onClick={() => removeMutation.mutate()}
+          >
+            {removeMutation.isPending
+              ? "Removing…"
+              : `Remove from ${selected.size} ${selected.size === 1 ? "property" : "properties"}`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 const BILLING_FREQUENCIES = [
   { value: "one_time", label: "One-time" },
   { value: "per_visit", label: "Per visit" },
@@ -639,6 +855,7 @@ export default function ServiceCatalog() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("active");
   const [bulkAssignService, setBulkAssignService] = useState<OrganizationService | null>(null);
+  const [bulkRemoveService, setBulkRemoveService] = useState<OrganizationService | null>(null);
 
   const { data: services = [], isLoading } = useQuery<OrganizationService[]>({
     queryKey: ["/api/admin/services"],
@@ -827,6 +1044,18 @@ export default function ServiceCatalog() {
                         <ListChecks className="w-3.5 h-3.5 mr-1.5" />
                         Assign to Properties
                       </Button>
+                      {(service as any).assignedPropertyCount > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+                          onClick={() => setBulkRemoveService(service)}
+                          title="Remove from properties"
+                        >
+                          <MinusCircle className="w-3.5 h-3.5 mr-1.5" />
+                          Remove from Properties
+                        </Button>
+                      )}
                       <Switch
                         checked={service.isActive}
                         onCheckedChange={() => toggleMutation.mutate(service)}
@@ -874,6 +1103,12 @@ export default function ServiceCatalog() {
         service={bulkAssignService}
         open={!!bulkAssignService}
         onOpenChange={(v) => { if (!v) setBulkAssignService(null); }}
+      />
+
+      <BulkRemoveModal
+        service={bulkRemoveService}
+        open={!!bulkRemoveService}
+        onOpenChange={(v) => { if (!v) setBulkRemoveService(null); }}
       />
     </div>
   );

@@ -12599,6 +12599,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
 
+    // POST /api/admin/services/:serviceId/bulk-remove — remove service from multiple properties at once
+    app.post("/api/admin/services/:serviceId/bulk-remove", isAuthenticated, isAdmin, async (req: any, res) => {
+      try {
+        const orgId = req.user?.claims?.orgId;
+        const serviceId = parseInt(req.params.serviceId, 10);
+        if (!orgId) return res.status(403).json({ message: "No organization context" });
+        const { propertyIds } = req.body;
+        if (!Array.isArray(propertyIds) || propertyIds.length === 0) {
+          return res.status(400).json({ message: "propertyIds must be a non-empty array" });
+        }
+        // Verify service belongs to caller's org
+        const [service] = await db
+          .select()
+          .from(orgSvcTable)
+          .where(and(eq(orgSvcTable.id, serviceId), eq(orgSvcTable.orgId, orgId)));
+        if (!service) return res.status(404).json({ message: "Service not found in your catalog" });
+
+        const results = { removed: 0, notFound: 0, failed: 0 };
+        for (const rawId of propertyIds) {
+          const propertyId = parseInt(String(rawId), 10);
+          if (isNaN(propertyId)) { results.failed++; continue; }
+          // Find the active assignment(s) for this property + service
+          const existing = await db
+            .select({ id: propertyServiceAssignments.id })
+            .from(propertyServiceAssignments)
+            .where(
+              and(
+                eq(propertyServiceAssignments.serviceId, serviceId),
+                eq(propertyServiceAssignments.propertyId, propertyId),
+                eq(propertyServiceAssignments.orgId, orgId),
+              )
+            );
+          if (existing.length === 0) { results.notFound++; continue; }
+          await db
+            .delete(propertyServiceAssignments)
+            .where(
+              and(
+                eq(propertyServiceAssignments.serviceId, serviceId),
+                eq(propertyServiceAssignments.propertyId, propertyId),
+                eq(propertyServiceAssignments.orgId, orgId),
+              )
+            );
+          results.removed++;
+        }
+        res.json(results);
+      } catch (err) {
+        console.error("POST /api/admin/services/:serviceId/bulk-remove error:", err);
+        res.status(500).json({ message: "Failed to bulk-remove service" });
+      }
+    });
+
     // GET /api/admin/services/:serviceId/assignments — list properties assigned to a service
     app.get("/api/admin/services/:serviceId/assignments", isAuthenticated, isAdmin, async (req: any, res) => {
       try {
