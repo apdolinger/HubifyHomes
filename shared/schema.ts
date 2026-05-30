@@ -3632,3 +3632,37 @@ export const insertOrgSetupProgressSchema = createInsertSchema(orgSetupProgress)
   createdAt: true,
   updatedAt: true,
 });
+
+// ── Property Service Assignments ───────────────────────────────────────────────
+// Links a service from the catalog to a specific property.
+// The automation layer (task generation, billing) reads this table in future tasks.
+export const propertyServiceAssignments = pgTable("property_service_assignments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => orgs.id, { onDelete: "cascade" }),
+  propertyId: integer("property_id").notNull().references(() => properties.id, { onDelete: "cascade" }),
+  serviceId: integer("service_id").notNull().references(() => organizationServices.id, { onDelete: "cascade" }),
+  clientContactId: integer("client_contact_id").references(() => contacts.id),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date"),
+  customPriceCents: integer("custom_price_cents"),
+  billingFrequencyOverride: varchar("billing_frequency_override", { length: 64 }).$type<
+    "one_time" | "weekly" | "biweekly" | "monthly" | "quarterly" | "annually" | "per_visit" | "custom"
+  >(),
+  status: varchar("status", { length: 32 }).$type<"active" | "paused" | "cancelled">().notNull().default("active"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("psa_org_id_idx").on(table.orgId),
+  index("psa_property_id_idx").on(table.propertyId),
+  index("psa_service_id_idx").on(table.serviceId),
+  index("psa_status_idx").on(table.status),
+]);
+
+export type PropertyServiceAssignment = typeof propertyServiceAssignments.$inferSelect;
+export type InsertPropertyServiceAssignment = typeof propertyServiceAssignments.$inferInsert;
+export const insertPropertyServiceAssignmentSchema = createInsertSchema(propertyServiceAssignments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});

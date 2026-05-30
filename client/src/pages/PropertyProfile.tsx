@@ -56,7 +56,8 @@ import {
   Key,
   Lock,
   ExternalLink,
-  Wrench
+  Wrench,
+  Briefcase
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -447,6 +448,420 @@ function InspectionScheduleSection({ propertyId }: { propertyId: string }) {
               <Button onClick={handleSubmit} disabled={isPending || !form.startDate} data-testid="btn-save-inspection-schedule">
                 {isPending ? <RefreshCw className="w-4 h-4 animate-spin mr-1" /> : null}
                 {editingSchedule ? "Save Changes" : "Add Schedule"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Property Services Section ────────────────────────────────────────────────
+const BILLING_FREQ_LABELS: Record<string, string> = {
+  one_time: "One-time",
+  per_visit: "Per visit",
+  weekly: "Weekly",
+  biweekly: "Bi-weekly",
+  monthly: "Monthly",
+  quarterly: "Quarterly",
+  annually: "Annually",
+  custom: "Custom",
+};
+
+function ServiceAssignmentStatusBadge({ status }: { status: string }) {
+  const map: Record<string, { label: string; className: string }> = {
+    active: { label: "Active", className: "bg-emerald-100 text-emerald-800 border-emerald-200" },
+    paused: { label: "Paused", className: "bg-yellow-100 text-yellow-800 border-yellow-200" },
+    cancelled: { label: "Cancelled", className: "bg-red-100 text-red-800 border-red-200" },
+  };
+  const cfg = map[status] || { label: status, className: "bg-slate-100 text-slate-700 border-slate-200" };
+  return <Badge variant="outline" className={`text-xs ${cfg.className}`}>{cfg.label}</Badge>;
+}
+
+function PropertyServicesSection({ propertyId }: { propertyId: string | number }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState<any | null>(null);
+  const [form, setForm] = useState({
+    serviceId: "",
+    clientContactId: "",
+    startDate: new Date().toISOString().split("T")[0],
+    endDate: "",
+    customPriceDollars: "",
+    billingFrequencyOverride: "",
+    notes: "",
+  });
+
+  const { data: assignments = [], isLoading } = useQuery<any[]>({
+    queryKey: [`/api/properties/${propertyId}/service-assignments`],
+    enabled: !!propertyId,
+  });
+
+  const { data: catalogServices = [] } = useQuery<any[]>({
+    queryKey: ["/api/admin/services"],
+  });
+
+  const { data: contacts = [] } = useQuery<any[]>({
+    queryKey: ["/api/contacts"],
+  });
+
+  const activeServices = (catalogServices as any[]).filter((s: any) => s.isActive);
+
+  const resetForm = () => {
+    setForm({
+      serviceId: "",
+      clientContactId: "",
+      startDate: new Date().toISOString().split("T")[0],
+      endDate: "",
+      customPriceDollars: "",
+      billingFrequencyOverride: "",
+      notes: "",
+    });
+  };
+
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", `/api/properties/${propertyId}/service-assignments`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/service-assignments`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/services"] });
+      toast({ title: "Service assigned successfully" });
+      setDialogOpen(false);
+      resetForm();
+    },
+    onError: () => toast({ title: "Error", description: "Failed to assign service", variant: "destructive" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await apiRequest("PATCH", `/api/properties/${propertyId}/service-assignments/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/service-assignments`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/services"] });
+      toast({ title: "Assignment updated" });
+      setDialogOpen(false);
+      setEditingAssignment(null);
+      resetForm();
+    },
+    onError: () => toast({ title: "Error", description: "Failed to update assignment", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/properties/${propertyId}/service-assignments/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/service-assignments`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/services"] });
+      toast({ title: "Assignment removed" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to remove assignment", variant: "destructive" }),
+  });
+
+  const openAdd = () => {
+    setEditingAssignment(null);
+    resetForm();
+    setDialogOpen(true);
+  };
+
+  const openEdit = (assignment: any) => {
+    setEditingAssignment(assignment);
+    setForm({
+      serviceId: String(assignment.serviceId),
+      clientContactId: assignment.clientContactId ? String(assignment.clientContactId) : "",
+      startDate: assignment.startDate || new Date().toISOString().split("T")[0],
+      endDate: assignment.endDate || "",
+      customPriceDollars: assignment.customPriceCents != null ? String((assignment.customPriceCents / 100).toFixed(2)) : "",
+      billingFrequencyOverride: assignment.billingFrequencyOverride || "",
+      notes: assignment.notes || "",
+    });
+    setDialogOpen(true);
+  };
+
+  const handleSubmit = () => {
+    const payload: any = {
+      serviceId: parseInt(form.serviceId, 10),
+      startDate: form.startDate,
+      clientContactId: form.clientContactId ? parseInt(form.clientContactId, 10) : null,
+      endDate: form.endDate || null,
+      customPriceCents: form.customPriceDollars ? Math.round(parseFloat(form.customPriceDollars) * 100) : null,
+      billingFrequencyOverride: form.billingFrequencyOverride || null,
+      notes: form.notes || null,
+    };
+    if (editingAssignment) {
+      updateMutation.mutate({ id: editingAssignment.id, data: payload });
+    } else {
+      createMutation.mutate(payload);
+    }
+  };
+
+  const handleStatusChange = (id: string, status: string) => {
+    updateMutation.mutate({ id, data: { status } });
+  };
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
+  const displayPrice = (a: any) => {
+    const cents = a.customPriceCents ?? a.serviceDefaultPriceCents;
+    if (cents == null) return "—";
+    return `$${(cents / 100).toFixed(2)}`;
+  };
+
+  const displayFreq = (a: any) => {
+    const f = a.billingFrequencyOverride || a.serviceBillingFrequency;
+    return BILLING_FREQ_LABELS[f] || f || "—";
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Briefcase className="w-5 h-5 text-teal-600" />
+              Assigned Services
+            </CardTitle>
+            <p className="text-sm text-slate-500 mt-1">Services from your catalog applied to this property.</p>
+          </div>
+          <Button size="sm" onClick={openAdd}>
+            <Plus className="w-4 h-4 mr-1" /> Add Service
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <RefreshCw className="w-5 h-5 animate-spin text-teal-600" />
+          </div>
+        ) : (assignments as any[]).length === 0 ? (
+          <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-lg">
+            <Briefcase className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 font-medium">No services assigned yet</p>
+            <p className="text-sm text-slate-400 mt-1 max-w-sm mx-auto">
+              Assign services from your catalog to track billing, schedules, and tasks for this property.
+            </p>
+            <Button variant="outline" size="sm" className="mt-4" onClick={openAdd}>
+              <Plus className="w-4 h-4 mr-1" /> Assign First Service
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {(assignments as any[]).map((a: any) => (
+              <div key={a.id} className="flex items-start justify-between p-4 border rounded-lg hover:bg-slate-50 transition-colors">
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-slate-900 text-sm">{a.serviceName}</span>
+                    <ServiceAssignmentStatusBadge status={a.status} />
+                    {a.serviceCategory && (
+                      <Badge variant="outline" className="text-xs text-teal-700 border-teal-200">{a.serviceCategory}</Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4 text-xs text-slate-500 flex-wrap">
+                    <span className="flex items-center gap-1">
+                      <DollarSign className="w-3 h-3" />
+                      {displayPrice(a)} / {displayFreq(a)}
+                      {a.customPriceCents != null && (
+                        <span className="text-teal-600 font-medium ml-1">(custom)</span>
+                      )}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      From {a.startDate}
+                      {a.endDate && ` – ${a.endDate}`}
+                    </span>
+                    {a.clientContactName && a.clientContactName.trim() && (
+                      <span className="flex items-center gap-1">
+                        <User className="w-3 h-3" />
+                        {a.clientContactName.trim()}
+                      </span>
+                    )}
+                  </div>
+                  {a.notes && (
+                    <p className="text-xs text-slate-400 italic truncate">{a.notes}</p>
+                  )}
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 flex-shrink-0 ml-2">
+                      <MoreVertical className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => openEdit(a)}>
+                      <Edit className="w-4 h-4 mr-2" /> Edit
+                    </DropdownMenuItem>
+                    {a.status === "active" && (
+                      <DropdownMenuItem onClick={() => handleStatusChange(a.id, "paused")}>
+                        Pause
+                      </DropdownMenuItem>
+                    )}
+                    {a.status === "paused" && (
+                      <DropdownMenuItem onClick={() => handleStatusChange(a.id, "active")}>
+                        Resume
+                      </DropdownMenuItem>
+                    )}
+                    {a.status !== "cancelled" && (
+                      <DropdownMenuItem
+                        className="text-orange-600 focus:text-orange-600"
+                        onClick={() => {
+                          if (confirm("Cancel this service assignment?")) handleStatusChange(a.id, "cancelled");
+                        }}
+                      >
+                        Cancel Assignment
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem
+                      className="text-red-600 focus:text-red-600"
+                      onClick={() => {
+                        if (confirm("Permanently remove this service assignment?")) deleteMutation.mutate(a.id);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" /> Remove
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Add / Edit Dialog */}
+        <Dialog
+          open={dialogOpen}
+          onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) { setEditingAssignment(null); resetForm(); }
+          }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{editingAssignment ? "Edit Service Assignment" : "Assign a Service"}</DialogTitle>
+              <DialogDescription>
+                {editingAssignment
+                  ? "Update the details of this service assignment."
+                  : "Add a service from your catalog to this property."}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label>Service *</Label>
+                <Select
+                  value={form.serviceId}
+                  onValueChange={(v) => setForm(f => ({ ...f, serviceId: v }))}
+                  disabled={!!editingAssignment}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a service…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeServices.map((s: any) => (
+                      <SelectItem key={s.id} value={String(s.id)}>
+                        {s.name}{s.category ? ` · ${s.category}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Start Date *</Label>
+                  <Input
+                    type="date"
+                    value={form.startDate}
+                    onChange={(e) => setForm(f => ({ ...f, startDate: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>End Date (optional)</Label>
+                  <Input
+                    type="date"
+                    value={form.endDate}
+                    onChange={(e) => setForm(f => ({ ...f, endDate: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Price Override ($)</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Default"
+                      className="pl-6"
+                      value={form.customPriceDollars}
+                      onChange={(e) => setForm(f => ({ ...f, customPriceDollars: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Frequency Override</Label>
+                  <Select
+                    value={form.billingFrequencyOverride || "_default"}
+                    onValueChange={(v) => setForm(f => ({ ...f, billingFrequencyOverride: v === "_default" ? "" : v }))}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Default" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_default">Use default</SelectItem>
+                      {Object.entries(BILLING_FREQ_LABELS).map(([k, v]) => (
+                        <SelectItem key={k} value={k}>{v}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Billed To (optional)</Label>
+                <Select
+                  value={form.clientContactId || "_none"}
+                  onValueChange={(v) => setForm(f => ({ ...f, clientContactId: v === "_none" ? "" : v }))}
+                >
+                  <SelectTrigger><SelectValue placeholder="Not assigned" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">Not assigned</SelectItem>
+                    {(contacts as any[]).map((c: any) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {`${c.firstName || ""} ${c.lastName || ""}`.trim() || c.email || `Contact #${c.id}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Notes (optional)</Label>
+                <Textarea
+                  placeholder="Any notes about this assignment…"
+                  rows={2}
+                  value={form.notes}
+                  onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => { setDialogOpen(false); setEditingAssignment(null); resetForm(); }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={isPending || !form.serviceId || !form.startDate}
+              >
+                {isPending && <RefreshCw className="w-4 h-4 animate-spin mr-1" />}
+                {editingAssignment ? "Save Changes" : "Assign Service"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -3704,7 +4119,7 @@ export default function PropertyProfile() {
 
         {/* Tabs for detailed information */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-10">
+          <TabsList className="grid w-full grid-cols-11">
             <TabsTrigger value="tasks">Tasks</TabsTrigger>
             <TabsTrigger value="contacts">Residents</TabsTrigger>
             <TabsTrigger value="rooms">Rooms</TabsTrigger>
@@ -3715,6 +4130,7 @@ export default function PropertyProfile() {
             <TabsTrigger value="custom">Custom Fields</TabsTrigger>
             <TabsTrigger value="notes">Notes</TabsTrigger>
             <TabsTrigger value="inspections">Inspections</TabsTrigger>
+            <TabsTrigger value="services">Services</TabsTrigger>
           </TabsList>
 
           <TabsContent value="tasks">
@@ -6037,6 +6453,11 @@ export default function PropertyProfile() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Services Tab */}
+          <TabsContent value="services">
+            <PropertyServicesSection propertyId={propertyId!} />
           </TabsContent>
 
           {/* Inspection History Tab */}

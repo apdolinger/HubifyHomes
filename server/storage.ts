@@ -294,6 +294,9 @@ import {
   orgSetupProgress,
   type OrgSetupProgress,
   type InsertOrgSetupProgress,
+  propertyServiceAssignments,
+  type PropertyServiceAssignment,
+  type InsertPropertyServiceAssignment,
 } from "@shared/schema";
 
 import { db } from "./db";
@@ -1034,6 +1037,13 @@ export interface IStorage {
   getOrgSetupProgress(orgId: string): Promise<OrgSetupProgress | undefined>;
   createOrgSetupProgress(orgId: string): Promise<OrgSetupProgress>;
   updateOrgSetupProgress(orgId: string, patch: Partial<InsertOrgSetupProgress>): Promise<OrgSetupProgress>;
+
+  // Property service assignment operations
+  getPropertyServiceAssignments(propertyId: number, orgId: string): Promise<PropertyServiceAssignment[]>;
+  createPropertyServiceAssignment(data: InsertPropertyServiceAssignment): Promise<PropertyServiceAssignment>;
+  updatePropertyServiceAssignment(id: string, orgId: string, patch: Partial<InsertPropertyServiceAssignment>): Promise<PropertyServiceAssignment>;
+  deletePropertyServiceAssignment(id: string, orgId: string): Promise<void>;
+  getServiceAssignmentsByService(serviceId: number, orgId: string): Promise<PropertyServiceAssignment[]>;
 
   // Onboarding prospect operations
   listOnboardingProspects(): Promise<OnboardingProspect[]>;
@@ -8118,6 +8128,54 @@ export class DatabaseStorage implements IStorage {
       .returning();
     if (!row) throw new Error(`org_setup_progress not found for org ${orgId}`);
     return row;
+  }
+
+  // ── Property service assignment operations ────────────────────────────────────
+  async getPropertyServiceAssignments(propertyId: number, orgId: string): Promise<PropertyServiceAssignment[]> {
+    return db
+      .select()
+      .from(propertyServiceAssignments)
+      .where(
+        and(
+          eq(propertyServiceAssignments.propertyId, propertyId),
+          eq(propertyServiceAssignments.orgId, orgId),
+        )
+      )
+      .orderBy(desc(propertyServiceAssignments.createdAt));
+  }
+
+  async createPropertyServiceAssignment(data: InsertPropertyServiceAssignment): Promise<PropertyServiceAssignment> {
+    const [row] = await db.insert(propertyServiceAssignments).values(data).returning();
+    return row;
+  }
+
+  async updatePropertyServiceAssignment(id: string, orgId: string, patch: Partial<InsertPropertyServiceAssignment>): Promise<PropertyServiceAssignment> {
+    const [row] = await db
+      .update(propertyServiceAssignments)
+      .set({ ...patch, updatedAt: new Date() })
+      .where(and(eq(propertyServiceAssignments.id, id), eq(propertyServiceAssignments.orgId, orgId)))
+      .returning();
+    if (!row) throw new Error(`property_service_assignment ${id} not found`);
+    return row;
+  }
+
+  async deletePropertyServiceAssignment(id: string, orgId: string): Promise<void> {
+    await db
+      .delete(propertyServiceAssignments)
+      .where(and(eq(propertyServiceAssignments.id, id), eq(propertyServiceAssignments.orgId, orgId)));
+  }
+
+  async getServiceAssignmentsByService(serviceId: number, orgId: string): Promise<PropertyServiceAssignment[]> {
+    return db
+      .select()
+      .from(propertyServiceAssignments)
+      .where(
+        and(
+          eq(propertyServiceAssignments.serviceId, serviceId),
+          eq(propertyServiceAssignments.orgId, orgId),
+        )
+      )
+      .orderBy(desc(propertyServiceAssignments.createdAt));
   }
 }
 

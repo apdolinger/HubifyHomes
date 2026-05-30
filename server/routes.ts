@@ -12145,14 +12145,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ── Organization Service Catalog ─────────────────────────────────────────────
   {
     const { organizationServices, insertOrganizationServiceSchema } = await import("@shared/schema");
-    const { eq, and, desc } = await import("drizzle-orm");
+    const { eq, and, desc, sql: sqlFn } = await import("drizzle-orm");
 
     app.get("/api/admin/services", isAuthenticated, isAdmin, async (req: any, res) => {
       try {
         const orgId = req.user?.claims?.orgId;
         if (!orgId) return res.status(403).json({ message: "No organization context" });
         const services = await db
-          .select()
+          .select({
+            id: organizationServices.id,
+            orgId: organizationServices.orgId,
+            name: organizationServices.name,
+            description: organizationServices.description,
+            category: organizationServices.category,
+            defaultPriceCents: organizationServices.defaultPriceCents,
+            billingFrequency: organizationServices.billingFrequency,
+            isBillable: organizationServices.isBillable,
+            createsTasks: organizationServices.createsTasks,
+            defaultTaskCategory: organizationServices.defaultTaskCategory,
+            recurrenceRule: organizationServices.recurrenceRule,
+            estimatedDurationMinutes: organizationServices.estimatedDurationMinutes,
+            isActive: organizationServices.isActive,
+            createdAt: organizationServices.createdAt,
+            updatedAt: organizationServices.updatedAt,
+            assignedPropertyCount: sqlFn<number>`(
+              SELECT COUNT(DISTINCT property_id)::int
+              FROM property_service_assignments
+              WHERE service_id = ${organizationServices.id}
+              AND status = 'active'
+            )`,
+          })
           .from(organizationServices)
           .where(eq(organizationServices.orgId, orgId))
           .orderBy(desc(organizationServices.createdAt));
@@ -12228,6 +12250,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (err) {
         console.error("DELETE /api/admin/services/:id error:", err);
         res.status(500).json({ message: "Failed to deactivate service" });
+      }
+    });
+  }
+
+  // ── Property Service Assignments ─────────────────────────────────────────────
+  {
+    const {
+      propertyServiceAssignments,
+      organizationServices: orgSvcTable,
+      insertPropertyServiceAssignmentSchema,
+    } = await import("@shared/schema");
+    const { eq, and, desc, sql: sqlFn2 } = await import("drizzle-orm");
+
+    // GET /api/properties/:propertyId/service-assignments — list with joined service data
+    app.get("/api/properties/:propertyId/service-assignments", isAuthenticated, async (req: any, res) => {
+      try {
+        const orgId = req.user?.claims?.orgId;
+        const propertyId = parseInt(req.params.propertyId, 10);
+        if (!orgId) return res.status(403).json({ message: "No organization context" });
+        const assignments = await db
+          .select({
+            id: propertyServiceAssignments.id,
+            orgId: propertyServiceAssignments.orgId,
+            propertyId: propertyServiceAssignments.propertyId,
+            serviceId: propertyServiceAssignments.serviceId,
+            clientContactId: propertyServiceAssignments.clientContactId,
+            startDate: propertyServiceAssignments.startDate,
+            endDate: propertyServiceAssignments.endDate,
+            customPriceCents: propertyServiceAssignments.customPriceCents,
+            billingFrequencyOverride: propertyServiceAssignments.billingFrequencyOverride,
+            status: propertyServiceAssignments.status,
+            notes: propertyServiceAssignments.notes,
+            createdAt: propertyServiceAssignments.createdAt,
+            updatedAt: propertyServiceAssignments.updatedAt,
+            serviceName: orgSvcTable.name,
+            serviceCategory: orgSvcTable.category,
+            serviceDefaultPriceCents: orgSvcTable.defaultPriceCents,
+            serviceBillingFrequency: orgSvcTable.billingFrequency,
+            serviceIsBillable: orgSvcTable.isBillable,
+            clientContactName: sqlFn2<string | null>`(
+              SELECT CONCAT(first_name, ' ', last_name)
+              FROM contacts
+              WHERE id = ${propertyServiceAssignments.clientContactId}
+            )`,
+          })
+          .from(propertyServiceAssignments)
+          .innerJoin(orgSvcTable, eq(propertyServiceAssignments.serviceId, orgSvcTable.id))
+          .where(
+            and(
+              eq(propertyServiceAssignments.propertyId, propertyId),
+              eq(propertyServiceAssignments.orgId, orgId),
+            )
+          )
+          .orderBy(desc(propertyServiceAssignments.createdAt));
+        res.json(assignments);
+      } catch (err) {
+        console.error("GET /api/properties/:propertyId/service-assignments error:", err);
+        res.status(500).json({ message: "Failed to fetch service assignments" });
+      }
+    });
+
+    // POST /api/properties/:propertyId/service-assignments — create
+    app.post("/api/properties/:propertyId/service-assignments", isAuthenticated, isAdmin, async (req: any, res) => {
+      try {
+        const orgId = req.user?.claims?.orgId;
+        const propertyId = parseInt(req.params.propertyId, 10);
+        if (!orgId) return res.status(403).json({ message: "No organization context" });
+        const [service] = await db
+          .select()
+          .from(orgSvcTable)
+          .where(and(eq(orgSvcTable.id, req.body.serviceId), eq(orgSvcTable.orgId, orgId)));
+        if (!service) return res.status(404).json({ message: "Service not found in your catalog" });
+        const parsed = insertPropertyServiceAssignmentSchema.safeParse({ ...req.body, orgId, propertyId });
+        if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten() });
+        const [created] = await db.insert(propertyServiceAssignments).values(parsed.data).returning();
+        res.status(201).json(created);
+      } catch (err) {
+        console.error("POST /api/properties/:propertyId/service-assignments error:", err);
+        res.status(500).json({ message: "Failed to create service assignment" });
+      }
+    });
+
+    // PATCH /api/properties/:propertyId/service-assignments/:id — update
+    app.patch("/api/properties/:propertyId/service-assignments/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+      try {
+        const orgId = req.user?.claims?.orgId;
+        const assignmentId = req.params.id;
+        if (!orgId) return res.status(403).json({ message: "No organization context" });
+        const [existing] = await db
+          .select()
+          .from(propertyServiceAssignments)
+          .where(and(eq(propertyServiceAssignments.id, assignmentId), eq(propertyServiceAssignments.orgId, orgId)));
+        if (!existing) return res.status(404).json({ message: "Assignment not found" });
+        const allowed = ["status", "customPriceCents", "billingFrequencyOverride", "endDate", "notes", "startDate", "clientContactId"];
+        const updates: Record<string, any> = { updatedAt: new Date() };
+        for (const key of allowed) {
+          if (req.body[key] !== undefined) updates[key] = req.body[key];
+        }
+        const [updated] = await db
+          .update(propertyServiceAssignments)
+          .set(updates)
+          .where(and(eq(propertyServiceAssignments.id, assignmentId), eq(propertyServiceAssignments.orgId, orgId)))
+          .returning();
+        res.json(updated);
+      } catch (err) {
+        console.error("PATCH /api/properties/:propertyId/service-assignments/:id error:", err);
+        res.status(500).json({ message: "Failed to update service assignment" });
+      }
+    });
+
+    // DELETE /api/properties/:propertyId/service-assignments/:id — remove
+    app.delete("/api/properties/:propertyId/service-assignments/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+      try {
+        const orgId = req.user?.claims?.orgId;
+        const assignmentId = req.params.id;
+        if (!orgId) return res.status(403).json({ message: "No organization context" });
+        const [existing] = await db
+          .select()
+          .from(propertyServiceAssignments)
+          .where(and(eq(propertyServiceAssignments.id, assignmentId), eq(propertyServiceAssignments.orgId, orgId)));
+        if (!existing) return res.status(404).json({ message: "Assignment not found" });
+        await db
+          .delete(propertyServiceAssignments)
+          .where(and(eq(propertyServiceAssignments.id, assignmentId), eq(propertyServiceAssignments.orgId, orgId)));
+        res.json({ message: "Assignment removed" });
+      } catch (err) {
+        console.error("DELETE /api/properties/:propertyId/service-assignments/:id error:", err);
+        res.status(500).json({ message: "Failed to remove service assignment" });
+      }
+    });
+
+    // GET /api/admin/services/:serviceId/assignments — list properties assigned to a service
+    app.get("/api/admin/services/:serviceId/assignments", isAuthenticated, isAdmin, async (req: any, res) => {
+      try {
+        const orgId = req.user?.claims?.orgId;
+        const serviceId = parseInt(req.params.serviceId, 10);
+        if (!orgId) return res.status(403).json({ message: "No organization context" });
+        const assignments = await db
+          .select({
+            id: propertyServiceAssignments.id,
+            propertyId: propertyServiceAssignments.propertyId,
+            status: propertyServiceAssignments.status,
+            startDate: propertyServiceAssignments.startDate,
+            endDate: propertyServiceAssignments.endDate,
+            createdAt: propertyServiceAssignments.createdAt,
+            propertyName: sqlFn2<string>`(SELECT name FROM properties WHERE id = ${propertyServiceAssignments.propertyId})`,
+          })
+          .from(propertyServiceAssignments)
+          .where(
+            and(
+              eq(propertyServiceAssignments.serviceId, serviceId),
+              eq(propertyServiceAssignments.orgId, orgId),
+            )
+          )
+          .orderBy(desc(propertyServiceAssignments.createdAt));
+        res.json(assignments);
+      } catch (err) {
+        console.error("GET /api/admin/services/:serviceId/assignments error:", err);
+        res.status(500).json({ message: "Failed to fetch service property assignments" });
       }
     });
   }

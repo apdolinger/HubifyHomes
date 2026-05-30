@@ -457,6 +457,11 @@ export default function ServiceCatalog() {
                         {!service.isActive && (
                           <Badge variant="outline" className="text-xs border-slate-300 text-slate-500">Inactive</Badge>
                         )}
+                        {(service as any).assignedPropertyCount > 0 && (
+                          <Badge variant="outline" className="text-xs border-blue-200 text-blue-700 bg-blue-50">
+                            {(service as any).assignedPropertyCount} {(service as any).assignedPropertyCount === 1 ? "property" : "properties"}
+                          </Badge>
+                        )}
                       </div>
 
                       {service.description && (

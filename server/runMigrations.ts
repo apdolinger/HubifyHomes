@@ -580,3 +580,35 @@ export async function ensureProspectConvertedAtColumn(): Promise<void> {
     client.release();
   }
 }
+
+export async function ensurePropertyServiceAssignmentsTable(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS property_service_assignments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+        property_id INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+        service_id INTEGER NOT NULL REFERENCES organization_services(id) ON DELETE CASCADE,
+        client_contact_id INTEGER REFERENCES contacts(id),
+        start_date DATE NOT NULL,
+        end_date DATE,
+        custom_price_cents INTEGER,
+        billing_frequency_override VARCHAR(64),
+        status VARCHAR(32) NOT NULL DEFAULT 'active',
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS psa_org_id_idx ON property_service_assignments(org_id);
+      CREATE INDEX IF NOT EXISTS psa_property_id_idx ON property_service_assignments(property_id);
+      CREATE INDEX IF NOT EXISTS psa_service_id_idx ON property_service_assignments(service_id);
+      CREATE INDEX IF NOT EXISTS psa_status_idx ON property_service_assignments(status);
+    `);
+    log("[MIGRATE] property_service_assignments table verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to ensure property_service_assignments table: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
