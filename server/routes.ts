@@ -2303,6 +2303,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Portal: active service assignments for a single property.
+  app.get('/api/portal/properties/:id/services', isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const portalUser = req.portalUser;
+      const propertyId = Number(req.params.id);
+      if (!Number.isInteger(propertyId)) {
+        return res.status(400).json({ message: 'Invalid property id' });
+      }
+      const links = await storage.getPortalUserProperties(portalUser.id);
+      const allowed = new Set(links.map((l) => l.propertyId));
+      if (!allowed.has(propertyId)) {
+        return res.status(404).json({ message: 'Property not found' });
+      }
+      const { propertyServiceAssignments, organizationServices: orgSvcTable } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      const rows = await db
+        .select({
+          id: propertyServiceAssignments.id,
+          status: propertyServiceAssignments.status,
+          startDate: propertyServiceAssignments.startDate,
+          endDate: propertyServiceAssignments.endDate,
+          customPriceCents: propertyServiceAssignments.customPriceCents,
+          billingFrequencyOverride: propertyServiceAssignments.billingFrequencyOverride,
+          serviceName: orgSvcTable.name,
+          serviceCategory: orgSvcTable.category,
+          serviceDefaultPriceCents: orgSvcTable.defaultPriceCents,
+          serviceBillingFrequency: orgSvcTable.billingFrequency,
+        })
+        .from(propertyServiceAssignments)
+        .innerJoin(orgSvcTable, eq(propertyServiceAssignments.serviceId, orgSvcTable.id))
+        .where(
+          and(
+            eq(propertyServiceAssignments.propertyId, propertyId),
+            eq(propertyServiceAssignments.orgId, portalUser.orgId),
+            eq(propertyServiceAssignments.status, 'active'),
+          )
+        );
+      res.json(rows);
+    } catch (error) {
+      console.error('Error fetching portal property services:', error);
+      res.status(500).json({ message: 'Failed to fetch services' });
+    }
+  });
+
   // Portal client home: tasks across the portal user's properties.
   app.get('/api/portal/tasks', isPortalAuthenticated, async (req: any, res) => {
     try {

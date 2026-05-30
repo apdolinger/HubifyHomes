@@ -5,7 +5,8 @@ import { usePortalAuth } from '@/contexts/PortalAuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Building2, MapPin, Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, Building2, MapPin, Loader2, Wrench } from 'lucide-react';
 
 interface PortalProperty {
   id: number;
@@ -20,6 +21,29 @@ interface PortalProperty {
   squareFootage: number | null;
   description: string | null;
   imageUrl: string | null;
+}
+
+interface PortalService {
+  id: string;
+  status: string;
+  startDate: string;
+  endDate: string | null;
+  customPriceCents: number | null;
+  billingFrequencyOverride: string | null;
+  serviceName: string;
+  serviceCategory: string | null;
+  serviceDefaultPriceCents: number | null;
+  serviceBillingFrequency: string | null;
+}
+
+function formatCents(cents: number | null | undefined): string | null {
+  if (cents == null) return null;
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
+}
+
+function formatFrequency(freq: string | null | undefined): string {
+  if (!freq) return '';
+  return freq.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export default function PortalPropertyDetail() {
@@ -38,6 +62,18 @@ export default function PortalPropertyDetail() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to load property');
+      return res.json();
+    },
+    enabled: !!token && !!user?.id && !!id,
+  });
+
+  const { data: services, isLoading: servicesLoading } = useQuery<PortalService[]>({
+    queryKey: ['/api/portal/properties', user?.id, id, 'services'],
+    queryFn: async () => {
+      const res = await fetch(`/api/portal/properties/${id}/services`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to load services');
       return res.json();
     },
     enabled: !!token && !!user?.id && !!id,
@@ -64,7 +100,7 @@ export default function PortalPropertyDetail() {
           <h1 className="text-lg font-semibold">Property details</h1>
         </div>
       </header>
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {isLoading ? (
           <Skeleton className="h-64 w-full" />
         ) : isError || !data ? (
@@ -112,6 +148,58 @@ export default function PortalPropertyDetail() {
             </CardContent>
           </Card>
         )}
+
+        {/* Services section */}
+        <Card data-testid="portal-property-services">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Wrench className="h-5 w-5 text-muted-foreground" />
+              <CardTitle className="text-base">Services</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {servicesLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : !services || services.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No active services assigned to this property.</p>
+            ) : (
+              <ul className="divide-y" data-testid="services-list">
+                {services.map((svc) => {
+                  const price = svc.customPriceCents ?? svc.serviceDefaultPriceCents;
+                  const freq = svc.billingFrequencyOverride ?? svc.serviceBillingFrequency;
+                  return (
+                    <li key={svc.id} className="py-3 flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{svc.serviceName}</p>
+                        {svc.serviceCategory && (
+                          <p className="text-xs text-muted-foreground capitalize mt-0.5">
+                            {svc.serviceCategory.replace(/[-_]/g, ' ')}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0 text-right">
+                        {price != null && (
+                          <div className="text-sm">
+                            <span className="font-medium">{formatCents(price)}</span>
+                            {freq && (
+                              <span className="text-muted-foreground text-xs ml-1">/ {formatFrequency(freq)}</span>
+                            )}
+                          </div>
+                        )}
+                        <Badge variant="secondary" className="capitalize text-xs">
+                          {svc.status}
+                        </Badge>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
       </main>
     </div>
   );
