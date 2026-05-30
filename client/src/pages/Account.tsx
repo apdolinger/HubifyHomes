@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useFeatureFlags } from "@/hooks/useFeatureFlags";
@@ -623,6 +623,8 @@ function BrandingTab({ orgId, orgName }: { orgId: string; orgName: string }) {
   const [logo, setLogo] = useState("");
   const [primaryColor, setPrimaryColor] = useState(DEFAULT_PRIMARY);
   const [secondaryColor, setSecondaryColor] = useState(DEFAULT_SECONDARY);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const logoFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (data?.branding) {
@@ -666,6 +668,43 @@ function BrandingTab({ orgId, orgName }: { orgId: string; orgName: string }) {
     },
   });
 
+  async function handleLogoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
+    if (file.size > MAX_BYTES) {
+      toast({ title: "File too large", description: "Please upload a logo under 2 MB.", variant: "destructive" });
+      e.target.value = "";
+      return;
+    }
+    const allowed = ["image/png", "image/jpeg", "image/svg+xml"];
+    if (!allowed.includes(file.type)) {
+      toast({ title: "Unsupported format", description: "Upload a PNG, JPG, or SVG file.", variant: "destructive" });
+      e.target.value = "";
+      return;
+    }
+
+    setLogoUploading(true);
+    try {
+      const form = new FormData();
+      form.append("files", file);
+      form.append("directory", `public/logos/${orgId}`);
+      const res = await fetch("/api/upload", { method: "POST", body: form, credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      const json = await res.json() as { urls: string[] };
+      if (json.urls?.[0]) {
+        setLogo(json.urls[0]);
+        toast({ title: "Logo uploaded", description: "Click Save Branding to apply it." });
+      }
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message || "Could not upload logo.", variant: "destructive" });
+    } finally {
+      setLogoUploading(false);
+      e.target.value = "";
+    }
+  }
+
   const previewLogoSrc = logo || HUBIFY_HOMES_LOGO_URL;
   const previewLogoAlt = logo ? `${orgName} logo` : HUBIFY_HOMES_LOGO_ALT;
   const usingFallback = !logo;
@@ -692,20 +731,67 @@ function BrandingTab({ orgId, orgName }: { orgId: string; orgName: string }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Hidden file input */}
+          <input
+            ref={logoFileRef}
+            type="file"
+            accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml"
+            className="hidden"
+            onChange={handleLogoFileChange}
+          />
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="md:col-span-2 space-y-2">
-              <Label htmlFor="branding-logo-url">Logo URL</Label>
-              <Input
-                id="branding-logo-url"
-                placeholder="https://example.com/logo.png"
-                value={logo}
-                onChange={(e) => setLogo(e.target.value)}
-                data-testid="input-branding-logo-url"
-              />
-              <p className="text-xs text-slate-500">
-                Public HTTPS URL to a PNG, JPG, or SVG. Leave blank to use the Hubify Homes
-                logo as a fallback.
-              </p>
+              <Label htmlFor="branding-logo-url">Logo</Label>
+
+              {/* Upload drop-zone / button */}
+              <div
+                className="border-2 border-dashed border-slate-200 rounded-lg p-5 text-center cursor-pointer hover:border-primary/50 hover:bg-slate-50 transition-colors"
+                onClick={() => logoFileRef.current?.click()}
+                data-testid="logo-upload-zone"
+              >
+                {logoUploading ? (
+                  <div className="flex flex-col items-center gap-2 text-slate-500">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+                    <span className="text-sm">Uploading…</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-slate-500">
+                    <Upload className="w-7 h-7 text-slate-400" />
+                    <p className="text-sm font-medium text-slate-700">Click to upload a logo file</p>
+                    <p className="text-xs text-slate-500">PNG, JPG, or SVG · max 2 MB</p>
+                    <p className="text-xs text-slate-400">Recommended: 300 × 80 px, transparent background</p>
+                  </div>
+                )}
+              </div>
+
+              {/* URL fallback */}
+              <div className="space-y-1 pt-1">
+                <Label htmlFor="branding-logo-url" className="text-xs text-slate-500">
+                  Or paste a public logo URL
+                </Label>
+                <Input
+                  id="branding-logo-url"
+                  placeholder="https://example.com/logo.png"
+                  value={logo}
+                  onChange={(e) => setLogo(e.target.value)}
+                  data-testid="input-branding-logo-url"
+                />
+              </div>
+
+              <div className="rounded-md bg-slate-50 border border-slate-200 p-3 space-y-1 text-xs text-slate-600">
+                <p className="font-medium text-slate-700">Logo requirements</p>
+                <ul className="space-y-0.5 list-disc list-inside">
+                  <li><span className="font-medium">Formats:</span> PNG (preferred), JPG, SVG</li>
+                  <li><span className="font-medium">Max file size:</span> 2 MB</li>
+                  <li><span className="font-medium">Recommended size:</span> 300 × 80 px (horizontal/landscape)</li>
+                  <li><span className="font-medium">Background:</span> transparent preferred for PNG/SVG</li>
+                  <li>Leave blank to display the Hubify Homes logo as a fallback</li>
+                </ul>
+                <p className="pt-1 text-slate-500">
+                  Your logo appears on the <span className="font-medium">client portal header</span>, <span className="font-medium">PDF invoices</span>, and <span className="font-medium">branded emails</span>.
+                </p>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="branding-primary-color">Header Color</Label>
