@@ -16333,12 +16333,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Org setup progress endpoints
-  app.get("/api/orgs/:orgId/setup-progress", isAuthenticated, async (req: any, res) => {
+  // Middleware that permits either a staff session (isAuthenticated) or an active super-admin session.
+  const isAuthenticatedOrSuperAdmin = (req: any, res: any, next: any) => {
+    const staffUser = (req.session as any)?.staffUser;
+    if (staffUser?.id) {
+      // Mimic what isAuthenticated does: attach req.user claims
+      req.user = {
+        claims: {
+          sub: staffUser.id,
+          orgId: staffUser.orgId,
+          role: staffUser.role,
+          email: staffUser.email,
+          first_name: staffUser.firstName,
+          last_name: staffUser.lastName,
+        },
+      };
+      return next();
+    }
+    const superAdmin = (req.session as any)?.superAdmin;
+    if (superAdmin?.authenticated) {
+      req.user = { claims: { sub: "super_admin", orgId: null, role: "super_admin", email: superAdmin.username } };
+      return next();
+    }
+    return res.status(401).json({ message: "Unauthorized" });
+  };
+
+  app.get("/api/orgs/:orgId/setup-progress", isAuthenticatedOrSuperAdmin, async (req: any, res) => {
     try {
       const { orgId } = req.params;
       const user = req.user as any;
       const userOrgId = user?.claims?.orgId;
-      const isSuperAdminUser = !!(req.session as any)?.superAdmin?.authenticated || user?.role === "super_admin";
+      const isSuperAdminUser = user?.claims?.role === "super_admin" || !!(req.session as any)?.superAdmin?.authenticated;
       if (!isSuperAdminUser && userOrgId !== orgId) {
         return res.status(403).json({ message: "Access denied" });
       }
@@ -16351,12 +16376,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/orgs/:orgId/setup-progress", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/orgs/:orgId/setup-progress", isAuthenticatedOrSuperAdmin, async (req: any, res) => {
     try {
       const { orgId } = req.params;
       const user = req.user as any;
       const userOrgId = user?.claims?.orgId;
-      const isSuperAdminUser = !!(req.session as any)?.superAdmin?.authenticated || user?.role === "super_admin";
+      const isSuperAdminUser = user?.claims?.role === "super_admin" || !!(req.session as any)?.superAdmin?.authenticated;
       if (!isSuperAdminUser && userOrgId !== orgId) {
         return res.status(403).json({ message: "Access denied" });
       }

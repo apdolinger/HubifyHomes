@@ -1235,7 +1235,7 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
   const convertToOrgMutation = useMutation({
     mutationFn: async (id: string) => {
       const res = await apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/convert-to-org`, {});
-      return res as any;
+      return await res.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
