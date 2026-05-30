@@ -100,6 +100,7 @@ function BulkAssignModal({
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [startDate, setStartDate] = useState("");
   const [customPrice, setCustomPrice] = useState("");
+  const [billingFrequency, setBillingFrequency] = useState("");
 
   const { data: properties = [], isLoading: propsLoading } = useQuery<any[]>({
     queryKey: ["/api/properties"],
@@ -150,6 +151,7 @@ function BulkAssignModal({
       const body: Record<string, unknown> = { propertyIds: Array.from(selected) };
       if (startDate) body.startDate = startDate;
       if (customPrice) body.customPriceCents = Math.round(parseFloat(customPrice) * 100);
+      if (billingFrequency) body.billingFrequencyOverride = billingFrequency;
       const res = await apiRequest("POST", `/api/admin/services/${service!.id}/bulk-assign`, body);
       return res.json() as Promise<{ created: number; skipped: number; failed: number }>;
     },
@@ -179,6 +181,7 @@ function BulkAssignModal({
     setSearch("");
     setStartDate("");
     setCustomPrice("");
+    setBillingFrequency("");
     onOpenChange(false);
   }
 
@@ -300,6 +303,24 @@ function BulkAssignModal({
                   className="pl-6 text-sm"
                 />
               </div>
+            </div>
+            <div className="space-y-1 col-span-2">
+              <label className="text-xs font-medium text-slate-600">Billing Frequency <span className="text-slate-400 font-normal">(optional)</span></label>
+              <Select value={billingFrequency} onValueChange={setBillingFrequency}>
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder="Use service default" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="one_time">One-time</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="biweekly">Biweekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="quarterly">Quarterly</SelectItem>
+                  <SelectItem value="annually">Annually</SelectItem>
+                  <SelectItem value="per_visit">Per Visit</SelectItem>
+                  <SelectItem value="custom">Custom</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

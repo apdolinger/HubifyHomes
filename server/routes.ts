@@ -12553,12 +12553,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const orgId = req.user?.claims?.orgId;
         const serviceId = parseInt(req.params.serviceId, 10);
         if (!orgId) return res.status(403).json({ message: "No organization context" });
-        const { propertyIds, startDate, customPriceCents } = req.body;
+        const { propertyIds, startDate, customPriceCents, billingFrequencyOverride } = req.body;
         if (!Array.isArray(propertyIds) || propertyIds.length === 0) {
           return res.status(400).json({ message: "propertyIds must be a non-empty array" });
         }
         const resolvedStartDate = startDate || new Date().toISOString().slice(0, 10);
         const resolvedCustomPrice = customPriceCents != null ? parseInt(String(customPriceCents), 10) : undefined;
+        const resolvedBillingFrequency = billingFrequencyOverride || undefined;
         // Verify service belongs to caller's org
         const [service] = await db
           .select()
@@ -12590,6 +12591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             serviceId,
             startDate: resolvedStartDate,
             ...(resolvedCustomPrice != null && !isNaN(resolvedCustomPrice) ? { customPriceCents: resolvedCustomPrice } : {}),
+            ...(resolvedBillingFrequency ? { billingFrequencyOverride: resolvedBillingFrequency } : {}),
           });
           if (!parsed.success) { results.failed++; continue; }
           await db.insert(propertyServiceAssignments).values(parsed.data);
