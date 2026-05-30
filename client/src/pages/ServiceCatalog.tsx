@@ -23,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { OrganizationService } from "@shared/schema";
 
@@ -195,7 +196,7 @@ function BulkAssignModal({
         esRef.current = null;
         queryClient.invalidateQueries({ queryKey: ["/api/admin/services"] });
         queryClient.invalidateQueries({ queryKey: [`/api/admin/services/${service.id}/assignments`] });
-        const { created = 0, skipped = 0, failed = 0 } = data;
+        const { created = 0, skipped = 0, failed = 0, createdIds = [] } = data;
         const parts: string[] = [];
         if (skipped > 0) parts.push(`${skipped} already assigned — skipped`);
         if (failed > 0) parts.push(`${failed} failed`);
@@ -204,6 +205,25 @@ function BulkAssignModal({
             ? `Assigned to ${created} ${created === 1 ? "property" : "properties"}`
             : "No new assignments made",
           description: parts.length > 0 ? parts.join(" · ") : undefined,
+          ...(created > 0 && createdIds.length > 0 ? {
+            action: (
+              <ToastAction altText="Undo" onClick={async () => {
+                try {
+                  const result = await apiRequest("POST", `/api/admin/services/${service.id}/bulk-unassign`, { propertyIds: createdIds });
+                  const { removed = 0 } = await result.json();
+                  queryClient.invalidateQueries({ queryKey: ["/api/admin/services"] });
+                  queryClient.invalidateQueries({ queryKey: [`/api/admin/services/${service.id}/assignments`] });
+                  toast({
+                    title: removed > 0
+                      ? `Removed ${removed} ${removed === 1 ? "assignment" : "assignments"}`
+                      : "Nothing to undo",
+                  });
+                } catch {
+                  toast({ title: "Undo failed", variant: "destructive" });
+                }
+              }}>Undo</ToastAction>
+            ),
+          } : {}),
         });
         setProgress(null);
         setSelected(new Set());

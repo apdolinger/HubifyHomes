@@ -12574,6 +12574,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const total = propertyIds.length;
       const counters = { processed: 0, created: 0, skipped: 0, failed: 0 };
+      const createdIds: number[] = [];
 
       try {
         // Verify service
@@ -12608,13 +12609,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               } else {
                 await db.insert(propertyServiceAssignments).values(parsed.data);
                 counters.created++;
+                createdIds.push(propertyId);
               }
             }
           }
           counters.processed++;
           send({ processed: counters.processed, total, created: counters.created, skipped: counters.skipped, failed: counters.failed });
         }
-        send({ processed: total, total, created: counters.created, skipped: counters.skipped, failed: counters.failed, done: true });
+        send({ processed: total, total, created: counters.created, skipped: counters.skipped, failed: counters.failed, createdIds, done: true });
       } catch (err) {
         console.error("GET /api/admin/services/:serviceId/bulk-assign/progress error:", err);
         send({ error: "Internal error during bulk-assign" });
@@ -12677,6 +12679,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (err) {
         console.error("POST /api/admin/services/:serviceId/bulk-assign error:", err);
         res.status(500).json({ message: "Failed to bulk-assign service" });
+      }
+    });
+
+    // POST /api/admin/services/:serviceId/bulk-unassign — undo a bulk-assign by removing only newly created assignments
+    app.post("/api/admin/services/:serviceId/bulk-unassign", isAuthenticated, isAdmin, async (req: any, res) => {
+      try {
+        const orgId = req.user?.claims?.orgId;
+        const serviceId = parseInt(req.params.serviceId, 10);
+        if (!orgId) return res.status(403).json({ message: "No organization context" });
+        const { propertyIds } = req.body;
+        if (!Array.isArray(propertyIds) || propertyIds.length === 0) {
+          return res.status(400).json({ message: "propertyIds must be a non-empty array" });
+        }
+        const [service] = await db
+          .select()
+          .from(orgSvcTable)
+          .where(and(eq(orgSvcTable.id, serviceId), eq(orgSvcTable.orgId, orgId)));
+        if (!service) return res.status(404).json({ message: "Service not found in your catalog" });
+
+        let removed = 0;
+        for (const rawId of propertyIds) {
+          const propertyId = parseInt(String(rawId), 10);
+          if (isNaN(propertyId)) continue;
+          const result = await db
+            .delete(propertyServiceAssignments)
+            .where(
+              and(
+                eq(propertyServiceAssignments.serviceId, serviceId),
+                eq(propertyServiceAssignments.propertyId, propertyId),
+                eq(propertyServiceAssignments.orgId, orgId),
+              )
+            );
+          if ((result as any).rowCount > 0 || (result as any).changes > 0) removed++;
+        }
+        res.json({ removed });
+      } catch (err) {
+        console.error("POST /api/admin/services/:serviceId/bulk-unassign error:", err);
+        res.status(500).json({ message: "Failed to undo bulk assignment" });
       }
     });
 
