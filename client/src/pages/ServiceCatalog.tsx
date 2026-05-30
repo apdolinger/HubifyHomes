@@ -98,6 +98,8 @@ function BulkAssignModal({
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [startDate, setStartDate] = useState("");
+  const [customPrice, setCustomPrice] = useState("");
 
   const { data: properties = [], isLoading: propsLoading } = useQuery<any[]>({
     queryKey: ["/api/properties"],
@@ -144,10 +146,12 @@ function BulkAssignModal({
   }
 
   const bulkMutation = useMutation({
-    mutationFn: () =>
-      apiRequest("POST", `/api/admin/services/${service!.id}/bulk-assign`, {
-        propertyIds: Array.from(selected),
-      }),
+    mutationFn: () => {
+      const body: Record<string, unknown> = { propertyIds: Array.from(selected) };
+      if (startDate) body.startDate = startDate;
+      if (customPrice) body.customPriceCents = Math.round(parseFloat(customPrice) * 100);
+      return apiRequest("POST", `/api/admin/services/${service!.id}/bulk-assign`, body);
+    },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/services"] });
       queryClient.invalidateQueries({ queryKey: [`/api/admin/services/${service!.id}/assignments`] });
@@ -167,6 +171,8 @@ function BulkAssignModal({
   function handleClose() {
     setSelected(new Set());
     setSearch("");
+    setStartDate("");
+    setCustomPrice("");
     onOpenChange(false);
   }
 
@@ -262,6 +268,34 @@ function BulkAssignModal({
               </div>
             )}
           </ScrollArea>
+
+          {/* Optional overrides */}
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-600">Start Date <span className="text-slate-400 font-normal">(optional)</span></label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-600">Custom Price <span className="text-slate-400 font-normal">(optional)</span></label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={customPrice}
+                  onChange={e => setCustomPrice(e.target.value)}
+                  className="pl-6 text-sm"
+                />
+              </div>
+            </div>
+          </div>
 
           {selected.size > 0 && (
             <p className="text-sm text-teal-700 font-medium text-center">
