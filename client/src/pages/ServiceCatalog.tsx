@@ -210,6 +210,24 @@ function BulkAssignModal({
     }
   }
 
+  function stopBulkAssign() {
+    if (!esRef.current || !service) return;
+    esRef.current.close();
+    esRef.current = null;
+    const current = progress;
+    setProgress(null);
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/services"] });
+    queryClient.invalidateQueries({ queryKey: [`/api/admin/services/${service.id}/assignments`] });
+    toast({
+      title: "Assignment stopped",
+      description: current
+        ? `Stopped after ${current.processed} of ${current.total} — ${current.created} assigned`
+        : "No assignments were made",
+    });
+    setSelected(new Set());
+    onOpenChange(false);
+  }
+
   function startBulkAssign() {
     if (!service || selected.size === 0) return;
     const params = new URLSearchParams();
@@ -459,16 +477,22 @@ function BulkAssignModal({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={isAssigning}>Cancel</Button>
-          <Button
-            className="bg-teal-600 hover:bg-teal-700"
-            disabled={selected.size === 0 || isAssigning}
-            onClick={startBulkAssign}
-          >
-            {isAssigning
-              ? "Assigning…"
-              : `Assign to ${selected.size} ${selected.size === 1 ? "property" : "properties"}`}
-          </Button>
+          {isAssigning ? (
+            <Button variant="destructive" onClick={stopBulkAssign}>
+              Stop
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={handleClose}>Cancel</Button>
+              <Button
+                className="bg-teal-600 hover:bg-teal-700"
+                disabled={selected.size === 0}
+                onClick={startBulkAssign}
+              >
+                {`Assign to ${selected.size} ${selected.size === 1 ? "property" : "properties"}`}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
