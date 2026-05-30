@@ -12295,6 +12295,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               SELECT CONCAT(first_name, ' ', last_name)
               FROM contacts
               WHERE id = ${propertyServiceAssignments.clientContactId}
+              AND org_id = ${orgId}
             )`,
           })
           .from(propertyServiceAssignments)
@@ -12367,6 +12368,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
             )
           );
         if (!existing) return res.status(404).json({ message: "Assignment not found" });
+
+        // Validate status enum
+        const validStatuses = ["active", "paused", "cancelled"] as const;
+        if (req.body.status !== undefined && !validStatuses.includes(req.body.status)) {
+          return res.status(400).json({ message: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
+        }
+
+        // Validate billingFrequencyOverride enum
+        const validFrequencies = ["one_time", "weekly", "biweekly", "monthly", "quarterly", "annually", "per_visit", "custom"] as const;
+        if (req.body.billingFrequencyOverride !== undefined && req.body.billingFrequencyOverride !== null && !validFrequencies.includes(req.body.billingFrequencyOverride)) {
+          return res.status(400).json({ message: `Invalid billingFrequencyOverride. Must be one of: ${validFrequencies.join(", ")}` });
+        }
+
+        // Verify contact (if being updated) belongs to same org
+        if (req.body.clientContactId != null) {
+          const [contact] = await db
+            .select()
+            .from(contactsTable)
+            .where(and(eq(contactsTable.id, req.body.clientContactId), eq(contactsTable.orgId, orgId)));
+          if (!contact) return res.status(404).json({ message: "Contact not found" });
+        }
+
         const allowed = ["status", "customPriceCents", "billingFrequencyOverride", "endDate", "notes", "startDate", "clientContactId"];
         const updates: Record<string, any> = { updatedAt: new Date() };
         for (const key of allowed) {
