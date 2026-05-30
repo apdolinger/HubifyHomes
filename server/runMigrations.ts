@@ -596,6 +596,7 @@ export async function ensurePropertyServiceAssignmentsTable(): Promise<void> {
         custom_price_cents INTEGER,
         billing_frequency_override VARCHAR(64),
         status VARCHAR(32) NOT NULL DEFAULT 'active',
+        visible_to_portal BOOLEAN NOT NULL DEFAULT true,
         notes TEXT,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
@@ -604,6 +605,7 @@ export async function ensurePropertyServiceAssignmentsTable(): Promise<void> {
       CREATE INDEX IF NOT EXISTS psa_property_id_idx ON property_service_assignments(property_id);
       CREATE INDEX IF NOT EXISTS psa_service_id_idx ON property_service_assignments(service_id);
       CREATE INDEX IF NOT EXISTS psa_status_idx ON property_service_assignments(status);
+      ALTER TABLE property_service_assignments ADD COLUMN IF NOT EXISTS visible_to_portal BOOLEAN NOT NULL DEFAULT true;
     `);
     log("[MIGRATE] property_service_assignments table verified.");
   } catch (err: any) {

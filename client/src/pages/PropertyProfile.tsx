@@ -57,7 +57,8 @@ import {
   Lock,
   ExternalLink,
   Wrench,
-  Briefcase
+  Briefcase,
+  EyeOff
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -661,6 +662,11 @@ function PropertyServicesSection({ propertyId }: { propertyId: string | number }
                     {a.serviceCategory && (
                       <Badge variant="outline" className="text-xs text-teal-700 border-teal-200">{a.serviceCategory}</Badge>
                     )}
+                    {a.visibleToPortal === false && (
+                      <Badge variant="outline" className="text-xs text-slate-500 border-slate-300 flex items-center gap-1">
+                        <EyeOff className="w-3 h-3" /> Hidden from portal
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex items-center gap-4 text-xs text-slate-500 flex-wrap">
                     <span className="flex items-center gap-1">
@@ -695,6 +701,12 @@ function PropertyServicesSection({ propertyId }: { propertyId: string | number }
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={() => openEdit(a)}>
                       <Edit className="w-4 h-4 mr-2" /> Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => updateMutation.mutate({ id: a.id, data: { visibleToPortal: !a.visibleToPortal } })}>
+                      {a.visibleToPortal === false
+                        ? <><Eye className="w-4 h-4 mr-2" /> Show in portal</>
+                        : <><EyeOff className="w-4 h-4 mr-2" /> Hide from portal</>
+                      }
                     </DropdownMenuItem>
                     {a.status === "active" && (
                       <DropdownMenuItem onClick={() => handleStatusChange(a.id, "paused")}>

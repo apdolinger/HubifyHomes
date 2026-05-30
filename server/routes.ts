@@ -2338,6 +2338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             eq(propertyServiceAssignments.propertyId, propertyId),
             eq(propertyServiceAssignments.orgId, portalUser.orgId),
             eq(propertyServiceAssignments.status, 'active'),
+            eq(propertyServiceAssignments.visibleToPortal, true),
           )
         );
       res.json(rows);
@@ -2428,6 +2429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             inArray(propertyServiceAssignments.propertyId, allowedIds),
             eq(propertyServiceAssignments.orgId, portalUser.orgId),
             eq(propertyServiceAssignments.status, 'active'),
+            eq(propertyServiceAssignments.visibleToPortal, true),
           )
         );
       const result = rows.map((r) => ({
@@ -12380,6 +12382,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             customPriceCents: propertyServiceAssignments.customPriceCents,
             billingFrequencyOverride: propertyServiceAssignments.billingFrequencyOverride,
             status: propertyServiceAssignments.status,
+            visibleToPortal: propertyServiceAssignments.visibleToPortal,
             notes: propertyServiceAssignments.notes,
             createdAt: propertyServiceAssignments.createdAt,
             updatedAt: propertyServiceAssignments.updatedAt,
@@ -12487,7 +12490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!contact) return res.status(404).json({ message: "Contact not found" });
         }
 
-        const allowed = ["status", "customPriceCents", "billingFrequencyOverride", "endDate", "notes", "startDate", "clientContactId"];
+        const allowed = ["status", "customPriceCents", "billingFrequencyOverride", "endDate", "notes", "startDate", "clientContactId", "visibleToPortal"];
         const updates: Record<string, any> = { updatedAt: new Date() };
         for (const key of allowed) {
           if (req.body[key] !== undefined) updates[key] = req.body[key];

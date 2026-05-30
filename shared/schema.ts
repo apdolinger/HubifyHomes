@@ -3649,6 +3649,7 @@ export const propertyServiceAssignments = pgTable("property_service_assignments"
     "one_time" | "weekly" | "biweekly" | "monthly" | "quarterly" | "annually" | "per_visit" | "custom"
   >(),
   status: varchar("status", { length: 32 }).$type<"active" | "paused" | "cancelled">().notNull().default("active"),
+  visibleToPortal: boolean("visible_to_portal").notNull().default(true),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
