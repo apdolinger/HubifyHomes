@@ -1071,12 +1071,31 @@ export default function ServiceCatalog() {
   const [editingService, setEditingService] = useState<OrganizationService | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("active");
+  const [propertyFilter, setPropertyFilter] = useState<string>("all");
   const [bulkAssignService, setBulkAssignService] = useState<OrganizationService | null>(null);
   const [bulkRemoveService, setBulkRemoveService] = useState<OrganizationService | null>(null);
 
   const { data: services = [], isLoading } = useQuery<OrganizationService[]>({
     queryKey: ["/api/admin/services"],
   });
+
+  const { data: properties = [] } = useQuery<any[]>({
+    queryKey: ["/api/properties"],
+  });
+
+  const { data: propertyAssignments = [] } = useQuery<any[]>({
+    queryKey: ["/api/properties", propertyFilter, "service-assignments"],
+    enabled: propertyFilter !== "all",
+    queryFn: async () => {
+      const res = await fetch(`/api/properties/${propertyFilter}/service-assignments`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch property service assignments");
+      return res.json();
+    },
+  });
+
+  const assignedServiceIds = propertyFilter !== "all"
+    ? new Set(propertyAssignments.map((a: any) => a.serviceId))
+    : null;
 
   const toggleMutation = useMutation({
     mutationFn: (service: OrganizationService) =>
@@ -1099,7 +1118,8 @@ export default function ServiceCatalog() {
   const filtered = services.filter(s => {
     const matchStatus = statusFilter === "all" ? true : statusFilter === "active" ? s.isActive : !s.isActive;
     const matchCat = categoryFilter === "all" ? true : s.category === categoryFilter;
-    return matchStatus && matchCat;
+    const matchProperty = assignedServiceIds === null ? true : assignedServiceIds.has(s.id);
+    return matchStatus && matchCat && matchProperty;
   });
 
   function openCreate() {
@@ -1133,7 +1153,7 @@ export default function ServiceCatalog() {
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-3 mb-5">
+        <div className="flex items-center gap-3 mb-5 flex-wrap">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-36 bg-white">
               <SelectValue />
@@ -1157,8 +1177,21 @@ export default function ServiceCatalog() {
             </SelectContent>
           </Select>
 
-          {(statusFilter !== "active" || categoryFilter !== "all") && (
-            <Button variant="ghost" size="sm" onClick={() => { setStatusFilter("active"); setCategoryFilter("all"); }}>
+          <Select value={propertyFilter} onValueChange={setPropertyFilter}>
+            <SelectTrigger className="w-52 bg-white">
+              <Building className="w-3.5 h-3.5 mr-1.5 text-slate-400 flex-shrink-0" />
+              <SelectValue placeholder="All properties" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All properties</SelectItem>
+              {(properties as any[]).map((p: any) => (
+                <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {(statusFilter !== "active" || categoryFilter !== "all" || propertyFilter !== "all") && (
+            <Button variant="ghost" size="sm" onClick={() => { setStatusFilter("active"); setCategoryFilter("all"); setPropertyFilter("all"); }}>
               Clear filters
             </Button>
           )}
@@ -1182,6 +1215,8 @@ export default function ServiceCatalog() {
             <p className="text-slate-500 text-sm max-w-md mx-auto mb-6">
               {services.length === 0
                 ? "Define the services your organization offers — like Home Watch Visits, Storm Checks, or Maintenance Coordination. These become the building blocks for billing and task automation."
+                : propertyFilter !== "all"
+                ? "No services are assigned to this property yet. Use 'Assign to Properties' on any service to add it."
                 : "Try adjusting your filters to see more services."}
             </p>
             {services.length === 0 && (
