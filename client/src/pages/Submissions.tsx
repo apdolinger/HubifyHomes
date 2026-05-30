@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { SubmissionForm, type SubmissionIntent } from "@/components/SubmissionForm";
 import { HUBIFY_HOMES_LOGO_URL, HUBIFY_HOMES_LOGO_ALT } from "@/lib/brand";
 
@@ -30,27 +31,21 @@ function useQueryParams() {
 
 export default function Submissions() {
   const { embed, intent } = useQueryParams();
-  const headerLabel = intent ? (INTENT_LABELS[intent] ?? "Get Started") : "Get Started";
+
+  useEffect(() => {
+    if (!embed) return;
+    document.documentElement.style.background = "transparent";
+    document.body.style.background = "transparent";
+    return () => {
+      document.documentElement.style.background = "";
+      document.body.style.background = "";
+    };
+  }, [embed]);
 
   if (embed) {
     return (
-      <div
-        className="min-h-screen flex items-start justify-center p-4 pt-6"
-        style={{ background: "transparent" }}
-      >
-        <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
-          <div className="bg-gradient-to-r from-teal-600 to-teal-500 px-6 py-4 flex items-center justify-between">
-            <img
-              src={HUBIFY_HOMES_LOGO_URL}
-              alt={HUBIFY_HOMES_LOGO_ALT}
-              className="h-7 w-auto brightness-0 invert"
-            />
-            <span className="text-white/80 text-xs font-medium tracking-wide uppercase">{headerLabel}</span>
-          </div>
-          <div className="p-6">
-            <SubmissionForm initialIntent={intent} />
-          </div>
-        </div>
+      <div style={{ width: "100%", background: "transparent", padding: "20px 24px" }}>
+        <SubmissionForm initialIntent={intent} />
       </div>
     );
   }

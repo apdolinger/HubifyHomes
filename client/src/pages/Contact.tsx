@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { CheckCircle, Loader2, X } from "lucide-react";
+import { CheckCircle, Loader2 } from "lucide-react";
 import { HUBIFY_HOMES_LOGO_URL, HUBIFY_HOMES_LOGO_ALT } from "@/lib/brand";
 
 const contactSchema = z.object({
@@ -197,32 +197,27 @@ export default function Contact() {
   const [submitted, setSubmitted] = useState(false);
   const embed = useEmbedMode();
 
+  useEffect(() => {
+    if (!embed) return;
+    document.documentElement.style.background = "transparent";
+    document.body.style.background = "transparent";
+    return () => {
+      document.documentElement.style.background = "";
+      document.body.style.background = "";
+    };
+  }, [embed]);
+
   if (embed) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center p-4"
-        style={{ background: "transparent" }}
-      >
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
-          <div className="bg-gradient-to-r from-teal-600 to-teal-500 px-6 py-4 flex items-center justify-between">
-            <img
-              src={HUBIFY_HOMES_LOGO_URL}
-              alt={HUBIFY_HOMES_LOGO_ALT}
-              className="h-7 w-auto brightness-0 invert"
-            />
-            <span className="text-white/80 text-xs font-medium tracking-wide uppercase">Contact Us</span>
-          </div>
-          <div className="p-6">
-            {submitted ? (
-              <SuccessState embed={true} />
-            ) : (
-              <ContactForm onSuccess={() => {
-                setSubmitted(true);
-                window.parent.postMessage({ type: "hubify:form_submitted" }, "*");
-              }} />
-            )}
-          </div>
-        </div>
+      <div style={{ width: "100%", background: "transparent", padding: "20px 24px" }}>
+        {submitted ? (
+          <SuccessState embed={true} />
+        ) : (
+          <ContactForm onSuccess={() => {
+            setSubmitted(true);
+            window.parent.postMessage({ type: "hubify:form_submitted" }, "*");
+          }} />
+        )}
       </div>
     );
   }

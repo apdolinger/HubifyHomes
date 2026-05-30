@@ -59,7 +59,9 @@ export default function CookieConsentBanner() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [analytics, setAnalytics] = useState(false);
   const [preference, setPreference] = useState(false);
-  const [suppressed, setSuppressed] = useState(false);
+  const [suppressed, setSuppressed] = useState(
+    new URLSearchParams(window.location.search).get("embed") === "true"
+  );
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
