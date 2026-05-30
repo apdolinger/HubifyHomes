@@ -155,3 +155,12 @@
 .kbd-light {
   @apply px-2 py-1 text-xs font-semibold text-white bg-teal-800 border border-teal-700 rounded;
 }
+
+/* Indeterminate progress bar animation for bulk operations.
+   The animated element is w-1/3 (33%) of its container.
+   translateX(-300%) pushes it 100% of the container width to the left (off-screen).
+   translateX(400%) pushes it ~133% of the container width to the right (off-screen). */
+@keyframes progress-indeterminate {
+  0%   { transform: translateX(-300%); }
+  100% { transform: translateX(400%); }
+}

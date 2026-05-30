@@ -146,19 +146,25 @@ function BulkAssignModal({
   }
 
   const bulkMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const body: Record<string, unknown> = { propertyIds: Array.from(selected) };
       if (startDate) body.startDate = startDate;
       if (customPrice) body.customPriceCents = Math.round(parseFloat(customPrice) * 100);
-      return apiRequest("POST", `/api/admin/services/${service!.id}/bulk-assign`, body);
+      const res = await apiRequest("POST", `/api/admin/services/${service!.id}/bulk-assign`, body);
+      return res.json() as Promise<{ created: number; skipped: number; failed: number }>;
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/services"] });
       queryClient.invalidateQueries({ queryKey: [`/api/admin/services/${service!.id}/assignments`] });
-      const { created = 0, skipped = 0 } = data ?? {};
+      const { created = 0, skipped = 0, failed = 0 } = data ?? {};
+      const parts: string[] = [];
+      if (skipped > 0) parts.push(`${skipped} already assigned — skipped`);
+      if (failed > 0) parts.push(`${failed} failed`);
       toast({
-        title: `Service assigned to ${created} ${created === 1 ? "property" : "properties"}`,
-        description: skipped > 0 ? `${skipped} already assigned — skipped.` : undefined,
+        title: created > 0
+          ? `Assigned to ${created} ${created === 1 ? "property" : "properties"}`
+          : "No new assignments made",
+        description: parts.length > 0 ? parts.join(" · ") : undefined,
       });
       setSelected(new Set());
       onOpenChange(false);
@@ -297,15 +303,27 @@ function BulkAssignModal({
             </div>
           </div>
 
-          {selected.size > 0 && (
+          {bulkMutation.isPending ? (
+            <div className="space-y-2 pt-1">
+              <p className="text-sm text-teal-700 font-medium text-center">
+                Assigning to {selected.size} {selected.size === 1 ? "property" : "properties"}…
+              </p>
+              <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                <div
+                  className="h-full w-1/3 bg-teal-500 rounded-full"
+                  style={{ animation: "progress-indeterminate 1.4s ease-in-out infinite" }}
+                />
+              </div>
+            </div>
+          ) : selected.size > 0 ? (
             <p className="text-sm text-teal-700 font-medium text-center">
               {selected.size} {selected.size === 1 ? "property" : "properties"} selected
             </p>
-          )}
+          ) : null}
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>Cancel</Button>
+          <Button variant="outline" onClick={handleClose} disabled={bulkMutation.isPending}>Cancel</Button>
           <Button
             className="bg-teal-600 hover:bg-teal-700"
             disabled={selected.size === 0 || bulkMutation.isPending}
