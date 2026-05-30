@@ -15668,7 +15668,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 </p>
               </div>
             `,
-          }).catch((err: any) => console.warn("[beta-application] confirmation email failed:", err));
+          }).then((r: any) => console.log(`[beta-application] confirmation sent resend_id=${r?.data?.id}`)).catch((err: any) => console.warn("[beta-application] confirmation email failed:", err));
         }
         const alertTo = process.env.SUPPORT_EMAIL || process.env.ADMIN_EMAIL;
         if (resend && fromEmail && alertTo) {
@@ -15898,12 +15898,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   .replace(/\{\{suggestedTier\}\}/gi, suggestedTier || "")
                   .replace(/\{\{estimatedHomes\}\}/gi, String(data.estimatedHomes ?? ""));
 
-              await resend.emails.send({
+              const cTplResult = await resend.emails.send({
                 from: fromEmail,
                 to: data.email,
                 subject: applyMergeTags(customTpl.subject),
                 html: applyMergeTags(customTpl.body),
               });
+              console.log(`[submission-form] confirmation sent (custom tpl) resend_id=${cTplResult?.data?.id}`);
             } else {
               const tierSection = suggestedTier
                 ? `<tr>
@@ -15983,6 +15984,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             emailSentAt = new Date();
             emailStatus = "sent";
+            console.log(`[submission-form] confirmation email delivered to ${data.email} for source=${prospectSource}`);
           } catch (err: any) {
             console.warn("[submission-form] prospect confirmation email failed:", err);
             emailStatus = `failed: ${err?.message ?? String(err)}`.slice(0, 255);
@@ -16038,7 +16040,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               </p>
             </div>
           `,
-        }).catch((err: any) => console.warn("[contact-form] confirmation email failed:", err));
+        }).then((r: any) => console.log(`[contact-form] confirmation sent resend_id=${r?.data?.id}`)).catch((err: any) => console.warn("[contact-form] confirmation email failed:", err));
       }
 
       // Internal notification email to the Hubify Homes contact inbox
