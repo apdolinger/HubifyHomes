@@ -291,6 +291,9 @@ import {
   discountCodeUsages,
   type DiscountCodeUsage,
   type InsertDiscountCodeUsage,
+  orgSetupProgress,
+  type OrgSetupProgress,
+  type InsertOrgSetupProgress,
 } from "@shared/schema";
 
 import { db } from "./db";
@@ -1026,6 +1029,11 @@ export interface IStorage {
   updateInspectionSchedule(id: number, updates: Partial<InsertInspectionSchedule>): Promise<InspectionSchedule>;
   deleteInspectionSchedule(id: number): Promise<void>;
   getInspectionTaskByScheduleAndDueDate(scheduleId: number, dueDate: string): Promise<Task | undefined>;
+
+  // Org setup progress operations
+  getOrgSetupProgress(orgId: string): Promise<OrgSetupProgress | undefined>;
+  createOrgSetupProgress(orgId: string): Promise<OrgSetupProgress>;
+  updateOrgSetupProgress(orgId: string, patch: Partial<InsertOrgSetupProgress>): Promise<OrgSetupProgress>;
 
   // Onboarding prospect operations
   listOnboardingProspects(): Promise<OnboardingProspect[]>;
@@ -8083,6 +8091,33 @@ export class DatabaseStorage implements IStorage {
 
   async claimOrgSignupToken(token: string): Promise<void> {
     await db.update(orgSignupTokens).set({ claimedAt: new Date() }).where(eq(orgSignupTokens.token, token));
+  }
+
+  // ── Org setup progress operations ─────────────────────────────────────────────
+  async getOrgSetupProgress(orgId: string): Promise<OrgSetupProgress | undefined> {
+    const [row] = await db.select().from(orgSetupProgress).where(eq(orgSetupProgress.orgId, orgId));
+    return row;
+  }
+
+  async createOrgSetupProgress(orgId: string): Promise<OrgSetupProgress> {
+    const [row] = await db
+      .insert(orgSetupProgress)
+      .values({ orgId })
+      .onConflictDoNothing()
+      .returning();
+    if (row) return row;
+    const existing = await this.getOrgSetupProgress(orgId);
+    return existing!;
+  }
+
+  async updateOrgSetupProgress(orgId: string, patch: Partial<InsertOrgSetupProgress>): Promise<OrgSetupProgress> {
+    const [row] = await db
+      .update(orgSetupProgress)
+      .set({ ...patch, updatedAt: new Date() })
+      .where(eq(orgSetupProgress.orgId, orgId))
+      .returning();
+    if (!row) throw new Error(`org_setup_progress not found for org ${orgId}`);
+    return row;
   }
 }
 

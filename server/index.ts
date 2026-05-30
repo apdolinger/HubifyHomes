@@ -213,7 +213,7 @@ app.use((req, res, next) => {
     // Without this the dispatcher logs an error on every task mutation in
     // environments where the webhook integration was never provisioned.
     try {
-      const { ensureWebhookTables, ensureCookieConsentPreferenceColumn, ensureOnboardingProspectsTable, ensureInvoiceReceiptColumns, ensureOrgSignupTokensTable, ensureErrorLogsTable, ensureDiscountCodeUsagesTable, ensureProspectDiscountCodeColumn, ensureStaffPasswordHashColumn, ensureSubmissionColumns, ensureProspectConfirmationEmailTemplateTable, ensureTrialColumns, ensureProspectConfirmationEmailColumns, ensureOrganizationServicesTable, ensureDemoProspectColumns } = await import('./runMigrations.js');
+      const { ensureWebhookTables, ensureCookieConsentPreferenceColumn, ensureOnboardingProspectsTable, ensureInvoiceReceiptColumns, ensureOrgSignupTokensTable, ensureErrorLogsTable, ensureDiscountCodeUsagesTable, ensureProspectDiscountCodeColumn, ensureStaffPasswordHashColumn, ensureSubmissionColumns, ensureProspectConfirmationEmailTemplateTable, ensureTrialColumns, ensureProspectConfirmationEmailColumns, ensureOrganizationServicesTable, ensureDemoProspectColumns, ensureOrgSetupProgressTable, ensureProspectConvertedAtColumn } = await import('./runMigrations.js');
       try {
         await ensureWebhookTables();
       } catch (err) {
@@ -294,6 +294,16 @@ app.use((req, res, next) => {
         await ensureOrgSlugAndStatusColumns();
       } catch (err) {
         console.error('Error ensuring orgs slug/status columns:', err);
+      }
+      try {
+        await ensureOrgSetupProgressTable();
+      } catch (err) {
+        console.error('Error ensuring org_setup_progress table:', err);
+      }
+      try {
+        await ensureProspectConvertedAtColumn();
+      } catch (err) {
+        console.error('Error ensuring converted_at column on onboarding_prospects:', err);
       }
     } catch (error) {
       console.error('Error loading startup migrations:', error);

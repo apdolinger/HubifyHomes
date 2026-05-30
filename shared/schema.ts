@@ -3408,6 +3408,7 @@ export const onboardingProspects = pgTable("onboarding_prospects", {
   demoAccessSent: boolean("demo_access_sent").notNull().default(false),
   demoEmailSentAt: timestamp("demo_email_sent_at"),
   demoEmailError: text("demo_email_error"),
+  convertedAt: timestamp("converted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
@@ -3603,6 +3604,30 @@ export const organizationServices = pgTable("organization_services", {
 export type OrganizationService = typeof organizationServices.$inferSelect;
 export type InsertOrganizationService = typeof organizationServices.$inferInsert;
 export const insertOrganizationServiceSchema = createInsertSchema(organizationServices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// ── Org Setup Progress ─────────────────────────────────────────────────────────
+// One row per org, tracks first-time onboarding steps for the setup wizard.
+export const orgSetupProgress = pgTable("org_setup_progress", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().unique().references(() => orgs.id, { onDelete: "cascade" }),
+  hasAddedProperty: boolean("has_added_property").notNull().default(false),
+  hasInvitedStaff: boolean("has_invited_staff").notNull().default(false),
+  hasConnectedStripe: boolean("has_connected_stripe").notNull().default(false),
+  hasImportedClients: boolean("has_imported_clients").notNull().default(false),
+  hasConfiguredService: boolean("has_configured_service").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("org_setup_progress_org_id_idx").on(table.orgId),
+]);
+
+export type OrgSetupProgress = typeof orgSetupProgress.$inferSelect;
+export type InsertOrgSetupProgress = typeof orgSetupProgress.$inferInsert;
+export const insertOrgSetupProgressSchema = createInsertSchema(orgSetupProgress).omit({
   id: true,
   createdAt: true,
   updatedAt: true,

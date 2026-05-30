@@ -16224,26 +16224,152 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { insertOrgSchema, insertOrgSubscriptionSchema } = await import("@shared/schema");
 
+      // Map suggestedTier (from public form) → org_subscriptions tier
+      function mapToSubscriptionTier(suggested: string | null): "starter" | "pro" | "grow" | "enterprise" {
+        if (!suggested) return "starter";
+        const s = suggested.toLowerCase();
+        if (s.includes("growth") || s === "grow" || s === "pricing_growth") return "grow";
+        if (s.includes("professional") || s === "pro" || s === "pricing_professional") return "pro";
+        if (s.includes("enterprise")) return "enterprise";
+        return "starter";
+      }
+
       const orgData = insertOrgSchema.parse({
         name: prospect.company || prospect.name,
         phone: prospect.phone || undefined,
         isActive: true,
+        orgStatus: "onboarding",
       });
       const org = await storage.createOrg(orgData);
 
+      // Create trial subscription (30-day trial)
+      const trialStart = new Date();
+      const trialEnd = new Date(trialStart);
+      trialEnd.setDate(trialEnd.getDate() + 30);
+
       const subData = insertOrgSubscriptionSchema.parse({
         orgId: org.id,
-        tier: "starter",
+        tier: mapToSubscriptionTier(prospect.suggestedTier),
         status: "trialing",
+        currentPeriodStart: trialStart,
+        currentPeriodEnd: trialEnd,
       });
       await storage.upsertOrgSubscription(subData);
 
-      const updated = await storage.updateOnboardingProspect(id, { orgId: org.id });
+      // Create setup progress record
+      await storage.createOrgSetupProgress(org.id);
 
-      res.status(201).json({ prospect: updated, org });
+      // Update prospect: mark as converted, record timestamp
+      const now = new Date();
+      const updated = await storage.updateOnboardingProspect(id, {
+        orgId: org.id,
+        stage: "converted",
+        convertedAt: now,
+      } as any);
+
+      // Send invite/welcome email to new org admin
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@hubifyhomes.com";
+      const loginUrl = `${req.protocol}://${req.get("host")}/staff/login`;
+      const trialEndFormatted = trialEnd.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+      const firstName = (prospect.firstName || prospect.name.split(" ")[0] || prospect.name);
+      const orgName = org.name;
+
+      if (resend) {
+        try {
+          await resend.emails.send({
+            from: fromEmail,
+            to: prospect.email,
+            subject: `You're invited to Hubify — ${orgName} is ready`,
+            html: `
+              <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
+                <div style="text-align:center;margin-bottom:28px">
+                  <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px">Hubify Homes</div>
+                </div>
+                <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Welcome, ${firstName}! Your organization is ready.</h1>
+                <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 20px">
+                  Your Hubify organization <strong>${orgName}</strong> has been set up and is ready to use.
+                  You have a <strong>30-day free trial</strong> — no credit card needed — running through <strong>${trialEndFormatted}</strong>.
+                </p>
+                <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;padding:20px;margin-bottom:28px">
+                  <p style="font-size:14px;font-weight:700;color:#0d9488;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.05em">What to do first</p>
+                  <ol style="padding-left:18px;margin:0;color:#0f172a;font-size:14px;line-height:1.9">
+                    <li>Sign in at the link below and set up your company profile.</li>
+                    <li>Add your first property and invite a team member.</li>
+                    <li>Explore the dashboard — tasks, billing, and scheduling are all ready for you.</li>
+                  </ol>
+                </div>
+                <div style="text-align:center;margin-bottom:32px">
+                  <a href="${loginUrl}" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
+                    Sign In to Hubify
+                  </a>
+                </div>
+                <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
+                <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
+                  Questions? Reply to this email — we're happy to help.<br/>
+                  Trial ends ${trialEndFormatted}. No charges until you upgrade.
+                </p>
+              </div>
+            `,
+          });
+        } catch (emailErr) {
+          console.error("[CONVERT] Failed to send invite email:", emailErr);
+        }
+      }
+
+      res.status(201).json({
+        prospect: updated,
+        org,
+        summary: {
+          orgName,
+          adminEmail: prospect.email,
+          trialEndsAt: trialEnd.toISOString(),
+          trialEndFormatted,
+        },
+      });
     } catch (error) {
       console.error("Error converting prospect to org:", error);
       res.status(500).json({ message: "Failed to convert prospect to organization" });
+    }
+  });
+
+  // Org setup progress endpoints
+  app.get("/api/orgs/:orgId/setup-progress", isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      const user = req.user as any;
+      const userOrgId = user?.claims?.orgId;
+      const isSuperAdminUser = !!(req.session as any)?.superAdmin?.authenticated || user?.role === "super_admin";
+      if (!isSuperAdminUser && userOrgId !== orgId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const progress = await storage.getOrgSetupProgress(orgId);
+      if (!progress) return res.status(404).json({ message: "Setup progress not found" });
+      res.json(progress);
+    } catch (error) {
+      console.error("Error fetching setup progress:", error);
+      res.status(500).json({ message: "Failed to fetch setup progress" });
+    }
+  });
+
+  app.patch("/api/orgs/:orgId/setup-progress", isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      const user = req.user as any;
+      const userOrgId = user?.claims?.orgId;
+      const isSuperAdminUser = !!(req.session as any)?.superAdmin?.authenticated || user?.role === "super_admin";
+      if (!isSuperAdminUser && userOrgId !== orgId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const allowed = ["hasAddedProperty", "hasInvitedStaff", "hasConnectedStripe", "hasImportedClients", "hasConfiguredService"];
+      const patch: Record<string, boolean> = {};
+      for (const key of allowed) {
+        if (key in req.body) patch[key] = Boolean(req.body[key]);
+      }
+      const progress = await storage.updateOrgSetupProgress(orgId, patch as any);
+      res.json(progress);
+    } catch (error) {
+      console.error("Error updating setup progress:", error);
+      res.status(500).json({ message: "Failed to update setup progress" });
     }
   });
 

@@ -540,3 +540,43 @@ export async function ensureCookieConsentPreferenceColumn(): Promise<void> {
     client.release();
   }
 }
+
+export async function ensureOrgSetupProgressTable(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS org_setup_progress (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id UUID NOT NULL UNIQUE REFERENCES orgs(id) ON DELETE CASCADE,
+        has_added_property BOOLEAN NOT NULL DEFAULT FALSE,
+        has_invited_staff BOOLEAN NOT NULL DEFAULT FALSE,
+        has_connected_stripe BOOLEAN NOT NULL DEFAULT FALSE,
+        has_imported_clients BOOLEAN NOT NULL DEFAULT FALSE,
+        has_configured_service BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS org_setup_progress_org_id_idx ON org_setup_progress(org_id);
+    `);
+    log("[MIGRATE] org_setup_progress table verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to ensure org_setup_progress table: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
+export async function ensureProspectConvertedAtColumn(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE onboarding_prospects
+        ADD COLUMN IF NOT EXISTS converted_at TIMESTAMP;
+    `);
+    log("[MIGRATE] onboarding_prospects converted_at column verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add converted_at column to onboarding_prospects: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}

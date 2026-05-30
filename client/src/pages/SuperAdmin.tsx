@@ -146,6 +146,7 @@ interface Prospect {
   demoAccessSent: boolean | null;
   demoEmailSentAt: string | null;
   demoEmailError: string | null;
+  convertedAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -1225,13 +1226,25 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
     }),
   });
 
+  const [conversionSummary, setConversionSummary] = useState<{
+    orgName: string;
+    adminEmail: string;
+    trialEndFormatted: string;
+  } | null>(null);
+
   const convertToOrgMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/convert-to-org`, {}),
-    onSuccess: () => {
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/convert-to-org`, {});
+      return res as any;
+    },
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/organizations"] });
-      toast({ title: "Organization created!", description: "The prospect has been linked to the new org." });
+      if (data?.summary) {
+        setConversionSummary(data.summary);
+      } else {
+        toast({ title: "Organization created!", description: "The prospect has been linked to the new org." });
+      }
     },
     onError: (e: Error) => toast({
       title: "Conversion failed",
@@ -1795,6 +1808,53 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
           if (droppingProspect) dropMutation.mutate({ id: droppingProspect.id, reason });
         }}
       />
+
+      {/* Conversion success dialog */}
+      <Dialog open={!!conversionSummary} onOpenChange={() => setConversionSummary(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-emerald-700">
+              <CheckCircle className="w-5 h-5" /> Organization Created!
+            </DialogTitle>
+            <DialogDescription>
+              The prospect has been converted and their organization is ready.
+            </DialogDescription>
+          </DialogHeader>
+          {conversionSummary && (
+            <div className="space-y-3 py-1">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Org name</span>
+                  <span className="font-semibold text-gray-900">{conversionSummary.orgName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Admin email</span>
+                  <span className="font-medium text-gray-800">{conversionSummary.adminEmail}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Trial ends</span>
+                  <span className="font-medium text-emerald-700">{conversionSummary.trialEndFormatted}</span>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 flex items-center gap-1">
+                <Mail className="w-3 h-3" /> An invite email has been sent to the org admin.
+              </p>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConversionSummary(null)}>Close</Button>
+            <Button
+              className="bg-indigo-600 hover:bg-indigo-700"
+              onClick={() => {
+                setConversionSummary(null);
+                setLocation("/super-admin?tab=organizations");
+              }}
+            >
+              <ExternalLink className="w-4 h-4 mr-1" /> View Organizations
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
