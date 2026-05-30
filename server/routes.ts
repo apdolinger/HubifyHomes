@@ -12491,6 +12491,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
 
+    // POST /api/admin/services/:serviceId/bulk-assign — assign service to multiple properties at once
+    app.post("/api/admin/services/:serviceId/bulk-assign", isAuthenticated, isAdmin, async (req: any, res) => {
+      try {
+        const orgId = req.user?.claims?.orgId;
+        const serviceId = parseInt(req.params.serviceId, 10);
+        if (!orgId) return res.status(403).json({ message: "No organization context" });
+        const { propertyIds } = req.body;
+        if (!Array.isArray(propertyIds) || propertyIds.length === 0) {
+          return res.status(400).json({ message: "propertyIds must be a non-empty array" });
+        }
+        // Verify service belongs to caller's org
+        const [service] = await db
+          .select()
+          .from(orgSvcTable)
+          .where(and(eq(orgSvcTable.id, serviceId), eq(orgSvcTable.orgId, orgId)));
+        if (!service) return res.status(404).json({ message: "Service not found in your catalog" });
+
+        // Fetch existing assignments for this service so we can skip duplicates
+        const existing = await db
+          .select({ propertyId: propertyServiceAssignments.propertyId })
+          .from(propertyServiceAssignments)
+          .where(and(eq(propertyServiceAssignments.serviceId, serviceId), eq(propertyServiceAssignments.orgId, orgId)));
+        const alreadyAssigned = new Set(existing.map(e => e.propertyId));
+
+        const results = { created: 0, skipped: 0, failed: 0 };
+        for (const rawId of propertyIds) {
+          const propertyId = parseInt(String(rawId), 10);
+          if (isNaN(propertyId)) { results.failed++; continue; }
+          if (alreadyAssigned.has(propertyId)) { results.skipped++; continue; }
+          // Verify property belongs to org
+          const [property] = await db
+            .select()
+            .from(propertiesTable)
+            .where(and(eq(propertiesTable.id, propertyId), eq(propertiesTable.orgId, orgId)));
+          if (!property) { results.failed++; continue; }
+          const parsed = insertPropertyServiceAssignmentSchema.safeParse({ orgId, propertyId, serviceId });
+          if (!parsed.success) { results.failed++; continue; }
+          await db.insert(propertyServiceAssignments).values(parsed.data);
+          results.created++;
+        }
+        res.json(results);
+      } catch (err) {
+        console.error("POST /api/admin/services/:serviceId/bulk-assign error:", err);
+        res.status(500).json({ message: "Failed to bulk-assign service" });
+      }
+    });
+
     // GET /api/admin/services/:serviceId/assignments — list properties assigned to a service
     app.get("/api/admin/services/:serviceId/assignments", isAuthenticated, isAdmin, async (req: any, res) => {
       try {

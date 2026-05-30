@@ -7,18 +7,21 @@ import { useLocation } from "wouter";
 import {
   Plus, Pencil, Trash2, Tag, DollarSign, Clock, RefreshCw,
   CheckCircle2, XCircle, ChevronDown, Briefcase, Building, ExternalLink,
+  ListChecks, Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { OrganizationService } from "@shared/schema";
@@ -78,6 +81,209 @@ function ServicePropertyBadge({ serviceId, count }: { serviceId: number; count: 
         )}
       </PopoverContent>
     </Popover>
+  );
+}
+
+// ── Bulk-assign modal ─────────────────────────────────────────────────────────
+function BulkAssignModal({
+  service,
+  open,
+  onOpenChange,
+}: {
+  service: OrganizationService | null;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+
+  const { data: properties = [], isLoading: propsLoading } = useQuery<any[]>({
+    queryKey: ["/api/properties"],
+    enabled: open,
+  });
+
+  const { data: existingAssignments = [] } = useQuery<any[]>({
+    queryKey: [`/api/admin/services/${service?.id}/assignments`],
+    enabled: open && !!service,
+  });
+
+  const alreadyAssigned = new Set(existingAssignments.map((a: any) => a.propertyId));
+
+  const filtered = properties.filter((p: any) =>
+    p.name?.toLowerCase().includes(search.toLowerCase()) ||
+    p.address?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  function toggle(id: number) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    const unassignedIds = filtered.filter((p: any) => !alreadyAssigned.has(p.id)).map((p: any) => p.id);
+    const allSelected = unassignedIds.every(id => selected.has(id));
+    if (allSelected) {
+      setSelected(prev => {
+        const next = new Set(prev);
+        unassignedIds.forEach(id => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelected(prev => {
+        const next = new Set(prev);
+        unassignedIds.forEach(id => next.add(id));
+        return next;
+      });
+    }
+  }
+
+  const bulkMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", `/api/admin/services/${service!.id}/bulk-assign`, {
+        propertyIds: Array.from(selected),
+      }),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/services"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/services/${service!.id}/assignments`] });
+      const { created = 0, skipped = 0 } = data ?? {};
+      toast({
+        title: `Service assigned to ${created} ${created === 1 ? "property" : "properties"}`,
+        description: skipped > 0 ? `${skipped} already assigned — skipped.` : undefined,
+      });
+      setSelected(new Set());
+      onOpenChange(false);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to assign service", variant: "destructive" });
+    },
+  });
+
+  function handleClose() {
+    setSelected(new Set());
+    setSearch("");
+    onOpenChange(false);
+  }
+
+  const unassignedFiltered = filtered.filter((p: any) => !alreadyAssigned.has(p.id));
+  const allUnassignedSelected =
+    unassignedFiltered.length > 0 && unassignedFiltered.every((p: any) => selected.has(p.id));
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ListChecks className="w-5 h-5 text-teal-600" />
+            Assign to Properties
+          </DialogTitle>
+          {service && (
+            <p className="text-sm text-slate-500 mt-1">
+              Assigning <strong>{service.name}</strong> to selected properties
+            </p>
+          )}
+        </DialogHeader>
+
+        <div className="space-y-3">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input
+              placeholder="Search properties…"
+              className="pl-9"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Select-all row */}
+          {!propsLoading && unassignedFiltered.length > 0 && (
+            <div className="flex items-center gap-2 px-1">
+              <Checkbox
+                id="select-all"
+                checked={allUnassignedSelected}
+                onCheckedChange={toggleAll}
+              />
+              <label htmlFor="select-all" className="text-xs text-slate-500 cursor-pointer select-none">
+                Select all unassigned ({unassignedFiltered.length})
+              </label>
+            </div>
+          )}
+
+          {/* Property list */}
+          <ScrollArea className="h-72 rounded-md border">
+            {propsLoading ? (
+              <div className="p-3 space-y-2">
+                {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full py-10 text-slate-400 text-sm">
+                <Building className="w-8 h-8 mb-2 opacity-40" />
+                {search ? "No properties match your search." : "No properties in your organization."}
+              </div>
+            ) : (
+              <div className="p-2 space-y-1">
+                {filtered.map((property: any) => {
+                  const isAssigned = alreadyAssigned.has(property.id);
+                  const isChecked = selected.has(property.id);
+                  return (
+                    <label
+                      key={property.id}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-colors ${
+                        isAssigned
+                          ? "opacity-50 cursor-not-allowed bg-slate-50"
+                          : isChecked
+                          ? "bg-teal-50 border border-teal-200"
+                          : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <Checkbox
+                        checked={isAssigned || isChecked}
+                        disabled={isAssigned}
+                        onCheckedChange={() => !isAssigned && toggle(property.id)}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-800 truncate">{property.name}</p>
+                        {property.address && (
+                          <p className="text-xs text-slate-400 truncate">{property.address}</p>
+                        )}
+                      </div>
+                      {isAssigned && (
+                        <span className="text-xs text-emerald-600 font-medium flex-shrink-0">Already assigned</span>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </ScrollArea>
+
+          {selected.size > 0 && (
+            <p className="text-sm text-teal-700 font-medium text-center">
+              {selected.size} {selected.size === 1 ? "property" : "properties"} selected
+            </p>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={handleClose}>Cancel</Button>
+          <Button
+            className="bg-teal-600 hover:bg-teal-700"
+            disabled={selected.size === 0 || bulkMutation.isPending}
+            onClick={() => bulkMutation.mutate()}
+          >
+            {bulkMutation.isPending
+              ? "Assigning…"
+              : `Assign to ${selected.size} ${selected.size === 1 ? "property" : "properties"}`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -380,6 +586,7 @@ export default function ServiceCatalog() {
   const [editingService, setEditingService] = useState<OrganizationService | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("active");
+  const [bulkAssignService, setBulkAssignService] = useState<OrganizationService | null>(null);
 
   const { data: services = [], isLoading } = useQuery<OrganizationService[]>({
     queryKey: ["/api/admin/services"],
@@ -558,6 +765,16 @@ export default function ServiceCatalog() {
 
                     {/* Right: actions */}
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs border-teal-200 text-teal-700 hover:bg-teal-50 hover:border-teal-300"
+                        onClick={() => setBulkAssignService(service)}
+                        title="Assign to multiple properties"
+                      >
+                        <ListChecks className="w-3.5 h-3.5 mr-1.5" />
+                        Assign to Properties
+                      </Button>
                       <Switch
                         checked={service.isActive}
                         onCheckedChange={() => toggleMutation.mutate(service)}
@@ -599,6 +816,12 @@ export default function ServiceCatalog() {
           if (!v) setEditingService(null);
         }}
         editingService={editingService}
+      />
+
+      <BulkAssignModal
+        service={bulkAssignService}
+        open={!!bulkAssignService}
+        onOpenChange={(v) => { if (!v) setBulkAssignService(null); }}
       />
     </div>
   );
