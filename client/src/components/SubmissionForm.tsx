@@ -12,6 +12,14 @@ import { Badge } from "@/components/ui/badge";
 import type { ComponentType } from "react";
 import { CheckCircle, Loader2, Building2, Users, MapPin, Home, ClipboardList, Star } from "lucide-react";
 
+// ── Embed helper ─────────────────────────────────────────────────────────────
+
+function postMessageIfEmbed() {
+  if (new URLSearchParams(window.location.search).get("embed") === "true") {
+    window.parent.postMessage({ type: "hubify:form_submitted" }, "*");
+  }
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type SubmissionIntent =
@@ -130,6 +138,7 @@ function ContactVariantForm({ onSuccess, compact }: { onSuccess?: () => void; co
     },
     onSuccess: () => {
       setSubmitted(true);
+      postMessageIfEmbed();
       onSuccess?.();
     },
   });
@@ -279,6 +288,7 @@ function BetaVariantForm({ onSuccess, compact }: { onSuccess?: () => void; compa
     },
     onSuccess: () => {
       setSubmitted(true);
+      postMessageIfEmbed();
       onSuccess?.();
     },
   });
@@ -502,6 +512,7 @@ function FullInquiryForm({
     },
     onSuccess: () => {
       setSubmitted(true);
+      postMessageIfEmbed();
       onSuccess?.();
     },
   });

@@ -216,7 +216,10 @@ export default function Contact() {
             {submitted ? (
               <SuccessState embed={true} />
             ) : (
-              <ContactForm onSuccess={() => setSubmitted(true)} />
+              <ContactForm onSuccess={() => {
+                setSubmitted(true);
+                window.parent.postMessage({ type: "hubify:form_submitted" }, "*");
+              }} />
             )}
           </div>
         </div>
