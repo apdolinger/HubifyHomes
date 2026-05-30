@@ -12547,6 +12547,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
 
+    // GET /api/admin/services/:serviceId/bulk-assign/progress — SSE stream for bulk-assign progress
+    app.get("/api/admin/services/:serviceId/bulk-assign/progress", isAuthenticated, isAdmin, async (req: any, res) => {
+      const orgId = req.user?.claims?.orgId;
+      const serviceId = parseInt(req.params.serviceId, 10);
+      if (!orgId) { res.status(403).json({ message: "No organization context" }); return; }
+
+      const rawIds = typeof req.query.propertyIds === "string" ? req.query.propertyIds : "";
+      const propertyIds = rawIds.split(",").map((s: string) => parseInt(s.trim(), 10)).filter((n: number) => !isNaN(n) && n > 0);
+      if (propertyIds.length === 0) { res.status(400).json({ message: "propertyIds query param required" }); return; }
+
+      const startDate: string = typeof req.query.startDate === "string" && req.query.startDate ? req.query.startDate : new Date().toISOString().slice(0, 10);
+      const customPriceCents: number | undefined = req.query.customPriceCents != null && req.query.customPriceCents !== "" ? parseInt(String(req.query.customPriceCents), 10) : undefined;
+      const billingFrequencyOverride: string | undefined = typeof req.query.billingFrequencyOverride === "string" && req.query.billingFrequencyOverride ? req.query.billingFrequencyOverride : undefined;
+
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.flushHeaders();
+
+      function send(data: object) {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+        if (typeof (res as any).flush === "function") (res as any).flush();
+      }
+
+      const total = propertyIds.length;
+      const counters = { processed: 0, created: 0, skipped: 0, failed: 0 };
+
+      try {
+        // Verify service
+        const [service] = await db.select().from(orgSvcTable).where(and(eq(orgSvcTable.id, serviceId), eq(orgSvcTable.orgId, orgId)));
+        if (!service) { send({ error: "Service not found" }); res.end(); return; }
+
+        // Fetch existing assignments
+        const existing = await db.select({ propertyId: propertyServiceAssignments.propertyId }).from(propertyServiceAssignments).where(and(eq(propertyServiceAssignments.serviceId, serviceId), eq(propertyServiceAssignments.orgId, orgId)));
+        const alreadyAssigned = new Set(existing.map((e: { propertyId: number }) => e.propertyId));
+
+        // Send initial event so frontend knows total
+        send({ processed: 0, total, created: 0, skipped: 0, failed: 0 });
+
+        for (const propertyId of propertyIds) {
+          if (alreadyAssigned.has(propertyId)) {
+            counters.skipped++;
+          } else {
+            const [property] = await db.select().from(propertiesTable).where(and(eq(propertiesTable.id, propertyId), eq(propertiesTable.orgId, orgId)));
+            if (!property) {
+              counters.failed++;
+            } else {
+              const parsed = insertPropertyServiceAssignmentSchema.safeParse({
+                orgId,
+                propertyId,
+                serviceId,
+                startDate,
+                ...(customPriceCents != null && !isNaN(customPriceCents) ? { customPriceCents } : {}),
+                ...(billingFrequencyOverride ? { billingFrequencyOverride } : {}),
+              });
+              if (!parsed.success) {
+                counters.failed++;
+              } else {
+                await db.insert(propertyServiceAssignments).values(parsed.data);
+                counters.created++;
+              }
+            }
+          }
+          counters.processed++;
+          send({ processed: counters.processed, total, created: counters.created, skipped: counters.skipped, failed: counters.failed });
+        }
+        send({ processed: total, total, created: counters.created, skipped: counters.skipped, failed: counters.failed, done: true });
+      } catch (err) {
+        console.error("GET /api/admin/services/:serviceId/bulk-assign/progress error:", err);
+        send({ error: "Internal error during bulk-assign" });
+      } finally {
+        res.end();
+      }
+    });
+
     // POST /api/admin/services/:serviceId/bulk-assign — assign service to multiple properties at once
     app.post("/api/admin/services/:serviceId/bulk-assign", isAuthenticated, isAdmin, async (req: any, res) => {
       try {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -123,6 +123,8 @@ function BulkAssignModal({
   const [startDate, setStartDate] = useState("");
   const [customPrice, setCustomPrice] = useState("");
   const [billingFrequency, setBillingFrequency] = useState("");
+  const [progress, setProgress] = useState<{ processed: number; total: number; created: number; skipped: number; failed: number } | null>(null);
+  const esRef = useRef<EventSource | null>(null);
 
   const { data: properties = [], isLoading: propsLoading } = useQuery<any[]>({
     queryKey: ["/api/properties"],
@@ -168,37 +170,57 @@ function BulkAssignModal({
     }
   }
 
-  const bulkMutation = useMutation({
-    mutationFn: async () => {
-      const body: Record<string, unknown> = { propertyIds: Array.from(selected) };
-      if (startDate) body.startDate = startDate;
-      if (customPrice) body.customPriceCents = Math.round(parseFloat(customPrice) * 100);
-      if (billingFrequency) body.billingFrequencyOverride = billingFrequency;
-      const res = await apiRequest("POST", `/api/admin/services/${service!.id}/bulk-assign`, body);
-      return res.json() as Promise<{ created: number; skipped: number; failed: number }>;
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/services"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/admin/services/${service!.id}/assignments`] });
-      const { created = 0, skipped = 0, failed = 0 } = data ?? {};
-      const parts: string[] = [];
-      if (skipped > 0) parts.push(`${skipped} already assigned — skipped`);
-      if (failed > 0) parts.push(`${failed} failed`);
-      toast({
-        title: created > 0
-          ? `Assigned to ${created} ${created === 1 ? "property" : "properties"}`
-          : "No new assignments made",
-        description: parts.length > 0 ? parts.join(" · ") : undefined,
-      });
-      setSelected(new Set());
-      onOpenChange(false);
-    },
-    onError: () => {
+  function startBulkAssign() {
+    if (!service || selected.size === 0) return;
+    const params = new URLSearchParams();
+    params.set("propertyIds", Array.from(selected).join(","));
+    if (startDate) params.set("startDate", startDate);
+    if (customPrice) params.set("customPriceCents", String(Math.round(parseFloat(customPrice) * 100)));
+    if (billingFrequency) params.set("billingFrequencyOverride", billingFrequency);
+    const url = `/api/admin/services/${service.id}/bulk-assign/progress?${params.toString()}`;
+    const es = new EventSource(url);
+    esRef.current = es;
+    es.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      if (data.error) {
+        es.close();
+        esRef.current = null;
+        setProgress(null);
+        toast({ title: "Error", description: data.error, variant: "destructive" });
+        return;
+      }
+      setProgress({ processed: data.processed, total: data.total, created: data.created, skipped: data.skipped, failed: data.failed });
+      if (data.done) {
+        es.close();
+        esRef.current = null;
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/services"] });
+        queryClient.invalidateQueries({ queryKey: [`/api/admin/services/${service.id}/assignments`] });
+        const { created = 0, skipped = 0, failed = 0 } = data;
+        const parts: string[] = [];
+        if (skipped > 0) parts.push(`${skipped} already assigned — skipped`);
+        if (failed > 0) parts.push(`${failed} failed`);
+        toast({
+          title: created > 0
+            ? `Assigned to ${created} ${created === 1 ? "property" : "properties"}`
+            : "No new assignments made",
+          description: parts.length > 0 ? parts.join(" · ") : undefined,
+        });
+        setProgress(null);
+        setSelected(new Set());
+        onOpenChange(false);
+      }
+    };
+    es.onerror = () => {
+      es.close();
+      esRef.current = null;
+      setProgress(null);
       toast({ title: "Error", description: "Failed to assign service", variant: "destructive" });
-    },
-  });
+    };
+  }
 
   function handleClose() {
+    if (esRef.current) { esRef.current.close(); esRef.current = null; }
+    setProgress(null);
     setSelected(new Set());
     setSearch("");
     setStartDate("");
@@ -206,6 +228,8 @@ function BulkAssignModal({
     setBillingFrequency("");
     onOpenChange(false);
   }
+
+  const isAssigning = progress !== null;
 
   const unassignedFiltered = filtered.filter((p: any) => !alreadyAssigned.has(p.id));
   const allUnassignedSelected =
@@ -346,17 +370,27 @@ function BulkAssignModal({
             </div>
           </div>
 
-          {bulkMutation.isPending ? (
-            <div className="space-y-2 pt-1">
-              <p className="text-sm text-teal-700 font-medium text-center">
-                Assigning to {selected.size} {selected.size === 1 ? "property" : "properties"}…
-              </p>
+          {isAssigning && progress ? (
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span className="text-teal-700 font-medium">
+                  {progress.processed} of {progress.total} processed
+                </span>
+                <span className="flex gap-2">
+                  {progress.created > 0 && <span className="text-emerald-600">{progress.created} assigned</span>}
+                  {progress.skipped > 0 && <span className="text-slate-400">{progress.skipped} skipped</span>}
+                  {progress.failed > 0 && <span className="text-red-500">{progress.failed} failed</span>}
+                </span>
+              </div>
               <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
                 <div
-                  className="h-full w-1/3 bg-teal-500 rounded-full"
-                  style={{ animation: "progress-indeterminate 1.4s ease-in-out infinite" }}
+                  className="h-full bg-teal-500 rounded-full transition-all duration-200"
+                  style={{ width: progress.total > 0 ? `${Math.round((progress.processed / progress.total) * 100)}%` : "0%" }}
                 />
               </div>
+              <p className="text-xs text-slate-400 text-center">
+                {Math.round((progress.processed / progress.total) * 100)}% complete
+              </p>
             </div>
           ) : selected.size > 0 ? (
             <p className="text-sm text-teal-700 font-medium text-center">
@@ -366,13 +400,13 @@ function BulkAssignModal({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={bulkMutation.isPending}>Cancel</Button>
+          <Button variant="outline" onClick={handleClose} disabled={isAssigning}>Cancel</Button>
           <Button
             className="bg-teal-600 hover:bg-teal-700"
-            disabled={selected.size === 0 || bulkMutation.isPending}
-            onClick={() => bulkMutation.mutate()}
+            disabled={selected.size === 0 || isAssigning}
+            onClick={startBulkAssign}
           >
-            {bulkMutation.isPending
+            {isAssigning
               ? "Assigning…"
               : `Assign to ${selected.size} ${selected.size === 1 ? "property" : "properties"}`}
           </Button>
