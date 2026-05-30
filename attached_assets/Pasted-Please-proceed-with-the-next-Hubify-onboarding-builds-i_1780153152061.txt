@@ -1,0 +1,164 @@
+Please proceed with the next Hubify onboarding builds in this exact order.
+
+Priority 1 — Build #138 Marketing CTAs → SuperAdmin Pipeline
+
+Goal:
+Every public-facing CTA should open the correct modal/form and create a tagged onboarding_prospect record in SuperAdmin.
+
+Build this first.
+
+This includes:
+- Get Started
+- Request a Demo
+- Apply for Beta
+- Get in Touch
+- Contact page form
+- Pricing tier buttons
+
+Expected behavior:
+- Get Started → full inquiry form → stage: inquiry, source: get_started
+- Request Demo → demo-intent form → stage: demo_requested, source: demo_request
+- Apply for Beta → beta application form → stage: inquiry, source: beta_application
+- Get in Touch / Contact → short contact form → stage: contact, source: contact_form
+- Pricing Starter → full inquiry form with Starter pre-selected → source: pricing_starter
+- Pricing Growth → full inquiry form with Growth pre-selected → source: pricing_growth
+- Pricing Professional → full inquiry form with Professional pre-selected → source: pricing_professional
+
+SuperAdmin should show:
+- source badge on each submission/prospect
+- source filter dropdown
+- clear labels like Beta Application, Contact Form, Demo Request, Pricing Starter, Pricing Growth, Pricing Professional
+
+Also:
+- Send confirmation emails for beta applications and contact forms.
+- Keep existing Get Started and Request Demo behavior working.
+- Do not change pipeline stages beyond source/stage routing.
+- Do not modify org conversion logic yet.
+
+Relevant files:
+- client/src/components/SubmissionModal.tsx
+- client/src/components/SubmissionForm.tsx
+- client/src/pages/Landing.tsx
+- client/src/pages/Contact.tsx
+- client/src/pages/SuperAdmin.tsx
+- server/routes.ts
+- shared/schema.ts
+
+After #138 is complete and tested, move to Priority 2.
+
+Priority 2 — Build #139 Organization Activation Completion
+
+Important correction:
+Use a 30-day trial, not a 14-day trial.
+
+Goal:
+When SuperAdmin converts a prospect into an organization, the system should fully prepare that organization for first use.
+
+Current issue:
+Conversion creates an org and admin user, but it does not fully activate the client.
+
+Expected behavior:
+When a prospect is converted to an organization:
+
+1. Create organization record.
+2. Create admin user.
+3. Create org_subscriptions record.
+4. Set subscription status to trial.
+5. Set trialStartedAt = now.
+6. Set trialEndsAt = now + 30 days.
+7. Use the prospect suggestedTier to populate the plan/tier if available.
+8. Create org_setup_progress record with all setup steps set to false:
+   - hasAddedProperty
+   - hasInvitedStaff
+   - hasConnectedStripe
+   - hasImportedClients
+   - hasConfiguredService
+9. Update onboarding_prospect:
+   - stage = converted
+   - convertedAt = now
+10. Send invite/welcome email to the new org admin.
+11. Show SuperAdmin a conversion success summary:
+   - org name
+   - admin email
+   - trial end date
+   - link to org if available
+
+Add setup progress endpoints:
+- GET /api/orgs/:orgId/setup-progress
+- PATCH /api/orgs/:orgId/setup-progress
+
+These should be authenticated and same-org or super-admin scoped.
+
+Out of scope:
+- Full onboarding wizard UI
+- Charging Stripe card
+- Trial expiry enforcement
+- Service-to-property assignment
+
+Relevant files:
+- server/routes.ts
+- shared/schema.ts
+- server/storage.ts
+- client/src/pages/SuperAdmin.tsx
+
+After #139 is complete and tested, move to Priority 3.
+
+Priority 3 — Build #140 Service-to-Property Assignment
+
+Goal:
+Connect the Service Catalog to real client operations by allowing admins to assign services to properties.
+
+Current issue:
+Service Catalog exists, but services are not connected to properties, tasks, or billing.
+
+Expected behavior:
+On a Property detail page, admins can assign one or more services from the organization’s Service Catalog to that property.
+
+Each assignment should store:
+- orgId
+- propertyId
+- serviceId
+- clientContactId optional
+- startDate
+- endDate optional
+- customPrice optional
+- billingFrequencyOverride optional
+- status: active, paused, cancelled
+- notes
+- createdAt
+- updatedAt
+
+Build:
+- property_service_assignments table
+- API endpoints:
+  - GET /api/properties/:propertyId/service-assignments
+  - POST /api/properties/:propertyId/service-assignments
+  - PATCH /api/properties/:propertyId/service-assignments/:id
+  - DELETE /api/properties/:propertyId/service-assignments/:id
+  - GET /api/admin/services/:serviceId/assignments
+- Property detail “Assigned Services” panel/tab
+- Add Service dialog
+- Pause/cancel/edit assignment actions
+- Service Catalog assigned-property count badge
+
+Out of scope:
+- Automatic task generation
+- Automatic invoice generation
+- Bulk assignment
+- Full setup wizard
+
+Relevant files:
+- shared/schema.ts
+- server/routes.ts
+- server/storage.ts
+- client/src/pages/ServiceCatalog.tsx
+- client/src/pages/PropertyProfile.tsx or equivalent property detail page
+
+Important:
+Do not build the full onboarding wizard yet.
+
+The correct sequence is:
+1. Finish all marketing CTA capture into SuperAdmin.
+2. Complete org activation after conversion.
+3. Connect services to properties.
+4. Then later build the guided onboarding wizard on top of those foundations.

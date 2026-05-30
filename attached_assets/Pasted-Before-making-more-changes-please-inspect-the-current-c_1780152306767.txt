@@ -1,0 +1,69 @@
+Before making more changes, please inspect the current client onboarding system and report back.
+
+Goal:
+I want Hubify Homes to have a clear client onboarding funnel from marketing submission → Super Admin review → organization activation → guided setup → property/service/task/billing configuration.
+
+Please inspect what already exists and explain what is real, what is mock, and what files are relevant.
+
+Review these areas:
+
+1. Marketing-to-SuperAdmin funnel
+- Which public forms currently create onboarding prospects?
+- Do contact, submissions, beta access, demo request, and pricing CTAs all create records?
+- Are sources/tags stored so SuperAdmin can tell where each lead came from?
+
+2. SuperAdmin onboarding pipeline
+- What pipeline stages exist?
+- What actions can SuperAdmin take on a prospect?
+- Can SuperAdmin convert a prospect into an organization?
+- What happens during conversion?
+
+3. Organization activation
+- When an org is created, what records are automatically created?
+- Is subscription/trial status created?
+- Are admin users created?
+- Are welcome emails sent?
+- Is there any setup checklist created?
+
+4. Client setup experience
+- After the new organization logs in, what do they see?
+- Is there a getting started dashboard?
+- Is there a setup wizard?
+- Is setup progress tracked in the database?
+
+5. Import/onboarding data
+- What import tools already exist for properties, contacts, tasks, or clients?
+- Can a new organization bulk import 50–100 properties?
+- Are owners/contacts attached correctly to properties?
+- Can services be assigned during import?
+
+6. Service catalog
+- Confirm the new Service Catalog exists.
+- Can services store pricing, recurrence, task behavior, and billing frequency?
+- Is there any connection yet between services and task templates?
+- Is there any connection yet between services and billing schedules?
+
+7. Tasks/workflows
+- What task template or recurring task functionality already exists?
+- Can recurring tasks be generated from templates?
+- Can checklist templates be attached?
+
+8. Billing
+- What Stripe/billing setup exists for organizations?
+- What billing setup exists for organizations charging their own clients?
+- Is billing connected to onboarding or service assignment yet?
+
+9. Missing pieces
+Please identify the biggest gaps in the onboarding flow.
+
+10. Recommended next build
+After inspection, recommend the best next step:
+A. Marketing CTA cleanup
+B. SuperAdmin onboarding pipeline improvements
+C. Guided client setup wizard
+D. Service-to-property assignment
+E. Service-to-task-template automation
+F. Bulk onboarding import
+G. Billing activation flow
+
+Do not implement yet. Only inspect, explain, and recommend the safest next build path.
