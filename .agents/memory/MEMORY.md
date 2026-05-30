@@ -1,0 +1,1 @@
+- [SubmissionForm variants](submission-form-variants.md) — form branches into ContactVariant/BetaVariant/FullInquiry based on SubmissionIntent; beta posts to /api/public/inquire with trialIntent="beta_application"; contact posts to /api/public/contact

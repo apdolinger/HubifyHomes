@@ -15102,12 +15102,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         teamSize: z.coerce.number().optional(),
         trialIntent: z.string().optional(),
         notes: z.string().optional(),
+        betaTierInterest: z.string().optional(),
       });
       const result = submissionSchema.safeParse(req.body);
       if (!result.success) {
         return res.status(400).json({ message: "Invalid data", errors: result.error.errors });
       }
       const data = result.data;
+      const intent = data.trialIntent;
 
       // Compute suggested tier from estimated homes
       const homes = data.estimatedHomes ?? 0;
@@ -15118,13 +15120,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       else if (homes <= 100) suggestedTier = "Operator Portfolio";
       else if (homes > 100) suggestedTier = "Enterprise Portfolio";
 
+      // Map intent → stage + source
+      let prospectStage: string;
+      let prospectSource: string;
+      if (intent === "need_demo") {
+        prospectStage = "demo_requested";
+        prospectSource = "demo_request";
+      } else if (intent === "beta_application") {
+        prospectStage = "inquiry";
+        prospectSource = "beta_application";
+      } else if (intent === "pricing_starter") {
+        prospectStage = "inquiry";
+        prospectSource = "pricing_starter";
+      } else if (intent === "pricing_growth") {
+        prospectStage = "inquiry";
+        prospectSource = "pricing_growth";
+      } else if (intent === "pricing_professional") {
+        prospectStage = "inquiry";
+        prospectSource = "pricing_professional";
+      } else {
+        prospectStage = "inquiry";
+        prospectSource = "get_started";
+      }
+
+      // For beta applications, prepend tier interest to notes
+      let processedNotes = data.notes ?? null;
+      if (intent === "beta_application" && data.betaTierInterest) {
+        const tierLabel = data.betaTierInterest === "founding_10"
+          ? "Founding 10 (50% off for life)"
+          : "Early Access 10 (25% off for life)";
+        processedNotes = `Beta tier: ${tierLabel}${data.notes ? `\n\n${data.notes}` : ""}`;
+      }
+
       const prospect = await storage.createOnboardingProspect({
         name: `${data.firstName} ${data.lastName}`.trim(),
         email: data.email,
         phone: data.phone ?? null,
         company: data.company,
-        notes: data.notes ?? null,
-        stage: data.trialIntent === "need_demo" ? "demo_requested" : "inquiry",
+        notes: processedNotes,
+        stage: prospectStage,
         firstName: data.firstName,
         lastName: data.lastName,
         website: data.website ?? null,
@@ -15137,8 +15171,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
         trialIntent: data.trialIntent ?? null,
         preferredContactMethod: data.preferredContactMethod ?? null,
         submissionStatus: "new",
-        source: data.trialIntent === "need_demo" ? "marketing_demo_request" : null,
+        source: prospectSource,
       } as any);
+
+      // ── Beta application confirmation ─────────────────────────────────────
+      if (intent === "beta_application") {
+        const fromEmail = process.env.RESEND_FROM_EMAIL;
+        const tierLabel = data.betaTierInterest === "founding_10"
+          ? "Founding 10 — 50% off for life"
+          : data.betaTierInterest === "early_access_10"
+          ? "Early Access 10 — 25% off for life"
+          : "Early Access";
+        if (resend && fromEmail) {
+          resend.emails.send({
+            from: fromEmail,
+            to: data.email,
+            subject: `${data.firstName}, your Hubify beta application is in!`,
+            html: `
+              <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
+                <div style="text-align:center;margin-bottom:28px">
+                  <img src="https://hubifyhomes.com/hubify-logo.png" alt="Hubify" width="130" style="height:auto;display:inline-block" onerror="this.style.display='none'" />
+                  <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px;margin-top:4px">Hubify Homes</div>
+                </div>
+                <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${data.firstName}, you're on the list!</h1>
+                <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
+                  We received your beta application for <strong>${data.company}</strong>. You've selected the
+                  <strong style="color:#0d9488">${tierLabel}</strong> tier — we'll be in touch within one business day to confirm your spot.
+                </p>
+                <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;padding:20px;margin-bottom:28px">
+                  <p style="font-size:14px;font-weight:700;color:#0d9488;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.05em">What happens next</p>
+                  <ul style="font-size:14px;color:#475569;line-height:1.8;margin:0;padding-left:18px">
+                    <li>Our team reviews your application (usually within 24 hours)</li>
+                    <li>You'll receive a welcome email with onboarding instructions</li>
+                    <li>Your beta discount is locked in for the lifetime of your subscription</li>
+                  </ul>
+                </div>
+                <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
+                <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
+                  Questions? Simply reply to this email — we're happy to help.
+                </p>
+              </div>
+            `,
+          }).catch((err: any) => console.warn("[beta-application] confirmation email failed:", err));
+        }
+        const alertTo = process.env.SUPPORT_EMAIL || process.env.ADMIN_EMAIL;
+        if (resend && fromEmail && alertTo) {
+          resend.emails.send({
+            from: fromEmail,
+            to: alertTo,
+            replyTo: data.email,
+            subject: `New beta application — ${data.firstName} ${data.lastName} (${data.company})`,
+            html: `
+              <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
+                <h2 style="color:#0d9488;margin-bottom:4px">New Beta Application</h2>
+                <p style="color:#64748b;font-size:14px;margin-top:0">Submitted via the Hubify Homes marketing site</p>
+                <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0"/>
+                <table style="width:100%;border-collapse:collapse;font-size:14px">
+                  <tr><td style="padding:6px 0;color:#64748b;width:150px">Name</td><td style="padding:6px 0;color:#0f172a;font-weight:600">${data.firstName} ${data.lastName}</td></tr>
+                  <tr><td style="padding:6px 0;color:#64748b">Email</td><td style="padding:6px 0"><a href="mailto:${data.email}" style="color:#0d9488">${data.email}</a></td></tr>
+                  ${data.phone ? `<tr><td style="padding:6px 0;color:#64748b">Phone</td><td style="padding:6px 0;color:#0f172a">${data.phone}</td></tr>` : ""}
+                  <tr><td style="padding:6px 0;color:#64748b">Organization</td><td style="padding:6px 0;color:#0f172a">${data.company}</td></tr>
+                  <tr><td style="padding:6px 0;color:#64748b">Beta Tier</td><td style="padding:6px 0;color:#0d9488;font-weight:600">${tierLabel}</td></tr>
+                  ${data.estimatedHomes ? `<tr><td style="padding:6px 0;color:#64748b">Est. Homes</td><td style="padding:6px 0;color:#0f172a">${data.estimatedHomes}</td></tr>` : ""}
+                </table>
+                ${processedNotes ? `<div style="margin-top:16px;padding:14px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0"><p style="margin:0 0 6px;color:#64748b;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Notes</p><p style="margin:0;color:#0f172a;font-size:14px;white-space:pre-wrap">${processedNotes}</p></div>` : ""}
+              </div>
+            `,
+          }).catch((err: any) => console.warn("[beta-application] admin alert failed:", err));
+        }
+        return res.status(201).json({ id: prospect.id, message: "Beta application received" });
+      }
 
       // ── Demo request flow ─────────────────────────────────────────────────
       if (data.trialIntent === "need_demo") {
@@ -15453,12 +15555,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!result.success) {
         return res.status(400).json({ message: "Invalid data", errors: result.error.errors });
       }
-      const prospect = await storage.createOnboardingProspect({ ...result.data, stage: "contact" });
+      const prospect = await storage.createOnboardingProspect({ ...result.data, stage: "contact", source: "contact_form" } as any);
 
-      // Send notification email to the Hubify Homes contact inbox
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@hubifyhomes.com";
+      const { name, email, company, phone, notes } = result.data;
+
+      // Confirmation email to the submitter
       if (resend) {
-        const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@hubifyhomes.com";
-        const { name, email, company, phone, notes } = result.data;
+        resend.emails.send({
+          from: fromEmail,
+          to: email,
+          subject: `We received your message — Hubify Homes`,
+          html: `
+            <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
+              <div style="text-align:center;margin-bottom:28px">
+                <img src="https://hubifyhomes.com/hubify-logo.png" alt="Hubify" width="130" style="height:auto;display:inline-block" onerror="this.style.display='none'" />
+                <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px;margin-top:4px">Hubify Homes</div>
+              </div>
+              <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Thanks for reaching out${name ? `, ${name.split(" ")[0]}` : ""}!</h1>
+              <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
+                We received your message and our team will be in touch within one business day.
+              </p>
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
+              <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
+                You received this because you submitted a contact form at Hubify Homes.
+              </p>
+            </div>
+          `,
+        }).catch((err: any) => console.warn("[contact-form] confirmation email failed:", err));
+      }
+
+      // Internal notification email to the Hubify Homes contact inbox
+      if (resend) {
         await resend.emails.send({
           from: fromEmail,
           to: "contact@hubifyhomes.com",

@@ -682,9 +682,42 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
   );
 }
 
+const SOURCE_META: Record<string, { label: string; color: string }> = {
+  get_started:           { label: "Get Started",          color: "bg-green-100 text-green-800" },
+  demo_request:          { label: "Demo Request",          color: "bg-blue-100 text-blue-800" },
+  marketing_demo_request:{ label: "Demo Request",          color: "bg-blue-100 text-blue-800" },
+  beta_application:      { label: "Beta Application",      color: "bg-teal-100 text-teal-800" },
+  contact_form:          { label: "Contact Form",          color: "bg-slate-100 text-slate-700" },
+  pricing_starter:       { label: "Pricing · Starter",     color: "bg-purple-100 text-purple-800" },
+  pricing_growth:        { label: "Pricing · Growth",      color: "bg-purple-100 text-purple-800" },
+  pricing_professional:  { label: "Pricing · Professional",color: "bg-purple-100 text-purple-800" },
+};
+
+function ProspectSourceBadge({ source }: { source: string | null }) {
+  if (!source) return <span className="text-muted-foreground text-xs">—</span>;
+  const meta = SOURCE_META[source] ?? { label: source.replace(/_/g, " "), color: "bg-gray-100 text-gray-700" };
+  return (
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap ${meta.color}`}>
+      {meta.label}
+    </span>
+  );
+}
+
+const SOURCE_FILTER_OPTIONS = [
+  { value: "all", label: "All sources" },
+  { value: "get_started", label: "Get Started" },
+  { value: "demo_request", label: "Demo Request" },
+  { value: "beta_application", label: "Beta Application" },
+  { value: "contact_form", label: "Contact Form" },
+  { value: "pricing_starter", label: "Pricing · Starter" },
+  { value: "pricing_growth", label: "Pricing · Growth" },
+  { value: "pricing_professional", label: "Pricing · Professional" },
+];
+
 function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: Prospect) => void }) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("all");
   const [selectedSubmission, setSelectedSubmission] = useState<Prospect | null>(null);
 
   const { data: submissions = [], isLoading } = useQuery<Prospect[]>({
@@ -703,15 +736,22 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return submissions.filter(s =>
-      !q ||
-      s.name?.toLowerCase().includes(q) ||
-      s.email?.toLowerCase().includes(q) ||
-      s.company?.toLowerCase().includes(q) ||
-      s.serviceArea?.toLowerCase().includes(q) ||
-      s.suggestedTier?.toLowerCase().includes(q)
-    );
-  }, [submissions, search]);
+    return submissions
+      .filter(s => {
+        if (sourceFilter === "all") return true;
+        // Normalize legacy "marketing_demo_request" → "demo_request" for filtering
+        const src = s.source === "marketing_demo_request" ? "demo_request" : (s.source ?? "get_started");
+        return src === sourceFilter;
+      })
+      .filter(s =>
+        !q ||
+        s.name?.toLowerCase().includes(q) ||
+        s.email?.toLowerCase().includes(q) ||
+        s.company?.toLowerCase().includes(q) ||
+        s.serviceArea?.toLowerCase().includes(q) ||
+        s.suggestedTier?.toLowerCase().includes(q)
+      );
+  }, [submissions, search, sourceFilter]);
 
   const fromFormCount = submissions.filter(s => s.firstName || s.estimatedHomes).length;
 
@@ -758,12 +798,24 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Input
-            placeholder="Search by name, email, company, area…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="max-w-sm"
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              placeholder="Search by name, email, company, area…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="max-w-sm"
+            />
+            <Select value={sourceFilter} onValueChange={setSourceFilter}>
+              <SelectTrigger className="w-44 h-9 text-sm">
+                <SelectValue placeholder="All sources" />
+              </SelectTrigger>
+              <SelectContent>
+                {SOURCE_FILTER_OPTIONS.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           {isLoading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">Loading…</div>
           ) : filtered.length === 0 ? (
@@ -774,12 +826,12 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
+                    <TableHead>Source</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Phone</TableHead>
                     <TableHead>Organization</TableHead>
                     <TableHead>Tier</TableHead>
                     <TableHead>Est. Homes</TableHead>
-                    <TableHead>Intent</TableHead>
                     <TableHead>Notes</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Submitted</TableHead>
@@ -794,6 +846,9 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
                     >
                       <TableCell className="font-medium whitespace-nowrap">
                         {s.firstName && s.lastName ? `${s.firstName} ${s.lastName}` : s.name}
+                      </TableCell>
+                      <TableCell>
+                        <ProspectSourceBadge source={s.source} />
                       </TableCell>
                       <TableCell className="text-sm">
                         <a
@@ -818,11 +873,6 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
                       </TableCell>
                       <TableCell className="text-sm text-center">
                         {s.estimatedHomes ?? <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {s.trialIntent ? (
-                          <span className="capitalize">{s.trialIntent.replace(/_/g, " ")}</span>
-                        ) : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell className="text-center">
                         {s.notes ? (
