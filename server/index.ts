@@ -17,6 +17,16 @@ if (process.env.NODE_ENV === "production") {
       crossOriginEmbedderPolicy: false,
     })
   );
+
+  // /submit and /contact are intentionally embeddable cross-origin so that
+  // hubifyhomes.com can load them inside an iframe modal. Remove the
+  // X-Frame-Options: SAMEORIGIN header that helmet sets for those two paths.
+  app.use((req, res, next) => {
+    if (req.path === "/submit" || req.path === "/contact") {
+      res.removeHeader("X-Frame-Options");
+    }
+    next();
+  });
 }
 
 // Rate limiting — all API routes
