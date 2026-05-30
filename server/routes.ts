@@ -2394,6 +2394,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Portal client home: active service assignments across all the portal user's properties.
+  app.get('/api/portal/services', isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const portalUser = req.portalUser;
+      const links = await storage.getPortalUserProperties(portalUser.id);
+      const propertyIds = links.map((l) => l.propertyId);
+      if (propertyIds.length === 0) return res.json([]);
+      const props = await storage.getPropertiesByIds(propertyIds, portalUser.orgId);
+      const propsById = new Map<number, string>(props.map((p) => [p.id, p.name]));
+      const allowedIds = Array.from(propsById.keys());
+      if (allowedIds.length === 0) return res.json([]);
+      const { propertyServiceAssignments, organizationServices: orgSvcTable } = await import('@shared/schema');
+      const { eq, and, inArray } = await import('drizzle-orm');
+      const rows = await db
+        .select({
+          id: propertyServiceAssignments.id,
+          propertyId: propertyServiceAssignments.propertyId,
+          status: propertyServiceAssignments.status,
+          startDate: propertyServiceAssignments.startDate,
+          endDate: propertyServiceAssignments.endDate,
+          customPriceCents: propertyServiceAssignments.customPriceCents,
+          billingFrequencyOverride: propertyServiceAssignments.billingFrequencyOverride,
+          serviceName: orgSvcTable.name,
+          serviceCategory: orgSvcTable.category,
+          serviceDefaultPriceCents: orgSvcTable.defaultPriceCents,
+          serviceBillingFrequency: orgSvcTable.billingFrequency,
+        })
+        .from(propertyServiceAssignments)
+        .innerJoin(orgSvcTable, eq(propertyServiceAssignments.serviceId, orgSvcTable.id))
+        .where(
+          and(
+            inArray(propertyServiceAssignments.propertyId, allowedIds),
+            eq(propertyServiceAssignments.orgId, portalUser.orgId),
+            eq(propertyServiceAssignments.status, 'active'),
+          )
+        );
+      const result = rows.map((r) => ({
+        ...r,
+        propertyName: r.propertyId ? (propsById.get(r.propertyId) ?? null) : null,
+      }));
+      result.sort((a, b) => {
+        const pa = a.propertyName ?? '';
+        const pb = b.propertyName ?? '';
+        if (pa !== pb) return pa.localeCompare(pb);
+        return (a.serviceName ?? '').localeCompare(b.serviceName ?? '');
+      });
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching portal services:', error);
+      res.status(500).json({ message: 'Failed to fetch services' });
+    }
+  });
+
   // Portal client home: invoices for the portal user's client (drafts hidden).
   app.get('/api/portal/invoices', isPortalAuthenticated, async (req: any, res) => {
     try {
