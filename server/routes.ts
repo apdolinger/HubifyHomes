@@ -12661,6 +12661,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const orgId = req.user?.claims?.orgId;
         const serviceId = parseInt(req.params.serviceId, 10);
         if (!orgId) return res.status(403).json({ message: "No organization context" });
+        const { organizationServices: orgSvcForList } = await import('@shared/schema');
         const assignments = await db
           .select({
             id: propertyServiceAssignments.id,
@@ -12668,10 +12669,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             status: propertyServiceAssignments.status,
             startDate: propertyServiceAssignments.startDate,
             endDate: propertyServiceAssignments.endDate,
+            customPriceCents: propertyServiceAssignments.customPriceCents,
             createdAt: propertyServiceAssignments.createdAt,
             propertyName: sqlFn2<string>`(SELECT name FROM properties WHERE id = ${propertyServiceAssignments.propertyId})`,
+            serviceDefaultPriceCents: orgSvcForList.defaultPriceCents,
           })
           .from(propertyServiceAssignments)
+          .leftJoin(orgSvcForList, eq(propertyServiceAssignments.serviceId, orgSvcForList.id))
           .where(
             and(
               eq(propertyServiceAssignments.serviceId, serviceId),
