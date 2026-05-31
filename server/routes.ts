@@ -4107,6 +4107,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
         metadata: { name: prospect.name, email: prospect.email, betaDiscountTier },
       });
 
+      // Non-blocking welcome email — failure must not fail the API response
+      if (resend) {
+        const fromEmail = process.env.RESEND_FROM_EMAIL || process.env.SUPPORT_EMAIL_FROM || "noreply@hubify.com";
+        const nameParts = (prospect.name || "").trim().split(/\s+/);
+        const firstName = nameParts[0] || prospect.name || "there";
+        const tierLabelMap: Record<string, string> = {
+          founding_10: "Founding Member (10% lifetime discount)",
+          early_access_10: "Early Access (10% discount)",
+        };
+        const tierLabel = prospect.betaDiscountTier ? tierLabelMap[prospect.betaDiscountTier] || prospect.betaDiscountTier : null;
+        const tierRow = tierLabel
+          ? `<tr>
+               <td style="padding:8px 0;color:#64748b;font-size:14px;width:160px;vertical-align:top">Beta tier</td>
+               <td style="padding:8px 0;font-size:14px;vertical-align:top">
+                 <span style="display:inline-block;background:#ccfbf1;color:#0d9488;font-weight:700;padding:3px 10px;border-radius:20px">${tierLabel}</span>
+               </td>
+             </tr>`
+          : "";
+        const companyRow = prospect.company
+          ? `<tr>
+               <td style="padding:8px 0;color:#64748b;font-size:14px;vertical-align:top">Organization</td>
+               <td style="padding:8px 0;color:#0f172a;font-size:14px;font-weight:600;vertical-align:top">${prospect.company}</td>
+             </tr>`
+          : "";
+
+        resend.emails.send({
+          to: prospect.email,
+          from: fromEmail,
+          subject: `You're in — welcome to the Hubify beta!`,
+          html: `
+            <div style="font-family:sans-serif;max-width:580px;margin:0 auto;padding:32px 24px;background:#ffffff">
+              <div style="text-align:center;margin-bottom:28px">
+                <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px">Hubify</div>
+              </div>
+              <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${firstName}, you're in!</h1>
+              <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
+                You've been granted access to the Hubify beta program. We're excited to have you on board${prospect.company ? ` at <strong>${prospect.company}</strong>` : ""}.
+              </p>
+              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px;margin-bottom:28px">
+                <table style="width:100%;border-collapse:collapse">
+                  <tr>
+                    <td style="padding:8px 0;color:#64748b;font-size:14px;width:160px;vertical-align:top">Name</td>
+                    <td style="padding:8px 0;color:#0f172a;font-size:14px;font-weight:600;vertical-align:top">${prospect.name}</td>
+                  </tr>
+                  ${companyRow}
+                  ${tierRow}
+                </table>
+              </div>
+              <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
+                Our team will reach out shortly with your next steps and onboarding details. In the meantime, feel free to reply to this email with any questions.
+              </p>
+              <p style="color:#6b7280;font-size:14px;margin-top:30px;">Best regards,<br>The Hubify Team</p>
+            </div>
+          `,
+          text: `Hi ${firstName},\n\nYou've been granted access to the Hubify beta program${prospect.company ? ` at ${prospect.company}` : ""}.\n\n${tierLabel ? `Beta tier: ${tierLabel}\n\n` : ""}Our team will reach out shortly with your next steps and onboarding details.\n\nBest regards,\nThe Hubify Team`,
+        }).then(({ error }) => {
+          if (error) {
+            console.error(`[beta-members] Welcome email failed for ${prospect.email}:`, error.message);
+          } else {
+            storage.updateOnboardingProspect(prospect.id, { welcomeEmailSentAt: new Date() } as any).catch(() => {});
+          }
+        }).catch((err: unknown) => {
+          console.error(`[beta-members] Welcome email exception for ${prospect.email}:`, err);
+        });
+      }
+
       res.status(201).json(prospect);
     } catch (error) {
       console.error("Error adding beta member:", error);
