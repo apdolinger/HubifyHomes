@@ -9,9 +9,23 @@ export const HUBIFY_HOMES_LOGO_PATH = path.join(
   "Hubify_Homes-2_1777805213575.png",
 );
 
+export const HUBIFY_HOMES_EMAIL_LOGO_PATH = path.join(
+  ROOT,
+  "attached_assets",
+  "hubify-homes-logo-email.png",
+);
+
 export function getHubifyHomesLogoBuffer(): Buffer | null {
   try {
     return fs.readFileSync(HUBIFY_HOMES_LOGO_PATH);
+  } catch {
+    return null;
+  }
+}
+
+export function getHubifyHomesEmailLogoBuffer(): Buffer | null {
+  try {
+    return fs.readFileSync(HUBIFY_HOMES_EMAIL_LOGO_PATH);
   } catch {
     return null;
   }
@@ -32,16 +46,30 @@ export function getAppBaseUrl(): string {
 }
 
 /**
- * Returns the logo URL for use in transactional emails.
+ * Returns the standard logo URL (used for non-email contexts).
  *
  * Priority:
- *  1. EMAIL_LOGO_URL env var — explicit override for any environment
- *  2. https://hubifyhomesonline.com — the production custom domain, served
- *     through Cloudflare. No Replit dev-domain restrictions, no auth wall,
- *     no x-robots-tag. The /hubify-homes-logo.png route in routes.ts serves
- *     the PNG from attached_assets/ on every request to this domain.
+ *  1. EMAIL_LOGO_URL env var — explicit override
+ *  2. https://hubifyhomesonline.com — Cloudflare-fronted production domain
  */
 export function getHubifyHomesLogoUrl(): string {
   if (process.env.EMAIL_LOGO_URL) return process.env.EMAIL_LOGO_URL;
   return "https://hubifyhomesonline.com/hubify-homes-logo.png";
+}
+
+/**
+ * Returns the URL for the email-optimised logo.
+ *
+ * The email logo (hubify-homes-logo-email.png) is:
+ *  - 260 × 52 px (2× retina), displayed at 130 px wide in email
+ *  - Tightly cropped around the wordmark — no large white canvas
+ *  - ~16 KB, served with Cross-Origin-Resource-Policy: cross-origin
+ *
+ * Priority:
+ *  1. EMAIL_LOGO_URL env var — explicit override
+ *  2. https://hubifyhomesonline.com/hubify-homes-logo-email.png
+ */
+export function getHubifyHomesEmailLogoUrl(): string {
+  if (process.env.EMAIL_LOGO_URL) return process.env.EMAIL_LOGO_URL;
+  return "https://hubifyhomesonline.com/hubify-homes-logo-email.png";
 }

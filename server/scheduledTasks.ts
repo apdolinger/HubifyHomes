@@ -5,7 +5,7 @@ import { sendEmail, buildMergeFieldData, processMergeFields } from './email-serv
 import { generateInvoicePDF } from './invoiceUtils';
 import { generateInvoiceEmailHTML, sendGenericEmail } from './emailUtils';
 import { chargeInvoice } from './stripe';
-import { getHubifyHomesLogoDataUri } from './brandAsset';
+import { getHubifyHomesEmailLogoUrl } from './brandAsset';
 import type { StageHistoryEntry, OnboardingStage } from '@shared/schema';
 
 function applyMergeTags(text: string, p: { name: string; email: string; company: string | null; phone: string | null; stage: string }): string {
@@ -1601,7 +1601,7 @@ export function buildTrialWelcomeEmail(prospect: { name: string; email: string; 
     html: `
       <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
         <div style="text-align:center;margin-bottom:28px">
-          <img src="${getHubifyHomesLogoDataUri()}" alt="Hubify" width="130" height="74" style="width:130px;height:74px;display:block;margin:0 auto;" />
+          <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="130" style="width:130px;max-width:130px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
           <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px;margin-top:4px">Hubify Homes</div>
         </div>
         <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Welcome, ${escapeHtml(firstName)}! Your 30-day demo is live.</h1>
@@ -1642,7 +1642,7 @@ function buildTrialExpiringEmail(prospect: { name: string; email: string; compan
     html: `
       <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
         <div style="text-align:center;margin-bottom:28px">
-          <img src="${getHubifyHomesLogoDataUri()}" alt="Hubify" width="130" height="74" style="width:130px;height:74px;display:block;margin:0 auto;" />
+          <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="130" style="width:130px;max-width:130px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
           <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px;margin-top:4px">Hubify Homes</div>
         </div>
         <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${escapeHtml(firstName)}, your demo ends in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}.</h1>
@@ -1682,7 +1682,7 @@ function buildTrialExpiredEmail(prospect: { name: string; email: string; company
     html: `
       <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
         <div style="text-align:center;margin-bottom:28px">
-          <img src="${getHubifyHomesLogoDataUri()}" alt="Hubify" width="130" height="74" style="width:130px;height:74px;display:block;margin:0 auto;" />
+          <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="130" style="width:130px;max-width:130px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
           <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px;margin-top:4px">Hubify Homes</div>
         </div>
         <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${escapeHtml(firstName)}, your 30-day demo has ended.</h1>
