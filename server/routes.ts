@@ -102,7 +102,7 @@ import {
 import { z } from "zod";
 import { createSetupIntentForClient, detachPaymentMethod, createPortalPayIntentForInvoice, chargeInvoice } from "./stripe";
 import { db } from "./db";
-import { eq, lt, and, desc, inArray, count, ne, isNull } from "drizzle-orm";
+import { eq, lt, and, or, desc, inArray, count, ne, isNull } from "drizzle-orm";
 import { Resend } from "resend";
 import { dispatchWebhookEvent, sendTestWebhookEvent, validateWebhookUrlSafe } from "./webhookDispatcher";
 import { seedDemoTenant, resetDemoTenant, DEMO_ORG_ID, DEMO_DOMAIN, DEMO_ADMIN_EMAIL } from "./demoSeed";
@@ -4069,6 +4069,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching beta members:", error);
       res.status(500).json({ message: "Failed to fetch beta members" });
+    }
+  });
+
+  // POST /api/super-admin/beta-members — manually add a beta member
+  app.post("/api/super-admin/beta-members", isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const { name, email, company, betaDiscountTier } = req.body;
+      if (!name || typeof name !== "string" || !name.trim()) {
+        return res.status(400).json({ message: "Name is required" });
+      }
+      if (!email || typeof email !== "string" || !email.trim()) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+      if (betaDiscountTier && !["founding_10", "early_access_10"].includes(betaDiscountTier)) {
+        return res.status(400).json({ message: "Invalid tier" });
+      }
+
+      const prospect = await storage.createOnboardingProspect({
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        company: company?.trim() || null,
+        betaDiscountTier: betaDiscountTier || null,
+        isBetaMember: true,
+        stage: "welcome",
+        source: "manual",
+      } as any);
+
+      await AuditLogger.log({
+        req,
+        action: "add_beta_member_manual",
+        actionType: "create",
+        resource: "onboarding_prospect",
+        resourceId: prospect.id,
+        severity: "info",
+        success: true,
+        metadata: { name: prospect.name, email: prospect.email, betaDiscountTier },
+      });
+
+      res.status(201).json(prospect);
+    } catch (error) {
+      console.error("Error adding beta member:", error);
+      res.status(500).json({ message: "Failed to add beta member" });
     }
   });
 

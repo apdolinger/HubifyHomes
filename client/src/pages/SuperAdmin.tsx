@@ -2267,10 +2267,19 @@ type BetaStatus = {
   totalRemaining: number;
 };
 
+type AddBetaMemberForm = {
+  name: string;
+  email: string;
+  company: string;
+  betaDiscountTier: string;
+};
+
 function BetaProgramTab() {
   const { toast } = useToast();
   const [removeTarget, setRemoveTarget] = useState<BetaMember | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BetaMember | null>(null);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addForm, setAddForm] = useState<AddBetaMemberForm>({ name: "", email: "", company: "", betaDiscountTier: "" });
 
   const { data: betaStatus, isLoading: statusLoading } = useQuery<BetaStatus>({
     queryKey: ["/api/public/beta-status"],
@@ -2303,6 +2312,19 @@ function BetaProgramTab() {
       toast({ title: "Beta member permanently deleted" });
     },
     onError: () => toast({ title: "Error", description: "Failed to delete beta member.", variant: "destructive" }),
+  });
+
+  // Manually add a beta member
+  const addMutation = useMutation({
+    mutationFn: (data: AddBetaMemberForm) => apiRequest("POST", "/api/super-admin/beta-members", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/beta-members"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/public/beta-status"] });
+      setAddDialogOpen(false);
+      setAddForm({ name: "", email: "", company: "", betaDiscountTier: "" });
+      toast({ title: "Beta member added", description: "They have been manually granted a beta slot." });
+    },
+    onError: (err: any) => toast({ title: "Error", description: err?.message ?? "Failed to add beta member.", variant: "destructive" }),
   });
 
   const tierLabel = (tier: string | null) => {
@@ -2358,9 +2380,14 @@ function BetaProgramTab() {
             <h3 className="font-semibold text-slate-900">Active Beta Members</h3>
             <p className="text-xs text-muted-foreground mt-0.5">Approved beta applicants holding a discounted slot</p>
           </div>
-          <Button size="sm" variant="outline" onClick={() => refetch()}>
-            <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => refetch()}>
+              <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh
+            </Button>
+            <Button size="sm" onClick={() => setAddDialogOpen(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Member
+            </Button>
+          </div>
         </div>
 
         {membersLoading ? (
@@ -2445,6 +2472,75 @@ function BetaProgramTab() {
           </div>
         )}
       </div>
+
+      {/* Add Member Dialog */}
+      <Dialog open={addDialogOpen} onOpenChange={(open) => { setAddDialogOpen(open); if (!open) setAddForm({ name: "", email: "", company: "", betaDiscountTier: "" }); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Beta Member Manually</DialogTitle>
+            <DialogDescription>
+              Grant a beta slot directly without requiring a pipeline application. The member will be saved with source "manual" and will not show a "From pipeline" badge.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="add-name">Full Name <span className="text-red-500">*</span></Label>
+              <Input
+                id="add-name"
+                placeholder="Jane Smith"
+                value={addForm.name}
+                onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="add-email">Email <span className="text-red-500">*</span></Label>
+              <Input
+                id="add-email"
+                type="email"
+                placeholder="jane@example.com"
+                value={addForm.email}
+                onChange={(e) => setAddForm((f) => ({ ...f, email: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="add-company">Company <span className="text-muted-foreground text-xs">(optional)</span></Label>
+              <Input
+                id="add-company"
+                placeholder="Acme Property Mgmt"
+                value={addForm.company}
+                onChange={(e) => setAddForm((f) => ({ ...f, company: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="add-tier">Beta Tier <span className="text-muted-foreground text-xs">(optional)</span></Label>
+              <Select value={addForm.betaDiscountTier} onValueChange={(v) => setAddForm((f) => ({ ...f, betaDiscountTier: v }))}>
+                <SelectTrigger id="add-tier">
+                  <SelectValue placeholder="Select a tier…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="founding_10">Founding 10 — 50% off</SelectItem>
+                  <SelectItem value="early_access_10">Early Access 10 — 25% off</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddDialogOpen(false)} disabled={addMutation.isPending}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (!addForm.name.trim() || !addForm.email.trim()) {
+                  toast({ title: "Name and email are required", variant: "destructive" });
+                  return;
+                }
+                addMutation.mutate(addForm);
+              }}
+              disabled={addMutation.isPending}
+            >
+              {addMutation.isPending ? <><RefreshCw className="w-3 h-3 mr-1.5 animate-spin" />Adding…</> : "Add Beta Member"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Free Slot Dialog */}
       <Dialog open={!!removeTarget} onOpenChange={() => setRemoveTarget(null)}>
