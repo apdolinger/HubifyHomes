@@ -12,7 +12,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { ObjectStorageService } from "./objectStorage";
 import { importSampleData } from "./import-data";
 import { getBrandingLevel, enforceBrandingPolicy, getBrandingCapabilities } from "./branding";
-import { getHubifyHomesEmailLogoUrl, HUBIFY_HOMES_LOGO_PATH, HUBIFY_HOMES_EMAIL_LOGO_PATH, getAppBaseUrl } from "./brandAsset";
+import { getHubifyHomesEmailLogoUrl, HUBIFY_HOMES_LOGO_PATH, HUBIFY_HOMES_EMAIL_LOGO_PATH, HUBIFY_HOMES_EMAIL_LOGO_V2_PATH, getAppBaseUrl } from "./brandAsset";
 import { 
   AuditLogger, 
   MFAEnforcement, 
@@ -938,12 +938,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.sendFile(HUBIFY_HOMES_LOGO_PATH);
   });
 
-  // Email-optimised logo: 260×52 px (2× retina), displayed at 130 px wide.
-  // Tightly cropped wordmark, ~16 KB. Used by all transactional email templates.
+  // Email-optimised logo (legacy v1 — kept for backward compat).
   app.get('/hubify-homes-logo-email.png', (_req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Cross-Origin-Resource-Policy', 'cross-origin');
     res.sendFile(HUBIFY_HOMES_EMAIL_LOGO_PATH);
+  });
+
+  // Email-optimised logo v2 — cache-busted filename used by all current email templates.
+  app.get('/hubify-homes-logo-email-v2.png', (_req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.sendFile(HUBIFY_HOMES_EMAIL_LOGO_V2_PATH);
   });
 
   // Serve uploaded photos
