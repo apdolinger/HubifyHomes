@@ -15843,7 +15843,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             html: `
               <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
                 <div style="text-align:center;margin-bottom:28px">
-                  <img src="https://hubifyhomes.com/hubify-logo.png" alt="Hubify" width="130" style="height:auto;display:inline-block" onerror="this.style.display='none'" />
+                  <img src="${getHubifyHomesLogoUrl()}" alt="Hubify" width="130" style="height:auto;display:inline-block" onerror="this.style.display='none'" />
                   <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px;margin-top:4px">Hubify Homes</div>
                 </div>
                 <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${data.firstName}, you're on the list!</h1>
@@ -15910,7 +15910,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               html: `
                 <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
                   <div style="text-align:center;margin-bottom:28px">
-                    <img src="https://hubifyhomes.com/hubify-logo.png" alt="Hubify" width="130" style="height:auto;display:inline-block" onerror="this.style.display='none'" />
+                    <img src="${getHubifyHomesLogoUrl()}" alt="Hubify" width="130" style="height:auto;display:inline-block" onerror="this.style.display='none'" />
                     <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px;margin-top:4px">Hubify Homes</div>
                   </div>
                   <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${data.firstName}, your demo request is in!</h1>
@@ -16119,7 +16119,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   <div style="font-family:sans-serif;max-width:580px;margin:0 auto;padding:32px 24px;background:#ffffff">
                     <!-- Logo -->
                     <div style="text-align:center;margin-bottom:28px">
-                      <img src="https://hubifyhomes.com/hubify-logo.png"
+                      <img src="${getHubifyHomesLogoUrl()}"
                            alt="Hubify"
                            width="130"
                            style="height:auto;display:inline-block"
@@ -16524,7 +16524,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             html: `
               <div style="font-family:sans-serif;max-width:580px;margin:0 auto;padding:32px 24px;background:#ffffff">
                 <div style="text-align:center;margin-bottom:28px">
-                  <img src="https://hubifyhomes.com/hubify-logo.png"
+                  <img src="${getHubifyHomesLogoUrl()}"
                        alt="Hubify"
                        width="130"
                        style="height:auto;display:inline-block"
@@ -16618,7 +16618,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           html: `
             <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
               <div style="text-align:center;margin-bottom:28px">
-                <img src="https://hubifyhomes.com/hubify-logo.png" alt="Hubify" width="130" style="height:auto;display:inline-block" onerror="this.style.display='none'" />
+                <img src="${getHubifyHomesLogoUrl()}" alt="Hubify" width="130" style="height:auto;display:inline-block" onerror="this.style.display='none'" />
                 <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px;margin-top:4px">Hubify Homes</div>
               </div>
               <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${firstName}, your demo is ready!</h1>
