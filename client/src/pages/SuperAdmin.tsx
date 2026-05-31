@@ -1103,6 +1103,7 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
   const [showDropped, setShowDropped] = useState(false);
   const [stuckDays, setStuckDays] = useState(7);
   const [dragOverStage, setDragOverStage] = useState<OnboardingStage | null>(null);
+  const [betaOnly, setBetaOnly] = useState(false);
 
   const saveStuckDaysMutation = useMutation({
     mutationFn: (days: number) =>
@@ -1146,7 +1147,11 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill]);
 
-  const active = allProspects.filter(p => p.stage !== "dropped");
+  const active = allProspects.filter(p => {
+    if (p.stage === "dropped") return false;
+    if (betaOnly && p.trialIntent !== "beta_application" && p.source !== "beta_application") return false;
+    return true;
+  });
   const dropped = allProspects.filter(p => p.stage === "dropped");
 
   const stageCounts = PIPELINE_STAGES.reduce<Record<string, number>>((acc, s) => {
@@ -1487,6 +1492,13 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
             }}
           >
             <Link2 className="w-4 h-4 mr-2" /> Copy Contact Link
+          </Button>
+          <Button
+            variant={betaOnly ? "default" : "outline"}
+            onClick={() => setBetaOnly(v => !v)}
+            className={betaOnly ? "bg-indigo-600 hover:bg-indigo-700 text-white" : ""}
+          >
+            <Filter className="w-4 h-4 mr-2" /> Beta only
           </Button>
           <Button onClick={openCreate}>
             <Plus className="w-4 h-4 mr-2" /> Add Prospect
