@@ -16144,7 +16144,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   <tr><td style="padding:6px 0;color:#64748b">Email</td><td style="padding:6px 0"><a href="mailto:${data.email}" style="color:#0d9488">${data.email}</a></td></tr>
                   ${data.phone ? `<tr><td style="padding:6px 0;color:#64748b">Phone</td><td style="padding:6px 0;color:#0f172a">${data.phone}</td></tr>` : ""}
                   <tr><td style="padding:6px 0;color:#64748b">Organization</td><td style="padding:6px 0;color:#0f172a">${data.company}</td></tr>
-                  <tr><td style="padding:6px 0;color:#64748b">Beta Tier</td><td style="padding:6px 0;color:#0d9488;font-weight:600">${tierLabel}</td></tr>
+                  <tr><td style="padding:6px 0;color:#64748b">Beta Tier</td><td style="padding:6px 0;color:#0d9488;font-weight:600">${suggestedTier || "N/A"}</td></tr>
                   ${data.estimatedHomes ? `<tr><td style="padding:6px 0;color:#64748b">Est. Homes</td><td style="padding:6px 0;color:#0f172a">${data.estimatedHomes}</td></tr>` : ""}
                 </table>
                 ${processedNotes ? `<div style="margin-top:16px;padding:14px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0"><p style="margin:0 0 6px;color:#64748b;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Notes</p><p style="margin:0;color:#0f172a;font-size:14px;white-space:pre-wrap">${processedNotes}</p></div>` : ""}
