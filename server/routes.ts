@@ -12,7 +12,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { ObjectStorageService } from "./objectStorage";
 import { importSampleData } from "./import-data";
 import { getBrandingLevel, enforceBrandingPolicy, getBrandingCapabilities } from "./branding";
-import { getHubifyHomesEmailLogoUrl, HUBIFY_HOMES_LOGO_PATH, HUBIFY_HOMES_EMAIL_LOGO_PATH, HUBIFY_HOMES_EMAIL_LOGO_V2_PATH, HUBIFY_HOMES_EMAIL_LOGO_V3_PATH, getAppBaseUrl } from "./brandAsset";
+import { getHubifyHomesEmailLogoUrl, HUBIFY_HOMES_LOGO_PATH, HUBIFY_HOMES_EMAIL_LOGO_PATH, HUBIFY_HOMES_EMAIL_LOGO_V2_PATH, HUBIFY_HOMES_EMAIL_LOGO_V3_PATH, HUBIFY_HOMES_EMAIL_LOGO_V4_PATH, getAppBaseUrl } from "./brandAsset";
 import { 
   AuditLogger, 
   MFAEnforcement, 
@@ -952,11 +952,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.sendFile(HUBIFY_HOMES_EMAIL_LOGO_V2_PATH);
   });
 
-  // Email-optimised logo v3 — transparent background, 320×64 px, tight crop.
+  // Email-optimised logo v3 — legacy, kept for backward compat.
   app.get('/hubify-homes-logo-email-v3.png', (_req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Cross-Origin-Resource-Policy', 'cross-origin');
     res.sendFile(HUBIFY_HOMES_EMAIL_LOGO_V3_PATH);
+  });
+
+  // Email-optimised logo v4 — approved teal "Hubify Homes", transparent, 480×672 px.
+  app.get('/hubify-homes-logo-email-v4.png', (_req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.sendFile(HUBIFY_HOMES_EMAIL_LOGO_V4_PATH);
   });
 
   // Serve uploaded photos
