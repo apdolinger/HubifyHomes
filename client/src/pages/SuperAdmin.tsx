@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { 
   ArrowLeft,
@@ -724,7 +725,10 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [selectedSubmission, setSelectedSubmission] = useState<Prospect | null>(null);
-  const [toDelete, setToDelete] = useState<Prospect | null>(null);
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkMoving, setBulkMoving] = useState(false);
 
   const { data: submissions = [], isLoading } = useQuery<Prospect[]>({
     queryKey: ["/api/super-admin/submissions"],
@@ -740,22 +744,11 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
     onError: () => toast({ title: "Error", description: "Failed to update status", variant: "destructive" }),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/super-admin/onboarding-prospects/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/submissions"] });
-      toast({ title: "Submission deleted" });
-      setToDelete(null);
-    },
-    onError: () => toast({ title: "Error", description: "Failed to delete submission", variant: "destructive" }),
-  });
-
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return submissions
       .filter(s => {
         if (sourceFilter === "all") return true;
-        // Normalize legacy "marketing_demo_request" → "demo_request" for filtering
         const src = s.source === "marketing_demo_request" ? "demo_request" : (s.source ?? "get_started");
         return src === sourceFilter;
       })
@@ -768,6 +761,63 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
         s.suggestedTier?.toLowerCase().includes(q)
       );
   }, [submissions, search, sourceFilter]);
+
+  const allChecked = checkedIds.size > 0 && filtered.every(s => checkedIds.has(s.id));
+  const someChecked = checkedIds.size > 0 && !allChecked;
+
+  function toggleAll() {
+    if (allChecked) {
+      setCheckedIds(new Set());
+    } else {
+      setCheckedIds(new Set(filtered.map(s => s.id)));
+    }
+  }
+
+  function toggleOne(id: string) {
+    setCheckedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  async function handleBulkDelete() {
+    setBulkDeleting(true);
+    try {
+      await Promise.all(
+        [...checkedIds].map(id => apiRequest("DELETE", `/api/super-admin/onboarding-prospects/${id}`))
+      );
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/submissions"] });
+      toast({ title: `${checkedIds.size} submission${checkedIds.size !== 1 ? "s" : ""} deleted` });
+      setCheckedIds(new Set());
+      setBulkDeleteOpen(false);
+    } catch {
+      toast({ title: "Error", description: "Some deletions failed", variant: "destructive" });
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
+  async function handleBulkMoveToPipeline() {
+    setBulkMoving(true);
+    const ids = [...checkedIds];
+    try {
+      await Promise.all(
+        ids.map(id => apiRequest("PATCH", `/api/super-admin/submissions/${id}/status`, { status: "converted" }))
+      );
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/submissions"] });
+      if (onMoveToPipeline) {
+        const toMove = filtered.filter(s => ids.includes(s.id));
+        toMove.forEach(sub => onMoveToPipeline(sub));
+      }
+      toast({ title: `${ids.length} submission${ids.length !== 1 ? "s" : ""} moved to pipeline` });
+      setCheckedIds(new Set());
+    } catch {
+      toast({ title: "Error", description: "Some updates failed", variant: "destructive" });
+    } finally {
+      setBulkMoving(false);
+    }
+  }
 
   const fromFormCount = submissions.filter(s => s.firstName || s.estimatedHomes).length;
 
@@ -832,6 +882,37 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
               </SelectContent>
             </Select>
           </div>
+
+          {checkedIds.size > 0 && (
+            <div className="flex items-center gap-3 px-3 py-2 bg-muted/60 rounded-lg border text-sm">
+              <span className="font-medium text-foreground">{checkedIds.size} selected</span>
+              <div className="flex gap-2 ml-auto">
+                {onMoveToPipeline && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleBulkMoveToPipeline}
+                    disabled={bulkMoving || bulkDeleting}
+                  >
+                    {bulkMoving ? "Moving…" : "Move to Pipeline"}
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => setBulkDeleteOpen(true)}
+                  disabled={bulkMoving || bulkDeleting}
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                  Delete selected
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setCheckedIds(new Set())}>
+                  Clear
+                </Button>
+              </div>
+            </div>
+          )}
+
           {isLoading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">Loading…</div>
           ) : filtered.length === 0 ? (
@@ -841,6 +922,14 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10 pl-4">
+                      <Checkbox
+                        checked={allChecked}
+                        data-state={someChecked ? "indeterminate" : allChecked ? "checked" : "unchecked"}
+                        onCheckedChange={toggleAll}
+                        aria-label="Select all"
+                      />
+                    </TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Source</TableHead>
                     <TableHead>Email</TableHead>
@@ -851,16 +940,22 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
                     <TableHead>Notes</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Submitted</TableHead>
-                    <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.map(s => (
                     <TableRow
                       key={s.id}
-                      className="cursor-pointer hover:bg-muted/50"
+                      className={`cursor-pointer hover:bg-muted/50 ${checkedIds.has(s.id) ? "bg-muted/40" : ""}`}
                       onClick={() => setSelectedSubmission(s)}
                     >
+                      <TableCell className="pl-4" onClick={e => e.stopPropagation()}>
+                        <Checkbox
+                          checked={checkedIds.has(s.id)}
+                          onCheckedChange={() => toggleOne(s.id)}
+                          aria-label={`Select ${s.name ?? s.email}`}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium whitespace-nowrap">
                         {s.firstName && s.lastName ? `${s.firstName} ${s.lastName}` : s.name}
                       </TableCell>
@@ -927,16 +1022,6 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                         {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : "—"}
                       </TableCell>
-                      <TableCell onClick={e => e.stopPropagation()}>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => setToDelete(s)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -966,29 +1051,20 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
         />
       )}
 
-      <Dialog open={!!toDelete} onOpenChange={open => { if (!open) setToDelete(null); }}>
+      <Dialog open={bulkDeleteOpen} onOpenChange={open => { if (!open) setBulkDeleteOpen(false); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete submission?</DialogTitle>
+            <DialogTitle>Delete {checkedIds.size} submission{checkedIds.size !== 1 ? "s" : ""}?</DialogTitle>
             <DialogDescription>
-              This will permanently remove the submission from{" "}
-              <span className="font-medium text-foreground">
-                {toDelete?.firstName && toDelete?.lastName
-                  ? `${toDelete.firstName} ${toDelete.lastName}`
-                  : toDelete?.name ?? toDelete?.email}
-              </span>. This cannot be undone.
+              This will permanently remove {checkedIds.size === 1 ? "this submission" : `all ${checkedIds.size} selected submissions`}. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setToDelete(null)} disabled={deleteMutation.isPending}>
+            <Button variant="outline" onClick={() => setBulkDeleteOpen(false)} disabled={bulkDeleting}>
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              onClick={() => toDelete && deleteMutation.mutate(toDelete.id)}
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending ? "Deleting…" : "Delete"}
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkDeleting}>
+              {bulkDeleting ? "Deleting…" : `Delete ${checkedIds.size}`}
             </Button>
           </DialogFooter>
         </DialogContent>
