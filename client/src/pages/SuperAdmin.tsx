@@ -2532,11 +2532,12 @@ function BetaProgramTab() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="add-tier">Beta Tier <span className="text-muted-foreground text-xs">(optional)</span></Label>
-              <Select value={addForm.betaDiscountTier} onValueChange={(v) => setAddForm((f) => ({ ...f, betaDiscountTier: v }))}>
+              <Select value={addForm.betaDiscountTier || "__none__"} onValueChange={(v) => setAddForm((f) => ({ ...f, betaDiscountTier: v === "__none__" ? "" : v }))}>
                 <SelectTrigger id="add-tier">
                   <SelectValue placeholder="Select a tier…" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__none__">None (unassigned)</SelectItem>
                   <SelectItem value="founding_10">Founding 10 — 50% off</SelectItem>
                   <SelectItem value="early_access_10">Early Access 10 — 25% off</SelectItem>
                 </SelectContent>
