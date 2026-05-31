@@ -16706,14 +16706,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const discountPct = assignedTier === "founding_10" ? tier1DiscountPct : tier2DiscountPct;
           const effectiveMonthlyPrice = Math.round(basePrice * (1 - discountPct / 100) * 100) / 100;
 
-          betaApprovalEmailPayload = {
-            prospectName: existing.name || "",
-            prospectEmail: existing.email,
-            prospectCompany: existing.company || "",
-            assignedTier,
-            discountPct,
-            effectiveMonthlyPrice,
-          };
+          // Only queue the approval email on fresh approvals — re-approvals (existingTier already set)
+          // should not send a duplicate welcome/discount email
+          if (!existingTier) {
+            betaApprovalEmailPayload = {
+              prospectName: existing.name || "",
+              prospectEmail: existing.email,
+              prospectCompany: existing.company || "",
+              assignedTier,
+              discountPct,
+              effectiveMonthlyPrice,
+            };
+          }
         }
       }
 
@@ -16727,7 +16731,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const nameParts = prospectName.trim().split(/\s+/);
           const firstName = nameParts[0] || "there";
           const tierLabel = assignedTier === "founding_10" ? "Founding 10" : "Early Access 10";
-          const onboardingUrl = "https://app.hubifyhomesonline.com/staff/login";
+          const onboardingUrl = `${getAppBaseUrl()}/staff/login`;
           resend.emails.send({
             from: fromEmail,
             to: prospectEmail,
