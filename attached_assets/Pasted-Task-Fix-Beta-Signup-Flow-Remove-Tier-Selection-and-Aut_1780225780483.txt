@@ -1,0 +1,56 @@
+Task: Fix Beta Signup Flow — Remove Tier Selection and Auto-Assign Beta Discount Slots
+
+What & Why
+
+The embedded beta signup form currently asks the applicant which beta tier they are applying for. This is incorrect.
+
+Applicants should not choose their beta discount. The system should automatically assign the beta discount based on active beta slot availability.
+
+Beta program rules:
+
+* First 10 active approved beta members receive 50% off monthly pricing.
+* Next 10 active approved beta members receive 25% off monthly pricing.
+* After 20 active approved beta members, the beta program is closed.
+* If a beta member is deleted or removed from active beta status in Super Admin, that slot becomes available again.
+
+Done looks like
+
+* The embedded beta signup form no longer displays “Which beta tier are you applying for?”
+* Applicants cannot select Founding 10 or Early Access 10.
+* The form only collects applicant/contact/business information.
+* The form displays a simple note such as: “Beta discounts are automatically assigned based on availability at the time of approval.”
+* Super Admin tracks beta slot availability.
+* Super Admin shows how many 50% beta slots are used/available.
+* Super Admin shows how many 25% beta slots are used/available.
+* When approving a beta applicant, the system automatically assigns the correct discount tier.
+* Once 20 active beta members exist, beta signup should show closed/unavailable.
+* If a beta user is deleted or removed from active beta status, the available slot count updates and the program can reopen if under 20 active beta users.
+
+Required logic
+
+Use active approved beta members as the source of truth.
+
+Assignment logic:
+
+* If active approved beta count is 0–9, assign 50% off / Founding 10.
+* If active approved beta count is 10–19, assign 25% off / Early Access 10.
+* If active approved beta count is 20 or more, block new beta approval/signup and mark beta program closed.
+
+Important correction
+
+The screenshot currently shows selectable cards for:
+
+* Founding 10 — 50% off
+* Early Access 10 — 25% off
+
+These cards should be removed from the applicant-facing form. They should only exist as Super Admin tracking/status information, not as applicant choices.
+
+Out of scope
+
+* Do not change the actual pricing tiers.
+* Do not change the setup fee logic.
+* Do not redesign the entire beta form.
+* Do not change non-beta forms.
+* Do not implement Stripe billing changes yet unless already connected to this flow.
+
+After this is built, we will review the embedded beta form and Super Admin beta tracking together.
