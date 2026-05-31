@@ -2206,6 +2206,7 @@ type BetaMember = {
   betaDiscountTier: string | null;
   createdAt: string | null;
   stage: string | null;
+  submissionStatus: string | null;
 };
 
 type BetaStatus = {
@@ -2235,24 +2236,26 @@ function BetaProgramTab() {
     queryKey: ["/api/super-admin/beta-members"],
   });
 
+  // Soft-remove: frees slot, keeps record (DELETE per spec)
   const removeMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("PATCH", `/api/super-admin/beta-members/${id}/remove`, {}),
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/super-admin/beta-members/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/beta-members"] });
       queryClient.invalidateQueries({ queryKey: ["/api/public/beta-status"] });
       setRemoveTarget(null);
       toast({ title: "Beta slot freed", description: "The member has been moved back to inquiry stage." });
     },
-    onError: () => toast({ title: "Error", description: "Failed to remove beta member.", variant: "destructive" }),
+    onError: () => toast({ title: "Error", description: "Failed to free beta slot.", variant: "destructive" }),
   });
 
+  // Hard delete: permanently removes record
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/super-admin/beta-members/${id}`),
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/super-admin/beta-members/${id}/hard`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/beta-members"] });
       queryClient.invalidateQueries({ queryKey: ["/api/public/beta-status"] });
       setDeleteTarget(null);
-      toast({ title: "Beta member deleted" });
+      toast({ title: "Beta member permanently deleted" });
     },
     onError: () => toast({ title: "Error", description: "Failed to delete beta member.", variant: "destructive" }),
   });
@@ -2265,28 +2268,38 @@ function BetaProgramTab() {
 
   return (
     <div className="space-y-6">
-      {/* Slot Summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white border rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold text-slate-800">
-            {statusLoading ? "…" : `${betaStatus?.activeBetaCount ?? 0} / ${betaStatus?.totalCap ?? 20}`}
-          </p>
-          <p className="text-xs text-muted-foreground mt-1 font-medium uppercase tracking-wide">Total Slots Used</p>
-          <p className="text-xs text-muted-foreground">{betaStatus?.totalRemaining ?? "—"} remaining</p>
+      {/* Slot Summary with Open/Closed badge */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Beta Program Status</h3>
+          {!statusLoading && betaStatus && (
+            betaStatus.open
+              ? <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">● Open</span>
+              : <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-red-100 text-red-700 border border-red-200">● Closed — Full</span>
+          )}
         </div>
-        <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold text-teal-800">
-            {statusLoading ? "…" : `${betaStatus?.tier1Filled ?? 0} / ${betaStatus?.tier1Cap ?? 10}`}
-          </p>
-          <p className="text-xs text-teal-700 mt-1 font-medium uppercase tracking-wide">Founding 10</p>
-          <p className="text-xs text-teal-600">50% off · {betaStatus?.tier1Remaining ?? "—"} left</p>
-        </div>
-        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold text-indigo-800">
-            {statusLoading ? "…" : `${betaStatus?.tier2Filled ?? 0} / ${betaStatus?.tier2Cap ?? 10}`}
-          </p>
-          <p className="text-xs text-indigo-700 mt-1 font-medium uppercase tracking-wide">Early Access 10</p>
-          <p className="text-xs text-indigo-600">25% off · {betaStatus?.tier2Remaining ?? "—"} left</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-white border rounded-xl p-4 text-center">
+            <p className="text-2xl font-bold text-slate-800">
+              {statusLoading ? "…" : `${betaStatus?.activeBetaCount ?? 0} / ${betaStatus?.totalCap ?? 20}`}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1 font-medium uppercase tracking-wide">Total Slots Used</p>
+            <p className="text-xs text-muted-foreground">{betaStatus?.totalRemaining ?? "—"} remaining</p>
+          </div>
+          <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 text-center">
+            <p className="text-2xl font-bold text-teal-800">
+              {statusLoading ? "…" : `${betaStatus?.tier1Filled ?? 0} / ${betaStatus?.tier1Cap ?? 10}`}
+            </p>
+            <p className="text-xs text-teal-700 mt-1 font-medium uppercase tracking-wide">Founding 10</p>
+            <p className="text-xs text-teal-600">50% off · {betaStatus?.tier1Remaining ?? "—"} left</p>
+          </div>
+          <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-center">
+            <p className="text-2xl font-bold text-indigo-800">
+              {statusLoading ? "…" : `${betaStatus?.tier2Filled ?? 0} / ${betaStatus?.tier2Cap ?? 10}`}
+            </p>
+            <p className="text-xs text-indigo-700 mt-1 font-medium uppercase tracking-wide">Early Access 10</p>
+            <p className="text-xs text-indigo-600">25% off · {betaStatus?.tier2Remaining ?? "—"} left</p>
+          </div>
         </div>
       </div>
 
@@ -2320,13 +2333,19 @@ function BetaProgramTab() {
                   <TableHead>Email</TableHead>
                   <TableHead>Company</TableHead>
                   <TableHead>Tier</TableHead>
-                  <TableHead>Approved</TableHead>
+                  <TableHead>Current Status</TableHead>
+                  <TableHead>Applied</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {betaMembers.map((member) => {
                   const tl = tierLabel(member.betaDiscountTier);
+                  const stageBadge = (() => {
+                    if (member.stage === "welcome") return { text: "Active — Approved", cls: "bg-emerald-100 text-emerald-800 border-emerald-200" };
+                    if (member.stage === "dropped") return { text: "Dropped", cls: "bg-red-100 text-red-700 border-red-200" };
+                    return { text: member.stage ?? "Unknown", cls: "bg-gray-100 text-gray-600 border-gray-200" };
+                  })();
                   return (
                     <TableRow key={member.id}>
                       <TableCell className="font-medium text-slate-900">{member.name ?? "—"}</TableCell>
@@ -2335,6 +2354,11 @@ function BetaProgramTab() {
                       <TableCell>
                         <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full border ${tl.cls}`}>
                           {tl.text}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full border ${stageBadge.cls}`}>
+                          {stageBadge.text}
                         </span>
                       </TableCell>
                       <TableCell className="text-slate-500 text-sm">

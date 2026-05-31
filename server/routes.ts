@@ -4072,8 +4072,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PATCH /api/super-admin/beta-members/:id/remove — free the slot (soft-remove)
+  // PATCH /api/super-admin/beta-members/:id/remove — legacy alias kept for compatibility
   app.patch("/api/super-admin/beta-members/:id/remove", isSuperAdmin, requireMFA, async (req: any, res) => {
+    req.params; // delegate to DELETE handler logic below
+    // Redirect semantically — just call the same soft-remove logic
+    const { id } = req.params;
+    try {
+      const prospect = await storage.getOnboardingProspect(id);
+      if (!prospect) return res.status(404).json({ message: "Beta member not found" });
+      const updated = await storage.updateOnboardingProspect(id, { betaRemovedAt: new Date(), stage: "inquiry" } as any);
+      await AuditLogger.log({ req, action: "remove_beta_member", actionType: "update", resource: "onboarding_prospect", resourceId: id, severity: "info", success: true, metadata: { name: prospect.name, email: prospect.email } });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error removing beta member:", error);
+      res.status(500).json({ message: "Failed to remove beta member" });
+    }
+  });
+
+  // DELETE /api/super-admin/beta-members/:id — soft-remove: frees slot, preserves record
+  app.delete("/api/super-admin/beta-members/:id", isSuperAdmin, requireMFA, async (req: any, res) => {
     try {
       const { id } = req.params;
       const prospect = await storage.getOnboardingProspect(id);
@@ -4095,15 +4112,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         metadata: { name: prospect.name, email: prospect.email },
       });
 
-      res.json(updated);
+      res.json({ message: "Beta slot freed", prospect: updated });
     } catch (error) {
       console.error("Error removing beta member:", error);
       res.status(500).json({ message: "Failed to remove beta member" });
     }
   });
 
-  // DELETE /api/super-admin/beta-members/:id — hard delete (also frees slot)
-  app.delete("/api/super-admin/beta-members/:id", isSuperAdmin, requireMFA, async (req: any, res) => {
+  // DELETE /api/super-admin/beta-members/:id/hard — hard delete (cannot be undone)
+  app.delete("/api/super-admin/beta-members/:id/hard", isSuperAdmin, requireMFA, async (req: any, res) => {
     try {
       const { id } = req.params;
       const prospect = await storage.getOnboardingProspect(id);
@@ -4122,7 +4139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         metadata: { name: prospect.name, email: prospect.email },
       });
 
-      res.json({ message: "Beta member deleted" });
+      res.json({ message: "Beta member permanently deleted" });
     } catch (error) {
       console.error("Error deleting beta member:", error);
       res.status(500).json({ message: "Failed to delete beta member" });
