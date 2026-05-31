@@ -115,6 +115,17 @@ export default function HubifyConsole() {
     return "sent";
   };
 
+  // Deduplicate invitations by email — keep only the most recent per address
+  const dedupedInvitations = Object.values(
+    (portalInvitations as any[]).reduce((acc: Record<string, any>, inv: any) => {
+      const key = inv.email.toLowerCase();
+      if (!acc[key] || new Date(inv.createdAt) > new Date(acc[key].createdAt)) {
+        acc[key] = inv;
+      }
+      return acc;
+    }, {})
+  ) as any[];
+
   const resendInvitationMutation = useMutation({
     mutationFn: async (id: string) => {
       const res = await apiRequest("POST", `/api/portal/invitations/${id}/resend`, {});
@@ -472,7 +483,7 @@ export default function HubifyConsole() {
                 {f === "all" ? "All" : f === "sent" ? "Pending" : f === "registered" ? "Registered" : "Expired"}
                 {" "}
                 <span className="opacity-70">
-                  ({(portalInvitations as any[]).filter((inv: any) => {
+                  ({dedupedInvitations.filter((inv: any) => {
                     if (f === "all") return true;
                     const s = getInvitationStatus(inv);
                     return s === f;
@@ -485,14 +496,14 @@ export default function HubifyConsole() {
         <CardContent className="p-0">
           {invitationsLoading ? (
             <div className="text-center py-6 text-slate-500">Loading invitations…</div>
-          ) : (portalInvitations as any[]).length === 0 ? (
+          ) : dedupedInvitations.length === 0 ? (
             <div className="text-center py-8">
               <Send className="w-10 h-10 text-slate-300 mx-auto mb-3" />
               <p className="text-slate-500 text-sm">No invitations sent yet.</p>
               <p className="text-xs text-slate-400 mt-1">Click "Invite Client" to send a branded portal invitation.</p>
             </div>
           ) : (() => {
-            const filtered = (portalInvitations as any[]).filter((inv: any) => {
+            const filtered = dedupedInvitations.filter((inv: any) => {
               if (invitationFilter === "all") return true;
               return getInvitationStatus(inv) === invitationFilter;
             });

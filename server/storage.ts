@@ -722,6 +722,17 @@ export interface IStorage {
   getOrgFeatureFlagOverrides(orgId: string): Promise<Record<string, boolean>>;
   setOrgFeatureFlagOverride(orgId: string, key: string, enabled: boolean | null): Promise<Record<string, boolean>>;
 
+  // Portal invitation operations
+  createPortalInvitation(data: InsertPortalInvitation): Promise<PortalInvitation>;
+  getPortalInvitationByToken(token: string): Promise<PortalInvitation | undefined>;
+  markPortalInvitationUsed(token: string): Promise<void>;
+  getPortalInvitationsByOrg(orgId: string): Promise<PortalInvitation[]>;
+  getPortalInvitationsByEmail(orgId: string, email: string): Promise<PortalInvitation[]>;
+  getPortalInvitationById(id: string): Promise<PortalInvitation | undefined>;
+  updatePortalInvitation(id: string, data: Partial<PortalInvitation>): Promise<PortalInvitation>;
+  deletePortalInvitation(id: string): Promise<void>;
+  getActivePortalInvitationByEmailAndOrg(orgId: string, email: string): Promise<PortalInvitation | undefined>;
+
   // Org self-signup token operations
   createOrgSignupToken(data: { orgId: string; email: string; token: string; expiresAt: Date }): Promise<OrgSignupToken>;
   getOrgSignupTokenByEmail(email: string): Promise<OrgSignupToken | undefined>;
