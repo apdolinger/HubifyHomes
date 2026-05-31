@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 import ICAL from "ical.js";
-import { getHubifyHomesLogoUrl } from "./brandAsset";
+import { getHubifyHomesLogoDataUri } from "./brandAsset";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
@@ -43,7 +43,7 @@ export function generateEventInvitationHTML(data: EventInvitationData): string {
   const secondaryColor = organizationBranding.secondaryColor || '#004499';
   const accentColor = organizationBranding.accentColor || '#00aaff';
   const orgLogo = organizationBranding.logo;
-  const logo = orgLogo || getHubifyHomesLogoUrl();
+  const logo = orgLogo || getHubifyHomesLogoDataUri();
   const logoAlt = orgLogo ? organizationName : 'Hubify Homes';
 
   const formatDateTime = (date: Date) => {
@@ -346,7 +346,7 @@ export async function sendEventInvitationEmail(
     if (template) {
       const variables = createEventInvitationVariables({
         organizationName: eventData.organizationName,
-        organizationLogoUrl: eventData.organizationBranding?.logo || getHubifyHomesLogoUrl(),
+        organizationLogoUrl: eventData.organizationBranding?.logo || getHubifyHomesLogoDataUri(),
         eventTitle: eventData.eventTitle,
         eventDescription: eventData.eventDescription || null,
         eventLocation: eventData.eventLocation || null,
@@ -426,7 +426,7 @@ export function generateInvoiceEmailHTML(data: InvoiceEmailData): string {
   const primaryColor = organizationBranding.primaryColor || '#667eea';
   const secondaryColor = organizationBranding.secondaryColor || '#764ba2';
   const orgLogo = organizationBranding.logo;
-  const logo = orgLogo || getHubifyHomesLogoUrl();
+  const logo = orgLogo || getHubifyHomesLogoDataUri();
   const logoAlt = orgLogo ? organizationName : 'Hubify Homes';
 
   const formatCurrency = (amount: number, curr: string): string => {

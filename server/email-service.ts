@@ -1,6 +1,6 @@
 import { sendGenericEmail } from "./emailUtils";
 import { storage } from "./storage";
-import { getHubifyHomesLogoUrl } from "./brandAsset";
+import { getHubifyHomesLogoDataUri } from "./brandAsset";
 
 // Merge field data type
 export interface MergeFieldData {
@@ -115,7 +115,7 @@ export function wrapInEmailTemplate(params: {
   const primaryColor = organizationBranding.primaryColor || '#0066cc';
   const secondaryColor = organizationBranding.secondaryColor || '#004499';
   const orgLogo = organizationBranding.logo;
-  const logo = orgLogo || getHubifyHomesLogoUrl();
+  const logo = orgLogo || getHubifyHomesLogoDataUri();
   const logoAlt = orgLogo ? organizationName : 'Hubify Homes';
   
   return `

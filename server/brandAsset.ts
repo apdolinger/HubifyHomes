@@ -17,9 +17,9 @@ export function getHubifyHomesLogoBuffer(): Buffer | null {
   }
 }
 
-export function getHubifyHomesLogoDataUri(): string | null {
+export function getHubifyHomesLogoDataUri(): string {
   const buf = getHubifyHomesLogoBuffer();
-  if (!buf) return null;
+  if (!buf) return getHubifyHomesLogoUrl();
   return `data:image/png;base64,${buf.toString("base64")}`;
 }
 
