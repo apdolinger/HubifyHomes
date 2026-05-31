@@ -62,7 +62,8 @@ import {
   ArrowUpDown,
   Check,
   ChevronsUpDown,
-  ClipboardCheck
+  ClipboardCheck,
+  FileCode
 } from "lucide-react";
 import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -2987,6 +2988,29 @@ export default function Admin() {
                 <Button data-testid="button-open-pdf-mockups">
                   <FileText className="w-4 h-4 mr-2" />
                   Open PDF Mockup Gallery
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <FileCode className="w-5 h-5 mr-2" />
+                Embed Preview
+              </CardTitle>
+              <CardDescription>
+                Preview the /submit and /contact forms inside an iframe, copy ready-made embed snippets, and verify the postMessage event fires correctly
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-slate-600 mb-4">
+                Test your website embed setup without leaving the admin panel. Live iframe previews let you confirm the forms render correctly, and the built-in postMessage monitor shows you the <code className="font-mono bg-slate-100 px-1 rounded text-sm">hubify:form_submitted</code> event in real time after a test submission.
+              </p>
+              <Link href="/admin/embed-preview">
+                <Button data-testid="button-open-embed-preview">
+                  <FileCode className="w-4 h-4 mr-2" />
+                  Open Embed Preview
                 </Button>
               </Link>
             </CardContent>
