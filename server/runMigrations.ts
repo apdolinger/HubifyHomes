@@ -587,7 +587,19 @@ export async function ensureBetaProspectColumns(): Promise<void> {
     await client.query(`
       ALTER TABLE onboarding_prospects
         ADD COLUMN IF NOT EXISTS beta_discount_tier VARCHAR,
-        ADD COLUMN IF NOT EXISTS beta_removed_at TIMESTAMP;
+        ADD COLUMN IF NOT EXISTS beta_removed_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS is_beta_member BOOLEAN NOT NULL DEFAULT false,
+        ADD COLUMN IF NOT EXISTS beta_approved_at TIMESTAMP;
+    `);
+    // Backfill existing approved beta members who pre-date the is_beta_member column
+    await client.query(`
+      UPDATE onboarding_prospects
+      SET is_beta_member = true,
+          beta_approved_at = COALESCE(updated_at, created_at)
+      WHERE source = 'beta_application'
+        AND stage = 'welcome'
+        AND beta_removed_at IS NULL
+        AND is_beta_member = false;
     `);
     log("[MIGRATE] onboarding_prospects beta columns verified.");
   } catch (err: any) {

@@ -4052,6 +4052,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ── Beta Member Management (Super Admin) ─────────────────────────────────
 
   // GET /api/super-admin/beta-members — list active approved beta members
+  // Uses isBetaMember flag (not stage) so members remain visible after stage transitions
   app.get("/api/super-admin/beta-members", isSuperAdmin, requireMFA, async (_req, res) => {
     try {
       const members = await db
@@ -4059,8 +4060,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(onboardingProspects)
         .where(
           and(
-            eq(onboardingProspects.stage, "welcome"),
-            eq(onboardingProspects.source, "beta_application"),
+            eq(onboardingProspects.isBetaMember, true),
             isNull(onboardingProspects.betaRemovedAt)
           )
         )
@@ -4072,15 +4072,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PATCH /api/super-admin/beta-members/:id/remove — legacy alias kept for compatibility
+  // PATCH /api/super-admin/beta-members/:id/remove — legacy alias for soft-remove
   app.patch("/api/super-admin/beta-members/:id/remove", isSuperAdmin, requireMFA, async (req: any, res) => {
-    req.params; // delegate to DELETE handler logic below
-    // Redirect semantically — just call the same soft-remove logic
     const { id } = req.params;
     try {
       const prospect = await storage.getOnboardingProspect(id);
       if (!prospect) return res.status(404).json({ message: "Beta member not found" });
-      const updated = await storage.updateOnboardingProspect(id, { betaRemovedAt: new Date(), stage: "inquiry" } as any);
+      const updated = await storage.updateOnboardingProspect(id, {
+        isBetaMember: false,
+        betaRemovedAt: new Date(),
+        stage: "inquiry",
+      } as any);
       await AuditLogger.log({ req, action: "remove_beta_member", actionType: "update", resource: "onboarding_prospect", resourceId: id, severity: "info", success: true, metadata: { name: prospect.name, email: prospect.email } });
       res.json(updated);
     } catch (error) {
@@ -4089,7 +4091,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // DELETE /api/super-admin/beta-members/:id — soft-remove: frees slot, preserves record
+  // DELETE /api/super-admin/beta-members/:id — soft-remove: clears isBetaMember, frees slot, preserves record
   app.delete("/api/super-admin/beta-members/:id", isSuperAdmin, requireMFA, async (req: any, res) => {
     try {
       const { id } = req.params;
@@ -4097,6 +4099,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!prospect) return res.status(404).json({ message: "Beta member not found" });
 
       const updated = await storage.updateOnboardingProspect(id, {
+        isBetaMember: false,
         betaRemovedAt: new Date(),
         stage: "inquiry",
       } as any);
@@ -15611,13 +15614,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tier2Cap = Number(bp?.tier2Cap ?? 10);
       const totalCap = tier1Cap + tier2Cap;
 
+      // Count active beta members by the durable isBetaMember flag (not stage)
       const [{ activeBetaCount }] = await db
         .select({ activeBetaCount: count() })
         .from(onboardingProspects)
         .where(
           and(
-            eq(onboardingProspects.stage, "welcome"),
-            eq(onboardingProspects.source, "beta_application"),
+            eq(onboardingProspects.isBetaMember, true),
             isNull(onboardingProspects.betaRemovedAt)
           )
         );
@@ -16555,13 +16558,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const tier2Cap = Number(bp?.tier2Cap ?? 10);
           const totalCap = tier1Cap + tier2Cap;
 
+          // Count active beta members by durable flag (not stage) so slot counting
+          // survives stage transitions after approval
           const [{ activeBetaCount }] = await db
             .select({ activeBetaCount: count() })
             .from(onboardingProspects)
             .where(
               and(
-                eq(onboardingProspects.stage, "welcome"),
-                eq(onboardingProspects.source, "beta_application"),
+                eq(onboardingProspects.isBetaMember, true),
                 isNull(onboardingProspects.betaRemovedAt),
                 ne(onboardingProspects.id, id)
               )
@@ -16582,6 +16586,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             assignedTier = activeBetaCount < tier1Cap ? "founding_10" : "early_access_10";
             (parseResult.data as any).betaDiscountTier = assignedTier;
+          }
+
+          // Mark as a durable beta member regardless of future stage changes;
+          // only stamp betaApprovedAt on fresh approvals — re-approvals preserve the original date
+          (parseResult.data as any).isBetaMember = true;
+          if (!existingTier) {
+            (parseResult.data as any).betaApprovedAt = new Date();
           }
 
           const discountPct = assignedTier === "founding_10" ? tier1DiscountPct : tier2DiscountPct;
