@@ -189,7 +189,7 @@ export function generateEventInvitationHTML(data: EventInvitationData): string {
 <body>
   <div class="container">
     <div class="header">
-      ${logo ? `<img src="${logo}" alt="${logoAlt}" width="200" height="60" class="logo" style="max-width:200px;max-height:80px;height:auto;width:auto;">` : ''}
+      ${logo ? `<img src="${logo}" alt="${logoAlt}" width="180" class="logo" style="width:180px;max-width:180px;height:auto;display:block;margin:0 auto 8px;border:0;outline:none;text-decoration:none;">` : ''}
       <p class="header-text">You're Invited to an Event</p>
     </div>
     
@@ -587,7 +587,7 @@ export function generateInvoiceEmailHTML(data: InvoiceEmailData): string {
 <body>
   <div class="container">
     <div class="header">
-      ${logo ? `<img src="${logo}" alt="${logoAlt}" width="200" height="60" class="logo" style="max-width:200px;max-height:80px;height:auto;width:auto;">` : ''}
+      ${logo ? `<img src="${logo}" alt="${logoAlt}" width="180" class="logo" style="width:180px;max-width:180px;height:auto;display:block;margin:0 auto 8px;border:0;outline:none;text-decoration:none;">` : ''}
       <h1 class="header-text">Invoice</h1>
       <p class="invoice-number">#${invoiceNumber}</p>
     </div>

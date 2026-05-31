@@ -180,7 +180,7 @@ export function wrapInEmailTemplate(params: {
 <body>
   <div class="container">
     <div class="header">
-      ${logo ? `<img src="${logo}" alt="${logoAlt}" width="200" height="60" class="logo" style="max-width:200px;max-height:80px;height:auto;width:auto;">` : ''}
+      ${logo ? `<img src="${logo}" alt="${logoAlt}" width="180" class="logo" style="width:180px;max-width:180px;height:auto;display:block;margin:0 auto 8px;border:0;outline:none;text-decoration:none;">` : ''}
       <p class="header-text">${organizationName}</p>
     </div>
     <div class="content">
