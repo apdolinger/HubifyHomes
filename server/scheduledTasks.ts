@@ -1601,7 +1601,7 @@ export function buildTrialWelcomeEmail(prospect: { name: string; email: string; 
     html: `
       <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
         <div style="text-align:center;margin-bottom:28px">
-          <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="130" style="width:130px;max-width:130px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
+          <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="160" style="width:160px;max-width:160px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
         </div>
         <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Welcome, ${escapeHtml(firstName)}! Your 30-day demo is live.</h1>
         <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
@@ -1641,7 +1641,7 @@ function buildTrialExpiringEmail(prospect: { name: string; email: string; compan
     html: `
       <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
         <div style="text-align:center;margin-bottom:28px">
-          <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="130" style="width:130px;max-width:130px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
+          <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="160" style="width:160px;max-width:160px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
         </div>
         <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${escapeHtml(firstName)}, your demo ends in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}.</h1>
         <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
@@ -1680,7 +1680,7 @@ function buildTrialExpiredEmail(prospect: { name: string; email: string; company
     html: `
       <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
         <div style="text-align:center;margin-bottom:28px">
-          <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="130" style="width:130px;max-width:130px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
+          <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="160" style="width:160px;max-width:160px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
         </div>
         <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${escapeHtml(firstName)}, your 30-day demo has ended.</h1>
         <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">

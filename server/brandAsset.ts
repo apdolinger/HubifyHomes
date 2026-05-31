@@ -21,6 +21,12 @@ export const HUBIFY_HOMES_EMAIL_LOGO_V2_PATH = path.join(
   "hubify-homes-logo-email-v2.png",
 );
 
+export const HUBIFY_HOMES_EMAIL_LOGO_V3_PATH = path.join(
+  ROOT,
+  "attached_assets",
+  "hubify-homes-logo-email-v3.png",
+);
+
 export function getHubifyHomesLogoBuffer(): Buffer | null {
   try {
     return fs.readFileSync(HUBIFY_HOMES_LOGO_PATH);
@@ -66,13 +72,14 @@ export function getHubifyHomesLogoUrl(): string {
 /**
  * Returns the URL for the email-optimised logo.
  *
- * Uses hubify-homes-logo-email-v2.png (cache-busted filename).
+ * Uses hubify-homes-logo-email-v3.png: transparent background, tight crop,
+ * 320×64 px (2× retina), displayed at 160 px wide in email templates.
  *
  * Priority:
  *  1. EMAIL_LOGO_URL env var — explicit override
- *  2. https://hubifyhomesonline.com/hubify-homes-logo-email-v2.png
+ *  2. https://hubifyhomesonline.com/hubify-homes-logo-email-v3.png
  */
 export function getHubifyHomesEmailLogoUrl(): string {
   if (process.env.EMAIL_LOGO_URL) return process.env.EMAIL_LOGO_URL;
-  return "https://hubifyhomesonline.com/hubify-homes-logo-email-v2.png";
+  return "https://hubifyhomesonline.com/hubify-homes-logo-email-v3.png";
 }
