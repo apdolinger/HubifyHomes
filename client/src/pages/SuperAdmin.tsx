@@ -139,6 +139,7 @@ interface Prospect {
   suggestedTier: string | null;
   trialIntent: string | null;
   preferredContactMethod: string | null;
+  betaDiscountTier: string | null;
   submissionStatus: string | null;
   confirmationEmailSentAt: string | null;
   confirmationEmailStatus: string | null;
@@ -280,6 +281,27 @@ function ProspectCard({
           {days}d{stuck ? " ⚠" : ""}
         </Badge>
       </div>
+
+      {(prospect.trialIntent === "beta_application" || prospect.source === "beta_application") && (
+        <div className="flex flex-wrap gap-1">
+          <Badge className="bg-violet-100 text-violet-800 border border-violet-200 text-xs px-1.5 py-0.5 font-semibold">
+            Beta
+          </Badge>
+          {prospect.betaDiscountTier && (
+            <Badge
+              className={`text-xs px-1.5 py-0.5 border font-medium ${
+                prospect.betaDiscountTier === "founding_10"
+                  ? "bg-teal-100 text-teal-800 border-teal-200"
+                  : "bg-indigo-100 text-indigo-800 border-indigo-200"
+              }`}
+            >
+              {prospect.betaDiscountTier === "founding_10"
+                ? "Founding 10 — 50% off"
+                : "Early Access 10 — 25% off"}
+            </Badge>
+          )}
+        </div>
+      )}
 
       {prospect.confirmationEmailStatus && prospect.confirmationEmailStatus !== "sent" && !DEMO_STAGES_SET.has(prospect.stage) && (
         <button
@@ -1196,7 +1218,17 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
       toast({ title: "Prospect advanced" });
     },
-    onError: () => toast({ title: "Error", description: "Failed to advance prospect", variant: "destructive" }),
+    onError: (error: Error) => {
+      let description = "Failed to advance prospect";
+      try {
+        const jsonPart = error.message.replace(/^\d+:\s*/, "");
+        const body = JSON.parse(jsonPart);
+        if (body?.message) description = body.message;
+      } catch {
+        if (error?.message) description = error.message;
+      }
+      toast({ title: "Error", description, variant: "destructive" });
+    },
   });
 
   const dropMutation = useMutation({
