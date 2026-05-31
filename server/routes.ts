@@ -15934,6 +15934,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         prospectSource = "get_started";
       }
 
+      // Beta application deduplication: reject if a non-dropped application
+      // with the same email already exists.
+      if (intent === "beta_application") {
+        const { ilike: ilikeOp } = await import("drizzle-orm");
+        const existing = await db
+          .select({ id: onboardingProspects.id })
+          .from(onboardingProspects)
+          .where(
+            and(
+              ilikeOp(onboardingProspects.email, data.email),
+              eq(onboardingProspects.source, "beta_application"),
+              ne(onboardingProspects.stage, "dropped")
+            )
+          )
+          .limit(1);
+        if (existing.length > 0) {
+          return res.status(409).json({
+            message: "We already have your application on file. Our team will be in touch soon.",
+          });
+        }
+      }
+
       const processedNotes = data.notes ?? null;
 
       const prospect = await storage.createOnboardingProspect({
