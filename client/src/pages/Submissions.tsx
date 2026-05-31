@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { SubmissionForm, type SubmissionIntent } from "@/components/SubmissionForm";
+import { useEmbedResize } from "@/lib/embedResize";
 import { HUBIFY_HOMES_LOGO_URL, HUBIFY_HOMES_LOGO_ALT } from "@/lib/brand";
 
 const VALID_INTENTS = new Set<string>([
@@ -31,6 +32,7 @@ function useQueryParams() {
 
 export default function Submissions() {
   const { embed, intent } = useQueryParams();
+  useEmbedResize();
 
   useEffect(() => {
     if (!embed) return;

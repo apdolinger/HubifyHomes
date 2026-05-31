@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useEmbedResize } from "@/lib/embedResize";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -194,6 +195,7 @@ function SuccessState({ embed }: { embed: boolean }) {
 }
 
 export default function Contact() {
+  useEmbedResize();
   const [submitted, setSubmitted] = useState(false);
   const embed = useEmbedMode();
 

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useEmbedResize } from "@/lib/embedResize";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -116,6 +117,7 @@ const contactModalSchema = z.object({
 type ContactModalValues = z.infer<typeof contactModalSchema>;
 
 function ContactVariantForm({ onSuccess, compact }: { onSuccess?: () => void; compact?: boolean }) {
+  useEmbedResize();
   const [submitted, setSubmitted] = useState(false);
 
   const form = useForm<ContactModalValues>({
@@ -258,6 +260,7 @@ const BETA_TIERS = [
 ];
 
 function BetaVariantForm({ onSuccess, compact }: { onSuccess?: () => void; compact?: boolean }) {
+  useEmbedResize();
   const [submitted, setSubmitted] = useState(false);
 
   const form = useForm<BetaValues>({
@@ -462,6 +465,7 @@ function FullInquiryForm({
   compact?: boolean;
   initialIntent?: SubmissionIntent;
 }) {
+  useEmbedResize();
   const [submitted, setSubmitted] = useState(false);
   const isDemo = initialIntent === "need_demo";
   const isPricing = !!initialIntent && PRICING_INTENTS.has(initialIntent);
