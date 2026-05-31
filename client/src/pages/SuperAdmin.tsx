@@ -1512,7 +1512,7 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
             onClick={() => setBetaOnly(v => !v)}
             className={betaOnly ? "bg-indigo-600 hover:bg-indigo-700 text-white" : ""}
           >
-            <Filter className="w-4 h-4 mr-2" /> Beta only
+            <Filter className="w-4 h-4 mr-2" /> Beta only ({allProspects.filter(p => p.stage !== "dropped" && (p.trialIntent === "beta_application" || p.source === "beta_application")).length})
           </Button>
           <Button onClick={openCreate}>
             <Plus className="w-4 h-4 mr-2" /> Add Prospect
