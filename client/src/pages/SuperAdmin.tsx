@@ -2061,11 +2061,11 @@ function BetaPricingCard() {
     queryKey: ["/api/super-admin/beta-pricing"],
   });
 
-  const { data: allProspects = [] } = useQuery<Prospect[]>({
-    queryKey: ["/api/super-admin/onboarding-prospects"],
+  // Server-driven counts use isBetaMember flag — survives stage changes (Task #208)
+  const { data: betaStatus } = useQuery<BetaStatus>({
+    queryKey: ["/api/public/beta-status"],
+    staleTime: 30_000,
   });
-
-  const welcomeCount = allProspects.filter(p => p.stage === "welcome").length;
 
   const [basePrice, setBasePrice] = useState(199);
   const [tier1DiscountPct, setTier1DiscountPct] = useState(50);
@@ -2083,19 +2083,24 @@ function BetaPricingCard() {
     }
   }, [saved]);
 
+  // Local totalCap mirrors the editable inputs — used for the cap fields and remaining preview
   const totalCap = tier1Cap + tier2Cap;
-  const inTier1 = welcomeCount < tier1Cap;
-  const inTier2 = !inTier1 && welcomeCount < totalCap;
-  const isBetaOpen = welcomeCount < totalCap;
+
+  // Filled counts always from server (isBetaMember = true, betaRemovedAt IS NULL)
+  const tier1Filled = betaStatus?.tier1Filled ?? 0;
+  const tier2Filled = betaStatus?.tier2Filled ?? 0;
+  // Remaining computed against local (possibly unsaved) cap so admin can preview impact
+  const tier1Remaining = Math.max(0, tier1Cap - tier1Filled);
+  const tier2Remaining = Math.max(0, tier2Cap - tier2Filled);
+
+  // Open/closed and active-tier display use server state (saved caps + isBetaMember counts)
+  const isBetaOpen = betaStatus?.open ?? true;
+  const inTier1 = (betaStatus?.tier1Remaining ?? tier1Cap) > 0;
+  const inTier2 = !inTier1 && (betaStatus?.tier2Remaining ?? tier2Cap) > 0;
   const currentDiscountPct = inTier1 ? tier1DiscountPct : inTier2 ? tier2DiscountPct : 0;
   const effectivePrice = isBetaOpen
     ? Math.round(basePrice * (1 - currentDiscountPct / 100) * 100) / 100
     : basePrice;
-
-  const tier1Filled = Math.min(welcomeCount, tier1Cap);
-  const tier2Filled = Math.max(0, Math.min(welcomeCount - tier1Cap, tier2Cap));
-  const tier1Remaining = Math.max(0, tier1Cap - tier1Filled);
-  const tier2Remaining = Math.max(0, tier2Cap - tier2Filled);
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -2229,9 +2234,9 @@ function BetaPricingCard() {
             : `Standard price: $${basePrice.toFixed(2)}/mo — beta program full`}
         </p>
         <p className="text-xs text-gray-500 mt-1">
-          {welcomeCount} of {totalCap} total beta spot{totalCap !== 1 ? "s" : ""} filled
+          {betaStatus?.activeBetaCount ?? 0} of {betaStatus?.totalCap ?? totalCap} total beta spot{(betaStatus?.totalCap ?? totalCap) !== 1 ? "s" : ""} filled
           {isBetaOpen
-            ? ` · ${totalCap - welcomeCount} spot${totalCap - welcomeCount !== 1 ? "s" : ""} remaining`
+            ? ` · ${betaStatus?.totalRemaining ?? 0} spot${(betaStatus?.totalRemaining ?? 0) !== 1 ? "s" : ""} remaining`
             : " · Beta is now closed"}
         </p>
         {!isBetaOpen && (
