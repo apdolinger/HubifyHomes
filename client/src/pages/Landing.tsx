@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building, Users, CheckSquare, BarChart3, Menu, X, Star, MessageCircle, ChevronRight, Sparkles } from "lucide-react";
@@ -65,6 +66,124 @@ const FEATURES = [
     description: "Get real-time insights into your property operations and team performance",
   },
 ];
+
+interface BetaStatusData {
+  open: boolean;
+  activeBetaCount: number;
+  totalCap: number;
+  totalRemaining: number;
+  tier1Filled: number;
+  tier1Cap: number;
+  tier1Remaining: number;
+  tier2Filled: number;
+  tier2Cap: number;
+  tier2Remaining: number;
+}
+
+function TierFillBar({ filled, cap }: { filled: number; cap: number }) {
+  const pct = cap > 0 ? Math.min(100, Math.round((filled / cap) * 100)) : 0;
+  return (
+    <div className="w-full bg-white/20 rounded-full h-1.5 mt-2 mb-1">
+      <div
+        className="bg-white/70 h-1.5 rounded-full transition-all duration-500"
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
+}
+
+function BetaSection({ onApply }: { onApply: () => void }) {
+  const { data, isError, isLoading } = useQuery<BetaStatusData>({
+    queryKey: ["/api/public/beta-status"],
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const tier1Full = data ? data.tier1Remaining === 0 : false;
+  const tier2Full = data ? data.tier2Remaining === 0 : false;
+  const betaFull  = data ? !data.open : false;
+
+  return (
+    <div className="py-16 border-t border-slate-200">
+      <div className="max-w-3xl mx-auto">
+        <div className="bg-gradient-to-r from-teal-600 to-teal-500 rounded-2xl p-8 sm:p-12 text-white text-center shadow-lg">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Sparkles className="w-5 h-5 text-teal-200" />
+            <span className="text-teal-100 text-sm font-semibold uppercase tracking-widest">Founding Beta Program</span>
+            <Sparkles className="w-5 h-5 text-teal-200" />
+          </div>
+          <h2 className="text-3xl font-bold mb-4">Lock In Your Founding Discount</h2>
+          <p className="text-teal-100 text-lg mb-6 max-w-xl mx-auto leading-relaxed">
+            We're accepting a small group of founding members who get lifetime pricing discounts in exchange for early feedback.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
+            {/* ── Tier 1: Founding 10 ── */}
+            <div className={`bg-white/15 rounded-xl px-6 py-4 text-center transition-opacity duration-300 ${tier1Full ? "opacity-60" : ""}`}>
+              <div className="flex items-center justify-center gap-1 mb-1">
+                <Star className="w-4 h-4 text-yellow-300 fill-yellow-300" />
+                <span className="text-sm font-bold text-white">Founding 10</span>
+              </div>
+              <div className="text-2xl font-extrabold text-white">50% off</div>
+              <div className="text-teal-200 text-xs mt-0.5">price locked for life</div>
+              {data && (
+                <>
+                  <TierFillBar filled={data.tier1Filled} cap={data.tier1Cap} />
+                  <p className="text-teal-100 text-xs">
+                    {tier1Full
+                      ? "Full"
+                      : `${data.tier1Filled} of ${data.tier1Cap} filled · ${data.tier1Remaining} left`}
+                  </p>
+                </>
+              )}
+            </div>
+
+            {/* ── Tier 2: Early Access 10 ── */}
+            <div className={`bg-white/10 rounded-xl px-6 py-4 text-center transition-opacity duration-300 ${tier2Full ? "opacity-60" : ""}`}>
+              <div className="text-sm font-bold text-teal-100 mb-1">Early Access 10</div>
+              <div className="text-2xl font-extrabold text-white">25% off</div>
+              <div className="text-teal-200 text-xs mt-0.5">price locked for life</div>
+              {data && (
+                <>
+                  <TierFillBar filled={data.tier2Filled} cap={data.tier2Cap} />
+                  <p className="text-teal-100 text-xs">
+                    {tier2Full
+                      ? "Full"
+                      : `${data.tier2Filled} of ${data.tier2Cap} filled · ${data.tier2Remaining} left`}
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+
+          {betaFull ? (
+            <p className="text-white/70 text-base font-medium italic">Beta Program Is Currently Full</p>
+          ) : (
+            <Button
+              onClick={onApply}
+              size="lg"
+              className="bg-white text-teal-700 hover:bg-teal-50 font-bold px-8"
+            >
+              Apply for Beta Access
+            </Button>
+          )}
+
+          <p className="text-teal-200 text-xs mt-4">
+            {data ? (
+              data.open
+                ? `${data.activeBetaCount} of ${data.totalCap} spots filled — ${data.totalRemaining} remaining · No credit card required`
+                : `All ${data.totalCap} beta spots are filled · No credit card required`
+            ) : isLoading ? (
+              <span className="inline-block bg-white/10 rounded animate-pulse w-56 h-3 align-middle" />
+            ) : isError ? (
+              "Limited spots available · No credit card required"
+            ) : null}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Landing() {
   const [isSubmitOpen, setIsSubmitOpen] = useState(false);
@@ -260,44 +379,7 @@ export default function Landing() {
         </div>
 
         {/* ── Beta Program ─────────────────────────────────────────────────── */}
-        <div className="py-16 border-t border-slate-200">
-          <div className="max-w-3xl mx-auto">
-            <div className="bg-gradient-to-r from-teal-600 to-teal-500 rounded-2xl p-8 sm:p-12 text-white text-center shadow-lg">
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <Sparkles className="w-5 h-5 text-teal-200" />
-                <span className="text-teal-100 text-sm font-semibold uppercase tracking-widest">Founding Beta Program</span>
-                <Sparkles className="w-5 h-5 text-teal-200" />
-              </div>
-              <h2 className="text-3xl font-bold mb-4">Lock In Your Founding Discount</h2>
-              <p className="text-teal-100 text-lg mb-6 max-w-xl mx-auto leading-relaxed">
-                We're accepting a small group of founding members who get lifetime pricing discounts in exchange for early feedback.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-                <div className="bg-white/15 rounded-xl px-6 py-4 text-center">
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <Star className="w-4 h-4 text-yellow-300 fill-yellow-300" />
-                    <span className="text-sm font-bold text-white">Founding 10</span>
-                  </div>
-                  <div className="text-2xl font-extrabold text-white">50% off</div>
-                  <div className="text-teal-200 text-xs mt-0.5">price locked for life</div>
-                </div>
-                <div className="bg-white/10 rounded-xl px-6 py-4 text-center">
-                  <div className="text-sm font-bold text-teal-100 mb-1">Early Access 10</div>
-                  <div className="text-2xl font-extrabold text-white">25% off</div>
-                  <div className="text-teal-200 text-xs mt-0.5">price locked for life</div>
-                </div>
-              </div>
-              <Button
-                onClick={() => setIsBetaOpen(true)}
-                size="lg"
-                className="bg-white text-teal-700 hover:bg-teal-50 font-bold px-8"
-              >
-                Apply for Beta Access
-              </Button>
-              <p className="text-teal-200 text-xs mt-4">Limited spots available · No credit card required</p>
-            </div>
-          </div>
-        </div>
+        <BetaSection onApply={() => setIsBetaOpen(true)} />
 
         {/* ── Marketing site link ───────────────────────────────────────────── */}
         <div className="text-center py-8 border-t border-slate-200">
