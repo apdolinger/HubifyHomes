@@ -12,7 +12,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { ObjectStorageService } from "./objectStorage";
 import { importSampleData } from "./import-data";
 import { getBrandingLevel, enforceBrandingPolicy, getBrandingCapabilities } from "./branding";
-import { getHubifyHomesLogoUrl } from "./brandAsset";
+import { getHubifyHomesLogoUrl, HUBIFY_HOMES_LOGO_PATH } from "./brandAsset";
 import { 
   AuditLogger, 
   MFAEnforcement, 
@@ -931,6 +931,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
   
+  // Serve Hubify Homes logo (used in transactional emails — must be publicly reachable)
+  app.get('/hubify-homes-logo.png', (_req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.sendFile(HUBIFY_HOMES_LOGO_PATH);
+  });
+
   // Serve uploaded photos
   app.use('/uploads', (req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
