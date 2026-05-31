@@ -3409,6 +3409,8 @@ export const onboardingProspects = pgTable("onboarding_prospects", {
   demoEmailSentAt: timestamp("demo_email_sent_at"),
   demoEmailError: text("demo_email_error"),
   convertedAt: timestamp("converted_at"),
+  betaDiscountTier: varchar("beta_discount_tier").$type<"founding_10" | "early_access_10">(),
+  betaRemovedAt: timestamp("beta_removed_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [

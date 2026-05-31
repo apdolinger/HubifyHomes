@@ -223,7 +223,7 @@ app.use((req, res, next) => {
     // Without this the dispatcher logs an error on every task mutation in
     // environments where the webhook integration was never provisioned.
     try {
-      const { ensureWebhookTables, ensureCookieConsentPreferenceColumn, ensureOnboardingProspectsTable, ensureInvoiceReceiptColumns, ensureOrgSignupTokensTable, ensureErrorLogsTable, ensureDiscountCodeUsagesTable, ensureProspectDiscountCodeColumn, ensureStaffPasswordHashColumn, ensureSubmissionColumns, ensureProspectConfirmationEmailTemplateTable, ensureTrialColumns, ensureProspectConfirmationEmailColumns, ensureOrganizationServicesTable, ensureDemoProspectColumns, ensureOrgSetupProgressTable, ensureProspectConvertedAtColumn, ensurePropertyServiceAssignmentsTable } = await import('./runMigrations.js');
+      const { ensureWebhookTables, ensureCookieConsentPreferenceColumn, ensureOnboardingProspectsTable, ensureInvoiceReceiptColumns, ensureOrgSignupTokensTable, ensureErrorLogsTable, ensureDiscountCodeUsagesTable, ensureProspectDiscountCodeColumn, ensureStaffPasswordHashColumn, ensureSubmissionColumns, ensureProspectConfirmationEmailTemplateTable, ensureTrialColumns, ensureProspectConfirmationEmailColumns, ensureOrganizationServicesTable, ensureDemoProspectColumns, ensureOrgSetupProgressTable, ensureProspectConvertedAtColumn, ensurePropertyServiceAssignmentsTable, ensureBetaProspectColumns } = await import('./runMigrations.js');
       try {
         await ensureWebhookTables();
       } catch (err) {
@@ -319,6 +319,11 @@ app.use((req, res, next) => {
         await ensurePropertyServiceAssignmentsTable();
       } catch (err) {
         console.error('Error ensuring property_service_assignments table:', err);
+      }
+      try {
+        await ensureBetaProspectColumns();
+      } catch (err) {
+        console.error('Error ensuring beta columns on onboarding_prospects:', err);
       }
     } catch (error) {
       console.error('Error loading startup migrations:', error);

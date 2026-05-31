@@ -1921,9 +1921,6 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
         </SheetContent>
       </Sheet>
 
-      {/* Beta pricing configuration */}
-      <BetaPricingCard />
-
       {/* Stage email templates configuration */}
       <StageEmailTemplatesPanel />
 
@@ -2195,6 +2192,226 @@ function BetaPricingCard() {
             : "Save Pricing"}
         </Button>
       </div>
+    </div>
+  );
+}
+
+// ── Beta Program Tab ─────────────────────────────────────────────────────────
+
+type BetaMember = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  company: string | null;
+  betaDiscountTier: string | null;
+  createdAt: string | null;
+  stage: string | null;
+};
+
+type BetaStatus = {
+  open: boolean;
+  activeBetaCount: number;
+  tier1Filled: number;
+  tier1Cap: number;
+  tier1Remaining: number;
+  tier2Filled: number;
+  tier2Cap: number;
+  tier2Remaining: number;
+  totalCap: number;
+  totalRemaining: number;
+};
+
+function BetaProgramTab() {
+  const { toast } = useToast();
+  const [removeTarget, setRemoveTarget] = useState<BetaMember | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<BetaMember | null>(null);
+
+  const { data: betaStatus, isLoading: statusLoading } = useQuery<BetaStatus>({
+    queryKey: ["/api/public/beta-status"],
+    staleTime: 30_000,
+  });
+
+  const { data: betaMembers = [], isLoading: membersLoading, refetch } = useQuery<BetaMember[]>({
+    queryKey: ["/api/super-admin/beta-members"],
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("PATCH", `/api/super-admin/beta-members/${id}/remove`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/beta-members"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/public/beta-status"] });
+      setRemoveTarget(null);
+      toast({ title: "Beta slot freed", description: "The member has been moved back to inquiry stage." });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to remove beta member.", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/super-admin/beta-members/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/beta-members"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/public/beta-status"] });
+      setDeleteTarget(null);
+      toast({ title: "Beta member deleted" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to delete beta member.", variant: "destructive" }),
+  });
+
+  const tierLabel = (tier: string | null) => {
+    if (tier === "founding_10") return { text: "Founding 10 — 50% off", cls: "bg-teal-100 text-teal-800 border-teal-200" };
+    if (tier === "early_access_10") return { text: "Early Access 10 — 25% off", cls: "bg-indigo-100 text-indigo-800 border-indigo-200" };
+    return { text: "Unassigned", cls: "bg-gray-100 text-gray-600 border-gray-200" };
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Slot Summary */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white border rounded-xl p-4 text-center">
+          <p className="text-2xl font-bold text-slate-800">
+            {statusLoading ? "…" : `${betaStatus?.activeBetaCount ?? 0} / ${betaStatus?.totalCap ?? 20}`}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1 font-medium uppercase tracking-wide">Total Slots Used</p>
+          <p className="text-xs text-muted-foreground">{betaStatus?.totalRemaining ?? "—"} remaining</p>
+        </div>
+        <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 text-center">
+          <p className="text-2xl font-bold text-teal-800">
+            {statusLoading ? "…" : `${betaStatus?.tier1Filled ?? 0} / ${betaStatus?.tier1Cap ?? 10}`}
+          </p>
+          <p className="text-xs text-teal-700 mt-1 font-medium uppercase tracking-wide">Founding 10</p>
+          <p className="text-xs text-teal-600">50% off · {betaStatus?.tier1Remaining ?? "—"} left</p>
+        </div>
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-center">
+          <p className="text-2xl font-bold text-indigo-800">
+            {statusLoading ? "…" : `${betaStatus?.tier2Filled ?? 0} / ${betaStatus?.tier2Cap ?? 10}`}
+          </p>
+          <p className="text-xs text-indigo-700 mt-1 font-medium uppercase tracking-wide">Early Access 10</p>
+          <p className="text-xs text-indigo-600">25% off · {betaStatus?.tier2Remaining ?? "—"} left</p>
+        </div>
+      </div>
+
+      {/* Beta Pricing Configuration */}
+      <BetaPricingCard />
+
+      {/* Beta Members Table */}
+      <div className="bg-white border rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-slate-900">Active Beta Members</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Approved beta applicants holding a discounted slot</p>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => refetch()}>
+            <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh
+          </Button>
+        </div>
+
+        {membersLoading ? (
+          <div className="py-12 text-center text-muted-foreground text-sm">Loading…</div>
+        ) : betaMembers.length === 0 ? (
+          <div className="py-12 text-center text-muted-foreground text-sm">
+            No approved beta members yet. Approve a beta applicant in the Onboarding pipeline to assign a slot.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Tier</TableHead>
+                  <TableHead>Approved</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {betaMembers.map((member) => {
+                  const tl = tierLabel(member.betaDiscountTier);
+                  return (
+                    <TableRow key={member.id}>
+                      <TableCell className="font-medium text-slate-900">{member.name ?? "—"}</TableCell>
+                      <TableCell className="text-slate-600 text-sm">{member.email ?? "—"}</TableCell>
+                      <TableCell className="text-slate-600 text-sm">{member.company ?? "—"}</TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full border ${tl.cls}`}>
+                          {tl.text}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-slate-500 text-sm">
+                        {member.createdAt ? new Date(member.createdAt).toLocaleDateString() : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-orange-600 border-orange-200 hover:bg-orange-50 text-xs"
+                            onClick={() => setRemoveTarget(member)}
+                          >
+                            Free Slot
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 border-red-200 hover:bg-red-50 text-xs"
+                            onClick={() => setDeleteTarget(member)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+
+      {/* Free Slot Dialog */}
+      <Dialog open={!!removeTarget} onOpenChange={() => setRemoveTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Free Beta Slot</DialogTitle>
+            <DialogDescription>
+              This will move <strong>{removeTarget?.name}</strong> back to inquiry stage and free their slot for a new applicant. Their record is preserved.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoveTarget(null)}>Cancel</Button>
+            <Button
+              className="bg-orange-600 hover:bg-orange-700"
+              onClick={() => removeTarget && removeMutation.mutate(removeTarget.id)}
+              disabled={removeMutation.isPending}
+            >
+              {removeMutation.isPending ? <><RefreshCw className="w-3 h-3 mr-1.5 animate-spin" />Freeing…</> : "Free Slot"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-red-700">Delete Beta Member</DialogTitle>
+            <DialogDescription>
+              This permanently deletes <strong>{deleteTarget?.name}</strong> and frees their slot. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? <><RefreshCw className="w-3 h-3 mr-1.5 animate-spin" />Deleting…</> : "Delete Permanently"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -8475,6 +8692,9 @@ export default function SuperAdmin() {
               </span>
             )}
           </TabsTrigger>
+          <TabsTrigger value="beta" className="relative data-[state=active]:bg-teal-600 data-[state=active]:text-white">
+            Beta
+          </TabsTrigger>
           <TabsTrigger value="demo" className="relative data-[state=active]:bg-teal-600 data-[state=active]:text-white">
             <MonitorPlay className="w-3.5 h-3.5 mr-1.5" />
             Demo
@@ -8603,6 +8823,11 @@ export default function SuperAdmin() {
         {/* Platform Tab */}
         <TabsContent value="platform">
           <TemplateManagement />
+        </TabsContent>
+
+        {/* Beta Program Tab */}
+        <TabsContent value="beta">
+          <BetaProgramTab />
         </TabsContent>
 
         {/* Demo Tenant Tab */}

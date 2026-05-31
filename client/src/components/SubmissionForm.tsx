@@ -3,7 +3,7 @@ import { useEmbedResize } from "@/lib/embedResize";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -232,36 +232,31 @@ const betaSchema = z.object({
   email: z.string().email("A valid email is required"),
   company: z.string().min(1, "Organization name is required"),
   estimatedHomes: z.coerce.number().min(1).optional(),
-  betaTierInterest: z.enum(["founding_10", "early_access_10"], {
-    required_error: "Please select a beta tier",
-    invalid_type_error: "Please select a beta tier",
-  }),
   notes: z.string().optional(),
 });
 type BetaValues = z.infer<typeof betaSchema>;
 
-const BETA_TIERS = [
-  {
-    value: "founding_10" as const,
-    label: "Founding 10",
-    discount: "50% off",
-    description: "First 10 founding members — price locked for life",
-    color: "border-teal-500 bg-teal-600 text-white",
-    inactiveColor: "border-slate-200 bg-white text-slate-700 hover:border-teal-400 hover:bg-teal-50",
-  },
-  {
-    value: "early_access_10" as const,
-    label: "Early Access 10",
-    discount: "25% off",
-    description: "Next 10 approved members — price locked for life",
-    color: "border-teal-500 bg-teal-600 text-white",
-    inactiveColor: "border-slate-200 bg-white text-slate-700 hover:border-teal-400 hover:bg-teal-50",
-  },
-];
+type BetaStatus = {
+  open: boolean;
+  activeBetaCount: number;
+  tier1Filled: number;
+  tier1Cap: number;
+  tier1Remaining: number;
+  tier2Filled: number;
+  tier2Cap: number;
+  tier2Remaining: number;
+  totalCap: number;
+  totalRemaining: number;
+};
 
 function BetaVariantForm({ onSuccess, compact }: { onSuccess?: () => void; compact?: boolean }) {
   useEmbedResize();
   const [submitted, setSubmitted] = useState(false);
+
+  const { data: betaStatus } = useQuery<BetaStatus>({
+    queryKey: ["/api/public/beta-status"],
+    staleTime: 30_000,
+  });
 
   const form = useForm<BetaValues>({
     resolver: zodResolver(betaSchema),
@@ -271,7 +266,6 @@ function BetaVariantForm({ onSuccess, compact }: { onSuccess?: () => void; compa
       email: "",
       company: "",
       estimatedHomes: undefined as unknown as number,
-      betaTierInterest: undefined as unknown as "founding_10",
       notes: "",
     },
   });
@@ -298,6 +292,26 @@ function BetaVariantForm({ onSuccess, compact }: { onSuccess?: () => void; compa
 
   if (submitted) return <SuccessMessage type="beta" />;
 
+  if (betaStatus && !betaStatus.open) {
+    return (
+      <div className="py-10 px-4 text-center space-y-4">
+        <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mx-auto">
+          <Star className="w-7 h-7 text-slate-400" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-800">Beta Program Is Currently Full</h2>
+        <p className="text-slate-500 text-sm max-w-sm mx-auto leading-relaxed">
+          All {betaStatus.totalCap} beta spots have been filled. We'll announce when new spots become available — follow us to stay in the loop.
+        </p>
+        <a
+          href="mailto:contact@hubifyhomesonline.com"
+          className="inline-block text-sm text-teal-600 underline underline-offset-2"
+        >
+          Contact us to join the waitlist
+        </a>
+      </div>
+    );
+  }
+
   return (
     <Form {...form}>
       <form
@@ -310,43 +324,20 @@ function BetaVariantForm({ onSuccess, compact }: { onSuccess?: () => void; compa
           </div>
         )}
 
-        <div>
-          <SectionHeader icon={Star} title="Beta Tier Selection" />
-          <FormField
-            control={form.control}
-            name="betaTierInterest"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Which beta tier are you applying for? *</FormLabel>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
-                  {BETA_TIERS.map((tier) => {
-                    const isSelected = field.value === tier.value;
-                    return (
-                      <button
-                        key={tier.value}
-                        type="button"
-                        onClick={() => field.onChange(tier.value)}
-                        className={`p-4 rounded-xl border-2 text-left transition-colors ${
-                          isSelected ? tier.color : tier.inactiveColor
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-semibold text-sm">{tier.label}</span>
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                            isSelected ? "bg-white/20 text-white" : "bg-teal-100 text-teal-700"
-                          }`}>{tier.discount}</span>
-                        </div>
-                        <p className={`text-xs leading-snug ${isSelected ? "text-white/80" : "text-slate-500"}`}>
-                          {tier.description}
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+        {/* Auto-assignment notice */}
+        <div className="flex items-start gap-3 p-4 bg-teal-50 border border-teal-200 rounded-xl">
+          <Star className="w-4 h-4 text-teal-600 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-teal-800">Beta discounts are automatically assigned</p>
+            <p className="text-xs text-teal-700 mt-0.5 leading-relaxed">
+              Your discount tier will be confirmed at the time of approval based on slot availability.
+              {betaStatus && (
+                <span className="ml-1 font-medium">
+                  ({betaStatus.totalRemaining} of {betaStatus.totalCap} spots remaining)
+                </span>
+              )}
+            </p>
+          </div>
         </div>
 
         <div>

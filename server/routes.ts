@@ -102,7 +102,7 @@ import {
 import { z } from "zod";
 import { createSetupIntentForClient, detachPaymentMethod, createPortalPayIntentForInvoice, chargeInvoice } from "./stripe";
 import { db } from "./db";
-import { eq, lt, and, desc, inArray, count } from "drizzle-orm";
+import { eq, lt, and, desc, inArray, count, ne, isNull } from "drizzle-orm";
 import { Resend } from "resend";
 import { dispatchWebhookEvent, sendTestWebhookEvent, validateWebhookUrlSafe } from "./webhookDispatcher";
 import { seedDemoTenant, resetDemoTenant, DEMO_ORG_ID, DEMO_DOMAIN, DEMO_ADMIN_EMAIL } from "./demoSeed";
@@ -4046,6 +4046,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating beta pricing:", error);
       res.status(500).json({ message: "Failed to update beta pricing" });
+    }
+  });
+
+  // ── Beta Member Management (Super Admin) ─────────────────────────────────
+
+  // GET /api/super-admin/beta-members — list active approved beta members
+  app.get("/api/super-admin/beta-members", isSuperAdmin, requireMFA, async (_req, res) => {
+    try {
+      const members = await db
+        .select()
+        .from(onboardingProspects)
+        .where(
+          and(
+            eq(onboardingProspects.stage, "welcome"),
+            eq(onboardingProspects.source, "beta_application"),
+            isNull(onboardingProspects.betaRemovedAt)
+          )
+        )
+        .orderBy(onboardingProspects.createdAt);
+      res.json(members);
+    } catch (error) {
+      console.error("Error fetching beta members:", error);
+      res.status(500).json({ message: "Failed to fetch beta members" });
+    }
+  });
+
+  // PATCH /api/super-admin/beta-members/:id/remove — free the slot (soft-remove)
+  app.patch("/api/super-admin/beta-members/:id/remove", isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const prospect = await storage.getOnboardingProspect(id);
+      if (!prospect) return res.status(404).json({ message: "Beta member not found" });
+
+      const updated = await storage.updateOnboardingProspect(id, {
+        betaRemovedAt: new Date(),
+        stage: "inquiry",
+      } as any);
+
+      await AuditLogger.log({
+        req,
+        action: "remove_beta_member",
+        actionType: "update",
+        resource: "onboarding_prospect",
+        resourceId: id,
+        severity: "info",
+        success: true,
+        metadata: { name: prospect.name, email: prospect.email },
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error removing beta member:", error);
+      res.status(500).json({ message: "Failed to remove beta member" });
+    }
+  });
+
+  // DELETE /api/super-admin/beta-members/:id — hard delete (also frees slot)
+  app.delete("/api/super-admin/beta-members/:id", isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const prospect = await storage.getOnboardingProspect(id);
+      if (!prospect) return res.status(404).json({ message: "Beta member not found" });
+
+      await storage.deleteOnboardingProspect(id);
+
+      await AuditLogger.log({
+        req,
+        action: "delete_beta_member",
+        actionType: "delete",
+        resource: "onboarding_prospect",
+        resourceId: id,
+        severity: "warning",
+        success: true,
+        metadata: { name: prospect.name, email: prospect.email },
+      });
+
+      res.json({ message: "Beta member deleted" });
+    } catch (error) {
+      console.error("Error deleting beta member:", error);
+      res.status(500).json({ message: "Failed to delete beta member" });
     }
   });
 
@@ -15504,6 +15584,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ── Public inquiry form (no auth) ────────────────────────────────────────
+
+  // Public: beta program slot status (no auth required)
+  app.get("/api/public/beta-status", async (_req, res) => {
+    try {
+      const settings = await storage.getPlatformSettings();
+      const bp = settings.betaPricing as any | undefined;
+      const tier1Cap = Number(bp?.tier1Cap ?? 10);
+      const tier2Cap = Number(bp?.tier2Cap ?? 10);
+      const totalCap = tier1Cap + tier2Cap;
+
+      const [{ activeBetaCount }] = await db
+        .select({ activeBetaCount: count() })
+        .from(onboardingProspects)
+        .where(
+          and(
+            eq(onboardingProspects.stage, "welcome"),
+            eq(onboardingProspects.source, "beta_application"),
+            isNull(onboardingProspects.betaRemovedAt)
+          )
+        );
+
+      const tier1Filled = Math.min(activeBetaCount, tier1Cap);
+      const tier2Filled = Math.max(0, Math.min(activeBetaCount - tier1Cap, tier2Cap));
+
+      res.json({
+        open: activeBetaCount < totalCap,
+        activeBetaCount,
+        tier1Filled,
+        tier1Cap,
+        tier1Remaining: Math.max(0, tier1Cap - tier1Filled),
+        tier2Filled,
+        tier2Cap,
+        tier2Remaining: Math.max(0, tier2Cap - tier2Filled),
+        totalCap,
+        totalRemaining: Math.max(0, totalCap - activeBetaCount),
+      });
+    } catch (error) {
+      console.error("Error fetching beta status:", error);
+      res.status(500).json({ message: "Failed to fetch beta status" });
+    }
+  });
+
   // Public: current effective pricing (no auth required)
   app.get("/api/public/pricing", async (_req, res) => {
     try {
@@ -15749,7 +15871,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         teamSize: z.coerce.number().optional(),
         trialIntent: z.string().optional(),
         notes: z.string().optional(),
-        betaTierInterest: z.string().optional(),
       });
       const result = submissionSchema.safeParse(req.body);
       if (!result.success) {
@@ -15796,14 +15917,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         prospectSource = "get_started";
       }
 
-      // For beta applications, prepend tier interest to notes
-      let processedNotes = data.notes ?? null;
-      if (intent === "beta_application" && data.betaTierInterest) {
-        const tierLabel = data.betaTierInterest === "founding_10"
-          ? "Founding 10 (50% off for life)"
-          : "Early Access 10 (25% off for life)";
-        processedNotes = `Beta tier: ${tierLabel}${data.notes ? `\n\n${data.notes}` : ""}`;
-      }
+      const processedNotes = data.notes ?? null;
 
       const prospect = await storage.createOnboardingProspect({
         name: `${data.firstName} ${data.lastName}`.trim(),
@@ -15830,15 +15944,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // ── Beta application confirmation ─────────────────────────────────────
       if (intent === "beta_application") {
         const fromEmail = process.env.RESEND_FROM_EMAIL;
-        const tierLabel = data.betaTierInterest === "founding_10"
-          ? "Founding 10 — 50% off for life"
-          : data.betaTierInterest === "early_access_10"
-          ? "Early Access 10 — 25% off for life"
-          : "Early Access";
         if (resend && fromEmail) {
           resend.emails.send({
             from: fromEmail,
             to: data.email,
+            replyTo: "contact@hubifyhomesonline.com",
             subject: `${data.firstName}, your Hubify beta application is in!`,
             html: `
               <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
@@ -15848,15 +15958,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 </div>
                 <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${data.firstName}, you're on the list!</h1>
                 <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
-                  We received your beta application for <strong>${data.company}</strong>. You've selected the
-                  <strong style="color:#0d9488">${tierLabel}</strong> tier — we'll be in touch within one business day to confirm your spot.
+                  We received your beta application for <strong>${data.company}</strong>. Our team will review your application and be in touch within one business day to confirm your spot and discount.
                 </p>
                 <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;padding:20px;margin-bottom:28px">
                   <p style="font-size:14px;font-weight:700;color:#0d9488;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.05em">What happens next</p>
                   <ul style="font-size:14px;color:#475569;line-height:1.8;margin:0;padding-left:18px">
                     <li>Our team reviews your application (usually within 24 hours)</li>
+                    <li>Your beta discount will be confirmed and assigned at the time of approval</li>
                     <li>You'll receive a welcome email with onboarding instructions</li>
-                    <li>Your beta discount is locked in for the lifetime of your subscription</li>
+                    <li>Your discount is locked in for the lifetime of your subscription</li>
                   </ul>
                 </div>
                 <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
@@ -16383,6 +16493,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
+
+      // Auto-assign beta discount tier when a beta applicant is approved (stage → "welcome")
+      if (parseResult.data.stage === "welcome") {
+        const existing = await storage.getOnboardingProspect(id);
+        if (existing?.source === "beta_application" && !existing?.betaRemovedAt) {
+          const settings = await storage.getPlatformSettings();
+          const bp = settings.betaPricing as any | undefined;
+          const tier1Cap = Number(bp?.tier1Cap ?? 10);
+          const tier2Cap = Number(bp?.tier2Cap ?? 10);
+          const totalCap = tier1Cap + tier2Cap;
+
+          const [{ activeBetaCount }] = await db
+            .select({ activeBetaCount: count() })
+            .from(onboardingProspects)
+            .where(
+              and(
+                eq(onboardingProspects.stage, "welcome"),
+                eq(onboardingProspects.source, "beta_application"),
+                isNull(onboardingProspects.betaRemovedAt),
+                ne(onboardingProspects.id, id)
+              )
+            );
+
+          if (activeBetaCount >= totalCap) {
+            return res.status(409).json({
+              message: "Beta program is full — no slots available. Remove an existing beta member to free a slot.",
+            });
+          }
+
+          (parseResult.data as any).betaDiscountTier =
+            activeBetaCount < tier1Cap ? "founding_10" : "early_access_10";
+        }
+      }
+
       const prospect = await storage.updateOnboardingProspect(id, parseResult.data);
       res.json(prospect);
     } catch (error) {
