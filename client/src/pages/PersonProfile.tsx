@@ -45,8 +45,14 @@ import {
   Trash2,
   TrendingUp,
   Eye,
-  Inbox
+  Inbox,
+  Send,
+  ShieldCheck,
+  AlertCircle,
+  CheckCircle2,
+  XCircle
 } from "lucide-react";
+import InviteToPortalModal from "@/components/InviteToPortalModal";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
@@ -847,6 +853,7 @@ export default function PersonProfile() {
 
   // Email composition modal state
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
   // Email history modal state
   const [isEmailHistoryModalOpen, setIsEmailHistoryModalOpen] = useState(false);
@@ -950,6 +957,26 @@ export default function PersonProfile() {
     },
     enabled: isAuthenticated,
   });
+
+  // Portal invitations for this contact
+  const personEmail = (person as any)?.email;
+  const { data: portalInvitations } = useQuery<any[]>({
+    queryKey: ["/api/portal/invitations", { email: personEmail }],
+    queryFn: async () => {
+      if (!personEmail) return [];
+      const res = await apiRequest("GET", `/api/portal/invitations?email=${encodeURIComponent(personEmail)}`);
+      return res.json();
+    },
+    enabled: isAuthenticated && !!personEmail,
+  });
+
+  const latestPortalInvitation = portalInvitations?.[0];
+  const portalInvitationStatus = (() => {
+    if (!latestPortalInvitation) return null;
+    if (latestPortalInvitation.isUsed) return "registered";
+    if (new Date(latestPortalInvitation.expiresAt) < new Date()) return "expired";
+    return "sent";
+  })();
 
   // Sync custom field values when person data loads
   useEffect(() => {
@@ -1505,6 +1532,16 @@ export default function PersonProfile() {
           </div>
           
           <div className="mt-4 lg:mt-0 flex space-x-2">
+            {["owner", "tenant", "client"].includes((person as any)?.type) && (person as any)?.email && (
+              <Button
+                variant="outline"
+                onClick={() => setIsInviteModalOpen(true)}
+                data-testid="button-invite-portal"
+              >
+                <Send className="w-4 h-4 mr-2" />
+                Invite to Portal
+              </Button>
+            )}
             <Button variant="outline" onClick={handleEditContact}>
               <Edit className="w-4 h-4 mr-2" />
               Edit Person
@@ -1705,6 +1742,69 @@ export default function PersonProfile() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Portal Access */}
+        {["owner", "tenant", "client"].includes((person as any)?.type) && (person as any)?.email && (
+          <Card data-testid="portal-access-card">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <ShieldCheck className="w-5 h-5 mr-2" />
+                Portal Access
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {portalInvitationStatus === "registered" && (
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">Registered</p>
+                    <p className="text-xs text-slate-500">Client has a portal account.</p>
+                  </div>
+                </div>
+              )}
+              {portalInvitationStatus === "sent" && (
+                <div className="flex items-start gap-2">
+                  <Send className="w-4 h-4 text-teal-500 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">Invitation Sent</p>
+                    <p className="text-xs text-slate-500">
+                      Expires {new Date(latestPortalInvitation?.expiresAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {portalInvitationStatus === "expired" && (
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">Invitation Expired</p>
+                    <p className="text-xs text-slate-500">Send a new invite to give access.</p>
+                  </div>
+                </div>
+              )}
+              {!portalInvitationStatus && (
+                <div className="flex items-start gap-2">
+                  <XCircle className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-slate-700">No Portal Access</p>
+                    <p className="text-xs text-slate-500">No invitation has been sent yet.</p>
+                  </div>
+                </div>
+              )}
+              {portalInvitationStatus !== "registered" && (
+                <Button
+                  size="sm"
+                  className="w-full mt-2"
+                  onClick={() => setIsInviteModalOpen(true)}
+                  data-testid="button-portal-access-invite"
+                >
+                  <Send className="w-3.5 h-3.5 mr-2" />
+                  {portalInvitationStatus === "sent" ? "Resend Invitation" : "Send Invitation"}
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Tabs Section */}
@@ -2739,6 +2839,19 @@ export default function PersonProfile() {
         recipientEmail={(person as any)?.email || ""}
         recipientName={`${(person as any)?.firstName || ""} ${(person as any)?.lastName || ""}`.trim()}
         recipientContactId={personId}
+      />
+
+      {/* Invite to Portal Modal */}
+      <InviteToPortalModal
+        isOpen={isInviteModalOpen}
+        onClose={() => {
+          setIsInviteModalOpen(false);
+          queryClient.invalidateQueries({ queryKey: ["/api/portal/invitations", { email: personEmail }] });
+        }}
+        prefillEmail={(person as any)?.email || ""}
+        prefillContactId={parseInt(personId as string)}
+        prefillPropertyIds={linkedProperties.map((lp: any) => String(lp.propertyId || lp.property?.id))}
+        contactFirstName={(person as any)?.firstName}
       />
 
       {/* Email History View Modal */}

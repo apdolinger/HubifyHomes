@@ -325,6 +325,12 @@ app.use((req, res, next) => {
       } catch (err) {
         console.error('Error ensuring beta columns on onboarding_prospects:', err);
       }
+      try {
+        const { ensurePortalInvitationColumns } = await import('./runMigrations.js');
+        await ensurePortalInvitationColumns();
+      } catch (err) {
+        console.error('Error ensuring portal_invitations columns:', err);
+      }
     } catch (error) {
       console.error('Error loading startup migrations:', error);
     }

@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { routes } from "@/lib/routes";
 import { useToast } from "@/hooks/use-toast";
 import SupportModal from "@/components/SupportModal";
+import InviteToPortalModal from "@/components/InviteToPortalModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,15 +19,22 @@ import {
   MessageCircle,
   Phone,
   Mail,
-  Eye
+  Eye,
+  Send,
+  RefreshCw,
+  Trash2,
+  Plus
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function HubifyConsole() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const { data: supportInfo } = useQuery<{ supportPhone: string | null }>({
     queryKey: ["/api/support-info"],
     // Override the global staleTime: Infinity so this query stays fresh
@@ -92,6 +99,53 @@ export default function HubifyConsole() {
   const { data: contacts = [], isLoading: contactsLoading } = useQuery({
     queryKey: ["/api/contacts"],
     enabled: isAuthenticated,
+  });
+
+  // Fetch portal invitations
+  const { data: portalInvitations = [], isLoading: invitationsLoading } = useQuery<any[]>({
+    queryKey: ["/api/portal/invitations"],
+    enabled: isAuthenticated,
+  });
+
+  const getInvitationStatus = (inv: any) => {
+    if (inv.isUsed) return "registered";
+    if (new Date(inv.expiresAt) < new Date()) return "expired";
+    return "sent";
+  };
+
+  const resendInvitationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/portal/invitations/${id}/resend`, {});
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.message || "Failed to resend");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/portal/invitations"] });
+      toast({ title: "Invitation resent", description: "A new email has been sent." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const cancelInvitationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/portal/invitations/${id}`);
+      if (!res.ok && res.status !== 204) {
+        const d = await res.json();
+        throw new Error(d.message || "Failed to cancel");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/portal/invitations"] });
+      toast({ title: "Invitation cancelled" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 
   const getTasksForProperty = (propertyId: number) => {
@@ -387,6 +441,85 @@ export default function HubifyConsole() {
         )}
       </div>
 
+      {/* Portal Invitations */}
+      <Card className="mt-8" data-testid="portal-invitations-section">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Send className="w-5 h-5 text-teal-600" />
+              Client Portal Invitations
+            </CardTitle>
+            <Button size="sm" onClick={() => setIsInviteModalOpen(true)} data-testid="button-new-invitation">
+              <Plus className="w-4 h-4 mr-2" />
+              Invite Client
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {invitationsLoading ? (
+            <div className="text-center py-6 text-slate-500">Loading invitations…</div>
+          ) : (portalInvitations as any[]).length === 0 ? (
+            <div className="text-center py-8">
+              <Send className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 text-sm">No invitations sent yet.</p>
+              <p className="text-xs text-slate-400 mt-1">Click "Invite Client" to send a branded portal invitation.</p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {(portalInvitations as any[]).map((inv: any) => {
+                const status = getInvitationStatus(inv);
+                return (
+                  <div key={inv.id} className="flex items-center justify-between py-3" data-testid={`invitation-${inv.id}`}>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-slate-800 truncate">{inv.email}</p>
+                      <p className="text-xs text-slate-500">
+                        {inv.sentAt
+                          ? `Sent ${new Date(inv.sentAt).toLocaleDateString()}`
+                          : `Created ${new Date(inv.createdAt).toLocaleDateString()}`}
+                        {status !== "registered" && (
+                          <> · Expires {new Date(inv.expiresAt).toLocaleDateString()}</>
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 ml-4 shrink-0">
+                      <Badge
+                        variant={status === "registered" ? "default" : status === "expired" ? "destructive" : "secondary"}
+                      >
+                        {status === "registered" ? "Registered" : status === "expired" ? "Expired" : "Pending"}
+                      </Badge>
+                      {!inv.isUsed && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          title="Resend invitation"
+                          disabled={resendInvitationMutation.isPending}
+                          onClick={() => resendInvitationMutation.mutate(inv.id)}
+                          data-testid={`resend-invite-${inv.id}`}
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                      {!inv.isUsed && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          title="Cancel invitation"
+                          disabled={cancelInvitationMutation.isPending}
+                          onClick={() => cancelInvitationMutation.mutate(inv.id)}
+                          data-testid={`cancel-invite-${inv.id}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Contact Support */}
       <Card className="mt-8">
         <CardContent className="p-6">
@@ -422,6 +555,11 @@ export default function HubifyConsole() {
       <SupportModal
         isOpen={isSupportModalOpen}
         onClose={() => setIsSupportModalOpen(false)}
+      />
+
+      <InviteToPortalModal
+        isOpen={isInviteModalOpen}
+        onClose={() => setIsInviteModalOpen(false)}
       />
     </main>
   );

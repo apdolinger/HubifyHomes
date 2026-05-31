@@ -34,8 +34,10 @@ import {
   Filter,
   Download,
   MoreHorizontal,
-  Settings
+  Settings,
+  Send
 } from "lucide-react";
+import InviteToPortalModal from "@/components/InviteToPortalModal";
 import { apiRequest } from "@/lib/queryClient";
 import { prefStorage } from "@/lib/cookieConsent";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -89,6 +91,7 @@ export default function People() {
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
   const [isCustomizeModalOpen, setIsCustomizeModalOpen] = useState(false);
   const [isStatsCustomizeModalOpen, setIsStatsCustomizeModalOpen] = useState(false);
+  const [inviteModalContact, setInviteModalContact] = useState<any>(null);
 
   // Default stats widgets configuration
   const defaultStatsWidgets: StatsWidget[] = [
@@ -1214,6 +1217,20 @@ export default function People() {
                       {columns.find(col => col.id === 'actions')?.visible && (
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end space-x-2">
+                            {["owner", "tenant", "client"].includes(group.type) && group.email && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                title="Invite to Portal"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setInviteModalContact(group);
+                                }}
+                                data-testid={`invite-portal-btn-${group.id}`}
+                              >
+                                <Send className="w-4 h-4" />
+                              </Button>
+                            )}
                             <Button
                               variant="outline"
                               size="sm"
@@ -1732,6 +1749,17 @@ export default function People() {
         defaultWidgets={defaultStatsWidgets}
         onSave={handleSaveStatsWidgets}
       />
+
+      {/* Invite to Portal Modal */}
+      {inviteModalContact && (
+        <InviteToPortalModal
+          isOpen={!!inviteModalContact}
+          onClose={() => setInviteModalContact(null)}
+          prefillEmail={inviteModalContact.email || ""}
+          prefillContactId={inviteModalContact.id}
+          contactFirstName={inviteModalContact.firstName}
+        />
+      )}
     </main>
   );
 }

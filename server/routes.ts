@@ -12,7 +12,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { ObjectStorageService } from "./objectStorage";
 import { importSampleData } from "./import-data";
 import { getBrandingLevel, enforceBrandingPolicy, getBrandingCapabilities } from "./branding";
-import { getHubifyHomesEmailLogoUrl, HUBIFY_HOMES_LOGO_PATH, HUBIFY_HOMES_EMAIL_LOGO_PATH } from "./brandAsset";
+import { getHubifyHomesEmailLogoUrl, HUBIFY_HOMES_LOGO_PATH, HUBIFY_HOMES_EMAIL_LOGO_PATH, getAppBaseUrl } from "./brandAsset";
 import { 
   AuditLogger, 
   MFAEnforcement, 
@@ -1965,7 +1965,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiresAt: sessionExpiresAt,
       });
 
-      res.status(201).json({ user: { ...user, passwordHash: undefined }, token });
+      // Fetch org name for the welcome screen
+      const org = await storage.getOrg(invitation.orgId);
+      const orgName = org?.name || 'Your Property Manager';
+
+      res.status(201).json({ user: { ...user, passwordHash: undefined }, token, orgName });
     } catch (error) {
       console.error('Error registering portal user:', error);
       res.status(500).json({ message: 'Failed to register user' });
@@ -2787,24 +2791,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Only admins can create invitations' });
       }
 
-      const { email, role, propertyIds, expiresInDays = 7 } = req.body;
+      const { email, role, propertyIds, contactId, expiresInDays = 7 } = req.body;
 
       if (!email || !role) {
         return res.status(400).json({ message: 'Email and role are required' });
       }
 
+      const orgId = currentUser.orgId!;
+      const normalizedEmail = email.toLowerCase().trim();
+
+      // Check for duplicate active (non-expired, non-used) invitation
+      const existing = await storage.getActivePortalInvitationByEmailAndOrg(orgId, normalizedEmail);
+      if (existing) {
+        return res.status(409).json({ message: 'An active invitation already exists for this email', invitation: existing });
+      }
+
       const token = nanoid(32);
       const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
+      const sentAt = new Date();
 
       const invitation = await storage.createPortalInvitation({
-        orgId: currentUser.orgId!,
+        orgId,
         token,
-        email: email.toLowerCase(),
+        email: normalizedEmail,
         role,
         propertyIds: propertyIds || [],
+        contactId: contactId || null,
         createdByUserId: currentUserId,
         expiresAt,
+        sentAt,
       });
+
+      // Send invitation email
+      try {
+        const { sendPortalInvitationEmail } = await import('./portalInvitationEmail.js');
+        const org = await storage.getOrg(orgId);
+        const baseUrl = getAppBaseUrl();
+        await sendPortalInvitationEmail({
+          toEmail: normalizedEmail,
+          orgName: org?.name || 'Your Property Manager',
+          orgBranding: (org?.branding as any) || {},
+          registrationUrl: `${baseUrl}/portal/register?token=${token}`,
+          expiresAt,
+          expiresInDays,
+        });
+      } catch (emailErr) {
+        console.error('[portal-invite] Failed to send invitation email:', emailErr);
+        // Don't fail the request — invitation record is created, admin can resend
+      }
 
       res.status(201).json(invitation);
     } catch (error) {
@@ -2822,11 +2856,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Only admins can view invitations' });
       }
 
-      const invitations = await storage.getPortalInvitationsByOrg(currentUser.orgId!);
+      const { email } = req.query;
+      let invitations;
+      if (email && typeof email === 'string') {
+        invitations = await storage.getPortalInvitationsByEmail(currentUser.orgId!, email);
+      } else {
+        invitations = await storage.getPortalInvitationsByOrg(currentUser.orgId!);
+      }
       res.json(invitations);
     } catch (error) {
       console.error('Error fetching portal invitations:', error);
       res.status(500).json({ message: 'Failed to fetch invitations' });
+    }
+  });
+
+  app.post('/api/portal/invitations/:id/resend', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user?.claims?.sub;
+      const currentUser = await storage.getUser(currentUserId);
+      if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'supervisor')) {
+        return res.status(403).json({ message: 'Only admins can resend invitations' });
+      }
+
+      const inv = await storage.getPortalInvitationById(req.params.id);
+      if (!inv || inv.orgId !== currentUser.orgId) {
+        return res.status(404).json({ message: 'Invitation not found' });
+      }
+      if (inv.isUsed) {
+        return res.status(400).json({ message: 'Cannot resend an already-used invitation' });
+      }
+
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const sentAt = new Date();
+      const updated = await storage.updatePortalInvitation(inv.id, { expiresAt, sentAt });
+
+      // Resend email
+      try {
+        const { sendPortalInvitationEmail } = await import('./portalInvitationEmail.js');
+        const org = await storage.getOrg(currentUser.orgId!);
+        const baseUrl = getAppBaseUrl();
+        await sendPortalInvitationEmail({
+          toEmail: inv.email,
+          orgName: org?.name || 'Your Property Manager',
+          orgBranding: (org?.branding as any) || {},
+          registrationUrl: `${baseUrl}/portal/register?token=${inv.token}`,
+          expiresAt,
+          expiresInDays: 7,
+        });
+      } catch (emailErr) {
+        console.error('[portal-invite] Failed to resend invitation email:', emailErr);
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Error resending portal invitation:', error);
+      res.status(500).json({ message: 'Failed to resend invitation' });
+    }
+  });
+
+  app.delete('/api/portal/invitations/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user?.claims?.sub;
+      const currentUser = await storage.getUser(currentUserId);
+      if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'supervisor')) {
+        return res.status(403).json({ message: 'Only admins can cancel invitations' });
+      }
+
+      const inv = await storage.getPortalInvitationById(req.params.id);
+      if (!inv || inv.orgId !== currentUser.orgId) {
+        return res.status(404).json({ message: 'Invitation not found' });
+      }
+
+      await storage.deletePortalInvitation(inv.id);
+      res.status(204).end();
+    } catch (error) {
+      console.error('Error cancelling portal invitation:', error);
+      res.status(500).json({ message: 'Failed to cancel invitation' });
     }
   });
 

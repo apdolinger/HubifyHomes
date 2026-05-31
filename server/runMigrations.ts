@@ -642,3 +642,19 @@ export async function ensurePropertyServiceAssignmentsTable(): Promise<void> {
     client.release();
   }
 }
+
+export async function ensurePortalInvitationColumns(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE portal_invitations
+        ADD COLUMN IF NOT EXISTS sent_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL;
+    `);
+    log("[MIGRATE] portal_invitations sent_at and contact_id columns verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add columns to portal_invitations: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}

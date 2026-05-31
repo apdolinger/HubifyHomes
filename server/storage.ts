@@ -2166,6 +2166,52 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(portalInvitations.createdAt));
   }
 
+  async getPortalInvitationsByEmail(orgId: string, email: string): Promise<PortalInvitation[]> {
+    return await db
+      .select()
+      .from(portalInvitations)
+      .where(and(
+        eq(portalInvitations.orgId, orgId),
+        eq(portalInvitations.email, email.toLowerCase())
+      ))
+      .orderBy(desc(portalInvitations.createdAt));
+  }
+
+  async getPortalInvitationById(id: string): Promise<PortalInvitation | undefined> {
+    const [inv] = await db.select().from(portalInvitations).where(eq(portalInvitations.id, id));
+    return inv;
+  }
+
+  async updatePortalInvitation(id: string, data: Partial<PortalInvitation>): Promise<PortalInvitation> {
+    const [updated] = await db
+      .update(portalInvitations)
+      .set(data)
+      .where(eq(portalInvitations.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePortalInvitation(id: string): Promise<void> {
+    await db.delete(portalInvitations).where(eq(portalInvitations.id, id));
+  }
+
+  async getActivePortalInvitationByEmailAndOrg(orgId: string, email: string): Promise<PortalInvitation | undefined> {
+    const now = new Date();
+    const [inv] = await db
+      .select()
+      .from(portalInvitations)
+      .where(and(
+        eq(portalInvitations.orgId, orgId),
+        eq(portalInvitations.email, email.toLowerCase()),
+        eq(portalInvitations.isUsed, false)
+      ))
+      .orderBy(desc(portalInvitations.createdAt))
+      .limit(1);
+    // Return only if not expired
+    if (inv && inv.expiresAt > now) return inv;
+    return undefined;
+  }
+
   // Community operations
   async getCommunities(): Promise<Community[]> {
     return db.select().from(communities).orderBy(desc(communities.createdAt));

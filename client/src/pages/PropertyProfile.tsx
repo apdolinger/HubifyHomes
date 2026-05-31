@@ -58,9 +58,11 @@ import {
   ExternalLink,
   Wrench,
   Briefcase,
-  EyeOff
+  EyeOff,
+  Send
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import InviteToPortalModal from "@/components/InviteToPortalModal";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -1053,6 +1055,7 @@ export default function PropertyProfile() {
   
   // Contact state
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+  const [invitePortalContact, setInvitePortalContact] = useState<any>(null);
   const [selectedContact, setSelectedContact] = useState<any>(null);
   const [editingContact, setEditingContact] = useState<any>(null);
   const [contactForm, setContactForm] = useState({
@@ -4300,7 +4303,20 @@ export default function PropertyProfile() {
                                         <p className="text-xs text-slate-500">{contact.phone}</p>
                                       )}
                                     </div>
-                                    <User className="w-5 h-5 text-green-600" />
+                                    <div className="flex items-center gap-2">
+                                      {contact.email && (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          title="Invite to Portal"
+                                          onClick={(e) => { e.stopPropagation(); setInvitePortalContact(contact); }}
+                                          data-testid={`invite-portal-${contact.id}`}
+                                        >
+                                          <Send className="w-3.5 h-3.5 text-teal-600" />
+                                        </Button>
+                                      )}
+                                      <User className="w-5 h-5 text-green-600" />
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -4346,7 +4362,20 @@ export default function PropertyProfile() {
                                         <p className="text-xs text-slate-500">{contact.email}</p>
                                       )}
                                     </div>
-                                    <User className="w-5 h-5 text-slate-400" />
+                                    <div className="flex items-center gap-2">
+                                      {contact.email && (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          title="Invite to Portal"
+                                          onClick={(e) => { e.stopPropagation(); setInvitePortalContact(contact); }}
+                                          data-testid={`invite-portal-member-${contact.id}`}
+                                        >
+                                          <Send className="w-3.5 h-3.5 text-teal-600" />
+                                        </Button>
+                                      )}
+                                      <User className="w-5 h-5 text-slate-400" />
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -10026,6 +10055,18 @@ export default function PropertyProfile() {
           propertyId={propertyId}
           propertyName={(property as any)?.name || (property as any)?.address1 || 'Property'}
         />
+
+        {/* Invite to Portal Modal */}
+        {invitePortalContact && (
+          <InviteToPortalModal
+            isOpen={!!invitePortalContact}
+            onClose={() => setInvitePortalContact(null)}
+            prefillEmail={invitePortalContact.email || ""}
+            prefillContactId={invitePortalContact.id}
+            prefillPropertyIds={[String(propertyId)]}
+            contactFirstName={invitePortalContact.firstName}
+          />
+        )}
       </div>
     </div>
   );

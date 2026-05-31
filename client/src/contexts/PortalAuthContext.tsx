@@ -16,7 +16,7 @@ interface PortalAuthContextType {
   user: PortalUser | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (inviteToken: string, email: string, password: string, firstName?: string, lastName?: string) => Promise<void>;
+  register: (inviteToken: string, email: string, password: string, firstName?: string, lastName?: string) => Promise<{ orgName: string }>;
   logout: () => Promise<void>;
   isLoading: boolean;
 }
@@ -80,7 +80,7 @@ export function PortalAuthProvider({ children }: { children: ReactNode }) {
     setLocation('/portal');
   };
 
-  const register = async (inviteToken: string, email: string, password: string, firstName?: string, lastName?: string) => {
+  const register = async (inviteToken: string, email: string, password: string, firstName?: string, lastName?: string): Promise<{ orgName: string }> => {
     const response = await fetch('/api/portal/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -96,7 +96,8 @@ export function PortalAuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('portal_token', data.token);
     setToken(data.token);
     setUser(data.user);
-    setLocation('/portal');
+    // Caller handles redirect after showing welcome screen
+    return { orgName: data.orgName || 'Your Property Manager' };
   };
 
   const logout = async () => {
