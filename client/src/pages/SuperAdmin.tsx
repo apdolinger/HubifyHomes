@@ -1104,6 +1104,7 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
   const [stuckDays, setStuckDays] = useState(7);
   const [dragOverStage, setDragOverStage] = useState<OnboardingStage | null>(null);
   const [betaOnly, setBetaOnly] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const saveStuckDaysMutation = useMutation({
     mutationFn: (days: number) =>
@@ -1150,6 +1151,10 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
   const active = allProspects.filter(p => {
     if (p.stage === "dropped") return false;
     if (betaOnly && p.trialIntent !== "beta_application" && p.source !== "beta_application") return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      if (!p.name.toLowerCase().includes(q) && !(p.email ?? "").toLowerCase().includes(q)) return false;
+    }
     return true;
   });
   const dropped = allProspects.filter(p => p.stage === "dropped");
@@ -1493,6 +1498,15 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
           >
             <Link2 className="w-4 h-4 mr-2" /> Copy Contact Link
           </Button>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <Input
+              placeholder="Search by name or email…"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-8 w-52 h-9 text-sm"
+            />
+          </div>
           <Button
             variant={betaOnly ? "default" : "outline"}
             onClick={() => setBetaOnly(v => !v)}
