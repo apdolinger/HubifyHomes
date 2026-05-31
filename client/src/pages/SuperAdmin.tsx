@@ -724,6 +724,7 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [selectedSubmission, setSelectedSubmission] = useState<Prospect | null>(null);
+  const [toDelete, setToDelete] = useState<Prospect | null>(null);
 
   const { data: submissions = [], isLoading } = useQuery<Prospect[]>({
     queryKey: ["/api/super-admin/submissions"],
@@ -737,6 +738,16 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
       toast({ title: "Status updated" });
     },
     onError: () => toast({ title: "Error", description: "Failed to update status", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/super-admin/onboarding-prospects/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/submissions"] });
+      toast({ title: "Submission deleted" });
+      setToDelete(null);
+    },
+    onError: () => toast({ title: "Error", description: "Failed to delete submission", variant: "destructive" }),
   });
 
   const filtered = useMemo(() => {
@@ -840,6 +851,7 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
                     <TableHead>Notes</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Submitted</TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -915,6 +927,16 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                         {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : "—"}
                       </TableCell>
+                      <TableCell onClick={e => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => setToDelete(s)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -943,6 +965,34 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
           } : undefined}
         />
       )}
+
+      <Dialog open={!!toDelete} onOpenChange={open => { if (!open) setToDelete(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete submission?</DialogTitle>
+            <DialogDescription>
+              This will permanently remove the submission from{" "}
+              <span className="font-medium text-foreground">
+                {toDelete?.firstName && toDelete?.lastName
+                  ? `${toDelete.firstName} ${toDelete.lastName}`
+                  : toDelete?.name ?? toDelete?.email}
+              </span>. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setToDelete(null)} disabled={deleteMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => toDelete && deleteMutation.mutate(toDelete.id)}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Deleting…" : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
