@@ -23,7 +23,8 @@ import {
   Send,
   RefreshCw,
   Trash2,
-  Plus
+  Plus,
+  Building2
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
@@ -35,6 +36,7 @@ export default function HubifyConsole() {
   const [, setLocation] = useLocation();
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [invitationFilter, setInvitationFilter] = useState<"all" | "sent" | "registered" | "expired">("all");
   const { data: supportInfo } = useQuery<{ supportPhone: string | null }>({
     queryKey: ["/api/support-info"],
     // Override the global staleTime: Infinity so this query stays fresh
@@ -454,8 +456,33 @@ export default function HubifyConsole() {
               Invite Client
             </Button>
           </div>
+          {/* Filter tabs */}
+          <div className="flex gap-1 mt-3 flex-wrap">
+            {(["all", "sent", "registered", "expired"] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setInvitationFilter(f)}
+                data-testid={`filter-invitations-${f}`}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  invitationFilter === f
+                    ? "bg-teal-600 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                {f === "all" ? "All" : f === "sent" ? "Pending" : f === "registered" ? "Registered" : "Expired"}
+                {" "}
+                <span className="opacity-70">
+                  ({(portalInvitations as any[]).filter((inv: any) => {
+                    if (f === "all") return true;
+                    const s = getInvitationStatus(inv);
+                    return s === f;
+                  }).length})
+                </span>
+              </button>
+            ))}
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {invitationsLoading ? (
             <div className="text-center py-6 text-slate-500">Loading invitations…</div>
           ) : (portalInvitations as any[]).length === 0 ? (
@@ -464,59 +491,109 @@ export default function HubifyConsole() {
               <p className="text-slate-500 text-sm">No invitations sent yet.</p>
               <p className="text-xs text-slate-400 mt-1">Click "Invite Client" to send a branded portal invitation.</p>
             </div>
-          ) : (
-            <div className="divide-y">
-              {(portalInvitations as any[]).map((inv: any) => {
-                const status = getInvitationStatus(inv);
-                return (
-                  <div key={inv.id} className="flex items-center justify-between py-3" data-testid={`invitation-${inv.id}`}>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-slate-800 truncate">{inv.email}</p>
-                      <p className="text-xs text-slate-500">
-                        {inv.sentAt
-                          ? `Sent ${new Date(inv.sentAt).toLocaleDateString()}`
-                          : `Created ${new Date(inv.createdAt).toLocaleDateString()}`}
-                        {status !== "registered" && (
-                          <> · Expires {new Date(inv.expiresAt).toLocaleDateString()}</>
-                        )}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3 ml-4 shrink-0">
-                      <Badge
-                        variant={status === "registered" ? "default" : status === "expired" ? "destructive" : "secondary"}
-                      >
-                        {status === "registered" ? "Registered" : status === "expired" ? "Expired" : "Pending"}
-                      </Badge>
-                      {!inv.isUsed && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          title="Resend invitation"
-                          disabled={resendInvitationMutation.isPending}
-                          onClick={() => resendInvitationMutation.mutate(inv.id)}
-                          data-testid={`resend-invite-${inv.id}`}
-                        >
-                          <RefreshCw className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
-                      {!inv.isUsed && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          title="Cancel invitation"
-                          disabled={cancelInvitationMutation.isPending}
-                          onClick={() => cancelInvitationMutation.mutate(inv.id)}
-                          data-testid={`cancel-invite-${inv.id}`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          ) : (() => {
+            const filtered = (portalInvitations as any[]).filter((inv: any) => {
+              if (invitationFilter === "all") return true;
+              return getInvitationStatus(inv) === invitationFilter;
+            });
+            if (filtered.length === 0) {
+              return (
+                <div className="text-center py-8 text-slate-500 text-sm">
+                  No {invitationFilter} invitations.
+                </div>
+              );
+            }
+            return (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-slate-50">
+                      <th className="text-left px-4 py-2.5 font-medium text-slate-600 whitespace-nowrap">Email / Contact</th>
+                      <th className="text-left px-4 py-2.5 font-medium text-slate-600 whitespace-nowrap">Status</th>
+                      <th className="text-left px-4 py-2.5 font-medium text-slate-600 whitespace-nowrap">Sent</th>
+                      <th className="text-left px-4 py-2.5 font-medium text-slate-600 whitespace-nowrap">Expires</th>
+                      <th className="text-left px-4 py-2.5 font-medium text-slate-600 whitespace-nowrap">Properties</th>
+                      <th className="text-right px-4 py-2.5 font-medium text-slate-600 whitespace-nowrap">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {filtered.map((inv: any) => {
+                      const status = getInvitationStatus(inv);
+                      const propCount = Array.isArray(inv.propertyIds) ? inv.propertyIds.length : 0;
+                      return (
+                        <tr key={inv.id} className="hover:bg-slate-50 transition-colors" data-testid={`invitation-${inv.id}`}>
+                          <td className="px-4 py-3">
+                            <p className="font-medium text-slate-800 truncate max-w-[220px]">{inv.email}</p>
+                            <p className="text-xs text-slate-400 capitalize">{inv.role}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge
+                              variant={status === "registered" ? "default" : status === "expired" ? "destructive" : "secondary"}
+                            >
+                              {status === "registered" ? "Registered" : status === "expired" ? "Expired" : "Pending"}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                            {inv.sentAt
+                              ? new Date(inv.sentAt).toLocaleDateString()
+                              : <span className="text-slate-400 italic">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                            {status === "registered" ? (
+                              <span className="text-slate-400 italic">—</span>
+                            ) : (
+                              new Date(inv.expiresAt).toLocaleDateString()
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {propCount > 0 ? (
+                              <span className="flex items-center gap-1 text-slate-600">
+                                <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                                {propCount} {propCount === 1 ? "property" : "properties"}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 italic text-xs">None</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2 justify-end">
+                              {!inv.isUsed && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  title="Resend invitation"
+                                  disabled={resendInvitationMutation.isPending}
+                                  onClick={() => resendInvitationMutation.mutate(inv.id)}
+                                  data-testid={`resend-invite-${inv.id}`}
+                                >
+                                  <RefreshCw className="w-3.5 h-3.5 mr-1" />
+                                  Resend
+                                </Button>
+                              )}
+                              {!inv.isUsed && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  title="Cancel invitation"
+                                  disabled={cancelInvitationMutation.isPending}
+                                  onClick={() => cancelInvitationMutation.mutate(inv.id)}
+                                  data-testid={`cancel-invite-${inv.id}`}
+                                  className="text-red-600 border-red-200 hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 mr-1" />
+                                  Cancel
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 

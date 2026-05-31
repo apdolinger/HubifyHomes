@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -36,6 +36,17 @@ export default function InviteToPortalModal({
   const [selectedPropertyIds, setSelectedPropertyIds] = useState<string[]>(prefillPropertyIds);
   const [duplicateInvitation, setDuplicateInvitation] = useState<any>(null);
   const [success, setSuccess] = useState(false);
+
+  // Sync prefill values whenever the modal opens (props may arrive after mount)
+  useEffect(() => {
+    if (isOpen) {
+      setEmail(prefillEmail);
+      setSelectedPropertyIds(prefillPropertyIds);
+      setRole("resident");
+      setDuplicateInvitation(null);
+      setSuccess(false);
+    }
+  }, [isOpen, prefillEmail, prefillPropertyIds.join(",")]);
 
   const { data: properties = [] } = useQuery<any[]>({
     queryKey: ["/api/properties"],

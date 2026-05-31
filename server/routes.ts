@@ -2827,6 +2827,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { sendPortalInvitationEmail } = await import('./portalInvitationEmail.js');
         const org = await storage.getOrg(orgId);
         const baseUrl = getAppBaseUrl();
+        // Look up contact first name for personalized greeting
+        let contactFirstName: string | undefined;
+        if (contactId) {
+          try {
+            const contact = await storage.getContact(contactId);
+            contactFirstName = contact?.firstName || undefined;
+          } catch {}
+        }
         await sendPortalInvitationEmail({
           toEmail: normalizedEmail,
           orgName: org?.name || 'Your Property Manager',
@@ -2834,6 +2842,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           registrationUrl: `${baseUrl}/portal/register?token=${token}`,
           expiresAt,
           expiresInDays,
+          contactFirstName,
         });
       } catch (emailErr) {
         console.error('[portal-invite] Failed to send invitation email:', emailErr);
@@ -2895,6 +2904,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { sendPortalInvitationEmail } = await import('./portalInvitationEmail.js');
         const org = await storage.getOrg(currentUser.orgId!);
         const baseUrl = getAppBaseUrl();
+        // Look up contact first name for personalized greeting
+        let contactFirstName: string | undefined;
+        if ((inv as any).contactId) {
+          try {
+            const contact = await storage.getContact((inv as any).contactId);
+            contactFirstName = contact?.firstName || undefined;
+          } catch {}
+        }
         await sendPortalInvitationEmail({
           toEmail: inv.email,
           orgName: org?.name || 'Your Property Manager',
@@ -2902,6 +2919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           registrationUrl: `${baseUrl}/portal/register?token=${inv.token}`,
           expiresAt,
           expiresInDays: 7,
+          contactFirstName,
         });
       } catch (emailErr) {
         console.error('[portal-invite] Failed to resend invitation email:', emailErr);

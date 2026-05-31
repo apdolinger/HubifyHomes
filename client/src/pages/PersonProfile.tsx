@@ -1759,6 +1759,11 @@ export default function PersonProfile() {
                   <div>
                     <p className="text-sm font-medium text-slate-800">Registered</p>
                     <p className="text-xs text-slate-500">Client has a portal account.</p>
+                    {latestPortalInvitation?.sentAt && (
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Invited {new Date(latestPortalInvitation.sentAt).toLocaleDateString()}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -1767,7 +1772,12 @@ export default function PersonProfile() {
                   <Send className="w-4 h-4 text-teal-500 mt-0.5 shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-slate-800">Invitation Sent</p>
-                    <p className="text-xs text-slate-500">
+                    {latestPortalInvitation?.sentAt && (
+                      <p className="text-xs text-slate-500">
+                        Sent {new Date(latestPortalInvitation.sentAt).toLocaleDateString()}
+                      </p>
+                    )}
+                    <p className="text-xs text-slate-400">
                       Expires {new Date(latestPortalInvitation?.expiresAt).toLocaleDateString()}
                     </p>
                   </div>
@@ -1778,7 +1788,12 @@ export default function PersonProfile() {
                   <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-slate-800">Invitation Expired</p>
-                    <p className="text-xs text-slate-500">Send a new invite to give access.</p>
+                    {latestPortalInvitation?.sentAt && (
+                      <p className="text-xs text-slate-500">
+                        Sent {new Date(latestPortalInvitation.sentAt).toLocaleDateString()}
+                      </p>
+                    )}
+                    <p className="text-xs text-slate-400">Send a new invite to give access.</p>
                   </div>
                 </div>
               )}
@@ -1792,15 +1807,37 @@ export default function PersonProfile() {
                 </div>
               )}
               {portalInvitationStatus !== "registered" && (
-                <Button
-                  size="sm"
-                  className="w-full mt-2"
-                  onClick={() => setIsInviteModalOpen(true)}
-                  data-testid="button-portal-access-invite"
-                >
-                  <Send className="w-3.5 h-3.5 mr-2" />
-                  {portalInvitationStatus === "sent" ? "Resend Invitation" : "Send Invitation"}
-                </Button>
+                <div className="flex flex-col gap-2 mt-2">
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setIsInviteModalOpen(true)}
+                    data-testid="button-portal-access-invite"
+                  >
+                    <Send className="w-3.5 h-3.5 mr-2" />
+                    {portalInvitationStatus === "sent" ? "Resend Invitation" : "Send Invitation"}
+                  </Button>
+                  {portalInvitationStatus === "sent" && latestPortalInvitation?.id && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full text-red-600 border-red-200 hover:bg-red-50"
+                      onClick={async () => {
+                        try {
+                          await apiRequest("DELETE", `/api/portal/invitations/${latestPortalInvitation.id}`);
+                          queryClient.invalidateQueries({ queryKey: ["/api/portal/invitations", { email: personEmail }] });
+                          toast({ title: "Invitation cancelled" });
+                        } catch {
+                          toast({ title: "Failed to cancel", variant: "destructive" });
+                        }
+                      }}
+                      data-testid="button-portal-access-cancel"
+                    >
+                      <XCircle className="w-3.5 h-3.5 mr-2" />
+                      Cancel Invitation
+                    </Button>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>
