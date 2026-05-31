@@ -16113,8 +16113,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px;margin-top:4px">Hubify Homes</div>
                 </div>
                 <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${data.firstName}, you're on the list!</h1>
-                <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
+                <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 16px">
                   We received your beta application for <strong>${data.company}</strong>. Our team will review your application and be in touch within one business day to confirm your spot and discount.
+                </p>
+                <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
+                  We review each application to ensure beta participants are a good fit for the program and to maintain a high-quality testing experience while we continue refining the platform.
                 </p>
                 <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;padding:20px;margin-bottom:28px">
                   <p style="font-size:14px;font-weight:700;color:#0d9488;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.05em">What happens next</p>
