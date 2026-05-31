@@ -16534,11 +16534,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Auto-assign beta discount tier when a beta applicant is approved (stage → "welcome")
+      let betaApprovalEmailPayload: {
+        prospectName: string;
+        prospectEmail: string;
+        prospectCompany: string;
+        assignedTier: string;
+        discountPct: number;
+        effectiveMonthlyPrice: number;
+      } | null = null;
+
       if (parseResult.data.stage === "welcome") {
         const existing = await storage.getOnboardingProspect(id);
         if (existing?.source === "beta_application" && !existing?.betaRemovedAt) {
           const settings = await storage.getPlatformSettings();
           const bp = settings.betaPricing as any | undefined;
+          const basePrice = Number(bp?.basePrice ?? 199);
+          const tier1DiscountPct = Number(bp?.tier1DiscountPct ?? bp?.discountPct ?? 50);
+          const tier2DiscountPct = Number(bp?.tier2DiscountPct ?? 25);
           const tier1Cap = Number(bp?.tier1Cap ?? 10);
           const tier2Cap = Number(bp?.tier2Cap ?? 10);
           const totalCap = tier1Cap + tier2Cap;
@@ -16555,18 +16567,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
               )
             );
 
-          if (activeBetaCount >= totalCap) {
-            return res.status(409).json({
-              message: "Beta program is full — no slots available. Remove an existing beta member to free a slot.",
-            });
+          // Preserve an already-assigned tier on re-approval; only compute
+          // a new one when none has been set yet.
+          const existingTier = (existing as any).betaDiscountTier as string | null | undefined;
+
+          let assignedTier: string;
+          if (existingTier) {
+            assignedTier = existingTier;
+          } else {
+            if (activeBetaCount >= totalCap) {
+              return res.status(409).json({
+                message: "Beta program is full — no slots available. Remove an existing beta member to free a slot.",
+              });
+            }
+            assignedTier = activeBetaCount < tier1Cap ? "founding_10" : "early_access_10";
+            (parseResult.data as any).betaDiscountTier = assignedTier;
           }
 
-          (parseResult.data as any).betaDiscountTier =
-            activeBetaCount < tier1Cap ? "founding_10" : "early_access_10";
+          const discountPct = assignedTier === "founding_10" ? tier1DiscountPct : tier2DiscountPct;
+          const effectiveMonthlyPrice = Math.round(basePrice * (1 - discountPct / 100) * 100) / 100;
+
+          betaApprovalEmailPayload = {
+            prospectName: existing.name || "",
+            prospectEmail: existing.email,
+            prospectCompany: existing.company || "",
+            assignedTier,
+            discountPct,
+            effectiveMonthlyPrice,
+          };
         }
       }
 
       const prospect = await storage.updateOnboardingProspect(id, parseResult.data);
+
+      // ── Beta approval confirmation email ────────────────────────────────────
+      if (betaApprovalEmailPayload) {
+        const { prospectName, prospectEmail, prospectCompany, assignedTier, discountPct, effectiveMonthlyPrice } = betaApprovalEmailPayload;
+        const fromEmail = process.env.RESEND_FROM_EMAIL;
+        if (resend && fromEmail) {
+          const nameParts = prospectName.trim().split(/\s+/);
+          const firstName = nameParts[0] || "there";
+          const tierLabel = assignedTier === "founding_10" ? "Founding 10" : "Early Access 10";
+          const onboardingUrl = "https://app.hubifyhomesonline.com/staff/login";
+          resend.emails.send({
+            from: fromEmail,
+            to: prospectEmail,
+            replyTo: "contact@hubifyhomesonline.com",
+            subject: `${firstName}, your Hubify beta discount is confirmed — ${tierLabel}`,
+            html: `
+              <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
+                <div style="text-align:center;margin-bottom:28px">
+                  <img src="${getHubifyHomesLogoUrl()}" alt="Hubify" width="130" style="height:auto;display:inline-block" onerror="this.style.display='none'" />
+                  <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px;margin-top:4px">Hubify Homes</div>
+                </div>
+                <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">You're approved, ${firstName}!</h1>
+                <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
+                  Great news — your beta application${prospectCompany ? ` for <strong>${prospectCompany}</strong>` : ""} has been approved. We've locked in your exclusive discount and reserved your spot in the Hubify beta program.
+                </p>
+                <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;padding:20px;margin-bottom:28px">
+                  <p style="font-size:13px;font-weight:700;color:#0d9488;margin:0 0 12px;text-transform:uppercase;letter-spacing:0.05em">Your Beta Discount</p>
+                  <table style="width:100%;border-collapse:collapse;font-size:15px">
+                    <tr>
+                      <td style="padding:6px 0;color:#475569;width:55%">Tier</td>
+                      <td style="padding:6px 0;color:#0f172a;font-weight:700">${tierLabel}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:6px 0;color:#475569">Discount</td>
+                      <td style="padding:6px 0;color:#0f172a;font-weight:700">${discountPct}% off — locked in for life</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:6px 0;color:#475569">Your monthly price</td>
+                      <td style="padding:6px 0;color:#0d9488;font-weight:800;font-size:18px">$${effectiveMonthlyPrice.toFixed(2)}<span style="font-size:13px;font-weight:400;color:#475569">/mo</span></td>
+                    </tr>
+                  </table>
+                </div>
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px;margin-bottom:28px">
+                  <p style="font-size:13px;font-weight:700;color:#334155;margin:0 0 10px;text-transform:uppercase;letter-spacing:0.05em">Next steps</p>
+                  <ol style="font-size:14px;color:#475569;line-height:1.9;margin:0;padding-left:18px">
+                    <li>Click the button below to set up your account</li>
+                    <li>Complete your company profile and add your first property</li>
+                    <li>Reach out any time — we're here to help you get started</li>
+                  </ol>
+                </div>
+                <div style="text-align:center;margin-bottom:28px">
+                  <a href="${onboardingUrl}" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;padding:14px 32px;border-radius:8px">Get started with Hubify →</a>
+                </div>
+                <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
+                <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
+                  Questions? Simply reply to this email — we're happy to help.<br/>
+                  Hubify Homes · <a href="https://hubifyhomesonline.com" style="color:#94a3b8">hubifyhomesonline.com</a>
+                </p>
+              </div>
+            `,
+          }).then((r: any) => console.log(`[beta-approval] discount confirmation sent to ${prospectEmail} resend_id=${r?.data?.id}`))
+            .catch((err: any) => console.warn("[beta-approval] discount confirmation email failed:", err));
+        }
+      }
+
       res.json(prospect);
     } catch (error) {
       console.error("Error updating onboarding prospect:", error);
