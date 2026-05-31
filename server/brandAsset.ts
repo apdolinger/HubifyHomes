@@ -31,6 +31,17 @@ export function getAppBaseUrl(): string {
   return process.env.PUBLIC_URL || "http://localhost:5000";
 }
 
+/**
+ * Returns the logo URL for use in transactional emails.
+ *
+ * Priority:
+ *  1. EMAIL_LOGO_URL env var — explicit override for any environment
+ *  2. https://hubifyhomesonline.com — the production custom domain, served
+ *     through Cloudflare. No Replit dev-domain restrictions, no auth wall,
+ *     no x-robots-tag. The /hubify-homes-logo.png route in routes.ts serves
+ *     the PNG from attached_assets/ on every request to this domain.
+ */
 export function getHubifyHomesLogoUrl(): string {
-  return `${getAppBaseUrl()}/hubify-homes-logo.png`;
+  if (process.env.EMAIL_LOGO_URL) return process.env.EMAIL_LOGO_URL;
+  return "https://hubifyhomesonline.com/hubify-homes-logo.png";
 }
