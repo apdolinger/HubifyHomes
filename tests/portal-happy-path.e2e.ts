@@ -105,10 +105,23 @@ async function signIn(page: Page) {
   await page.waitForFunction(() => !!localStorage.getItem('portal_token'), null, {
     timeout: 5000,
   });
-  if (new URL(page.url()).pathname !== '/portal') {
+  // Prefer waiting for the SPA navigation (wouter setLocation) to complete — this
+  // avoids a full page reload, keeping isLoading=false and user already set so the
+  // tabs render immediately. Only fall back to page.goto if the SPA redirect doesn't
+  // fire within 8 s (e.g. CI timing difference).
+  const arrivedViaSpa = await page
+    .waitForURL((url) => new URL(url).pathname === '/portal', { timeout: 8000 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (!arrivedViaSpa) {
+    // Full-page reload path: PortalAuthContext will call GET /api/portal/me before
+    // clearing isLoading. Give the cold Neon WebSocket connection time to respond.
     await page.goto(`${BASE_URL}/portal`, { waitUntil: 'domcontentloaded' });
   }
-  await page.getByTestId('tab-properties').waitFor({ timeout: 20000 });
+
+  // 30 s covers both the fast SPA path and the slower cold-DB reload path in CI.
+  await page.getByTestId('tab-properties').waitFor({ timeout: 30000 });
 }
 
 async function main() {
