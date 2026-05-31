@@ -140,6 +140,9 @@ interface Prospect {
   trialIntent: string | null;
   preferredContactMethod: string | null;
   betaDiscountTier: string | null;
+  isBetaMember: boolean | null;
+  betaApprovedAt: string | null;
+  betaRemovedAt: string | null;
   submissionStatus: string | null;
   confirmationEmailSentAt: string | null;
   confirmationEmailStatus: string | null;
@@ -282,26 +285,60 @@ function ProspectCard({
         </Badge>
       </div>
 
-      {(prospect.trialIntent === "beta_application" || prospect.source === "beta_application") && (
-        <div className="flex flex-wrap gap-1">
-          <Badge className="bg-violet-100 text-violet-800 border border-violet-200 text-xs px-1.5 py-0.5 font-semibold">
-            Beta
-          </Badge>
-          {prospect.betaDiscountTier && (
-            <Badge
-              className={`text-xs px-1.5 py-0.5 border font-medium ${
-                prospect.betaDiscountTier === "founding_10"
-                  ? "bg-teal-100 text-teal-800 border-teal-200"
-                  : "bg-indigo-100 text-indigo-800 border-indigo-200"
-              }`}
-            >
-              {prospect.betaDiscountTier === "founding_10"
-                ? "Founding 10 — 50% off"
-                : "Early Access 10 — 25% off"}
+      {/* ── Beta status badges — three mutually exclusive states ── */}
+      {(prospect.trialIntent === "beta_application" || prospect.source === "beta_application" || prospect.isBetaMember || prospect.betaRemovedAt) && (() => {
+        const isActive = prospect.isBetaMember === true && !prospect.betaRemovedAt;
+        const isFreed  = !!prospect.betaRemovedAt;
+        const tierLabel = prospect.betaDiscountTier === "founding_10"
+          ? "Founding 10 — 50% off"
+          : prospect.betaDiscountTier === "early_access_10"
+            ? "Early Access 10 — 25% off"
+            : prospect.betaDiscountTier ?? null;
+
+        if (isActive) {
+          return (
+            <div className="flex flex-wrap gap-1">
+              <Badge className="bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs px-1.5 py-0.5 font-semibold">
+                Active Beta Member
+              </Badge>
+              {tierLabel && (
+                <Badge
+                  className={`text-xs px-1.5 py-0.5 border font-medium ${
+                    prospect.betaDiscountTier === "founding_10"
+                      ? "bg-teal-100 text-teal-800 border-teal-200"
+                      : "bg-indigo-100 text-indigo-800 border-indigo-200"
+                  }`}
+                >
+                  {tierLabel}
+                </Badge>
+              )}
+            </div>
+          );
+        }
+
+        if (isFreed) {
+          return (
+            <div className="flex flex-wrap gap-1">
+              <Badge className="bg-gray-100 text-gray-500 border border-gray-200 text-xs px-1.5 py-0.5 font-medium">
+                Beta Slot Freed
+              </Badge>
+              {tierLabel && (
+                <Badge className="bg-gray-50 text-gray-400 border border-gray-200 text-xs px-1.5 py-0.5 font-medium">
+                  {tierLabel}
+                </Badge>
+              )}
+            </div>
+          );
+        }
+
+        return (
+          <div className="flex flex-wrap gap-1">
+            <Badge className="bg-violet-100 text-violet-800 border border-violet-200 text-xs px-1.5 py-0.5 font-semibold">
+              Beta Applicant
             </Badge>
-          )}
-        </div>
-      )}
+          </div>
+        );
+      })()}
 
       {prospect.confirmationEmailStatus && prospect.confirmationEmailStatus !== "sent" && !DEMO_STAGES_SET.has(prospect.stage) && (
         <button
