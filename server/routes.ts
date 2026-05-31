@@ -12,6 +12,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { ObjectStorageService } from "./objectStorage";
 import { importSampleData } from "./import-data";
 import { getBrandingLevel, enforceBrandingPolicy, getBrandingCapabilities } from "./branding";
+import { getHubifyHomesLogoUrl } from "./brandAsset";
 import { 
   AuditLogger, 
   MFAEnforcement, 
@@ -16219,11 +16220,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resend.emails.send({
           from: fromEmail,
           to: email,
+          replyTo: "contact@hubifyhomesonline.com",
           subject: `We received your message — Hubify Homes`,
           html: `
             <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
               <div style="text-align:center;margin-bottom:28px">
-                <img src="https://hubifyhomes.com/hubify-logo.png" alt="Hubify" width="130" style="height:auto;display:inline-block" onerror="this.style.display='none'" />
+                <img src="${getHubifyHomesLogoUrl()}" alt="Hubify" width="130" style="height:auto;display:inline-block" onerror="this.style.display='none'" />
                 <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px;margin-top:4px">Hubify Homes</div>
               </div>
               <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Thanks for reaching out${name ? `, ${name.split(" ")[0]}` : ""}!</h1>
