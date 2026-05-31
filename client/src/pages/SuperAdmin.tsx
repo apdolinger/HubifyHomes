@@ -2239,6 +2239,7 @@ type BetaMember = {
   createdAt: string | null;
   stage: string | null;
   submissionStatus: string | null;
+  source: string | null;
 };
 
 type BetaStatus = {
@@ -2384,9 +2385,17 @@ function BetaProgramTab() {
                       <TableCell className="text-slate-600 text-sm">{member.email ?? "—"}</TableCell>
                       <TableCell className="text-slate-600 text-sm">{member.company ?? "—"}</TableCell>
                       <TableCell>
-                        <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full border ${tl.cls}`}>
-                          {tl.text}
-                        </span>
+                        <div className="flex flex-col gap-1">
+                          <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full border ${tl.cls}`}>
+                            {tl.text}
+                          </span>
+                          {member.source === "beta_application" && (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-200 w-fit">
+                              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                              From pipeline
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full border ${stageBadge.cls}`}>
