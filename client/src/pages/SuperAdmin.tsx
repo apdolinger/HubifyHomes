@@ -1246,13 +1246,19 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
     onError: (error: Error) => {
       const match = error.message.match(/^\d+: (.+)$/);
       let description = "Failed to save prospect";
+      let statusCode = 0;
       if (match) {
+        statusCode = parseInt(error.message);
         try {
           const parsed = JSON.parse(match[1]);
           if (parsed?.message) description = parsed.message;
         } catch {
           description = match[1];
         }
+      }
+      if (statusCode === 409) {
+        form.setError("email", { type: "manual", message: description });
+        return;
       }
       toast({ title: "Error", description, variant: "destructive" });
     },
