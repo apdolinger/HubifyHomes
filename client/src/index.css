@@ -5,23 +5,23 @@
 :root {
   --background: hsl(0, 0%, 100%);
   --foreground: hsl(222.2, 84%, 4.9%);
-  --muted: hsl(174, 30%, 97%);
+  --muted: hsl(192, 30%, 97%);
   --muted-foreground: hsl(215.4, 16.3%, 46.9%);
   --popover: hsl(0, 0%, 100%);
   --popover-foreground: hsl(222.2, 84%, 4.9%);
   --card: hsl(0, 0%, 100%);
   --card-foreground: hsl(222.2, 84%, 4.9%);
-  --border: hsl(174, 20%, 91%);
-  --input: hsl(174, 20%, 91%);
-  --primary: hsl(177, 57%, 45%);
+  --border: hsl(192, 20%, 91%);
+  --input: hsl(192, 20%, 91%);
+  --primary: hsl(192, 100%, 45%);
   --primary-foreground: hsl(0, 0%, 100%);
-  --secondary: hsl(174, 30%, 97%);
+  --secondary: hsl(192, 30%, 97%);
   --secondary-foreground: hsl(222.2, 84%, 4.9%);
-  --accent: hsl(174, 30%, 97%);
+  --accent: hsl(192, 30%, 97%);
   --accent-foreground: hsl(222.2, 84%, 4.9%);
   --destructive: hsl(0, 84.2%, 60.2%);
   --destructive-foreground: hsl(210, 40%, 98%);
-  --ring: hsl(177, 57%, 45%);
+  --ring: hsl(192, 100%, 45%);
   --radius: 0.75rem;
   
   /* Custom colors for property management */
@@ -37,11 +37,11 @@
   --slate-900: hsl(222.2, 84%, 4.9%);
   
   /* Brand teal palette — replaces blue as the primary accent */
-  --teal-50: hsl(174, 100%, 96%);
-  --teal-100: hsl(175, 77%, 90%);
-  --teal-500: hsl(177, 57%, 45%);
-  --teal-600: hsl(178, 63%, 38%);
-  --teal-700: hsl(178, 68%, 30%);
+  --teal-50: hsl(192, 100%, 96%);
+  --teal-100: hsl(192, 100%, 90%);
+  --teal-500: hsl(192, 100%, 45%);
+  --teal-600: hsl(192, 100%, 37%);
+  --teal-700: hsl(192, 100%, 28%);
   
   --red-50: hsl(0, 85.7%, 97.3%);
   --red-100: hsl(0, 93.3%, 94.1%);
