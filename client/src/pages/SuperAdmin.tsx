@@ -571,6 +571,15 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
 
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
 
+  const betaPricingPreview = useQuery({
+    queryKey: ["/api/super-admin/onboarding-prospects", submission.id, "approve-beta", "preview"],
+    queryFn: () =>
+      fetch(`/api/super-admin/onboarding-prospects/${submission.id}/approve-beta/preview`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : null),
+    enabled: approveDialogOpen && isBetaApp && !isBetaApproved,
+    staleTime: 30_000,
+  });
+
   const approveBetaMutation = useMutation({
     mutationFn: (id: string) =>
       apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/approve-beta`, {}),
@@ -593,6 +602,7 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
 
   const isBetaApp = submission.source === "beta_application";
   const isBetaApproved = !!(submission.isBetaMember && !submission.betaRemovedAt);
+  const showBetaApprovalDetails = isBetaApproved || submission.stage === "agreement_pending";
 
   return (
     <Sheet open onOpenChange={handleClose}>
@@ -703,33 +713,96 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
             </div>
           </div>
 
-          {/* Beta Application Questions — only for beta_application source */}
-          {isBetaApp && (submission.whyInterested || submission.biggestChallenge || submission.launchTimeframe) && (
+          {/* Beta Application — always shown for beta_application source; covers all 11 fields */}
+          {isBetaApp && (
             <>
               <Separator />
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-teal-600 mb-3">Beta Application</p>
-                <div className="space-y-4 text-sm">
-                  {submission.whyInterested && (
+                <div className="grid grid-cols-2 gap-3 text-sm mb-4">
+                  {submission.company && (
+                    <div className="col-span-2">
+                      <p className="text-muted-foreground text-xs mb-0.5">Organization Name</p>
+                      <p className="font-medium">{submission.company}</p>
+                    </div>
+                  )}
+                  {submission.website && (
+                    <div className="col-span-2">
+                      <p className="text-muted-foreground text-xs mb-0.5">Website</p>
+                      <a href={submission.website.startsWith("http") ? submission.website : `https://${submission.website}`} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline break-all font-medium">{submission.website}</a>
+                    </div>
+                  )}
+                  {submission.businessType && (
+                    <div>
+                      <p className="text-muted-foreground text-xs mb-0.5">Business Type</p>
+                      <p className="font-medium capitalize">{submission.businessType.replace(/_/g, " ")}</p>
+                    </div>
+                  )}
+                  {submission.serviceArea && (
+                    <div>
+                      <p className="text-muted-foreground text-xs mb-0.5">Service Area</p>
+                      <p className="font-medium">{submission.serviceArea}</p>
+                    </div>
+                  )}
+                  {submission.estimatedHomes != null && (
+                    <div>
+                      <p className="text-muted-foreground text-xs mb-0.5">Properties Managed</p>
+                      <p className="font-medium">{submission.estimatedHomes}</p>
+                    </div>
+                  )}
+                  {submission.teamSize != null && (
+                    <div>
+                      <p className="text-muted-foreground text-xs mb-0.5">Staff Users Expected</p>
+                      <p className="font-medium">{submission.teamSize}</p>
+                    </div>
+                  )}
+                  {submission.currentMgmtMethod && (
+                    <div className="col-span-2">
+                      <p className="text-muted-foreground text-xs mb-0.5">Current Software / Method</p>
+                      <p className="font-medium capitalize">{submission.currentMgmtMethod.replace(/_/g, " ")}</p>
+                    </div>
+                  )}
+                  {submission.preferredContactMethod && (
+                    <div>
+                      <p className="text-muted-foreground text-xs mb-0.5">Preferred Contact</p>
+                      <p className="font-medium capitalize">{submission.preferredContactMethod}</p>
+                    </div>
+                  )}
+                </div>
+                {/* Beta-specific questions */}
+                <div className="space-y-3 text-sm">
+                  {submission.whyInterested ? (
                     <div>
                       <p className="text-muted-foreground text-xs mb-1 font-medium">Why interested in Hubify Homes?</p>
                       <p className="text-foreground leading-relaxed bg-muted/40 rounded p-2">{submission.whyInterested}</p>
                     </div>
+                  ) : (
+                    <div>
+                      <p className="text-muted-foreground text-xs mb-1 font-medium">Why interested in Hubify Homes?</p>
+                      <p className="text-muted-foreground italic text-xs">Not provided</p>
+                    </div>
                   )}
-                  {submission.biggestChallenge && (
+                  {submission.biggestChallenge ? (
                     <div>
                       <p className="text-muted-foreground text-xs mb-1 font-medium">Biggest operational challenge?</p>
                       <p className="text-foreground leading-relaxed bg-muted/40 rounded p-2">{submission.biggestChallenge}</p>
                     </div>
-                  )}
-                  {submission.launchTimeframe && (
+                  ) : (
                     <div>
-                      <p className="text-muted-foreground text-xs mb-1 font-medium">Preferred launch timeframe</p>
+                      <p className="text-muted-foreground text-xs mb-1 font-medium">Biggest operational challenge?</p>
+                      <p className="text-muted-foreground italic text-xs">Not provided</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-muted-foreground text-xs mb-1 font-medium">Preferred launch timeframe</p>
+                    {submission.launchTimeframe ? (
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-teal-50 text-teal-700 border border-teal-200">
                         {submission.launchTimeframe}
                       </span>
-                    </div>
-                  )}
+                    ) : (
+                      <p className="text-muted-foreground italic text-xs">Not provided</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </>
@@ -758,8 +831,8 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
             </div>
           </div>
 
-          {/* Beta Approval Details — shown only when isBetaMember = true */}
-          {isBetaApproved && (
+          {/* Beta Approval Details — shown when isBetaMember OR stage = agreement_pending */}
+          {showBetaApprovalDetails && (
             <>
               <Separator />
               <div className="rounded-lg border border-teal-200 bg-teal-50 p-4">
@@ -890,24 +963,76 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
             <DialogHeader>
               <DialogTitle>Approve Beta Application?</DialogTitle>
               <DialogDescription>
-                This will assign a cohort slot, compute the portfolio tier and discounted pricing from platform settings,
-                and move <strong>{displayName}</strong> ({submission.company}) to <strong>Agreement Pending</strong>.
-                This action cannot be undone without manually editing the prospect.
+                Review the computed pricing below, then confirm to move <strong>{displayName}</strong> to <strong>Agreement Pending</strong>.
               </DialogDescription>
             </DialogHeader>
-            <div className="rounded-md border border-teal-200 bg-teal-50 p-3 text-sm text-teal-800 space-y-1">
-              <p>✓ Cohort slot auto-assigned (50% or 25% off based on slot #)</p>
-              <p>✓ Portfolio tier derived from estimated properties</p>
-              <p>✓ Pricing looked up from platform pricing tiers</p>
-              <p>✓ Stage set to <strong>agreement_pending</strong></p>
-            </div>
+
+            {betaPricingPreview.isLoading && (
+              <div className="flex items-center justify-center py-6 text-muted-foreground text-sm gap-2">
+                <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-teal-600" />
+                Computing pricing…
+              </div>
+            )}
+
+            {betaPricingPreview.data && !betaPricingPreview.data.isFull && (
+              <div className="rounded-lg border border-teal-200 bg-teal-50 p-4 space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">Computed Approval Details</p>
+                <table className="w-full text-sm border-collapse">
+                  <tbody>
+                    <tr>
+                      <td className="py-1 pr-3 text-teal-600 w-40">Cohort #</td>
+                      <td className="py-1 font-semibold text-teal-900">{betaPricingPreview.data.cohortNumber} of {betaPricingPreview.data.totalSlotsAvailable}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-1 pr-3 text-teal-600">Portfolio Tier</td>
+                      <td className="py-1 font-semibold text-teal-900">{betaPricingPreview.data.portfolioTier}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-1 pr-3 text-teal-600">Discount</td>
+                      <td className="py-1 font-semibold text-teal-900">{betaPricingPreview.data.discountPct}% off (life-locked)</td>
+                    </tr>
+                    <tr>
+                      <td className="py-1 pr-3 text-teal-600">List Price</td>
+                      <td className="py-1 font-medium text-teal-800">${Number(betaPricingPreview.data.originalMonthlyPrice).toFixed(2)}/mo</td>
+                    </tr>
+                    <tr>
+                      <td className="py-1 pr-3 text-teal-600">Beta Price</td>
+                      <td className="py-1 font-bold text-teal-900 text-base">${Number(betaPricingPreview.data.discountedMonthlyPrice).toFixed(2)}/mo</td>
+                    </tr>
+                    {betaPricingPreview.data.setupFee > 0 && (
+                      <tr>
+                        <td className="py-1 pr-3 text-teal-600">Setup Fee</td>
+                        <td className="py-1 font-semibold text-teal-900">${Number(betaPricingPreview.data.setupFee).toFixed(2)}</td>
+                      </tr>
+                    )}
+                    <tr>
+                      <td className="py-1 pr-3 text-teal-600">Slots Remaining</td>
+                      <td className="py-1 font-semibold text-teal-900">{betaPricingPreview.data.slotsRemaining} after this approval</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {betaPricingPreview.data?.isFull && (
+              <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                ⚠ Beta program is full — no slots available. Remove an existing beta member before approving.
+              </div>
+            )}
+
+            {!betaPricingPreview.isLoading && !betaPricingPreview.data && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                Could not load pricing preview. You can still proceed and pricing will be computed on approval.
+              </div>
+            )}
+
             <DialogFooter className="gap-2 sm:gap-0">
               <Button variant="outline" onClick={() => setApproveDialogOpen(false)} disabled={approveBetaMutation.isPending}>
                 Cancel
               </Button>
               <Button
                 className="bg-teal-600 hover:bg-teal-700 text-white"
-                disabled={approveBetaMutation.isPending}
+                disabled={approveBetaMutation.isPending || betaPricingPreview.isLoading || betaPricingPreview.data?.isFull}
                 onClick={() => approveBetaMutation.mutate(submission.id)}
               >
                 {approveBetaMutation.isPending ? "Approving…" : "Confirm Approval"}

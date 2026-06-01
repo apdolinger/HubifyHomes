@@ -16329,7 +16329,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const processedNotes = data.notes ?? null;
+      // Build processedNotes — for beta applications, pack the question answers
+      // into the notes field for backward compatibility alongside the dedicated columns.
+      let processedNotes = data.notes ?? null;
+      if (intent === "beta_application") {
+        const betaParts = [
+          data.whyInterested ? `Why interested: ${data.whyInterested}` : null,
+          data.biggestChallenge ? `Biggest challenge: ${data.biggestChallenge}` : null,
+          data.launchTimeframe ? `Launch timeframe: ${data.launchTimeframe}` : null,
+        ].filter(Boolean).join("\n\n");
+        if (betaParts) {
+          processedNotes = processedNotes ? `${processedNotes}\n\n${betaParts}` : betaParts;
+        }
+      }
 
       const prospect = await storage.createOnboardingProspect({
         name: `${data.firstName} ${data.lastName}`.trim(),
@@ -17037,6 +17049,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error approving beta application:", error);
       res.status(500).json({ message: "Failed to approve beta application" });
+    }
+  });
+
+  // GET /api/super-admin/onboarding-prospects/:id/approve-beta/preview
+  // Returns the pricing that would be computed on approval WITHOUT committing anything.
+  app.get("/api/super-admin/onboarding-prospects/:id/approve-beta/preview", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const existing = await storage.getOnboardingProspect(id);
+      if (!existing) return res.status(404).json({ message: "Prospect not found" });
+      if (existing.source !== "beta_application") {
+        return res.status(400).json({ message: "Not a beta application." });
+      }
+      if ((existing as any).isBetaMember && !(existing as any).betaRemovedAt) {
+        return res.status(409).json({ message: "Already an approved beta member." });
+      }
+
+      const [{ activeBetaCount }] = await db
+        .select({ activeBetaCount: count() })
+        .from(onboardingProspects)
+        .where(
+          and(
+            eq(onboardingProspects.isBetaMember, true),
+            isNull(onboardingProspects.betaRemovedAt),
+            ne(onboardingProspects.id, id)
+          )
+        );
+
+      const settings = await storage.getPlatformSettings();
+      const bp = settings.betaPricing as any | undefined;
+      const tier1DiscountPct = Number(bp?.tier1DiscountPct ?? bp?.discountPct ?? 50);
+      const tier2DiscountPct = Number(bp?.tier2DiscountPct ?? 25);
+      const tier1Cap = Number(bp?.tier1Cap ?? 10);
+      const tier2Cap = Number(bp?.tier2Cap ?? 10);
+      const totalCap = tier1Cap + tier2Cap;
+
+      const slotsRemaining = totalCap - activeBetaCount;
+      const cohortNumber = activeBetaCount + 1;
+      const discountPct = cohortNumber <= tier1Cap ? tier1DiscountPct : tier2DiscountPct;
+
+      const homes = (existing as any).estimatedHomes ?? 0;
+      let portfolioTier: string;
+      if (homes >= 101) portfolioTier = "Enterprise Portfolio";
+      else if (homes >= 51) portfolioTier = "Operator Portfolio";
+      else if (homes >= 26) portfolioTier = "Professional Portfolio";
+      else if (homes >= 11) portfolioTier = "Growth Portfolio";
+      else portfolioTier = "Starter Portfolio";
+
+      const pricingTiers = (settings.pricingTiers ?? []) as Array<{
+        name: string; homesMin: number; homesMax: number;
+        monthlyPrice: number; setupFee: number;
+      }>;
+      const matchedTier = pricingTiers.find(t => homes >= t.homesMin && homes <= t.homesMax);
+      const originalMonthlyPrice = matchedTier ? Number(matchedTier.monthlyPrice) : Number(bp?.basePrice ?? 199);
+      const tierSetupFee = matchedTier ? Number(matchedTier.setupFee) : 0;
+      const discountedMonthlyPrice = Math.round(originalMonthlyPrice * (1 - discountPct / 100) * 100) / 100;
+
+      res.json({
+        prospectId: id,
+        prospectName: existing.name,
+        company: existing.company,
+        estimatedHomes: homes,
+        cohortNumber,
+        portfolioTier,
+        discountPct,
+        originalMonthlyPrice,
+        discountedMonthlyPrice,
+        setupFee: tierSetupFee,
+        totalSlotsAvailable: totalCap,
+        slotsRemaining,
+        isFull: slotsRemaining <= 0,
+        agreementStatus: "pending",
+      });
+    } catch (error) {
+      console.error("Error previewing beta approval:", error);
+      res.status(500).json({ message: "Failed to compute beta approval preview" });
     }
   });
 
