@@ -239,9 +239,9 @@ const betaSchema = z.object({
   serviceArea: z.string().optional(),
   currentSoftware: z.string().optional(),
   // Beta Questions
-  whyInterested: z.string().min(1, "Please tell us why you're interested"),
-  biggestChallenge: z.string().min(1, "Please describe your biggest challenge"),
-  launchTimeframe: z.string().min(1, "Please select a timeframe"),
+  whyInterested: z.string().optional(),
+  biggestChallenge: z.string().optional(),
+  launchTimeframe: z.string().optional(),
 });
 type BetaValues = z.infer<typeof betaSchema>;
 
@@ -474,7 +474,7 @@ function BetaVariantForm({ onSuccess, compact }: { onSuccess?: () => void; compa
           <div className="space-y-4">
             <FormField control={form.control} name="whyInterested" render={({ field }) => (
               <FormItem>
-                <FormLabel>Why are you interested in Hubify Homes? *</FormLabel>
+                <FormLabel>Why are you interested in Hubify Homes?</FormLabel>
                 <FormControl>
                   <Textarea
                     rows={3}
@@ -487,7 +487,7 @@ function BetaVariantForm({ onSuccess, compact }: { onSuccess?: () => void; compa
             )} />
             <FormField control={form.control} name="biggestChallenge" render={({ field }) => (
               <FormItem>
-                <FormLabel>What is your biggest operational challenge? *</FormLabel>
+                <FormLabel>What is your biggest operational challenge?</FormLabel>
                 <FormControl>
                   <Textarea
                     rows={3}
@@ -500,7 +500,7 @@ function BetaVariantForm({ onSuccess, compact }: { onSuccess?: () => void; compa
             )} />
             <FormField control={form.control} name="launchTimeframe" render={({ field }) => (
               <FormItem>
-                <FormLabel>Preferred launch timeframe? *</FormLabel>
+                <FormLabel>Preferred launch timeframe?</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
