@@ -269,7 +269,7 @@ export default function Landing() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* ── Hero ─────────────────────────────────────────────────────────── */}
         <div className="pt-16 pb-4 text-center">
-          <div className="h-28 sm:h-36 overflow-hidden flex justify-center items-start mx-auto max-w-xs sm:max-w-sm mb-2">
+          <div className="h-52 overflow-hidden flex justify-center items-start mx-auto max-w-xs sm:max-w-sm mb-2">
             <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="w-full h-auto" />
           </div>
           <p className="mt-0 max-w-md mx-auto text-base text-slate-600 sm:text-lg md:text-xl md:max-w-3xl">
