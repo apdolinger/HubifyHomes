@@ -8,6 +8,7 @@ import MyTasks from '@/components/portal/MyTasks';
 import MyInvoices from '@/components/portal/MyInvoices';
 import MyDocuments from '@/components/portal/MyDocuments';
 import MyServices from '@/components/portal/MyServices';
+import MyInspections from '@/components/portal/MyInspections';
 import { Button } from '@/components/ui/button';
 import { LogOut, Loader2, Bell } from 'lucide-react';
 import LegalLinks from '@/components/LegalLinks';
@@ -81,12 +82,14 @@ export default function Portal() {
             <TabsTrigger value="tasks" data-testid="tab-tasks">My Tasks</TabsTrigger>
             <TabsTrigger value="invoices" data-testid="tab-invoices">My Invoices</TabsTrigger>
             <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
+            <TabsTrigger value="inspections" data-testid="tab-inspections">Inspections</TabsTrigger>
             <TabsTrigger value="services" data-testid="tab-services">My Services</TabsTrigger>
           </TabsList>
           <TabsContent value="properties"><MyProperties /></TabsContent>
           <TabsContent value="tasks"><MyTasks /></TabsContent>
           <TabsContent value="invoices"><MyInvoices /></TabsContent>
           <TabsContent value="documents"><MyDocuments /></TabsContent>
+          <TabsContent value="inspections"><MyInspections /></TabsContent>
           <TabsContent value="services"><MyServices /></TabsContent>
         </Tabs>
       </main>

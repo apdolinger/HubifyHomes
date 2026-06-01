@@ -2538,6 +2538,7 @@ export class DatabaseStorage implements IStorage {
         assignedById: tasks.assignedById,
         dueDate: tasks.dueDate,
         completedAt: tasks.completedAt,
+        category: tasks.category,
         isArchived: tasks.isArchived,
         createdAt: tasks.createdAt,
         updatedAt: tasks.updatedAt,

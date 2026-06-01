@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Building2, MapPin, Loader2, Wrench } from 'lucide-react';
+import { ArrowLeft, Building2, MapPin, Loader2, Wrench, ClipboardCheck, FileText } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface PortalProperty {
   id: number;
@@ -21,6 +22,15 @@ interface PortalProperty {
   squareFootage: number | null;
   description: string | null;
   imageUrl: string | null;
+}
+
+interface PortalInspection {
+  id: number;
+  title: string;
+  completedAt: string | null;
+  dueDate: string | null;
+  propertyId: number | null;
+  propertyName: string | null;
 }
 
 interface PortalService {
@@ -74,6 +84,18 @@ export default function PortalPropertyDetail() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to load services');
+      return res.json();
+    },
+    enabled: !!token && !!user?.id && !!id,
+  });
+
+  const { data: inspections, isLoading: inspectionsLoading } = useQuery<PortalInspection[]>({
+    queryKey: ['/api/portal/inspections', user?.id, id],
+    queryFn: async () => {
+      const res = await fetch(`/api/portal/inspections?propertyId=${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to load inspections');
       return res.json();
     },
     enabled: !!token && !!user?.id && !!id,
@@ -148,6 +170,47 @@ export default function PortalPropertyDetail() {
             </CardContent>
           </Card>
         )}
+
+        {/* Inspection history section */}
+        <Card data-testid="portal-property-inspections">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <ClipboardCheck className="h-5 w-5 text-muted-foreground" />
+              <CardTitle className="text-base">Inspection Reports</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {inspectionsLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : !inspections || inspections.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No completed inspections for this property.</p>
+            ) : (
+              <ul className="divide-y" data-testid="inspections-list">
+                {inspections.map((insp) => (
+                  <li key={insp.id} className="py-3 flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{insp.title}</p>
+                      {insp.completedAt && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Completed {format(new Date(insp.completedAt), 'MMM d, yyyy')}
+                        </p>
+                      )}
+                    </div>
+                    <Link href={`/portal/inspections/${insp.id}`}>
+                      <Button variant="outline" size="sm" className="gap-1.5 shrink-0">
+                        <FileText className="h-3.5 w-3.5" />
+                        View Report
+                      </Button>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Services section */}
         <Card data-testid="portal-property-services">

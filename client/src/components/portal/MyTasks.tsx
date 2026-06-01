@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'wouter';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { CheckSquare } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { CheckSquare, FileText } from 'lucide-react';
 import { usePortalAuth } from '@/contexts/PortalAuthContext';
 import { format } from 'date-fns';
 
@@ -14,6 +16,7 @@ interface PortalTask {
   dueDate: string | null;
   propertyId: number | null;
   propertyName: string | null;
+  category: string | null;
 }
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -71,6 +74,14 @@ export default function MyTasks() {
                 <Badge variant={STATUS_VARIANT[t.status] || 'secondary'} className="capitalize">
                   {t.status.replace(/_/g, ' ')}
                 </Badge>
+                {t.category === 'inspection' && t.status === 'completed' && (
+                  <Link href={`/portal/inspections/${t.id}`}>
+                    <Button variant="outline" size="sm" className="gap-1.5">
+                      <FileText className="h-3.5 w-3.5" />
+                      Report
+                    </Button>
+                  </Link>
+                )}
               </div>
             </div>
           );

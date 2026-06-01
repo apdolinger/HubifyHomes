@@ -1,1 +1,3 @@
 - [SubmissionForm variants](submission-form-variants.md) — form branches into ContactVariant/BetaVariant/FullInquiry based on SubmissionIntent; beta posts to /api/public/inquire with trialIntent="beta_application"; contact posts to /api/public/contact
+- [Tasks table has no org_id](tasks-org-scoping.md) — tasks scope through propertyId→properties.org_id; never check task.orgId directly
+- [Portal inspection scoping](portal-inspection-scoping.md) — portal inspection endpoints gate on portal_user_properties list, not task.orgId; getTasksByPropertyIds must include category column

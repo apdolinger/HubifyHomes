@@ -2408,6 +2408,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dueDate: Date | null;
         propertyId: number | null;
         propertyName: string | null;
+        category: string | null;
       }> = [];
       for (const t of taskRows) {
         if (!t.propertyId || !propsById.has(t.propertyId)) continue;
@@ -2420,6 +2421,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           dueDate: t.dueDate,
           propertyId: t.propertyId,
           propertyName: propsById.get(t.propertyId) || null,
+          category: (t as any).category ?? null,
         });
       }
       merged.sort((a, b) => {
@@ -2798,6 +2800,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching portal documents:', error);
       res.status(500).json({ message: 'Failed to fetch documents' });
+    }
+  });
+
+  // Portal inspections — list completed inspection reports for the portal user's properties
+  app.get('/api/portal/inspections', isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const portalUser = req.portalUser;
+      const links = await storage.getPortalUserProperties(portalUser.id);
+      const propertyIds = links.map((l: any) => l.propertyId);
+      if (propertyIds.length === 0) return res.json([]);
+      const { tasks: tasksTable, properties: propsTable } = await import('@shared/schema');
+      const { eq, and, inArray, desc: descOp } = await import('drizzle-orm');
+      const filterPropertyId = req.query.propertyId ? parseInt(req.query.propertyId as string) : null;
+      const effectivePropertyIds =
+        filterPropertyId && propertyIds.includes(filterPropertyId)
+          ? [filterPropertyId]
+          : filterPropertyId
+          ? []
+          : propertyIds;
+      if (effectivePropertyIds.length === 0) return res.json([]);
+      const rows = await db
+        .select({
+          id: tasksTable.id,
+          title: tasksTable.title,
+          status: tasksTable.status,
+          completedAt: tasksTable.completedAt,
+          dueDate: tasksTable.dueDate,
+          propertyId: tasksTable.propertyId,
+          propertyName: propsTable.name,
+        })
+        .from(tasksTable)
+        .leftJoin(propsTable, eq(tasksTable.propertyId, propsTable.id))
+        .where(
+          and(
+            eq(tasksTable.category, 'inspection'),
+            eq(tasksTable.status, 'completed'),
+            inArray(tasksTable.propertyId, effectivePropertyIds),
+          )
+        )
+        .orderBy(descOp(tasksTable.completedAt));
+      res.json(rows);
+    } catch (error) {
+      console.error('Error fetching portal inspections:', error);
+      res.status(500).json({ message: 'Failed to fetch inspections' });
+    }
+  });
+
+  // Portal inspection report detail
+  app.get('/api/portal/inspections/:id', isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const portalUser = req.portalUser;
+      const taskId = parseInt(req.params.id);
+      // Security: verify task property is in portal user's allowed list (which is org-scoped)
+      const links = await storage.getPortalUserProperties(portalUser.id);
+      const allowedPropertyIds = links.map((l: any) => l.propertyId);
+      const task = await storage.getTask(taskId);
+      if (!task) return res.status(404).json({ message: 'Not found' });
+      if ((task as any).category !== 'inspection' || (task as any).status !== 'completed') {
+        return res.status(404).json({ message: 'Not found' });
+      }
+      if (!(task as any).propertyId || !allowedPropertyIds.includes((task as any).propertyId)) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      const checklistItems = await storage.getTaskChecklistItems(taskId);
+      const passCount = checklistItems.filter((i: any) => i.result === 'pass').length;
+      const failCount = checklistItems.filter((i: any) => i.result === 'fail').length;
+      const naCount = checklistItems.filter((i: any) => i.result === 'na').length;
+      const pendingCount = checklistItems.filter((i: any) => !i.result).length;
+      res.json({ task, checklistItems, summary: { passCount, failCount, naCount, pendingCount } });
+    } catch (error) {
+      console.error('Error fetching portal inspection report:', error);
+      res.status(500).json({ message: 'Failed to fetch inspection report' });
+    }
+  });
+
+  // Portal inspection report PDF download
+  app.get('/api/portal/inspections/:id/pdf', isPortalAuthenticated, async (req: any, res) => {
+    try {
+      const portalUser = req.portalUser;
+      const taskId = parseInt(req.params.id);
+      // Security: verify task property is in portal user's allowed list (which is org-scoped)
+      const links = await storage.getPortalUserProperties(portalUser.id);
+      const allowedPropertyIds = links.map((l: any) => l.propertyId);
+      const task = await storage.getTask(taskId);
+      if (!task) return res.status(404).json({ message: 'Not found' });
+      if ((task as any).category !== 'inspection' || (task as any).status !== 'completed') {
+        return res.status(404).json({ message: 'Not found' });
+      }
+      if (!(task as any).propertyId || !allowedPropertyIds.includes((task as any).propertyId)) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      const checklistItems = await storage.getTaskChecklistItems(taskId);
+      const pdfBuffer = await buildInspectionReportPdf(task, checklistItems, {});
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="inspection-report-${taskId}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('Error generating portal inspection PDF:', error);
+      res.status(500).json({ message: 'Failed to generate PDF' });
     }
   });
 
