@@ -1,0 +1,97 @@
+#229 - Beta Approval Email & Agreement Initiation
+
+What & Why
+
+When a Super Admin clicks "Approve Beta Application", the applicant should immediately receive an approval email that starts onboarding.
+
+Approval should not simply update internal status fields. It should begin the onboarding journey by directing the applicant to complete:
+
+1. Beta Agreement
+2. Payment Setup
+3. Platform Initialization
+
+Done Looks Like
+
+When a Super Admin clicks "Approve Beta Application":
+
+* Pricing is calculated.
+* Beta cohort is assigned.
+* Portfolio tier is assigned.
+* Agreement status is set to Pending.
+* An approval email is automatically sent.
+
+If the email sends successfully:
+
+* stage = agreement_pending
+* approvalEmailSent = true
+* approvalEmailSentAt is recorded
+
+If the email fails:
+
+* approval action should fail and notify the admin
+* do not move the prospect to agreement_pending
+* keep them in review status
+
+Email Contents
+
+The email should include:
+
+Organization Name
+
+Property Count
+
+Assigned Portfolio Tier
+
+Original Monthly Price
+
+Discount Percentage
+
+Discounted Monthly Price
+
+One-Time Database Initialization Fee
+
+Beta Cohort Number
+
+A statement that beta pricing is locked in for the life of their active subscription while remaining in good standing.
+
+The email should contain a prominent button:
+
+"Start Onboarding"
+
+The onboarding link should direct them to the upcoming agreement workflow.
+
+Example URL:
+
+https://hubifyhomesonline.com/onboarding/{secure-token}
+
+Security
+
+Generate a unique onboarding token.
+
+Store:
+
+* onboardingToken
+* onboardingTokenCreatedAt
+* onboardingTokenExpiresAt
+
+The onboarding link should use this token rather than exposing prospect IDs.
+
+Future Workflow
+
+The onboarding page launched from the email will eventually include:
+
+Step 1: Agreement Review & Signature
+
+Step 2: Payment Method Setup
+
+Step 3: Platform Initialization
+
+Step 4: Welcome to Hubify Homes
+
+Out of Scope
+
+Agreement generation itself.
+Stripe checkout implementation.
+Organization provisioning.
+
+Those will be subsequent tasks.
