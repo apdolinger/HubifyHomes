@@ -8049,9 +8049,16 @@ export class DatabaseStorage implements IStorage {
     const existing = await this.getOnboardingProspect(id);
     if (!existing) throw new Error(`Onboarding prospect ${id} not found`);
 
-    let stageHistory = existing.stageHistory ?? [];
+    // If the caller explicitly provides stageHistory, use it as the base so callers
+    // can pre-inject milestone entries (e.g. "beta_approved") before a stage transition.
+    // Falls back to existing history when not provided.
+    const baseHistory: any[] = (patch as any).stageHistory != null
+      ? (patch as any).stageHistory
+      : (existing.stageHistory ?? []);
+
+    let stageHistory = baseHistory;
     if (patch.stage && patch.stage !== existing.stage) {
-      stageHistory = [...stageHistory, { stage: patch.stage, enteredAt: new Date().toISOString() }];
+      stageHistory = [...baseHistory, { stage: patch.stage, enteredAt: new Date().toISOString() }];
     }
 
     const [row] = await db
