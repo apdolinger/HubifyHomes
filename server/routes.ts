@@ -12543,18 +12543,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/orgs/:orgId/stripe-connection", isAuthenticated, async (req, res) => {
     try {
       const { orgId } = req.params;
-      
-      // Verify user belongs to org
-      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+      const userOrgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
+      const userRole = (req.user as any)?.claims?.role || (req.user as any)?.role;
+
+      if (userOrgId !== orgId && userRole !== "admin") {
         return res.status(403).json({ message: "Access denied" });
       }
 
       const connection = await storage.getOrgStripeConnection(orgId);
-      
-      // Hide sensitive data
+
       if (connection) {
-        const { stripeSecretKey, accessToken, refreshToken, ...safeConnection } = connection;
-        res.json(safeConnection);
+        // Strip secrets; expose a boolean so the frontend knows whether the webhook is set
+        const { stripeSecretKey, accessToken, refreshToken, stripeWebhookSecret, ...safeConnection } = connection;
+        res.json({
+          ...safeConnection,
+          hasWebhookSecret: !!stripeWebhookSecret,
+        });
       } else {
         res.json(null);
       }
@@ -12567,20 +12571,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/orgs/:orgId/stripe-connection", isAuthenticated, async (req, res) => {
     try {
       const { orgId } = req.params;
-      
-      // Verify user belongs to org or is platform admin
-      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+      const userOrgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
+      const userRole = (req.user as any)?.claims?.role || (req.user as any)?.role;
+      const userEmail = (req.user as any)?.claims?.email || (req.user as any)?.email || "";
+
+      if (userOrgId !== orgId && userRole !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
       }
 
       const { accountType, stripePublishableKey, stripeSecretKey } = req.body;
 
       if (accountType === "direct") {
+        const { encrypt } = await import("./encryption");
         const connection = await storage.createOrgStripeConnection({
           orgId,
           accountType: "direct",
           stripePublishableKey,
-          stripeSecretKey, // TODO: Encrypt in production
+          stripeSecretKey: stripeSecretKey ? encrypt(stripeSecretKey) : undefined,
           isActive: true,
         });
 
@@ -12588,13 +12595,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(201).json(safeConnection);
       } else if (accountType === "connect") {
         const org = await storage.getOrg(orgId);
-        if (!org) {
-          return res.status(404).json({ message: "Organization not found" });
-        }
+        if (!org) return res.status(404).json({ message: "Organization not found" });
 
         const { createStripeConnectAccount } = await import("./stripe");
-        const account = await createStripeConnectAccount(orgId, org.name, req.user.email || "");
-        
+        const account = await createStripeConnectAccount(orgId, org.name, userEmail);
         res.status(201).json({ accountId: account.id });
       } else {
         res.status(400).json({ message: "Invalid account type" });
@@ -12605,12 +12609,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PATCH — update individual fields (webhook secret, etc.) without re-creating the whole connection
+  app.patch("/api/orgs/:orgId/stripe-connection", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const userOrgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
+      const userRole = (req.user as any)?.claims?.role || (req.user as any)?.role;
+
+      if (userOrgId !== orgId && userRole !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { stripeWebhookSecret } = req.body;
+      const updates: Record<string, any> = {};
+
+      if (typeof stripeWebhookSecret !== "undefined") {
+        updates.stripeWebhookSecret = stripeWebhookSecret || null;
+      }
+
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ message: "No fields to update" });
+      }
+
+      // Upsert: update if exists, create a minimal record if not
+      let existing = await storage.getOrgStripeConnection(orgId);
+      let connection;
+      if (existing) {
+        connection = await storage.updateOrgStripeConnection(orgId, updates);
+      } else {
+        connection = await storage.createOrgStripeConnection({ orgId, accountType: "direct", isActive: false, ...updates } as any);
+      }
+
+      if (!connection) {
+        return res.status(500).json({ message: "Failed to save connection" });
+      }
+
+      const { stripeSecretKey, accessToken, refreshToken, stripeWebhookSecret: secret, ...safeConnection } = connection;
+      res.json({ ...safeConnection, hasWebhookSecret: !!secret });
+    } catch (error) {
+      console.error("Error updating Stripe connection:", error);
+      res.status(500).json({ message: "Failed to update Stripe connection" });
+    }
+  });
+
   app.delete("/api/orgs/:orgId/stripe-connection", isAuthenticated, async (req, res) => {
     try {
       const { orgId } = req.params;
-      
-      // Verify user belongs to org or is platform admin
-      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+      const userOrgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
+      const userRole = (req.user as any)?.claims?.role || (req.user as any)?.role;
+
+      if (userOrgId !== orgId && userRole !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -12622,19 +12670,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Returns whether this org is payment-ready (used by admin invoice list for the warning banner)
+  app.get("/api/orgs/:orgId/payment-readiness", isAuthenticated, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const userOrgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
+      const userRole = (req.user as any)?.claims?.role || (req.user as any)?.role;
+
+      if (userOrgId !== orgId && userRole !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const connection = await storage.getOrgStripeConnection(orgId);
+      const webhookConfigured =
+        !!(connection?.stripeWebhookSecret) ||
+        !!(process.env[`STRIPE_ORG_WEBHOOK_SECRET_${orgId}`]) ||
+        !!(process.env.STRIPE_ORG_WEBHOOK_SECRET);
+
+      res.json({
+        stripeConnected: !!(connection?.isActive),
+        webhookConfigured,
+        accountType: connection?.accountType ?? null,
+      });
+    } catch (error) {
+      console.error("Error checking payment readiness:", error);
+      res.status(500).json({ message: "Failed to check payment readiness" });
+    }
+  });
+
   app.post("/api/orgs/:orgId/stripe-connect/account-link", isAuthenticated, async (req, res) => {
     try {
       const { orgId } = req.params;
-      const { accountId, returnUrl, refreshUrl } = req.body;
-      
-      // Verify user belongs to org or is platform admin
-      if (req.user?.orgId !== orgId && req.user?.role !== "admin") {
+      const userOrgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
+      const userRole = (req.user as any)?.claims?.role || (req.user as any)?.role;
+      const userEmail = (req.user as any)?.claims?.email || (req.user as any)?.email || "";
+
+      if (userOrgId !== orgId && userRole !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
       }
 
-      const { createStripeConnectAccountLink } = await import("./stripe");
-      const accountLink = await createStripeConnectAccountLink(accountId, returnUrl, refreshUrl);
-      
+      const { createStripeConnectAccount, createStripeConnectAccountLink } = await import("./stripe");
+
+      // Auto-create the Connect account if one doesn't exist yet
+      let connection = await storage.getOrgStripeConnection(orgId);
+      let stripeAccountId = connection?.stripeAccountId;
+
+      if (!stripeAccountId) {
+        const org = await storage.getOrg(orgId);
+        if (!org) return res.status(404).json({ message: "Organization not found" });
+        const account = await createStripeConnectAccount(orgId, org.name, userEmail);
+        stripeAccountId = account.id;
+      }
+
+      // Build return/refresh URLs from the request host so they always match the deployment
+      const host = `${req.protocol}://${req.get("host")}`;
+      const returnUrl = `${host}/api/orgs/${orgId}/stripe-connect/return`;
+      const refreshUrl = `${host}/api/orgs/${orgId}/stripe-connect/refresh`;
+
+      const accountLink = await createStripeConnectAccountLink(stripeAccountId, returnUrl, refreshUrl);
       res.json(accountLink);
     } catch (error) {
       console.error("Error creating account link:", error);

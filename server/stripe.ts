@@ -59,8 +59,9 @@ export async function getOrgStripe(orgId: string): Promise<{ stripe: Stripe; acc
 
   // If using direct API keys
   if (connection.accountType === "direct" && connection.stripeSecretKey) {
+    const { decrypt } = await import("./encryption");
     return {
-      stripe: new Stripe(connection.stripeSecretKey, {
+      stripe: new Stripe(decrypt(connection.stripeSecretKey), {
         apiVersion: "2024-11-20.acacia",
       }),
       publishableKey: connection.stripePublishableKey,
@@ -224,12 +225,33 @@ export async function handleMasterWebhook(event: Stripe.Event) {
       case "invoice.payment_failed":
         await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
         break;
+
+      case "account.updated":
+        await handleConnectAccountUpdated(event.data.object as Stripe.Account);
+        break;
     }
 
     await storage.markWebhookProcessed(event.id);
   } catch (error) {
     await storage.markWebhookProcessed(event.id, (error as Error).message);
     throw error;
+  }
+}
+
+async function handleConnectAccountUpdated(account: Stripe.Account) {
+  const orgId = account.metadata?.orgId;
+  if (!orgId) return;
+
+  try {
+    await storage.updateOrgStripeConnection(orgId, {
+      isActive: account.charges_enabled || account.details_submitted,
+      chargesEnabled: account.charges_enabled,
+      payoutsEnabled: account.payouts_enabled,
+      detailsSubmitted: account.details_submitted,
+      lastSyncedAt: new Date(),
+    });
+  } catch {
+    // Connection may not exist yet; ignore
   }
 }
 

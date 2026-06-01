@@ -156,6 +156,9 @@ export const orgStripeConnections = pgTable("org_stripe_connections", {
   payoutsEnabled: boolean("payouts_enabled").default(false),
   detailsSubmitted: boolean("details_submitted").default(false),
   
+  // Webhook configuration (self-serve — avoids per-org env vars)
+  stripeWebhookSecret: varchar("stripe_webhook_secret"),
+
   lastSyncedAt: timestamp("last_synced_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

@@ -741,6 +741,21 @@ export async function ensureOnboardingTrackerColumns(): Promise<void> {
   }
 }
 
+export async function ensureStripeWebhookSecretColumn(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE org_stripe_connections
+        ADD COLUMN IF NOT EXISTS stripe_webhook_secret VARCHAR;
+    `);
+    log("[MIGRATE] org_stripe_connections.stripe_webhook_secret column verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add stripe_webhook_secret to org_stripe_connections: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensurePortalInvitationColumns(): Promise<void> {
   const client = await pool.connect();
   try {

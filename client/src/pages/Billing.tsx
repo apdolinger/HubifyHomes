@@ -846,6 +846,12 @@ function InvoicesTab() {
     enabled: isAuthenticated,
   });
 
+  // Payment readiness — drives the amber banner
+  const { data: paymentReadiness } = useQuery({
+    queryKey: ["/api/orgs", orgId, "payment-readiness"],
+    enabled: isAuthenticated && !!orgId,
+  });
+
   const sendInvoiceMutation = useMutation({
     mutationFn: async ({ invoiceId, email, message }: { invoiceId: string; email: string; message?: string }) => {
       const user = await queryClient.fetchQuery({ queryKey: ["/api/auth/user"] }) as any;
@@ -954,6 +960,42 @@ function InvoicesTab() {
 
   return (
     <div className="space-y-4">
+      {/* Payment Readiness Banner — shown when Stripe is not yet connected */}
+      {paymentReadiness && !(paymentReadiness as any).stripeConnected && (
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-amber-200 bg-amber-50" data-testid="banner-stripe-not-configured">
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-amber-900">Stripe is not connected</p>
+            <p className="text-sm text-amber-800 mt-0.5">
+              Clients won't be able to pay invoices online until you connect Stripe.
+            </p>
+          </div>
+          <a
+            href="/settings/stripe"
+            className="shrink-0 text-sm font-medium text-amber-700 underline underline-offset-2 hover:text-amber-900"
+          >
+            Set up Stripe →
+          </a>
+        </div>
+      )}
+      {paymentReadiness && (paymentReadiness as any).stripeConnected && !(paymentReadiness as any).webhookConfigured && (
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-amber-200 bg-amber-50" data-testid="banner-webhook-not-configured">
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-amber-900">Webhook not configured</p>
+            <p className="text-sm text-amber-800 mt-0.5">
+              Invoice statuses won't update automatically after payment until you add a webhook signing secret.
+            </p>
+          </div>
+          <a
+            href="/settings/stripe"
+            className="shrink-0 text-sm font-medium text-amber-700 underline underline-offset-2 hover:text-amber-900"
+          >
+            Configure webhooks →
+          </a>
+        </div>
+      )}
+
       {/* Failed Payments Alert Widget */}
       {(failedInvoices.length > 0 || overdueInvoices.length > 0) && (
         <Card className="border-red-200 bg-red-50" data-testid="card-failed-payments">
@@ -1263,6 +1305,15 @@ function InvoicesTab() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {paymentReadiness && !(paymentReadiness as any).stripeConnected && (
+              <div className="flex items-start gap-2 p-3 rounded-md border border-amber-200 bg-amber-50 text-sm">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <span className="text-amber-800">
+                  Stripe is not connected — clients will receive the invoice but won't be able to pay online.{" "}
+                  <a href="/settings/stripe" className="underline font-medium">Set up Stripe →</a>
+                </span>
+              </div>
+            )}
             <div className="space-y-2">
               <label className="text-sm font-medium">Recipient Email</label>
               <Input

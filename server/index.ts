@@ -137,30 +137,94 @@ app.post("/api/stripe/webhooks/org/:orgId", express.raw({ type: "application/jso
   try {
     const { orgId } = req.params;
     const { getOrgStripe, handleOrgWebhook } = await import("./stripe");
-    
-    const orgStripeConnection = await getOrgStripe(orgId);
-    if (!orgStripeConnection) {
-      return res.status(404).json({ message: "Organization Stripe connection not found" });
-    }
+    const { storage } = await import("./storage");
 
+    // DB-stored secret takes priority over env vars — enables full self-serve per org
+    const connection = await storage.getOrgStripeConnection(orgId);
     const sig = req.headers["stripe-signature"];
-    const webhookSecret = process.env[`STRIPE_ORG_WEBHOOK_SECRET_${orgId}`] || process.env.STRIPE_ORG_WEBHOOK_SECRET;
+    const webhookSecret =
+      connection?.stripeWebhookSecret ||
+      process.env[`STRIPE_ORG_WEBHOOK_SECRET_${orgId}`] ||
+      process.env.STRIPE_ORG_WEBHOOK_SECRET;
 
     if (!sig || !webhookSecret) {
-      return res.status(400).json({ message: "Missing signature or webhook secret" });
+      return res.status(400).json({
+        message:
+          "Webhook secret not configured. Add your Stripe webhook signing secret in Settings → Stripe → Webhooks.",
+      });
     }
 
-    const event = orgStripeConnection.stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      webhookSecret
-    );
+    const orgStripeConnection = await getOrgStripe(orgId);
+    if (!orgStripeConnection) {
+      return res.status(404).json({ message: "Organization Stripe connection not found or inactive" });
+    }
 
+    // constructEvent is pure HMAC-SHA256 — no Stripe API call needed
+    const event = orgStripeConnection.stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
     await handleOrgWebhook(event, orgId);
     res.json({ received: true });
   } catch (error) {
     console.error("Organization webhook error:", error);
     res.status(400).json({ message: `Webhook Error: ${(error as Error).message}` });
+  }
+});
+
+// Stripe Connect return URL — Stripe bounces the browser here after onboarding completes
+app.get("/api/orgs/:orgId/stripe-connect/return", async (req, res) => {
+  try {
+    const { orgId } = req.params;
+    const { storage } = await import("./storage");
+    const { getMasterStripe } = await import("./stripe");
+
+    const connection = await storage.getOrgStripeConnection(orgId);
+    if (!connection?.stripeAccountId) {
+      return res.redirect("/settings/stripe?error=no_account");
+    }
+
+    const stripe = getMasterStripe();
+    const account = await stripe.accounts.retrieve(connection.stripeAccountId);
+
+    await storage.updateOrgStripeConnection(orgId, {
+      isActive: account.charges_enabled || account.details_submitted,
+      chargesEnabled: account.charges_enabled,
+      payoutsEnabled: account.payouts_enabled,
+      detailsSubmitted: account.details_submitted,
+      lastSyncedAt: new Date(),
+    });
+
+    const success = account.charges_enabled || account.details_submitted;
+    res.redirect(`/settings/stripe?${success ? "connected=true" : "onboarding=incomplete"}`);
+  } catch (error) {
+    console.error("Connect return error:", error);
+    res.redirect("/settings/stripe?error=verification_failed");
+  }
+});
+
+// Stripe Connect refresh URL — re-generates the onboarding link when user abandoned or link expired
+app.get("/api/orgs/:orgId/stripe-connect/refresh", async (req, res) => {
+  try {
+    const { orgId } = req.params;
+    const { storage } = await import("./storage");
+    const { createStripeConnectAccountLink } = await import("./stripe");
+
+    const connection = await storage.getOrgStripeConnection(orgId);
+    if (!connection?.stripeAccountId) {
+      return res.redirect("/settings/stripe?error=no_account");
+    }
+
+    const host = `${req.protocol}://${req.get("host")}`;
+    const returnUrl = `${host}/api/orgs/${orgId}/stripe-connect/return`;
+    const refreshUrl = `${host}/api/orgs/${orgId}/stripe-connect/refresh`;
+
+    const accountLink = await createStripeConnectAccountLink(
+      connection.stripeAccountId,
+      returnUrl,
+      refreshUrl
+    );
+    res.redirect(accountLink.url);
+  } catch (error) {
+    console.error("Connect refresh error:", error);
+    res.redirect("/settings/stripe?error=refresh_failed");
   }
 });
 
@@ -416,6 +480,12 @@ app.use((req, res, next) => {
         await ensureOnboardingTrackerColumns();
       } catch (err) {
         console.error('Error ensuring tracker columns on onboarding_prospects:', err);
+      }
+      try {
+        const { ensureStripeWebhookSecretColumn } = await import('./runMigrations.js');
+        await ensureStripeWebhookSecretColumn();
+      } catch (err) {
+        console.error('Error ensuring stripe_webhook_secret column:', err);
       }
     } catch (error) {
       console.error('Error loading startup migrations:', error);
