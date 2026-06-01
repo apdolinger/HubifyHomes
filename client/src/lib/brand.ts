@@ -1,4 +1,4 @@
-import logoUrl from "@assets/Hubify_Homes-2_1777805213575.png";
+import logoUrl from "@assets/hubify-homes-logo-new.png";
 import iconUrl from "@assets/hubify_homes_icon.png";
 
 export const HUBIFY_HOMES_LOGO_URL = logoUrl;

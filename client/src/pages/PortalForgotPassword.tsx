@@ -98,9 +98,9 @@ export default function PortalForgotPassword() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <img src={logoSrc} alt={logoAlt} className="h-14 w-auto" />
+            <img src={logoSrc} alt={logoAlt} className="h-24 w-24 object-contain rounded-xl" />
           </div>
-          <CardTitle className="text-2xl font-bold">{portalTitle} – Forgot Password</CardTitle>
+          <CardTitle className="text-2xl font-bold">Forgot Password</CardTitle>
           <CardDescription>Enter your email to receive a password reset link</CardDescription>
         </CardHeader>
         <CardContent>

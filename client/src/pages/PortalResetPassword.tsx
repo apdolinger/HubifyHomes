@@ -193,7 +193,7 @@ export default function PortalResetPassword() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="h-14 w-auto" />
+            <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="h-24 w-24 object-contain rounded-xl" />
           </div>
           <CardTitle className="text-2xl font-bold">Reset Your Password</CardTitle>
           <CardDescription>
