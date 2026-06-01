@@ -17053,21 +17053,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const orgName = existing.company ?? existing.name ?? "your organization";
 
       if (!resend || !fromEmail) {
-        // Email not configured — still commit the stage advance but flag email as unsent
-        await storage.updateOnboardingProspect(id, {
-          stage: "agreement_pending",
-          stageHistory: newHistory,
-          approvalEmailSent: false,
-        } as any);
-        const updated = await storage.getOnboardingProspect(id);
-        return res.status(200).json({
-          ...updated,
-          _warning: "Approval saved but email service is not configured. Use 'Resend Approval Email' once RESEND_FROM_EMAIL is set.",
+        // Email not configured — treat as failure; do NOT advance the stage.
+        return res.status(502).json({
+          message: "Approval fields saved but email service is not configured (RESEND_FROM_EMAIL missing). Fix the configuration and use 'Resend Approval Email' to complete approval.",
         });
       }
 
       try {
-        await resend.emails.send({
+        const sendResult = await resend.emails.send({
           from: fromEmail,
           to: existing.email,
           replyTo: "contact@hubifyhomesonline.com",
@@ -17153,6 +17146,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             </div>
           `,
         });
+        // Resend SDK can resolve with an error field instead of throwing
+        if (sendResult.error) {
+          const errMsg = (sendResult.error as any)?.message ?? JSON.stringify(sendResult.error);
+          console.error("[approve-beta] Approval email returned error:", errMsg);
+          return res.status(502).json({
+            message: `Prospect approved but the approval email failed to send: ${errMsg}. Use "Resend Approval Email" to retry.`,
+            emailError: errMsg,
+          });
+        }
       } catch (emailErr: any) {
         console.error("[approve-beta] Approval email failed:", emailErr?.message ?? emailErr);
         // Email failed — do NOT advance the stage. Return 502 so the admin sees the error.
@@ -17242,7 +17244,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const prospectHomes = (existing as any).estimatedHomes ?? 0;
 
       try {
-        await resend.emails.send({
+        const resendResult = await resend.emails.send({
           from: fromEmail,
           to: existing.email,
           replyTo: "contact@hubifyhomesonline.com",
@@ -17312,6 +17314,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             </div>
           `,
         });
+        // Resend SDK can resolve with an error field instead of throwing
+        if (resendResult.error) {
+          const errMsg = (resendResult.error as any)?.message ?? JSON.stringify(resendResult.error);
+          console.error("[resend-approval-email] Email returned error:", errMsg);
+          return res.status(502).json({
+            message: `Failed to send approval email: ${errMsg}. Please try again.`,
+            emailError: errMsg,
+          });
+        }
       } catch (emailErr: any) {
         console.error("[resend-approval-email] Email failed:", emailErr?.message ?? emailErr);
         return res.status(502).json({
