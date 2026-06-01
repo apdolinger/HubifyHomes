@@ -1,0 +1,93 @@
+Task: Beta Approval Email Automation + Resend
+
+We need the beta approval email to be sent automatically when a prospect is approved for beta, and we need the ability to resend it manually from Super Admin.
+
+Email Subject:
+{First Name}, you've been approved for Hubify Beta!
+
+Email Body Requirements:
+
+Use the existing branded Hubify email template system.
+
+Content:
+
+Congratulations, {First Name}!
+
+We're excited to confirm that {Org Name} has been approved for the Hubify Beta Program. Your spot is reserved — here are the details of your membership:
+
+Beta Membership Details card:
+
+* Organization: {Org Name}
+* Portfolio Tier: {Starter / Growth / Professional / Operator / Enterprise}
+* Properties: {N} properties — omit if 0 or unknown
+* Beta Cohort: Member #{N}
+* List Price: ${original}/mo
+* Beta Discount: {X}% off — locked for life
+* Your Monthly Price: ${discounted}/mo
+* Database Init Fee: ${fee} one-time — omit if $0
+
+Yellow callout:
+“Your beta pricing is locked in for life — as long as your subscription remains in good standing, your rate will never increase.”
+
+Main text:
+“To get started, complete your Beta Agreement, set up payment, and initialize your platform. The button below will take you through the entire onboarding process step by step.”
+
+CTA button:
+Start Onboarding →
+
+Button should link to the 7-day onboarding token URL.
+
+Footer:
+This link expires in 7 days. If you need a new link, reply to this email and we'll send one.
+
+Questions? Reply to this email — we're happy to help.
+Hubify Homes · [hello@hubifyhomesonline.com](mailto:hello@hubifyhomesonline.com)
+
+Automation Requirements:
+
+1. Automatically send this beta approval email when:
+
+* A prospect is moved into the “beta_approved” stage in onboarding
+* Or a Super Admin clicks an “Approve for Beta” action
+
+2. Generate a fresh 7-day onboarding token when the email is sent.
+
+3. Store tracking fields on the prospect record:
+
+* betaApprovalEmailSent: boolean
+* betaApprovalEmailSentAt: timestamp
+* betaApprovalEmailLastResentAt: timestamp nullable
+* onboardingTokenExpiresAt: timestamp
+* betaApprovalEmailSendError: text nullable
+
+4. Add resend ability in Super Admin:
+
+* Button: “Resend Beta Approval Email”
+* Should generate a fresh 7-day onboarding token
+* Should resend the same branded email
+* Should update betaApprovalEmailLastResentAt
+* Should show success/failure toast
+
+5. Super Admin UI should show:
+
+* Approval email status: Not Sent / Sent / Failed
+* Sent date
+* Token expiration date
+* Resend button
+* Error message if send failed
+
+6. Prevent accidental duplicates:
+
+* If the prospect is already in beta_approved and the email has already been sent, do not auto-send again unless the user clicks Resend.
+* If moving from another stage into beta_approved for the first time, auto-send.
+
+7. Validation:
+   Please test:
+
+* Moving a prospect into beta_approved automatically sends the email
+* Email contains correct pricing, discount, fee, tier, and onboarding link
+* Onboarding token works
+* Token expires in 7 days
+* Resend creates a new valid token
+* Super Admin status updates correctly
+* Failed email send is captured and visible

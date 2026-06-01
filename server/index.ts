@@ -487,6 +487,12 @@ app.use((req, res, next) => {
       } catch (err) {
         console.error('Error ensuring stripe_webhook_secret column:', err);
       }
+      try {
+        const { ensureApprovalEmailTrackingColumns } = await import('./runMigrations.js');
+        await ensureApprovalEmailTrackingColumns();
+      } catch (err) {
+        console.error('Error ensuring approval email tracking columns:', err);
+      }
     } catch (error) {
       console.error('Error loading startup migrations:', error);
     }

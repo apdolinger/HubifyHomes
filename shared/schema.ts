@@ -3449,6 +3449,8 @@ export const onboardingProspects = pgTable("onboarding_prospects", {
   // Approval email tracking
   approvalEmailSent: boolean("approval_email_sent").notNull().default(false),
   approvalEmailSentAt: timestamp("approval_email_sent_at"),
+  approvalEmailLastResentAt: timestamp("approval_email_last_resent_at"),
+  approvalEmailSendError: text("approval_email_send_error"),
   // Onboarding tracker fields
   owner: varchar("owner"),
   nextAction: text("next_action"),

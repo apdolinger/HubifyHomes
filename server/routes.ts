@@ -17545,32 +17545,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!(existing as any).isBetaMember) {
         return res.status(400).json({ message: "Prospect has not been approved yet. Use 'Approve Beta Application' first." });
       }
-      if ((existing as any).approvalEmailSent) {
-        return res.status(409).json({ message: "Approval email was already sent successfully." });
-      }
 
       const fromEmail = process.env.RESEND_FROM_EMAIL;
       if (!resend || !fromEmail) {
         return res.status(503).json({ message: "Email service is not configured (RESEND_FROM_EMAIL missing)." });
       }
 
-      // Use the existing token if it hasn't expired; otherwise mint a fresh one.
+      // Always mint a fresh 7-day token on every resend
       const crypto = await import("crypto");
-      let onboardingToken = (existing as any).onboardingToken as string | null;
-      let tokenExpiresAt = (existing as any).onboardingTokenExpiresAt as Date | null;
       const tokenNow = new Date();
-      let tokenWasRefreshed = false;
-
-      if (!onboardingToken || !tokenExpiresAt || new Date(tokenExpiresAt) <= tokenNow) {
-        onboardingToken = crypto.randomBytes(32).toString("hex");
-        tokenExpiresAt = new Date(tokenNow.getTime() + 7 * 24 * 60 * 60 * 1000);
-        tokenWasRefreshed = true;
-        await storage.updateOnboardingProspect(id, {
-          onboardingToken,
-          onboardingTokenCreatedAt: tokenNow,
-          onboardingTokenExpiresAt: tokenExpiresAt,
-        } as any);
-      }
+      const onboardingToken = crypto.randomBytes(32).toString("hex");
+      const tokenExpiresAt = new Date(tokenNow.getTime() + 7 * 24 * 60 * 60 * 1000);
+      await storage.updateOnboardingProspect(id, {
+        onboardingToken,
+        onboardingTokenCreatedAt: tokenNow,
+        onboardingTokenExpiresAt: tokenExpiresAt,
+      } as any);
 
       const onboardingUrl = `https://hubifyhomesonline.com/onboarding/${onboardingToken}`;
       const recipientName = (existing as any).firstName ?? existing.name ?? "there";
@@ -17658,24 +17648,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (resendResult.error) {
           const errMsg = (resendResult.error as any)?.message ?? JSON.stringify(resendResult.error);
           console.error("[resend-approval-email] Email returned error:", errMsg);
+          await storage.updateOnboardingProspect(id, { approvalEmailSendError: errMsg } as any);
           return res.status(502).json({
             message: `Failed to send approval email: ${errMsg}. Please try again.`,
             emailError: errMsg,
           });
         }
       } catch (emailErr: any) {
-        console.error("[resend-approval-email] Email failed:", emailErr?.message ?? emailErr);
+        const errMsg = emailErr?.message ?? String(emailErr);
+        console.error("[resend-approval-email] Email failed:", errMsg);
+        await storage.updateOnboardingProspect(id, { approvalEmailSendError: errMsg } as any);
         return res.status(502).json({
-          message: `Failed to send approval email: ${emailErr?.message ?? "Unknown error"}. Please try again.`,
-          emailError: emailErr?.message ?? String(emailErr),
+          message: `Failed to send approval email: ${errMsg}. Please try again.`,
+          emailError: errMsg,
         });
       }
 
-      // Email succeeded — mark as sent and advance stage if not already there
+      // Email succeeded — mark as sent, record resent timestamp, clear any prior error, advance stage
       const stageUpdate: any = {
         approvalEmailSent: true,
-        approvalEmailSentAt: new Date(),
+        approvalEmailLastResentAt: new Date(),
+        approvalEmailSendError: null,
       };
+      // Only set approvalEmailSentAt on the very first successful send
+      if (!(existing as any).approvalEmailSent) {
+        stageUpdate.approvalEmailSentAt = new Date();
+      }
       if (existing.stage !== "agreement_pending") {
         const history: any[] = (existing as any).stageHistory ?? [];
         stageUpdate.stage = "agreement_pending";
@@ -17695,7 +17693,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: id,
         severity: "info",
         success: true,
-        metadata: { tokenWasRefreshed },
+        metadata: { freshTokenMinted: true },
       });
 
       res.json(updated);

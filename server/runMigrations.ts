@@ -704,6 +704,22 @@ export async function ensureAgreementSignatureColumns(): Promise<void> {
   }
 }
 
+export async function ensureApprovalEmailTrackingColumns(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE onboarding_prospects
+        ADD COLUMN IF NOT EXISTS approval_email_last_resent_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS approval_email_send_error TEXT;
+    `);
+    log("[MIGRATE] onboarding_prospects approval email tracking columns verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add approval email tracking columns: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensurePaymentSetupColumns(): Promise<void> {
   const client = await pool.connect();
   try {

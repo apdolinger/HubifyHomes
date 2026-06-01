@@ -163,6 +163,8 @@ interface Prospect {
   onboardingTokenExpiresAt: string | null;
   approvalEmailSent: boolean | null;
   approvalEmailSentAt: string | null;
+  approvalEmailLastResentAt: string | null;
+  approvalEmailSendError: string | null;
   submissionStatus: string | null;
   confirmationEmailSentAt: string | null;
   confirmationEmailStatus: string | null;
@@ -1547,39 +1549,63 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
           </div>
         )}
 
-        {/* Resend Approval Email — shown when approved but email failed to send */}
-        {isBetaApp && isBetaApproved && !submission.approvalEmailSent && (
+        {/* Approval email status + resend — shown whenever approved */}
+        {isBetaApp && isBetaApproved && (
           <div ref={resendRef} className="pt-4 mt-4 border-t space-y-2">
-            <div className="flex items-center gap-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-700 mb-2">
-              <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
-              Approval saved — email was not delivered. Resend to give the applicant their onboarding link.
-            </div>
+            {/* Status badge */}
+            {submission.approvalEmailSent ? (
+              <div className="flex items-center gap-2 rounded-md bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-700">
+                <CheckCircle className="h-4 w-4 shrink-0" />
+                <span>Approval email sent</span>
+                {submission.approvalEmailSentAt && (
+                  <span className="text-green-600 text-xs ml-auto">
+                    {new Date(submission.approvalEmailSentAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-700">
+                <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                Email not delivered — resend to give the applicant their onboarding link.
+              </div>
+            )}
+
+            {/* Error detail */}
+            {submission.approvalEmailSendError && (
+              <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">
+                Last error: {submission.approvalEmailSendError}
+              </p>
+            )}
+
+            {/* Token expiry */}
+            {submission.onboardingTokenExpiresAt && (
+              <p className="text-xs text-muted-foreground">
+                Link expires: {new Date(submission.onboardingTokenExpiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                {new Date(submission.onboardingTokenExpiresAt) < new Date() && (
+                  <span className="ml-1 text-amber-600 font-medium">(expired)</span>
+                )}
+              </p>
+            )}
+
+            {/* Last resent */}
+            {submission.approvalEmailLastResentAt && (
+              <p className="text-xs text-muted-foreground">
+                Last resent: {new Date(submission.approvalEmailLastResentAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+              </p>
+            )}
+
+            {/* Resend button — always available for approved prospects */}
             <Button
-              className="w-full bg-amber-600 hover:bg-amber-700 text-white"
+              className="w-full bg-teal-600 hover:bg-teal-700 text-white"
               disabled={resendApprovalEmailMutation.isPending}
               onClick={() => resendApprovalEmailMutation.mutate(submission.id)}
             >
               {resendApprovalEmailMutation.isPending ? (
                 <><span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />Sending…</>
               ) : (
-                <><Send className="h-4 w-4 mr-2" />Resend Approval Email</>
+                <><Send className="h-4 w-4 mr-2" />{submission.approvalEmailSent ? "Resend Approval Email" : "Send Approval Email"}</>
               )}
             </Button>
-          </div>
-        )}
-
-        {/* Approval email sent confirmation badge */}
-        {isBetaApp && isBetaApproved && submission.approvalEmailSent && (
-          <div className="pt-4 mt-4 border-t">
-            <div className="flex items-center gap-2 rounded-md bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-700">
-              <CheckCircle className="h-4 w-4 shrink-0" />
-              Approval email sent
-              {submission.approvalEmailSentAt && (
-                <span className="text-green-600 text-xs ml-auto">
-                  {new Date(submission.approvalEmailSentAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                </span>
-              )}
-            </div>
           </div>
         )}
 
@@ -2866,22 +2892,51 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
                 )}
               </div>
 
-              {editingProspect.approvalEmailSent && (
+              {(editingProspect as any).isBetaMember && (
                 <>
                   <Separator className="my-4" />
-                  <div>
+                  <div className="space-y-2">
                     <p className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-2">
                       <Mail className="w-3.5 h-3.5" /> Approval Email
                     </p>
-                    <div className="flex items-center gap-2 rounded-md bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-700">
-                      <CheckCircle2 className="w-4 h-4 shrink-0" />
-                      <span className="font-medium">Email sent</span>
-                      {editingProspect.approvalEmailSentAt && (
-                        <span className="text-green-600 text-xs ml-auto">
-                          {new Date(editingProspect.approvalEmailSentAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                        </span>
-                      )}
-                    </div>
+                    {/* Status badge */}
+                    {editingProspect.approvalEmailSent ? (
+                      <div className="flex items-center gap-2 rounded-md bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-700">
+                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                        <span className="font-medium">Sent</span>
+                        {editingProspect.approvalEmailSentAt && (
+                          <span className="text-green-600 text-xs ml-auto">
+                            {new Date(editingProspect.approvalEmailSentAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-700">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span className="font-medium">Not sent</span>
+                      </div>
+                    )}
+                    {/* Error */}
+                    {editingProspect.approvalEmailSendError && (
+                      <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">
+                        Error: {editingProspect.approvalEmailSendError}
+                      </p>
+                    )}
+                    {/* Token expiry */}
+                    {editingProspect.onboardingTokenExpiresAt && (
+                      <p className="text-xs text-muted-foreground">
+                        Link expires: {new Date(editingProspect.onboardingTokenExpiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        {new Date(editingProspect.onboardingTokenExpiresAt) < new Date() && (
+                          <span className="ml-1 text-amber-600 font-medium">(expired)</span>
+                        )}
+                      </p>
+                    )}
+                    {/* Last resent */}
+                    {editingProspect.approvalEmailLastResentAt && (
+                      <p className="text-xs text-muted-foreground">
+                        Last resent: {new Date(editingProspect.approvalEmailLastResentAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      </p>
+                    )}
                   </div>
                 </>
               )}
