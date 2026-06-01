@@ -337,6 +337,12 @@ app.use((req, res, next) => {
       } catch (err) {
         console.error('Error ensuring beta approval columns on onboarding_prospects:', err);
       }
+      try {
+        const { ensureBetaApprovalEmailColumns } = await import('./runMigrations.js');
+        await ensureBetaApprovalEmailColumns();
+      } catch (err) {
+        console.error('Error ensuring beta approval email columns on onboarding_prospects:', err);
+      }
     } catch (error) {
       console.error('Error loading startup migrations:', error);
     }

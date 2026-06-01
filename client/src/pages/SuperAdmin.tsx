@@ -155,6 +155,12 @@ interface Prospect {
   setupFee: number | null;
   betaCohortNumber: number | null;
   agreementStatus: string | null;
+  // Onboarding token & approval email tracking
+  onboardingToken: string | null;
+  onboardingTokenCreatedAt: string | null;
+  onboardingTokenExpiresAt: string | null;
+  approvalEmailSent: boolean | null;
+  approvalEmailSentAt: string | null;
   submissionStatus: string | null;
   confirmationEmailSentAt: string | null;
   confirmationEmailStatus: string | null;
@@ -592,11 +598,37 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/submissions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
       setApproveDialogOpen(false);
-      toast({ title: "Beta application approved", description: "Prospect is now in Agreement Pending stage." });
+      toast({ title: "Beta application approved", description: "Approval email sent. Prospect moved to Agreement Pending." });
       onClose();
     },
     onError: (err: any) => {
-      toast({ title: "Approval failed", description: err?.message ?? "Failed to approve beta application", variant: "destructive" });
+      const msg = err?.message ?? "Failed to approve beta application";
+      const isEmailFail = msg.toLowerCase().includes("email");
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      setApproveDialogOpen(false);
+      toast({
+        title: isEmailFail ? "Approved — but email failed to send" : "Approval failed",
+        description: isEmailFail
+          ? "Pricing and token saved. Use 'Resend Approval Email' to retry."
+          : msg,
+        variant: "destructive",
+      });
+      if (isEmailFail) onClose();
+    },
+  });
+
+  const resendApprovalEmailMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/resend-approval-email`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      toast({ title: "Approval email sent", description: "The applicant has been sent the onboarding link." });
+      onClose();
+    },
+    onError: (err: any) => {
+      toast({ title: "Email failed", description: err?.message ?? "Failed to resend approval email", variant: "destructive" });
     },
   });
 
@@ -944,8 +976,44 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
               Approve Beta Application
             </Button>
             <p className="text-xs text-muted-foreground text-center">
-              Assigns cohort slot, computes pricing, and moves to Agreement Pending
+              Assigns cohort slot, computes pricing, and sends onboarding email
             </p>
+          </div>
+        )}
+
+        {/* Resend Approval Email — shown when approved but email failed to send */}
+        {isBetaApp && isBetaApproved && !submission.approvalEmailSent && (
+          <div className="pt-4 mt-4 border-t space-y-2">
+            <div className="flex items-center gap-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-700 mb-2">
+              <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+              Approval saved — email was not delivered. Resend to give the applicant their onboarding link.
+            </div>
+            <Button
+              className="w-full bg-amber-600 hover:bg-amber-700 text-white"
+              disabled={resendApprovalEmailMutation.isPending}
+              onClick={() => resendApprovalEmailMutation.mutate(submission.id)}
+            >
+              {resendApprovalEmailMutation.isPending ? (
+                <><span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />Sending…</>
+              ) : (
+                <><Send className="h-4 w-4 mr-2" />Resend Approval Email</>
+              )}
+            </Button>
+          </div>
+        )}
+
+        {/* Approval email sent confirmation badge */}
+        {isBetaApp && isBetaApproved && submission.approvalEmailSent && (
+          <div className="pt-4 mt-4 border-t">
+            <div className="flex items-center gap-2 rounded-md bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-700">
+              <CheckCircle className="h-4 w-4 shrink-0" />
+              Approval email sent
+              {submission.approvalEmailSentAt && (
+                <span className="text-green-600 text-xs ml-auto">
+                  {new Date(submission.approvalEmailSentAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                </span>
+              )}
+            </div>
           </div>
         )}
 

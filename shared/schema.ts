@@ -3428,6 +3428,13 @@ export const onboardingProspects = pgTable("onboarding_prospects", {
   setupFee: real("setup_fee"),
   betaCohortNumber: integer("beta_cohort_number"),
   agreementStatus: varchar("agreement_status"),
+  // Onboarding token (generated at approval, used in the onboarding link)
+  onboardingToken: varchar("onboarding_token"),
+  onboardingTokenCreatedAt: timestamp("onboarding_token_created_at"),
+  onboardingTokenExpiresAt: timestamp("onboarding_token_expires_at"),
+  // Approval email tracking
+  approvalEmailSent: boolean("approval_email_sent").notNull().default(false),
+  approvalEmailSentAt: timestamp("approval_email_sent_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [

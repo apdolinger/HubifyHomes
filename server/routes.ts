@@ -16946,8 +16946,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ── Beta Approval ─────────────────────────────────────────────────────────
   // POST /api/super-admin/onboarding-prospects/:id/approve-beta
   // Computes cohort slot, portfolio tier, and pricing from platform settings,
-  // stores all fields on the prospect, appends "beta_approved" to stage_history,
-  // and sets stage = "agreement_pending" in a single update.
+  // generates a unique onboarding token, sends the approval email, then —
+  // only if the email succeeds — sets stage = "agreement_pending" and records
+  // the email metadata. If the email fails, returns 502 and does NOT advance
+  // the stage so the admin can retry via the resend endpoint.
   app.post("/api/super-admin/onboarding-prospects/:id/approve-beta", isSuperAdmin, requireMFA, async (req: any, res) => {
     try {
       const { id } = req.params;
@@ -17012,7 +17014,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tierSetupFee = matchedTier ? Number(matchedTier.setupFee) : 0;
       const discountedMonthlyPrice = Math.round(originalMonthlyPrice * (1 - discountPct / 100) * 100) / 100;
 
-      // Append "beta_approved" milestone to stageHistory, set stage = "agreement_pending"
+      // Generate a cryptographically random URL-safe onboarding token (64 hex chars = 32 bytes).
+      // The token expires in 7 days. We write it to the DB before attempting the email so the
+      // token is available for the resend endpoint if the first email attempt fails.
+      const crypto = await import("crypto");
+      const onboardingToken = crypto.randomBytes(32).toString("hex");
+      const tokenNow = new Date();
+      const tokenExpiresAt = new Date(tokenNow.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const onboardingUrl = `https://hubifyhomesonline.com/onboarding/${onboardingToken}`;
+
+      // Persist approval fields + token (stage stays unchanged until email succeeds)
       const now = new Date();
       const existingHistory: any[] = (existing as any).stageHistory ?? [];
       const newHistory = [
@@ -17020,9 +17031,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { stage: "beta_approved", enteredAt: now.toISOString(), note: "Beta application approved" },
       ];
 
-      const updated = await storage.updateOnboardingProspect(id, {
-        stage: "agreement_pending",
-        stageHistory: newHistory,
+      await storage.updateOnboardingProspect(id, {
         isBetaMember: true,
         betaApprovedAt: now,
         betaCohortNumber: cohortNumber,
@@ -17032,6 +17041,133 @@ export async function registerRoutes(app: Express): Promise<Server> {
         discountedMonthlyPrice,
         setupFee: tierSetupFee,
         agreementStatus: "pending",
+        onboardingToken,
+        onboardingTokenCreatedAt: tokenNow,
+        onboardingTokenExpiresAt: tokenExpiresAt,
+        approvalEmailSent: false,
+      } as any);
+
+      // ── Send approval email ──────────────────────────────────────────────
+      const fromEmail = process.env.RESEND_FROM_EMAIL;
+      const recipientName = (existing as any).firstName ?? existing.name ?? "there";
+      const orgName = existing.company ?? existing.name ?? "your organization";
+
+      if (!resend || !fromEmail) {
+        // Email not configured — still commit the stage advance but flag email as unsent
+        await storage.updateOnboardingProspect(id, {
+          stage: "agreement_pending",
+          stageHistory: newHistory,
+          approvalEmailSent: false,
+        } as any);
+        const updated = await storage.getOnboardingProspect(id);
+        return res.status(200).json({
+          ...updated,
+          _warning: "Approval saved but email service is not configured. Use 'Resend Approval Email' once RESEND_FROM_EMAIL is set.",
+        });
+      }
+
+      try {
+        await resend.emails.send({
+          from: fromEmail,
+          to: existing.email,
+          replyTo: "contact@hubifyhomesonline.com",
+          subject: `${recipientName}, you've been approved for Hubify Beta!`,
+          html: `
+            <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;background:#ffffff">
+              <div style="text-align:center;margin-bottom:28px">
+                <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="180" style="width:180px;max-width:180px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
+              </div>
+
+              <h1 style="font-size:24px;font-weight:700;color:#0f172a;margin:0 0 8px">Congratulations, ${recipientName}!</h1>
+              <p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 20px">
+                We're excited to confirm that <strong>${orgName}</strong> has been approved for the Hubify Beta Program.
+                Your spot is reserved — here are the details of your membership:
+              </p>
+
+              <!-- Approval details card -->
+              <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:12px;padding:24px;margin-bottom:28px">
+                <p style="font-size:12px;font-weight:700;color:#0d9488;margin:0 0 14px;text-transform:uppercase;letter-spacing:0.06em">Your Beta Membership Details</p>
+                <table style="width:100%;border-collapse:collapse;font-size:14px">
+                  <tr>
+                    <td style="padding:7px 0;color:#64748b;width:200px;vertical-align:top">Organization</td>
+                    <td style="padding:7px 0;color:#0f172a;font-weight:600">${orgName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:7px 0;color:#64748b;vertical-align:top">Portfolio Tier</td>
+                    <td style="padding:7px 0;color:#0f172a;font-weight:600">${portfolioTier}</td>
+                  </tr>
+                  ${homes > 0 ? `<tr>
+                    <td style="padding:7px 0;color:#64748b;vertical-align:top">Properties</td>
+                    <td style="padding:7px 0;color:#0f172a">${homes} properties</td>
+                  </tr>` : ""}
+                  <tr>
+                    <td style="padding:7px 0;color:#64748b;vertical-align:top">Beta Cohort</td>
+                    <td style="padding:7px 0;color:#0f172a">Member #${cohortNumber}</td>
+                  </tr>
+                  <tr><td colspan="2" style="padding:8px 0"><hr style="border:none;border-top:1px solid #ccfbf1;margin:0"/></td></tr>
+                  <tr>
+                    <td style="padding:7px 0;color:#64748b;vertical-align:top">List Price</td>
+                    <td style="padding:7px 0;color:#94a3b8;text-decoration:line-through">$${originalMonthlyPrice.toFixed(2)}/mo</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:7px 0;color:#64748b;vertical-align:top">Beta Discount</td>
+                    <td style="padding:7px 0;color:#0d9488;font-weight:600">${discountPct}% off — locked for life</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:7px 0;color:#64748b;vertical-align:top">Your Monthly Price</td>
+                    <td style="padding:7px 0;color:#0f172a;font-weight:700;font-size:18px">$${discountedMonthlyPrice.toFixed(2)}<span style="font-size:13px;font-weight:400;color:#64748b">/mo</span></td>
+                  </tr>
+                  ${tierSetupFee > 0 ? `<tr>
+                    <td style="padding:7px 0;color:#64748b;vertical-align:top">Database Init Fee</td>
+                    <td style="padding:7px 0;color:#0f172a">$${tierSetupFee.toFixed(2)} one-time</td>
+                  </tr>` : ""}
+                </table>
+              </div>
+
+              <!-- Lifetime lock guarantee -->
+              <div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:16px;margin-bottom:28px">
+                <p style="font-size:14px;color:#92400e;margin:0;line-height:1.6">
+                  🔒 <strong>Your beta pricing is locked in for life</strong> — as long as your subscription remains in good standing, your rate will never increase.
+                </p>
+              </div>
+
+              <!-- CTA -->
+              <p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 24px">
+                To get started, complete your Beta Agreement, set up payment, and initialize your platform. The button below will take you through the entire onboarding process step by step.
+              </p>
+              <div style="text-align:center;margin-bottom:32px">
+                <a href="${onboardingUrl}"
+                   style="display:inline-block;background:#0d9488;color:#ffffff;font-size:16px;font-weight:700;text-decoration:none;padding:14px 40px;border-radius:9px;letter-spacing:0.01em">
+                  Start Onboarding →
+                </a>
+              </div>
+              <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0 0 4px">
+                This link expires in 7 days. If you need a new link, reply to this email and we'll send one.
+              </p>
+
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0 20px" />
+              <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
+                Questions? Reply to this email — we're happy to help.<br/>
+                Hubify Homes · hello@hubifyhomesonline.com
+              </p>
+            </div>
+          `,
+        });
+      } catch (emailErr: any) {
+        console.error("[approve-beta] Approval email failed:", emailErr?.message ?? emailErr);
+        // Email failed — do NOT advance the stage. Return 502 so the admin sees the error.
+        return res.status(502).json({
+          message: `Prospect approved but the approval email failed to send: ${emailErr?.message ?? "Unknown error"}. Use "Resend Approval Email" to retry.`,
+          emailError: emailErr?.message ?? String(emailErr),
+        });
+      }
+
+      // ── Email succeeded — now commit the stage advance ───────────────────
+      const updated = await storage.updateOnboardingProspect(id, {
+        stage: "agreement_pending",
+        stageHistory: newHistory,
+        approvalEmailSent: true,
+        approvalEmailSentAt: new Date(),
       } as any);
 
       await AuditLogger.log({
@@ -17049,6 +17185,172 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error approving beta application:", error);
       res.status(500).json({ message: "Failed to approve beta application" });
+    }
+  });
+
+  // POST /api/super-admin/onboarding-prospects/:id/resend-approval-email
+  // Resends the approval email for a beta applicant whose first send failed.
+  // Regenerates the onboarding URL from the stored token (or mints a fresh one
+  // if the old token has expired) and advances stage to agreement_pending on success.
+  app.post("/api/super-admin/onboarding-prospects/:id/resend-approval-email", isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const existing = await storage.getOnboardingProspect(id);
+      if (!existing) return res.status(404).json({ message: "Prospect not found" });
+      if (existing.source !== "beta_application") {
+        return res.status(400).json({ message: "This prospect is not a beta application." });
+      }
+      if (!(existing as any).isBetaMember) {
+        return res.status(400).json({ message: "Prospect has not been approved yet. Use 'Approve Beta Application' first." });
+      }
+      if ((existing as any).approvalEmailSent) {
+        return res.status(409).json({ message: "Approval email was already sent successfully." });
+      }
+
+      const fromEmail = process.env.RESEND_FROM_EMAIL;
+      if (!resend || !fromEmail) {
+        return res.status(503).json({ message: "Email service is not configured (RESEND_FROM_EMAIL missing)." });
+      }
+
+      // Use the existing token if it hasn't expired; otherwise mint a fresh one.
+      const crypto = await import("crypto");
+      let onboardingToken = (existing as any).onboardingToken as string | null;
+      let tokenExpiresAt = (existing as any).onboardingTokenExpiresAt as Date | null;
+      const tokenNow = new Date();
+      let tokenWasRefreshed = false;
+
+      if (!onboardingToken || !tokenExpiresAt || new Date(tokenExpiresAt) <= tokenNow) {
+        onboardingToken = crypto.randomBytes(32).toString("hex");
+        tokenExpiresAt = new Date(tokenNow.getTime() + 7 * 24 * 60 * 60 * 1000);
+        tokenWasRefreshed = true;
+        await storage.updateOnboardingProspect(id, {
+          onboardingToken,
+          onboardingTokenCreatedAt: tokenNow,
+          onboardingTokenExpiresAt: tokenExpiresAt,
+        } as any);
+      }
+
+      const onboardingUrl = `https://hubifyhomesonline.com/onboarding/${onboardingToken}`;
+      const recipientName = (existing as any).firstName ?? existing.name ?? "there";
+      const orgName = existing.company ?? existing.name ?? "your organization";
+      const portfolioTier = (existing as any).portfolioTier ?? "—";
+      const originalMonthlyPrice = Number((existing as any).originalMonthlyPrice ?? 0);
+      const discountPct = Number((existing as any).discountPercentage ?? 0);
+      const discountedMonthlyPrice = Number((existing as any).discountedMonthlyPrice ?? 0);
+      const tierSetupFee = Number((existing as any).setupFee ?? 0);
+      const cohortNumber = (existing as any).betaCohortNumber ?? 1;
+      const prospectHomes = (existing as any).estimatedHomes ?? 0;
+
+      try {
+        await resend.emails.send({
+          from: fromEmail,
+          to: existing.email,
+          replyTo: "contact@hubifyhomesonline.com",
+          subject: `${recipientName}, your Hubify Beta onboarding link is ready`,
+          html: `
+            <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;background:#ffffff">
+              <div style="text-align:center;margin-bottom:28px">
+                <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="180" style="width:180px;max-width:180px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
+              </div>
+
+              <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Your onboarding link is ready</h1>
+              <p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 20px">
+                Hi ${recipientName} — here is your Hubify Beta onboarding link for <strong>${orgName}</strong>.
+                ${tokenWasRefreshed ? "We've generated a fresh link that expires in 7 days." : ""}
+              </p>
+
+              <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:12px;padding:24px;margin-bottom:28px">
+                <p style="font-size:12px;font-weight:700;color:#0d9488;margin:0 0 14px;text-transform:uppercase;letter-spacing:0.06em">Your Beta Membership Details</p>
+                <table style="width:100%;border-collapse:collapse;font-size:14px">
+                  <tr>
+                    <td style="padding:7px 0;color:#64748b;width:200px">Portfolio Tier</td>
+                    <td style="padding:7px 0;color:#0f172a;font-weight:600">${portfolioTier}</td>
+                  </tr>
+                  ${prospectHomes > 0 ? `<tr><td style="padding:7px 0;color:#64748b">Properties</td><td style="padding:7px 0;color:#0f172a">${prospectHomes} properties</td></tr>` : ""}
+                  <tr>
+                    <td style="padding:7px 0;color:#64748b">Beta Cohort</td>
+                    <td style="padding:7px 0;color:#0f172a">Member #${cohortNumber}</td>
+                  </tr>
+                  <tr><td colspan="2" style="padding:8px 0"><hr style="border:none;border-top:1px solid #ccfbf1;margin:0"/></td></tr>
+                  <tr>
+                    <td style="padding:7px 0;color:#64748b">List Price</td>
+                    <td style="padding:7px 0;color:#94a3b8;text-decoration:line-through">$${originalMonthlyPrice.toFixed(2)}/mo</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:7px 0;color:#64748b">Beta Discount</td>
+                    <td style="padding:7px 0;color:#0d9488;font-weight:600">${discountPct}% off — locked for life</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:7px 0;color:#64748b">Your Monthly Price</td>
+                    <td style="padding:7px 0;color:#0f172a;font-weight:700;font-size:18px">$${discountedMonthlyPrice.toFixed(2)}<span style="font-size:13px;font-weight:400;color:#64748b">/mo</span></td>
+                  </tr>
+                  ${tierSetupFee > 0 ? `<tr><td style="padding:7px 0;color:#64748b">Database Init Fee</td><td style="padding:7px 0;color:#0f172a">$${tierSetupFee.toFixed(2)} one-time</td></tr>` : ""}
+                </table>
+              </div>
+
+              <div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:16px;margin-bottom:28px">
+                <p style="font-size:14px;color:#92400e;margin:0;line-height:1.6">
+                  🔒 <strong>Your beta pricing is locked in for life</strong> — as long as your subscription remains in good standing, your rate will never increase.
+                </p>
+              </div>
+
+              <div style="text-align:center;margin-bottom:32px">
+                <a href="${onboardingUrl}"
+                   style="display:inline-block;background:#0d9488;color:#ffffff;font-size:16px;font-weight:700;text-decoration:none;padding:14px 40px;border-radius:9px;letter-spacing:0.01em">
+                  Start Onboarding →
+                </a>
+              </div>
+              <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0 0 4px">
+                This link expires in 7 days. If you need another one, reply to this email.
+              </p>
+
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0 20px" />
+              <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
+                Questions? Reply to this email — we're happy to help.<br/>
+                Hubify Homes · hello@hubifyhomesonline.com
+              </p>
+            </div>
+          `,
+        });
+      } catch (emailErr: any) {
+        console.error("[resend-approval-email] Email failed:", emailErr?.message ?? emailErr);
+        return res.status(502).json({
+          message: `Failed to send approval email: ${emailErr?.message ?? "Unknown error"}. Please try again.`,
+          emailError: emailErr?.message ?? String(emailErr),
+        });
+      }
+
+      // Email succeeded — mark as sent and advance stage if not already there
+      const stageUpdate: any = {
+        approvalEmailSent: true,
+        approvalEmailSentAt: new Date(),
+      };
+      if (existing.stage !== "agreement_pending") {
+        const history: any[] = (existing as any).stageHistory ?? [];
+        stageUpdate.stage = "agreement_pending";
+        stageUpdate.stageHistory = [
+          ...history,
+          { stage: "agreement_pending", enteredAt: new Date().toISOString(), note: "Approval email resent" },
+        ];
+      }
+
+      const updated = await storage.updateOnboardingProspect(id, stageUpdate);
+
+      await AuditLogger.log({
+        req,
+        action: "resend_beta_approval_email",
+        actionType: "update",
+        resource: "onboarding_prospect",
+        resourceId: id,
+        severity: "info",
+        success: true,
+        metadata: { tokenWasRefreshed },
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error resending approval email:", error);
+      res.status(500).json({ message: "Failed to resend approval email" });
     }
   });
 

@@ -667,6 +667,25 @@ export async function ensureBetaApprovalColumns(): Promise<void> {
   }
 }
 
+export async function ensureBetaApprovalEmailColumns(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE onboarding_prospects
+        ADD COLUMN IF NOT EXISTS onboarding_token VARCHAR UNIQUE,
+        ADD COLUMN IF NOT EXISTS onboarding_token_created_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS onboarding_token_expires_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS approval_email_sent BOOLEAN NOT NULL DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS approval_email_sent_at TIMESTAMP;
+    `);
+    log("[MIGRATE] onboarding_prospects beta approval email columns verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add beta approval email columns to onboarding_prospects: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensurePortalInvitationColumns(): Promise<void> {
   const client = await pool.connect();
   try {
