@@ -227,12 +227,21 @@ function ContactVariantForm({ onSuccess, compact }: { onSuccess?: () => void; co
 // ── Beta Application Variant ──────────────────────────────────────────────────
 
 const betaSchema = z.object({
+  // Company Information
+  company: z.string().min(1, "Company name is required"),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("A valid email is required"),
-  company: z.string().min(1, "Organization name is required"),
+  phone: z.string().optional(),
+  // Operational Information
   estimatedHomes: z.coerce.number().min(1).optional(),
-  notes: z.string().optional(),
+  teamSize: z.coerce.number().min(1).optional(),
+  serviceArea: z.string().optional(),
+  currentSoftware: z.string().optional(),
+  // Beta Questions
+  whyInterested: z.string().min(1, "Please tell us why you're interested"),
+  biggestChallenge: z.string().min(1, "Please describe your biggest challenge"),
+  launchTimeframe: z.string().min(1, "Please select a timeframe"),
 });
 type BetaValues = z.infer<typeof betaSchema>;
 
@@ -261,21 +270,45 @@ function BetaVariantForm({ onSuccess, compact }: { onSuccess?: () => void; compa
   const form = useForm<BetaValues>({
     resolver: zodResolver(betaSchema),
     defaultValues: {
+      company: "",
       firstName: "",
       lastName: "",
       email: "",
-      company: "",
+      phone: "",
       estimatedHomes: undefined as unknown as number,
-      notes: "",
+      teamSize: undefined as unknown as number,
+      serviceArea: "",
+      currentSoftware: "",
+      whyInterested: "",
+      biggestChallenge: "",
+      launchTimeframe: "",
     },
   });
 
   const mutation = useMutation({
     mutationFn: async (values: BetaValues) => {
+      const notes = [
+        values.whyInterested   ? `Why interested in Hubify Homes:\n${values.whyInterested}`     : null,
+        values.biggestChallenge ? `Biggest operational challenge:\n${values.biggestChallenge}`   : null,
+        values.launchTimeframe  ? `Preferred launch timeframe: ${values.launchTimeframe}`        : null,
+      ].filter(Boolean).join("\n\n");
+
       const res = await fetch("/api/public/inquire", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...values, trialIntent: "beta_application" }),
+        body: JSON.stringify({
+          firstName: values.firstName,
+          lastName: values.lastName,
+          email: values.email,
+          phone: values.phone,
+          company: values.company,
+          estimatedHomes: values.estimatedHomes,
+          teamSize: values.teamSize,
+          serviceArea: values.serviceArea,
+          currentMgmtMethod: values.currentSoftware,
+          notes,
+          trialIntent: "beta_application",
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -324,7 +357,7 @@ function BetaVariantForm({ onSuccess, compact }: { onSuccess?: () => void; compa
           </div>
         )}
 
-        {/* Auto-assignment notice */}
+        {/* Spots notice */}
         <div className="flex items-start gap-3 p-4 bg-teal-50 border border-teal-200 rounded-xl">
           <Star className="w-4 h-4 text-teal-600 mt-0.5 shrink-0" />
           <div>
@@ -340,9 +373,17 @@ function BetaVariantForm({ onSuccess, compact }: { onSuccess?: () => void; compa
           </div>
         </div>
 
+        {/* ── Company Information ─────────────────────────────────────────── */}
         <div>
-          <SectionHeader icon={Users} title="Contact Information" />
+          <SectionHeader icon={Building2} title="Company Information" />
           <div className="space-y-4">
+            <FormField control={form.control} name="company" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Company Name *</FormLabel>
+                <FormControl><Input placeholder="Acme Property Group" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="firstName" render={({ field }) => (
                 <FormItem>
@@ -359,57 +400,129 @@ function BetaVariantForm({ onSuccess, compact }: { onSuccess?: () => void; compa
                 </FormItem>
               )} />
             </div>
-            <FormField control={form.control} name="email" render={({ field }) => (
+            <div className="grid grid-cols-2 gap-4">
+              <FormField control={form.control} name="email" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email *</FormLabel>
+                  <FormControl><Input type="email" placeholder="jane@example.com" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="phone" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone</FormLabel>
+                  <FormControl><Input type="tel" placeholder="(555) 000-0000" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Operational Information ─────────────────────────────────────── */}
+        <div>
+          <SectionHeader icon={Home} title="Operational Information" />
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField control={form.control} name="estimatedHomes" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Properties Managed</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={1}
+                      placeholder="e.g. 25"
+                      {...field}
+                      onChange={e => field.onChange(e.target.valueAsNumber || undefined)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="teamSize" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Staff Users Expected</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={1}
+                      placeholder="e.g. 5"
+                      {...field}
+                      onChange={e => field.onChange(e.target.valueAsNumber || undefined)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
+            <FormField control={form.control} name="serviceArea" render={({ field }) => (
               <FormItem>
-                <FormLabel>Email *</FormLabel>
-                <FormControl><Input type="email" placeholder="jane@example.com" {...field} /></FormControl>
+                <FormLabel>Service Area</FormLabel>
+                <FormControl><Input placeholder="e.g. Naples, FL / Southwest Florida" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="currentSoftware" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Current Software Used</FormLabel>
+                <FormControl><Input placeholder="e.g. Excel, AppFolio, none" {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />
           </div>
         </div>
 
+        {/* ── Beta Questions ──────────────────────────────────────────────── */}
         <div>
-          <SectionHeader icon={Building2} title="Organization" />
+          <SectionHeader icon={ClipboardList} title="Beta Questions" />
           <div className="space-y-4">
-            <FormField control={form.control} name="company" render={({ field }) => (
+            <FormField control={form.control} name="whyInterested" render={({ field }) => (
               <FormItem>
-                <FormLabel>Organization Name *</FormLabel>
-                <FormControl><Input placeholder="Acme Property Group" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="estimatedHomes" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Estimated Homes Managed</FormLabel>
+                <FormLabel>Why are you interested in Hubify Homes? *</FormLabel>
                 <FormControl>
-                  <Input
-                    type="number"
-                    min={1}
-                    placeholder="e.g. 25"
+                  <Textarea
+                    rows={3}
+                    placeholder="Tell us what drew you to Hubify and what you're hoping to accomplish…"
                     {...field}
-                    onChange={e => field.onChange(e.target.valueAsNumber || undefined)}
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )} />
+            <FormField control={form.control} name="biggestChallenge" render={({ field }) => (
+              <FormItem>
+                <FormLabel>What is your biggest operational challenge? *</FormLabel>
+                <FormControl>
+                  <Textarea
+                    rows={3}
+                    placeholder="e.g. tracking tasks across properties, invoicing clients, coordinating staff…"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="launchTimeframe" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Preferred launch timeframe? *</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a timeframe…" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="ASAP">As soon as possible</SelectItem>
+                    <SelectItem value="1-3 months">1–3 months</SelectItem>
+                    <SelectItem value="3-6 months">3–6 months</SelectItem>
+                    <SelectItem value="6+ months">6+ months</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
           </div>
         </div>
-
-        <FormField control={form.control} name="notes" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Anything else we should know?</FormLabel>
-            <FormControl>
-              <Textarea
-                rows={3}
-                placeholder="Tell us about your current setup, goals, or any questions..."
-                {...field}
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )} />
 
         <Button
           type="submit"
