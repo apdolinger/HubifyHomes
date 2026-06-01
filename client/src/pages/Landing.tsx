@@ -269,8 +269,7 @@ export default function Landing() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* ── Hero ─────────────────────────────────────────────────────────── */}
         <div className="pt-16 pb-4 text-center">
-          <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="h-20 sm:h-24 w-auto mx-auto mb-6" />
-          <h1 className="text-4xl font-bold text-slate-900 sm:text-5xl md:text-6xl">Hubify</h1>
+          <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="w-44 sm:w-56 h-44 sm:h-56 object-contain rounded-3xl mx-auto mb-8" />
           <p className="mt-3 max-w-md mx-auto text-base text-slate-600 sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
             Professional property management platform for home watch and estate management companies
           </p>
