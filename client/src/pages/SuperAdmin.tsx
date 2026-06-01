@@ -569,6 +569,11 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
     ? `${submission.firstName} ${submission.lastName}`
     : submission.name;
 
+  // These must be declared before useQuery that uses them in `enabled`
+  const isBetaApp = submission.source === "beta_application";
+  const isBetaApproved = !!(submission.isBetaMember && !submission.betaRemovedAt);
+  const showBetaApprovalDetails = isBetaApproved || submission.stage === "agreement_pending";
+
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
 
   const betaPricingPreview = useQuery({
@@ -599,10 +604,6 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
     flushNotesSave();
     onClose();
   };
-
-  const isBetaApp = submission.source === "beta_application";
-  const isBetaApproved = !!(submission.isBetaMember && !submission.betaRemovedAt);
-  const showBetaApprovalDetails = isBetaApproved || submission.stage === "agreement_pending";
 
   return (
     <Sheet open onOpenChange={handleClose}>
@@ -720,6 +721,21 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-teal-600 mb-3">Beta Application</p>
                 <div className="grid grid-cols-2 gap-3 text-sm mb-4">
+                  {/* Contact fields */}
+                  <div className="col-span-2">
+                    <p className="text-muted-foreground text-xs mb-0.5">Contact Name</p>
+                    <p className="font-medium">{displayName || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs mb-0.5">Email</p>
+                    <a href={`mailto:${submission.email}`} className="text-teal-600 hover:underline break-all font-medium">{submission.email}</a>
+                  </div>
+                  {submission.phone && (
+                    <div>
+                      <p className="text-muted-foreground text-xs mb-0.5">Phone</p>
+                      <p className="font-medium">{submission.phone}</p>
+                    </div>
+                  )}
                   {submission.company && (
                     <div className="col-span-2">
                       <p className="text-muted-foreground text-xs mb-0.5">Organization Name</p>
