@@ -59,6 +59,7 @@ import {
   RefreshCw,
   Archive,
   AlertCircle,
+  CheckCircle2,
   Info,
   UserPlus,
   UserMinus,
@@ -353,6 +354,12 @@ function ProspectCard({
                     Approval email not yet delivered — open to resend
                   </TooltipContent>
                 </Tooltip>
+              )}
+              {prospect.approvalEmailSent && prospect.approvalEmailSentAt && (
+                <Badge className="bg-green-50 text-green-700 border border-green-200 text-xs flex items-center gap-1 px-1.5 py-0.5 font-medium w-full justify-center mt-0.5">
+                  <CheckCircle2 className="w-3 h-3 shrink-0" />
+                  Email sent {new Date(prospect.approvalEmailSentAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                </Badge>
               )}
             </div>
           );
