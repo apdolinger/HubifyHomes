@@ -411,6 +411,12 @@ app.use((req, res, next) => {
       } catch (err) {
         console.error('Error ensuring payment setup columns on onboarding_prospects:', err);
       }
+      try {
+        const { ensureOnboardingTrackerColumns } = await import('./runMigrations.js');
+        await ensureOnboardingTrackerColumns();
+      } catch (err) {
+        console.error('Error ensuring tracker columns on onboarding_prospects:', err);
+      }
     } catch (error) {
       console.error('Error loading startup migrations:', error);
     }

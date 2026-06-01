@@ -78,6 +78,7 @@ import {
   Star,
   ArrowRight,
   ChevronDown,
+  ChevronUp,
   ChevronRight,
   XCircle,
   Funnel,
@@ -173,6 +174,17 @@ interface Prospect {
   convertedAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+  // Payment setup fields (Task #231)
+  paymentStatus: string | null;
+  paymentCompletedAt: string | null;
+  betaStripeCustomerId: string | null;
+  betaStripeSubscriptionId: string | null;
+  betaStripeCheckoutSessionId: string | null;
+  // Onboarding tracker fields
+  owner: string | null;
+  nextAction: string | null;
+  lastContactedAt: string | null;
+  onboardingChecklist: Record<string, boolean> | null;
 }
 
 interface StageEmailTemplate {
@@ -246,6 +258,523 @@ const prospectFormSchema = z.object({
   agreementContent: z.string().optional(),
 });
 type ProspectFormValues = z.infer<typeof prospectFormSchema>;
+
+// ── Onboarding Tracker ────────────────────────────────────────────────────────
+
+const TRACKER_CHECKLIST: {
+  section: string;
+  headerCls: string;
+  items: { key: string; label: string; auto: ((p: Prospect) => boolean) | null }[];
+}[] = [
+  {
+    section: "Agreement",
+    headerCls: "text-yellow-700 bg-yellow-50 border-yellow-200",
+    items: [
+      { key: "agreement_sent",   label: "Agreement sent",   auto: (p) => !!p.approvalEmailSent },
+      { key: "agreement_viewed", label: "Agreement viewed", auto: null },
+      { key: "agreement_signed", label: "Agreement signed", auto: (p) => !!p.agreementSignedAt },
+    ],
+  },
+  {
+    section: "Billing",
+    headerCls: "text-green-700 bg-green-50 border-green-200",
+    items: [
+      { key: "stripe_customer_created",  label: "Stripe customer created",  auto: (p) => !!p.betaStripeCustomerId },
+      { key: "payment_method_added",     label: "Payment method added",     auto: null },
+      { key: "subscription_active",      label: "Subscription active",      auto: (p) => !!p.betaStripeSubscriptionId },
+      { key: "initial_payment_complete", label: "Initial payment complete", auto: (p) => p.paymentStatus === "paid" },
+    ],
+  },
+  {
+    section: "System Setup",
+    headerCls: "text-blue-700 bg-blue-50 border-blue-200",
+    items: [
+      { key: "org_created",          label: "Organization created",  auto: (p) => !!p.orgId },
+      { key: "database_provisioned", label: "Database provisioned",  auto: null },
+      { key: "branding_uploaded",    label: "Branding uploaded",     auto: null },
+      { key: "admin_user_created",   label: "Admin user created",    auto: null },
+    ],
+  },
+  {
+    section: "Training",
+    headerCls: "text-purple-700 bg-purple-50 border-purple-200",
+    items: [
+      { key: "training_scheduled", label: "Training scheduled", auto: null },
+      { key: "training_completed", label: "Training completed", auto: null },
+      { key: "golive_confirmed",   label: "Go-live confirmed",  auto: null },
+    ],
+  },
+];
+
+function isChecklistItemComplete(
+  item: { key: string; auto: ((p: Prospect) => boolean) | null },
+  prospect: Prospect,
+): boolean {
+  if (item.auto) return item.auto(prospect);
+  return !!(prospect.onboardingChecklist?.[item.key]);
+}
+
+function computeSetupProgress(prospect: Prospect): number {
+  let checked = 0;
+  const total = TRACKER_CHECKLIST.reduce((s, sec) => s + sec.items.length, 0);
+  for (const section of TRACKER_CHECKLIST) {
+    for (const item of section.items) {
+      if (isChecklistItemComplete(item, prospect)) checked++;
+    }
+  }
+  return total === 0 ? 0 : Math.round((checked / total) * 100);
+}
+
+const STAGE_BADGE_COLORS: Partial<Record<OnboardingStage, string>> = {
+  contact:              "bg-slate-100 text-slate-700",
+  inquiry:              "bg-teal-100 text-teal-700",
+  beta_approved:        "bg-teal-100 text-teal-800",
+  agreement_pending:    "bg-yellow-100 text-yellow-800",
+  agreement:            "bg-yellow-100 text-yellow-700",
+  payment_pending:      "bg-orange-100 text-orange-700",
+  payment_setup:        "bg-orange-100 text-orange-800",
+  platform_initializing:"bg-violet-100 text-violet-700",
+  initial_payment:      "bg-purple-100 text-purple-700",
+  welcome:              "bg-green-100 text-green-700",
+  demo_requested:       "bg-sky-100 text-sky-700",
+  demo_sent:            "bg-blue-100 text-blue-700",
+  demo_completed:       "bg-violet-100 text-violet-800",
+  follow_up_needed:     "bg-amber-100 text-amber-800",
+  converted:            "bg-emerald-100 text-emerald-700",
+  not_a_fit:            "bg-red-100 text-red-700",
+};
+
+function ProgressBar({ value, className }: { value: number; className?: string }) {
+  const barCls = value === 100 ? "bg-green-500" : value >= 50 ? "bg-blue-500" : "bg-gray-400";
+  return (
+    <div className={`w-full bg-gray-100 rounded-full overflow-hidden ${className ?? ""}`} style={{ height: "6px" }}>
+      <div className={`h-full rounded-full transition-all ${barCls}`} style={{ width: `${value}%` }} />
+    </div>
+  );
+}
+
+function OnboardingTrackerSection({
+  prospects,
+  onEdit,
+  onDrop,
+}: {
+  prospects: Prospect[];
+  onEdit: (p: Prospect) => void;
+  onDrop: (p: Prospect) => void;
+}) {
+  const { toast } = useToast();
+  const [drawerOpen, setDrawerOpen]       = useState(false);
+  const [selected, setSelected]           = useState<Prospect | null>(null);
+  const [draftOwner, setDraftOwner]       = useState("");
+  const [draftNextAction, setDraftNextAction] = useState("");
+  const [draftChecklist, setDraftChecklist]   = useState<Record<string, boolean>>({});
+  const [sortCol, setSortCol]             = useState("days");
+  const [sortDir, setSortDir]             = useState<"asc" | "desc">("desc");
+
+  useEffect(() => {
+    if (selected) {
+      const updated = prospects.find(p => p.id === selected.id);
+      if (updated) setSelected(updated);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prospects]);
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) =>
+      apiRequest("PATCH", `/api/super-admin/onboarding-prospects/${id}`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      toast({ title: "Saved" });
+    },
+    onError: () => toast({ title: "Failed to save", variant: "destructive" }),
+  });
+
+  function openDrawer(p: Prospect) {
+    setSelected(p);
+    setDraftOwner(p.owner ?? "");
+    setDraftNextAction(p.nextAction ?? "");
+    setDraftChecklist(p.onboardingChecklist ?? {});
+    setDrawerOpen(true);
+  }
+
+  function saveDrawer() {
+    if (!selected) return;
+    updateMutation.mutate({
+      id: selected.id,
+      payload: {
+        owner: draftOwner.trim() || null,
+        nextAction: draftNextAction.trim() || null,
+        onboardingChecklist: draftChecklist,
+      },
+    });
+  }
+
+  function markContacted() {
+    if (!selected) return;
+    const now = new Date().toISOString();
+    updateMutation.mutate({ id: selected.id, payload: { lastContactedAt: now } });
+    setSelected(prev => prev ? { ...prev, lastContactedAt: now } : null);
+  }
+
+  function toggleSort(col: string) {
+    if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortCol(col); setSortDir("asc"); }
+  }
+
+  function SortIcon({ col }: { col: string }) {
+    if (sortCol !== col) return <ChevronDown className="w-3 h-3 opacity-30 inline" />;
+    return sortDir === "asc"
+      ? <ChevronUp className="w-3 h-3 text-blue-600 inline" />
+      : <ChevronDown className="w-3 h-3 text-blue-600 inline" />;
+  }
+
+  function SortTh({ col, label, cls }: { col: string; label: string; cls?: string }) {
+    return (
+      <TableHead
+        className={`cursor-pointer select-none whitespace-nowrap ${cls ?? ""}`}
+        onClick={() => toggleSort(col)}
+      >
+        <span className="inline-flex items-center gap-1">{label}<SortIcon col={col} /></span>
+      </TableHead>
+    );
+  }
+
+  const sorted = useMemo(() => {
+    return [...prospects].sort((a, b) => {
+      let av: string | number = 0;
+      let bv: string | number = 0;
+      if (sortCol === "client")       { av = (a.company || a.name).toLowerCase(); bv = (b.company || b.name).toLowerCase(); }
+      else if (sortCol === "stage")   { av = a.stage;                              bv = b.stage; }
+      else if (sortCol === "agreement") { av = a.agreementStatus ?? "";            bv = b.agreementStatus ?? ""; }
+      else if (sortCol === "payment") { av = a.paymentStatus ?? "";                bv = b.paymentStatus ?? ""; }
+      else if (sortCol === "progress") { av = computeSetupProgress(a);             bv = computeSetupProgress(b); }
+      else if (sortCol === "days")    { av = stageDays(a);                         bv = stageDays(b); }
+      else if (sortCol === "lastContacted") { av = a.lastContactedAt ?? "";        bv = b.lastContactedAt ?? ""; }
+      if (av < bv) return sortDir === "asc" ? -1 : 1;
+      if (av > bv) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [prospects, sortCol, sortDir]);
+
+  const draftProspect: Prospect | null = selected
+    ? { ...selected, onboardingChecklist: draftChecklist }
+    : null;
+
+  return (
+    <div className="mt-8">
+      <div className="flex items-center gap-2 mb-3">
+        <ClipboardList className="w-4 h-4 text-gray-600" />
+        <h3 className="text-sm font-semibold text-gray-800">Onboarding Tracker</h3>
+        <Badge variant="outline" className="text-xs">{prospects.length}</Badge>
+        <span className="text-xs text-gray-400 ml-1">— operational view of every active client</span>
+      </div>
+
+      {prospects.length === 0 ? (
+        <p className="text-sm text-gray-400 text-center py-8 border rounded-lg bg-gray-50">
+          No active prospects to track.
+        </p>
+      ) : (
+        <div className="border rounded-lg overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-50 text-xs">
+                <SortTh col="client"      label="Client / Company" />
+                <TableHead className="whitespace-nowrap">Contact Email</TableHead>
+                <SortTh col="stage"       label="Current Stage" />
+                <TableHead>Owner</TableHead>
+                <SortTh col="agreement"   label="Agreement" />
+                <SortTh col="payment"     label="Payment" />
+                <SortTh col="progress"    label="Setup %" />
+                <SortTh col="days"        label="Days in Stage" />
+                <TableHead className="whitespace-nowrap">Next Action</TableHead>
+                <SortTh col="lastContacted" label="Last Contacted" />
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sorted.map(p => {
+                const progress  = computeSetupProgress(p);
+                const days      = stageDays(p);
+                const stageBadge = STAGE_BADGE_COLORS[p.stage] ?? "bg-gray-100 text-gray-700";
+                const stageLabel = PIPELINE_STAGES.find(s => s.key === p.stage)?.label ?? p.stage;
+                return (
+                  <TableRow
+                    key={p.id}
+                    className="cursor-pointer hover:bg-blue-50/40 text-sm"
+                    onClick={() => openDrawer(p)}
+                  >
+                    {/* Client / Company */}
+                    <TableCell>
+                      <div className="font-medium text-gray-900">{p.company || p.name}</div>
+                      {p.company && <div className="text-xs text-gray-400">{p.name}</div>}
+                    </TableCell>
+
+                    {/* Contact Email */}
+                    <TableCell className="text-xs text-gray-500">{p.email}</TableCell>
+
+                    {/* Current Stage */}
+                    <TableCell>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${stageBadge}`}>
+                        {stageLabel}
+                      </span>
+                    </TableCell>
+
+                    {/* Owner */}
+                    <TableCell className="text-xs text-gray-600 whitespace-nowrap">
+                      {p.owner ?? <span className="text-gray-300">—</span>}
+                    </TableCell>
+
+                    {/* Agreement Status */}
+                    <TableCell>
+                      {p.agreementStatus ? (
+                        <Badge variant="outline" className={`text-xs capitalize ${
+                          p.agreementStatus === "signed"  ? "border-green-300 text-green-700 bg-green-50" :
+                          p.agreementStatus === "sent"    ? "border-blue-300 text-blue-700 bg-blue-50" :
+                          "border-gray-300 text-gray-600"
+                        }`}>
+                          {p.agreementStatus}
+                        </Badge>
+                      ) : <span className="text-gray-300 text-xs">—</span>}
+                    </TableCell>
+
+                    {/* Payment Status */}
+                    <TableCell>
+                      {p.paymentStatus ? (
+                        <Badge variant="outline" className={`text-xs capitalize ${
+                          p.paymentStatus === "paid"    ? "border-green-300 text-green-700 bg-green-50" :
+                          p.paymentStatus === "pending" ? "border-amber-300 text-amber-700 bg-amber-50" :
+                          "border-gray-300 text-gray-600"
+                        }`}>
+                          {p.paymentStatus}
+                        </Badge>
+                      ) : <span className="text-gray-300 text-xs">—</span>}
+                    </TableCell>
+
+                    {/* Setup Progress % */}
+                    <TableCell>
+                      <div className="flex items-center gap-2 min-w-[90px]">
+                        <ProgressBar value={progress} className="flex-1" />
+                        <span className="text-xs text-gray-600 w-9 text-right tabular-nums">{progress}%</span>
+                      </div>
+                    </TableCell>
+
+                    {/* Days in Current Stage */}
+                    <TableCell className="text-center">
+                      <span className={`text-xs font-semibold ${
+                        days > 14 ? "text-red-600" : days > 7 ? "text-amber-600" : "text-gray-600"
+                      }`}>
+                        {days}d
+                      </span>
+                    </TableCell>
+
+                    {/* Next Action */}
+                    <TableCell className="max-w-[180px]">
+                      {p.nextAction
+                        ? <span className="text-xs text-gray-700 line-clamp-2">{p.nextAction}</span>
+                        : <span className="text-gray-300 text-xs">—</span>}
+                    </TableCell>
+
+                    {/* Last Contacted */}
+                    <TableCell className="text-xs text-gray-500 whitespace-nowrap">
+                      {p.lastContactedAt
+                        ? new Date(p.lastContactedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                        : <span className="text-gray-300">—</span>}
+                    </TableCell>
+
+                    {/* Actions */}
+                    <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-0.5">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openDrawer(p)}>
+                              <Eye className="w-3.5 h-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>View checklist</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onEdit(p)}>
+                              <Edit className="w-3.5 h-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Edit prospect</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
+                              onClick={() => onDrop(p)}
+                            >
+                              <Archive className="w-3.5 h-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Archive / Drop</TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* ── Tracker Detail Drawer ── */}
+      <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          {selected && draftProspect && (
+            <>
+              <SheetHeader className="pb-2">
+                <SheetTitle className="text-base flex items-center gap-2">
+                  <ClipboardList className="w-4 h-4 text-gray-500" />
+                  {selected.company || selected.name}
+                </SheetTitle>
+                <SheetDescription className="text-xs">{selected.email}</SheetDescription>
+              </SheetHeader>
+
+              {/* Profile summary card */}
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg mb-4 mt-4">
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate">{selected.company || selected.name}</p>
+                  {selected.company && <p className="text-xs text-gray-500 truncate">{selected.name}</p>}
+                  <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STAGE_BADGE_COLORS[selected.stage] ?? "bg-gray-100 text-gray-700"}`}>
+                      {PIPELINE_STAGES.find(s => s.key === selected.stage)?.label ?? selected.stage}
+                    </span>
+                    <span className="text-xs text-gray-400">{stageDays(selected)}d in stage</span>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-2xl font-bold text-gray-800">{computeSetupProgress(draftProspect)}%</div>
+                  <div className="text-xs text-gray-400">complete</div>
+                </div>
+              </div>
+
+              <ProgressBar value={computeSetupProgress(draftProspect)} className="mb-5" />
+
+              {/* Editable fields */}
+              <div className="space-y-3 mb-5">
+                <div>
+                  <Label className="text-xs font-medium text-gray-600 mb-1 block">Owner</Label>
+                  <Input
+                    className="h-8 text-sm"
+                    placeholder="Assign to a team member…"
+                    value={draftOwner}
+                    onChange={e => setDraftOwner(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-gray-600 mb-1 block">Next Action</Label>
+                  <Textarea
+                    className="text-sm resize-none"
+                    rows={2}
+                    placeholder="What needs to happen next?"
+                    value={draftNextAction}
+                    onChange={e => setDraftNextAction(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-gray-600 mb-1 block">Last Contacted</Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600 flex-1">
+                      {selected.lastContactedAt
+                        ? new Date(selected.lastContactedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+                        : <span className="text-gray-400 text-xs">Not yet recorded</span>}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs shrink-0"
+                      onClick={markContacted}
+                      disabled={updateMutation.isPending}
+                    >
+                      Mark as Contacted
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <Separator className="mb-4" />
+
+              {/* Onboarding Checklist */}
+              <p className="text-xs font-semibold text-gray-600 mb-3 uppercase tracking-wide">Onboarding Checklist</p>
+              <div className="space-y-3 mb-6">
+                {TRACKER_CHECKLIST.map(section => {
+                  const sectionChecked = section.items.filter(item =>
+                    isChecklistItemComplete(item, draftProspect)
+                  ).length;
+                  return (
+                    <div key={section.section} className="border rounded-lg overflow-hidden">
+                      <div className={`px-3 py-2 border-b flex items-center justify-between ${section.headerCls}`}>
+                        <span className="text-xs font-semibold">{section.section}</span>
+                        <span className="text-xs opacity-60 tabular-nums">
+                          {sectionChecked}/{section.items.length}
+                        </span>
+                      </div>
+                      <div className="divide-y bg-white">
+                        {section.items.map(item => {
+                          const isAuto = !!item.auto;
+                          const checked = isAuto ? item.auto!(selected) : !!(draftChecklist[item.key]);
+                          return (
+                            <div
+                              key={item.key}
+                              className={`flex items-center gap-3 px-3 py-2.5 ${isAuto ? "bg-gray-50/60" : ""}`}
+                            >
+                              <Checkbox
+                                checked={checked}
+                                disabled={isAuto}
+                                onCheckedChange={(v) => {
+                                  if (!isAuto) setDraftChecklist(prev => ({ ...prev, [item.key]: !!v }));
+                                }}
+                                className={isAuto ? "opacity-50" : ""}
+                              />
+                              <span className={`text-xs flex-1 ${checked ? "line-through text-gray-400" : "text-gray-700"}`}>
+                                {item.label}
+                              </span>
+                              {isAuto && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="text-xs text-gray-400 italic cursor-help">auto</span>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="text-xs">Auto-detected from system data</TooltipContent>
+                                </Tooltip>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Save / Edit footer */}
+              <div className="flex gap-2 sticky bottom-0 bg-white pt-3 pb-1 border-t">
+                <Button
+                  className="flex-1"
+                  onClick={saveDrawer}
+                  disabled={updateMutation.isPending}
+                >
+                  {updateMutation.isPending ? "Saving…" : "Save Changes"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => { setDrawerOpen(false); onEdit(selected); }}
+                >
+                  <Edit className="w-3.5 h-3.5 mr-1.5" /> Edit Profile
+                </Button>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+}
 
 const DEMO_STAGES_SET = new Set<OnboardingStage>(["demo_requested", "demo_sent", "demo_completed", "follow_up_needed", "converted", "not_a_fit"]);
 
@@ -2147,6 +2676,13 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
           <p className="text-sm text-gray-400 mt-2">No dropped prospects.</p>
         )}
       </div>
+
+      {/* Onboarding Tracker Table */}
+      <OnboardingTrackerSection
+        prospects={active}
+        onEdit={openEdit}
+        onDrop={(p) => setDroppingProspect(p)}
+      />
 
       {/* Create / Edit sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>

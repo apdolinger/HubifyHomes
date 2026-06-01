@@ -3446,6 +3446,11 @@ export const onboardingProspects = pgTable("onboarding_prospects", {
   // Approval email tracking
   approvalEmailSent: boolean("approval_email_sent").notNull().default(false),
   approvalEmailSentAt: timestamp("approval_email_sent_at"),
+  // Onboarding tracker fields
+  owner: varchar("owner"),
+  nextAction: text("next_action"),
+  lastContactedAt: timestamp("last_contacted_at"),
+  onboardingChecklist: jsonb("onboarding_checklist").$type<Record<string, boolean>>(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [

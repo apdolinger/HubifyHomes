@@ -723,6 +723,24 @@ export async function ensurePaymentSetupColumns(): Promise<void> {
   }
 }
 
+export async function ensureOnboardingTrackerColumns(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE onboarding_prospects
+        ADD COLUMN IF NOT EXISTS owner VARCHAR,
+        ADD COLUMN IF NOT EXISTS next_action TEXT,
+        ADD COLUMN IF NOT EXISTS last_contacted_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS onboarding_checklist JSONB;
+    `);
+    log("[MIGRATE] onboarding_prospects tracker columns verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add tracker columns to onboarding_prospects: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensurePortalInvitationColumns(): Promise<void> {
   const client = await pool.connect();
   try {
