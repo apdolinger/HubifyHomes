@@ -50,7 +50,7 @@ export default function PortalLogin() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <img src={logoSrc} alt={logoAlt} className="h-24 w-24 object-contain rounded-xl" />
+            <img src={logoSrc} alt={logoAlt} className="h-16 w-auto" />
           </div>
           <CardDescription>Sign in to access your property portal</CardDescription>
         </CardHeader>

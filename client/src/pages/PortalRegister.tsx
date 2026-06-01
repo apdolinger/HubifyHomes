@@ -70,7 +70,7 @@ export default function PortalRegister() {
         <Card className="w-full max-w-md text-center" data-testid="welcome-card">
           <CardContent className="pt-10 pb-10 space-y-5">
             <div className="flex justify-center">
-              <img src={logoSrc} alt={logoAlt} className="h-14 w-auto" />
+              <img src={logoSrc} alt={logoAlt} className="h-16 w-auto" />
             </div>
             <div className="flex justify-center">
               <CheckCircle2 className="w-16 h-16 text-teal-500" />
@@ -96,7 +96,7 @@ export default function PortalRegister() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <img src={logoSrc} alt={logoAlt} className="h-24 w-24 object-contain rounded-xl" />
+            <img src={logoSrc} alt={logoAlt} className="h-16 w-auto" />
           </div>
           <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
           <CardDescription>Register with your invitation</CardDescription>
