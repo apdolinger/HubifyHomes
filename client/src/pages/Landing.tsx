@@ -218,7 +218,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="h-9 w-auto" />
+              <span className="text-xl font-bold text-slate-900">Hubify</span>
             </div>
             <div className="hidden sm:flex items-center gap-3">
               <Button onClick={() => setIsSubmitOpen(true)} className="bg-teal-600 hover:bg-teal-700 text-white">
