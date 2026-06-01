@@ -16839,32 +16839,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (prospect.onboardingTokenExpiresAt && new Date(prospect.onboardingTokenExpiresAt) < new Date()) {
         return res.status(410).json({ message: "This onboarding link has expired. Please reply to your approval email to request a new one." });
       }
-      if (prospect.agreementStatus === "signed") {
-        return res.status(200).json({
-          alreadySigned: true,
-          agreementSignedAt: prospect.agreementSignedAt,
-          agreementSignerName: (prospect as any).agreementSignerName,
-          stage: prospect.stage,
-        });
-      }
       // Return safe subset — never expose internal UUID in this endpoint
+      const p = prospect as any;
       res.json({
-        alreadySigned: false,
+        alreadySigned: p.agreementStatus === "signed",
+        agreementSignedAt: prospect.agreementSignedAt,
+        agreementSignerName: p.agreementSignerName,
         name: prospect.name,
-        firstName: (prospect as any).firstName,
-        lastName: (prospect as any).lastName,
+        firstName: p.firstName,
+        lastName: p.lastName,
         email: prospect.email,
         phone: prospect.phone,
         company: prospect.company,
-        estimatedHomes: (prospect as any).estimatedHomes,
-        teamSize: (prospect as any).teamSize,
-        portfolioTier: (prospect as any).portfolioTier,
-        originalMonthlyPrice: (prospect as any).originalMonthlyPrice,
-        discountPercentage: (prospect as any).discountPercentage,
-        discountedMonthlyPrice: (prospect as any).discountedMonthlyPrice,
-        setupFee: (prospect as any).setupFee,
-        betaCohortNumber: (prospect as any).betaCohortNumber,
-        agreementStatus: (prospect as any).agreementStatus ?? "pending",
+        estimatedHomes: p.estimatedHomes,
+        teamSize: p.teamSize,
+        portfolioTier: p.portfolioTier,
+        originalMonthlyPrice: p.originalMonthlyPrice,
+        discountPercentage: p.discountPercentage,
+        discountedMonthlyPrice: p.discountedMonthlyPrice,
+        setupFee: p.setupFee,
+        betaCohortNumber: p.betaCohortNumber,
+        agreementStatus: p.agreementStatus ?? "pending",
+        paymentStatus: p.paymentStatus ?? null,
+        paymentCompletedAt: p.paymentCompletedAt ?? null,
         stage: prospect.stage,
       });
     } catch (error) {
@@ -16942,6 +16939,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error accepting agreement:", error);
       res.status(500).json({ message: "Failed to record agreement acceptance." });
+    }
+  });
+
+  // POST /api/public/onboarding/:token/create-checkout
+  // Creates a Stripe Checkout session for the beta setup fee + first month subscription.
+  app.post("/api/public/onboarding/:token/create-checkout", async (req, res) => {
+    try {
+      const { token } = req.params;
+      if (!token || token.length !== 64 || !/^[0-9a-f]+$/.test(token)) {
+        return res.status(400).json({ message: "Invalid onboarding link." });
+      }
+
+      if (!process.env.STRIPE_SECRET_KEY) {
+        return res.status(503).json({ message: "Payment processing is not configured. Please contact support." });
+      }
+
+      const { eq } = await import("drizzle-orm");
+      const rows = await db
+        .select()
+        .from(onboardingProspects)
+        .where(eq(onboardingProspects.onboardingToken, token))
+        .limit(1);
+      const prospect = rows[0];
+      if (!prospect) return res.status(404).json({ message: "Onboarding link not found." });
+      if (!prospect.isBetaMember || !prospect.betaApprovedAt) {
+        return res.status(403).json({ message: "Application not approved for beta." });
+      }
+      if (prospect.onboardingTokenExpiresAt && new Date(prospect.onboardingTokenExpiresAt) < new Date()) {
+        return res.status(410).json({ message: "This onboarding link has expired. Please contact support for a new link." });
+      }
+      const p = prospect as any;
+      if (p.agreementStatus !== "signed") {
+        return res.status(409).json({ message: "Agreement must be signed before payment." });
+      }
+      if (p.paymentStatus === "paid") {
+        return res.status(409).json({ message: "Payment has already been completed." });
+      }
+
+      const { getMasterStripe } = await import("./stripe");
+      const stripe = getMasterStripe();
+
+      const discountedMonthlyPriceCents = Math.round((p.discountedMonthlyPrice ?? 0) * 100);
+      const setupFeeCents = Math.round((p.setupFee ?? 0) * 100);
+
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      const successUrl = `${baseUrl}/onboarding/${token}?payment=success&session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = `${baseUrl}/onboarding/${token}?payment=cancelled`;
+
+      const lineItems: any[] = [];
+
+      // Recurring monthly subscription
+      if (discountedMonthlyPriceCents > 0) {
+        lineItems.push({
+          price_data: {
+            currency: "usd",
+            unit_amount: discountedMonthlyPriceCents,
+            product_data: {
+              name: `Hubify Homes Beta — ${p.portfolioTier ?? "Standard"} Plan`,
+              description: `Beta cohort #${p.betaCohortNumber ?? "?"} · ${p.discountPercentage ?? 0}% founding discount (locked for life)`,
+            },
+            recurring: { interval: "month" },
+          },
+          quantity: 1,
+        });
+      }
+
+      // One-time setup fee (added to first invoice automatically in subscription mode)
+      if (setupFeeCents > 0) {
+        lineItems.push({
+          price_data: {
+            currency: "usd",
+            unit_amount: setupFeeCents,
+            product_data: {
+              name: "Platform Initialization Fee",
+              description: "One-time database and platform setup fee",
+            },
+          },
+          quantity: 1,
+        });
+      }
+
+      if (lineItems.length === 0) {
+        return res.status(400).json({ message: "No pricing configured for this prospect. Please contact support." });
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        mode: "subscription",
+        customer_email: prospect.email ?? undefined,
+        line_items: lineItems,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        metadata: {
+          prospect_token: token,
+          prospect_email: prospect.email ?? "",
+          org_name: prospect.company ?? "",
+          portfolio_tier: p.portfolioTier ?? "",
+          beta_cohort_number: String(p.betaCohortNumber ?? ""),
+          discount_percentage: String(p.discountPercentage ?? 0),
+        },
+        subscription_data: {
+          metadata: {
+            prospect_token: token,
+            hubify_beta: "true",
+          },
+        },
+        payment_method_types: ["card"],
+        billing_address_collection: "auto",
+      });
+
+      // Store checkout session ID on the prospect for audit
+      await db.update(onboardingProspects).set({
+        betaStripeCheckoutSessionId: session.id,
+      } as any).where(eq(onboardingProspects.id, prospect.id));
+
+      res.json({ checkoutUrl: session.url });
+    } catch (error: any) {
+      console.error("Error creating beta checkout session:", error);
+      res.status(500).json({ message: error?.message ?? "Failed to create payment session." });
     }
   });
 

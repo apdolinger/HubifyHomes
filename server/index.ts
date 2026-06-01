@@ -77,6 +77,62 @@ app.post("/api/stripe/webhooks/master", express.raw({ type: "application/json" }
   }
 });
 
+// Beta onboarding checkout webhook — must be before express.json()
+app.post("/api/stripe/webhooks/beta-onboarding", express.raw({ type: "application/json" }), async (req, res) => {
+  try {
+    const sig = req.headers["stripe-signature"];
+    const webhookSecret = process.env.STRIPE_BETA_ONBOARDING_WEBHOOK_SECRET;
+
+    let event: any;
+    if (sig && webhookSecret) {
+      const { getMasterStripe } = await import("./stripe");
+      const stripe = getMasterStripe();
+      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    } else {
+      // No secret configured — parse raw JSON for dev/staging
+      try {
+        event = JSON.parse(req.body.toString());
+      } catch {
+        return res.status(400).json({ message: "Invalid JSON body" });
+      }
+    }
+
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object;
+      const prospectToken = session.metadata?.prospect_token;
+      if (prospectToken) {
+        const { db } = await import("./db");
+        const { onboardingProspects } = await import("@shared/schema");
+        const { eq } = await import("drizzle-orm");
+        const rows = await db.select().from(onboardingProspects)
+          .where(eq(onboardingProspects.onboardingToken, prospectToken)).limit(1);
+        const prospect = rows[0];
+        if (prospect) {
+          const now = new Date();
+          const existingHistory: any[] = (prospect as any).stageHistory ?? [];
+          await db.update(onboardingProspects).set({
+            paymentStatus: "paid",
+            paymentCompletedAt: now,
+            betaStripeCustomerId: session.customer ?? null,
+            betaStripeSubscriptionId: session.subscription ?? null,
+            stage: "platform_initializing",
+            stageHistory: [
+              ...existingHistory,
+              { stage: "platform_initializing", enteredAt: now.toISOString(), note: "Stripe Checkout completed" },
+            ],
+          } as any).where(eq(onboardingProspects.id, prospect.id));
+          console.log(`[beta-onboarding-webhook] Payment confirmed for prospect ${prospect.id}`);
+        }
+      }
+    }
+
+    res.json({ received: true });
+  } catch (error) {
+    console.error("[beta-onboarding-webhook] Error:", error);
+    res.status(400).json({ message: `Webhook Error: ${(error as Error).message}` });
+  }
+});
+
 app.post("/api/stripe/webhooks/org/:orgId", express.raw({ type: "application/json" }), async (req, res) => {
   try {
     const { orgId } = req.params;
@@ -348,6 +404,12 @@ app.use((req, res, next) => {
         await ensureAgreementSignatureColumns();
       } catch (err) {
         console.error('Error ensuring agreement signature columns on onboarding_prospects:', err);
+      }
+      try {
+        const { ensurePaymentSetupColumns } = await import('./runMigrations.js');
+        await ensurePaymentSetupColumns();
+      } catch (err) {
+        console.error('Error ensuring payment setup columns on onboarding_prospects:', err);
       }
     } catch (error) {
       console.error('Error loading startup migrations:', error);

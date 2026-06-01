@@ -3433,6 +3433,12 @@ export const onboardingProspects = pgTable("onboarding_prospects", {
   agreementOrganizationName: varchar("agreement_organization_name"),
   agreementAcceptedIp: varchar("agreement_accepted_ip"),
   agreementAcceptedUserAgent: text("agreement_accepted_user_agent"),
+  // Beta payment details (populated after Stripe Checkout completes)
+  paymentStatus: varchar("payment_status"),
+  paymentCompletedAt: timestamp("payment_completed_at"),
+  betaStripeCustomerId: varchar("beta_stripe_customer_id"),
+  betaStripeSubscriptionId: varchar("beta_stripe_subscription_id"),
+  betaStripeCheckoutSessionId: varchar("beta_stripe_checkout_session_id"),
   // Onboarding token (generated at approval, used in the onboarding link)
   onboardingToken: varchar("onboarding_token"),
   onboardingTokenCreatedAt: timestamp("onboarding_token_created_at"),
@@ -3453,6 +3459,7 @@ export const onboardingStageEnum = z.enum([
   "agreement",
   "payment_pending",
   "payment_setup",
+  "platform_initializing",
   "initial_payment",
   "welcome",
   "dropped",

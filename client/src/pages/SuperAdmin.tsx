@@ -109,7 +109,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 // Onboarding Pipeline Tab
 // ============================================================================
 
-type OnboardingStage = "contact" | "inquiry" | "agreement" | "payment_pending" | "payment_setup" | "initial_payment" | "welcome" | "dropped" | "demo_requested" | "demo_sent" | "demo_completed" | "follow_up_needed" | "converted" | "not_a_fit" | "beta_approved" | "agreement_pending";
+type OnboardingStage = "contact" | "inquiry" | "agreement" | "payment_pending" | "payment_setup" | "platform_initializing" | "initial_payment" | "welcome" | "dropped" | "demo_requested" | "demo_sent" | "demo_completed" | "follow_up_needed" | "converted" | "not_a_fit" | "beta_approved" | "agreement_pending";
 
 interface StageHistoryEntry { stage: OnboardingStage; enteredAt: string; }
 
@@ -198,8 +198,9 @@ const PIPELINE_STAGES: { key: OnboardingStage; label: string; color: string }[] 
   { key: "beta_approved",     label: "Beta Approved",      color: "border-teal-500 bg-teal-100" },
   { key: "agreement_pending", label: "Agreement Pending",  color: "border-yellow-500 bg-yellow-50" },
   { key: "agreement",         label: "Agreement",          color: "border-yellow-400 bg-yellow-50" },
-  { key: "payment_pending",   label: "Payment Pending",    color: "border-orange-300 bg-orange-50" },
-  { key: "payment_setup",     label: "Payment Setup",      color: "border-orange-400 bg-orange-50" },
+  { key: "payment_pending",      label: "Payment Pending",      color: "border-orange-300 bg-orange-50" },
+  { key: "payment_setup",        label: "Payment Setup",        color: "border-orange-400 bg-orange-50" },
+  { key: "platform_initializing", label: "Platform Initializing", color: "border-violet-400 bg-violet-50" },
   { key: "initial_payment",   label: "Initial Payment",    color: "border-purple-400 bg-purple-50" },
   { key: "welcome",           label: "Welcome",            color: "border-green-400 bg-green-50" },
   { key: "demo_requested",    label: "Demo Requested",     color: "border-sky-400 bg-sky-50" },
@@ -210,7 +211,7 @@ const PIPELINE_STAGES: { key: OnboardingStage; label: string; color: string }[] 
   { key: "not_a_fit",         label: "Not a Fit",          color: "border-red-300 bg-red-50" },
 ];
 
-const STAGE_ORDER: OnboardingStage[] = ["contact", "inquiry", "beta_approved", "agreement_pending", "agreement", "payment_pending", "payment_setup", "initial_payment", "welcome"];
+const STAGE_ORDER: OnboardingStage[] = ["contact", "inquiry", "beta_approved", "agreement_pending", "agreement", "payment_pending", "payment_setup", "platform_initializing", "initial_payment", "welcome"];
 const DEMO_STAGE_ORDER: OnboardingStage[] = ["demo_requested", "demo_sent", "demo_completed", "follow_up_needed", "converted"];
 
 function nextStage(current: OnboardingStage): OnboardingStage | null {

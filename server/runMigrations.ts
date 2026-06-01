@@ -704,6 +704,25 @@ export async function ensureAgreementSignatureColumns(): Promise<void> {
   }
 }
 
+export async function ensurePaymentSetupColumns(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE onboarding_prospects
+        ADD COLUMN IF NOT EXISTS payment_status VARCHAR,
+        ADD COLUMN IF NOT EXISTS payment_completed_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS beta_stripe_customer_id VARCHAR,
+        ADD COLUMN IF NOT EXISTS beta_stripe_subscription_id VARCHAR,
+        ADD COLUMN IF NOT EXISTS beta_stripe_checkout_session_id VARCHAR;
+    `);
+    log("[MIGRATE] onboarding_prospects payment setup columns verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add payment setup columns to onboarding_prospects: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensurePortalInvitationColumns(): Promise<void> {
   const client = await pool.connect();
   try {

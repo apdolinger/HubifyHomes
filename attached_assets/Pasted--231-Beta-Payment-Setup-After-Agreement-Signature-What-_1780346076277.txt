@@ -1,0 +1,86 @@
+#231 - Beta Payment Setup After Agreement Signature
+
+What & Why
+
+After an approved beta client signs the Beta Agreement, they should move to payment setup before the platform is initialized.
+
+The payment step should collect payment through Stripe using the approved pricing already stored on the prospect record.
+
+Done Looks Like
+
+After the agreement is signed:
+
+* stage = payment_pending
+* agreementStatus = signed
+* the onboarding page advances to Step 2: Payment Setup
+
+Step 2 should display:
+
+* Organization Name
+* Portfolio Tier
+* Number of Properties
+* Original Monthly Price
+* Beta Discount Percentage
+* Discounted Monthly Price
+* One-Time Database Initialization Fee
+* Total Due Today
+
+Payment Logic
+
+Total due today should include:
+
+* One-Time Database Initialization Fee
+* First subscription payment, unless we decide subscription starts after platform activation
+
+For now, use:
+
+Total Due Today = Setup Fee + First Month Discounted Subscription
+
+Stripe
+
+Create a Stripe Checkout session for the approved beta prospect.
+
+Checkout should include:
+
+* Setup/database initialization fee as one-time charge
+* Discounted monthly subscription as recurring subscription
+* Customer email from the prospect record
+* Organization/company name in metadata
+* Prospect ID in metadata
+* Portfolio tier in metadata
+* Beta cohort number in metadata
+* Discount percentage in metadata
+
+After successful payment:
+
+* paymentStatus = paid
+* paymentCompletedAt = current timestamp
+* stripeCustomerId = saved
+* stripeSubscriptionId = saved
+* stage = platform_initializing
+
+If payment fails or is cancelled:
+
+* stage remains payment_pending
+* show clear retry message
+
+Frontend
+
+On /onboarding/:token, add Step 2: Payment Setup.
+
+If agreement is not signed, Step 2 should be locked.
+
+If agreement is signed but payment is not complete, show the payment summary and a button:
+
+“Continue to Secure Payment”
+
+After Stripe success redirect, show:
+
+“Payment received. Your platform setup is now starting.”
+
+Out of Scope
+
+Actual platform/organization provisioning.
+Importing homes.
+Creating staff users.
+Final welcome email.
