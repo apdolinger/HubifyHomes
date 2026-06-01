@@ -16639,8 +16639,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   <div style="font-family:sans-serif;max-width:580px;margin:0 auto;padding:32px 24px;background:#ffffff">
                     <!-- Logo -->
                     <div style="text-align:center;margin-bottom:28px">
-                      <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="180" style="width:180px;max-width:180px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
-                      <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px;margin-top:4px">Hubify</div>
+                      <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="140" style="width:140px;max-width:140px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
                     </div>
 
                     <!-- Greeting -->
@@ -17181,8 +17180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             html: `
               <div style="font-family:sans-serif;max-width:580px;margin:0 auto;padding:32px 24px;background:#ffffff">
                 <div style="text-align:center;margin-bottom:28px">
-                  <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="180" style="width:180px;max-width:180px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
-                  <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px;margin-top:4px">Hubify</div>
+                  <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="140" style="width:140px;max-width:140px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
                 </div>
                 <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${firstName}, thanks for reaching out!</h1>
                 <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
