@@ -1,0 +1,129 @@
+#230 - Beta Agreement Review & Signature Workflow
+
+What & Why
+
+After a beta applicant is approved and receives the approval email, the secure onboarding link should take them to the first onboarding step: reviewing and accepting the Hubify Homes Beta Agreement.
+
+This agreement step should dynamically pull the approved prospect’s company, pricing, portfolio, and beta discount details so the applicant can formally accept their beta terms before payment setup and platform initialization.
+
+Done Looks Like
+
+When the approved applicant clicks the secure onboarding link from their approval email, they land on an onboarding page.
+
+The onboarding page shows a step-based flow:
+
+Step 1: Agreement Review & Signature
+Step 2: Payment Setup
+Step 3: Platform Initialization
+Step 4: Welcome to Hubify Homes
+
+For this task, only build Step 1.
+
+The agreement page should display:
+
+* Company Name
+* Contact Name
+* Email
+* Phone
+* Number of Properties Managed
+* Number of Staff Users Expected
+* Portfolio Tier
+* Original Monthly Price
+* Discount Percentage
+* Discounted Monthly Price
+* One-Time Database Initialization Fee
+* Beta Cohort Number
+* Agreement Status
+
+Agreement Acceptance
+
+The user must check:
+
+* I agree to the Hubify Homes Beta Agreement.
+* I agree to the Hubify Homes Terms of Service.
+* I agree to the Hubify Homes Privacy Policy.
+
+The user must type:
+
+* Authorized Signer Name
+* Organization Name
+
+The organization name must match the approved company name or require confirmation.
+
+When the user clicks “Accept & Continue”:
+
+* agreementStatus = "signed"
+* agreementSignedAt = current timestamp
+* agreementSignerName = typed signer name
+* agreementOrganizationName = typed organization name
+* agreementAcceptedIp = request IP if available
+* agreementAcceptedUserAgent = browser user agent if available
+* stage = payment_pending
+
+Security
+
+Use the existing onboarding token from the approval email.
+
+Do not expose internal prospect IDs in the URL.
+
+If the token is missing, expired, invalid, or already cancelled, show a clear error message.
+
+Backend
+
+Add public onboarding endpoints:
+
+GET /api/public/onboarding/:token
+
+Returns approved prospect onboarding details needed for the agreement screen.
+
+POST /api/public/onboarding/:token/accept-agreement
+
+Accepts:
+
+* signerName
+* organizationName
+* agreement checkbox confirmations
+
+Validates:
+
+* valid token
+* token not expired
+* agreementStatus is pending
+* required checkboxes are true
+* signerName is present
+* organizationName is present
+
+Then updates the prospect record.
+
+Database
+
+Add columns if not already present:
+
+* agreement_signed_at
+* agreement_signer_name
+* agreement_organization_name
+* agreement_accepted_ip
+* agreement_accepted_user_agent
+
+Frontend
+
+Create the onboarding page route:
+
+/onboarding/:token
+
+Use a clean branded Hubify Homes layout.
+
+Show the pricing and beta terms clearly.
+
+Show the agreement acceptance section.
+
+After successful signature, move the user to a simple “Agreement Signed” confirmation screen that says:
+
+“Your beta agreement has been accepted. The next step is payment setup.”
+
+Out of Scope
+
+Stripe payment setup.
+Actual organization/platform provisioning.
+Full PDF generation.
+Admin countersignature.
