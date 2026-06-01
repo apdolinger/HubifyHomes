@@ -64,6 +64,7 @@ import Contact from "@/pages/Contact";
 import Signup from "@/pages/Signup";
 import Billing from "@/pages/Billing";
 import PaymentCollectionPage from "@/pages/PaymentCollectionPage";
+import OnboardingPortal from "@/pages/OnboardingPortal";
 import InspectionReport from "@/pages/InspectionReport";
 import InspectionSchedules from "@/pages/InspectionSchedules";
 import Navigation from "@/components/Navigation";
@@ -130,6 +131,7 @@ function Router() {
       <Route path="/super-admin/login" component={SuperAdminLogin} />
       <Route path="/super-admin" component={SuperAdmin} />
       <Route path="/payment-collection/:token" component={PaymentCollectionPage} />
+      <Route path="/onboarding/:token" component={OnboardingPortal} />
       <Route path="/submit" component={Submissions} />
       <Route path="/inquire">{() => { window.location.replace("/submit"); return null; }}</Route>
       <Route path="/contact" component={Contact} />

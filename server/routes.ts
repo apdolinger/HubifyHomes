@@ -16813,6 +16813,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Public Onboarding (tokenized, no auth) ───────────────────────────────
+  // GET /api/public/onboarding/:token
+  // Returns approved prospect details needed to render the agreement screen.
+  // No auth — gated only by the secure 64-hex onboarding token.
+  app.get("/api/public/onboarding/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      if (!token || token.length !== 64 || !/^[0-9a-f]+$/.test(token)) {
+        return res.status(400).json({ message: "Invalid onboarding link." });
+      }
+      const { eq } = await import("drizzle-orm");
+      const rows = await db
+        .select()
+        .from(onboardingProspects)
+        .where(eq(onboardingProspects.onboardingToken, token))
+        .limit(1);
+      const prospect = rows[0];
+      if (!prospect) {
+        return res.status(404).json({ message: "This onboarding link is not valid. Please contact support." });
+      }
+      if (!prospect.isBetaMember || !prospect.betaApprovedAt) {
+        return res.status(403).json({ message: "This link is not associated with an approved beta application." });
+      }
+      if (prospect.onboardingTokenExpiresAt && new Date(prospect.onboardingTokenExpiresAt) < new Date()) {
+        return res.status(410).json({ message: "This onboarding link has expired. Please reply to your approval email to request a new one." });
+      }
+      if (prospect.agreementStatus === "signed") {
+        return res.status(200).json({
+          alreadySigned: true,
+          agreementSignedAt: prospect.agreementSignedAt,
+          agreementSignerName: (prospect as any).agreementSignerName,
+          stage: prospect.stage,
+        });
+      }
+      // Return safe subset — never expose internal UUID in this endpoint
+      res.json({
+        alreadySigned: false,
+        name: prospect.name,
+        firstName: (prospect as any).firstName,
+        lastName: (prospect as any).lastName,
+        email: prospect.email,
+        phone: prospect.phone,
+        company: prospect.company,
+        estimatedHomes: (prospect as any).estimatedHomes,
+        teamSize: (prospect as any).teamSize,
+        portfolioTier: (prospect as any).portfolioTier,
+        originalMonthlyPrice: (prospect as any).originalMonthlyPrice,
+        discountPercentage: (prospect as any).discountPercentage,
+        discountedMonthlyPrice: (prospect as any).discountedMonthlyPrice,
+        setupFee: (prospect as any).setupFee,
+        betaCohortNumber: (prospect as any).betaCohortNumber,
+        agreementStatus: (prospect as any).agreementStatus ?? "pending",
+        stage: prospect.stage,
+      });
+    } catch (error) {
+      console.error("Error fetching onboarding details:", error);
+      res.status(500).json({ message: "Failed to load onboarding details." });
+    }
+  });
+
+  // POST /api/public/onboarding/:token/accept-agreement
+  // Records the applicant's agreement signature and advances stage to payment_pending.
+  app.post("/api/public/onboarding/:token/accept-agreement", async (req, res) => {
+    try {
+      const { token } = req.params;
+      if (!token || token.length !== 64 || !/^[0-9a-f]+$/.test(token)) {
+        return res.status(400).json({ message: "Invalid onboarding link." });
+      }
+      const { z } = await import("zod");
+      const bodySchema = z.object({
+        signerName: z.string().min(1, "Signer name is required"),
+        organizationName: z.string().min(1, "Organization name is required"),
+        agreeToTerms: z.literal(true, { errorMap: () => ({ message: "You must agree to the Terms of Service" }) }),
+        agreeToPrivacy: z.literal(true, { errorMap: () => ({ message: "You must agree to the Privacy Policy" }) }),
+        agreeToBetaAgreement: z.literal(true, { errorMap: () => ({ message: "You must agree to the Beta Agreement" }) }),
+      });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Please complete all required fields.", errors: parsed.error.errors });
+      }
+      const { signerName, organizationName } = parsed.data;
+
+      const { eq } = await import("drizzle-orm");
+      const rows = await db
+        .select()
+        .from(onboardingProspects)
+        .where(eq(onboardingProspects.onboardingToken, token))
+        .limit(1);
+      const prospect = rows[0];
+      if (!prospect) return res.status(404).json({ message: "Onboarding link not found." });
+      if (!prospect.isBetaMember || !prospect.betaApprovedAt) {
+        return res.status(403).json({ message: "Application not approved for beta." });
+      }
+      if (prospect.onboardingTokenExpiresAt && new Date(prospect.onboardingTokenExpiresAt) < new Date()) {
+        return res.status(410).json({ message: "This onboarding link has expired. Please contact support for a new link." });
+      }
+      if ((prospect as any).agreementStatus === "signed") {
+        return res.status(409).json({ message: "Agreement has already been signed." });
+      }
+
+      // Capture IP and user-agent for audit trail
+      const acceptedIp =
+        (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ??
+        req.socket?.remoteAddress ??
+        null;
+      const acceptedUserAgent = req.headers["user-agent"] ?? null;
+
+      const now = new Date();
+      const existingHistory: any[] = (prospect as any).stageHistory ?? [];
+      const updatedHistory = [
+        ...existingHistory,
+        { stage: "payment_pending", enteredAt: now.toISOString(), note: "Beta agreement signed" },
+      ];
+
+      await storage.updateOnboardingProspect(prospect.id, {
+        agreementStatus: "signed",
+        agreementSignedAt: now,
+        agreementSignerName: signerName,
+        agreementOrganizationName: organizationName,
+        agreementAcceptedIp: acceptedIp,
+        agreementAcceptedUserAgent: acceptedUserAgent,
+        stage: "payment_pending",
+        stageHistory: updatedHistory,
+      } as any);
+
+      res.json({ success: true, message: "Agreement accepted. Proceeding to payment setup." });
+    } catch (error) {
+      console.error("Error accepting agreement:", error);
+      res.status(500).json({ message: "Failed to record agreement acceptance." });
+    }
+  });
+
   // ── Onboarding Prospects ─────────────────────────────────────────────────
   app.post("/api/super-admin/onboarding-prospects/send-stuck-digest", isSuperAdmin, requireMFA, async (_req, res) => {
     try {

@@ -3428,6 +3428,11 @@ export const onboardingProspects = pgTable("onboarding_prospects", {
   setupFee: real("setup_fee"),
   betaCohortNumber: integer("beta_cohort_number"),
   agreementStatus: varchar("agreement_status"),
+  // Agreement signature details (populated at signing time)
+  agreementSignerName: varchar("agreement_signer_name"),
+  agreementOrganizationName: varchar("agreement_organization_name"),
+  agreementAcceptedIp: varchar("agreement_accepted_ip"),
+  agreementAcceptedUserAgent: text("agreement_accepted_user_agent"),
   // Onboarding token (generated at approval, used in the onboarding link)
   onboardingToken: varchar("onboarding_token"),
   onboardingTokenCreatedAt: timestamp("onboarding_token_created_at"),
@@ -3446,6 +3451,7 @@ export const onboardingStageEnum = z.enum([
   "contact",
   "inquiry",
   "agreement",
+  "payment_pending",
   "payment_setup",
   "initial_payment",
   "welcome",
