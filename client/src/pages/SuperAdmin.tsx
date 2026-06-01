@@ -2330,6 +2330,26 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
                 )}
               </div>
 
+              {editingProspect.approvalEmailSent && (
+                <>
+                  <Separator className="my-4" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-2">
+                      <Mail className="w-3.5 h-3.5" /> Approval Email
+                    </p>
+                    <div className="flex items-center gap-2 rounded-md bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-700">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      <span className="font-medium">Email sent</span>
+                      {editingProspect.approvalEmailSentAt && (
+                        <span className="text-green-600 text-xs ml-auto">
+                          {new Date(editingProspect.approvalEmailSentAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+
               <Separator className="my-4" />
               <div>
                 <p className="text-sm font-medium mb-2 text-gray-700">Stage History</p>
