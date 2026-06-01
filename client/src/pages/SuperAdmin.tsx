@@ -252,6 +252,7 @@ function ProspectCard({
   onAdvance,
   onDrop,
   onEdit,
+  onOpenResend,
   onSendWelcome,
   sendingEmail,
   onConvertToOrg,
@@ -264,6 +265,7 @@ function ProspectCard({
   onAdvance: () => void;
   onDrop: () => void;
   onEdit: () => void;
+  onOpenResend?: () => void;
   onSendWelcome: () => void;
   sendingEmail: boolean;
   onConvertToOrg: () => void;
@@ -331,6 +333,24 @@ function ProspectCard({
                 >
                   {tierLabel}
                 </Badge>
+              )}
+              {!prospect.approvalEmailSent && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      className="w-full mt-0.5"
+                      onClick={onOpenResend ?? onEdit}
+                    >
+                      <Badge className="bg-amber-100 text-amber-800 border border-amber-300 text-xs flex items-center gap-1 px-1.5 py-0.5 font-medium w-full justify-center">
+                        <AlertCircle className="w-3 h-3 shrink-0" />
+                        Email pending
+                      </Badge>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs max-w-xs">
+                    Approval email not yet delivered — open to resend
+                  </TooltipContent>
+                </Tooltip>
               )}
             </div>
           );
@@ -516,12 +536,13 @@ function SubmissionStatusBadge({ status }: { status: string | null }) {
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${opt.color}`}>{opt.label}</span>;
 }
 
-function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesChange, onMoveToPipeline }: {
+function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesChange, onMoveToPipeline, focusResend }: {
   submission: Prospect;
   onClose: () => void;
   onStatusChange: (id: string, status: string) => void;
   onNotesChange: (id: string, notes: string) => void;
   onMoveToPipeline?: (submission: Prospect) => void;
+  focusResend?: boolean;
 }) {
   const { toast } = useToast();
   const [notesValue, setNotesValue] = useState(submission.notes ?? "");
@@ -530,6 +551,13 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
   const notesValueRef = useRef(notesValue);
   const saveStatusRef = useRef(saveStatus);
   const isMountedRef = useRef(true);
+  const resendRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (focusResend && resendRef.current) {
+      setTimeout(() => resendRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
+    }
+  }, [focusResend]);
 
   useEffect(() => () => { isMountedRef.current = false; }, []);
 
@@ -983,7 +1011,7 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
 
         {/* Resend Approval Email — shown when approved but email failed to send */}
         {isBetaApp && isBetaApproved && !submission.approvalEmailSent && (
-          <div className="pt-4 mt-4 border-t space-y-2">
+          <div ref={resendRef} className="pt-4 mt-4 border-t space-y-2">
             <div className="flex items-center gap-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-700 mb-2">
               <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
               Approval saved — email was not delivered. Resend to give the applicant their onboarding link.
@@ -1522,6 +1550,19 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
   const { toast } = useToast();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingProspect, setEditingProspect] = useState<Prospect | null>(null);
+  const [detailProspect, setDetailProspect] = useState<Prospect | null>(null);
+  const [detailFocusResend, setDetailFocusResend] = useState(false);
+
+  const detailStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      apiRequest("PATCH", `/api/super-admin/submissions/${id}/status`, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/submissions"] });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to update status", variant: "destructive" }),
+  });
+
   const [droppingProspect, setDroppingProspect] = useState<Prospect | null>(null);
   const [showDropped, setShowDropped] = useState(false);
   const [stuckDays, setStuckDays] = useState(7);
@@ -2007,6 +2048,7 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
                         }}
                         onDrop={() => setDroppingProspect(p)}
                         onEdit={() => openEdit(p)}
+                        onOpenResend={() => { setDetailProspect(p); setDetailFocusResend(true); }}
                         onSendWelcome={() => welcomeEmailMutation.mutate(p.id)}
                         sendingEmail={welcomeEmailMutation.isPending && welcomeEmailMutation.variables === p.id}
                         onConvertToOrg={() => convertToOrgMutation.mutate(p.id)}
@@ -2469,6 +2511,23 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Detail sheet opened from pipeline card badge click — focuses the resend section */}
+      {detailProspect && (
+        <SubmissionDetailSheet
+          submission={detailProspect}
+          focusResend={detailFocusResend}
+          onClose={() => { setDetailProspect(null); setDetailFocusResend(false); }}
+          onStatusChange={(id, status) => {
+            detailStatusMutation.mutate({ id, status });
+            setDetailProspect(prev => prev ? { ...prev, submissionStatus: status } : prev);
+          }}
+          onNotesChange={(id, notes) => {
+            setDetailProspect(prev => prev ? { ...prev, notes } : prev);
+            queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+          }}
+        />
+      )}
     </div>
   );
 }
