@@ -12735,6 +12735,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/orgs/:orgId/stripe-connect/return
+  // Stripe redirects here after the user completes (or cancels) the Connect onboarding flow.
+  // We retrieve the account, flip isActive if charges are enabled, then redirect to the settings page.
+  app.get("/api/orgs/:orgId/stripe-connect/return", async (req, res) => {
+    const { orgId } = req.params;
+    try {
+      const connection = await storage.getOrgStripeConnection(orgId);
+      if (!connection?.stripeAccountId) {
+        console.warn("[stripe-connect/return] No connection found for org", orgId);
+        return res.redirect(`/settings/stripe?error=no_connection`);
+      }
+
+      const { getMasterStripe } = await import("./stripe");
+      const stripe = getMasterStripe();
+      if (!stripe) {
+        console.warn("[stripe-connect/return] Master Stripe not configured");
+        return res.redirect(`/settings/stripe?error=stripe_not_configured`);
+      }
+
+      const account = await stripe.accounts.retrieve(connection.stripeAccountId);
+      const isReady = account.charges_enabled || account.details_submitted;
+
+      if (isReady) {
+        await storage.updateOrgStripeConnection(orgId, { isActive: true } as any);
+        console.log(`[stripe-connect/return] org=${orgId} account=${account.id} activated (charges_enabled=${account.charges_enabled})`);
+        return res.redirect(`/settings/stripe?connected=true`);
+      } else {
+        // Account created but not yet fully onboarded — send them back to finish
+        console.log(`[stripe-connect/return] org=${orgId} account=${account.id} not yet ready — redirecting to refresh`);
+        return res.redirect(`/api/orgs/${orgId}/stripe-connect/refresh`);
+      }
+    } catch (err: any) {
+      console.error("[stripe-connect/return] Error:", err?.message ?? err);
+      return res.redirect(`/settings/stripe?error=server_error`);
+    }
+  });
+
+  // GET /api/orgs/:orgId/stripe-connect/refresh
+  // Stripe redirects here when the account link has expired (user took too long).
+  // We generate a fresh account link and redirect the user back to Stripe.
+  app.get("/api/orgs/:orgId/stripe-connect/refresh", async (req, res) => {
+    const { orgId } = req.params;
+    try {
+      const connection = await storage.getOrgStripeConnection(orgId);
+      if (!connection?.stripeAccountId) {
+        return res.redirect(`/settings/stripe?error=no_connection`);
+      }
+
+      const { createStripeConnectAccountLink, getMasterStripe } = await import("./stripe");
+      const stripe = getMasterStripe();
+      if (!stripe) {
+        return res.redirect(`/settings/stripe?error=stripe_not_configured`);
+      }
+
+      const host = `${req.protocol}://${req.get("host")}`;
+      const returnUrl = `${host}/api/orgs/${orgId}/stripe-connect/return`;
+      const refreshUrl = `${host}/api/orgs/${orgId}/stripe-connect/refresh`;
+
+      const accountLink = await createStripeConnectAccountLink(connection.stripeAccountId, returnUrl, refreshUrl);
+      return res.redirect(accountLink.url);
+    } catch (err: any) {
+      console.error("[stripe-connect/refresh] Error:", err?.message ?? err);
+      return res.redirect(`/account?tab=stripe&connect=error&reason=server_error`);
+    }
+  });
+
   // Organizations list endpoint for admin
   app.get("/api/organizations", isAuthenticated, async (req, res) => {
     try {
@@ -17588,7 +17654,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Your onboarding link is ready</h1>
               <p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 20px">
                 Hi ${recipientName} — here is your Hubify Beta onboarding link for <strong>${orgName}</strong>.
-                ${tokenWasRefreshed ? "We've generated a fresh link that expires in 7 days." : ""}
+                We've generated a fresh link that expires in 7 days.
               </p>
 
               <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:12px;padding:24px;margin-bottom:28px">
