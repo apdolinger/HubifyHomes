@@ -287,12 +287,6 @@ function BetaVariantForm({ onSuccess, compact }: { onSuccess?: () => void; compa
 
   const mutation = useMutation({
     mutationFn: async (values: BetaValues) => {
-      const notes = [
-        values.whyInterested   ? `Why interested in Hubify Homes:\n${values.whyInterested}`     : null,
-        values.biggestChallenge ? `Biggest operational challenge:\n${values.biggestChallenge}`   : null,
-        values.launchTimeframe  ? `Preferred launch timeframe: ${values.launchTimeframe}`        : null,
-      ].filter(Boolean).join("\n\n");
-
       const res = await fetch("/api/public/inquire", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -306,7 +300,9 @@ function BetaVariantForm({ onSuccess, compact }: { onSuccess?: () => void; compa
           teamSize: values.teamSize,
           serviceArea: values.serviceArea,
           currentMgmtMethod: values.currentSoftware,
-          notes,
+          whyInterested: values.whyInterested,
+          biggestChallenge: values.biggestChallenge,
+          launchTimeframe: values.launchTimeframe,
           trialIntent: "beta_application",
         }),
       });

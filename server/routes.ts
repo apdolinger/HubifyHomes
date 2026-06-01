@@ -16257,6 +16257,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         teamSize: z.coerce.number().optional(),
         trialIntent: z.string().optional(),
         notes: z.string().optional(),
+        // Beta application dedicated fields
+        whyInterested: z.string().optional(),
+        biggestChallenge: z.string().optional(),
+        launchTimeframe: z.string().optional(),
       });
       const result = submissionSchema.safeParse(req.body);
       if (!result.success) {
@@ -16347,6 +16351,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         preferredContactMethod: data.preferredContactMethod ?? null,
         submissionStatus: "new",
         source: prospectSource,
+        // Beta application question answers saved as dedicated columns
+        whyInterested: data.whyInterested ?? null,
+        biggestChallenge: data.biggestChallenge ?? null,
+        launchTimeframe: data.launchTimeframe ?? null,
       } as any);
 
       // ── Beta application confirmation ─────────────────────────────────────
@@ -16405,9 +16413,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   ${data.phone ? `<tr><td style="padding:6px 0;color:#64748b">Phone</td><td style="padding:6px 0;color:#0f172a">${data.phone}</td></tr>` : ""}
                   <tr><td style="padding:6px 0;color:#64748b">Organization</td><td style="padding:6px 0;color:#0f172a">${data.company}</td></tr>
                   <tr><td style="padding:6px 0;color:#64748b">Beta Tier</td><td style="padding:6px 0;color:#0d9488;font-weight:600">${suggestedTier || "N/A"}</td></tr>
-                  ${data.estimatedHomes ? `<tr><td style="padding:6px 0;color:#64748b">Est. Homes</td><td style="padding:6px 0;color:#0f172a">${data.estimatedHomes}</td></tr>` : ""}
+                  ${data.estimatedHomes ? `<tr><td style="padding:6px 0;color:#64748b">Est. Properties</td><td style="padding:6px 0;color:#0f172a">${data.estimatedHomes}</td></tr>` : ""}
+                  ${data.teamSize ? `<tr><td style="padding:6px 0;color:#64748b">Staff Users</td><td style="padding:6px 0;color:#0f172a">${data.teamSize}</td></tr>` : ""}
+                  ${data.serviceArea ? `<tr><td style="padding:6px 0;color:#64748b">Service Area</td><td style="padding:6px 0;color:#0f172a">${data.serviceArea}</td></tr>` : ""}
+                  ${data.currentMgmtMethod ? `<tr><td style="padding:6px 0;color:#64748b">Current Software</td><td style="padding:6px 0;color:#0f172a">${data.currentMgmtMethod}</td></tr>` : ""}
                 </table>
-                ${processedNotes ? `<div style="margin-top:16px;padding:14px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0"><p style="margin:0 0 6px;color:#64748b;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Notes</p><p style="margin:0;color:#0f172a;font-size:14px;white-space:pre-wrap">${processedNotes}</p></div>` : ""}
+                ${data.whyInterested ? `<div style="margin-top:16px;padding:14px;background:#f0fdfa;border-radius:8px;border:1px solid #99f6e4"><p style="margin:0 0 6px;color:#0d9488;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Why Interested in Hubify Homes</p><p style="margin:0;color:#0f172a;font-size:14px;white-space:pre-wrap">${data.whyInterested}</p></div>` : ""}
+                ${data.biggestChallenge ? `<div style="margin-top:10px;padding:14px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0"><p style="margin:0 0 6px;color:#64748b;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Biggest Operational Challenge</p><p style="margin:0;color:#0f172a;font-size:14px;white-space:pre-wrap">${data.biggestChallenge}</p></div>` : ""}
+                ${data.launchTimeframe ? `<div style="margin-top:10px;padding:12px 14px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0"><p style="margin:0;color:#64748b;font-size:14px;">Preferred launch timeframe: <strong style="color:#0f172a">${data.launchTimeframe}</strong></p></div>` : ""}
               </div>
             `,
           }).catch((err: any) => console.warn("[beta-application] admin alert failed:", err));
@@ -16898,147 +16911,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Auto-assign beta discount tier when a beta applicant is approved (stage → "welcome")
-      let betaApprovalEmailPayload: {
-        prospectName: string;
-        prospectEmail: string;
-        prospectCompany: string;
-        assignedTier: string;
-        discountPct: number;
-        effectiveMonthlyPrice: number;
-      } | null = null;
-
-      if (parseResult.data.stage === "welcome") {
-        const existing = await storage.getOnboardingProspect(id);
-        if (existing?.source === "beta_application" && !existing?.betaRemovedAt) {
-          const settings = await storage.getPlatformSettings();
-          const bp = settings.betaPricing as any | undefined;
-          const basePrice = Number(bp?.basePrice ?? 199);
-          const tier1DiscountPct = Number(bp?.tier1DiscountPct ?? bp?.discountPct ?? 50);
-          const tier2DiscountPct = Number(bp?.tier2DiscountPct ?? 25);
-          const tier1Cap = Number(bp?.tier1Cap ?? 10);
-          const tier2Cap = Number(bp?.tier2Cap ?? 10);
-          const totalCap = tier1Cap + tier2Cap;
-
-          // Count active beta members by durable flag (not stage) so slot counting
-          // survives stage transitions after approval
-          const [{ activeBetaCount }] = await db
-            .select({ activeBetaCount: count() })
-            .from(onboardingProspects)
-            .where(
-              and(
-                eq(onboardingProspects.isBetaMember, true),
-                isNull(onboardingProspects.betaRemovedAt),
-                ne(onboardingProspects.id, id)
-              )
-            );
-
-          // Preserve an already-assigned tier on re-approval; only compute
-          // a new one when none has been set yet.
-          const existingTier = (existing as any).betaDiscountTier as string | null | undefined;
-
-          let assignedTier: string;
-          if (existingTier) {
-            assignedTier = existingTier;
-          } else {
-            if (activeBetaCount >= totalCap) {
-              return res.status(409).json({
-                message: "Beta program is full — no slots available. Remove an existing beta member to free a slot.",
-              });
-            }
-            assignedTier = activeBetaCount < tier1Cap ? "founding_10" : "early_access_10";
-            (parseResult.data as any).betaDiscountTier = assignedTier;
-          }
-
-          // Mark as a durable beta member regardless of future stage changes;
-          // only stamp betaApprovedAt on fresh approvals — re-approvals preserve the original date
-          (parseResult.data as any).isBetaMember = true;
-          if (!existingTier) {
-            (parseResult.data as any).betaApprovedAt = new Date();
-          }
-
-          const discountPct = assignedTier === "founding_10" ? tier1DiscountPct : tier2DiscountPct;
-          const effectiveMonthlyPrice = Math.round(basePrice * (1 - discountPct / 100) * 100) / 100;
-
-          // Only queue the approval email on fresh approvals — re-approvals (existingTier already set)
-          // should not send a duplicate welcome/discount email
-          if (!existingTier) {
-            betaApprovalEmailPayload = {
-              prospectName: existing.name || "",
-              prospectEmail: existing.email,
-              prospectCompany: existing.company || "",
-              assignedTier,
-              discountPct,
-              effectiveMonthlyPrice,
-            };
-          }
-        }
-      }
-
       const prospect = await storage.updateOnboardingProspect(id, parseResult.data);
-
-      // ── Beta approval confirmation email ────────────────────────────────────
-      if (betaApprovalEmailPayload) {
-        const { prospectName, prospectEmail, prospectCompany, assignedTier, discountPct, effectiveMonthlyPrice } = betaApprovalEmailPayload;
-        const fromEmail = process.env.RESEND_FROM_EMAIL;
-        if (resend && fromEmail) {
-          const nameParts = prospectName.trim().split(/\s+/);
-          const firstName = nameParts[0] || "there";
-          const tierLabel = assignedTier === "founding_10" ? "Founding 10" : "Early Access 10";
-          const onboardingUrl = `${getAppBaseUrl()}/staff/login`;
-          resend.emails.send({
-            from: fromEmail,
-            to: prospectEmail,
-            replyTo: "contact@hubifyhomesonline.com",
-            subject: `${firstName}, your Hubify beta discount is confirmed — ${tierLabel}`,
-            html: `
-              <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
-                <div style="text-align:center;margin-bottom:28px">
-                  <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="180" style="width:180px;max-width:180px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
-                </div>
-                <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">You're approved, ${firstName}!</h1>
-                <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
-                  Great news — your beta application${prospectCompany ? ` for <strong>${prospectCompany}</strong>` : ""} has been approved. We've locked in your exclusive discount and reserved your spot in the Hubify beta program.
-                </p>
-                <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;padding:20px;margin-bottom:28px">
-                  <p style="font-size:13px;font-weight:700;color:#0d9488;margin:0 0 12px;text-transform:uppercase;letter-spacing:0.05em">Your Beta Discount</p>
-                  <table style="width:100%;border-collapse:collapse;font-size:15px">
-                    <tr>
-                      <td style="padding:6px 0;color:#475569;width:55%">Tier</td>
-                      <td style="padding:6px 0;color:#0f172a;font-weight:700">${tierLabel}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:6px 0;color:#475569">Discount</td>
-                      <td style="padding:6px 0;color:#0f172a;font-weight:700">${discountPct}% off — locked in for life</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:6px 0;color:#475569">Your monthly price</td>
-                      <td style="padding:6px 0;color:#0d9488;font-weight:800;font-size:18px">$${effectiveMonthlyPrice.toFixed(2)}<span style="font-size:13px;font-weight:400;color:#475569">/mo</span></td>
-                    </tr>
-                  </table>
-                </div>
-                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px;margin-bottom:28px">
-                  <p style="font-size:13px;font-weight:700;color:#334155;margin:0 0 10px;text-transform:uppercase;letter-spacing:0.05em">Next steps</p>
-                  <ol style="font-size:14px;color:#475569;line-height:1.9;margin:0;padding-left:18px">
-                    <li>Click the button below to set up your account</li>
-                    <li>Complete your company profile and add your first property</li>
-                    <li>Reach out any time — we're here to help you get started</li>
-                  </ol>
-                </div>
-                <div style="text-align:center;margin-bottom:28px">
-                  <a href="${onboardingUrl}" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;padding:14px 32px;border-radius:8px">Get started with Hubify →</a>
-                </div>
-                <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
-                <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
-                  Questions? Simply reply to this email — we're happy to help.<br/>
-                  Hubify Homes · <a href="https://hubifyhomesonline.com" style="color:#94a3b8">hubifyhomesonline.com</a>
-                </p>
-              </div>
-            `,
-          }).then((r: any) => console.log(`[beta-approval] discount confirmation sent to ${prospectEmail} resend_id=${r?.data?.id}`))
-            .catch((err: any) => console.warn("[beta-approval] discount confirmation email failed:", err));
-        }
-      }
 
       res.json(prospect);
     } catch (error) {
@@ -17055,6 +16928,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting onboarding prospect:", error);
       res.status(500).json({ message: "Failed to delete onboarding prospect" });
+    }
+  });
+
+  // ── Beta Approval ─────────────────────────────────────────────────────────
+  // POST /api/super-admin/onboarding-prospects/:id/approve-beta
+  // Computes cohort slot, portfolio tier, and pricing from platform settings,
+  // stores all fields on the prospect, appends "beta_approved" to stage_history,
+  // and sets stage = "agreement_pending" in a single update.
+  app.post("/api/super-admin/onboarding-prospects/:id/approve-beta", isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const existing = await storage.getOnboardingProspect(id);
+      if (!existing) return res.status(404).json({ message: "Prospect not found" });
+      if (existing.source !== "beta_application") {
+        return res.status(400).json({ message: "This prospect is not a beta application." });
+      }
+      if ((existing as any).isBetaMember && !(existing as any).betaRemovedAt) {
+        return res.status(409).json({ message: "This prospect is already an approved beta member." });
+      }
+
+      // Count CURRENTLY active beta members (isBetaMember = true, not removed)
+      // — excludes the current prospect since we're approving them now.
+      const [{ activeBetaCount }] = await db
+        .select({ activeBetaCount: count() })
+        .from(onboardingProspects)
+        .where(
+          and(
+            eq(onboardingProspects.isBetaMember, true),
+            isNull(onboardingProspects.betaRemovedAt),
+            ne(onboardingProspects.id, id)
+          )
+        );
+
+      // Load platform settings for caps and pricing
+      const settings = await storage.getPlatformSettings();
+      const bp = settings.betaPricing as any | undefined;
+      const tier1DiscountPct = Number(bp?.tier1DiscountPct ?? bp?.discountPct ?? 50);
+      const tier2DiscountPct = Number(bp?.tier2DiscountPct ?? 25);
+      const tier1Cap = Number(bp?.tier1Cap ?? 10);
+      const tier2Cap = Number(bp?.tier2Cap ?? 10);
+      const totalCap = tier1Cap + tier2Cap;
+
+      if (activeBetaCount >= totalCap) {
+        return res.status(409).json({
+          message: `Beta program is full (${totalCap} slots). Remove an existing beta member to free a slot.`,
+        });
+      }
+
+      const cohortNumber = activeBetaCount + 1;
+      const discountPct = cohortNumber <= tier1Cap ? tier1DiscountPct : tier2DiscountPct;
+
+      // Determine portfolio tier from estimatedHomes
+      const homes = (existing as any).estimatedHomes ?? 0;
+      let portfolioTier: string;
+      if (homes >= 101) portfolioTier = "Enterprise Portfolio";
+      else if (homes >= 51) portfolioTier = "Operator Portfolio";
+      else if (homes >= 26) portfolioTier = "Professional Portfolio";
+      else if (homes >= 11) portfolioTier = "Growth Portfolio";
+      else portfolioTier = "Starter Portfolio";
+
+      // Look up pricing from pricingTiers (by homes range) or fall back to betaPricing.basePrice
+      const pricingTiers = (settings.pricingTiers ?? []) as Array<{
+        name: string; homesMin: number; homesMax: number;
+        monthlyPrice: number; setupFee: number; startsAt?: boolean;
+      }>;
+      const matchedTier = pricingTiers.find(t => homes >= t.homesMin && homes <= t.homesMax);
+      const originalMonthlyPrice = matchedTier
+        ? Number(matchedTier.monthlyPrice)
+        : Number(bp?.basePrice ?? 199);
+      const tierSetupFee = matchedTier ? Number(matchedTier.setupFee) : 0;
+      const discountedMonthlyPrice = Math.round(originalMonthlyPrice * (1 - discountPct / 100) * 100) / 100;
+
+      // Append "beta_approved" milestone to stageHistory, set stage = "agreement_pending"
+      const now = new Date();
+      const existingHistory: any[] = (existing as any).stageHistory ?? [];
+      const newHistory = [
+        ...existingHistory,
+        { stage: "beta_approved", enteredAt: now.toISOString(), note: "Beta application approved" },
+      ];
+
+      const updated = await storage.updateOnboardingProspect(id, {
+        stage: "agreement_pending",
+        stageHistory: newHistory,
+        isBetaMember: true,
+        betaApprovedAt: now,
+        betaCohortNumber: cohortNumber,
+        portfolioTier,
+        originalMonthlyPrice,
+        discountPercentage: discountPct,
+        discountedMonthlyPrice,
+        setupFee: tierSetupFee,
+        agreementStatus: "pending",
+      } as any);
+
+      await AuditLogger.log({
+        req,
+        action: "approve_beta_application",
+        actionType: "update",
+        resource: "onboarding_prospect",
+        resourceId: id,
+        severity: "info",
+        success: true,
+        metadata: { cohortNumber, portfolioTier, discountPct, originalMonthlyPrice, discountedMonthlyPrice, setupFee: tierSetupFee },
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error approving beta application:", error);
+      res.status(500).json({ message: "Failed to approve beta application" });
     }
   });
 

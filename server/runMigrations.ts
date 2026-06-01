@@ -643,6 +643,30 @@ export async function ensurePropertyServiceAssignmentsTable(): Promise<void> {
   }
 }
 
+export async function ensureBetaApprovalColumns(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE onboarding_prospects
+        ADD COLUMN IF NOT EXISTS why_interested TEXT,
+        ADD COLUMN IF NOT EXISTS biggest_challenge TEXT,
+        ADD COLUMN IF NOT EXISTS launch_timeframe VARCHAR,
+        ADD COLUMN IF NOT EXISTS portfolio_tier VARCHAR,
+        ADD COLUMN IF NOT EXISTS original_monthly_price REAL,
+        ADD COLUMN IF NOT EXISTS discount_percentage INTEGER,
+        ADD COLUMN IF NOT EXISTS discounted_monthly_price REAL,
+        ADD COLUMN IF NOT EXISTS setup_fee REAL,
+        ADD COLUMN IF NOT EXISTS beta_cohort_number INTEGER,
+        ADD COLUMN IF NOT EXISTS agreement_status VARCHAR;
+    `);
+    log("[MIGRATE] onboarding_prospects beta approval columns verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add beta approval columns to onboarding_prospects: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensurePortalInvitationColumns(): Promise<void> {
   const client = await pool.connect();
   try {

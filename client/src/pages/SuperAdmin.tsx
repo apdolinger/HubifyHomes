@@ -109,7 +109,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 // Onboarding Pipeline Tab
 // ============================================================================
 
-type OnboardingStage = "contact" | "inquiry" | "agreement" | "payment_setup" | "initial_payment" | "welcome" | "dropped" | "demo_requested" | "demo_sent" | "demo_completed" | "follow_up_needed" | "converted" | "not_a_fit";
+type OnboardingStage = "contact" | "inquiry" | "agreement" | "payment_setup" | "initial_payment" | "welcome" | "dropped" | "demo_requested" | "demo_sent" | "demo_completed" | "follow_up_needed" | "converted" | "not_a_fit" | "beta_approved" | "agreement_pending";
 
 interface StageHistoryEntry { stage: OnboardingStage; enteredAt: string; }
 
@@ -143,6 +143,18 @@ interface Prospect {
   isBetaMember: boolean | null;
   betaApprovedAt: string | null;
   betaRemovedAt: string | null;
+  // Beta application question answers
+  whyInterested: string | null;
+  biggestChallenge: string | null;
+  launchTimeframe: string | null;
+  // Beta approval pricing details
+  portfolioTier: string | null;
+  originalMonthlyPrice: number | null;
+  discountPercentage: number | null;
+  discountedMonthlyPrice: number | null;
+  setupFee: number | null;
+  betaCohortNumber: number | null;
+  agreementStatus: string | null;
   submissionStatus: string | null;
   confirmationEmailSentAt: string | null;
   confirmationEmailStatus: string | null;
@@ -175,21 +187,23 @@ interface ProspectEmail {
 }
 
 const PIPELINE_STAGES: { key: OnboardingStage; label: string; color: string }[] = [
-  { key: "contact",          label: "Contact",          color: "border-slate-400 bg-slate-50" },
-  { key: "inquiry",          label: "Submission",       color: "border-teal-400 bg-teal-50" },
-  { key: "agreement",        label: "Agreement",        color: "border-yellow-400 bg-yellow-50" },
-  { key: "payment_setup",    label: "Payment Setup",    color: "border-orange-400 bg-orange-50" },
-  { key: "initial_payment",  label: "Initial Payment",  color: "border-purple-400 bg-purple-50" },
-  { key: "welcome",          label: "Welcome",          color: "border-green-400 bg-green-50" },
-  { key: "demo_requested",   label: "Demo Requested",   color: "border-sky-400 bg-sky-50" },
-  { key: "demo_sent",        label: "Demo Sent",        color: "border-blue-400 bg-blue-50" },
-  { key: "demo_completed",   label: "Demo Completed",   color: "border-violet-400 bg-violet-50" },
-  { key: "follow_up_needed", label: "Follow-Up",        color: "border-amber-400 bg-amber-50" },
-  { key: "converted",        label: "Converted",        color: "border-emerald-400 bg-emerald-50" },
-  { key: "not_a_fit",        label: "Not a Fit",        color: "border-red-300 bg-red-50" },
+  { key: "contact",           label: "Contact",            color: "border-slate-400 bg-slate-50" },
+  { key: "inquiry",           label: "Submission",         color: "border-teal-400 bg-teal-50" },
+  { key: "beta_approved",     label: "Beta Approved",      color: "border-teal-500 bg-teal-100" },
+  { key: "agreement_pending", label: "Agreement Pending",  color: "border-yellow-500 bg-yellow-50" },
+  { key: "agreement",         label: "Agreement",          color: "border-yellow-400 bg-yellow-50" },
+  { key: "payment_setup",     label: "Payment Setup",      color: "border-orange-400 bg-orange-50" },
+  { key: "initial_payment",   label: "Initial Payment",    color: "border-purple-400 bg-purple-50" },
+  { key: "welcome",           label: "Welcome",            color: "border-green-400 bg-green-50" },
+  { key: "demo_requested",    label: "Demo Requested",     color: "border-sky-400 bg-sky-50" },
+  { key: "demo_sent",         label: "Demo Sent",          color: "border-blue-400 bg-blue-50" },
+  { key: "demo_completed",    label: "Demo Completed",     color: "border-violet-400 bg-violet-50" },
+  { key: "follow_up_needed",  label: "Follow-Up",          color: "border-amber-400 bg-amber-50" },
+  { key: "converted",         label: "Converted",          color: "border-emerald-400 bg-emerald-50" },
+  { key: "not_a_fit",         label: "Not a Fit",          color: "border-red-300 bg-red-50" },
 ];
 
-const STAGE_ORDER: OnboardingStage[] = ["contact", "inquiry", "agreement", "payment_setup", "initial_payment", "welcome"];
+const STAGE_ORDER: OnboardingStage[] = ["contact", "inquiry", "beta_approved", "agreement_pending", "agreement", "payment_setup", "initial_payment", "welcome"];
 const DEMO_STAGE_ORDER: OnboardingStage[] = ["demo_requested", "demo_sent", "demo_completed", "follow_up_needed", "converted"];
 
 function nextStage(current: OnboardingStage): OnboardingStage | null {
@@ -555,10 +569,30 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
     ? `${submission.firstName} ${submission.lastName}`
     : submission.name;
 
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+
+  const approveBetaMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/approve-beta`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      setApproveDialogOpen(false);
+      toast({ title: "Beta application approved", description: "Prospect is now in Agreement Pending stage." });
+      onClose();
+    },
+    onError: (err: any) => {
+      toast({ title: "Approval failed", description: err?.message ?? "Failed to approve beta application", variant: "destructive" });
+    },
+  });
+
   const handleClose = () => {
     flushNotesSave();
     onClose();
   };
+
+  const isBetaApp = submission.source === "beta_application";
+  const isBetaApproved = !!(submission.isBetaMember && !submission.betaRemovedAt);
 
   return (
     <Sheet open onOpenChange={handleClose}>
@@ -669,6 +703,38 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
             </div>
           </div>
 
+          {/* Beta Application Questions — only for beta_application source */}
+          {isBetaApp && (submission.whyInterested || submission.biggestChallenge || submission.launchTimeframe) && (
+            <>
+              <Separator />
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-teal-600 mb-3">Beta Application</p>
+                <div className="space-y-4 text-sm">
+                  {submission.whyInterested && (
+                    <div>
+                      <p className="text-muted-foreground text-xs mb-1 font-medium">Why interested in Hubify Homes?</p>
+                      <p className="text-foreground leading-relaxed bg-muted/40 rounded p-2">{submission.whyInterested}</p>
+                    </div>
+                  )}
+                  {submission.biggestChallenge && (
+                    <div>
+                      <p className="text-muted-foreground text-xs mb-1 font-medium">Biggest operational challenge?</p>
+                      <p className="text-foreground leading-relaxed bg-muted/40 rounded p-2">{submission.biggestChallenge}</p>
+                    </div>
+                  )}
+                  {submission.launchTimeframe && (
+                    <div>
+                      <p className="text-muted-foreground text-xs mb-1 font-medium">Preferred launch timeframe</p>
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-teal-50 text-teal-700 border border-teal-200">
+                        {submission.launchTimeframe}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
           <Separator />
 
           {/* Tier & Intent */}
@@ -691,6 +757,69 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
               ) : null}
             </div>
           </div>
+
+          {/* Beta Approval Details — shown only when isBetaMember = true */}
+          {isBetaApproved && (
+            <>
+              <Separator />
+              <div className="rounded-lg border border-teal-200 bg-teal-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-teal-700 mb-3 flex items-center gap-1.5">
+                  <CheckCircle className="h-3.5 w-3.5" />
+                  Beta Approval Details
+                </p>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  {submission.betaCohortNumber != null && (
+                    <div>
+                      <p className="text-teal-600 text-xs mb-0.5">Cohort #</p>
+                      <p className="font-semibold text-teal-900">{submission.betaCohortNumber}</p>
+                    </div>
+                  )}
+                  {submission.portfolioTier && (
+                    <div>
+                      <p className="text-teal-600 text-xs mb-0.5">Portfolio Tier</p>
+                      <p className="font-semibold text-teal-900">{submission.portfolioTier}</p>
+                    </div>
+                  )}
+                  {submission.discountPercentage != null && (
+                    <div>
+                      <p className="text-teal-600 text-xs mb-0.5">Discount</p>
+                      <p className="font-semibold text-teal-900">{submission.discountPercentage}% off (life-locked)</p>
+                    </div>
+                  )}
+                  {submission.originalMonthlyPrice != null && (
+                    <div>
+                      <p className="text-teal-600 text-xs mb-0.5">List Price</p>
+                      <p className="font-semibold text-teal-900">${submission.originalMonthlyPrice.toFixed(2)}/mo</p>
+                    </div>
+                  )}
+                  {submission.discountedMonthlyPrice != null && (
+                    <div>
+                      <p className="text-teal-600 text-xs mb-0.5">Beta Price</p>
+                      <p className="font-bold text-teal-900 text-base">${submission.discountedMonthlyPrice.toFixed(2)}/mo</p>
+                    </div>
+                  )}
+                  {submission.setupFee != null && (
+                    <div>
+                      <p className="text-teal-600 text-xs mb-0.5">Setup Fee</p>
+                      <p className="font-semibold text-teal-900">${submission.setupFee.toFixed(2)}</p>
+                    </div>
+                  )}
+                  {submission.agreementStatus && (
+                    <div>
+                      <p className="text-teal-600 text-xs mb-0.5">Agreement</p>
+                      <p className="font-semibold text-teal-900 capitalize">{submission.agreementStatus.replace(/_/g, " ")}</p>
+                    </div>
+                  )}
+                  {submission.betaApprovedAt && (
+                    <div>
+                      <p className="text-teal-600 text-xs mb-0.5">Approved On</p>
+                      <p className="font-semibold text-teal-900">{new Date(submission.betaApprovedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
 
           <Separator />
           <div>
@@ -715,7 +844,23 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
           </div>
         </div>
 
-        {onMoveToPipeline && submission.submissionStatus !== "converted" && (
+        {/* Approve Beta Application — shown for unapproved beta applicants */}
+        {isBetaApp && !isBetaApproved && (
+          <div className="pt-4 mt-4 border-t space-y-2">
+            <Button
+              className="w-full bg-teal-600 hover:bg-teal-700 text-white"
+              onClick={() => setApproveDialogOpen(true)}
+            >
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Approve Beta Application
+            </Button>
+            <p className="text-xs text-muted-foreground text-center">
+              Assigns cohort slot, computes pricing, and moves to Agreement Pending
+            </p>
+          </div>
+        )}
+
+        {onMoveToPipeline && submission.submissionStatus !== "converted" && !isBetaApp && (
           <div className="pt-4 mt-4 border-t">
             <Button
               className="w-full bg-teal-600 hover:bg-teal-700 text-white"
@@ -738,6 +883,38 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
             </div>
           </div>
         )}
+
+        {/* Approve Beta Confirmation Dialog */}
+        <Dialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Approve Beta Application?</DialogTitle>
+              <DialogDescription>
+                This will assign a cohort slot, compute the portfolio tier and discounted pricing from platform settings,
+                and move <strong>{displayName}</strong> ({submission.company}) to <strong>Agreement Pending</strong>.
+                This action cannot be undone without manually editing the prospect.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="rounded-md border border-teal-200 bg-teal-50 p-3 text-sm text-teal-800 space-y-1">
+              <p>✓ Cohort slot auto-assigned (50% or 25% off based on slot #)</p>
+              <p>✓ Portfolio tier derived from estimated properties</p>
+              <p>✓ Pricing looked up from platform pricing tiers</p>
+              <p>✓ Stage set to <strong>agreement_pending</strong></p>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setApproveDialogOpen(false)} disabled={approveBetaMutation.isPending}>
+                Cancel
+              </Button>
+              <Button
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+                disabled={approveBetaMutation.isPending}
+                onClick={() => approveBetaMutation.mutate(submission.id)}
+              >
+                {approveBetaMutation.isPending ? "Approving…" : "Confirm Approval"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </SheetContent>
     </Sheet>
   );

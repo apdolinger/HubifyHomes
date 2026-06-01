@@ -11,6 +11,7 @@ import {
   uuid,
   unique,
   date,
+  real,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -3415,6 +3416,18 @@ export const onboardingProspects = pgTable("onboarding_prospects", {
   betaRemovedAt: timestamp("beta_removed_at"),
   isBetaMember: boolean("is_beta_member").notNull().default(false),
   betaApprovedAt: timestamp("beta_approved_at"),
+  // Beta application question answers (saved as dedicated columns)
+  whyInterested: text("why_interested"),
+  biggestChallenge: text("biggest_challenge"),
+  launchTimeframe: varchar("launch_timeframe"),
+  // Beta approval pricing details (populated at approval time)
+  portfolioTier: varchar("portfolio_tier"),
+  originalMonthlyPrice: real("original_monthly_price"),
+  discountPercentage: integer("discount_percentage"),
+  discountedMonthlyPrice: real("discounted_monthly_price"),
+  setupFee: real("setup_fee"),
+  betaCohortNumber: integer("beta_cohort_number"),
+  agreementStatus: varchar("agreement_status"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
@@ -3436,6 +3449,8 @@ export const onboardingStageEnum = z.enum([
   "follow_up_needed",
   "converted",
   "not_a_fit",
+  "beta_approved",
+  "agreement_pending",
 ]);
 
 export const insertOnboardingProspectSchema = createInsertSchema(onboardingProspects).omit({
