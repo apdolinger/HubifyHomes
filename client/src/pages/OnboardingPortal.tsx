@@ -23,6 +23,8 @@ import {
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const AGREEMENT_VERSION = "v1.1";
+const TERMS_VERSION = "v1.1";
+const PRIVACY_VERSION = "v1.0";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -352,14 +354,14 @@ function BetaAgreementContent({ company }: { company?: string }) {
 function TermsContent() {
   return (
     <div className="text-sm text-slate-700 leading-relaxed space-y-5">
-      <p className="text-xs text-slate-400">Last Updated: May 17, 2026</p>
+      <p className="text-xs text-slate-400">Version {TERMS_VERSION} · Effective June 2, 2026</p>
       <p>
-        These Terms of Service ("<strong>Terms</strong>") constitute a legally binding agreement between you and Hubify. By accessing or using our services, you agree to be bound by these Terms. If you do not agree, you may not use the Service.
+        These Terms of Service ("<strong>Terms</strong>") constitute a legally binding agreement between you and <strong>Hubify Homes Inc.</strong> ("Hubify", "we", "us", or "our"). By accessing or using our services, you agree to be bound by these Terms. If you do not agree, you may not use the Service.
       </p>
 
       <div>
         <p className="font-semibold text-slate-900 mb-1">1. Acceptance of Terms</p>
-        <p>By creating an account, accessing, or using the Hubify platform, you agree to comply with and be legally bound by these Terms, our Privacy Policy, and all applicable laws. If you use the Service on behalf of an organization, you represent that you have authority to bind that organization.</p>
+        <p>By creating an account, accessing, or using the Hubify platform, you agree to comply with and be legally bound by these Terms, our Privacy Policy, and all applicable laws. If you use the Service on behalf of an organization, you represent that you have authority to bind that organization to these Terms.</p>
       </div>
 
       <div>
@@ -376,20 +378,21 @@ function TermsContent() {
 
       <div>
         <p className="font-semibold text-slate-900 mb-1">3. Description of Service</p>
-        <p>Hubify provides a cloud-based property management platform for home watch and estate management companies, including property/client management, task organization, team collaboration, invoicing, calendar/scheduling, and reporting. We reserve the right to modify, suspend, or discontinue any aspect of the Service at any time.</p>
+        <p>Hubify Homes Inc. provides a cloud-based property management platform for home watch and estate management companies, including property/client management, task organization, team collaboration, invoicing, calendar/scheduling, and reporting. We reserve the right to modify, suspend, or discontinue any aspect of the Service at any time with reasonable notice.</p>
       </div>
 
       <div>
         <p className="font-semibold text-slate-900 mb-1">4. Subscription &amp; Payment Terms</p>
         <ul className="list-disc list-inside space-y-0.5 ml-3 mb-2">
-          <li>Subscription fees are billed in advance on a monthly or annual basis</li>
-          <li>Payments are processed securely through Stripe</li>
-          <li>All fees are non-refundable unless required by law or stated otherwise</li>
-          <li>Failed payments may result in service suspension or termination</li>
+          <li>Subscriptions <strong>automatically renew</strong> at the end of each billing period (monthly or annual) unless cancelled before the renewal date</li>
+          <li>Payments are processed securely through Stripe; by providing payment details you authorize recurring charges</li>
+          <li>All fees are non-refundable unless required by law or expressly stated otherwise in writing</li>
+          <li>Failed or disputed payments may result in immediate service suspension or termination</li>
           <li>You are responsible for all applicable taxes</li>
-          <li>Price changes will be communicated with 30 days advance notice</li>
+          <li>Price changes will be communicated with at least 30 days advance notice</li>
+          <li>Beta pricing, if applicable, is governed by the separate Beta Participation Agreement and may be forfeited upon breach</li>
         </ul>
-        <p>You may cancel your subscription at any time; cancellations take effect at the end of the current billing period.</p>
+        <p>You may cancel your subscription at any time; cancellations take effect at the end of the current billing period with no pro-rated refund.</p>
       </div>
 
       <div>
@@ -401,7 +404,7 @@ function TermsContent() {
           <li>Reverse engineer, decompile, or disassemble the Service</li>
           <li>Rent, lease, sell, or sublicense access to the Service</li>
           <li>Use the Service to develop a competing product</li>
-          <li>Access the Service through automated means without permission</li>
+          <li>Access the Service through automated means without written permission</li>
         </ul>
       </div>
 
@@ -421,30 +424,30 @@ function TermsContent() {
 
       <div>
         <p className="font-semibold text-slate-900 mb-1">7. Intellectual Property</p>
-        <p className="mb-2">The Service and all content are owned by Hubify and protected by copyright, trademark, and other IP laws. You retain ownership of all data and content you upload ("User Content") and grant us a limited license to process it solely to provide the Service.</p>
-        <p>Feedback you provide becomes our property; we may use it without compensation or attribution.</p>
+        <p className="mb-2">The Service and all content are owned by Hubify Homes Inc. and protected by copyright, trademark, and other IP laws. You retain ownership of all data and content you upload ("User Content") and grant us a limited license to process it solely to provide the Service.</p>
+        <p>Feedback you provide may be used by Hubify Homes Inc. to improve the Service without compensation or attribution.</p>
       </div>
 
       <div>
         <p className="font-semibold text-slate-900 mb-1">8. Privacy &amp; Data Protection</p>
-        <p>Our collection, use, and protection of your personal information is governed by our Privacy Policy, incorporated into these Terms by reference. By using the Service, you consent to our privacy practices.</p>
+        <p>Our collection, use, and protection of your personal information is governed by our Privacy Policy, incorporated into these Terms by reference. By using the Service, you consent to our privacy practices as described therein.</p>
       </div>
 
       <div>
         <p className="font-semibold text-slate-900 mb-1">9. Service Level &amp; Availability</p>
-        <p>We strive to maintain 99.9% uptime but do not guarantee uninterrupted access. Scheduled maintenance will be communicated in advance when possible. We perform regular automated backups but you are responsible for maintaining independent backups of critical data.</p>
+        <p>We strive to maintain high availability but do not guarantee uninterrupted access. Scheduled maintenance will be communicated in advance when possible. We perform regular automated backups but you are responsible for maintaining independent backups of critical data.</p>
       </div>
 
       <div>
         <p className="font-semibold text-slate-900 mb-1">10. Disclaimers &amp; Limitations of Liability</p>
         <p className="font-semibold mb-2">THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED.</p>
-        <p className="font-semibold mb-2">TO THE MAXIMUM EXTENT PERMITTED BY LAW, HUBIFY SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOST PROFITS OR BUSINESS INTERRUPTION.</p>
+        <p className="font-semibold mb-2">TO THE MAXIMUM EXTENT PERMITTED BY LAW, HUBIFY HOMES INC. SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOST PROFITS OR BUSINESS INTERRUPTION.</p>
         <p>Our total liability for any claims shall not exceed the amount you paid us in the 12 months preceding the claim, or $100, whichever is greater.</p>
       </div>
 
       <div>
         <p className="font-semibold text-slate-900 mb-1">11. Indemnification</p>
-        <p>You agree to indemnify and hold harmless Hubify and its officers, directors, and employees from any claims, damages, and expenses arising from your use or misuse of the Service, your violation of these Terms, or your User Content.</p>
+        <p>You agree to indemnify and hold harmless Hubify Homes Inc. and its officers, directors, and employees from any claims, damages, and expenses arising from your use or misuse of the Service, your violation of these Terms, or your User Content.</p>
       </div>
 
       <div>
@@ -455,21 +458,26 @@ function TermsContent() {
 
       <div>
         <p className="font-semibold text-slate-900 mb-1">13. Modifications to Terms</p>
-        <p>We may modify these Terms at any time. Material changes will be communicated via email and/or prominent notice on the Service. Continued use after changes constitutes acceptance.</p>
+        <p>We may modify these Terms at any time. Material changes will be communicated via email and/or prominent notice on the Service at least 14 days before taking effect. Continued use after the effective date constitutes acceptance of the revised Terms.</p>
       </div>
 
       <div>
         <p className="font-semibold text-slate-900 mb-1">14. Termination</p>
-        <p>You may terminate your account at any time. We may suspend or terminate your account immediately for violation of these Terms, non-payment, fraudulent activity, or legal requirements. Upon termination, you will have 30 days to export your data.</p>
+        <p>You may terminate your account at any time by contacting support. We may suspend or terminate your account immediately for violation of these Terms, non-payment, fraudulent activity, or legal requirements. Upon termination, you will have 30 days to export your data before it is deleted.</p>
       </div>
 
       <div>
         <p className="font-semibold text-slate-900 mb-1">15. General Provisions</p>
-        <p>These Terms, together with our Privacy Policy, constitute the entire agreement between you and Hubify. If any provision is found unenforceable, the remaining provisions remain in full effect. Contact: <a href="mailto:legal@hubify.com" className="text-teal-600 hover:underline">legal@hubify.com</a></p>
+        <p>These Terms, together with our Privacy Policy and any applicable Beta Participation Agreement, constitute the entire agreement between you and Hubify Homes Inc. If any provision is found unenforceable, the remaining provisions remain in full effect.</p>
+      </div>
+
+      <div>
+        <p className="font-semibold text-slate-900 mb-1">16. Contact</p>
+        <p>Questions about these Terms? Contact us at <a href="mailto:contact@hubifyhomes.com" className="text-teal-600 hover:underline">contact@hubifyhomes.com</a>.</p>
       </div>
 
       <div className="border-t border-slate-200 pt-4 text-xs text-slate-400">
-        Terms of Service · Last Updated May 17, 2026 · Hubify Homes
+        Terms of Service {TERMS_VERSION} · Effective June 2, 2026 · Hubify Homes Inc.
       </div>
     </div>
   );
@@ -776,6 +784,8 @@ function AgreementStep({ data, token, onSigned }: {
         body: JSON.stringify({
           ...values,
           agreementVersion: AGREEMENT_VERSION,
+          tosVersion: TERMS_VERSION,
+          privacyVersion: PRIVACY_VERSION,
           agreementViewedAt: betaViewedAt,
           agreementScrolledAt: betaScrolledAt,
         }),

@@ -820,3 +820,71 @@ export async function ensureAgreementEmailTrackingColumns(): Promise<void> {
     client.release();
   }
 }
+
+export async function ensureAgreementAcceptancesTable(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS agreement_acceptances (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id UUID REFERENCES orgs(id) ON DELETE SET NULL,
+        user_id VARCHAR,
+        prospect_id UUID REFERENCES onboarding_prospects(id) ON DELETE SET NULL,
+        agreement_type VARCHAR NOT NULL,
+        agreement_version VARCHAR NOT NULL,
+        accepted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        ip_address VARCHAR,
+        user_agent TEXT,
+        signer_name VARCHAR,
+        organization_name VARCHAR,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS agreement_acceptances_org_id_idx ON agreement_acceptances(org_id);
+      CREATE INDEX IF NOT EXISTS agreement_acceptances_prospect_id_idx ON agreement_acceptances(prospect_id);
+      CREATE INDEX IF NOT EXISTS agreement_acceptances_type_idx ON agreement_acceptances(agreement_type);
+    `);
+    log("[MIGRATE] agreement_acceptances table verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to create agreement_acceptances table: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
+export async function ensureBillingLifecycleColumns(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE org_subscriptions
+        ADD COLUMN IF NOT EXISTS billing_cycle VARCHAR DEFAULT 'monthly',
+        ADD COLUMN IF NOT EXISTS canceled_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS beta_price_locked BOOLEAN DEFAULT false,
+        ADD COLUMN IF NOT EXISTS beta_price_forfeited_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS beta_price_forfeiture_reason VARCHAR,
+        ADD COLUMN IF NOT EXISTS payment_status VARCHAR;
+    `);
+    log("[MIGRATE] org_subscriptions billing lifecycle columns verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add billing lifecycle columns: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
+export async function ensureProspectAgreementVersionColumns(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE onboarding_prospects
+        ADD COLUMN IF NOT EXISTS tos_accepted_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS tos_version VARCHAR,
+        ADD COLUMN IF NOT EXISTS privacy_accepted_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS privacy_version VARCHAR;
+    `);
+    log("[MIGRATE] onboarding_prospects ToS/Privacy version columns verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add prospect agreement version columns: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}

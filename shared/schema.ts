@@ -125,6 +125,15 @@ export const orgSubscriptions = pgTable("org_subscriptions", {
   
   renewedAt: timestamp("renewed_at"),
   expiresAt: timestamp("expires_at"),
+
+  // Billing lifecycle fields (populated when billing goes live)
+  billingCycle: varchar("billing_cycle").$type<"monthly" | "annual">().default("monthly"),
+  canceledAt: timestamp("canceled_at"),
+  betaPriceLocked: boolean("beta_price_locked").default(false),
+  betaPriceForfeitedAt: timestamp("beta_price_forfeited_at"),
+  betaPriceForfeitureReason: varchar("beta_price_forfeiture_reason"),
+  paymentStatus: varchar("payment_status").$type<"current" | "past_due" | "failed" | "disputed" | "refunded">(),
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -3455,6 +3464,11 @@ export const onboardingProspects = pgTable("onboarding_prospects", {
   approvalEmailSentAt: timestamp("approval_email_sent_at"),
   approvalEmailLastResentAt: timestamp("approval_email_last_resent_at"),
   approvalEmailSendError: text("approval_email_send_error"),
+  // Per-document acceptance timestamps (denormalized for quick querying)
+  tosAcceptedAt: timestamp("tos_accepted_at"),
+  tosVersion: varchar("tos_version"),
+  privacyAcceptedAt: timestamp("privacy_accepted_at"),
+  privacyVersion: varchar("privacy_version"),
   // Agreement confirmation email tracking
   agreementEmailSentAt: timestamp("agreement_email_sent_at"),
   agreementEmailStatus: varchar("agreement_email_status"),
@@ -3724,4 +3738,35 @@ export const insertPropertyServiceAssignmentSchema = createInsertSchema(property
   id: true,
   createdAt: true,
   updatedAt: true,
+});
+
+// ── Agreement Acceptances ──────────────────────────────────────────────────────
+// Immutable audit log — one row per document accepted. Never updated, only inserted.
+export const agreementAcceptances = pgTable("agreement_acceptances", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  // One or both of these may be set depending on whether the signer is a prospect or org user
+  orgId: uuid("org_id").references(() => orgs.id, { onDelete: "set null" }),
+  userId: varchar("user_id"),
+  prospectId: uuid("prospect_id").references(() => onboardingProspects.id, { onDelete: "set null" }),
+  agreementType: varchar("agreement_type")
+    .$type<"terms_of_service" | "privacy_policy" | "beta_participation_agreement">()
+    .notNull(),
+  agreementVersion: varchar("agreement_version").notNull(),
+  acceptedAt: timestamp("accepted_at").notNull().defaultNow(),
+  ipAddress: varchar("ip_address"),
+  userAgent: text("user_agent"),
+  signerName: varchar("signer_name"),
+  organizationName: varchar("organization_name"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("agreement_acceptances_org_id_idx").on(table.orgId),
+  index("agreement_acceptances_prospect_id_idx").on(table.prospectId),
+  index("agreement_acceptances_type_idx").on(table.agreementType),
+]);
+
+export type AgreementAcceptance = typeof agreementAcceptances.$inferSelect;
+export type InsertAgreementAcceptance = typeof agreementAcceptances.$inferInsert;
+export const insertAgreementAcceptanceSchema = createInsertSchema(agreementAcceptances).omit({
+  id: true,
+  createdAt: true,
 });

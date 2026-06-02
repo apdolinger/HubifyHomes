@@ -505,6 +505,24 @@ app.use((req, res, next) => {
       } catch (err) {
         console.error('Error ensuring agreement email tracking columns:', err);
       }
+      try {
+        const { ensureAgreementAcceptancesTable } = await import('./runMigrations.js');
+        await ensureAgreementAcceptancesTable();
+      } catch (err) {
+        console.error('Error ensuring agreement_acceptances table:', err);
+      }
+      try {
+        const { ensureBillingLifecycleColumns } = await import('./runMigrations.js');
+        await ensureBillingLifecycleColumns();
+      } catch (err) {
+        console.error('Error ensuring billing lifecycle columns:', err);
+      }
+      try {
+        const { ensureProspectAgreementVersionColumns } = await import('./runMigrations.js');
+        await ensureProspectAgreementVersionColumns();
+      } catch (err) {
+        console.error('Error ensuring prospect agreement version columns:', err);
+      }
     } catch (error) {
       console.error('Error loading startup migrations:', error);
     }

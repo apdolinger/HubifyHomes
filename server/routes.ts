@@ -5015,6 +5015,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // ── Admin billing lifecycle controls ─────────────────────────────────────────
+  // All routes gated by isSuperAdmin + requireMFA.
+
+  // POST /api/super-admin/orgs/:orgId/billing/cancel
+  app.post("/api/super-admin/orgs/:orgId/billing/cancel", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const { reason } = req.body ?? {};
+      const org = await storage.getOrg(orgId);
+      if (!org) return res.status(404).json({ message: "Organization not found" });
+      const now = new Date();
+      await storage.updateOrgSubscription(orgId, {
+        canceledAt: now,
+        status: "canceled" as any,
+        betaPriceForfeitureReason: reason ?? "admin_cancel",
+      } as any);
+      res.json({ ok: true, canceledAt: now });
+    } catch (err: any) {
+      console.error("[billing/cancel]", err?.message ?? err);
+      res.status(500).json({ message: "Failed to cancel subscription" });
+    }
+  });
+
+  // POST /api/super-admin/orgs/:orgId/billing/mark-payment-failed
+  app.post("/api/super-admin/orgs/:orgId/billing/mark-payment-failed", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const org = await storage.getOrg(orgId);
+      if (!org) return res.status(404).json({ message: "Organization not found" });
+      await storage.updateOrgSubscription(orgId, {
+        paymentStatus: "failed" as any,
+        status: "past_due" as any,
+      } as any);
+      res.json({ ok: true });
+    } catch (err: any) {
+      console.error("[billing/mark-payment-failed]", err?.message ?? err);
+      res.status(500).json({ message: "Failed to mark payment failed" });
+    }
+  });
+
+  // POST /api/super-admin/orgs/:orgId/billing/mark-payment-disputed
+  app.post("/api/super-admin/orgs/:orgId/billing/mark-payment-disputed", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const org = await storage.getOrg(orgId);
+      if (!org) return res.status(404).json({ message: "Organization not found" });
+      await storage.updateOrgSubscription(orgId, {
+        paymentStatus: "disputed" as any,
+      } as any);
+      res.json({ ok: true });
+    } catch (err: any) {
+      console.error("[billing/mark-payment-disputed]", err?.message ?? err);
+      res.status(500).json({ message: "Failed to mark payment disputed" });
+    }
+  });
+
+  // POST /api/super-admin/orgs/:orgId/billing/forfeit-beta-pricing
+  app.post("/api/super-admin/orgs/:orgId/billing/forfeit-beta-pricing", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const { reason } = req.body ?? {};
+      const org = await storage.getOrg(orgId);
+      if (!org) return res.status(404).json({ message: "Organization not found" });
+      const existing = await storage.getOrgSubscription(orgId);
+      if (!existing?.betaPriceLocked) {
+        return res.status(409).json({ message: "Organization does not have locked beta pricing." });
+      }
+      const now = new Date();
+      await storage.updateOrgSubscription(orgId, {
+        betaPriceLocked: false,
+        betaPriceForfeitedAt: now,
+        betaPriceForfeitureReason: reason ?? "admin_action",
+      } as any);
+      res.json({ ok: true, forfeitedAt: now });
+    } catch (err: any) {
+      console.error("[billing/forfeit-beta-pricing]", err?.message ?? err);
+      res.status(500).json({ message: "Failed to forfeit beta pricing" });
+    }
+  });
+
+  // GET /api/super-admin/orgs/:orgId/agreement-history
+  app.get("/api/super-admin/orgs/:orgId/agreement-history", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const org = await storage.getOrg(orgId);
+      if (!org) return res.status(404).json({ message: "Organization not found" });
+      const records = await storage.getAgreementAcceptancesByOrg(orgId);
+      res.json(records);
+    } catch (err: any) {
+      console.error("[agreement-history]", err?.message ?? err);
+      res.status(500).json({ message: "Failed to fetch agreement history" });
+    }
+  });
+
   // Public effective flag map for the calling user's org
   app.get("/api/feature-flags/me", isAuthenticated, async (req: any, res) => {
     try {
@@ -17181,6 +17275,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         agreeToBetaAgreement: z.literal(true, { errorMap: () => ({ message: "You must agree to the Beta Agreement" }) }),
         // Agreement engagement metadata (optional, recorded for audit trail)
         agreementVersion: z.string().optional(),
+        tosVersion: z.string().optional(),
+        privacyVersion: z.string().optional(),
         agreementViewedAt: z.string().datetime().optional(),
         agreementScrolledAt: z.string().datetime().optional(),
       });
@@ -17222,7 +17318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { stage: "payment_pending", enteredAt: now.toISOString(), note: "Beta agreement signed" },
       ];
 
-      const { agreementVersion, agreementViewedAt, agreementScrolledAt } = parsed.data;
+      const { agreementVersion, tosVersion, privacyVersion, agreementViewedAt, agreementScrolledAt } = parsed.data;
 
       await storage.updateOnboardingProspect(prospect.id, {
         agreementStatus: "signed",
@@ -17234,9 +17330,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         agreementVersion: agreementVersion ?? null,
         agreementViewedAt: agreementViewedAt ? new Date(agreementViewedAt) : null,
         agreementScrolledAt: agreementScrolledAt ? new Date(agreementScrolledAt) : null,
+        // Denormalized per-document acceptance timestamps
+        tosAcceptedAt: now,
+        tosVersion: tosVersion ?? null,
+        privacyAcceptedAt: now,
+        privacyVersion: privacyVersion ?? null,
         stage: "agreement_complete",
         stageHistory: updatedHistory,
       } as any);
+
+      // Write immutable agreement_acceptances records — one per document
+      const sharedFields = {
+        prospectId: prospect.id,
+        orgId: prospect.orgId ?? null,
+        userId: null,
+        ipAddress: acceptedIp,
+        userAgent: acceptedUserAgent,
+        signerName,
+        organizationName,
+        acceptedAt: now,
+      };
+      await Promise.all([
+        storage.createAgreementAcceptance({
+          ...sharedFields,
+          agreementType: "terms_of_service",
+          agreementVersion: tosVersion ?? "v1.1",
+        }),
+        storage.createAgreementAcceptance({
+          ...sharedFields,
+          agreementType: "privacy_policy",
+          agreementVersion: privacyVersion ?? "v1.0",
+        }),
+        storage.createAgreementAcceptance({
+          ...sharedFields,
+          agreementType: "beta_participation_agreement",
+          agreementVersion: agreementVersion ?? "v1.1",
+        }),
+      ]);
 
       // Send confirmation email (non-blocking — failures are logged but do not affect the response)
       if (resend) {

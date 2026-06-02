@@ -172,6 +172,15 @@ export default function OrgClientInvoices() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Guard: warn if trying to send (open) without Stripe configured
+    if (formData.status === "open" && paymentReadiness && !paymentReadiness.stripeConnected) {
+      toast({
+        title: "Stripe not connected",
+        description: "Connect Stripe in Settings → Stripe Settings before sending invoices for online payment.",
+        variant: "destructive",
+      });
+      return;
+    }
     createInvoiceMutation.mutate(formData);
   };
 

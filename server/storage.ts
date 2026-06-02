@@ -297,6 +297,9 @@ import {
   propertyServiceAssignments,
   type PropertyServiceAssignment,
   type InsertPropertyServiceAssignment,
+  agreementAcceptances,
+  type AgreementAcceptance,
+  type InsertAgreementAcceptance,
 } from "@shared/schema";
 
 import { db } from "./db";
@@ -428,6 +431,10 @@ export interface IStorage {
   }>>;
   getOrgSubscription(orgId: string): Promise<OrgSubscription | undefined>;
   upsertOrgSubscription(subscription: InsertOrgSubscription): Promise<OrgSubscription>;
+  // Agreement acceptance audit log
+  createAgreementAcceptance(acceptance: InsertAgreementAcceptance): Promise<AgreementAcceptance>;
+  getAgreementAcceptancesByOrg(orgId: string): Promise<AgreementAcceptance[]>;
+  getAgreementAcceptancesByProspect(prospectId: string): Promise<AgreementAcceptance[]>;
   getUserCookieConsent(userId: string): Promise<UserCookieConsent | undefined>;
   upsertUserCookieConsent(consent: InsertUserCookieConsent): Promise<UserCookieConsent>;
   getPortalUserCookieConsent(portalUserId: string): Promise<PortalUserCookieConsent | undefined>;
@@ -878,6 +885,11 @@ export interface IStorage {
   resolveConflictResolution(id: number, notes?: string): Promise<ConflictResolution>;
   getPendingConflictsByUser(userId: string): Promise<ConflictResolution[]>;
   
+  // Agreement acceptance audit log
+  createAgreementAcceptance(acceptance: InsertAgreementAcceptance): Promise<AgreementAcceptance>;
+  getAgreementAcceptancesByOrg(orgId: string): Promise<AgreementAcceptance[]>;
+  getAgreementAcceptancesByProspect(prospectId: string): Promise<AgreementAcceptance[]>;
+
   // Stripe operations - Master billing (Hubify billing organizations)
   getOrgSubscription(orgId: string): Promise<OrgSubscription | undefined>;
   getAllOrgSubscriptions(): Promise<OrgSubscription[]>;
@@ -6587,6 +6599,32 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return subscription;
     }
+  }
+
+  // ── Agreement acceptance audit log ────────────────────────────────────────
+
+  async createAgreementAcceptance(acceptance: InsertAgreementAcceptance): Promise<AgreementAcceptance> {
+    const [record] = await db
+      .insert(agreementAcceptances)
+      .values(acceptance)
+      .returning();
+    return record;
+  }
+
+  async getAgreementAcceptancesByOrg(orgId: string): Promise<AgreementAcceptance[]> {
+    return db
+      .select()
+      .from(agreementAcceptances)
+      .where(eq(agreementAcceptances.orgId, orgId))
+      .orderBy(desc(agreementAcceptances.acceptedAt));
+  }
+
+  async getAgreementAcceptancesByProspect(prospectId: string): Promise<AgreementAcceptance[]> {
+    return db
+      .select()
+      .from(agreementAcceptances)
+      .where(eq(agreementAcceptances.prospectId, prospectId))
+      .orderBy(desc(agreementAcceptances.acceptedAt));
   }
 
   // Stripe operations - Per-organization connections
