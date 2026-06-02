@@ -4178,16 +4178,156 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ── Encryption Status (Super Admin) ──────────────────────────────────────
-  // Returns whether encryption is truly active (key is set AND valid 32-byte base64).
-  // Uses isEncryptionEnabled() from encryption.ts — same check as runtime encrypt().
+  // Returns whether encryption is truly active (key is set AND valid 32-byte base64),
+  // whether the canary decrypts successfully (key-mismatch detection), and how many
+  // org_stripe_connections rows fail decryption with the current key.
   // No key material is returned.
   app.get("/api/super-admin/platform/encryption-status", isSuperAdmin, requireMFA, async (_req, res) => {
     try {
-      const { isEncryptionEnabled } = await import("./encryption");
-      res.json({ enabled: isEncryptionEnabled() });
+      const { isEncryptionEnabled, encrypt, decrypt, getCanaryPlaintext } = await import("./encryption");
+      const enabled = isEncryptionEnabled();
+
+      if (!enabled) {
+        return res.json({ enabled: false, canaryOk: null, affectedCount: 0, totalConnections: 0 });
+      }
+
+      // ── Canary check ──
+      // Read the stored canary from platform_settings. If none exists, write one now.
+      const settings = await storage.getPlatformSettings();
+      const storedCanary = settings["encryption_canary_v1"] as string | undefined;
+      let canaryOk: boolean;
+
+      if (!storedCanary) {
+        // First time with encryption enabled — write the canary
+        const canaryValue = encrypt(getCanaryPlaintext());
+        await storage.setPlatformSettings({ encryption_canary_v1: canaryValue }, null);
+        canaryOk = true;
+      } else {
+        try {
+          const decrypted = decrypt(storedCanary);
+          canaryOk = decrypted === getCanaryPlaintext();
+        } catch {
+          canaryOk = false;
+        }
+      }
+
+      // ── Connection health check ──
+      // Try to decrypt the stripeSecretKey of every connection to find affected rows.
+      const { orgStripeConnections: oscTable } = await import("@shared/schema");
+      const allConnections = await db.select().from(oscTable);
+      let affectedCount = 0;
+      for (const conn of allConnections) {
+        const fields = [conn.stripeSecretKey, conn.accessToken, conn.refreshToken, conn.stripeWebhookSecret];
+        const hasEncryptedField = fields.some(
+          (f) => typeof f === "string" && f.split(":").length === 3
+        );
+        if (!hasEncryptedField) continue; // plaintext or null — skip
+        try {
+          // Attempt decryption of the first non-null encrypted field
+          const field = fields.find((f) => typeof f === "string" && f.split(":").length === 3)!;
+          const result = decrypt(field as string);
+          // If decrypt returns the cipher string unchanged (wrong key), count as affected
+          if (result === field) affectedCount++;
+        } catch {
+          affectedCount++;
+        }
+      }
+
+      res.json({
+        enabled,
+        canaryOk,
+        affectedCount,
+        totalConnections: allConnections.length,
+      });
     } catch (err) {
       console.error("Error checking encryption status:", err);
       res.status(500).json({ message: "Failed to check encryption status" });
+    }
+  });
+
+  // ── Re-encrypt stored Stripe keys (Super Admin) ───────────────────────────
+  // Admin provides the OLD key (base64) in the request body. The server decrypts
+  // every org_stripe_connections row with the old key and re-encrypts with the
+  // current key. Also re-issues the encryption canary.
+  app.post("/api/super-admin/platform/reencrypt-stripe-keys", isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const { isEncryptionEnabled, encryptWithKey, decryptWithKey, parseKeyBase64, encrypt, getCanaryPlaintext } = await import("./encryption");
+
+      if (!isEncryptionEnabled()) {
+        return res.status(400).json({ message: "Encryption is not enabled. Set PLATFORM_ENCRYPTION_KEY first." });
+      }
+
+      const { oldKey: oldKeyB64 } = req.body;
+      if (!oldKeyB64 || typeof oldKeyB64 !== "string") {
+        return res.status(400).json({ message: "oldKey (base64) is required in the request body." });
+      }
+
+      const oldKeyBuf = parseKeyBase64(oldKeyB64);
+      if (!oldKeyBuf) {
+        return res.status(400).json({ message: "oldKey must be a valid base64-encoded 32-byte key." });
+      }
+
+      const { orgStripeConnections: oscTable } = await import("@shared/schema");
+      const allConnections = await db.select().from(oscTable);
+
+      let reencrypted = 0;
+      let skipped = 0;
+      const errors: { orgId: string; error: string }[] = [];
+
+      for (const conn of allConnections) {
+        try {
+          const updates: Record<string, string | undefined> = {};
+
+          const reencryptField = (val: string | null | undefined): string | undefined => {
+            if (!val) return undefined;
+            if (val.split(":").length !== 3) return undefined; // not encrypted
+            const plain = decryptWithKey(val, oldKeyBuf); // throws on wrong key
+            return encrypt(plain); // encrypt with current key
+          };
+
+          let changed = false;
+          const secretUpdate = reencryptField(conn.stripeSecretKey);
+          if (secretUpdate !== undefined) { updates.stripeSecretKey = secretUpdate; changed = true; }
+          const accessUpdate = reencryptField(conn.accessToken);
+          if (accessUpdate !== undefined) { updates.accessToken = accessUpdate; changed = true; }
+          const refreshUpdate = reencryptField(conn.refreshToken);
+          if (refreshUpdate !== undefined) { updates.refreshToken = refreshUpdate; changed = true; }
+          const webhookUpdate = reencryptField(conn.stripeWebhookSecret);
+          if (webhookUpdate !== undefined) { updates.stripeWebhookSecret = webhookUpdate; changed = true; }
+
+          if (changed) {
+            await storage.updateOrgStripeConnection(conn.orgId, updates as any);
+            reencrypted++;
+          } else {
+            skipped++;
+          }
+        } catch (err: any) {
+          errors.push({ orgId: conn.orgId, error: err?.message ?? String(err) });
+        }
+      }
+
+      // Re-issue canary with current key only when ALL rows succeeded.
+      // If any row failed (wrong old key, corrupted data) we leave the canary
+      // unchanged so the key-mismatch warning remains visible in the UI.
+      if (errors.length === 0) {
+        const newCanary = encrypt(getCanaryPlaintext());
+        await storage.setPlatformSettings({ encryption_canary_v1: newCanary }, req.user?.claims?.sub ?? null);
+      }
+
+      await AuditLogger.log({
+        req,
+        action: "reencrypt_stripe_keys",
+        actionType: "update",
+        resource: "org_stripe_connections",
+        severity: "warning",
+        success: errors.length === 0,
+        metadata: { reencrypted, skipped, errorCount: errors.length },
+      });
+
+      res.json({ reencrypted, skipped, errors });
+    } catch (err) {
+      console.error("Error re-encrypting Stripe keys:", err);
+      res.status(500).json({ message: "Failed to re-encrypt Stripe keys" });
     }
   });
 

@@ -7663,15 +7663,24 @@ function SystemIntegrationsCard() {
 }
 
 // Encryption Card — queries /api/super-admin/platform/encryption-status (read-only)
-// Key generation and display are entirely client-side; no key material travels over the wire.
+// Key generation is entirely client-side; no key material travels over the wire.
+// Re-encryption: the old key is supplied by the admin, sent to the server only for
+// the one-time re-encrypt call, then discarded.
 function EncryptionCard() {
   const { toast } = useToast();
-  const { data, isLoading } = useQuery<{ enabled: boolean }>({
+  const { data, isLoading, refetch } = useQuery<{
+    enabled: boolean;
+    canaryOk: boolean | null;
+    affectedCount: number;
+    totalConnections: number;
+  }>({
     queryKey: ['/api/super-admin/platform/encryption-status'],
   });
 
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showReencrypt, setShowReencrypt] = useState(false);
+  const [oldKey, setOldKey] = useState('');
 
   const generateKey = () => {
     const bytes = new Uint8Array(32);
@@ -7693,6 +7702,32 @@ function EncryptionCard() {
     }
   };
 
+  const reencryptMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', '/api/super-admin/platform/reencrypt-stripe-keys', { oldKey });
+      return res.json();
+    },
+    onSuccess: (result: any) => {
+      const { reencrypted, skipped, errors } = result;
+      if (errors?.length > 0) {
+        toast({
+          title: 'Re-encryption completed with errors',
+          description: `${reencrypted} re-encrypted, ${skipped} skipped, ${errors.length} failed. Check server logs.`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Re-encryption complete',
+          description: `${reencrypted} connection(s) re-encrypted, ${skipped} already using plaintext (skipped).`,
+        });
+      }
+      setOldKey('');
+      setShowReencrypt(false);
+      refetch();
+    },
+    onError: (e: any) => toast({ title: 'Re-encryption failed', description: e.message, variant: 'destructive' }),
+  });
+
   if (isLoading) {
     return (
       <Card>
@@ -7702,6 +7737,10 @@ function EncryptionCard() {
   }
 
   const enabled = !!data?.enabled;
+  const canaryOk = data?.canaryOk ?? null;
+  const affectedCount = data?.affectedCount ?? 0;
+  const totalConnections = data?.totalConnections ?? 0;
+  const keyMismatch = enabled && (canaryOk === false || affectedCount > 0);
 
   return (
     <Card>
@@ -7709,22 +7748,56 @@ function EncryptionCard() {
         <CardTitle className="flex items-center"><Lock className="w-5 h-5 mr-2" />Encryption</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {enabled ? (
+        {/* Key-mismatch critical warning */}
+        {keyMismatch && (
+          <div className="flex items-start space-x-3 p-4 rounded-lg bg-red-50 border border-red-300">
+            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <div className="font-semibold text-red-900 mb-1">Encryption Key Mismatch Detected</div>
+              <p className="text-sm text-red-700 mb-3">
+                The current <code className="font-mono bg-red-100 px-1 rounded">PLATFORM_ENCRYPTION_KEY</code> does
+                not match the key that was used to encrypt the stored Stripe credentials
+                {affectedCount > 0 ? ` (${affectedCount} of ${totalConnections} connection${totalConnections !== 1 ? 's' : ''} affected)` : ''}.
+                Stripe payments will fail for affected organisations until the keys are re-encrypted.
+              </p>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => setShowReencrypt(true)}
+                data-testid="button-open-reencrypt"
+              >
+                <Key className="w-4 h-4 mr-2" />
+                Re-encrypt stored keys…
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Normal encrypted state */}
+        {enabled && !keyMismatch && (
           <div className="flex items-start space-x-3 p-4 rounded-lg bg-green-50 border border-green-200">
             <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
-            <div>
+            <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <span className="font-medium text-green-900">Encryption Active</span>
                 <Badge className="bg-green-100 text-green-800 border-green-300">AES-256-GCM</Badge>
                 <Badge variant="outline" className="text-green-800 border-green-300">32-byte key</Badge>
               </div>
-              <p className="text-sm text-green-700">
-                <code className="font-mono bg-green-100 px-1 rounded">PLATFORM_ENCRYPTION_KEY</code> is set.
-                Stripe secret keys are encrypted at rest using AES-256-GCM.
+              <p className="text-sm text-green-700 mb-2">
+                <code className="font-mono bg-green-100 px-1 rounded">PLATFORM_ENCRYPTION_KEY</code> is set and
+                verified. Stripe secret keys are encrypted at rest using AES-256-GCM.
               </p>
+              {totalConnections > 0 && (
+                <p className="text-xs text-green-600">
+                  {totalConnections} Stripe connection{totalConnections !== 1 ? 's' : ''} — all decrypt correctly.
+                </p>
+              )}
             </div>
           </div>
-        ) : (
+        )}
+
+        {/* Encryption not active */}
+        {!enabled && (
           <div className="space-y-4">
             <div className="flex items-start space-x-3 p-4 rounded-lg bg-amber-50 border border-amber-200">
               <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
@@ -7770,6 +7843,113 @@ function EncryptionCard() {
                 </p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Re-encrypt panel — shown when triggered from the key-mismatch warning */}
+        {enabled && showReencrypt && (
+          <div className="border border-slate-200 rounded-lg p-4 space-y-3 bg-slate-50">
+            <div className="font-medium text-slate-800 flex items-center gap-2">
+              <Key className="w-4 h-4" />
+              Re-encrypt Stored Stripe Keys
+            </div>
+            <p className="text-sm text-slate-600">
+              Enter the <strong>old</strong> encryption key (the key that was active when the Stripe credentials were
+              originally saved). The server will decrypt each stored credential with the old key and immediately
+              re-encrypt it with the current key. The old key is used only for this operation and is not stored.
+            </p>
+            <div className="space-y-1">
+              <Label htmlFor="old-key-input">Old encryption key (base64)</Label>
+              <Input
+                id="old-key-input"
+                type="password"
+                placeholder="Paste your old PLATFORM_ENCRYPTION_KEY here…"
+                value={oldKey}
+                onChange={(e) => setOldKey(e.target.value)}
+                className="font-mono text-sm"
+                data-testid="input-old-encryption-key"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                disabled={!oldKey.trim() || reencryptMutation.isPending}
+                onClick={() => reencryptMutation.mutate()}
+                data-testid="button-confirm-reencrypt"
+              >
+                {reencryptMutation.isPending ? 'Re-encrypting…' : 'Re-encrypt now'}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => { setShowReencrypt(false); setOldKey(''); }}
+                disabled={reencryptMutation.isPending}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Manual re-encrypt trigger when encryption is active but no mismatch */}
+        {enabled && !keyMismatch && !showReencrypt && totalConnections > 0 && (
+          <div className="pt-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowReencrypt(true)}
+              data-testid="button-open-reencrypt-manual"
+            >
+              <Key className="w-4 h-4 mr-2" />
+              Re-encrypt after key rotation…
+            </Button>
+            <p className="text-xs text-slate-500 mt-1">
+              Use this after rotating <code className="font-mono bg-slate-100 px-1 rounded">PLATFORM_ENCRYPTION_KEY</code> to migrate stored credentials to the new key.
+            </p>
+          </div>
+        )}
+
+        {/* Re-encrypt panel when triggered manually (no mismatch) */}
+        {enabled && !keyMismatch && showReencrypt && (
+          <div className="border border-slate-200 rounded-lg p-4 space-y-3 bg-slate-50">
+            <div className="font-medium text-slate-800 flex items-center gap-2">
+              <Key className="w-4 h-4" />
+              Re-encrypt Stored Stripe Keys
+            </div>
+            <p className="text-sm text-slate-600">
+              Enter the <strong>previous</strong> encryption key. The server will re-encrypt all stored Stripe
+              credentials from the old key to the current one.
+            </p>
+            <div className="space-y-1">
+              <Label htmlFor="old-key-input-manual">Previous encryption key (base64)</Label>
+              <Input
+                id="old-key-input-manual"
+                type="password"
+                placeholder="Paste your previous PLATFORM_ENCRYPTION_KEY here…"
+                value={oldKey}
+                onChange={(e) => setOldKey(e.target.value)}
+                className="font-mono text-sm"
+                data-testid="input-old-encryption-key-manual"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                disabled={!oldKey.trim() || reencryptMutation.isPending}
+                onClick={() => reencryptMutation.mutate()}
+                data-testid="button-confirm-reencrypt-manual"
+              >
+                {reencryptMutation.isPending ? 'Re-encrypting…' : 'Re-encrypt now'}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => { setShowReencrypt(false); setOldKey(''); }}
+                disabled={reencryptMutation.isPending}
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
         )}
       </CardContent>
