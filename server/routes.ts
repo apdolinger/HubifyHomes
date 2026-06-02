@@ -4245,11 +4245,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // ── Access item plaintext count ──
+      const { propertyAccessItems: paiTable } = await import("@shared/schema");
+      const allAccessItems = await db.select({ id: paiTable.id, value: paiTable.value }).from(paiTable);
+      const plaintextAccessItems = allAccessItems.filter(
+        (r) => r.value.split(":").length !== 3
+      ).length;
+
       res.json({
         enabled,
         canaryOk,
         affectedCount,
         totalConnections: allConnections.length,
+        plaintextAccessItems,
+        totalAccessItems: allAccessItems.length,
       });
     } catch (err) {
       console.error("Error checking encryption status:", err);
@@ -4340,6 +4349,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       console.error("Error re-encrypting Stripe keys:", err);
       res.status(500).json({ message: "Failed to re-encrypt Stripe keys" });
+    }
+  });
+
+  // ── Migrate plaintext property access credentials → AES-256-GCM (Super Admin) ─
+  // Scans every property_access_items row. Rows whose value already looks
+  // encrypted (3-part base64:base64:base64) are skipped; all others are
+  // encrypted in-place with the current PLATFORM_ENCRYPTION_KEY.
+  app.post("/api/super-admin/platform/encrypt-access-items", isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const { isEncryptionEnabled, encrypt } = await import("./encryption");
+
+      if (!isEncryptionEnabled()) {
+        return res.status(400).json({ message: "Encryption is not enabled. Set PLATFORM_ENCRYPTION_KEY first." });
+      }
+
+      const { propertyAccessItems: paiTable } = await import("@shared/schema");
+      const allItems = await db.select().from(paiTable);
+
+      let encrypted = 0;
+      let skipped = 0;
+      const errors: { id: number; error: string }[] = [];
+
+      for (const item of allItems) {
+        const parts = item.value.split(":");
+        if (parts.length === 3) {
+          // Already looks encrypted — skip
+          skipped++;
+          continue;
+        }
+        try {
+          await db.update(paiTable).set({ value: encrypt(item.value) }).where(eq(paiTable.id, item.id));
+          encrypted++;
+        } catch (err: any) {
+          errors.push({ id: item.id, error: err?.message ?? String(err) });
+        }
+      }
+
+      await AuditLogger.log({
+        req,
+        action: "encrypt_access_items",
+        actionType: "update",
+        resource: "property_access_items",
+        severity: "warning",
+        success: errors.length === 0,
+        metadata: { total: allItems.length, encrypted, skipped, errorCount: errors.length },
+      });
+
+      res.json({ total: allItems.length, encrypted, skipped, errors });
+    } catch (err) {
+      console.error("Error encrypting access items:", err);
+      res.status(500).json({ message: "Failed to encrypt access items" });
     }
   });
 
@@ -7049,8 +7109,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid property ID' });
       }
       
+      const { decrypt } = await import("./encryption");
       const items = await storage.getPropertyAccessItems(propertyId);
-      res.json(items);
+      res.json(items.map(item => ({ ...item, value: decrypt(item.value) })));
     } catch (error) {
       console.error("Error fetching property access items:", error);
       res.status(500).json({ message: "Failed to fetch property access items" });
@@ -7070,9 +7131,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         createdById: userId
       });
-      
-      const item = await storage.createPropertyAccessItem(validatedData);
-      res.status(201).json(item);
+
+      const { encrypt, decrypt } = await import("./encryption");
+      const stored = await storage.createPropertyAccessItem({
+        ...validatedData,
+        value: encrypt(validatedData.value),
+      });
+      res.status(201).json({ ...stored, value: decrypt(stored.value) });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid data", errors: error.errors });
@@ -7089,8 +7154,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid access item ID' });
       }
 
-      const item = await storage.updatePropertyAccessItem(id, req.body);
-      res.json(item);
+      const { encrypt, decrypt } = await import("./encryption");
+      const body = { ...req.body };
+      if (typeof body.value === "string") {
+        body.value = encrypt(body.value);
+      }
+      const item = await storage.updatePropertyAccessItem(id, body);
+      res.json({ ...item, value: decrypt(item.value) });
     } catch (error) {
       console.error("Error updating property access item:", error);
       res.status(500).json({ message: "Failed to update property access item" });
