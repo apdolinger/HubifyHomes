@@ -359,10 +359,12 @@ function OnboardingTrackerSection({
   prospects,
   onEdit,
   onDrop,
+  onGoToOrganizations,
 }: {
   prospects: Prospect[];
   onEdit: (p: Prospect) => void;
   onDrop: (p: Prospect) => void;
+  onGoToOrganizations?: () => void;
 }) {
   const { toast } = useToast();
   const [drawerOpen, setDrawerOpen]       = useState(false);
@@ -989,7 +991,7 @@ function ProspectCard({
           {prospect.orgId ? (
             <button
               className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium w-full"
-              onClick={() => setLocation(`/super-admin?tab=organizations`)}
+              onClick={() => onGoToOrganizations?.()}
               title={`Org ID: ${prospect.orgId}`}
             >
               <CheckCircle className="w-3 h-3 shrink-0" />
@@ -2116,7 +2118,7 @@ function SubmissionsTab({ onMoveToPipeline, defaultSourceFilter, statusFilter }:
   );
 }
 
-function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, initialDemoOnly }: { prefill?: ProspectFormValues | null; onPrefillConsumed?: () => void; initialBetaOnly?: boolean; initialDemoOnly?: boolean }) {
+function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, initialDemoOnly, onGoToOrganizations }: { prefill?: ProspectFormValues | null; onPrefillConsumed?: () => void; initialBetaOnly?: boolean; initialDemoOnly?: boolean; onGoToOrganizations?: () => void }) {
   const { toast } = useToast();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingProspect, setEditingProspect] = useState<Prospect | null>(null);
@@ -2716,6 +2718,7 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
         prospects={active}
         onEdit={openEdit}
         onDrop={(p) => setDroppingProspect(p)}
+        onGoToOrganizations={onGoToOrganizations}
       />
 
       {/* Create / Edit sheet */}
@@ -3131,7 +3134,7 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
               className="bg-indigo-600 hover:bg-indigo-700"
               onClick={() => {
                 setConversionSummary(null);
-                setLocation("/super-admin?tab=organizations");
+                onGoToOrganizations?.();
               }}
             >
               <ExternalLink className="w-4 h-4 mr-1" /> View Organizations
@@ -10188,16 +10191,23 @@ export default function SuperAdmin() {
               <OnboardingPipelineTab
                 prefill={pipelinePrefill}
                 onPrefillConsumed={() => setPipelinePrefill(null)}
+                onGoToOrganizations={() => { setActiveTab("organizations"); setOrgsInnerTab("orgs"); }}
               />
             </TabsContent>
             <TabsContent value="beta">
-              <OnboardingPipelineTab initialBetaOnly={true} />
+              <OnboardingPipelineTab
+                initialBetaOnly={true}
+                onGoToOrganizations={() => { setActiveTab("organizations"); setOrgsInnerTab("orgs"); }}
+              />
               <div className="mt-6">
                 <BetaProgramTab />
               </div>
             </TabsContent>
             <TabsContent value="demo-requests">
-              <OnboardingPipelineTab initialDemoOnly={true} />
+              <OnboardingPipelineTab
+                initialDemoOnly={true}
+                onGoToOrganizations={() => { setActiveTab("organizations"); setOrgsInnerTab("orgs"); }}
+              />
               <div className="mt-6">
                 <DemoRequestsTab />
               </div>
