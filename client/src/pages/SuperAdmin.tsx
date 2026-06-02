@@ -157,6 +157,14 @@ interface Prospect {
   setupFee: number | null;
   betaCohortNumber: number | null;
   agreementStatus: string | null;
+  // Agreement engagement metadata & signer details
+  agreementViewedAt: string | null;
+  agreementScrolledAt: string | null;
+  agreementVersion: string | null;
+  agreementAcceptedIp: string | null;
+  agreementAcceptedUserAgent: string | null;
+  agreementSignerName: string | null;
+  agreementOrganizationName: string | null;
   // Onboarding token & approval email tracking
   onboardingToken: string | null;
   onboardingTokenCreatedAt: string | null;
@@ -1521,6 +1529,61 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
                     <div>
                       <p className="text-teal-600 text-xs mb-0.5">Approved On</p>
                       <p className="font-semibold text-teal-900">{new Date(submission.betaApprovedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Agreement Audit — only shown when at least one audit field is present */}
+          {(submission.agreementViewedAt || submission.agreementScrolledAt || submission.agreementSignedAt || submission.agreementVersion || submission.agreementAcceptedIp) && (
+            <>
+              <Separator />
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 mb-3 flex items-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5" />
+                  Agreement Audit
+                </p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  {submission.agreementVersion && (
+                    <div>
+                      <p className="text-slate-500 text-xs mb-0.5">Version</p>
+                      <p className="font-medium text-slate-800">{submission.agreementVersion}</p>
+                    </div>
+                  )}
+                  {submission.agreementViewedAt && (
+                    <div>
+                      <p className="text-slate-500 text-xs mb-0.5">Viewed At</p>
+                      <p className="font-medium text-slate-800">{new Date(submission.agreementViewedAt).toLocaleString()}</p>
+                    </div>
+                  )}
+                  {submission.agreementScrolledAt && (
+                    <div>
+                      <p className="text-slate-500 text-xs mb-0.5">Scrolled to Bottom</p>
+                      <p className="font-medium text-slate-800">{new Date(submission.agreementScrolledAt).toLocaleString()}</p>
+                    </div>
+                  )}
+                  {submission.agreementSignedAt && (
+                    <div>
+                      <p className="text-slate-500 text-xs mb-0.5">Accepted At</p>
+                      <p className="font-medium text-slate-800">{new Date(submission.agreementSignedAt).toLocaleString()}</p>
+                    </div>
+                  )}
+                  {submission.agreementAcceptedIp && (
+                    <div>
+                      <p className="text-slate-500 text-xs mb-0.5">IP Address</p>
+                      <p className="font-medium text-slate-800 font-mono text-xs">{submission.agreementAcceptedIp}</p>
+                    </div>
+                  )}
+                  {submission.agreementAcceptedUserAgent && (
+                    <div className="col-span-2">
+                      <p className="text-slate-500 text-xs mb-0.5">User Agent</p>
+                      <p className="font-medium text-slate-800 text-xs break-all line-clamp-2" title={submission.agreementAcceptedUserAgent}>
+                        {submission.agreementAcceptedUserAgent.length > 120
+                          ? submission.agreementAcceptedUserAgent.slice(0, 120) + "…"
+                          : submission.agreementAcceptedUserAgent}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -3025,6 +3088,61 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
                         Last resent: {new Date(editingProspect.approvalEmailLastResentAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                       </p>
                     )}
+                  </div>
+                </>
+              )}
+
+              {/* Agreement Audit — only shown when at least one audit field is present */}
+              {(editingProspect.agreementViewedAt || editingProspect.agreementScrolledAt || editingProspect.agreementSignedAt || editingProspect.agreementVersion || editingProspect.agreementAcceptedIp) && (
+                <>
+                  <Separator className="my-4" />
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 mb-2.5 flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5" />
+                      Agreement Audit
+                    </p>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                      {editingProspect.agreementVersion && (
+                        <div>
+                          <p className="text-slate-500 mb-0.5">Version</p>
+                          <p className="font-medium text-slate-800">{editingProspect.agreementVersion}</p>
+                        </div>
+                      )}
+                      {editingProspect.agreementViewedAt && (
+                        <div>
+                          <p className="text-slate-500 mb-0.5">Viewed At</p>
+                          <p className="font-medium text-slate-800">{new Date(editingProspect.agreementViewedAt).toLocaleString()}</p>
+                        </div>
+                      )}
+                      {editingProspect.agreementScrolledAt && (
+                        <div>
+                          <p className="text-slate-500 mb-0.5">Scrolled to Bottom</p>
+                          <p className="font-medium text-slate-800">{new Date(editingProspect.agreementScrolledAt).toLocaleString()}</p>
+                        </div>
+                      )}
+                      {editingProspect.agreementSignedAt && (
+                        <div>
+                          <p className="text-slate-500 mb-0.5">Accepted At</p>
+                          <p className="font-medium text-slate-800">{new Date(editingProspect.agreementSignedAt).toLocaleString()}</p>
+                        </div>
+                      )}
+                      {editingProspect.agreementAcceptedIp && (
+                        <div>
+                          <p className="text-slate-500 mb-0.5">IP Address</p>
+                          <p className="font-medium text-slate-800 font-mono">{editingProspect.agreementAcceptedIp}</p>
+                        </div>
+                      )}
+                      {editingProspect.agreementAcceptedUserAgent && (
+                        <div className="col-span-2">
+                          <p className="text-slate-500 mb-0.5">User Agent</p>
+                          <p className="font-medium text-slate-800 break-all" title={editingProspect.agreementAcceptedUserAgent}>
+                            {editingProspect.agreementAcceptedUserAgent.length > 120
+                              ? editingProspect.agreementAcceptedUserAgent.slice(0, 120) + "…"
+                              : editingProspect.agreementAcceptedUserAgent}
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </>
               )}
