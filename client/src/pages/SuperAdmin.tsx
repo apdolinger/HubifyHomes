@@ -1575,6 +1575,18 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
                   Agreement Audit
                 </p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  {submission.agreementSignerName && (
+                    <div>
+                      <p className="text-slate-500 text-xs mb-0.5">Signer Name</p>
+                      <p className="font-medium text-slate-800">{submission.agreementSignerName}</p>
+                    </div>
+                  )}
+                  {submission.agreementOrganizationName && (
+                    <div>
+                      <p className="text-slate-500 text-xs mb-0.5">Organization</p>
+                      <p className="font-medium text-slate-800">{submission.agreementOrganizationName}</p>
+                    </div>
+                  )}
                   {submission.agreementVersion && (
                     <div>
                       <p className="text-slate-500 text-xs mb-0.5">Version</p>
@@ -3149,6 +3161,18 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
                       Agreement Audit
                     </p>
                     <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                      {editingProspect.agreementSignerName && (
+                        <div>
+                          <p className="text-slate-500 mb-0.5">Signer Name</p>
+                          <p className="font-medium text-slate-800">{editingProspect.agreementSignerName}</p>
+                        </div>
+                      )}
+                      {editingProspect.agreementOrganizationName && (
+                        <div>
+                          <p className="text-slate-500 mb-0.5">Organization</p>
+                          <p className="font-medium text-slate-800">{editingProspect.agreementOrganizationName}</p>
+                        </div>
+                      )}
                       {editingProspect.agreementVersion && (
                         <div>
                           <p className="text-slate-500 mb-0.5">Version</p>
