@@ -12572,7 +12572,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json({
           ...safeConnection,
           hasWebhookSecret: !!stripeWebhookSecret,
-          encryptionEnabled: !!process.env.PLATFORM_ENCRYPTION_KEY,
+          encryptionEnabled: (await import("./encryption")).isEncryptionEnabled(),
         });
       } else {
         res.json(null);
