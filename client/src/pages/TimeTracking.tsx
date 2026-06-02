@@ -82,7 +82,8 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function TimeTracking() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
+  const user = _user as any;
   const canManage = user?.role === "admin" || user?.role === "supervisor";
 
   const [userFilter, setUserFilter] = useState("all");
