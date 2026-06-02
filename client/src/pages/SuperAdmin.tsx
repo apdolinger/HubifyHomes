@@ -1757,10 +1757,10 @@ const SOURCE_FILTER_OPTIONS = [
   { value: "pricing_enterprise",   label: "Pricing · Enterprise" },
 ];
 
-function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: Prospect) => void }) {
+function SubmissionsTab({ onMoveToPipeline, defaultSourceFilter, statusFilter }: { onMoveToPipeline?: (submission: Prospect) => void; defaultSourceFilter?: string; statusFilter?: string }) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
-  const [sourceFilter, setSourceFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState(defaultSourceFilter ?? "all");
   const [selectedSubmission, setSelectedSubmission] = useState<Prospect | null>(null);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
@@ -1785,6 +1785,12 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
     const q = search.toLowerCase();
     return submissions
       .filter(s => {
+        if (statusFilter && statusFilter !== "all") {
+          return (s.submissionStatus ?? "new") === statusFilter;
+        }
+        return true;
+      })
+      .filter(s => {
         if (sourceFilter === "all") return true;
         const src = s.source === "marketing_demo_request" ? "demo_request" : (s.source ?? "get_started");
         return src === sourceFilter;
@@ -1797,7 +1803,7 @@ function SubmissionsTab({ onMoveToPipeline }: { onMoveToPipeline?: (submission: 
         s.serviceArea?.toLowerCase().includes(q) ||
         s.suggestedTier?.toLowerCase().includes(q)
       );
-  }, [submissions, search, sourceFilter]);
+  }, [submissions, search, sourceFilter, statusFilter]);
 
   const allChecked = checkedIds.size > 0 && filtered.every(s => checkedIds.has(s.id));
   const someChecked = checkedIds.size > 0 && !allChecked;
@@ -4591,6 +4597,223 @@ function DemoTenantTab() {
         </DialogContent>
       </Dialog>
 
+    </div>
+  );
+}
+
+function DroppedProspectsTab() {
+  const { toast } = useToast();
+  const { data: allProspects = [], isLoading } = useQuery<Prospect[]>({
+    queryKey: ["/api/super-admin/onboarding-prospects"],
+  });
+
+  const dropped = allProspects.filter(p => p.stage === "dropped");
+
+  const restoreMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest("PATCH", `/api/super-admin/onboarding-prospects/${id}`, { stage: "inquiry", droppedReason: null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      toast({ title: "Prospect restored to Submission" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to restore prospect", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/super-admin/onboarding-prospects/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      toast({ title: "Prospect deleted" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to delete prospect", variant: "destructive" }),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <XCircle className="w-5 h-5 text-red-500" />
+            Dropped Prospects
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            {dropped.length} prospect{dropped.length !== 1 ? "s" : ""} marked as dropped
+          </p>
+        </CardHeader>
+        <CardContent>
+          {dropped.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground text-sm">No dropped prospects.</div>
+          ) : (
+            <div className="rounded-lg border overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Company</TableHead>
+                    <TableHead>Reason</TableHead>
+                    <TableHead>Dropped</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {dropped.map(p => (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium">{p.name}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{p.email}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{p.company ?? "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
+                        {p.droppedReason ?? <span className="italic text-muted-foreground/60">No reason given</span>}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                        {p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : "—"}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => restoreMutation.mutate(p.id)}
+                            disabled={restoreMutation.isPending}
+                          >
+                            Restore
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 border-red-200 hover:bg-red-50"
+                            onClick={() => deleteMutation.mutate(p.id)}
+                            disabled={deleteMutation.isPending}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function DemoRequestsTab() {
+  type DemoRequestsSummary = {
+    total: number;
+    sent: number;
+    stageCounts: Record<string, number>;
+    recent: Array<{
+      id: string;
+      name: string;
+      company: string | null;
+      email: string;
+      stage: string;
+      demoAccessSent: boolean | null;
+      demoEmailSentAt: string | null;
+      demoEmailError: string | null;
+      createdAt: string | null;
+    }>;
+  };
+
+  const { data: requestsSummary, isLoading } = useQuery<DemoRequestsSummary>({
+    queryKey: ["/api/super-admin/demo/requests-summary"],
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  if (!requestsSummary) {
+    return (
+      <div className="text-center py-12 text-muted-foreground text-sm">No demo request data available.</div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="border rounded-xl bg-white overflow-hidden">
+        <div className="flex items-center gap-2 px-5 py-4 border-b bg-gray-50">
+          <ClipboardList className="w-4 h-4 text-sky-600" />
+          <h3 className="font-semibold text-sm text-gray-800">Demo Requests</h3>
+          <Badge className="ml-auto bg-sky-100 text-sky-800 text-xs">{requestsSummary.total} total</Badge>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {[
+              { key: "demo_requested",   label: "Requested",  color: "border-sky-300 bg-sky-50 text-sky-800" },
+              { key: "demo_sent",        label: "Sent",       color: "border-blue-300 bg-blue-50 text-blue-800" },
+              { key: "demo_completed",   label: "Completed",  color: "border-violet-300 bg-violet-50 text-violet-800" },
+              { key: "follow_up_needed", label: "Follow-Up",  color: "border-amber-300 bg-amber-50 text-amber-800" },
+              { key: "converted",        label: "Converted",  color: "border-emerald-300 bg-emerald-50 text-emerald-800" },
+              { key: "not_a_fit",        label: "Not a Fit",  color: "border-red-300 bg-red-50 text-red-700" },
+            ].map((s, i, arr) => (
+              <div key={s.key} className="flex items-center gap-1">
+                <div className={`rounded-full px-3 py-1 text-xs font-medium border ${s.color}`}>
+                  {s.label}: <span className="font-bold">{requestsSummary.stageCounts[s.key] ?? 0}</span>
+                </div>
+                {i < arr.length - 1 && <ChevronRight className="w-3 h-3 text-gray-400" />}
+              </div>
+            ))}
+          </div>
+          {requestsSummary.recent.length > 0 ? (
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Name</TableHead>
+                    <TableHead className="text-xs">Company</TableHead>
+                    <TableHead className="text-xs">Stage</TableHead>
+                    <TableHead className="text-xs">Email Status</TableHead>
+                    <TableHead className="text-xs">Received</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {requestsSummary.recent.map(r => (
+                    <TableRow key={r.id}>
+                      <TableCell className="font-medium text-sm">{r.name}</TableCell>
+                      <TableCell className="text-sm text-gray-500">{r.company ?? "—"}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs capitalize">
+                          {r.stage.replace(/_/g, " ")}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {r.demoAccessSent
+                          ? <span className="text-green-600 text-xs flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Sent</span>
+                          : r.demoEmailError
+                            ? <span className="text-red-600 text-xs flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Failed</span>
+                            : <span className="text-gray-400 text-xs">Pending</span>
+                        }
+                      </TableCell>
+                      <TableCell className="text-xs text-gray-400">
+                        {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 text-center py-4">No demo requests yet. Share the landing page to get started.</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -9870,10 +10093,14 @@ function ComplianceTab() {
 export default function SuperAdmin() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [activeTab, setActiveTab] = useState("organizations");
+  const [activeTab, setActiveTab] = useState("onboarding");
   const [isSuperAdminAuthenticated, setIsSuperAdminAuthenticated] = useState<boolean | null>(null);
   const [superAdminUsername, setSuperAdminUsername] = useState<string>("");
   const [pipelinePrefill, setPipelinePrefill] = useState<ProspectFormValues | null>(null);
+  const [onboardingInnerTab, setOnboardingInnerTab] = useState("new");
+  const [orgsInnerTab, setOrgsInnerTab] = useState("orgs");
+  const [platformInnerTab, setPlatformInnerTab] = useState("settings");
+  const [supportInnerTab, setSupportInnerTab] = useState("tickets");
 
   const { data: submissionsData = [] } = useQuery<Prospect[]>({
     queryKey: ["/api/super-admin/submissions"],
@@ -9984,72 +10211,179 @@ export default function SuperAdmin() {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="flex w-full overflow-x-auto h-auto flex-wrap gap-1 justify-start bg-muted p-1">
-          <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
-          <TabsTrigger value="submissions" className="relative">
-            Submissions
+          <TabsTrigger value="onboarding" className="relative">
+            Onboarding
             {newSubmissionsCount > 0 && (
               <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none min-w-[16px] h-4 px-1">
                 {newSubmissionsCount}
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="beta" className="relative data-[state=active]:bg-teal-600 data-[state=active]:text-white">
-            Beta
-          </TabsTrigger>
-          <TabsTrigger value="demo" className="relative data-[state=active]:bg-teal-600 data-[state=active]:text-white">
-            <MonitorPlay className="w-3.5 h-3.5 mr-1.5" />
-            Demo
-          </TabsTrigger>
           <TabsTrigger value="organizations">Organizations</TabsTrigger>
-          <TabsTrigger value="users">All Users</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
-          <TabsTrigger value="support">Support</TabsTrigger>
-          <TabsTrigger value="email-templates" data-testid="tab-email-templates">Email Templates</TabsTrigger>
-          <TabsTrigger value="communication">Communication</TabsTrigger>
           <TabsTrigger value="revenue">Revenue</TabsTrigger>
-          <TabsTrigger value="features">Feature Flags</TabsTrigger>
           <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
           <TabsTrigger value="platform">Platform</TabsTrigger>
-          <TabsTrigger value="admins">Admins</TabsTrigger>
-          <TabsTrigger value="compliance">Compliance</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="support">Support</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
 
-        {/* Onboarding Pipeline Tab */}
+        {/* ── ONBOARDING ── */}
         <TabsContent value="onboarding">
-          <OnboardingPipelineTab
-            prefill={pipelinePrefill}
-            onPrefillConsumed={() => setPipelinePrefill(null)}
-          />
+          <Tabs value={onboardingInnerTab} onValueChange={setOnboardingInnerTab} className="space-y-4">
+            <TabsList className="flex flex-wrap gap-1 h-auto bg-muted/60 p-1">
+              <TabsTrigger value="new" className="relative">
+                New Submissions
+                {newSubmissionsCount > 0 && (
+                  <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none min-w-[16px] h-4 px-1">
+                    {newSubmissionsCount}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="all-submissions">All Submissions</TabsTrigger>
+              <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
+              <TabsTrigger value="beta">Beta Applications</TabsTrigger>
+              <TabsTrigger value="demo-requests">Demo Requests</TabsTrigger>
+              <TabsTrigger value="dropped">Dropped</TabsTrigger>
+            </TabsList>
+            <TabsContent value="new">
+              <SubmissionsTab
+                statusFilter="new"
+                onMoveToPipeline={(submission) => {
+                  const displayName = submission.firstName && submission.lastName
+                    ? `${submission.firstName} ${submission.lastName}`
+                    : submission.name;
+                  setPipelinePrefill({
+                    name: displayName ?? "",
+                    email: submission.email ?? "",
+                    company: submission.company ?? "",
+                    phone: submission.phone ?? "",
+                    notes: submission.notes ?? "",
+                    agreementContent: "",
+                  });
+                  setOnboardingInnerTab("pipeline");
+                  toast({ title: "Opening pipeline", description: `Pre-filled with ${displayName}'s data.` });
+                }}
+              />
+            </TabsContent>
+            <TabsContent value="all-submissions">
+              <SubmissionsTab
+                onMoveToPipeline={(submission) => {
+                  const displayName = submission.firstName && submission.lastName
+                    ? `${submission.firstName} ${submission.lastName}`
+                    : submission.name;
+                  setPipelinePrefill({
+                    name: displayName ?? "",
+                    email: submission.email ?? "",
+                    company: submission.company ?? "",
+                    phone: submission.phone ?? "",
+                    notes: submission.notes ?? "",
+                    agreementContent: "",
+                  });
+                  setOnboardingInnerTab("pipeline");
+                  toast({ title: "Opening pipeline", description: `Pre-filled with ${displayName}'s data.` });
+                }}
+              />
+            </TabsContent>
+            <TabsContent value="pipeline">
+              <OnboardingPipelineTab
+                prefill={pipelinePrefill}
+                onPrefillConsumed={() => setPipelinePrefill(null)}
+              />
+            </TabsContent>
+            <TabsContent value="beta">
+              <BetaProgramTab />
+            </TabsContent>
+            <TabsContent value="demo-requests">
+              <DemoRequestsTab />
+            </TabsContent>
+            <TabsContent value="dropped">
+              <DroppedProspectsTab />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
-        {/* Submissions Tab */}
-        <TabsContent value="submissions">
-          <SubmissionsTab
-            onMoveToPipeline={(submission) => {
-              const displayName = submission.firstName && submission.lastName
-                ? `${submission.firstName} ${submission.lastName}`
-                : submission.name;
-              setPipelinePrefill({
-                name: displayName ?? "",
-                email: submission.email ?? "",
-                company: submission.company ?? "",
-                phone: submission.phone ?? "",
-                notes: submission.notes ?? "",
-                agreementContent: "",
-              });
-              setActiveTab("onboarding");
-              toast({ title: "Opening pipeline", description: `Pre-filled with ${displayName}'s data.` });
-            }}
-          />
-        </TabsContent>
-
-        {/* Organizations Tab */}
+        {/* ── ORGANIZATIONS ── */}
         <TabsContent value="organizations">
-          <OrganizationsTab />
+          <Tabs value={orgsInnerTab} onValueChange={setOrgsInnerTab} className="space-y-4">
+            <TabsList className="flex flex-wrap gap-1 h-auto bg-muted/60 p-1">
+              <TabsTrigger value="orgs">Organizations</TabsTrigger>
+              <TabsTrigger value="users">All Users</TabsTrigger>
+            </TabsList>
+            <TabsContent value="orgs">
+              <OrganizationsTab />
+            </TabsContent>
+            <TabsContent value="users">
+              <AllUsersTab />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
-        {/* Reports Tab */}
+        {/* ── REVENUE ── */}
+        <TabsContent value="revenue">
+          <RevenueTabContent />
+        </TabsContent>
+
+        {/* ── MONITORING ── */}
+        <TabsContent value="monitoring">
+          <MonitoringTabContent />
+        </TabsContent>
+
+        {/* ── PLATFORM ── */}
+        <TabsContent value="platform">
+          <Tabs value={platformInnerTab} onValueChange={setPlatformInnerTab} className="space-y-4">
+            <TabsList className="flex flex-wrap gap-1 h-auto bg-muted/60 p-1">
+              <TabsTrigger value="settings">Settings</TabsTrigger>
+              <TabsTrigger value="features">Feature Flags</TabsTrigger>
+              <TabsTrigger value="email-templates" data-testid="tab-email-templates">Email Templates</TabsTrigger>
+              <TabsTrigger value="templates">Template Management</TabsTrigger>
+              <TabsTrigger value="admins">Admins</TabsTrigger>
+              <TabsTrigger value="compliance">Compliance</TabsTrigger>
+              <TabsTrigger value="demo-tenant">
+                <MonitorPlay className="w-3.5 h-3.5 mr-1.5" />
+                Demo Tenant
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="settings">
+              <SettingsTabContent />
+            </TabsContent>
+            <TabsContent value="features">
+              <FeatureFlagsTabContent />
+            </TabsContent>
+            <TabsContent value="email-templates">
+              <EmailTemplates />
+            </TabsContent>
+            <TabsContent value="templates">
+              <TemplateManagement />
+            </TabsContent>
+            <TabsContent value="admins">
+              <PlatformAdminsTab />
+            </TabsContent>
+            <TabsContent value="compliance">
+              <ComplianceTab />
+            </TabsContent>
+            <TabsContent value="demo-tenant">
+              <DemoTenantTab />
+            </TabsContent>
+          </Tabs>
+        </TabsContent>
+
+        {/* ── SUPPORT ── */}
+        <TabsContent value="support">
+          <Tabs value={supportInnerTab} onValueChange={setSupportInnerTab} className="space-y-4">
+            <TabsList className="flex flex-wrap gap-1 h-auto bg-muted/60 p-1">
+              <TabsTrigger value="tickets">Support Tickets</TabsTrigger>
+              <TabsTrigger value="alerts">System Alerts</TabsTrigger>
+            </TabsList>
+            <TabsContent value="tickets">
+              <SupportTickets />
+            </TabsContent>
+            <TabsContent value="alerts">
+              <CommunicationTabContent />
+            </TabsContent>
+          </Tabs>
+        </TabsContent>
+
+        {/* ── REPORTS ── */}
         <TabsContent value="reports">
           <div className="space-y-6">
             <Card>
@@ -10066,7 +10400,6 @@ export default function SuperAdmin() {
                 <CommunitiesReport />
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
@@ -10082,72 +10415,6 @@ export default function SuperAdmin() {
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-
-        {/* Support Tab */}
-        <TabsContent value="support">
-          <SupportTickets />
-        </TabsContent>
-
-        {/* Email Templates Tab */}
-        <TabsContent value="email-templates">
-          <EmailTemplates />
-        </TabsContent>
-
-        {/* All Users Tab */}
-        <TabsContent value="users">
-          <AllUsersTab />
-        </TabsContent>
-
-        {/* Communication Tab - System Alerts */}
-        <TabsContent value="communication">
-          <CommunicationTabContent />
-        </TabsContent>
-
-
-        {/* Revenue Tab */}
-        <TabsContent value="revenue">
-          <RevenueTabContent />
-        </TabsContent>
-
-        {/* Feature Flags Tab */}
-        <TabsContent value="features">
-          <FeatureFlagsTabContent />
-        </TabsContent>
-
-        {/* Monitoring Tab */}
-        <TabsContent value="monitoring">
-          <MonitoringTabContent />
-        </TabsContent>
-
-
-        {/* Platform Tab */}
-        <TabsContent value="platform">
-          <TemplateManagement />
-        </TabsContent>
-
-        {/* Beta Program Tab */}
-        <TabsContent value="beta">
-          <BetaProgramTab />
-        </TabsContent>
-
-        {/* Demo Tenant Tab */}
-        <TabsContent value="demo">
-          <DemoTenantTab />
-        </TabsContent>
-
-        {/* Platform Admins Tab */}
-        <TabsContent value="admins">
-          <PlatformAdminsTab />
-        </TabsContent>
-
-        <TabsContent value="compliance">
-          <ComplianceTab />
-        </TabsContent>
-
-        {/* Settings Tab */}
-        <TabsContent value="settings">
-          <SettingsTabContent />
         </TabsContent>
       </Tabs>
     </main>

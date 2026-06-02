@@ -12,7 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { FileText, Upload, Download, Plus, Users } from "lucide-react";
+import { FileText, Upload, Download, Plus, Users, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { format } from "date-fns";
 import { CustomFieldsRenderer } from "@/components/CustomFieldsRenderer";
 
@@ -65,6 +66,11 @@ export default function OrgClientInvoices() {
 
   const { data: allInvoices = [], isLoading } = useQuery<ClientInvoice[]>({
     queryKey: [`/api/orgs/${orgId}/client-invoices`],
+    enabled: isAuthenticated && !!orgId,
+  });
+
+  const { data: paymentReadiness } = useQuery<{ stripeConnected: boolean; webhookConfigured: boolean }>({
+    queryKey: [`/api/orgs/${orgId}/payment-readiness`],
     enabled: isAuthenticated && !!orgId,
   });
 
@@ -200,7 +206,19 @@ export default function OrgClientInvoices() {
   };
 
   return (
-    <div className="container mx-auto py-8">
+    <div className="container mx-auto py-8 space-y-4">
+      {paymentReadiness && !paymentReadiness.stripeConnected && (
+        <Alert className="border-amber-300 bg-amber-50">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-800">
+            <strong>Stripe not connected.</strong> Clients won't be able to pay online until you connect Stripe in{" "}
+            <a href="/admin/settings?tab=stripe" className="underline font-medium hover:text-amber-900">
+              Account → Stripe Settings
+            </a>
+            .
+          </AlertDescription>
+        </Alert>
+      )}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
