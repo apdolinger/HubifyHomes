@@ -795,6 +795,7 @@ function ProspectCard({
   convertingToOrg,
   onSendDemoEmail,
   sendingDemoEmail,
+  onGoToOrganizations,
 }: {
   prospect: Prospect;
   stuckDays: number;
@@ -808,6 +809,7 @@ function ProspectCard({
   convertingToOrg: boolean;
   onSendDemoEmail?: () => void;
   sendingDemoEmail?: boolean;
+  onGoToOrganizations?: () => void;
 }) {
   const [, setLocation] = useLocation();
   const days = stageDays(prospect);
@@ -2629,6 +2631,7 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
                         convertingToOrg={convertToOrgMutation.isPending && convertToOrgMutation.variables === p.id}
                         onSendDemoEmail={() => demoEmailMutation.mutate(p.id)}
                         sendingDemoEmail={demoEmailMutation.isPending && demoEmailMutation.variables === p.id}
+                        onGoToOrganizations={onGoToOrganizations}
                       />
                     ))
                   )}
