@@ -165,6 +165,9 @@ interface Prospect {
   agreementAcceptedUserAgent: string | null;
   agreementSignerName: string | null;
   agreementOrganizationName: string | null;
+  // Agreement confirmation email tracking
+  agreementEmailSentAt: string | null;
+  agreementEmailStatus: string | null;
   // Onboarding token & approval email tracking
   onboardingToken: string | null;
   onboardingTokenCreatedAt: string | null;
@@ -1563,7 +1566,7 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
           )}
 
           {/* Agreement Audit — only shown when at least one audit field is present */}
-          {(submission.agreementViewedAt || submission.agreementScrolledAt || submission.agreementSignedAt || submission.agreementVersion || submission.agreementAcceptedIp) && (
+          {(submission.agreementViewedAt || submission.agreementScrolledAt || submission.agreementSignedAt || submission.agreementVersion || submission.agreementAcceptedIp || submission.agreementEmailStatus) && (
             <>
               <Separator />
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -1600,6 +1603,24 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
                     <div>
                       <p className="text-slate-500 text-xs mb-0.5">IP Address</p>
                       <p className="font-medium text-slate-800 font-mono text-xs">{submission.agreementAcceptedIp}</p>
+                    </div>
+                  )}
+                  {submission.agreementEmailStatus && (
+                    <div>
+                      <p className="text-slate-500 text-xs mb-0.5">Confirmation Email</p>
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                        submission.agreementEmailStatus === "sent"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-red-100 text-red-700"
+                      }`}>
+                        {submission.agreementEmailStatus === "sent" ? "Sent" : "Failed"}
+                      </span>
+                    </div>
+                  )}
+                  {submission.agreementEmailSentAt && (
+                    <div>
+                      <p className="text-slate-500 text-xs mb-0.5">Email Sent At</p>
+                      <p className="font-medium text-slate-800">{new Date(submission.agreementEmailSentAt).toLocaleString()}</p>
                     </div>
                   )}
                   {submission.agreementAcceptedUserAgent && (
@@ -3119,7 +3140,7 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
               )}
 
               {/* Agreement Audit — only shown when at least one audit field is present */}
-              {(editingProspect.agreementViewedAt || editingProspect.agreementScrolledAt || editingProspect.agreementSignedAt || editingProspect.agreementVersion || editingProspect.agreementAcceptedIp) && (
+              {(editingProspect.agreementViewedAt || editingProspect.agreementScrolledAt || editingProspect.agreementSignedAt || editingProspect.agreementVersion || editingProspect.agreementAcceptedIp || editingProspect.agreementEmailStatus) && (
                 <>
                   <Separator className="my-4" />
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -3156,6 +3177,24 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
                         <div>
                           <p className="text-slate-500 mb-0.5">IP Address</p>
                           <p className="font-medium text-slate-800 font-mono">{editingProspect.agreementAcceptedIp}</p>
+                        </div>
+                      )}
+                      {editingProspect.agreementEmailStatus && (
+                        <div>
+                          <p className="text-slate-500 mb-0.5">Confirmation Email</p>
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                            editingProspect.agreementEmailStatus === "sent"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-red-100 text-red-700"
+                          }`}>
+                            {editingProspect.agreementEmailStatus === "sent" ? "Sent" : "Failed"}
+                          </span>
+                        </div>
+                      )}
+                      {editingProspect.agreementEmailSentAt && (
+                        <div>
+                          <p className="text-slate-500 mb-0.5">Email Sent At</p>
+                          <p className="font-medium text-slate-800">{new Date(editingProspect.agreementEmailSentAt).toLocaleString()}</p>
                         </div>
                       )}
                       {editingProspect.agreementAcceptedUserAgent && (

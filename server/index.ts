@@ -499,6 +499,12 @@ app.use((req, res, next) => {
       } catch (err) {
         console.error('Error ensuring agreement metadata columns:', err);
       }
+      try {
+        const { ensureAgreementEmailTrackingColumns } = await import('./runMigrations.js');
+        await ensureAgreementEmailTrackingColumns();
+      } catch (err) {
+        console.error('Error ensuring agreement email tracking columns:', err);
+      }
     } catch (error) {
       console.error('Error loading startup migrations:', error);
     }

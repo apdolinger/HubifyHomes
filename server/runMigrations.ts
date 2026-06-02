@@ -804,3 +804,19 @@ export async function ensureAgreementMetadataColumns(): Promise<void> {
     client.release();
   }
 }
+
+export async function ensureAgreementEmailTrackingColumns(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE onboarding_prospects
+        ADD COLUMN IF NOT EXISTS agreement_email_sent_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS agreement_email_status VARCHAR;
+    `);
+    log("[MIGRATE] onboarding_prospects agreement email tracking columns verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add agreement email tracking columns: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}

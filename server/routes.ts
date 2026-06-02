@@ -17288,8 +17288,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             </div>
           `,
         })
-          .then((r: any) => console.log(`[accept-agreement] confirmation email sent to ${prospect.email} resend_id=${r?.data?.id}`))
-          .catch((err: any) => console.warn("[accept-agreement] confirmation email failed (non-fatal):", err));
+          .then((r: any) => {
+            console.log(`[accept-agreement] confirmation email sent to ${prospect.email} resend_id=${r?.data?.id}`);
+            storage.updateOnboardingProspect(prospect.id, {
+              agreementEmailSentAt: new Date(),
+              agreementEmailStatus: "sent",
+            } as any).catch((dbErr: any) => console.warn("[accept-agreement] failed to record email sent status:", dbErr));
+          })
+          .catch((err: any) => {
+            console.warn("[accept-agreement] confirmation email failed (non-fatal):", err);
+            storage.updateOnboardingProspect(prospect.id, {
+              agreementEmailSentAt: new Date(),
+              agreementEmailStatus: "failed",
+            } as any).catch((dbErr: any) => console.warn("[accept-agreement] failed to record email failed status:", dbErr));
+          });
       }
 
       res.json({ success: true, message: "Agreement accepted. Proceeding to payment setup." });
