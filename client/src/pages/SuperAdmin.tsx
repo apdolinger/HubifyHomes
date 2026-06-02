@@ -7573,6 +7573,121 @@ function SystemIntegrationsCard() {
   );
 }
 
+// Encryption Card — queries /api/super-admin/platform/encryption-status (read-only)
+// Key generation and display are entirely client-side; no key material travels over the wire.
+function EncryptionCard() {
+  const { toast } = useToast();
+  const { data, isLoading } = useQuery<{ enabled: boolean }>({
+    queryKey: ['/api/super-admin/platform/encryption-status'],
+  });
+
+  const [generatedKey, setGeneratedKey] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const generateKey = () => {
+    const bytes = new Uint8Array(32);
+    window.crypto.getRandomValues(bytes);
+    const b64 = btoa(String.fromCharCode(...bytes));
+    setGeneratedKey(b64);
+    setCopied(false);
+  };
+
+  const copyKey = async () => {
+    if (!generatedKey) return;
+    try {
+      await navigator.clipboard.writeText(generatedKey);
+      setCopied(true);
+      toast({ title: 'Key copied to clipboard' });
+      setTimeout(() => setCopied(false), 3000);
+    } catch {
+      toast({ title: 'Copy failed', description: 'Select the key text and copy manually.', variant: 'destructive' });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="py-6 text-center text-slate-500 text-sm">Loading encryption status…</CardContent>
+      </Card>
+    );
+  }
+
+  const enabled = !!data?.enabled;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center"><Lock className="w-5 h-5 mr-2" />Encryption</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {enabled ? (
+          <div className="flex items-start space-x-3 p-4 rounded-lg bg-green-50 border border-green-200">
+            <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-medium text-green-900">Encryption Active</span>
+                <Badge className="bg-green-100 text-green-800 border-green-300">AES-256-GCM</Badge>
+                <Badge variant="outline" className="text-green-800 border-green-300">32-byte key</Badge>
+              </div>
+              <p className="text-sm text-green-700">
+                <code className="font-mono bg-green-100 px-1 rounded">PLATFORM_ENCRYPTION_KEY</code> is set.
+                Stripe secret keys are encrypted at rest using AES-256-GCM.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-start space-x-3 p-4 rounded-lg bg-amber-50 border border-amber-200">
+              <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+              <div>
+                <div className="font-medium text-amber-900 mb-1">Encryption Not Active</div>
+                <p className="text-sm text-amber-700">
+                  <code className="font-mono bg-amber-100 px-1 rounded">PLATFORM_ENCRYPTION_KEY</code> is not set.
+                  Stripe secret keys are stored as plaintext. Set this environment variable to enable AES-256-GCM encryption at rest.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm text-slate-600 mb-3">
+                Generate a cryptographically secure 32-byte key below, then add it as an environment variable named{' '}
+                <code className="font-mono bg-slate-100 px-1 rounded text-slate-800">PLATFORM_ENCRYPTION_KEY</code>{' '}
+                in your hosting environment (e.g. Replit Secrets or your deployment platform). The key is generated locally in your browser — it is never sent to the server.
+              </p>
+
+              <Button onClick={generateKey} variant="outline" data-testid="button-generate-encryption-key">
+                <Key className="w-4 h-4 mr-2" />
+                Generate Key
+              </Button>
+            </div>
+
+            {generatedKey && (
+              <div className="space-y-2">
+                <Label>Generated Key (base64, 32 bytes)</Label>
+                <div className="flex items-center gap-2">
+                  <code
+                    className="flex-1 block font-mono text-xs bg-slate-100 border rounded px-3 py-2 break-all select-all"
+                    data-testid="text-generated-key"
+                  >
+                    {generatedKey}
+                  </code>
+                  <Button size="sm" variant="outline" onClick={copyKey} data-testid="button-copy-encryption-key">
+                    {copied ? <CheckCircle2 className="w-4 h-4 text-green-600" /> : <Key className="w-4 h-4" />}
+                    {copied ? 'Copied' : 'Copy'}
+                  </Button>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Add this as a secret named <code className="font-mono bg-slate-100 px-1 rounded">PLATFORM_ENCRYPTION_KEY</code> and restart the server. Keep a secure backup — losing the key means losing access to encrypted data.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // Settings Tab — backed by /api/super-admin/platform-settings
 // ============================================================================
 function SettingsTabContent() {
@@ -7662,6 +7777,8 @@ function SettingsTabContent() {
       <SystemIntegrationsCard />
 
       <SelfSignupCard />
+
+      <EncryptionCard />
 
       <Card>
         <CardHeader>

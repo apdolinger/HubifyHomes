@@ -4177,6 +4177,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Encryption Status (Super Admin) ──────────────────────────────────────
+  // Returns whether encryption is truly active (key is set AND valid 32-byte base64).
+  // Uses isEncryptionEnabled() from encryption.ts — same check as runtime encrypt().
+  // No key material is returned.
+  app.get("/api/super-admin/platform/encryption-status", isSuperAdmin, requireMFA, async (_req, res) => {
+    try {
+      const { isEncryptionEnabled } = await import("./encryption");
+      res.json({ enabled: isEncryptionEnabled() });
+    } catch (err) {
+      console.error("Error checking encryption status:", err);
+      res.status(500).json({ message: "Failed to check encryption status" });
+    }
+  });
+
   // ── Integration Status (Super Admin) ─────────────────────────────────────
   app.get("/api/super-admin/integration-status", isSuperAdmin, requireMFA, async (_req, res) => {
     try {
