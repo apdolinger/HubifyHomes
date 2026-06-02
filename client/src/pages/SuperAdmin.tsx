@@ -2116,7 +2116,7 @@ function SubmissionsTab({ onMoveToPipeline, defaultSourceFilter, statusFilter }:
   );
 }
 
-function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: ProspectFormValues | null; onPrefillConsumed?: () => void }) {
+function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, initialDemoOnly }: { prefill?: ProspectFormValues | null; onPrefillConsumed?: () => void; initialBetaOnly?: boolean; initialDemoOnly?: boolean }) {
   const { toast } = useToast();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingProspect, setEditingProspect] = useState<Prospect | null>(null);
@@ -2137,7 +2137,7 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
   const [showDropped, setShowDropped] = useState(false);
   const [stuckDays, setStuckDays] = useState(7);
   const [dragOverStage, setDragOverStage] = useState<OnboardingStage | null>(null);
-  const [betaOnly, setBetaOnly] = useState(false);
+  const [betaOnly, setBetaOnly] = useState(initialBetaOnly ?? false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const saveStuckDaysMutation = useMutation({
@@ -2182,8 +2182,10 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed }: { prefill?: Prosp
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill]);
 
+  const DEMO_STAGES: string[] = ["demo_requested", "demo_sent", "demo_completed", "follow_up_needed", "converted", "not_a_fit"];
   const active = allProspects.filter(p => {
     if (p.stage === "dropped") return false;
+    if (initialDemoOnly && p.source !== "marketing_demo_request" && !DEMO_STAGES.includes(p.stage)) return false;
     if (betaOnly && p.trialIntent !== "beta_application" && p.source !== "beta_application") return false;
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
@@ -4053,17 +4055,6 @@ function DemoTenantTab() {
     queryKey: ["/api/super-admin/demo/info"],
   });
 
-  type DemoRequestsSummary = {
-    total: number;
-    sent: number;
-    stageCounts: Record<string, number>;
-    recent: Array<{ id: string; name: string; company: string | null; email: string; stage: string; demoAccessSent: boolean | null; demoEmailSentAt: string | null; demoEmailError: string | null; createdAt: string | null }>;
-  };
-
-  const { data: requestsSummary } = useQuery<DemoRequestsSummary>({
-    queryKey: ["/api/super-admin/demo/requests-summary"],
-  });
-
   const seedMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/super-admin/demo/seed", {}),
     onSuccess: () => {
@@ -4230,77 +4221,6 @@ function DemoTenantTab() {
               </div>
             ))}
           </div>
-
-          {/* ── Demo Requests summary ── */}
-          {requestsSummary !== undefined && (
-            <div className="border rounded-xl bg-white overflow-hidden">
-              <div className="flex items-center gap-2 px-5 py-4 border-b bg-gray-50">
-                <ClipboardList className="w-4 h-4 text-sky-600" />
-                <h3 className="font-semibold text-sm text-gray-800">Demo Requests</h3>
-                <Badge className="ml-auto bg-sky-100 text-sky-800 text-xs">{requestsSummary.total} total</Badge>
-              </div>
-              <div className="p-5 space-y-4">
-                {/* Stage funnel */}
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { key: "demo_requested",   label: "Requested",  color: "border-sky-300 bg-sky-50 text-sky-800" },
-                    { key: "demo_sent",        label: "Sent",       color: "border-blue-300 bg-blue-50 text-blue-800" },
-                    { key: "demo_completed",   label: "Completed",  color: "border-violet-300 bg-violet-50 text-violet-800" },
-                    { key: "follow_up_needed", label: "Follow-Up",  color: "border-amber-300 bg-amber-50 text-amber-800" },
-                    { key: "converted",        label: "Converted",  color: "border-emerald-300 bg-emerald-50 text-emerald-800" },
-                    { key: "not_a_fit",        label: "Not a Fit",  color: "border-red-300 bg-red-50 text-red-700" },
-                  ].map((s, i, arr) => (
-                    <div key={s.key} className="flex items-center gap-1">
-                      <div className={`rounded-full px-3 py-1 text-xs font-medium border ${s.color}`}>
-                        {s.label}: <span className="font-bold">{requestsSummary.stageCounts[s.key] ?? 0}</span>
-                      </div>
-                      {i < arr.length - 1 && <ChevronRight className="w-3 h-3 text-gray-400" />}
-                    </div>
-                  ))}
-                </div>
-                {/* Recent leads */}
-                {requestsSummary.recent.length > 0 ? (
-                  <div className="border rounded-lg overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-xs">Name</TableHead>
-                          <TableHead className="text-xs">Company</TableHead>
-                          <TableHead className="text-xs">Stage</TableHead>
-                          <TableHead className="text-xs">Email Status</TableHead>
-                          <TableHead className="text-xs">Received</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {requestsSummary.recent.map(r => (
-                          <TableRow key={r.id}>
-                            <TableCell className="font-medium text-sm">{r.name}</TableCell>
-                            <TableCell className="text-sm text-gray-500">{r.company ?? "—"}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="text-xs capitalize">{r.stage.replace(/_/g, " ")}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              {r.demoAccessSent
-                                ? <span className="text-green-600 text-xs flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Sent</span>
-                                : r.demoEmailError
-                                  ? <span className="text-red-600 text-xs flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Failed</span>
-                                  : <span className="text-gray-400 text-xs">Pending</span>
-                              }
-                            </TableCell>
-                            <TableCell className="text-xs text-gray-400">
-                              {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-400 text-center py-4">No demo requests yet. Share the landing page to get started.</p>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* ── Two-column: org details + credentials ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -10239,7 +10159,6 @@ export default function SuperAdmin() {
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="all-submissions">All Submissions</TabsTrigger>
               <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
               <TabsTrigger value="beta">Beta Applications</TabsTrigger>
               <TabsTrigger value="demo-requests">Demo Requests</TabsTrigger>
@@ -10265,25 +10184,6 @@ export default function SuperAdmin() {
                 }}
               />
             </TabsContent>
-            <TabsContent value="all-submissions">
-              <SubmissionsTab
-                onMoveToPipeline={(submission) => {
-                  const displayName = submission.firstName && submission.lastName
-                    ? `${submission.firstName} ${submission.lastName}`
-                    : submission.name;
-                  setPipelinePrefill({
-                    name: displayName ?? "",
-                    email: submission.email ?? "",
-                    company: submission.company ?? "",
-                    phone: submission.phone ?? "",
-                    notes: submission.notes ?? "",
-                    agreementContent: "",
-                  });
-                  setOnboardingInnerTab("pipeline");
-                  toast({ title: "Opening pipeline", description: `Pre-filled with ${displayName}'s data.` });
-                }}
-              />
-            </TabsContent>
             <TabsContent value="pipeline">
               <OnboardingPipelineTab
                 prefill={pipelinePrefill}
@@ -10291,10 +10191,16 @@ export default function SuperAdmin() {
               />
             </TabsContent>
             <TabsContent value="beta">
-              <BetaProgramTab />
+              <OnboardingPipelineTab initialBetaOnly={true} />
+              <div className="mt-6">
+                <BetaProgramTab />
+              </div>
             </TabsContent>
             <TabsContent value="demo-requests">
-              <DemoRequestsTab />
+              <OnboardingPipelineTab initialDemoOnly={true} />
+              <div className="mt-6">
+                <DemoRequestsTab />
+              </div>
             </TabsContent>
             <TabsContent value="dropped">
               <DroppedProspectsTab />
