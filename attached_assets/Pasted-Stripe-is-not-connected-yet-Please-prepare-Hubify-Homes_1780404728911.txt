@@ -1,0 +1,74 @@
+Stripe is not connected yet. Please prepare Hubify Homes for future billing compliance and agreement enforcement.
+
+Do these tasks:
+	1.	Update the Terms of Service to v1.1
+	•	Company name: Hubify Homes Inc.
+	•	Contact email: contact@hubifyhomes.com
+	•	Effective date: June 2, 2026
+	•	Include subscription rules:
+	•	subscriptions will renew automatically once billing is active
+	•	customers can cancel anytime
+	•	cancellation ends service at the end of the billing cycle
+	•	no refunds after billing unless required by law or manually approved
+	•	beta pricing is governed by the Beta Participation Agreement
+	2.	Add Terms of Service acceptance tracking
+Save:
+	•	userId
+	•	organizationId
+	•	agreementType: terms_of_service
+	•	agreementVersion: v1.1
+	•	acceptedAt
+	•	ipAddress
+	•	userAgent
+	•	createdAt
+	3.	Add Beta Agreement acceptance tracking
+Save:
+	•	userId
+	•	organizationId
+	•	agreementType: beta_participation_agreement
+	•	agreementVersion: v1.1
+	•	acceptedAt
+	•	ipAddress
+	•	userAgent
+	•	createdAt
+	4.	Make agreement records immutable
+Do not update old acceptance records. Create a new record when a new version is accepted.
+	5.	Block onboarding completion unless the required agreements are accepted:
+	•	Terms of Service v1.1
+	•	Privacy Policy current version
+	•	Beta Participation Agreement v1.1, if beta participant
+	6.	Add billing-rule fields now, even though Stripe is not connected yet:
+	•	subscriptionStatus
+	•	billingCycle
+	•	currentPeriodStart
+	•	currentPeriodEnd
+	•	cancelAtPeriodEnd
+	•	canceledAt
+	•	betaPriceLocked
+	•	betaPriceForfeitedAt
+	•	betaPriceForfeitureReason
+	•	paymentStatus
+	7.	Add backend logic so beta pricing is forfeited if:
+	•	customer cancels
+	•	customer misses payment
+	•	customer disputes payment
+	•	customer creates a chargeback
+	•	customer breaches Terms
+	•	customer breaches Beta Agreement
+	•	customer has any lapse in active subscription status
+	8.	Add admin-facing controls/placeholders for now:
+	•	mark organization as canceled
+	•	mark payment failed
+	•	mark payment disputed
+	•	mark beta pricing forfeited
+	•	view agreement acceptance history
+	9.	Do not build live Stripe checkout yet unless Stripe keys are available.
+Instead, prepare the schema, agreement enforcement, and billing status logic so Stripe can be connected later.
+
+Please first audit the current codebase and return:
+	•	what already exists
+	•	what is missing
+	•	recommended implementation plan
+	•	files that need to change
+
+Then implement after confirming the plan.
