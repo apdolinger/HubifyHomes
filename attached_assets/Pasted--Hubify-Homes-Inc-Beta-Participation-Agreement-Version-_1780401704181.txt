@@ -1,0 +1,209 @@
+# Hubify Homes Inc. Beta Participation Agreement
+
+**Version v1.1 · Effective June 2, 2026**
+
+This Hubify Homes Inc. Beta Participation Agreement ("Agreement") is entered into between **Hubify Homes Inc.** ("Hubify," "we," "us") and the organization identified during onboarding ("Beta Participant" or "you"), and governs your participation in the Hubify Homes closed beta program.
+
+## 1. Beta Program Access
+
+Subject to the terms of this Agreement, Hubify grants you a limited, non-exclusive, non-transferable, revocable license to access and use the Hubify platform ("Platform") solely for your internal business purposes during the Beta Period.
+
+Access is provided on an invitation-only basis and may be suspended, restricted, or revoked in accordance with this Agreement.
+
+## 2. Beta Pricing & Lifetime Lock
+
+In consideration of your early adoption and participation in the Beta Program, Hubify may offer a discounted monthly subscription rate ("Beta Price") as specified during onboarding.
+
+The Beta Price is reserved exclusively for approved Beta Participants and remains available only while Participant maintains a continuous active subscription account in good standing.
+
+Good standing requires:
+
+* Timely payment of all fees and charges
+* Compliance with this Agreement
+* Compliance with the Terms of Service and Privacy Policy
+* Compliance with all applicable Platform policies
+* No chargebacks, payment disputes, fraud, abuse, or misuse of the Platform
+
+The Beta Price shall immediately terminate upon:
+
+* Cancellation of service
+* Voluntary account closure
+* Suspension of service
+* Termination for cause
+* Non-payment
+* Chargebacks or payment disputes
+* Any lapse in active subscription status
+
+If Participant's subscription ceases for any reason, Participant shall not be entitled to reinstatement of the Beta Price upon reactivation or creation of a new account.
+
+A one-time platform initialization fee may apply as disclosed during onboarding. Initialization fees become non-refundable once platform provisioning begins.
+
+Monthly subscription fees are billed in advance. Participant may cancel at any time, with cancellation becoming effective at the conclusion of the current billing cycle.
+
+## 3. Beta Nature of the Platform
+
+Participant acknowledges that the Platform is a pre-release beta product and may contain bugs, defects, interruptions, security vulnerabilities, incomplete functionality, or other errors.
+
+Hubify makes no guarantees regarding:
+
+* Platform availability
+* Uptime
+* Feature completeness
+* Performance
+* Data durability
+* Future feature availability
+
+Participant understands that functionality may be modified, removed, delayed, or discontinued at any time during the Beta Period.
+
+Hubify will use commercially reasonable efforts to maintain service continuity and provide notice of planned maintenance when practical.
+
+## 4. Feedback & Improvements
+
+Participant agrees to provide reasonable feedback regarding use of the Platform, including bug reports, feature requests, usability observations, operational recommendations, and related comments ("Feedback").
+
+Participant grants Hubify a perpetual, irrevocable, worldwide, royalty-free, transferable license to use, modify, commercialize, incorporate, distribute, and otherwise exploit any Feedback without restriction or compensation.
+
+## 5. Confidentiality
+
+The Platform, its functionality, features, pricing, documentation, roadmaps, unreleased functionality, screenshots, performance information, and all non-public information disclosed by Hubify constitute Confidential Information.
+
+Participant agrees not to disclose, publish, distribute, reproduce, or share Confidential Information with any third party without Hubify's prior written consent.
+
+Participant shall not publicly publish:
+
+* Screenshots of the Platform
+* Performance benchmarks
+* Security findings
+* Unreleased features
+* Product roadmaps
+* Internal workflows
+
+without Hubify's prior written consent.
+
+These confidentiality obligations survive termination of this Agreement for two (2) years.
+
+## 6. Data & Privacy
+
+Hubify will process Participant data in accordance with its Privacy Policy.
+
+Participant represents and warrants that it has obtained all rights, permissions, notices, and consents necessary to upload, store, process, and transmit data through the Platform.
+
+Participant retains ownership of all data submitted to the Platform.
+
+Participant grants Hubify a limited license to access, host, process, store, transmit, and display such data solely as necessary to provide, support, maintain, secure, improve, and operate the Platform.
+
+Hubify may use aggregated, anonymized, and de-identified information derived from Platform usage for analytics, benchmarking, service improvements, research, product development, operational insights, marketing, and related business purposes, provided such information does not identify Participant, its customers, homeowners, vendors, or specific properties.
+
+Hubify will not sell Participant's identifiable data to third parties.
+
+Participant acknowledges that Hubify does not guarantee against data loss, corruption, deletion, or unavailability during the Beta Period and remains solely responsible for maintaining independent backups of critical business information.
+
+## 7. Acceptable Use
+
+Participant agrees to use the Platform only for lawful business purposes and in compliance with all applicable laws and regulations.
+
+Participant shall not:
+
+* Reverse engineer the Platform
+* Attempt unauthorized access
+* Circumvent security controls
+* Interfere with Platform operations
+* Upload malicious software
+* Use the Platform for unlawful purposes
+* Access or attempt to access other customer data
+
+## 8. Intellectual Property
+
+Hubify and its licensors retain all right, title, and interest in and to the Platform, including all software, source code, designs, documentation, trademarks, service marks, branding, workflows, inventions, improvements, and related intellectual property.
+
+No ownership rights are transferred to Participant under this Agreement.
+
+## 9. Property Management Disclaimer
+
+Participant acknowledges that the Platform is an administrative software tool intended to assist with property management, home watch, estate management, and related operational activities.
+
+The Platform does not provide:
+
+* Legal advice
+* Accounting advice
+* Regulatory compliance advice
+* Inspection services
+* Emergency response services
+* Property management services
+* Professional advisory services
+
+Participant remains solely responsible for all inspections, communications, decisions, services, customer interactions, emergency responses, compliance obligations, and business operations conducted through or in connection with the Platform.
+
+## 10. Disclaimer of Warranties
+
+THE PLATFORM IS PROVIDED "AS IS," "AS AVAILABLE," AND WITH ALL FAULTS.
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, HUBIFY DISCLAIMS ALL WARRANTIES, WHETHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, ACCURACY, RELIABILITY, SECURITY, AND AVAILABILITY.
+
+HUBIFY DOES NOT WARRANT THAT THE PLATFORM WILL BE ERROR-FREE, UNINTERRUPTED, SECURE, OR FREE FROM DATA LOSS.
+
+## 11. Limitation of Liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, HUBIFY'S TOTAL AGGREGATE LIABILITY ARISING OUT OF OR RELATED TO THIS AGREEMENT OR THE PLATFORM SHALL NOT EXCEED THE TOTAL FEES PAID BY PARTICIPANT TO HUBIFY DURING THE THREE (3) MONTHS IMMEDIATELY PRECEDING THE EVENT GIVING RISE TO THE CLAIM.
+
+IN NO EVENT SHALL HUBIFY BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, PUNITIVE, OR LOST-PROFIT DAMAGES.
+
+## 12. Indemnification
+
+Participant agrees to defend, indemnify, and hold harmless Hubify Homes Inc., its officers, directors, employees, contractors, affiliates, successors, and assigns from and against any claims, damages, losses, liabilities, judgments, penalties, costs, and expenses, including reasonable attorneys' fees, arising from:
+
+* Participant's use of the Platform
+* Participant's violation of this Agreement
+* Participant's violation of applicable law
+* Data uploaded by Participant
+* Services provided by Participant to its customers
+
+## 13. Suspension & Termination
+
+Either party may terminate this Agreement upon thirty (30) days' written notice.
+
+Hubify may immediately suspend, restrict, or terminate access upon:
+
+* Non-payment
+* Material breach
+* Security concerns
+* Fraudulent activity
+* Abuse of the Platform
+* Legal or regulatory concerns
+* Compliance risks
+* Reputational risks
+
+Hubify further reserves the right to suspend or terminate service if continued service would cause Hubify to violate any applicable law, regulation, governmental requirement, court order, compliance obligation, or regulatory framework.
+
+Where reasonably practicable, Hubify will provide notice and an opportunity to export data.
+
+Participant may request a data export within thirty (30) days following termination.
+
+## 14. Force Majeure
+
+Hubify shall not be liable for any delay, interruption, or failure resulting from causes beyond its reasonable control, including natural disasters, hurricanes, acts of God, internet outages, cyberattacks, labor disputes, governmental actions, utility failures, cloud provider failures, payment processor failures, or failures of third-party services.
+
+## 15. Dispute Resolution
+
+This Agreement shall be governed by the laws of the State of Florida without regard to conflict-of-law principles.
+
+Any dispute arising from or relating to this Agreement shall be resolved exclusively through binding arbitration administered by the American Arbitration Association.
+
+Participant agrees that all disputes shall be brought solely in an individual capacity and not as a plaintiff or class member in any purported class action, representative action, collective action, or consolidated proceeding.
+
+## 16. Entire Agreement
+
+This Agreement, together with the Hubify Terms of Service and Privacy Policy, constitutes the entire agreement between the parties concerning the Beta Program and supersedes all prior discussions, understandings, or agreements relating to the subject matter herein.
+
+By selecting "I Agree" during onboarding, Participant acknowledges that it has read, understood, and agrees to be bound by this Agreement.
+
+---
+
+**Hubify Homes Inc.**
+[hello@hubifyhomesonline.com](mailto:hello@hubifyhomesonline.com)
+
+**Agreement Version:** v1.1
+
+**Participant Organization:** ______________________
+
+**Date Accepted:** ______________________

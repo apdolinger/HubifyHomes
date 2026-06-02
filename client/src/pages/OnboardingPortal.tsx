@@ -22,7 +22,7 @@ import {
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const AGREEMENT_VERSION = "v1.0";
+const AGREEMENT_VERSION = "v1.1";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -154,63 +154,196 @@ function TokenError({ status, message }: { status: number; message: string }) {
 // ── Legal document content ────────────────────────────────────────────────────
 
 function BetaAgreementContent({ company }: { company?: string }) {
-  const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   return (
     <div className="text-sm text-slate-700 leading-relaxed space-y-5">
-      <p className="text-xs text-slate-400">Version {AGREEMENT_VERSION} · Effective {today}</p>
+      <p className="text-xs text-slate-400">Version {AGREEMENT_VERSION} · Effective June 2, 2026</p>
       <p>
-        This Hubify Homes Beta Participation Agreement ("<strong>Agreement</strong>") is entered into between
-        Hubify Homes ("<strong>Hubify</strong>") and the organization identified during onboarding
-        ("<strong>Beta Participant</strong>"), and governs your participation in the Hubify Homes closed beta program.
+        This Hubify Homes Inc. Beta Participation Agreement ("<strong>Agreement</strong>") is entered into between{" "}
+        <strong>Hubify Homes Inc.</strong> ("<strong>Hubify</strong>," "we," "us") and the organization identified
+        during onboarding ("<strong>Beta Participant</strong>" or "you"), and governs your participation in the
+        Hubify Homes closed beta program.
       </p>
+
       <div>
         <p className="font-semibold text-slate-900 mb-1">1. Beta Program Access</p>
-        <p>Subject to the terms of this Agreement, Hubify grants you a limited, non-exclusive, non-transferable license to access and use the Hubify platform solely for internal business purposes during the Beta Period. Access is provided on an invitation-only basis and may be revoked at any time in accordance with Section 9.</p>
+        <p className="mb-2">Subject to the terms of this Agreement, Hubify grants you a limited, non-exclusive, non-transferable, revocable license to access and use the Hubify platform ("Platform") solely for your internal business purposes during the Beta Period.</p>
+        <p>Access is provided on an invitation-only basis and may be suspended, restricted, or revoked in accordance with this Agreement.</p>
       </div>
+
       <div>
         <p className="font-semibold text-slate-900 mb-1">2. Beta Pricing &amp; Lifetime Lock</p>
-        <p>In consideration of your early adoption and feedback, Hubify extends a discounted monthly subscription rate ("<strong>Beta Price</strong>") as set forth in your approval notice. This Beta Price is locked in for the lifetime of your subscription, meaning Hubify will not increase your monthly rate above the Beta Price so long as your subscription remains in continuous good standing.</p>
-        <p className="mt-2">A one-time platform initialization fee may apply as detailed in your onboarding portal. This fee is non-refundable after platform provisioning begins. Monthly subscription fees are billed in advance. You may cancel at any time; cancellations take effect at the end of the current billing cycle.</p>
+        <p className="mb-2">In consideration of your early adoption and participation in the Beta Program, Hubify may offer a discounted monthly subscription rate ("Beta Price") as specified during onboarding.</p>
+        <p className="mb-2">The Beta Price is reserved exclusively for approved Beta Participants and remains available only while Participant maintains a continuous active subscription account in good standing.</p>
+        <p className="mb-1">Good standing requires:</p>
+        <ul className="list-disc list-inside space-y-0.5 ml-3 mb-2">
+          <li>Timely payment of all fees and charges</li>
+          <li>Compliance with this Agreement</li>
+          <li>Compliance with the Terms of Service and Privacy Policy</li>
+          <li>Compliance with all applicable Platform policies</li>
+          <li>No chargebacks, payment disputes, fraud, abuse, or misuse of the Platform</li>
+        </ul>
+        <p className="mb-1">The Beta Price shall immediately terminate upon:</p>
+        <ul className="list-disc list-inside space-y-0.5 ml-3 mb-2">
+          <li>Cancellation of service</li>
+          <li>Voluntary account closure</li>
+          <li>Suspension of service</li>
+          <li>Termination for cause</li>
+          <li>Non-payment</li>
+          <li>Chargebacks or payment disputes</li>
+          <li>Any lapse in active subscription status</li>
+        </ul>
+        <p className="mb-2">If Participant's subscription ceases for any reason, Participant shall not be entitled to reinstatement of the Beta Price upon reactivation or creation of a new account.</p>
+        <p>A one-time platform initialization fee may apply as disclosed during onboarding. Initialization fees become non-refundable once platform provisioning begins. Monthly subscription fees are billed in advance. Participant may cancel at any time, with cancellation becoming effective at the conclusion of the current billing cycle.</p>
       </div>
+
       <div>
         <p className="font-semibold text-slate-900 mb-1">3. Beta Nature of the Platform</p>
-        <p>You acknowledge that the Platform is in an early-access beta state and may contain errors, bugs, or incomplete features. Hubify makes no guarantee of uptime, data durability, or feature availability during the Beta Period. We will make commercially reasonable efforts to maintain service continuity and notify you of planned maintenance windows.</p>
+        <p className="mb-2">Participant acknowledges that the Platform is a pre-release beta product and may contain bugs, defects, interruptions, security vulnerabilities, incomplete functionality, or other errors.</p>
+        <p className="mb-1">Hubify makes no guarantees regarding:</p>
+        <ul className="list-disc list-inside space-y-0.5 ml-3 mb-2">
+          <li>Platform availability</li>
+          <li>Uptime</li>
+          <li>Feature completeness</li>
+          <li>Performance</li>
+          <li>Data durability</li>
+          <li>Future feature availability</li>
+        </ul>
+        <p className="mb-2">Participant understands that functionality may be modified, removed, delayed, or discontinued at any time during the Beta Period.</p>
+        <p>Hubify will use commercially reasonable efforts to maintain service continuity and provide notice of planned maintenance when practical.</p>
       </div>
+
       <div>
         <p className="font-semibold text-slate-900 mb-1">4. Feedback &amp; Improvements</p>
-        <p>You agree to provide Hubify with reasonable feedback regarding your use of the Platform. You grant Hubify a perpetual, irrevocable, royalty-free license to use, incorporate, and commercialize any Feedback without restriction or compensation to you.</p>
+        <p className="mb-2">Participant agrees to provide reasonable feedback regarding use of the Platform, including bug reports, feature requests, usability observations, operational recommendations, and related comments ("Feedback").</p>
+        <p>Participant grants Hubify a perpetual, irrevocable, worldwide, royalty-free, transferable license to use, modify, commercialize, incorporate, distribute, and otherwise exploit any Feedback without restriction or compensation.</p>
       </div>
+
       <div>
         <p className="font-semibold text-slate-900 mb-1">5. Confidentiality</p>
-        <p>The Platform, its features, pricing structure, and any non-public information disclosed to you constitute Confidential Information of Hubify. You agree not to disclose or share Confidential Information with third parties without prior written consent. This obligation survives termination for two (2) years.</p>
+        <p className="mb-2">The Platform, its functionality, features, pricing, documentation, roadmaps, unreleased functionality, screenshots, performance information, and all non-public information disclosed by Hubify constitute Confidential Information.</p>
+        <p className="mb-2">Participant agrees not to disclose, publish, distribute, reproduce, or share Confidential Information with any third party without Hubify's prior written consent.</p>
+        <p className="mb-1">Participant shall not publicly publish:</p>
+        <ul className="list-disc list-inside space-y-0.5 ml-3 mb-2">
+          <li>Screenshots of the Platform</li>
+          <li>Performance benchmarks</li>
+          <li>Security findings</li>
+          <li>Unreleased features</li>
+          <li>Product roadmaps</li>
+          <li>Internal workflows</li>
+        </ul>
+        <p>without Hubify's prior written consent. These confidentiality obligations survive termination of this Agreement for two (2) years.</p>
       </div>
+
       <div>
         <p className="font-semibold text-slate-900 mb-1">6. Data &amp; Privacy</p>
-        <p>Hubify will handle your data in accordance with its Privacy Policy. You retain ownership of all data you input into the Platform; Hubify receives a limited license to process that data solely to provide the service.</p>
+        <p className="mb-2">Hubify will process Participant data in accordance with its Privacy Policy.</p>
+        <p className="mb-2">Participant represents and warrants that it has obtained all rights, permissions, notices, and consents necessary to upload, store, process, and transmit data through the Platform.</p>
+        <p className="mb-2">Participant retains ownership of all data submitted to the Platform. Participant grants Hubify a limited license to access, host, process, store, transmit, and display such data solely as necessary to provide, support, maintain, secure, improve, and operate the Platform.</p>
+        <p className="mb-2">Hubify may use aggregated, anonymized, and de-identified information derived from Platform usage for analytics, benchmarking, service improvements, research, product development, and related business purposes, provided such information does not identify Participant, its customers, homeowners, vendors, or specific properties.</p>
+        <p className="mb-2">Hubify will not sell Participant's identifiable data to third parties.</p>
+        <p>Participant acknowledges that Hubify does not guarantee against data loss, corruption, deletion, or unavailability during the Beta Period and remains solely responsible for maintaining independent backups of critical business information.</p>
       </div>
+
       <div>
         <p className="font-semibold text-slate-900 mb-1">7. Acceptable Use</p>
-        <p>You agree to use the Platform only for lawful property management purposes and in compliance with all applicable laws. You will not attempt to reverse engineer, circumvent security controls, or use the Platform in any manner that could harm Hubify or other users.</p>
+        <p className="mb-1">Participant agrees to use the Platform only for lawful business purposes and in compliance with all applicable laws and regulations. Participant shall not:</p>
+        <ul className="list-disc list-inside space-y-0.5 ml-3">
+          <li>Reverse engineer the Platform</li>
+          <li>Attempt unauthorized access</li>
+          <li>Circumvent security controls</li>
+          <li>Interfere with Platform operations</li>
+          <li>Upload malicious software</li>
+          <li>Use the Platform for unlawful purposes</li>
+          <li>Access or attempt to access other customer data</li>
+        </ul>
       </div>
+
       <div>
-        <p className="font-semibold text-slate-900 mb-1">8. Disclaimer of Warranties</p>
-        <p>THE PLATFORM IS PROVIDED "AS IS" AND "AS AVAILABLE" DURING THE BETA PERIOD. HUBIFY EXPRESSLY DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.</p>
+        <p className="font-semibold text-slate-900 mb-1">8. Intellectual Property</p>
+        <p>Hubify and its licensors retain all right, title, and interest in and to the Platform, including all software, source code, designs, documentation, trademarks, service marks, branding, workflows, inventions, improvements, and related intellectual property. No ownership rights are transferred to Participant under this Agreement.</p>
       </div>
+
       <div>
-        <p className="font-semibold text-slate-900 mb-1">9. Limitation of Liability</p>
-        <p>TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, HUBIFY'S AGGREGATE LIABILITY SHALL NOT EXCEED THE TOTAL FEES PAID BY YOU IN THE THREE (3) MONTHS PRECEDING THE CLAIM. IN NO EVENT SHALL HUBIFY BE LIABLE FOR INDIRECT, INCIDENTAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES.</p>
+        <p className="font-semibold text-slate-900 mb-1">9. Property Management Disclaimer</p>
+        <p className="mb-2">Participant acknowledges that the Platform is an administrative software tool intended to assist with property management, home watch, estate management, and related operational activities.</p>
+        <p className="mb-1">The Platform does not provide:</p>
+        <ul className="list-disc list-inside space-y-0.5 ml-3 mb-2">
+          <li>Legal advice</li>
+          <li>Accounting advice</li>
+          <li>Regulatory compliance advice</li>
+          <li>Inspection services</li>
+          <li>Emergency response services</li>
+          <li>Property management services</li>
+          <li>Professional advisory services</li>
+        </ul>
+        <p>Participant remains solely responsible for all inspections, communications, decisions, services, customer interactions, emergency responses, compliance obligations, and business operations conducted through or in connection with the Platform.</p>
       </div>
+
       <div>
-        <p className="font-semibold text-slate-900 mb-1">10. Termination</p>
-        <p>Either party may terminate this Agreement with thirty (30) days' written notice. Hubify may terminate immediately upon material breach. Upon termination, your access will be suspended and you may request a data export within 30 days.</p>
+        <p className="font-semibold text-slate-900 mb-1">10. Disclaimer of Warranties</p>
+        <p className="font-semibold mb-2">THE PLATFORM IS PROVIDED "AS IS," "AS AVAILABLE," AND WITH ALL FAULTS.</p>
+        <p className="font-semibold mb-2">TO THE MAXIMUM EXTENT PERMITTED BY LAW, HUBIFY DISCLAIMS ALL WARRANTIES, WHETHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, ACCURACY, RELIABILITY, SECURITY, AND AVAILABILITY.</p>
+        <p className="font-semibold">HUBIFY DOES NOT WARRANT THAT THE PLATFORM WILL BE ERROR-FREE, UNINTERRUPTED, SECURE, OR FREE FROM DATA LOSS.</p>
       </div>
+
       <div>
-        <p className="font-semibold text-slate-900 mb-1">11. General</p>
-        <p>This Agreement is governed by the laws of the State of Florida. Disputes shall be resolved by binding arbitration per the American Arbitration Association rules. This Agreement, together with the Terms of Service and Privacy Policy, constitutes the entire agreement between the parties.</p>
+        <p className="font-semibold text-slate-900 mb-1">11. Limitation of Liability</p>
+        <p className="font-semibold mb-2">TO THE MAXIMUM EXTENT PERMITTED BY LAW, HUBIFY'S TOTAL AGGREGATE LIABILITY ARISING OUT OF OR RELATED TO THIS AGREEMENT OR THE PLATFORM SHALL NOT EXCEED THE TOTAL FEES PAID BY PARTICIPANT TO HUBIFY DURING THE THREE (3) MONTHS IMMEDIATELY PRECEDING THE EVENT GIVING RISE TO THE CLAIM.</p>
+        <p className="font-semibold">IN NO EVENT SHALL HUBIFY BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, PUNITIVE, OR LOST-PROFIT DAMAGES.</p>
       </div>
-      <div className="border-t border-slate-200 pt-4 text-xs text-slate-400">
-        Agreement {AGREEMENT_VERSION} · Hubify Homes · hello@hubifyhomesonline.com
-        {company && ` · Participant: ${company}`}
+
+      <div>
+        <p className="font-semibold text-slate-900 mb-1">12. Indemnification</p>
+        <p className="mb-1">Participant agrees to defend, indemnify, and hold harmless Hubify Homes Inc., its officers, directors, employees, contractors, affiliates, successors, and assigns from and against any claims, damages, losses, liabilities, judgments, penalties, costs, and expenses, including reasonable attorneys' fees, arising from:</p>
+        <ul className="list-disc list-inside space-y-0.5 ml-3">
+          <li>Participant's use of the Platform</li>
+          <li>Participant's violation of this Agreement</li>
+          <li>Participant's violation of applicable law</li>
+          <li>Data uploaded by Participant</li>
+          <li>Services provided by Participant to its customers</li>
+        </ul>
+      </div>
+
+      <div>
+        <p className="font-semibold text-slate-900 mb-1">13. Suspension &amp; Termination</p>
+        <p className="mb-2">Either party may terminate this Agreement upon thirty (30) days' written notice.</p>
+        <p className="mb-1">Hubify may immediately suspend, restrict, or terminate access upon:</p>
+        <ul className="list-disc list-inside space-y-0.5 ml-3 mb-2">
+          <li>Non-payment</li>
+          <li>Material breach</li>
+          <li>Security concerns</li>
+          <li>Fraudulent activity</li>
+          <li>Abuse of the Platform</li>
+          <li>Legal or regulatory concerns</li>
+          <li>Compliance risks</li>
+          <li>Reputational risks</li>
+        </ul>
+        <p className="mb-2">Hubify further reserves the right to suspend or terminate service if continued service would cause Hubify to violate any applicable law, regulation, governmental requirement, court order, compliance obligation, or regulatory framework.</p>
+        <p>Where reasonably practicable, Hubify will provide notice and an opportunity to export data. Participant may request a data export within thirty (30) days following termination.</p>
+      </div>
+
+      <div>
+        <p className="font-semibold text-slate-900 mb-1">14. Force Majeure</p>
+        <p>Hubify shall not be liable for any delay, interruption, or failure resulting from causes beyond its reasonable control, including natural disasters, hurricanes, acts of God, internet outages, cyberattacks, labor disputes, governmental actions, utility failures, cloud provider failures, payment processor failures, or failures of third-party services.</p>
+      </div>
+
+      <div>
+        <p className="font-semibold text-slate-900 mb-1">15. Dispute Resolution</p>
+        <p className="mb-2">This Agreement shall be governed by the laws of the State of Florida without regard to conflict-of-law principles.</p>
+        <p className="mb-2">Any dispute arising from or relating to this Agreement shall be resolved exclusively through binding arbitration administered by the American Arbitration Association.</p>
+        <p>Participant agrees that all disputes shall be brought solely in an individual capacity and not as a plaintiff or class member in any purported class action, representative action, collective action, or consolidated proceeding.</p>
+      </div>
+
+      <div>
+        <p className="font-semibold text-slate-900 mb-1">16. Entire Agreement</p>
+        <p className="mb-2">This Agreement, together with the Hubify Terms of Service and Privacy Policy, constitutes the entire agreement between the parties concerning the Beta Program and supersedes all prior discussions, understandings, or agreements relating to the subject matter herein.</p>
+        <p>By selecting "I Agree" during onboarding, Participant acknowledges that it has read, understood, and agrees to be bound by this Agreement.</p>
+      </div>
+
+      <div className="border-t border-slate-200 pt-4 space-y-1 text-xs text-slate-400">
+        <p><strong className="text-slate-600">Hubify Homes Inc.</strong> · <a href="mailto:hello@hubifyhomesonline.com" className="text-teal-600 hover:underline">hello@hubifyhomesonline.com</a></p>
+        <p>Agreement Version: {AGREEMENT_VERSION}</p>
+        {company && <p>Participant Organization: {company}</p>}
       </div>
     </div>
   );
