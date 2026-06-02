@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -9,11 +9,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   CheckCircle, Clock, AlertTriangle, Loader2, Lock,
   ShieldCheck, CreditCard, ArrowRight, RefreshCw, XCircle,
+  FileText, ChevronDown,
 } from "lucide-react";
+
+// ── Constants ──────────────────────────────────────────────────────────────────
+
+const AGREEMENT_VERSION = "v1.0";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -45,7 +53,7 @@ interface OnboardingDetails {
 
 const agreementSchema = z.object({
   agreeToBetaAgreement: z.literal(true, {
-    errorMap: () => ({ message: "You must agree to the Hubify Homes Beta Agreement" }),
+    errorMap: () => ({ message: "You must review and accept the Hubify Homes Beta Agreement" }),
   }),
   agreeToTerms: z.literal(true, {
     errorMap: () => ({ message: "You must agree to the Terms of Service" }),
@@ -142,6 +150,246 @@ function TokenError({ status, message }: { status: number; message: string }) {
   );
 }
 
+// ── Beta Agreement text ───────────────────────────────────────────────────────
+
+function BetaAgreementText({ company }: { company?: string }) {
+  const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  return (
+    <div className="text-sm text-slate-700 leading-relaxed space-y-5">
+      <div>
+        <p className="text-xs text-slate-400 mb-1">Version {AGREEMENT_VERSION} · Effective {today}</p>
+        <p>
+          This Hubify Homes Beta Participation Agreement ("<strong>Agreement</strong>") is entered into between
+          Hubify Homes ("<strong>Hubify</strong>," "<strong>we</strong>," "<strong>us</strong>") and the
+          organization identified during onboarding ("<strong>Beta Participant</strong>" or "<strong>you</strong>"),
+          and governs your participation in the Hubify Homes closed beta program.
+        </p>
+      </div>
+
+      <div>
+        <p className="font-semibold text-slate-900 mb-1">1. Beta Program Access</p>
+        <p>
+          Subject to the terms of this Agreement, Hubify grants you a limited, non-exclusive, non-transferable
+          license to access and use the Hubify platform ("<strong>Platform</strong>") solely for internal business
+          purposes during the Beta Period. Access is provided on an invitation-only basis and may be revoked at
+          any time in accordance with Section 9.
+        </p>
+      </div>
+
+      <div>
+        <p className="font-semibold text-slate-900 mb-1">2. Beta Pricing &amp; Lifetime Lock</p>
+        <p>
+          In consideration of your early adoption and feedback, Hubify extends a discounted monthly subscription
+          rate ("<strong>Beta Price</strong>") as set forth in your approval notice. This Beta Price is
+          locked in for the lifetime of your subscription, meaning Hubify will not increase your monthly rate
+          above the Beta Price so long as your subscription remains in continuous good standing.
+        </p>
+        <p className="mt-2">
+          A one-time platform initialization fee may apply as detailed in your onboarding portal. This fee is
+          non-refundable after platform provisioning begins. Monthly subscription fees are billed in advance.
+          You may cancel at any time; cancellations take effect at the end of the current billing cycle.
+        </p>
+      </div>
+
+      <div>
+        <p className="font-semibold text-slate-900 mb-1">3. Beta Nature of the Platform</p>
+        <p>
+          You acknowledge that the Platform is in an early-access beta state and may contain errors, bugs, or
+          incomplete features. Hubify makes no guarantee of uptime, data durability, or feature availability
+          during the Beta Period. We will make commercially reasonable efforts to maintain service continuity
+          and notify you of planned maintenance windows.
+        </p>
+      </div>
+
+      <div>
+        <p className="font-semibold text-slate-900 mb-1">4. Feedback &amp; Improvements</p>
+        <p>
+          You agree to provide Hubify with reasonable feedback regarding your use of the Platform, including bug
+          reports, feature requests, and usability observations ("<strong>Feedback</strong>"). You grant Hubify
+          a perpetual, irrevocable, royalty-free license to use, incorporate, and commercialize any Feedback
+          without restriction or compensation to you.
+        </p>
+      </div>
+
+      <div>
+        <p className="font-semibold text-slate-900 mb-1">5. Confidentiality</p>
+        <p>
+          The Platform, its features, pricing structure, and any non-public information disclosed to you
+          constitute Confidential Information of Hubify. You agree not to disclose, publish, or share
+          Confidential Information with third parties without Hubify's prior written consent, except as
+          required by law. This obligation survives termination of this Agreement for a period of two (2) years.
+        </p>
+      </div>
+
+      <div>
+        <p className="font-semibold text-slate-900 mb-1">6. Data &amp; Privacy</p>
+        <p>
+          Hubify will handle your data in accordance with its{" "}
+          <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline font-medium">
+            Privacy Policy
+          </a>
+          . You represent that you have obtained all necessary consents to upload or process any personal data
+          through the Platform. You retain ownership of all data you input into the Platform; Hubify receives
+          a limited license to process that data solely to provide the service.
+        </p>
+      </div>
+
+      <div>
+        <p className="font-semibold text-slate-900 mb-1">7. Acceptable Use</p>
+        <p>
+          You agree to use the Platform only for lawful property management purposes and in compliance with all
+          applicable laws and regulations. You will not attempt to reverse engineer, circumvent security controls,
+          or use the Platform in any manner that could harm Hubify or other users.
+        </p>
+      </div>
+
+      <div>
+        <p className="font-semibold text-slate-900 mb-1">8. Disclaimer of Warranties</p>
+        <p>
+          THE PLATFORM IS PROVIDED "AS IS" AND "AS AVAILABLE" DURING THE BETA PERIOD. HUBIFY EXPRESSLY
+          DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF
+          MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. HUBIFY DOES NOT WARRANT
+          THAT THE PLATFORM WILL BE ERROR-FREE OR UNINTERRUPTED.
+        </p>
+      </div>
+
+      <div>
+        <p className="font-semibold text-slate-900 mb-1">9. Limitation of Liability</p>
+        <p>
+          TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, HUBIFY'S AGGREGATE LIABILITY TO YOU FOR ANY
+          CLAIMS ARISING OUT OF OR RELATING TO THIS AGREEMENT OR THE PLATFORM SHALL NOT EXCEED THE TOTAL FEES
+          PAID BY YOU IN THE THREE (3) MONTHS PRECEDING THE CLAIM. IN NO EVENT SHALL HUBIFY BE LIABLE FOR
+          INDIRECT, INCIDENTAL, CONSEQUENTIAL, SPECIAL, OR PUNITIVE DAMAGES.
+        </p>
+      </div>
+
+      <div>
+        <p className="font-semibold text-slate-900 mb-1">10. Termination</p>
+        <p>
+          Either party may terminate this Agreement with thirty (30) days' written notice. Hubify may
+          terminate immediately upon material breach of this Agreement, including non-payment. Upon termination,
+          your access to the Platform will be suspended and you may request an export of your data within
+          30 days of termination.
+        </p>
+      </div>
+
+      <div>
+        <p className="font-semibold text-slate-900 mb-1">11. General</p>
+        <p>
+          This Agreement is governed by the laws of the State of Florida, without regard to conflict of law
+          principles. Any dispute shall be resolved by binding arbitration in accordance with the rules of the
+          American Arbitration Association. This Agreement, together with the{" "}
+          <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline font-medium">
+            Terms of Service
+          </a>{" "}
+          and{" "}
+          <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline font-medium">
+            Privacy Policy
+          </a>
+          , constitutes the entire agreement between the parties with respect to the subject matter hereof and
+          supersedes all prior agreements and understandings.
+        </p>
+      </div>
+
+      <div className="border-t border-slate-200 pt-4 text-xs text-slate-400">
+        Agreement {AGREEMENT_VERSION} · Hubify Homes · hello@hubifyhomesonline.com
+        {company && ` · Participant: ${company}`}
+      </div>
+    </div>
+  );
+}
+
+// ── Agreement modal ───────────────────────────────────────────────────────────
+
+function AgreementModal({
+  open,
+  onOpenChange,
+  company,
+  onAccept,
+  scrolledToBottom,
+  onScroll,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  company?: string;
+  onAccept: () => void;
+  scrolledToBottom: boolean;
+  onScroll: (e: React.UIEvent<HTMLDivElement>) => void;
+}) {
+  const [confirmed, setConfirmed] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      setConfirmed(false);
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({ top: 0 });
+      }, 50);
+    }
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl w-full h-[85vh] flex flex-col p-0 gap-0">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-200 shrink-0">
+          <DialogTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+            <FileText className="w-4 h-4 text-teal-600" />
+            Hubify Homes Beta Participation Agreement
+          </DialogTitle>
+          <p className="text-xs text-slate-500 mt-1">Version {AGREEMENT_VERSION} — Read the full agreement before accepting</p>
+        </DialogHeader>
+
+        {/* Scrollable agreement body */}
+        <div
+          ref={scrollRef}
+          onScroll={onScroll}
+          className="flex-1 overflow-y-auto px-6 py-5 min-h-0"
+        >
+          <BetaAgreementText company={company} />
+        </div>
+
+        {/* Scroll-to-bottom nudge */}
+        {!scrolledToBottom && (
+          <div className="shrink-0 flex items-center justify-center gap-1.5 py-2 bg-slate-50 border-t border-slate-200 text-xs text-slate-400">
+            <ChevronDown className="w-3.5 h-3.5 animate-bounce" />
+            Scroll to the bottom to continue
+          </div>
+        )}
+
+        <DialogFooter className="px-6 py-4 border-t border-slate-200 shrink-0 flex-col gap-3 sm:flex-col">
+          <label
+            className={`flex items-start gap-3 cursor-pointer select-none ${!scrolledToBottom ? "opacity-40 pointer-events-none" : ""}`}
+          >
+            <Checkbox
+              checked={confirmed}
+              onCheckedChange={(v) => setConfirmed(v === true)}
+              disabled={!scrolledToBottom}
+              className="mt-0.5 shrink-0"
+            />
+            <span className="text-sm text-slate-700 leading-snug">
+              I have read, understand, and agree to the Hubify Homes Beta Participation Agreement ({AGREEMENT_VERSION}).
+            </span>
+          </label>
+          <div className="flex gap-3 justify-end">
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
+            <Button
+              size="sm"
+              className="bg-teal-600 hover:bg-teal-700 text-white"
+              disabled={!scrolledToBottom || !confirmed}
+              onClick={onAccept}
+            >
+              <ShieldCheck className="w-4 h-4 mr-1.5" />
+              Accept Agreement
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Step 1: Agreement form ─────────────────────────────────────────────────────
 
 function AgreementStep({ data, token, onSigned }: {
@@ -150,6 +398,13 @@ function AgreementStep({ data, token, onSigned }: {
   onSigned: (name: string) => void;
 }) {
   const { toast } = useToast();
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [agreementViewedAt, setAgreementViewedAt] = useState<string | null>(null);
+  const [agreementScrolledAt, setAgreementScrolledAt] = useState<string | null>(null);
+  const [scrolledToBottom, setScrolledToBottom] = useState(false);
+  const [betaAgreementAccepted, setBetaAgreementAccepted] = useState(false);
+
   const form = useForm<AgreementForm>({
     resolver: zodResolver(agreementSchema),
     defaultValues: {
@@ -161,12 +416,39 @@ function AgreementStep({ data, token, onSigned }: {
     },
   });
 
+  const handleOpenModal = () => {
+    setModalOpen(true);
+    if (!agreementViewedAt) setAgreementViewedAt(new Date().toISOString());
+  };
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 60;
+    if (nearBottom && !agreementScrolledAt) {
+      setScrolledToBottom(true);
+      setAgreementScrolledAt(new Date().toISOString());
+    } else if (nearBottom) {
+      setScrolledToBottom(true);
+    }
+  };
+
+  const handleAcceptFromModal = () => {
+    setBetaAgreementAccepted(true);
+    setModalOpen(false);
+    form.setValue("agreeToBetaAgreement", true, { shouldValidate: true });
+  };
+
   const acceptMutation = useMutation({
     mutationFn: async (values: AgreementForm) => {
       const res = await fetch(`/api/public/onboarding/${token}/accept-agreement`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify({
+          ...values,
+          agreementVersion: AGREEMENT_VERSION,
+          agreementViewedAt,
+          agreementScrolledAt,
+        }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.message ?? "Failed to submit agreement.");
@@ -184,6 +466,16 @@ function AgreementStep({ data, token, onSigned }: {
 
   return (
     <>
+      {/* Agreement modal */}
+      <AgreementModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        company={data.company}
+        onAccept={handleAcceptFromModal}
+        scrolledToBottom={scrolledToBottom}
+        onScroll={handleScroll}
+      />
+
       {/* Membership details card */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6">
         <p className="text-xs font-bold uppercase tracking-widest text-teal-600 mb-4">Your Beta Membership</p>
@@ -250,28 +542,98 @@ function AgreementStep({ data, token, onSigned }: {
         <Form {...form}>
           <form onSubmit={form.handleSubmit((v) => acceptMutation.mutate(v))} className="space-y-5">
             <div className="space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
-              {[
-                { name: "agreeToBetaAgreement" as const, label: <>I agree to the <a href="https://hubifyhomesonline.com/beta-agreement" target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline font-medium">Hubify Homes Beta Agreement</a></> },
-                { name: "agreeToTerms" as const, label: <>I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline font-medium">Terms of Service</a></> },
-                { name: "agreeToPrivacy" as const, label: <>I agree to the <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline font-medium">Privacy Policy</a></> },
-              ].map(({ name, label }) => (
-                <FormField key={name} control={form.control} name={name} render={({ field }) => (
-                  <FormItem className="flex items-start gap-3">
-                    <FormControl>
-                      <Checkbox
-                        id={name}
-                        checked={field.value === true}
-                        onCheckedChange={(v) => field.onChange(v === true ? true : undefined)}
-                        className="mt-0.5"
-                      />
-                    </FormControl>
-                    <div className="flex-1">
-                      <FormLabel htmlFor={name} className="text-sm text-slate-700 font-normal leading-snug cursor-pointer">{label}</FormLabel>
+
+              {/* Beta Agreement — modal-gated */}
+              <FormField control={form.control} name="agreeToBetaAgreement" render={({ field }) => (
+                <FormItem>
+                  <div className="flex items-start gap-3">
+                    {betaAgreementAccepted ? (
+                      <CheckCircle className="w-4 h-4 mt-0.5 text-teal-600 shrink-0" />
+                    ) : (
+                      <div className="w-4 h-4 mt-0.5 rounded border-2 border-slate-300 shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      {betaAgreementAccepted ? (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm text-teal-700 font-medium">Beta Agreement accepted</span>
+                          <button
+                            type="button"
+                            onClick={handleOpenModal}
+                            className="text-xs text-teal-600 hover:underline underline-offset-2"
+                          >
+                            (review again)
+                          </button>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-sm text-slate-700 mb-2 leading-snug">
+                            I have read and agree to the{" "}
+                            <strong className="text-slate-900">Hubify Homes Beta Agreement</strong>
+                          </p>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="border-teal-300 text-teal-700 hover:bg-teal-50 text-xs font-medium"
+                            onClick={handleOpenModal}
+                          >
+                            <FileText className="w-3.5 h-3.5 mr-1.5" />
+                            Read &amp; Accept Beta Agreement
+                          </Button>
+                        </div>
+                      )}
                       <FormMessage />
                     </div>
-                  </FormItem>
-                )} />
-              ))}
+                  </div>
+                  <input type="hidden" {...field} />
+                </FormItem>
+              )} />
+
+              {/* Terms */}
+              <FormField control={form.control} name="agreeToTerms" render={({ field }) => (
+                <FormItem className="flex items-start gap-3">
+                  <FormControl>
+                    <Checkbox
+                      id="agreeToTerms"
+                      checked={field.value === true}
+                      onCheckedChange={(v) => field.onChange(v === true ? true : undefined)}
+                      className="mt-0.5"
+                    />
+                  </FormControl>
+                  <div className="flex-1">
+                    <FormLabel htmlFor="agreeToTerms" className="text-sm text-slate-700 font-normal leading-snug cursor-pointer">
+                      I agree to the{" "}
+                      <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline font-medium">
+                        Terms of Service
+                      </a>
+                    </FormLabel>
+                    <FormMessage />
+                  </div>
+                </FormItem>
+              )} />
+
+              {/* Privacy */}
+              <FormField control={form.control} name="agreeToPrivacy" render={({ field }) => (
+                <FormItem className="flex items-start gap-3">
+                  <FormControl>
+                    <Checkbox
+                      id="agreeToPrivacy"
+                      checked={field.value === true}
+                      onCheckedChange={(v) => field.onChange(v === true ? true : undefined)}
+                      className="mt-0.5"
+                    />
+                  </FormControl>
+                  <div className="flex-1">
+                    <FormLabel htmlFor="agreeToPrivacy" className="text-sm text-slate-700 font-normal leading-snug cursor-pointer">
+                      I agree to the{" "}
+                      <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline font-medium">
+                        Privacy Policy
+                      </a>
+                    </FormLabel>
+                    <FormMessage />
+                  </div>
+                </FormItem>
+              )} />
             </div>
 
             <FormField control={form.control} name="signerName" render={({ field }) => (
@@ -301,13 +663,13 @@ function AgreementStep({ data, token, onSigned }: {
               {acceptMutation.isPending ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting…</>
               ) : (
-                <><ShieldCheck className="w-4 h-4 mr-2" />Accept & Continue</>
+                <><ShieldCheck className="w-4 h-4 mr-2" />Accept &amp; Continue</>
               )}
             </Button>
 
             <p className="text-center text-xs text-slate-400">
               By clicking "Accept & Continue" you are electronically signing this agreement.
-              Your IP address and browser information will be recorded for legal purposes.
+              Your IP address, browser information, and agreement review timestamps will be recorded for legal purposes.
             </p>
           </form>
         </Form>
@@ -342,14 +704,12 @@ function PaymentStep({ data, token }: { data: OnboardingDetails; token: string }
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      {/* Header */}
       <div className="bg-gradient-to-r from-teal-600 to-indigo-600 px-6 py-5">
         <p className="text-white font-semibold text-lg">Payment Setup</p>
         <p className="text-teal-100 text-sm mt-0.5">Secure checkout via Stripe</p>
       </div>
 
       <div className="p-6">
-        {/* Order summary */}
         <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4">Order Summary</p>
         <div className="space-y-3 mb-5">
           <div className="flex justify-between items-start">
@@ -385,7 +745,6 @@ function PaymentStep({ data, token }: { data: OnboardingDetails; token: string }
           </div>
         </div>
 
-        {/* Recurring note */}
         <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-6 text-xs text-slate-500 leading-relaxed">
           After today, you'll be billed <strong className="text-slate-700">{fmt(data.discountedMonthlyPrice)}/month</strong>.
           Your beta discount of <strong className="text-slate-700">{data.discountPercentage ?? 0}%</strong> is locked in for the lifetime
@@ -413,7 +772,7 @@ function PaymentStep({ data, token }: { data: OnboardingDetails; token: string }
   );
 }
 
-// ── Locked Step 2 placeholder (agreement not signed yet) ──────────────────────
+// ── Locked Step 2 placeholder ──────────────────────────────────────────────────
 
 function PaymentStepLocked() {
   return (
@@ -467,7 +826,7 @@ function PaymentCancelledBanner() {
   );
 }
 
-// ── Verifying payment screen (shown immediately after Stripe redirect) ─────────
+// ── Verifying payment screen ─────────────────────────────────────────────────
 
 function VerifyingPayment({ token, onVerified }: { token: string; onVerified: () => void }) {
   const { data, isError } = useQuery<OnboardingDetails>({
@@ -513,7 +872,7 @@ export default function OnboardingPortal() {
   const { token } = useParams<{ token: string }>();
   const search = useSearch();
   const params = new URLSearchParams(search);
-  const paymentParam = params.get("payment"); // "success" | "cancelled" | null
+  const paymentParam = params.get("payment");
 
   const [localSigned, setLocalSigned] = useState(false);
   const [signerNameLocal, setSignerNameLocal] = useState("");
@@ -535,7 +894,6 @@ export default function OnboardingPortal() {
     enabled: !!token,
   });
 
-  // ── Loading ──────────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
@@ -548,20 +906,15 @@ export default function OnboardingPortal() {
     );
   }
 
-  // ── Error ────────────────────────────────────────────────────────────────────
   if (error || !data) {
     const err = error as any;
     return <TokenError status={err?.status ?? 500} message={err?.message ?? "Failed to load."} />;
   }
 
-  // ── Derive current state ──────────────────────────────────────────────────────
   const agreementSigned = data.alreadySigned || localSigned;
   const paymentPaid = data.paymentStatus === "paid" || data.stage === "platform_initializing" || paymentVerified;
-
-  // Determine current wizard step for the step indicator
   const currentStep = paymentPaid ? 3 : agreementSigned ? 2 : 1;
 
-  // ── Payment success/processing redirect ───────────────────────────────────────
   if (paymentParam === "success" && !paymentPaid) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-10 px-4">
@@ -583,7 +936,6 @@ export default function OnboardingPortal() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-10 px-4">
       <div className="max-w-2xl mx-auto">
 
-        {/* Header */}
         <div className="text-center mb-8">
           <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="h-16 w-auto mx-auto mb-6" />
           <StepIndicator current={currentStep} />
@@ -607,10 +959,8 @@ export default function OnboardingPortal() {
           )}
         </div>
 
-        {/* Cancelled banner */}
         {paymentParam === "cancelled" && !paymentPaid && <PaymentCancelledBanner />}
 
-        {/* Step 1: Agreement */}
         {!agreementSigned && (
           <AgreementStep
             data={data}
@@ -622,10 +972,8 @@ export default function OnboardingPortal() {
           />
         )}
 
-        {/* Step 1 done, Step 2: Payment */}
         {agreementSigned && !paymentPaid && (
           <>
-            {/* Agreement done badge */}
             <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 mb-4 text-sm text-teal-700">
               <CheckCircle className="w-4 h-4 shrink-0" />
               <span>
@@ -637,10 +985,8 @@ export default function OnboardingPortal() {
           </>
         )}
 
-        {/* Step 2 done: Payment confirmed */}
         {paymentPaid && <PaymentSuccess data={data} />}
 
-        {/* Footer */}
         <p className="text-center text-xs text-slate-400 mt-6">
           Questions?{" "}
           <a href="mailto:hello@hubifyhomesonline.com" className="text-teal-600 hover:underline">

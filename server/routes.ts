@@ -12553,11 +12553,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const connection = await storage.getOrgStripeConnection(orgId);
 
       if (connection) {
-        // Strip secrets; expose a boolean so the frontend knows whether the webhook is set
+        // Strip secrets; expose booleans so the frontend knows what's configured
         const { stripeSecretKey, accessToken, refreshToken, stripeWebhookSecret, ...safeConnection } = connection;
         res.json({
           ...safeConnection,
           hasWebhookSecret: !!stripeWebhookSecret,
+          encryptionEnabled: !!process.env.PLATFORM_ENCRYPTION_KEY,
         });
       } else {
         res.json(null);
@@ -17164,6 +17165,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         agreeToTerms: z.literal(true, { errorMap: () => ({ message: "You must agree to the Terms of Service" }) }),
         agreeToPrivacy: z.literal(true, { errorMap: () => ({ message: "You must agree to the Privacy Policy" }) }),
         agreeToBetaAgreement: z.literal(true, { errorMap: () => ({ message: "You must agree to the Beta Agreement" }) }),
+        // Agreement engagement metadata (optional, recorded for audit trail)
+        agreementVersion: z.string().optional(),
+        agreementViewedAt: z.string().datetime().optional(),
+        agreementScrolledAt: z.string().datetime().optional(),
       });
       const parsed = bodySchema.safeParse(req.body);
       if (!parsed.success) {
@@ -17203,6 +17208,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { stage: "payment_pending", enteredAt: now.toISOString(), note: "Beta agreement signed" },
       ];
 
+      const { agreementVersion, agreementViewedAt, agreementScrolledAt } = parsed.data;
+
       await storage.updateOnboardingProspect(prospect.id, {
         agreementStatus: "signed",
         agreementSignedAt: now,
@@ -17210,7 +17217,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         agreementOrganizationName: organizationName,
         agreementAcceptedIp: acceptedIp,
         agreementAcceptedUserAgent: acceptedUserAgent,
-        stage: "payment_pending",
+        agreementVersion: agreementVersion ?? null,
+        agreementViewedAt: agreementViewedAt ? new Date(agreementViewedAt) : null,
+        agreementScrolledAt: agreementScrolledAt ? new Date(agreementScrolledAt) : null,
+        stage: "agreement_complete",
         stageHistory: updatedHistory,
       } as any);
 

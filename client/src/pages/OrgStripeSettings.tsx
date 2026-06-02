@@ -411,7 +411,9 @@ export default function OrgStripeSettings() {
               <Alert>
                 <Shield className="h-4 w-4" />
                 <AlertDescription>
-                  Your secret key is encrypted at rest using AES-256-GCM before being stored. It is never returned to the frontend.
+                  {(connection as any)?.encryptionEnabled
+                    ? "Your secret key is encrypted at rest using AES-256-GCM before being stored. It is never returned to the frontend."
+                    : "Your secret key is stored securely and never returned to the frontend. Enable PLATFORM_ENCRYPTION_KEY for at-rest AES-256-GCM encryption."}
                 </AlertDescription>
               </Alert>
 

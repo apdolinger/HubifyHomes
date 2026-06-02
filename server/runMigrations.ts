@@ -787,3 +787,20 @@ export async function ensurePortalInvitationColumns(): Promise<void> {
     client.release();
   }
 }
+
+export async function ensureAgreementMetadataColumns(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE onboarding_prospects
+        ADD COLUMN IF NOT EXISTS agreement_viewed_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS agreement_scrolled_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS agreement_version VARCHAR;
+    `);
+    log("[MIGRATE] onboarding_prospects agreement metadata columns verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add agreement metadata columns: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}

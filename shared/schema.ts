@@ -3436,6 +3436,10 @@ export const onboardingProspects = pgTable("onboarding_prospects", {
   agreementOrganizationName: varchar("agreement_organization_name"),
   agreementAcceptedIp: varchar("agreement_accepted_ip"),
   agreementAcceptedUserAgent: text("agreement_accepted_user_agent"),
+  // Agreement engagement metadata
+  agreementViewedAt: timestamp("agreement_viewed_at"),
+  agreementScrolledAt: timestamp("agreement_scrolled_at"),
+  agreementVersion: varchar("agreement_version"),
   // Beta payment details (populated after Stripe Checkout completes)
   paymentStatus: varchar("payment_status"),
   paymentCompletedAt: timestamp("payment_completed_at"),

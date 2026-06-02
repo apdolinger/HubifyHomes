@@ -493,6 +493,12 @@ app.use((req, res, next) => {
       } catch (err) {
         console.error('Error ensuring approval email tracking columns:', err);
       }
+      try {
+        const { ensureAgreementMetadataColumns } = await import('./runMigrations.js');
+        await ensureAgreementMetadataColumns();
+      } catch (err) {
+        console.error('Error ensuring agreement metadata columns:', err);
+      }
     } catch (error) {
       console.error('Error loading startup migrations:', error);
     }
