@@ -17449,7 +17449,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const prospect = await storage.updateOnboardingProspect(id, parseResult.data);
+      // When stage is moved to beta_approved via the generic PATCH (e.g. the
+      // kanban drag or stage dropdown), automatically mark the prospect as a
+      // beta member so the resend-approval-email button becomes visible.
+      // This does NOT send an email — the admin must use "Resend Approval Email"
+      // to do that once any needed pricing fields are filled in.
+      const patch: typeof parseResult.data = { ...parseResult.data };
+      if (patch.stage === "beta_approved") {
+        const existing = await storage.getOnboardingProspect(id);
+        if (existing && !(existing as any).isBetaMember) {
+          (patch as any).isBetaMember = true;
+          (patch as any).betaApprovedAt = (patch as any).betaApprovedAt ?? new Date();
+          (patch as any).approvalEmailSent = (existing as any).approvalEmailSent ?? false;
+        }
+      }
+
+      const prospect = await storage.updateOnboardingProspect(id, patch);
 
       res.json(prospect);
     } catch (error) {

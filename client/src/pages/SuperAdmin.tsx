@@ -1149,7 +1149,9 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
 
   // These must be declared before useQuery that uses them in `enabled`
   const isBetaApp = submission.source === "beta_application";
-  const isBetaApproved = !!(submission.isBetaMember && !submission.betaRemovedAt);
+  // Also treat manually-staged prospects (stage set via dropdown without going
+  // through the approve-beta flow) as approved so the resend section is visible.
+  const isBetaApproved = !!(submission.isBetaMember && !submission.betaRemovedAt) || submission.stage === "beta_approved";
   const showBetaApprovalDetails = isBetaApproved || submission.stage === "agreement_pending";
 
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
