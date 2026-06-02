@@ -4188,7 +4188,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const enabled = isEncryptionEnabled();
 
       if (!enabled) {
-        return res.json({ enabled: false, canaryOk: null, affectedCount: 0, totalConnections: 0 });
+        const { orgStripeConnections: oscTablePlain } = await import("@shared/schema");
+        const { isNotNull } = await import("drizzle-orm");
+        const plaintextRows = await db
+          .select({ orgId: oscTablePlain.orgId })
+          .from(oscTablePlain)
+          .where(isNotNull(oscTablePlain.stripeSecretKey));
+        return res.json({
+          enabled: false,
+          canaryOk: null,
+          affectedCount: 0,
+          totalConnections: 0,
+          plaintextStripeOrgs: plaintextRows.length,
+        });
       }
 
       // ── Canary check ──

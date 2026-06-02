@@ -7673,6 +7673,7 @@ function EncryptionCard() {
     canaryOk: boolean | null;
     affectedCount: number;
     totalConnections: number;
+    plaintextStripeOrgs?: number;
   }>({
     queryKey: ['/api/super-admin/platform/encryption-status'],
   });
@@ -7740,6 +7741,7 @@ function EncryptionCard() {
   const canaryOk = data?.canaryOk ?? null;
   const affectedCount = data?.affectedCount ?? 0;
   const totalConnections = data?.totalConnections ?? 0;
+  const plaintextStripeOrgs = data?.plaintextStripeOrgs ?? 0;
   const keyMismatch = enabled && (canaryOk === false || affectedCount > 0);
 
   return (
@@ -7809,6 +7811,23 @@ function EncryptionCard() {
                 </p>
               </div>
             </div>
+
+            {plaintextStripeOrgs > 0 && (
+              <div className="flex items-start space-x-3 p-4 rounded-lg bg-red-50 border border-red-300" data-testid="plaintext-stripe-orgs-warning">
+                <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+                <div>
+                  <div className="font-semibold text-red-900 mb-1">
+                    {plaintextStripeOrgs} org{plaintextStripeOrgs !== 1 ? 's have' : ' has'} Stripe keys stored as plaintext
+                  </div>
+                  <p className="text-sm text-red-700">
+                    {plaintextStripeOrgs === 1
+                      ? 'This organisation has a connected Stripe account whose secret key is unencrypted on disk.'
+                      : `These ${plaintextStripeOrgs} organisations have connected Stripe accounts whose secret keys are unencrypted on disk.`}{' '}
+                    Generate and set <code className="font-mono bg-red-100 px-1 rounded">PLATFORM_ENCRYPTION_KEY</code> above to protect them.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div>
               <p className="text-sm text-slate-600 mb-3">
