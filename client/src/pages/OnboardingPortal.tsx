@@ -24,7 +24,7 @@ import {
 
 const AGREEMENT_VERSION = "v1.1";
 const TERMS_VERSION = "v1.2";
-const PRIVACY_VERSION = "v1.0";
+const PRIVACY_VERSION = "v1.2";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -532,78 +532,103 @@ function TermsContent() {
 function PrivacyContent() {
   return (
     <div className="text-sm text-slate-700 leading-relaxed space-y-5">
-      <p className="text-xs text-slate-400">Last Updated: May 17, 2026</p>
-      <p>This Privacy Policy describes how Hubify collects, uses, and protects your personal information in compliance with US and Canadian privacy laws (CCPA/CPRA, GDPR, PIPEDA).</p>
+      <p className="text-xs text-slate-400">Version {PRIVACY_VERSION} · Effective June 2, 2026</p>
+      <p>
+        Hubify Homes Inc. ("Hubify," "we," "us," or "our") respects your privacy and is committed to protecting the information entrusted to us. This Privacy Policy explains how we collect, use, disclose, store, and protect information when you access or use the Hubify platform, website, applications, and related services (collectively, the "Services").
+      </p>
 
       <div>
         <p className="font-semibold text-slate-900 mb-1">1. Information We Collect</p>
-        <p className="mb-1"><strong>Information you provide directly:</strong></p>
-        <ul className="list-disc list-inside space-y-0.5 ml-3 mb-2">
-          <li><strong>Account Information:</strong> Name, email, phone, company name, business address</li>
-          <li><strong>Payment Information:</strong> Credit card details and billing address (processed through Stripe)</li>
-          <li><strong>Property &amp; Client Data:</strong> Information about properties, clients, tasks, and contacts you manage</li>
-          <li><strong>Communications:</strong> Messages and support requests you send to us</li>
+        <p className="mb-1"><strong>Information You Provide</strong></p>
+        <ul className="list-disc list-inside space-y-0.5 ml-3 mb-3">
+          <li>Name</li>
+          <li>Email address</li>
+          <li>Phone number</li>
+          <li>Company name</li>
+          <li>Business address</li>
+          <li>Account information</li>
+          <li>Property information</li>
+          <li>Client information</li>
+          <li>Vendor information</li>
+          <li>Communications with Hubify</li>
+          <li>Support requests</li>
+          <li>Documents and files uploaded to the Services</li>
         </ul>
-        <p className="mb-1"><strong>Information collected automatically:</strong></p>
+        <p className="mb-1"><strong>Payment Information</strong></p>
+        <p className="mb-3">Payment information is processed by third-party payment processors such as Stripe. Hubify does not store complete payment card information.</p>
+        <p className="mb-1"><strong>Information Collected Automatically</strong></p>
         <ul className="list-disc list-inside space-y-0.5 ml-3">
-          <li><strong>Usage Data:</strong> Pages viewed, features used, time spent</li>
-          <li><strong>Device Information:</strong> IP address, browser type, operating system</li>
-          <li><strong>Cookies &amp; Tracking:</strong> Session cookies, analytics cookies, preference cookies</li>
+          <li>IP address</li>
+          <li>Browser type</li>
+          <li>Device information</li>
+          <li>Operating system</li>
+          <li>Usage information</li>
+          <li>Authentication activity</li>
+          <li>Log files</li>
+          <li>Cookie and session information</li>
         </ul>
       </div>
 
       <div>
-        <p className="font-semibold text-slate-900 mb-1">2. How We Use Your Information</p>
+        <p className="font-semibold text-slate-900 mb-1">2. How We Use Information</p>
         <ul className="list-disc list-inside space-y-0.5 ml-3">
-          <li><strong>Service Delivery:</strong> Provide, maintain, and improve our property management platform</li>
-          <li><strong>Account Management:</strong> Create and manage your account, process subscriptions</li>
-          <li><strong>Payment Processing:</strong> Process payments, prevent fraud, issue invoices</li>
-          <li><strong>Customer Support:</strong> Respond to inquiries and troubleshoot issues</li>
-          <li><strong>Communication:</strong> Send service updates, security alerts, administrative messages</li>
-          <li><strong>Security:</strong> Detect fraud, prevent abuse, enforce terms of service</li>
-          <li><strong>Legal Compliance:</strong> Meet regulatory requirements and respond to legal requests</li>
+          <li>Provide and operate the Services</li>
+          <li>Create and manage accounts</li>
+          <li>Process subscriptions and payments</li>
+          <li>Provide customer support</li>
+          <li>Secure and maintain the platform</li>
+          <li>Detect and prevent fraud, abuse, and security incidents</li>
+          <li>Improve existing features and develop new features</li>
+          <li>Communicate service-related information</li>
+          <li>Comply with legal obligations</li>
+          <li>Enforce our agreements and policies</li>
         </ul>
       </div>
 
       <div>
-        <p className="font-semibold text-slate-900 mb-1">3. How We Share Your Information</p>
-        <p className="mb-1"><strong>Service providers we work with:</strong></p>
-        <ul className="list-disc list-inside space-y-0.5 ml-3 mb-2">
-          <li><strong>Cloud Hosting:</strong> Replit, Google Cloud Platform</li>
-          <li><strong>Payment Processing:</strong> Stripe</li>
-          <li><strong>Email Services:</strong> Resend (transactional and marketing emails)</li>
-          <li><strong>Authentication:</strong> Replit Auth, Google OAuth</li>
-          <li><strong>Object Storage:</strong> Google Cloud Storage</li>
-        </ul>
-        <p className="font-semibold">We do not sell your personal information to third parties for monetary consideration.</p>
-        <p className="mt-2">We may disclose information when required by law, legal process, or to protect rights and safety.</p>
+        <p className="font-semibold text-slate-900 mb-1">3. Aggregated and De-Identified Information</p>
+        <p className="mb-1">Hubify may create aggregated, anonymized, or de-identified information derived from use of the Services. Such information may be used for analytics, benchmarking, product development, research, service improvements, industry insights, and operational reporting.</p>
+        <p className="font-semibold">Hubify will not sell identifiable customer data or identifiable personal information to third parties.</p>
       </div>
 
       <div>
-        <p className="font-semibold text-slate-900 mb-1">4. Data Retention</p>
+        <p className="font-semibold text-slate-900 mb-1">4. How We Share Information</p>
+        <p className="mb-1">We may share information with service providers that assist in operating the Services, including providers of hosting and cloud infrastructure, payment processing, email delivery, authentication, customer support, analytics, and artificial intelligence and automation services.</p>
+        <p className="mb-1">We may also disclose information:</p>
         <ul className="list-disc list-inside space-y-0.5 ml-3">
-          <li><strong>Active Accounts:</strong> Retained while active and for 3 years after closure</li>
-          <li><strong>Payment Records:</strong> 7 years for tax and accounting purposes</li>
-          <li><strong>Security Logs:</strong> 1 year for audit and fraud prevention</li>
+          <li>When required by law</li>
+          <li>To comply with legal process</li>
+          <li>To protect rights, safety, or security</li>
+          <li>To investigate fraud or misuse</li>
+          <li>In connection with a merger, acquisition, financing, or sale of assets</li>
         </ul>
-        <p className="mt-2">You may request earlier deletion subject to legal and contractual obligations.</p>
       </div>
 
       <div>
-        <p className="font-semibold text-slate-900 mb-1">5. Your Privacy Rights</p>
-        <p className="mb-2">Depending on your location, you have rights under CCPA/CPRA (California), GDPR (EU), and PIPEDA (Canada), including rights to: access your data, request deletion, correct inaccuracies, withdraw consent, and file complaints with regulators.</p>
-        <p>To exercise your rights: <a href="mailto:privacy@hubify.com" className="text-teal-600 hover:underline">privacy@hubify.com</a>. We will respond within 30–45 days as required by applicable law.</p>
+        <p className="font-semibold text-slate-900 mb-1">5. Artificial Intelligence Features</p>
+        <p className="mb-1">Certain features may utilize artificial intelligence, automation, machine learning, or third-party AI providers. Information submitted to AI-powered features may be processed by third-party providers solely for the purpose of delivering requested functionality and operating the Services.</p>
+        <p>Users are responsible for determining whether information submitted to AI features is appropriate for their business requirements.</p>
       </div>
 
       <div>
-        <p className="font-semibold text-slate-900 mb-1">6. Data Security</p>
-        <p>We implement industry-standard security including TLS/SSL encryption in transit, AES-256 encryption at rest, role-based access controls, multi-factor authentication for admin accounts, and 24/7 security monitoring. While we take reasonable precautions, no system is completely secure.</p>
+        <p className="font-semibold text-slate-900 mb-1">6. Data Retention</p>
+        <p className="mb-1">We retain information for as long as reasonably necessary to provide the Services, comply with legal obligations, resolve disputes, enforce agreements, and maintain business records.</p>
+        <ul className="list-disc list-inside space-y-0.5 ml-3">
+          <li>Account information is retained while accounts remain active</li>
+          <li>Billing and tax records may be retained as required by law</li>
+          <li>Security and audit logs may be retained for operational and security purposes</li>
+        </ul>
       </div>
 
       <div>
-        <p className="font-semibold text-slate-900 mb-1">7. Cookies &amp; Tracking Technologies</p>
-        <p className="mb-2">We use Essential Cookies (required for authentication and core functionality), Preference Cookies (remember your settings), and Analytics Cookies (understand usage patterns — aggregated data only). We do not use cookies for advertising or cross-site tracking.</p>
-        <p className="mb-3">You can manage Preference and Analytics cookies at any time:</p>
+        <p className="font-semibold text-slate-900 mb-1">7. Data Security</p>
+        <p className="mb-1">Hubify uses commercially reasonable administrative, technical, and organizational safeguards designed to protect information. Security measures may include encryption in transit, encryption at rest, access controls, authentication controls, and monitoring and logging.</p>
+        <p>No method of transmission or storage is completely secure, and Hubify cannot guarantee absolute security.</p>
+      </div>
+
+      <div>
+        <p className="font-semibold text-slate-900 mb-1">8. Cookies and Similar Technologies</p>
+        <p className="mb-2">Hubify may use cookies and similar technologies to authenticate users, maintain sessions, remember preferences, analyze usage patterns, and improve Services. You may control cookie settings through your browser, although disabling certain cookies may affect functionality.</p>
         <button
           type="button"
           onClick={openCookiePreferences}
@@ -614,27 +639,36 @@ function PrivacyContent() {
       </div>
 
       <div>
-        <p className="font-semibold text-slate-900 mb-1">8. International Data Transfers</p>
-        <p>Your information may be transferred to and processed in the United States or other countries where our service providers operate. We ensure adequate protection through Standard Contractual Clauses and compliance with cross-border data transfer requirements.</p>
+        <p className="font-semibold text-slate-900 mb-1">9. Your Privacy Choices</p>
+        <p className="mb-1">Subject to applicable law, you may have rights to access personal information, correct inaccurate information, request deletion of information, request a copy of information, and object to certain processing activities.</p>
+        <p>Requests may be submitted to: <a href="mailto:privacy@hubifyhomes.com" className="text-teal-600 hover:underline">privacy@hubifyhomes.com</a>. Hubify may take reasonable steps to verify identity before processing requests.</p>
       </div>
 
       <div>
-        <p className="font-semibold text-slate-900 mb-1">9. Children's Privacy</p>
-        <p>Our services are not directed to individuals under 18 years of age. We do not knowingly collect personal information from children.</p>
+        <p className="font-semibold text-slate-900 mb-1">10. International Data Transfers</p>
+        <p>Information may be processed and stored in the United States and other jurisdictions where Hubify or its service providers operate. By using the Services, you acknowledge that information may be transferred and processed in these jurisdictions as permitted by applicable law.</p>
       </div>
 
       <div>
-        <p className="font-semibold text-slate-900 mb-1">10. Changes to This Policy</p>
-        <p>We may update this Privacy Policy periodically. Material changes will be communicated via email and prominent notice on our platform. Continued use constitutes acceptance.</p>
+        <p className="font-semibold text-slate-900 mb-1">11. Children's Privacy</p>
+        <p>The Services are intended for business users and individuals eighteen (18) years of age or older. Hubify does not knowingly collect personal information from children.</p>
       </div>
 
       <div>
-        <p className="font-semibold text-slate-900 mb-1">11. Contact Us</p>
-        <p>Privacy Officer: <a href="mailto:privacy@hubify.com" className="text-teal-600 hover:underline">privacy@hubify.com</a> — We respond within 30–45 days.</p>
+        <p className="font-semibold text-slate-900 mb-1">12. Changes to This Privacy Policy</p>
+        <p>Hubify may update this Privacy Policy from time to time. Material changes will be communicated through reasonable means, which may include email notifications or notices within the Services. Continued use of the Services after an updated Privacy Policy becomes effective constitutes acceptance of the revised policy.</p>
+      </div>
+
+      <div>
+        <p className="font-semibold text-slate-900 mb-1">13. Contact Information</p>
+        <p className="mb-1">Questions regarding this Privacy Policy or privacy-related requests may be directed to:</p>
+        <p className="mb-0.5"><a href="mailto:contact@hubifyhomes.com" className="text-teal-600 hover:underline">contact@hubifyhomes.com</a></p>
+        <p className="mb-0.5 font-medium">Hubify Homes Inc.</p>
+        <p>Jupiter, Florida, USA</p>
       </div>
 
       <div className="border-t border-slate-200 pt-4 text-xs text-slate-400">
-        Privacy Policy · Last Updated May 17, 2026 · Hubify Homes · Compliant with CCPA/CPRA, GDPR, PIPEDA
+        Hubify Homes Inc. · Privacy Policy {PRIVACY_VERSION} · Effective June 2, 2026
       </div>
     </div>
   );

@@ -1,0 +1,194 @@
+# Hubify Homes Inc. Privacy Policy
+
+**Version v1.2 · Effective June 2, 2026**
+
+Hubify Homes Inc. ("Hubify," "we," "us," or "our") respects your privacy and is committed to protecting the information entrusted to us.
+
+This Privacy Policy explains how we collect, use, disclose, store, and protect information when you access or use the Hubify platform, website, applications, and related services (collectively, the "Services").
+
+## 1. Information We Collect
+
+### Information You Provide
+
+We may collect information you provide directly, including:
+
+* Name
+* Email address
+* Phone number
+* Company name
+* Business address
+* Account information
+* Property information
+* Client information
+* Vendor information
+* Communications with Hubify
+* Support requests
+* Documents and files uploaded to the Services
+
+### Payment Information
+
+Payment information is processed by third-party payment processors such as Stripe. Hubify does not store complete payment card information.
+
+### Information Collected Automatically
+
+We may automatically collect:
+
+* IP address
+* Browser type
+* Device information
+* Operating system
+* Usage information
+* Authentication activity
+* Log files
+* Cookie and session information
+
+## 2. How We Use Information
+
+We may use information to:
+
+* Provide and operate the Services
+* Create and manage accounts
+* Process subscriptions and payments
+* Provide customer support
+* Secure and maintain the platform
+* Detect and prevent fraud, abuse, and security incidents
+* Improve existing features and develop new features
+* Communicate service-related information
+* Comply with legal obligations
+* Enforce our agreements and policies
+
+## 3. Aggregated and De-Identified Information
+
+Hubify may create aggregated, anonymized, or de-identified information derived from use of the Services.
+
+Such information may be used for:
+
+* Analytics
+* Benchmarking
+* Product development
+* Research
+* Service improvements
+* Industry insights
+* Operational reporting
+
+Hubify will not sell identifiable customer data or identifiable personal information to third parties.
+
+## 4. How We Share Information
+
+We may share information with service providers that assist in operating the Services, including providers of:
+
+* Hosting and cloud infrastructure
+* Payment processing
+* Email delivery
+* Authentication
+* Customer support
+* Analytics
+* Artificial intelligence and automation services
+
+We may also disclose information:
+
+* When required by law
+* To comply with legal process
+* To protect rights, safety, or security
+* To investigate fraud or misuse
+* In connection with a merger, acquisition, financing, or sale of assets
+
+## 5. Artificial Intelligence Features
+
+Certain features may utilize artificial intelligence, automation, machine learning, or third-party AI providers.
+
+Information submitted to AI-powered features may be processed by third-party providers solely for the purpose of delivering requested functionality and operating the Services.
+
+Users are responsible for determining whether information submitted to AI features is appropriate for their business requirements.
+
+## 6. Data Retention
+
+We retain information for as long as reasonably necessary to:
+
+* Provide the Services
+* Comply with legal obligations
+* Resolve disputes
+* Enforce agreements
+* Maintain business records
+
+Generally:
+
+* Account information is retained while accounts remain active.
+* Billing and tax records may be retained as required by law.
+* Security and audit logs may be retained for operational and security purposes.
+
+## 7. Data Security
+
+Hubify uses commercially reasonable administrative, technical, and organizational safeguards designed to protect information.
+
+Security measures may include:
+
+* Encryption in transit
+* Encryption at rest
+* Access controls
+* Authentication controls
+* Monitoring and logging
+
+No method of transmission or storage is completely secure, and Hubify cannot guarantee absolute security.
+
+## 8. Cookies and Similar Technologies
+
+Hubify may use cookies and similar technologies to:
+
+* Authenticate users
+* Maintain sessions
+* Remember preferences
+* Analyze usage patterns
+* Improve Services
+
+You may control cookie settings through your browser, although disabling certain cookies may affect functionality.
+
+## 9. Your Privacy Choices
+
+Subject to applicable law, you may have rights to:
+
+* Access personal information
+* Correct inaccurate information
+* Request deletion of information
+* Request a copy of information
+* Object to certain processing activities
+
+Requests may be submitted to:
+
+**[privacy@hubifyhomes.com](mailto:privacy@hubifyhomes.com)**
+
+Hubify may take reasonable steps to verify identity before processing requests.
+
+## 10. International Data Transfers
+
+Information may be processed and stored in the United States and other jurisdictions where Hubify or its service providers operate.
+
+By using the Services, you acknowledge that information may be transferred and processed in these jurisdictions as permitted by applicable law.
+
+## 11. Children's Privacy
+
+The Services are intended for business users and individuals eighteen (18) years of age or older.
+
+Hubify does not knowingly collect personal information from children.
+
+## 12. Changes to This Privacy Policy
+
+Hubify may update this Privacy Policy from time to time.
+
+Material changes will be communicated through reasonable means, which may include email notifications or notices within the Services.
+
+Continued use of the Services after an updated Privacy Policy becomes effective constitutes acceptance of the revised policy.
+
+## 13. Contact Information
+
+Questions regarding this Privacy Policy may be directed to:
+
+**[privacy@hubifyhomes.com](mailto:privacy@hubifyhomes.com)**
+
+**Hubify Homes Inc.**
+
+---
+
+**Hubify Homes Inc.**
+**Privacy Policy v1.2**
+**Effective June 2, 2026**
