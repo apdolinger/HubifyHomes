@@ -932,17 +932,43 @@ function ProspectCard({
         );
       })()}
 
-      {prospect.confirmationEmailStatus && prospect.confirmationEmailStatus !== "sent" && !DEMO_STAGES_SET.has(prospect.stage) && (
-        <button
-          className="flex items-center gap-1 w-full text-left"
-          onClick={onEdit}
-          title={`Confirmation email failed: ${prospect.confirmationEmailStatus}`}
-        >
-          <Badge className="bg-amber-100 text-amber-800 border border-amber-300 text-xs flex items-center gap-1 px-1.5 py-0.5 font-medium w-full justify-center">
-            <AlertCircle className="w-3 h-3 shrink-0" />
-            Email failed — click to resend
-          </Badge>
-        </button>
+      {!DEMO_STAGES_SET.has(prospect.stage) && prospect.confirmationEmailStatus && (
+        prospect.confirmationEmailStatus === "sent" ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge className="bg-green-50 text-green-700 border border-green-200 text-xs flex items-center gap-1 px-1.5 py-0.5 font-medium w-full justify-center">
+                <CheckCircle2 className="w-3 h-3 shrink-0" />
+                Agreement email sent
+                {prospect.confirmationEmailSentAt && (
+                  <> {new Date(prospect.confirmationEmailSentAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</>
+                )}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs max-w-xs">
+              Confirmation email delivered to {prospect.email}
+              {prospect.confirmationEmailSentAt && (
+                <> on {new Date(prospect.confirmationEmailSentAt).toLocaleString()}</>
+              )}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className="flex items-center gap-1 w-full text-left"
+                onClick={onEdit}
+              >
+                <Badge className="bg-amber-100 text-amber-800 border border-amber-300 text-xs flex items-center gap-1 px-1.5 py-0.5 font-medium w-full justify-center">
+                  <AlertCircle className="w-3 h-3 shrink-0" />
+                  Agreement email failed
+                </Badge>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs max-w-xs">
+              {prospect.confirmationEmailStatus.replace(/^failed:\s*/i, "") || "Confirmation email failed to send"} — click to view and retry
+            </TooltipContent>
+          </Tooltip>
+        )
       )}
 
       {/* ── Demo pipeline actions ── */}
