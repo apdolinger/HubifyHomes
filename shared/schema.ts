@@ -1190,12 +1190,16 @@ export const timeEntries = pgTable("time_entries", {
   notes: text("notes"),
   billableRateCents: integer("billable_rate_cents"), // Hourly rate in cents, overrides task rate if set
   isBillable: boolean("is_billable").notNull().default(true),
+  workType: varchar("work_type"),
+  mileage: integer("mileage"),
+  status: varchar("status").notNull().default("draft"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   index("time_entries_org_user_idx").on(table.orgId, table.userId),
   index("time_entries_property_idx").on(table.propertyId),
   index("time_entries_task_idx").on(table.taskId),
+  index("time_entries_status_idx").on(table.status),
 ]);
 
 // Contacts/People table

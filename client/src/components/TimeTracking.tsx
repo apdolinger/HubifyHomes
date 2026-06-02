@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,22 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+
+const WORK_TYPES = [
+  "Inspection",
+  "Home Watch Visit",
+  "Maintenance",
+  "Vendor Coordination",
+  "Travel",
+  "Administrative",
+  "Cleaning",
+  "Welcome Home Service",
+  "Departure Service",
+  "Other",
+];
 
 interface TimeEntry {
   id: number;
@@ -21,6 +35,9 @@ interface TimeEntry {
   taskId: number | null;
   notes: string | null;
   billableRateCents: number | null;
+  workType: string | null;
+  mileage: number | null;
+  status: string;
 }
 
 interface Property {
@@ -39,6 +56,8 @@ export function TimeTrackingDropdownItems() {
   const [timeType, setTimeType] = useState<"client" | "organizational">("client");
   const [propertyId, setPropertyId] = useState<string>("");
   const [taskId, setTaskId] = useState<string>("");
+  const [workType, setWorkType] = useState<string>("Home Watch Visit");
+  const [mileage, setMileage] = useState<string>("");
   const [notes, setNotes] = useState("");
 
   const { data: activeEntry, isLoading } = useQuery<TimeEntry | null>({
@@ -54,7 +73,13 @@ export function TimeTrackingDropdownItems() {
   });
 
   const clockInMutation = useMutation({
-    mutationFn: async (data: { propertyId?: number; taskId?: number; notes?: string }) => {
+    mutationFn: async (data: {
+      propertyId?: number;
+      taskId?: number;
+      notes?: string;
+      workType?: string;
+      mileage?: number;
+    }) => {
       return await apiRequest("POST", "/api/time-entries/clock-in", data);
     },
     onSuccess: () => {
@@ -62,14 +87,17 @@ export function TimeTrackingDropdownItems() {
       queryClient.invalidateQueries({ queryKey: ["/api/time-entries"] });
       toast({
         title: "Clocked In",
-        description: timeType === "organizational" 
-          ? "Tracking organizational time (non-billable)." 
-          : "Your time is now being tracked.",
+        description:
+          timeType === "organizational"
+            ? "Tracking organizational time (non-billable)."
+            : "Your time is now being tracked.",
       });
       setShowClockInDialog(false);
       setTimeType("client");
       setPropertyId("");
       setTaskId("");
+      setWorkType("Home Watch Visit");
+      setMileage("");
       setNotes("");
     },
     onError: (error: any) => {
@@ -103,18 +131,16 @@ export function TimeTrackingDropdownItems() {
   });
 
   const handleClockIn = () => {
-    // For organizational time, don't send property/task
-    if (timeType === "organizational") {
-      clockInMutation.mutate({
-        notes: notes || undefined,
-      });
-    } else {
-      clockInMutation.mutate({
-        propertyId: propertyId && propertyId !== "none" ? parseInt(propertyId) : undefined,
-        taskId: taskId && taskId !== "none" ? parseInt(taskId) : undefined,
-        notes: notes || undefined,
-      });
+    const payload: Parameters<typeof clockInMutation.mutate>[0] = {
+      notes: notes || undefined,
+      workType: workType || undefined,
+      mileage: mileage ? parseInt(mileage) : undefined,
+    };
+    if (timeType === "client") {
+      payload.propertyId = propertyId && propertyId !== "none" ? parseInt(propertyId) : undefined;
+      payload.taskId = taskId && taskId !== "none" ? parseInt(taskId) : undefined;
     }
+    clockInMutation.mutate(payload);
   };
 
   const handleClockOut = () => {
@@ -179,7 +205,7 @@ export function TimeTrackingDropdownItems() {
           <DialogHeader>
             <DialogTitle>Clock In</DialogTitle>
             <DialogDescription>
-              {timeType === "organizational" 
+              {timeType === "organizational"
                 ? "Track non-billable organizational time (admin, training, meetings, etc.)"
                 : "Track time for client work and billable services."}
             </DialogDescription>
@@ -191,7 +217,6 @@ export function TimeTrackingDropdownItems() {
                 value={timeType}
                 onValueChange={(value: "client" | "organizational") => {
                   setTimeType(value);
-                  // Clear property/task when switching to organizational
                   if (value === "organizational") {
                     setPropertyId("");
                     setTaskId("");
@@ -220,6 +245,22 @@ export function TimeTrackingDropdownItems() {
                   </Label>
                 </div>
               </RadioGroup>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="work-type">Work Type</Label>
+              <Select value={workType} onValueChange={setWorkType}>
+                <SelectTrigger id="work-type" data-testid="select-work-type">
+                  <SelectValue placeholder="Select work type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {WORK_TYPES.map((wt) => (
+                    <SelectItem key={wt} value={wt}>
+                      {wt}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {timeType === "client" && (
@@ -257,6 +298,19 @@ export function TimeTrackingDropdownItems() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="mileage">Mileage (Optional)</Label>
+                  <Input
+                    id="mileage"
+                    type="number"
+                    min="0"
+                    placeholder="Miles driven"
+                    value={mileage}
+                    onChange={(e) => setMileage(e.target.value)}
+                    data-testid="input-mileage"
+                  />
+                </div>
               </>
             )}
 
@@ -264,9 +318,11 @@ export function TimeTrackingDropdownItems() {
               <Label htmlFor="notes">Notes (Optional)</Label>
               <Textarea
                 id="notes"
-                placeholder={timeType === "organizational" 
-                  ? "e.g., Team meeting, training, administrative work..."
-                  : "Add any notes about this time entry..."}
+                placeholder={
+                  timeType === "organizational"
+                    ? "e.g., Team meeting, training, administrative work..."
+                    : "Add any notes about this time entry..."
+                }
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 data-testid="input-notes"

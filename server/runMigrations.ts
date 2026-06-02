@@ -888,3 +888,19 @@ export async function ensureProspectAgreementVersionColumns(): Promise<void> {
     client.release();
   }
 }
+
+export async function ensureTimeEntryV1Columns(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS work_type VARCHAR;
+      ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS mileage INTEGER;
+      ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS status VARCHAR NOT NULL DEFAULT 'draft';
+    `);
+    log("[MIGRATE] time_entries V1 columns (work_type, mileage, status) verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add time_entries V1 columns: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}

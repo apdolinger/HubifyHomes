@@ -1,0 +1,89 @@
+Future Feature Planning: Time Tracking, Job Costing, and QuickBooks Integration
+
+Do not build this yet. Please review the current Hubify codebase and advise how this should fit into the roadmap.
+
+Goal:
+Hubify should eventually help organizations track staff time, understand profitability by property, and optionally sync accounting/payroll data to QuickBooks.
+
+Core concept:
+Hubify should remain the operations platform. QuickBooks should remain the accounting/payroll system.
+
+Potential future workflow:
+
+1. Team Member Clock In / Clock Out
+   Staff can clock in from Hubify or Field Mode and select:
+
+* Property
+* Task/service
+* Work type
+* Billable or non-billable
+* Notes
+* Start time
+* End time
+* Optional mileage
+* Optional materials/costs
+
+2. Manager Timesheet Review
+   Admins can review:
+
+* Hours by employee
+* Hours by property
+* Billable vs non-billable time
+* Overtime flags
+* Missing clock-outs
+* Notes/photos tied to work performed
+
+3. Job Costing by Property
+   Hubify should calculate:
+
+* Labor cost
+* Mileage cost
+* Material cost
+* Vendor cost
+* Total cost per property
+* Revenue per property
+* Profitability per property
+
+4. Billable Time to Invoice
+   For billable work:
+
+* Approved time entries can generate draft invoice line items
+* Example: Vendor Coordination — 2.5 hours × $85/hr = $212.50
+* Admin reviews before sending invoice
+
+5. QuickBooks Integration Later
+   Eventually sync:
+
+* Customers
+* Employees
+* Service items
+* Invoices
+* Payments
+* Time activities
+* Possibly payroll exports
+
+Important:
+QuickBooks should not receive operational data like inspections, reports, occupancy, property timelines, or internal tasks unless needed for billing/accounting.
+
+Please audit what already exists around:
+
+* Time tracking
+* Clock in/out
+* Billable flags
+* Time reports
+* Payroll exports
+* Invoice line-item generation
+* QuickBooks readiness
+
+Then recommend:
+
+1. What is already built
+2. What needs cleanup
+3. What should be added for Version 1
+4. What should wait until Version 2
+5. Whether QuickBooks should be before or after real beta feedback from Brittany and Trent
+
+My current instinct:
+
+* Time tracking/job costing could be Version 1.
+* QuickBooks integration should wait until after beta feedback.

@@ -1,0 +1,120 @@
+Task #237 — Time Tracking V1 Completion
+
+Based on the audit, time tracking is largely implemented.
+
+Goal:
+Complete the existing system so beta organizations can realistically use it for field staff management, billable work tracking, and future job costing.
+
+Please focus only on completing and polishing the current time-tracking system.
+
+Phase 1 Requirements
+
+1. Work Type
+   Add a workType field to time entries.
+
+Suggested values:
+
+* Inspection
+* Home Watch Visit
+* Maintenance
+* Vendor Coordination
+* Travel
+* Administrative
+* Cleaning
+* Welcome Home Service
+* Departure Service
+* Other
+
+Visible on:
+
+* Clock-in flow
+* Time entry edit screen
+* Reports
+
+2. Mileage Tracking
+   Add optional mileage field.
+
+Requirements:
+
+* Miles driven
+* Included in reports
+* Stored on time entry
+* Visible in admin review
+
+No reimbursement calculations yet.
+
+3. Approval Workflow
+   Add status:
+
+* Draft
+* Pending Approval
+* Approved
+* Rejected
+
+Requirements:
+
+* Staff submit entries
+* Managers approve/reject
+* Approved entries become locked
+* Rejected entries require correction
+
+4. Missing Clock-Out Detection
+   Flag entries that remain open beyond a configurable threshold.
+
+Default:
+12 hours
+
+Show:
+
+* Dashboard warning
+* Time Tracking warning
+* Admin notification
+
+5. Overtime Detection
+   Flag employees exceeding:
+
+40 hours per week
+
+Show:
+
+* Badge in reports
+* Warning in admin review
+
+No payroll calculations.
+
+6. Live PDF Reports
+   Replace sample PDF generator.
+
+Generate actual time reports from real data.
+
+Phase 2 Requirements
+
+7. Approved Time → Draft Invoice
+   Allow managers to:
+
+* Select approved billable entries
+* Generate draft invoice
+* Review invoice
+* Send invoice
+
+Do not auto-send.
+
+Validation
+
+Please provide:
+
+* Screenshots
+* End-to-end test results
+* Approval workflow demonstration
+* Invoice generation demonstration
+
+Out of Scope
+
+* QuickBooks integration
+* Payroll integration
+* Profitability dashboards
+* Materials costing
+* Photo capture
+* Revenue analytics
+
+These will be considered after beta feedback.

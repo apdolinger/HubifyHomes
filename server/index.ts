@@ -523,6 +523,12 @@ app.use((req, res, next) => {
       } catch (err) {
         console.error('Error ensuring prospect agreement version columns:', err);
       }
+      try {
+        const { ensureTimeEntryV1Columns } = await import('./runMigrations.js');
+        await ensureTimeEntryV1Columns();
+      } catch (err) {
+        console.error('Error ensuring time entry V1 columns:', err);
+      }
     } catch (error) {
       console.error('Error loading startup migrations:', error);
     }

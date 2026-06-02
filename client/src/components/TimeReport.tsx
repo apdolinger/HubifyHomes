@@ -27,9 +27,11 @@ interface ReportBucket {
   nonBillableHours: number;
   billableAmountCents: number;
   entryCount: number;
+  totalMileage?: number;
 }
 
 interface ReportGroup extends ReportBucket {
+  overtimeFlag?: boolean;
   breakdown: ReportBucket[];
 }
 
@@ -43,6 +45,7 @@ interface ReportResponse {
     activeUsers: number;
     activeProperties: number;
     entryCount: number;
+    totalMileage?: number;
   };
   groups: ReportGroup[];
 }
@@ -322,7 +325,18 @@ export default function TimeReport({ users, properties, tasks, onDrillIn }: Prop
             </div>
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => {
+                const url = `/api/time-entries/report.pdf?${queryString}`;
+                window.open(url, "_blank");
+              }}
+              variant="outline"
+              disabled={!report || report.groups.length === 0}
+              data-testid="button-export-pdf"
+            >
+              <Download className="w-4 h-4 mr-2" /> Export PDF
+            </Button>
             <Button onClick={exportCSV} variant="outline" disabled={!report || report.groups.length === 0} data-testid="button-export-report">
               <Download className="w-4 h-4 mr-2" /> Export CSV
             </Button>
@@ -337,8 +351,24 @@ export default function TimeReport({ users, properties, tasks, onDrillIn }: Prop
         <SummaryCard label="Non-Billable" value={fmtHours(totals?.nonBillableHours ?? 0)} icon={<Clock className="w-4 h-4" />} testId="summary-nonbillable-hours" />
         <SummaryCard label="Billable $" value={fmtMoney(totals?.billableAmountCents ?? 0)} icon={<DollarSign className="w-4 h-4" />} testId="summary-billable-amount" />
         <SummaryCard label="Employees" value={String(totals?.activeUsers ?? 0)} icon={<Users className="w-4 h-4" />} testId="summary-active-users" />
-        <SummaryCard label="Properties" value={String(totals?.activeProperties ?? 0)} icon={<Building2 className="w-4 h-4" />} testId="summary-active-properties" />
+        {(totals?.totalMileage ?? 0) > 0
+          ? <SummaryCard label="Total Miles" value={`${totals!.totalMileage} mi`} icon={<Building2 className="w-4 h-4" />} testId="summary-total-mileage" />
+          : <SummaryCard label="Properties" value={String(totals?.activeProperties ?? 0)} icon={<Building2 className="w-4 h-4" />} testId="summary-active-properties" />
+        }
       </div>
+
+      {/* Overtime alert banner */}
+      {groupBy === "user" && report && report.groups.some((g) => g.overtimeFlag) && (
+        <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200" data-testid="overtime-alert">
+          <span className="text-amber-600 mt-0.5">⚠</span>
+          <div>
+            <p className="text-sm font-medium text-amber-800">Overtime Detected</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              {report.groups.filter((g) => g.overtimeFlag).map((g) => g.label).join(", ")} exceeded 40 hours in at least one work week.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Grouped table */}
       <Card>
@@ -387,14 +417,25 @@ export default function TimeReport({ users, properties, tasks, onDrillIn }: Prop
                         </Button>
                       </TableCell>
                       <TableCell>
-                        <button
-                          className="font-medium text-left hover:underline disabled:text-slate-700 disabled:no-underline"
-                          onClick={() => handleDrill(g)}
-                          disabled={g.key === "unassigned"}
-                          data-testid={`link-drill-${g.key}`}
-                        >
-                          {g.label}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            className="font-medium text-left hover:underline disabled:text-slate-700 disabled:no-underline"
+                            onClick={() => handleDrill(g)}
+                            disabled={g.key === "unassigned"}
+                            data-testid={`link-drill-${g.key}`}
+                          >
+                            {g.label}
+                          </button>
+                          {g.overtimeFlag && (
+                            <span
+                              className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200"
+                              title="Overtime: exceeded 40h in at least one work week"
+                              data-testid={`overtime-badge-${g.key}`}
+                            >
+                              ⚠ OT
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">{fmtHours(g.totalHours)}</TableCell>
                       <TableCell className="text-right">{fmtHours(g.billableHours)}</TableCell>

@@ -8191,19 +8191,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         nonBillableHours: number;
         billableAmountCents: number;
         entryCount: number;
+        totalMileage: number;
         breakdown: Map<string, Bucket>;
       };
 
       const makeBucket = (key: string, label: string): Bucket => ({
         key, label,
         totalHours: 0, billableHours: 0, nonBillableHours: 0,
-        billableAmountCents: 0, entryCount: 0, breakdown: new Map(),
+        billableAmountCents: 0, entryCount: 0, totalMileage: 0, breakdown: new Map(),
       });
 
       const groups = new Map<string, Bucket>();
       const activeUserIds = new Set<string>();
       const activePropertyIds = new Set<string>();
-      let totalHours = 0, billableHours = 0, nonBillableHours = 0, billableAmountCents = 0;
+      let totalHours = 0, billableHours = 0, nonBillableHours = 0, billableAmountCents = 0, totalMileage = 0;
+
+      // Per-user per-week hour tracking for overtime detection (Mon-start ISO week)
+      const userWeekHours = new Map<string, Map<string, number>>();
+      const getWeekKey = (date: Date): string => {
+        const d = new Date(date);
+        const day = d.getDay();
+        d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+        return d.toISOString().slice(0, 10);
+      };
 
       for (const entry of entries) {
         const hours = computeHours(entry);
@@ -8211,12 +8221,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const amountCents = isBillable && entry.billableRateCents
           ? Math.round((entry.billableRateCents) * hours)
           : 0;
+        const entryMileage = (entry as any).mileage ?? 0;
 
         totalHours += hours;
         if (isBillable) billableHours += hours; else nonBillableHours += hours;
         billableAmountCents += amountCents;
+        totalMileage += entryMileage;
         activeUserIds.add(entry.userId);
         if (entry.propertyId) activePropertyIds.add(String(entry.propertyId));
+
+        // Accumulate per-user weekly hours for overtime
+        const weekKey = getWeekKey(new Date(entry.clockIn));
+        if (!userWeekHours.has(entry.userId)) userWeekHours.set(entry.userId, new Map());
+        const wm = userWeekHours.get(entry.userId)!;
+        wm.set(weekKey, (wm.get(weekKey) ?? 0) + hours);
 
         const primaryKey = groupBy === 'user'
           ? (entry.userId || 'unassigned')
@@ -8231,6 +8249,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (isBillable) g.billableHours += hours; else g.nonBillableHours += hours;
         g.billableAmountCents += amountCents;
         g.entryCount += 1;
+        g.totalMileage += entryMileage;
 
         const subKey = groupBy === 'user'
           ? (entry.propertyId ? String(entry.propertyId) : 'unassigned')
@@ -8247,6 +8266,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sub.entryCount += 1;
       }
 
+      // Build overtime flag map: true if user exceeded 40h in any single ISO week
+      const userOvertimeFlags = new Map<string, boolean>();
+      for (const [uid, weekMap] of userWeekHours) {
+        userOvertimeFlags.set(uid, Array.from(weekMap.values()).some((h) => h > 40));
+      }
+
       const serializeBucket = (b: Bucket) => ({
         key: b.key,
         label: b.label,
@@ -8255,6 +8280,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         nonBillableHours: Number(b.nonBillableHours.toFixed(2)),
         billableAmountCents: b.billableAmountCents,
         entryCount: b.entryCount,
+        totalMileage: b.totalMileage,
       });
 
       const result = {
@@ -8267,11 +8293,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           activeUsers: activeUserIds.size,
           activeProperties: activePropertyIds.size,
           entryCount: entries.length,
+          totalMileage,
         },
         groups: Array.from(groups.values())
           .sort((a, b) => b.totalHours - a.totalHours)
           .map((g) => ({
             ...serializeBucket(g),
+            overtimeFlag: groupBy === 'user' ? (userOvertimeFlags.get(g.key) ?? false) : false,
             breakdown: Array.from(g.breakdown.values())
               .sort((a, b) => b.totalHours - a.totalHours)
               .map(serializeBucket),
@@ -8285,6 +8313,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Live time-report PDF — mirrors the JSON report route but returns a PDF
+  app.get("/api/time-entries/report.pdf", isAuthenticated, requireFeatureFlag("advanced_reporting"), async (req: any, res) => {
+    try {
+      const user = req.user;
+      const userId = user.claims?.sub || user.id;
+      const dbUser = userId ? await storage.getUser(userId) : null;
+      const orgId = dbUser?.orgId || user.claims?.orgId || user.orgId;
+      const role = dbUser?.role || user.claims?.role;
+
+      if (!orgId) return res.status(400).json({ message: "Organization ID is required" });
+      if (role !== 'admin' && role !== 'supervisor') return res.status(403).json({ message: "Only admins and supervisors can export time reports" });
+
+      const groupBy: "user" | "property" = req.query.groupBy === 'property' ? 'property' : 'user';
+      const billableFilterQ = typeof req.query.billable === 'string' ? req.query.billable : 'all';
+      const startDateRaw = typeof req.query.startDate === 'string' ? req.query.startDate : undefined;
+      const endDateRaw = typeof req.query.endDate === 'string' ? req.query.endDate : undefined;
+
+      const filters: any = {};
+      if (typeof req.query.userId === 'string') filters.userId = req.query.userId;
+      if (typeof req.query.propertyId === 'string') { const n = parseInt(req.query.propertyId); if (Number.isFinite(n)) filters.propertyId = n; }
+      if (typeof req.query.taskId === 'string') { const n = parseInt(req.query.taskId); if (Number.isFinite(n)) filters.taskId = n; }
+      if (startDateRaw) filters.startDate = startDateRaw;
+      if (endDateRaw) filters.endDate = `${endDateRaw}T23:59:59.999Z`;
+
+      const allEntries: any[] = await storage.getTimeEntries(orgId, filters);
+      const entries = allEntries.filter((e: any) => {
+        if (billableFilterQ === 'billable') return e.isBillable === true;
+        if (billableFilterQ === 'nonbillable') return e.isBillable === false;
+        return true;
+      });
+
+      const [allUsers, allProperties] = await Promise.all([
+        storage.getUsersByOrg(orgId),
+        storage.getProperties(true, orgId),
+      ]);
+      const userMap = new Map<string, string>(
+        allUsers.map((u: any) => [u.id, `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || u.email || u.id])
+      );
+      const propertyMap = new Map<number, string>(
+        allProperties.map((p: any) => [p.id, p.name])
+      );
+
+      const computeH = (e: any) => {
+        const ms = Math.max(0, (e.clockOut ? new Date(e.clockOut) : new Date()).getTime() - new Date(e.clockIn).getTime());
+        return ms / 3600000;
+      };
+
+      type PBucket = { key: string; label: string; totalHours: number; billableHours: number; nonBillableHours: number; billableAmountCents: number; entryCount: number; totalMileage: number; breakdown: Map<string, PBucket> };
+      const mb = (key: string, label: string): PBucket => ({ key, label, totalHours: 0, billableHours: 0, nonBillableHours: 0, billableAmountCents: 0, entryCount: 0, totalMileage: 0, breakdown: new Map() });
+
+      const groups = new Map<string, PBucket>();
+      const userWeekHours = new Map<string, Map<string, number>>();
+      const getWK = (d: Date) => { const x = new Date(d); const day = x.getDay(); x.setDate(x.getDate() + (day === 0 ? -6 : 1 - day)); return x.toISOString().slice(0, 10); };
+      let th = 0, bh = 0, nbh = 0, bac = 0, tm = 0;
+
+      for (const e of entries) {
+        const h = computeH(e), bil = e.isBillable !== false, ac = bil && e.billableRateCents ? Math.round(e.billableRateCents * h) : 0, mi = e.mileage ?? 0;
+        th += h; if (bil) bh += h; else nbh += h; bac += ac; tm += mi;
+        const wk = getWK(new Date(e.clockIn));
+        if (!userWeekHours.has(e.userId)) userWeekHours.set(e.userId, new Map());
+        const wm = userWeekHours.get(e.userId)!; wm.set(wk, (wm.get(wk) ?? 0) + h);
+        const pk = groupBy === 'user' ? (e.userId || 'x') : (e.propertyId ? String(e.propertyId) : 'x');
+        const pl = groupBy === 'user' ? (userMap.get(e.userId) || 'Unknown') : (e.propertyId ? (propertyMap.get(e.propertyId) || `#${e.propertyId}`) : '(No Property)');
+        let g = groups.get(pk); if (!g) { g = mb(pk, pl); groups.set(pk, g); }
+        g.totalHours += h; if (bil) g.billableHours += h; else g.nonBillableHours += h; g.billableAmountCents += ac; g.entryCount++; g.totalMileage += mi;
+        const sk = groupBy === 'user' ? (e.propertyId ? String(e.propertyId) : 'x') : (e.userId || 'x');
+        const sl = groupBy === 'user' ? (e.propertyId ? (propertyMap.get(e.propertyId) || `#${e.propertyId}`) : '(No Property)') : (userMap.get(e.userId) || 'Unknown');
+        let sub = g.breakdown.get(sk); if (!sub) { sub = mb(sk, sl); g.breakdown.set(sk, sub); }
+        sub.totalHours += h; if (bil) sub.billableHours += h; else sub.nonBillableHours += h; sub.billableAmountCents += ac; sub.entryCount++;
+      }
+
+      const overFlags = new Map<string, boolean>();
+      for (const [uid, wm] of userWeekHours) overFlags.set(uid, Array.from(wm.values()).some((v) => v > 40));
+
+      const dateRange = [startDateRaw, endDateRaw].filter(Boolean).join(' – ') || 'All dates';
+      const billableFilter = billableFilterQ === 'billable' ? 'Billable Only' : billableFilterQ === 'nonbillable' ? 'Non-Billable Only' : 'All';
+
+      const { generateLiveTimeReportPdf } = await import("./pdfGenerators/timeReportPdf.js");
+      const reportData = {
+        groupBy: groupBy as "user" | "property",
+        dateRange,
+        billableFilter,
+        totals: { totalHours: th, billableHours: bh, nonBillableHours: nbh, billableAmountCents: bac, activeUsers: 0, activeProperties: 0, entryCount: entries.length, totalMileage: tm },
+        groups: Array.from(groups.values()).sort((a, b) => b.totalHours - a.totalHours).map((g) => ({
+          key: g.key, label: g.label,
+          totalHours: g.totalHours, billableHours: g.billableHours, nonBillableHours: g.nonBillableHours,
+          billableAmountCents: g.billableAmountCents, entryCount: g.entryCount, totalMileage: g.totalMileage,
+          overtimeFlag: groupBy === 'user' ? (overFlags.get(g.key) ?? false) : false,
+          breakdown: Array.from(g.breakdown.values()).sort((a, b) => b.totalHours - a.totalHours).map((s) => ({
+            key: s.key, label: s.label, totalHours: s.totalHours, billableHours: s.billableHours,
+            nonBillableHours: s.nonBillableHours, billableAmountCents: s.billableAmountCents, entryCount: s.entryCount,
+          })),
+        })),
+      };
+
+      const buf = await generateLiveTimeReportPdf(reportData);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="time-report-${startDateRaw ?? 'all'}-to-${endDateRaw ?? 'all'}.pdf"`);
+      res.send(buf);
+    } catch (error) {
+      console.error("Error generating live time report PDF:", error);
+      res.status(500).json({ message: "Failed to generate time report PDF" });
+    }
+  });
+
   app.get("/api/time-entries/active", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -8293,6 +8426,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching active time entry:", error);
       res.status(500).json({ message: "Failed to fetch active time entry" });
+    }
+  });
+
+  app.get("/api/time-entries/missing-clockout", isAuthenticated, requireFeatureFlag("task_cost_tracking"), async (req: any, res) => {
+    try {
+      const user = req.user;
+      const orgId = user.orgId;
+      const canViewAll = user.role === 'admin' || user.role === 'supervisor';
+      const userId = user.claims?.sub || user.id;
+      const thresholdHours = 12;
+      const cutoff = new Date(Date.now() - thresholdHours * 60 * 60 * 1000);
+
+      const allEntries = await storage.getTimeEntries(orgId);
+      const missing = allEntries.filter((entry: any) =>
+        !entry.clockOut &&
+        new Date(entry.clockIn) < cutoff &&
+        (canViewAll || entry.userId === userId)
+      );
+
+      res.json({ count: missing.length, thresholdHours, entries: missing });
+    } catch (error) {
+      console.error("Error fetching missing clock-outs:", error);
+      res.status(500).json({ message: "Failed to fetch missing clock-outs" });
     }
   });
 
@@ -8328,7 +8484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "You already have an active time entry. Please clock out first." });
       }
 
-      const { propertyId, taskId, notes } = req.body;
+      const { propertyId, taskId, notes, workType, mileage } = req.body;
 
       let billableRate: number | null = null;
 
@@ -8348,6 +8504,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         taskId: taskId ? parseInt(taskId) : null,
         notes: notes || null,
         billableRateCents: billableRate,
+        workType: workType || null,
+        mileage: mileage != null ? parseInt(mileage) : null,
+        status: 'draft',
       };
 
       const validatedData = insertTimeEntrySchema.parse(entryData);
@@ -8390,6 +8549,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Submit a time entry for manager approval (staff action)
+  app.post("/api/time-entries/:id/submit", isAuthenticated, requireFeatureFlag("task_cost_tracking"), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+
+      const entry = await storage.getTimeEntry(id);
+      if (!entry) return res.status(404).json({ message: "Time entry not found" });
+
+      // Only the entry owner can submit (admins can approve directly)
+      if (entry.userId !== userId) {
+        return res.status(403).json({ message: "You can only submit your own time entries" });
+      }
+
+      if ((entry as any).status === 'approved') {
+        return res.status(400).json({ message: "Approved entries cannot be re-submitted" });
+      }
+
+      if (!(entry as any).clockOut) {
+        return res.status(400).json({ message: "Cannot submit an active (clocked-in) entry" });
+      }
+
+      const updatedEntry = await storage.updateTimeEntry(id, { status: 'pending_approval' } as any);
+      res.json(updatedEntry);
+    } catch (error) {
+      console.error("Error submitting time entry:", error);
+      res.status(500).json({ message: "Failed to submit time entry" });
+    }
+  });
+
+  // Bulk approve / reject time entries (admin/supervisor action)
+  app.post("/api/time-entries/bulk-action", isAuthenticated, requireFeatureFlag("task_cost_tracking"), async (req: any, res) => {
+    try {
+      const user = req.user;
+      const canManage = user.role === 'admin' || user.role === 'supervisor';
+      if (!canManage) return res.status(403).json({ message: "Only admins and supervisors can approve or reject entries" });
+
+      const { action, ids, rejectionNote } = req.body as { action: 'approve' | 'reject'; ids: number[]; rejectionNote?: string };
+      if (!['approve', 'reject'].includes(action)) {
+        return res.status(400).json({ message: "action must be 'approve' or 'reject'" });
+      }
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ message: "ids must be a non-empty array" });
+      }
+
+      const newStatus = action === 'approve' ? 'approved' : 'rejected';
+      const results: any[] = [];
+
+      for (const id of ids) {
+        const entry = await storage.getTimeEntry(id);
+        if (!entry) continue;
+        if ((entry as any).status === 'approved' && action === 'approve') {
+          results.push({ id, skipped: true, reason: 'already approved' });
+          continue;
+        }
+        const updates: any = { status: newStatus };
+        if (action === 'reject' && rejectionNote) updates.notes = rejectionNote;
+        const updated = await storage.updateTimeEntry(id, updates);
+        results.push(updated);
+      }
+
+      res.json({ success: true, action, count: results.length, results });
+    } catch (error) {
+      console.error("Error performing bulk action on time entries:", error);
+      res.status(500).json({ message: "Failed to perform bulk action" });
+    }
+  });
+
+  // Generate a draft client invoice from approved time entries (Phase 2)
+  app.post("/api/time-entries/generate-invoice", isAuthenticated, requireFeatureFlag("task_cost_tracking"), async (req: any, res) => {
+    try {
+      const user = req.user;
+      const orgId = user.orgId;
+      const canManage = user.role === 'admin' || user.role === 'supervisor';
+      if (!canManage) return res.status(403).json({ message: "Only admins and supervisors can generate invoices" });
+
+      const { timeEntryIds, clientId, notes } = req.body as { timeEntryIds: number[]; clientId: string; notes?: string };
+      if (!Array.isArray(timeEntryIds) || timeEntryIds.length === 0) {
+        return res.status(400).json({ message: "timeEntryIds must be a non-empty array" });
+      }
+      if (!clientId) return res.status(400).json({ message: "clientId is required" });
+
+      // Fetch and validate entries
+      const validEntries: any[] = [];
+      for (const id of timeEntryIds) {
+        const entry = await storage.getTimeEntry(id);
+        if (!entry) continue;
+        if ((entry as any).orgId !== orgId) continue;
+        if ((entry as any).status !== 'approved') continue;
+        if (!entry.clockOut) continue;
+        validEntries.push(entry);
+      }
+
+      if (validEntries.length === 0) {
+        return res.status(400).json({ message: "No valid approved time entries found" });
+      }
+
+      // Build line items from entries
+      let totalAmountCents = 0;
+      const lineItems = validEntries.map((e: any) => {
+        const hours = Math.max(0, (new Date(e.clockOut).getTime() - new Date(e.clockIn).getTime()) / 3600000);
+        const rate = e.billableRateCents ?? 0;
+        const total = Math.round(rate * hours);
+        totalAmountCents += total;
+        const desc = [e.workType, e.notes].filter(Boolean).join(' — ') || 'Time Entry';
+        return {
+          description: `${desc} (${hours.toFixed(2)}h @ $${(rate / 100).toFixed(2)}/hr)`,
+          quantity: Math.round(hours * 100) / 100,
+          unitAmountCents: rate,
+          totalCents: total,
+        };
+      });
+
+      // Find the client record for this contact
+      // clientId from the frontend is the contacts table integer id (as a string)
+      const clients = await storage.getClients(orgId);
+      const client = clients.find((c: any) =>
+        String(c.contactId) === String(clientId) || c.id === clientId
+      );
+      if (!client) {
+        return res.status(404).json({ message: "Client not found. Make sure this contact has been set up as a client." });
+      }
+
+      const invoiceData = {
+        orgId,
+        clientId: client.id,
+        amountCents: totalAmountCents,
+        currency: 'usd',
+        status: 'draft' as const,
+        lineItems,
+        description: notes || `Time entries for ${validEntries.length} entr${validEntries.length === 1 ? 'y' : 'ies'}`,
+        createdBy: user.claims?.sub || user.id,
+      };
+
+      const invoice = await storage.createClientInvoice(invoiceData as any);
+      res.status(201).json({ invoice, entryCount: validEntries.length, totalAmountCents });
+    } catch (error) {
+      console.error("Error generating invoice from time entries:", error);
+      res.status(500).json({ message: "Failed to generate invoice" });
+    }
+  });
+
   app.patch("/api/time-entries/:id", isAuthenticated, requireFeatureFlag("task_cost_tracking"), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -8400,14 +8701,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Time entry not found" });
       }
 
+      // Approved entries are locked — no edits allowed
+      if ((entry as any).status === 'approved') {
+        return res.status(403).json({ message: "Approved entries are locked and cannot be edited" });
+      }
+
       // Check if user has permission to fully edit time entries
       const canFullyEdit = user.role === 'admin' || user.role === 'supervisor';
+      const userId = user.claims?.sub || user.id;
+
+      // Staff can only edit their own entries
+      if (!canFullyEdit && entry.userId !== userId) {
+        return res.status(403).json({ message: "You can only edit your own time entries" });
+      }
 
       const updates: any = {};
       
-      // Everyone can edit notes and billable rate
+      // Everyone can edit: notes, workType, mileage, billable rate
       if (req.body.notes !== undefined) updates.notes = req.body.notes;
       if (req.body.billableRateCents !== undefined) updates.billableRateCents = req.body.billableRateCents;
+      if (req.body.workType !== undefined) updates.workType = req.body.workType || null;
+      if (req.body.mileage !== undefined) updates.mileage = req.body.mileage != null ? parseInt(req.body.mileage) : null;
 
       // Only admins and supervisors can edit all other fields
       if (canFullyEdit) {
@@ -8416,6 +8730,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (req.body.userId !== undefined) updates.userId = req.body.userId;
         if (req.body.propertyId !== undefined) updates.propertyId = req.body.propertyId ? parseInt(req.body.propertyId) : null;
         if (req.body.taskId !== undefined) updates.taskId = req.body.taskId ? parseInt(req.body.taskId) : null;
+      }
+
+      // If editing a rejected entry, move it back to draft
+      if ((entry as any).status === 'rejected' && Object.keys(updates).length > 0) {
+        updates.status = 'draft';
       }
 
       const updatedEntry = await storage.updateTimeEntry(id, updates);
