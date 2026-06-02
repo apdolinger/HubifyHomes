@@ -17224,6 +17224,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stageHistory: updatedHistory,
       } as any);
 
+      // Send confirmation email (non-blocking — failures are logged but do not affect the response)
+      if (resend) {
+        const baseUrl = getAppBaseUrl();
+        const onboardingUrl = `${baseUrl}/onboarding/${token}`;
+        const signedAt = now.toLocaleString("en-US", { month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" });
+        const versionLabel = agreementVersion ? ` (v${agreementVersion})` : "";
+        const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@hubifyhomes.com";
+
+        resend.emails.send({
+          from: fromEmail,
+          to: prospect.email,
+          subject: "You've signed the Hubify Beta Agreement",
+          html: `
+            <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
+              <div style="text-align:center;margin-bottom:28px">
+                <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="180" style="width:180px;max-width:180px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
+              </div>
+              <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 16px">Agreement Signed — You're In!</h1>
+              <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
+                Hi ${signerName}, thanks for signing the Hubify Beta Agreement${versionLabel}. Your onboarding step has been recorded — here's a summary for your records.
+              </p>
+              <table style="width:100%;border-collapse:collapse;font-size:14px;margin:0 0 28px">
+                <tr>
+                  <td style="padding:8px 0;color:#64748b;width:160px;vertical-align:top">Signer name</td>
+                  <td style="padding:8px 0;color:#0f172a;font-weight:600">${signerName}</td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;color:#64748b;vertical-align:top">Organization</td>
+                  <td style="padding:8px 0;color:#0f172a;font-weight:600">${organizationName}</td>
+                </tr>
+                ${agreementVersion ? `
+                <tr>
+                  <td style="padding:8px 0;color:#64748b;vertical-align:top">Agreement version</td>
+                  <td style="padding:8px 0;color:#0f172a">${agreementVersion}</td>
+                </tr>` : ""}
+                <tr>
+                  <td style="padding:8px 0;color:#64748b;vertical-align:top">Signed at</td>
+                  <td style="padding:8px 0;color:#0f172a">${signedAt}</td>
+                </tr>
+              </table>
+              <div style="text-align:center;margin:0 0 28px">
+                <a href="${onboardingUrl}" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:6px">Continue to Payment Setup</a>
+              </div>
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px">
+              <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
+                You received this because you signed the Hubify Beta Agreement. If you have questions, reply to this email or contact <a href="mailto:support@hubifyhomesonline.com" style="color:#0d9488">support@hubifyhomesonline.com</a>.
+              </p>
+            </div>
+          `,
+        })
+          .then((r: any) => console.log(`[accept-agreement] confirmation email sent to ${prospect.email} resend_id=${r?.data?.id}`))
+          .catch((err: any) => console.warn("[accept-agreement] confirmation email failed (non-fatal):", err));
+      }
+
       res.json({ success: true, message: "Agreement accepted. Proceeding to payment setup." });
     } catch (error) {
       console.error("Error accepting agreement:", error);
