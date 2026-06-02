@@ -12698,6 +12698,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/orgs/:orgId/beta-checklist", isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      const user = req.user as any;
+      const userOrgId = user?.claims?.orgId || user?.orgId;
+      const userRole = user?.claims?.role || user?.role;
+      if (userOrgId !== orgId && userRole !== "admin" && userRole !== "super_admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const [org, properties, contacts, invitations, stripeConnection, allTasks, allInvoices] = await Promise.all([
+        storage.getOrganization(orgId),
+        storage.getProperties(true, orgId),
+        storage.getContacts(true, orgId),
+        storage.getPortalInvitationsByOrg(orgId),
+        storage.getOrgStripeConnection(orgId),
+        storage.getTasks(orgId),
+        storage.getClientInvoices(orgId),
+      ]);
+
+      if (!org) return res.status(404).json({ message: "Organization not found" });
+
+      const branding = (org.branding as any) ?? {};
+
+      const items = [
+        {
+          key: "profile",
+          label: "Complete company profile",
+          description: "Add your phone number and address so clients can reach you.",
+          done: !!(org.phone && (org.city || (org as any).address1)),
+          href: "/account?tab=company",
+          icon: "Building2",
+        },
+        {
+          key: "logo",
+          label: "Upload your logo",
+          description: "Add your company logo for a professional branded experience.",
+          done: !!branding.logo,
+          href: "/account?tab=branding",
+          icon: "Image",
+        },
+        {
+          key: "branding",
+          label: "Configure portal branding",
+          description: "Set your brand colors so clients see your identity in the portal.",
+          done: !!branding.primaryColor,
+          href: "/account?tab=branding",
+          icon: "Palette",
+        },
+        {
+          key: "stripe",
+          label: "Connect Stripe",
+          description: "Accept online payments directly from clients.",
+          done: !!(stripeConnection?.isActive),
+          href: "/settings/stripe",
+          icon: "CreditCard",
+        },
+        {
+          key: "webhook",
+          label: "Configure payment webhooks",
+          description: "Receive real-time payment status updates in Hubify.",
+          done: !!(stripeConnection?.stripeWebhookSecret) || !!(process.env.STRIPE_ORG_WEBHOOK_SECRET),
+          href: "/settings/stripe",
+          icon: "Webhook",
+        },
+        {
+          key: "property",
+          label: "Add your first property",
+          description: "Create the first property in your managed portfolio.",
+          done: properties.length > 0,
+          href: "/properties",
+          icon: "Home",
+        },
+        {
+          key: "contact",
+          label: "Add your first client",
+          description: "Add an owner, tenant, or client contact.",
+          done: contacts.length > 0,
+          href: "/people",
+          icon: "Users",
+        },
+        {
+          key: "invitation",
+          label: "Send a portal invitation",
+          description: "Invite a client to view their property portal.",
+          done: invitations.length > 0,
+          href: "/hubify-console",
+          icon: "Mail",
+        },
+        {
+          key: "inspection",
+          label: "Complete your first inspection",
+          description: "Run a property inspection task with a checklist.",
+          done: allTasks.some((t: any) => t.category === "inspection" && t.status === "completed"),
+          href: "/tasks",
+          icon: "ClipboardCheck",
+        },
+        {
+          key: "invoice",
+          label: "Send your first invoice",
+          description: "Create and send an invoice to a client.",
+          done: allInvoices.some((inv: any) => inv.sentAt != null || inv.status === "open" || inv.status === "paid"),
+          href: "/invoices/clients",
+          icon: "FileText",
+        },
+      ];
+
+      const completedCount = items.filter(i => i.done).length;
+      const total = items.length;
+      const percentage = Math.round((completedCount / total) * 100);
+      const nextItem = items.find(i => !i.done) ?? null;
+      const isComplete = completedCount === total;
+
+      res.json({ items, completedCount, total, percentage, nextItem, isComplete });
+    } catch (error) {
+      console.error("Error fetching beta checklist:", error);
+      res.status(500).json({ message: "Failed to fetch beta checklist" });
+    }
+  });
+
   app.post("/api/orgs/:orgId/stripe-connect/account-link", isAuthenticated, async (req, res) => {
     try {
       const { orgId } = req.params;

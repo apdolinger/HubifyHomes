@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useTaskModal } from "@/contexts/TaskModalContext";
@@ -19,6 +19,7 @@ import {
   Building, 
   AlertTriangle, 
   CheckCircle, 
+  CheckCircle2,
   Users, 
   Plus,
   ArrowRight,
@@ -43,6 +44,7 @@ import {
   UserPlus,
   LayoutDashboard,
   ChevronRight,
+  Rocket,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { prefStorage } from "@/lib/cookieConsent";
@@ -50,6 +52,117 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { useLocation } from "wouter";
 import DashboardCustomizationModal from "@/components/DashboardCustomizationModal";
 import { CalendarWidget, SupportWidget, DuplicatesWidget, BillingWidget } from "@/components/DashboardWidgets";
+
+// ─── Setup Progress Card ───────────────────────────────────────────────────────
+// Compact beta-readiness card shown on the dashboard until dismissed or complete.
+
+function SetupProgressCard({ user }: { user: any }) {
+  const [, setLocation] = useLocation();
+  const DISMISS_KEY = "hubify_setup_card_dismissed_v1";
+
+  const [dismissed, setDismissed] = useState(() => {
+    try { return localStorage.getItem(DISMISS_KEY) === "true"; } catch { return false; }
+  });
+
+  const orgId = (user as any)?.orgId;
+
+  const { data } = useQuery<{
+    completedCount: number;
+    total: number;
+    percentage: number;
+    nextItem: { label: string; href: string } | null;
+    isComplete: boolean;
+  }>({
+    queryKey: ["/api/orgs", orgId, "beta-checklist"],
+    queryFn: async () => {
+      const res = await fetch(`/api/orgs/${orgId}/beta-checklist`);
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: !!orgId,
+    staleTime: 60_000,
+  });
+
+  const dismiss = useCallback(() => {
+    try { localStorage.setItem(DISMISS_KEY, "true"); } catch { /* noop */ }
+    setDismissed(true);
+  }, []);
+
+  if (dismissed || !data) return null;
+  if (data.isComplete && dismissed) return null;
+
+  const { completedCount, total, percentage, nextItem, isComplete } = data;
+
+  return (
+    <div className={`mb-6 rounded-xl border p-4 relative ${
+      isComplete
+        ? "bg-emerald-50 border-emerald-200"
+        : "bg-gradient-to-r from-teal-50 to-slate-50 border-teal-100"
+    }`}>
+      <button
+        onClick={dismiss}
+        className="absolute top-3 right-3 text-slate-300 hover:text-slate-500 transition-colors"
+        aria-label="Dismiss"
+      >
+        <X className="w-4 h-4" />
+      </button>
+
+      <div className="flex items-center gap-3 pr-6">
+        {isComplete ? (
+          <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+        ) : (
+          <Rocket className="w-5 h-5 text-teal-500 flex-shrink-0" />
+        )}
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className={`text-sm font-semibold ${isComplete ? "text-emerald-700" : "text-slate-800"}`}>
+              {isComplete ? "Ready for Beta Use! 🎉" : "Getting Beta-Ready"}
+            </span>
+            <span className="text-xs text-slate-500">
+              {completedCount} of {total} steps complete
+            </span>
+            <div className="flex items-center gap-1.5">
+              <div className="w-24 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${percentage}%`,
+                    background: isComplete ? "#10b981" : "#0d9488",
+                  }}
+                />
+              </div>
+              <span className="text-xs font-medium text-slate-500">{percentage}%</span>
+            </div>
+          </div>
+
+          {!isComplete && nextItem && (
+            <p className="text-xs text-slate-500 mt-0.5">
+              Next:{" "}
+              <button
+                className="text-teal-600 hover:underline font-medium"
+                onClick={() => setLocation(nextItem.href)}
+              >
+                {nextItem.label}
+              </button>
+            </p>
+          )}
+        </div>
+
+        <button
+          onClick={() => setLocation("/setup")}
+          className={`flex-shrink-0 text-xs font-medium flex items-center gap-1 whitespace-nowrap transition-colors ${
+            isComplete
+              ? "text-emerald-600 hover:text-emerald-700"
+              : "text-teal-600 hover:text-teal-700"
+          }`}
+        >
+          View checklist <ChevronRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ─── Getting Started Card ─────────────────────────────────────────────────────
 // Shown automatically to users who created their account within the last 14 days.
@@ -714,6 +827,9 @@ function renderMessageWithMentions(content: string) {
           </div>
         </div>
       </div>
+
+      {/* Beta-readiness setup progress card — persistent until dismissed */}
+      <SetupProgressCard user={user} />
 
       {/* Getting Started welcome card — shown for users created in the last 14 days */}
       <GettingStartedCard user={user} />

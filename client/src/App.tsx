@@ -67,6 +67,7 @@ import PaymentCollectionPage from "@/pages/PaymentCollectionPage";
 import OnboardingPortal from "@/pages/OnboardingPortal";
 import InspectionReport from "@/pages/InspectionReport";
 import InspectionSchedules from "@/pages/InspectionSchedules";
+import SetupChecklist from "@/pages/SetupChecklist";
 import Navigation from "@/components/Navigation";
 import QuickSearchModal from "@/components/QuickSearchModal";
 import QuickAddTaskModal from "@/components/QuickAddTaskModal";
@@ -249,6 +250,7 @@ function Router() {
           <Route path="/billing/invoices" component={OrgBillingInvoices} />
           <Route path="/invoices/clients" component={OrgClientInvoices} />
           <Route path="/settings/stripe" component={OrgStripeSettings} />
+          <Route path="/setup" component={SetupChecklist} />
           
           {/* Backward compatibility redirects */}
           <Route path="/admin/client-portal">
