@@ -315,15 +315,18 @@ function AuthenticatedAppContent() {
     };
   }, []);
 
+  const [location] = useLocation();
+  const isOnboarding = location.startsWith("/onboarding/");
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <Navigation />
+      {!isOnboarding && <Navigation />}
       <div className="flex-1">
         <Router />
       </div>
     
-    {/* Footer - Internal Only */}
-    <footer className="bg-white border-t border-slate-200 py-4">
+    {/* Footer - Internal Only (hidden during onboarding flow) */}
+    {!isOnboarding && <footer className="bg-white border-t border-slate-200 py-4">
       <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
         <div className="text-sm text-slate-600">
           © {new Date().getFullYear()} Hubify. All rights reserved.
@@ -355,7 +358,7 @@ function AuthenticatedAppContent() {
           </a>
         </div>
       </div>
-    </footer>
+    </footer>}
     
     <QuickSearchModal 
       isOpen={isQuickSearchOpen} 

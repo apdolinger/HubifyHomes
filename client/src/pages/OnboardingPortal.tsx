@@ -125,7 +125,7 @@ function TokenError({ status, message }: { status: number; message: string }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center justify-center p-6">
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 max-w-md w-full p-10 text-center">
-        <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="h-10 w-auto mx-auto mb-8" />
+        <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="h-16 w-auto mx-auto mb-8" />
         <div className="flex justify-center mb-4">{icon}</div>
         <h1 className="text-xl font-bold text-slate-900 mb-3">
           {status === 410 ? "Link Expired" : "Invalid Link"}
@@ -540,7 +540,7 @@ export default function OnboardingPortal() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
         <div className="text-center">
-          <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="h-10 w-auto mx-auto mb-8" />
+          <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="h-16 w-auto mx-auto mb-8" />
           <Loader2 className="w-7 h-7 animate-spin text-teal-600 mx-auto" />
           <p className="mt-3 text-slate-500 text-sm">Loading your onboarding details…</p>
         </div>
@@ -567,7 +567,7 @@ export default function OnboardingPortal() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-10 px-4">
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-8">
-            <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="h-10 w-auto mx-auto mb-6" />
+            <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="h-16 w-auto mx-auto mb-6" />
             <StepIndicator current={3} />
           </div>
           <VerifyingPayment token={token!} onVerified={() => {
@@ -585,7 +585,7 @@ export default function OnboardingPortal() {
 
         {/* Header */}
         <div className="text-center mb-8">
-          <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="h-10 w-auto mx-auto mb-6" />
+          <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="h-16 w-auto mx-auto mb-6" />
           <StepIndicator current={currentStep} />
           {!agreementSigned && (
             <>
