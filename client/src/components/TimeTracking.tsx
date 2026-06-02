@@ -79,6 +79,7 @@ export function TimeTrackingDropdownItems() {
       notes?: string;
       workType?: string;
       mileage?: number;
+      isBillable?: boolean;
     }) => {
       return await apiRequest("POST", "/api/time-entries/clock-in", data);
     },
@@ -135,6 +136,7 @@ export function TimeTrackingDropdownItems() {
       notes: notes || undefined,
       workType: workType || undefined,
       mileage: mileage ? parseInt(mileage) : undefined,
+      isBillable: timeType === "client",
     };
     if (timeType === "client") {
       payload.propertyId = propertyId && propertyId !== "none" ? parseInt(propertyId) : undefined;

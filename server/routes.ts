@@ -8484,7 +8484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "You already have an active time entry. Please clock out first." });
       }
 
-      const { propertyId, taskId, notes, workType, mileage } = req.body;
+      const { propertyId, taskId, notes, workType, mileage, isBillable } = req.body;
 
       let billableRate: number | null = null;
 
@@ -8496,6 +8496,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Default isBillable to true for client time; frontend sends explicit boolean
+      const isBillableVal = typeof isBillable === 'boolean' ? isBillable : true;
+
       const entryData = {
         userId,
         orgId,
@@ -8504,6 +8507,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         taskId: taskId ? parseInt(taskId) : null,
         notes: notes || null,
         billableRateCents: billableRate,
+        isBillable: isBillableVal,
         workType: workType || null,
         mileage: mileage != null ? parseInt(mileage) : null,
         status: 'draft',
@@ -8717,11 +8721,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updates: any = {};
       
-      // Everyone can edit: notes, workType, mileage, billable rate
+      // Everyone can edit: notes, workType, mileage, billable rate, isBillable
       if (req.body.notes !== undefined) updates.notes = req.body.notes;
       if (req.body.billableRateCents !== undefined) updates.billableRateCents = req.body.billableRateCents;
       if (req.body.workType !== undefined) updates.workType = req.body.workType || null;
       if (req.body.mileage !== undefined) updates.mileage = req.body.mileage != null ? parseInt(req.body.mileage) : null;
+      if (typeof req.body.isBillable === 'boolean') updates.isBillable = req.body.isBillable;
 
       // Only admins and supervisors can edit all other fields
       if (canFullyEdit) {
