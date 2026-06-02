@@ -1155,6 +1155,9 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
   const showBetaApprovalDetails = isBetaApproved || submission.stage === "agreement_pending";
 
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [overrideDiscountPct, setOverrideDiscountPct] = useState<string>("");
+  const [overrideBetaPrice, setOverrideBetaPrice] = useState<string>("");
+  const [overrideSetupFee, setOverrideSetupFee] = useState<string>("");
 
   const betaPricingPreview = useQuery({
     queryKey: ["/api/super-admin/onboarding-prospects", submission.id, "approve-beta", "preview"],
@@ -1165,9 +1168,18 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
     staleTime: 30_000,
   });
 
+  // Pre-populate override fields when preview data arrives
+  useEffect(() => {
+    if (betaPricingPreview.data && !betaPricingPreview.data.isFull) {
+      setOverrideDiscountPct(String(betaPricingPreview.data.discountPct));
+      setOverrideBetaPrice(Number(betaPricingPreview.data.discountedMonthlyPrice).toFixed(2));
+      setOverrideSetupFee(Number(betaPricingPreview.data.setupFee).toFixed(2));
+    }
+  }, [betaPricingPreview.data]);
+
   const approveBetaMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/approve-beta`, {}),
+    mutationFn: ({ id, overrides }: { id: string; overrides: Record<string, number> }) =>
+      apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/approve-beta`, overrides),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/submissions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
@@ -1657,42 +1669,96 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
             )}
 
             {betaPricingPreview.data && !betaPricingPreview.data.isFull && (
-              <div className="rounded-lg border border-teal-200 bg-teal-50 p-4 space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">Computed Approval Details</p>
-                <table className="w-full text-sm border-collapse">
-                  <tbody>
-                    <tr>
-                      <td className="py-1 pr-3 text-teal-600 w-40">Cohort #</td>
-                      <td className="py-1 font-semibold text-teal-900">{betaPricingPreview.data.cohortNumber} of {betaPricingPreview.data.totalSlotsAvailable}</td>
-                    </tr>
-                    <tr>
-                      <td className="py-1 pr-3 text-teal-600">Portfolio Tier</td>
-                      <td className="py-1 font-semibold text-teal-900">{betaPricingPreview.data.portfolioTier}</td>
-                    </tr>
-                    <tr>
-                      <td className="py-1 pr-3 text-teal-600">Discount</td>
-                      <td className="py-1 font-semibold text-teal-900">{betaPricingPreview.data.discountPct}% off (life-locked)</td>
-                    </tr>
-                    <tr>
-                      <td className="py-1 pr-3 text-teal-600">List Price</td>
-                      <td className="py-1 font-medium text-teal-800">${Number(betaPricingPreview.data.originalMonthlyPrice).toFixed(2)}/mo</td>
-                    </tr>
-                    <tr>
-                      <td className="py-1 pr-3 text-teal-600">Beta Price</td>
-                      <td className="py-1 font-bold text-teal-900 text-base">${Number(betaPricingPreview.data.discountedMonthlyPrice).toFixed(2)}/mo</td>
-                    </tr>
-                    {betaPricingPreview.data.setupFee > 0 && (
+              <div className="space-y-3">
+                {/* Read-only cohort/tier info */}
+                <div className="rounded-lg border border-teal-200 bg-teal-50 p-4 space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">Computed Approval Details</p>
+                  <table className="w-full text-sm border-collapse">
+                    <tbody>
                       <tr>
-                        <td className="py-1 pr-3 text-teal-600">Setup Fee</td>
-                        <td className="py-1 font-semibold text-teal-900">${Number(betaPricingPreview.data.setupFee).toFixed(2)}</td>
+                        <td className="py-1 pr-3 text-teal-600 w-40">Cohort #</td>
+                        <td className="py-1 font-semibold text-teal-900">{betaPricingPreview.data.cohortNumber} of {betaPricingPreview.data.totalSlotsAvailable}</td>
                       </tr>
-                    )}
-                    <tr>
-                      <td className="py-1 pr-3 text-teal-600">Slots Remaining</td>
-                      <td className="py-1 font-semibold text-teal-900">{betaPricingPreview.data.slotsRemaining} after this approval</td>
-                    </tr>
-                  </tbody>
-                </table>
+                      <tr>
+                        <td className="py-1 pr-3 text-teal-600">Portfolio Tier</td>
+                        <td className="py-1 font-semibold text-teal-900">{betaPricingPreview.data.portfolioTier}</td>
+                      </tr>
+                      <tr>
+                        <td className="py-1 pr-3 text-teal-600">List Price</td>
+                        <td className="py-1 font-medium text-teal-800">${Number(betaPricingPreview.data.originalMonthlyPrice).toFixed(2)}/mo</td>
+                      </tr>
+                      <tr>
+                        <td className="py-1 pr-3 text-teal-600">Slots Remaining</td>
+                        <td className="py-1 font-semibold text-teal-900">{betaPricingPreview.data.slotsRemaining} after this approval</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Editable pricing overrides */}
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Pricing — Edit Before Confirming</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs text-amber-700 font-medium">Discount %</label>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={overrideDiscountPct}
+                          onChange={e => {
+                            setOverrideDiscountPct(e.target.value);
+                            const disc = Number(e.target.value);
+                            const list = Number(betaPricingPreview.data!.originalMonthlyPrice);
+                            if (!isNaN(disc) && !isNaN(list)) {
+                              setOverrideBetaPrice((list * (1 - disc / 100)).toFixed(2));
+                            }
+                          }}
+                          className="h-8 text-sm pr-6"
+                        />
+                        <span className="absolute right-2 top-1.5 text-xs text-muted-foreground">%</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-amber-700 font-medium">Beta Price/mo</label>
+                      <div className="relative">
+                        <span className="absolute left-2 top-1.5 text-xs text-muted-foreground">$</span>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={overrideBetaPrice}
+                          onChange={e => setOverrideBetaPrice(e.target.value)}
+                          className="h-8 text-sm pl-5"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-amber-700 font-medium">Setup Fee</label>
+                      <div className="relative">
+                        <span className="absolute left-2 top-1.5 text-xs text-muted-foreground">$</span>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={overrideSetupFee}
+                          onChange={e => setOverrideSetupFee(e.target.value)}
+                          className="h-8 text-sm pl-5"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="text-xs text-amber-700 underline underline-offset-2 hover:text-amber-900"
+                    onClick={() => {
+                      setOverrideDiscountPct("100");
+                      setOverrideBetaPrice("0.00");
+                      setOverrideSetupFee("0.00");
+                    }}
+                  >
+                    Set to Free (100% off)
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1715,7 +1781,13 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
               <Button
                 className="bg-teal-600 hover:bg-teal-700 text-white"
                 disabled={approveBetaMutation.isPending || betaPricingPreview.isLoading || betaPricingPreview.data?.isFull}
-                onClick={() => approveBetaMutation.mutate(submission.id)}
+                onClick={() => {
+                  const overrides: Record<string, number> = {};
+                  if (overrideDiscountPct !== "") overrides.overrideDiscountPct = Number(overrideDiscountPct);
+                  if (overrideBetaPrice !== "") overrides.overrideBetaPrice = Number(overrideBetaPrice);
+                  if (overrideSetupFee !== "") overrides.overrideSetupFee = Number(overrideSetupFee);
+                  approveBetaMutation.mutate({ id: submission.id, overrides });
+                }}
               >
                 {approveBetaMutation.isPending ? "Approving…" : "Confirm Approval"}
               </Button>

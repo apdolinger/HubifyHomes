@@ -17532,7 +17532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const cohortNumber = activeBetaCount + 1;
-      const discountPct = cohortNumber <= tier1Cap ? tier1DiscountPct : tier2DiscountPct;
+      const computedDiscountPct = cohortNumber <= tier1Cap ? tier1DiscountPct : tier2DiscountPct;
 
       // Determine portfolio tier from estimatedHomes
       const homes = (existing as any).estimatedHomes ?? 0;
@@ -17549,11 +17549,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         monthlyPrice: number; setupFee: number; startsAt?: boolean;
       }>;
       const matchedTier = pricingTiers.find(t => homes >= t.homesMin && homes <= t.homesMax);
-      const originalMonthlyPrice = matchedTier
+      const computedMonthlyPrice = matchedTier
         ? Number(matchedTier.monthlyPrice)
         : Number(bp?.basePrice ?? 199);
-      const tierSetupFee = matchedTier ? Number(matchedTier.setupFee) : 0;
-      const discountedMonthlyPrice = Math.round(originalMonthlyPrice * (1 - discountPct / 100) * 100) / 100;
+      const computedSetupFee = matchedTier ? Number(matchedTier.setupFee) : 0;
+
+      // ── Admin price overrides (optional — sent from approval dialog) ──────
+      // Super Admin can override discount %, monthly price, and/or setup fee
+      // on a per-user basis (e.g. 100% off for a free beta slot).
+      const body = req.body as any;
+      const discountPct = (typeof body.overrideDiscountPct === "number" && body.overrideDiscountPct >= 0 && body.overrideDiscountPct <= 100)
+        ? body.overrideDiscountPct
+        : computedDiscountPct;
+      const originalMonthlyPrice = (typeof body.overrideListPrice === "number" && body.overrideListPrice >= 0)
+        ? body.overrideListPrice
+        : computedMonthlyPrice;
+      const tierSetupFee = (typeof body.overrideSetupFee === "number" && body.overrideSetupFee >= 0)
+        ? body.overrideSetupFee
+        : computedSetupFee;
+      // If a beta price is explicitly passed, use it; otherwise compute from list × discount
+      const discountedMonthlyPrice = (typeof body.overrideBetaPrice === "number" && body.overrideBetaPrice >= 0)
+        ? body.overrideBetaPrice
+        : Math.round(originalMonthlyPrice * (1 - discountPct / 100) * 100) / 100;
 
       // Generate a cryptographically random URL-safe onboarding token (64 hex chars = 32 bytes).
       // The token expires in 7 days. We write it to the DB before attempting the email so the
