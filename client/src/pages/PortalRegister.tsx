@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'wouter';
+import { Link, useLocation, useSearch } from 'wouter';
 import { usePortalAuth } from '@/contexts/PortalAuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,9 +12,9 @@ import { HUBIFY_HOMES_LOGO_URL, HUBIFY_HOMES_LOGO_ALT } from '@/lib/brand';
 import { useTenant } from '@/contexts/TenantContext';
 
 export default function PortalRegister() {
-  const [location, setLocation] = useLocation();
-  const searchParams = new URLSearchParams(location.split('?')[1]);
-  const tokenFromUrl = searchParams.get('token') || '';
+  const [, setLocation] = useLocation();
+  const search = useSearch();
+  const tokenFromUrl = new URLSearchParams(search).get('token') || '';
 
   const [inviteToken, setInviteToken] = useState(tokenFromUrl);
   const [email, setEmail] = useState('');
