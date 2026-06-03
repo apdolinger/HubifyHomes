@@ -904,3 +904,34 @@ export async function ensureTimeEntryV1Columns(): Promise<void> {
     client.release();
   }
 }
+
+export async function ensureClientInvoiceRefundColumns(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE client_invoices ADD COLUMN IF NOT EXISTS stripe_charge_id VARCHAR;
+      ALTER TABLE client_invoices ADD COLUMN IF NOT EXISTS stripe_refund_id VARCHAR;
+      ALTER TABLE client_invoices ADD COLUMN IF NOT EXISTS refund_amount_cents INTEGER;
+      ALTER TABLE client_invoices ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMP;
+    `);
+    log("[MIGRATE] client_invoices refund audit columns (stripe_charge_id, stripe_refund_id, refund_amount_cents, refunded_at) verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add client_invoices refund columns: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
+export async function ensureOrgSubscriptionSetupFeeColumn(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE org_subscriptions ADD COLUMN IF NOT EXISTS setup_fee_cents INTEGER NOT NULL DEFAULT 0;
+    `);
+    log("[MIGRATE] org_subscriptions.setup_fee_cents column verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add org_subscriptions.setup_fee_cents: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}

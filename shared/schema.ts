@@ -134,6 +134,9 @@ export const orgSubscriptions = pgTable("org_subscriptions", {
   betaPriceForfeitureReason: varchar("beta_price_forfeiture_reason"),
   paymentStatus: varchar("payment_status").$type<"current" | "past_due" | "failed" | "disputed" | "refunded">(),
 
+  // Snapshot of the setup fee charged at sign-up (in cents) — used for refund proration
+  setupFeeCents: integer("setup_fee_cents").default(0),
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -270,6 +273,12 @@ export const clientInvoices = pgTable("client_invoices", {
   receiptUrl: text("receipt_url"),
   paymentMethodBrand: varchar("payment_method_brand"),
   paymentMethodLast4: varchar("payment_method_last4"),
+
+  // Refund audit trail (populated from Stripe charge.refunded webhook)
+  stripeChargeId: varchar("stripe_charge_id"),
+  stripeRefundId: varchar("stripe_refund_id"),
+  refundAmountCents: integer("refund_amount_cents"),
+  refundedAt: timestamp("refunded_at"),
 
   // Links and storage
   hostedInvoiceUrl: text("hosted_invoice_url"),

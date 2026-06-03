@@ -1,0 +1,109 @@
+Future Build: Payment Reconciliation + Refund Tracker
+
+Please audit the existing billing/payment/refund system and recommend how to build a reconciliation workflow.
+
+Problem:
+Hubify will have customers paying monthly or annually. If someone pays annually but cancels after using only part of the year, Super Admin needs to calculate and document the remaining refundable amount.
+
+Example:
+	•	Client pays annual subscription
+	•	Uses 3 months
+	•	Cancels
+	•	Super Admin needs to see:
+	•	amount paid
+	•	service period
+	•	amount used/earned
+	•	refundable balance
+	•	refund issued
+	•	remaining retained revenue
+
+We need this both for:
+	1.	Platform level:
+Hubify → Organizations
+	2.	Organization level:
+Organization → Their clients
+
+Please audit what already exists around:
+	•	Stripe payments
+	•	Subscriptions
+	•	Invoices
+	•	Refunds
+	•	Payment status
+	•	Credit memos
+	•	Cancellations
+	•	Annual billing
+	•	Proration
+	•	Revenue recognition
+	•	Admin payment history
+
+Recommended feature:
+
+Super Admin → Business / Revenue → Payment Reconciliation
+
+Should show:
+	•	Organization name
+	•	Subscription plan
+	•	Billing interval: monthly / annual
+	•	Amount paid
+	•	Payment date
+	•	Service period start/end
+	•	Months/days used
+	•	Earned amount
+	•	Unused balance
+	•	Refundable amount
+	•	Refund status
+	•	Stripe payment ID
+	•	Stripe refund ID
+	•	Notes
+	•	Internal admin who processed refund
+
+Actions:
+	•	View payment details
+	•	Calculate prorated refund
+	•	Issue refund through Stripe
+	•	Record manual refund
+	•	Mark no refund due
+	•	Add internal note
+	•	Export reconciliation report
+
+Refund calculation:
+Support:
+	•	Monthly subscriptions
+	•	Annual subscriptions
+	•	One-time setup fees
+	•	Non-refundable fees
+	•	Partial refunds
+	•	Full refunds
+	•	Manual override with required reason
+
+Important:
+Setup/database initiation fees should default to non-refundable unless Super Admin overrides.
+
+For annual subscriptions:
+Refundable amount should calculate based on unused time remaining in the paid service period.
+
+Example:
+Annual paid: $1,200
+Used: 3 months
+Earned: $300
+Unused/refundable: $900
+Setup fee: excluded unless manually refunded
+
+Org-level version:
+Organizations should eventually have the same type of reconciliation for their clients:
+	•	Client paid annual home watch service
+	•	Client cancels mid-year
+	•	Organization can calculate unused amount
+	•	Issue refund or credit
+	•	Track refund/credit history
+
+Please recommend:
+	1.	What already exists
+	2.	What data model is missing
+	3.	What Stripe supports directly
+	4.	What needs to be stored in Hubify
+	5.	Whether this should be built before or after beta
+	6.	The safest MVP version
+	7.	Any accounting/legal cautions around refund rules and non-refundable setup fees
+
+Do not build yet. First provide a gap analysis and recommended implementation plan.

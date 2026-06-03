@@ -529,6 +529,18 @@ app.use((req, res, next) => {
       } catch (err) {
         console.error('Error ensuring time entry V1 columns:', err);
       }
+      try {
+        const { ensureClientInvoiceRefundColumns } = await import('./runMigrations.js');
+        await ensureClientInvoiceRefundColumns();
+      } catch (err) {
+        console.error('Error ensuring client invoice refund columns:', err);
+      }
+      try {
+        const { ensureOrgSubscriptionSetupFeeColumn } = await import('./runMigrations.js');
+        await ensureOrgSubscriptionSetupFeeColumn();
+      } catch (err) {
+        console.error('Error ensuring org_subscriptions.setup_fee_cents column:', err);
+      }
     } catch (error) {
       console.error('Error loading startup migrations:', error);
     }

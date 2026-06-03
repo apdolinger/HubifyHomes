@@ -17064,6 +17064,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         orgId: org.id,
         tier: "starter",
         status: "trialing",
+        setupFeeCents: Math.round(((prospect as any).setupFee ?? 0) * 100),
       });
       await storage.upsertOrgSubscription(org.id, subData);
       await storage.updateOnboardingProspect(prospect.id, { orgId: org.id });
@@ -19264,6 +19265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "trialing",
         currentPeriodStart: trialStart,
         currentPeriodEnd: trialEnd,
+        setupFeeCents: Math.round(((prospect as any).setupFee ?? 0) * 100),
       });
       await storage.upsertOrgSubscription(subData);
 

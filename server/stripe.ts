@@ -471,11 +471,12 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent,
     paymentMethod: paymentIntent.payment_method_types?.[0] || "card",
     paymentDate: new Date(),
     stripePaymentIntentId: paymentIntent.id,
+    stripeChargeId: charge?.id ?? null,
     paymentError: null,
     receiptUrl,
     paymentMethodBrand,
     paymentMethodLast4,
-  });
+  } as any);
 
   // Send notification email about successful payment
   await sendPaymentSuccessNotification(invoiceId, paymentIntent.amount);
@@ -515,12 +516,27 @@ async function handleChargeRefunded(charge: Stripe.Charge, orgId: string) {
     return;
   }
 
+  // Extract the most recent refund from the charge's refund list for audit trail
+  const latestRefund = charge.refunds?.data?.[0];
+  const stripeRefundId = latestRefund?.id ?? null;
+  const refundAmountCents = latestRefund?.amount ?? charge.amount_refunded ?? null;
+  const refundedAt = latestRefund?.created
+    ? new Date(latestRefund.created * 1000)
+    : new Date();
+
   await storage.updateInvoicePaymentStatusByStripePaymentIntent(paymentIntentId, {
     paymentStatus: "refunded",
     status: "void",
-  });
+    stripeChargeId: charge.id,
+    stripeRefundId,
+    refundAmountCents,
+    refundedAt,
+  } as any);
 
-  console.log(`Charge ${charge.id} refunded for payment intent ${paymentIntentId}`);
+  console.log(
+    `Charge ${charge.id} refunded — refund ${stripeRefundId ?? "n/a"}, ` +
+    `$${((refundAmountCents ?? 0) / 100).toFixed(2)} — payment intent ${paymentIntentId}`
+  );
 }
 
 async function sendPaymentFailureNotification(invoiceId: string, errorMessage: string) {
