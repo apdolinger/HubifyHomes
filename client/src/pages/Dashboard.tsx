@@ -50,6 +50,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { prefStorage } from "@/lib/cookieConsent";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useLocation } from "wouter";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import DashboardCustomizationModal from "@/components/DashboardCustomizationModal";
 import { CalendarWidget, SupportWidget, DuplicatesWidget, BillingWidget } from "@/components/DashboardWidgets";
 
@@ -724,6 +726,16 @@ function renderMessageWithMentions(content: string) {
 
 
 
+  const { isFeatureEnabled } = useFeatureFlags();
+  const timeTrackingEnabled = isFeatureEnabled("task_cost_tracking");
+  const canManageTime = timeTrackingEnabled && ((user as any)?.role === "admin" || (user as any)?.role === "supervisor");
+
+  const { data: missingClockouts } = useQuery<{ count: number; thresholdHours: number }>({
+    queryKey: ["/api/time-entries/missing-clockout"],
+    enabled: canManageTime,
+    refetchInterval: 5 * 60 * 1000,
+  });
+
   // Get enabled widgets sorted by order
   const enabledWidgets = dashboardWidgets
     .filter((widget) => widget.enabled)
@@ -833,6 +845,25 @@ function renderMessageWithMentions(content: string) {
 
       {/* Getting Started welcome card — shown for users created in the last 14 days */}
       <GettingStartedCard user={user} />
+
+      {/* Missing clock-out alert — admin/supervisor only, requires task_cost_tracking flag */}
+      {missingClockouts && missingClockouts.count > 0 && (
+        <Alert className="mb-6 border-amber-300 bg-amber-50" data-testid="dashboard-missing-clockout-alert">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="text-amber-800">
+            {missingClockouts.count} open time entr{missingClockouts.count === 1 ? "y" : "ies"} over {missingClockouts.thresholdHours}h
+          </AlertTitle>
+          <AlertDescription className="text-amber-700">
+            Staff may have forgotten to clock out.{" "}
+            <button
+              className="underline underline-offset-2 font-medium hover:text-amber-900"
+              onClick={() => setLocation("/time-tracking")}
+            >
+              Review in Time Tracking →
+            </button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Dashboard Widgets */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
