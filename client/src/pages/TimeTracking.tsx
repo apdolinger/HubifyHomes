@@ -14,10 +14,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { Switch } from "@/components/ui/switch";
 import {
   Clock, Edit, Trash2, Filter, Download, Shield,
   AlertTriangle, Lock, CheckCircle, XCircle, Send,
-  FileText, RefreshCw
+  FileText, RefreshCw, Play, StopCircle
 } from "lucide-react";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -106,6 +107,15 @@ export default function TimeTracking() {
   const [editPropertyId, setEditPropertyId] = useState("");
   const [editTaskId, setEditTaskId] = useState("");
   const [editUserId, setEditUserId] = useState("");
+
+  // Clock-in dialog
+  const [showClockInDialog, setShowClockInDialog] = useState(false);
+  const [clockInPropertyId, setClockInPropertyId] = useState("");
+  const [clockInTaskId, setClockInTaskId] = useState("");
+  const [clockInWorkType, setClockInWorkType] = useState("");
+  const [clockInMileage, setClockInMileage] = useState("");
+  const [clockInNotes, setClockInNotes] = useState("");
+  const [clockInIsBillable, setClockInIsBillable] = useState(true);
 
   // Reject dialog
   const [showRejectDialog, setShowRejectDialog] = useState(false);
@@ -206,6 +216,40 @@ export default function TimeTracking() {
       setRejectNote("");
     },
     onError: (error: any) => toast({ title: "Error", description: error.message || "Action failed", variant: "destructive" }),
+  });
+
+  const { data: activeEntry } = useQuery<TimeEntry | null>({
+    queryKey: ["/api/time-entries/active"],
+    refetchInterval: 30000,
+  });
+
+  const clockInMutation = useMutation({
+    mutationFn: (data: { propertyId?: number | null; taskId?: number | null; workType?: string; mileage?: number | null; notes?: string; isBillable: boolean }) =>
+      apiRequest("POST", "/api/time-entries/clock-in", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/time-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/time-entries/active"] });
+      toast({ title: "Clocked In", description: "Time entry started." });
+      setShowClockInDialog(false);
+      setClockInPropertyId("");
+      setClockInTaskId("");
+      setClockInWorkType("");
+      setClockInMileage("");
+      setClockInNotes("");
+      setClockInIsBillable(true);
+    },
+    onError: (error: any) => toast({ title: "Error", description: error.message || "Failed to clock in", variant: "destructive" }),
+  });
+
+  const clockOutMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("POST", `/api/time-entries/${id}/clock-out`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/time-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/time-entries/active"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/time-entries/missing-clockout"] });
+      toast({ title: "Clocked Out", description: "Time entry completed." });
+    },
+    onError: (error: any) => toast({ title: "Error", description: error.message || "Failed to clock out", variant: "destructive" }),
   });
 
   const generateInvoiceMutation = useMutation({
@@ -357,7 +401,7 @@ export default function TimeTracking() {
           <h1 className="text-3xl font-bold text-slate-800">Time Tracking</h1>
           <p className="text-slate-600 mt-1">View and manage time entries</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap justify-end">
           {canManage && selectedEntryIds.size > 0 && (
             <Button onClick={() => setShowInvoiceDialog(true)} data-testid="button-generate-invoice">
               <FileText className="w-4 h-4 mr-2" />
@@ -368,6 +412,35 @@ export default function TimeTracking() {
             <Button onClick={exportToCSV} variant="outline" data-testid="button-export">
               <Download className="w-4 h-4 mr-2" />
               Export CSV
+            </Button>
+          )}
+          {activeEntry ? (
+            <Button
+              variant="destructive"
+              onClick={() => clockOutMutation.mutate(activeEntry.id)}
+              disabled={clockOutMutation.isPending}
+              data-testid="button-clock-out"
+            >
+              <StopCircle className="w-4 h-4 mr-2" />
+              Clock Out
+              <span className="ml-2 inline-flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                {(() => {
+                  const ms = Date.now() - new Date(activeEntry.clockIn).getTime();
+                  const h = Math.floor(ms / 3600000);
+                  const m = Math.floor((ms % 3600000) / 60000);
+                  return `${h}h ${m}m`;
+                })()}
+              </span>
+            </Button>
+          ) : (
+            <Button
+              onClick={() => setShowClockInDialog(true)}
+              className="bg-teal-600 hover:bg-teal-700 text-white"
+              data-testid="button-clock-in"
+            >
+              <Play className="w-4 h-4 mr-2" />
+              Clock In
             </Button>
           )}
         </div>
@@ -847,6 +920,117 @@ export default function TimeTracking() {
             <Button variant="outline" onClick={() => setShowRejectDialog(false)}>Cancel</Button>
             <Button variant="destructive" onClick={handleRejectConfirm} disabled={bulkActionMutation.isPending} data-testid="button-confirm-reject">
               {bulkActionMutation.isPending ? "Rejecting..." : "Reject Entry"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clock-In Dialog */}
+      <Dialog open={showClockInDialog} onOpenChange={setShowClockInDialog}>
+        <DialogContent className="max-w-lg" data-testid="dialog-clock-in">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Play className="w-4 h-4 text-teal-600" />
+              Clock In
+            </DialogTitle>
+            <DialogDescription>Start a new time entry. Select the work type and any relevant property or task.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Work Type</Label>
+              <Select value={clockInWorkType} onValueChange={setClockInWorkType}>
+                <SelectTrigger data-testid="select-clock-in-work-type">
+                  <SelectValue placeholder="Select work type (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No work type</SelectItem>
+                  {WORK_TYPES.map((wt) => (
+                    <SelectItem key={wt} value={wt}>{wt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Property</Label>
+                <Select value={clockInPropertyId} onValueChange={setClockInPropertyId}>
+                  <SelectTrigger data-testid="select-clock-in-property">
+                    <SelectValue placeholder="No property" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No property</SelectItem>
+                    {properties.map((p) => (
+                      <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Task</Label>
+                <Select value={clockInTaskId} onValueChange={setClockInTaskId}>
+                  <SelectTrigger data-testid="select-clock-in-task">
+                    <SelectValue placeholder="No task" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No task</SelectItem>
+                    {tasks.map((t) => (
+                      <SelectItem key={t.id} value={t.id.toString()}>{t.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Mileage (miles)</Label>
+              <Input
+                type="number"
+                min="0"
+                value={clockInMileage}
+                onChange={(e) => setClockInMileage(e.target.value)}
+                placeholder="e.g. 12"
+                data-testid="input-clock-in-mileage"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                value={clockInNotes}
+                onChange={(e) => setClockInNotes(e.target.value)}
+                placeholder="Any notes about this time entry..."
+                rows={2}
+                data-testid="input-clock-in-notes"
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <p className="text-sm font-medium">Billable Time</p>
+                <p className="text-xs text-muted-foreground">Mark this time as billable to a client</p>
+              </div>
+              <Switch
+                checked={clockInIsBillable}
+                onCheckedChange={setClockInIsBillable}
+                data-testid="switch-clock-in-billable"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowClockInDialog(false)}>Cancel</Button>
+            <Button
+              className="bg-teal-600 hover:bg-teal-700 text-white"
+              disabled={clockInMutation.isPending}
+              data-testid="button-confirm-clock-in"
+              onClick={() =>
+                clockInMutation.mutate({
+                  propertyId: clockInPropertyId ? parseInt(clockInPropertyId) : null,
+                  taskId: clockInTaskId ? parseInt(clockInTaskId) : null,
+                  workType: clockInWorkType || undefined,
+                  mileage: clockInMileage ? parseInt(clockInMileage) : null,
+                  notes: clockInNotes || undefined,
+                  isBillable: clockInIsBillable,
+                })
+              }
+            >
+              {clockInMutation.isPending ? "Starting..." : "Start Clock"}
             </Button>
           </DialogFooter>
         </DialogContent>

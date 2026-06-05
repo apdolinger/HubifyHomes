@@ -1,0 +1,78 @@
+3. Reusable Itinerary Templates
+
+Manager can save an itinerary as a template.
+
+Example templates:
+	•	Tuesday Coastal Itinerary
+	•	North County Weekly Itinerary
+	•	Jupiter Estates Itinerary
+	•	Luxury Home Watch Itinerary
+
+Template should include:
+	•	Name
+	•	Default staff member or role
+	•	Preferred start time
+	•	Stop order
+	•	Properties/tasks
+	•	Estimated work times
+	•	Default buffers
+	•	Notes
+
+A manager should be able to generate a real Daily Itinerary from a saved template for a selected date.
+
+Important: editing a generated Daily Itinerary should not automatically change the original template unless the manager chooses “Update Template.”
+
+⸻
+
+4. Daily Itinerary Instances
+
+When a template is used, Hubify creates a real Daily Itinerary for a specific date.
+
+Example:
+
+Template: Tuesday Coastal Itinerary
+Generated instance: Tuesday Coastal Itinerary — June 9, 2026
+
+The Daily Itinerary should store:
+	•	Date
+	•	Staff member
+	•	Ordered stops
+	•	Scheduled start/end times
+	•	Travel time between stops
+	•	Total estimated work time
+	•	Total estimated travel time
+	•	Total day length
+	•	Status: Draft, Published, Completed
+
+⸻
+
+5. Calendar Sync
+
+When the manager publishes the itinerary:
+	•	Create calendar blocks for each property visit/task
+	•	Include property address
+	•	Include task link back to Hubify
+	•	Include checklist/report link if available
+	•	Include notes
+	•	Include travel time between stops either as calendar blocks or visible inside the itinerary
+
+If the itinerary changes after publishing:
+	•	Update related calendar events
+	•	Remove calendar events for removed stops
+	•	Adjust times for reordered stops
+
+⸻
+
+6. Travel Time
+
+Add travel time between properties.
+
+Phase 1 can use simple estimated travel time manually entered or calculated from addresses if mapping is already available.
+
+Future-ready structure should support Google Maps / Mapbox API later.
+
+Each stop should know:
+	•	Travel time from previous stop
+	•	Distance from previous stop
+	•	Buffer time
+	•	Estimated arrival time

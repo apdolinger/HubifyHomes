@@ -32,6 +32,7 @@ import {
   ChevronDown,
   Settings,
   Calendar,
+  MapPin,
   Clock,
   CreditCard,
   Wrench,
@@ -366,6 +367,12 @@ export default function Navigation() {
                   <Calendar className="w-4 h-4 mr-2" />
                   Calendar
                 </DropdownMenuItem>
+                {((user as any)?.role === 'admin' || (user as any)?.role === 'supervisor') && (
+                  <DropdownMenuItem onClick={() => window.location.href = '/dispatch'}>
+                    <MapPin className="w-4 h-4 mr-2" />
+                    Dispatch Center
+                  </DropdownMenuItem>
+                )}
                 {isFlagEnabled("task_cost_tracking") && (
                   <DropdownMenuItem onClick={() => window.location.href = '/time-tracking'} data-testid="menu-time-tracking">
                     <Clock className="w-4 h-4 mr-2" />

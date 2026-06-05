@@ -21331,6 +21331,510 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Dispatch Center ────────────────────────────────────────────────────────────
+
+  /** Helper: cascade-calculate scheduledStart/End for ordered stops given itinerary startTime + date */
+  function calcStopTimes(
+    isoDate: string,
+    startTime: string,
+    stops: Array<{ estimatedWorkMinutes: number; travelMinutesFromPrevious: number; bufferMinutes: number }>
+  ): Array<{ scheduledStart: Date; scheduledEnd: Date }> {
+    const [hh, mm] = startTime.split(":").map(Number);
+    let cursor = new Date(`${isoDate}T${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}:00`);
+    return stops.map((s) => {
+      cursor = new Date(cursor.getTime() + (s.travelMinutesFromPrevious + s.bufferMinutes) * 60000);
+      const scheduledStart = new Date(cursor.getTime());
+      cursor = new Date(cursor.getTime() + s.estimatedWorkMinutes * 60000);
+      return { scheduledStart, scheduledEnd: new Date(cursor.getTime()) };
+    });
+  }
+
+  function dispatchAdminGuard(req: any, res: any): boolean {
+    const role = (req.user as any)?.claims?.role ?? (req.user as any)?.role;
+    if (role !== "admin" && role !== "supervisor") {
+      res.status(403).json({ message: "Admin or supervisor role required." });
+      return false;
+    }
+    return true;
+  }
+
+  // ── Templates CRUD ────────────────────────────────────────────────────────────
+
+  app.get("/api/dispatch/templates", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!dispatchAdminGuard(req, res)) return;
+      const orgId = (req.user as any)?.claims?.orgId;
+      const { itineraryTemplates: tTable, itineraryTemplateStops: sTable } = await import("@shared/schema");
+      const templates = await db.select().from(tTable).where(and(eq(tTable.orgId, orgId), ne(tTable.status, "deleted"))).orderBy(desc(tTable.createdAt));
+      const templateIds = templates.map((t) => t.id);
+      const stops = templateIds.length > 0
+        ? await db.select().from(sTable).where(inArray(sTable.templateId, templateIds)).orderBy(sTable.stopOrder)
+        : [];
+      const stopsByTemplate: Record<string, typeof stops> = {};
+      for (const s of stops) stopsByTemplate[s.templateId] = [...(stopsByTemplate[s.templateId] ?? []), s];
+      res.json(templates.map((t) => ({ ...t, stops: stopsByTemplate[t.id] ?? [] })));
+    } catch (err) {
+      console.error("[dispatch] GET /templates", err);
+      res.status(500).json({ message: "Failed to fetch itinerary templates" });
+    }
+  });
+
+  app.post("/api/dispatch/templates", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!dispatchAdminGuard(req, res)) return;
+      const orgId = (req.user as any)?.claims?.orgId;
+      const userId = (req.user as any)?.claims?.sub;
+      const { itineraryTemplates: tTable, itineraryTemplateStops: sTable } = await import("@shared/schema");
+      const { stops: rawStops, ...headerData } = req.body;
+      const [template] = await db.insert(tTable).values({ ...headerData, orgId, createdBy: userId }).returning();
+      const stopsToInsert = (rawStops ?? []).map((s: any, i: number) => ({ ...s, orgId, templateId: template.id, stopOrder: i }));
+      const insertedStops = stopsToInsert.length > 0 ? await db.insert(sTable).values(stopsToInsert).returning() : [];
+      res.status(201).json({ ...template, stops: insertedStops });
+    } catch (err) {
+      console.error("[dispatch] POST /templates", err);
+      res.status(500).json({ message: "Failed to create itinerary template" });
+    }
+  });
+
+  app.get("/api/dispatch/templates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!dispatchAdminGuard(req, res)) return;
+      const orgId = (req.user as any)?.claims?.orgId;
+      const { itineraryTemplates: tTable, itineraryTemplateStops: sTable } = await import("@shared/schema");
+      const [template] = await db.select().from(tTable).where(and(eq(tTable.id, req.params.id), eq(tTable.orgId, orgId)));
+      if (!template) return res.status(404).json({ message: "Template not found" });
+      const stops = await db.select().from(sTable).where(eq(sTable.templateId, template.id)).orderBy(sTable.stopOrder);
+      res.json({ ...template, stops });
+    } catch (err) {
+      console.error("[dispatch] GET /templates/:id", err);
+      res.status(500).json({ message: "Failed to fetch template" });
+    }
+  });
+
+  app.patch("/api/dispatch/templates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!dispatchAdminGuard(req, res)) return;
+      const orgId = (req.user as any)?.claims?.orgId;
+      const { itineraryTemplates: tTable, itineraryTemplateStops: sTable } = await import("@shared/schema");
+      const [existing] = await db.select().from(tTable).where(and(eq(tTable.id, req.params.id), eq(tTable.orgId, orgId)));
+      if (!existing) return res.status(404).json({ message: "Template not found" });
+      const { stops: rawStops, id: _id, orgId: _org, createdAt: _ca, ...patch } = req.body;
+      const [updated] = await db.update(tTable).set({ ...patch, updatedAt: new Date() }).where(eq(tTable.id, existing.id)).returning();
+      if (rawStops !== undefined) {
+        await db.delete(sTable).where(eq(sTable.templateId, existing.id));
+        const stopsToInsert = rawStops.map((s: any, i: number) => ({ ...s, id: undefined, orgId, templateId: existing.id, stopOrder: i }));
+        const insertedStops = stopsToInsert.length > 0 ? await db.insert(sTable).values(stopsToInsert).returning() : [];
+        return res.json({ ...updated, stops: insertedStops });
+      }
+      const stops = await db.select().from(sTable).where(eq(sTable.templateId, existing.id)).orderBy(sTable.stopOrder);
+      res.json({ ...updated, stops });
+    } catch (err) {
+      console.error("[dispatch] PATCH /templates/:id", err);
+      res.status(500).json({ message: "Failed to update template" });
+    }
+  });
+
+  app.delete("/api/dispatch/templates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!dispatchAdminGuard(req, res)) return;
+      const orgId = (req.user as any)?.claims?.orgId;
+      const { itineraryTemplates: tTable } = await import("@shared/schema");
+      const [existing] = await db.select().from(tTable).where(and(eq(tTable.id, req.params.id), eq(tTable.orgId, orgId)));
+      if (!existing) return res.status(404).json({ message: "Template not found" });
+      await db.update(tTable).set({ status: "deleted", updatedAt: new Date() }).where(eq(tTable.id, existing.id));
+      res.json({ success: true });
+    } catch (err) {
+      console.error("[dispatch] DELETE /templates/:id", err);
+      res.status(500).json({ message: "Failed to delete template" });
+    }
+  });
+
+  app.post("/api/dispatch/templates/:id/generate", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!dispatchAdminGuard(req, res)) return;
+      const orgId = (req.user as any)?.claims?.orgId;
+      const userId = (req.user as any)?.claims?.sub;
+      const { itineraryTemplates: tTable, itineraryTemplateStops: tsTable, dailyItineraries: diTable, dailyItineraryStops: disTable } = await import("@shared/schema");
+      const [template] = await db.select().from(tTable).where(and(eq(tTable.id, req.params.id), eq(tTable.orgId, orgId)));
+      if (!template) return res.status(404).json({ message: "Template not found" });
+      const { date, assignedUserId, startTime } = req.body;
+      if (!date) return res.status(400).json({ message: "date is required" });
+      const effectiveStartTime = startTime ?? template.preferredStartTime ?? "08:00";
+      const effectiveAssignedUser = assignedUserId ?? template.defaultAssignedUserId ?? null;
+      const templateStops = await db.select().from(tsTable).where(eq(tsTable.templateId, template.id)).orderBy(tsTable.stopOrder);
+      const times = calcStopTimes(date, effectiveStartTime, templateStops);
+      const [itinerary] = await db.insert(diTable).values({
+        orgId,
+        date,
+        assignedUserId: effectiveAssignedUser,
+        templateId: template.id,
+        name: `${template.name} — ${date}`,
+        startTime: effectiveStartTime,
+        status: "draft",
+        totalWorkMinutes: templateStops.reduce((a, s) => a + s.estimatedWorkMinutes, 0),
+        totalTravelMinutes: templateStops.reduce((a, s) => a + s.travelMinutesFromPrevious, 0),
+        totalBufferMinutes: templateStops.reduce((a, s) => a + s.bufferMinutes, 0),
+        totalDayMinutes: templateStops.reduce((a, s) => a + s.estimatedWorkMinutes + s.travelMinutesFromPrevious + s.bufferMinutes, 0),
+        createdBy: userId,
+      }).returning();
+      const stops = templateStops.length > 0
+        ? await db.insert(disTable).values(templateStops.map((s, i) => ({
+            orgId,
+            dailyItineraryId: itinerary.id,
+            propertyId: s.propertyId,
+            taskId: s.taskId,
+            assignedUserId: effectiveAssignedUser,
+            stopOrder: i,
+            estimatedWorkMinutes: s.estimatedWorkMinutes,
+            travelMinutesFromPrevious: s.travelMinutesFromPrevious,
+            distanceFromPrevious: s.distanceFromPrevious,
+            bufferMinutes: s.bufferMinutes,
+            scheduledStart: times[i].scheduledStart,
+            scheduledEnd: times[i].scheduledEnd,
+            notes: s.notes,
+          }))).returning()
+        : [];
+      res.status(201).json({ ...itinerary, stops });
+    } catch (err) {
+      console.error("[dispatch] POST /templates/:id/generate", err);
+      res.status(500).json({ message: "Failed to generate itinerary from template" });
+    }
+  });
+
+  // ── Daily Itineraries CRUD ────────────────────────────────────────────────────
+
+  app.get("/api/dispatch/itineraries", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!dispatchAdminGuard(req, res)) return;
+      const orgId = (req.user as any)?.claims?.orgId;
+      const { dailyItineraries: diTable, dailyItineraryStops: disTable } = await import("@shared/schema");
+      const { eq: eqOp, and: andOp } = await import("drizzle-orm");
+      const conditions: any[] = [eqOp(diTable.orgId, orgId)];
+      if (req.query.date) conditions.push(eqOp(diTable.date, req.query.date as string));
+      if (req.query.assignedUserId) conditions.push(eqOp(diTable.assignedUserId, req.query.assignedUserId as string));
+      const itineraries = await db.select().from(diTable).where(andOp(...conditions)).orderBy(desc(diTable.date));
+      const ids = itineraries.map((i) => i.id);
+      const stops = ids.length > 0
+        ? await db.select().from(disTable).where(inArray(disTable.dailyItineraryId, ids)).orderBy(disTable.stopOrder)
+        : [];
+      const stopsByItin: Record<string, typeof stops> = {};
+      for (const s of stops) stopsByItin[s.dailyItineraryId] = [...(stopsByItin[s.dailyItineraryId] ?? []), s];
+      res.json(itineraries.map((i) => ({ ...i, stops: stopsByItin[i.id] ?? [] })));
+    } catch (err) {
+      console.error("[dispatch] GET /itineraries", err);
+      res.status(500).json({ message: "Failed to fetch itineraries" });
+    }
+  });
+
+  app.post("/api/dispatch/itineraries", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!dispatchAdminGuard(req, res)) return;
+      const orgId = (req.user as any)?.claims?.orgId;
+      const userId = (req.user as any)?.claims?.sub;
+      const { dailyItineraries: diTable } = await import("@shared/schema");
+      const { date, name, assignedUserId, startTime, ...rest } = req.body;
+      if (!date || !name) return res.status(400).json({ message: "date and name are required" });
+      const [itinerary] = await db.insert(diTable).values({
+        orgId,
+        date,
+        name,
+        assignedUserId: assignedUserId ?? null,
+        startTime: startTime ?? "08:00",
+        status: "draft",
+        createdBy: userId,
+        ...rest,
+      }).returning();
+      res.status(201).json({ ...itinerary, stops: [] });
+    } catch (err) {
+      console.error("[dispatch] POST /itineraries", err);
+      res.status(500).json({ message: "Failed to create itinerary" });
+    }
+  });
+
+  app.get("/api/dispatch/itineraries/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!dispatchAdminGuard(req, res)) return;
+      const orgId = (req.user as any)?.claims?.orgId;
+      const { dailyItineraries: diTable, dailyItineraryStops: disTable, properties: pTable, tasks: tTable } = await import("@shared/schema");
+      const [itinerary] = await db.select().from(diTable).where(and(eq(diTable.id, req.params.id), eq(diTable.orgId, orgId)));
+      if (!itinerary) return res.status(404).json({ message: "Itinerary not found" });
+      const stops = await db.select().from(disTable).where(eq(disTable.dailyItineraryId, itinerary.id)).orderBy(disTable.stopOrder);
+      const propIds = [...new Set(stops.map((s) => s.propertyId).filter(Boolean))] as number[];
+      const taskIds = [...new Set(stops.map((s) => s.taskId).filter(Boolean))] as number[];
+      const propMap: Record<number, any> = {};
+      const taskMap: Record<number, any> = {};
+      if (propIds.length > 0) {
+        const props = await db.select().from(pTable).where(inArray(pTable.id, propIds));
+        for (const p of props) propMap[p.id] = p;
+      }
+      if (taskIds.length > 0) {
+        const tasks = await db.select().from(tTable).where(inArray(tTable.id, taskIds));
+        for (const t of tasks) taskMap[t.id] = t;
+      }
+      const enrichedStops = stops.map((s) => ({
+        ...s,
+        property: s.propertyId ? propMap[s.propertyId] ?? null : null,
+        task: s.taskId ? taskMap[s.taskId] ?? null : null,
+      }));
+      res.json({ ...itinerary, stops: enrichedStops });
+    } catch (err) {
+      console.error("[dispatch] GET /itineraries/:id", err);
+      res.status(500).json({ message: "Failed to fetch itinerary" });
+    }
+  });
+
+  app.patch("/api/dispatch/itineraries/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!dispatchAdminGuard(req, res)) return;
+      const orgId = (req.user as any)?.claims?.orgId;
+      const { dailyItineraries: diTable, dailyItineraryStops: disTable } = await import("@shared/schema");
+      const [existing] = await db.select().from(diTable).where(and(eq(diTable.id, req.params.id), eq(diTable.orgId, orgId)));
+      if (!existing) return res.status(404).json({ message: "Itinerary not found" });
+      const { id: _id, orgId: _org, createdAt: _ca, ...patch } = req.body;
+      const wasPublished = existing.status === "published";
+      const startTimeChanged = patch.startTime && patch.startTime !== existing.startTime;
+      if (wasPublished && Object.keys(patch).some((k) => ["date","assignedUserId","startTime","status"].includes(k))) {
+        patch.needsCalendarSync = true;
+      }
+      const [updated] = await db.update(diTable).set({ ...patch, updatedAt: new Date() }).where(eq(diTable.id, existing.id)).returning();
+      if (startTimeChanged) {
+        const stops = await db.select().from(disTable).where(eq(disTable.dailyItineraryId, existing.id)).orderBy(disTable.stopOrder);
+        const times = calcStopTimes(updated.date as string, updated.startTime, stops);
+        for (let i = 0; i < stops.length; i++) {
+          await db.update(disTable).set({ scheduledStart: times[i].scheduledStart, scheduledEnd: times[i].scheduledEnd, updatedAt: new Date() }).where(eq(disTable.id, stops[i].id));
+        }
+      }
+      res.json(updated);
+    } catch (err) {
+      console.error("[dispatch] PATCH /itineraries/:id", err);
+      res.status(500).json({ message: "Failed to update itinerary" });
+    }
+  });
+
+  app.delete("/api/dispatch/itineraries/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!dispatchAdminGuard(req, res)) return;
+      const orgId = (req.user as any)?.claims?.orgId;
+      const { dailyItineraries: diTable, dailyItineraryStops: disTable } = await import("@shared/schema");
+      const [existing] = await db.select().from(diTable).where(and(eq(diTable.id, req.params.id), eq(diTable.orgId, orgId)));
+      if (!existing) return res.status(404).json({ message: "Itinerary not found" });
+      const stops = await db.select().from(disTable).where(eq(disTable.dailyItineraryId, existing.id));
+      const eventIds = stops.map((s) => s.calendarEventId).filter(Boolean) as string[];
+      if (eventIds.length > 0) {
+        await db.delete(events).where(inArray(events.id, eventIds));
+      }
+      await db.delete(diTable).where(eq(diTable.id, existing.id));
+      res.json({ success: true });
+    } catch (err) {
+      console.error("[dispatch] DELETE /itineraries/:id", err);
+      res.status(500).json({ message: "Failed to delete itinerary" });
+    }
+  });
+
+  // ── Stops upsert / delete ─────────────────────────────────────────────────────
+
+  app.patch("/api/dispatch/itineraries/:id/stops", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!dispatchAdminGuard(req, res)) return;
+      const orgId = (req.user as any)?.claims?.orgId;
+      const { dailyItineraries: diTable, dailyItineraryStops: disTable } = await import("@shared/schema");
+      const [itinerary] = await db.select().from(diTable).where(and(eq(diTable.id, req.params.id), eq(diTable.orgId, orgId)));
+      if (!itinerary) return res.status(404).json({ message: "Itinerary not found" });
+      const rawStops: any[] = req.body.stops ?? [];
+      const times = calcStopTimes(itinerary.date as string, itinerary.startTime, rawStops);
+      await db.delete(disTable).where(eq(disTable.dailyItineraryId, itinerary.id));
+      const inserted = rawStops.length > 0
+        ? await db.insert(disTable).values(rawStops.map((s, i) => ({
+            orgId,
+            dailyItineraryId: itinerary.id,
+            propertyId: s.propertyId ?? null,
+            taskId: s.taskId ?? null,
+            assignedUserId: s.assignedUserId ?? itinerary.assignedUserId ?? null,
+            stopOrder: i,
+            estimatedWorkMinutes: s.estimatedWorkMinutes ?? 60,
+            travelMinutesFromPrevious: s.travelMinutesFromPrevious ?? 15,
+            distanceFromPrevious: s.distanceFromPrevious ?? null,
+            bufferMinutes: s.bufferMinutes ?? 0,
+            scheduledStart: times[i].scheduledStart,
+            scheduledEnd: times[i].scheduledEnd,
+            status: s.status ?? "pending",
+            calendarEventId: s.calendarEventId ?? null,
+            notes: s.notes ?? null,
+          }))).returning()
+        : [];
+      const totalWork = rawStops.reduce((a, s) => a + (s.estimatedWorkMinutes ?? 60), 0);
+      const totalTravel = rawStops.reduce((a, s) => a + (s.travelMinutesFromPrevious ?? 15), 0);
+      const totalBuffer = rawStops.reduce((a, s) => a + (s.bufferMinutes ?? 0), 0);
+      const needsSync = itinerary.status === "published";
+      await db.update(diTable).set({
+        totalWorkMinutes: totalWork,
+        totalTravelMinutes: totalTravel,
+        totalBufferMinutes: totalBuffer,
+        totalDayMinutes: totalWork + totalTravel + totalBuffer,
+        needsCalendarSync: needsSync,
+        updatedAt: new Date(),
+      }).where(eq(diTable.id, itinerary.id));
+      res.json(inserted);
+    } catch (err) {
+      console.error("[dispatch] PATCH /itineraries/:id/stops", err);
+      res.status(500).json({ message: "Failed to update stops" });
+    }
+  });
+
+  app.delete("/api/dispatch/itineraries/:id/stops/:stopId", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!dispatchAdminGuard(req, res)) return;
+      const orgId = (req.user as any)?.claims?.orgId;
+      const { dailyItineraries: diTable, dailyItineraryStops: disTable } = await import("@shared/schema");
+      const [itinerary] = await db.select().from(diTable).where(and(eq(diTable.id, req.params.id), eq(diTable.orgId, orgId)));
+      if (!itinerary) return res.status(404).json({ message: "Itinerary not found" });
+      const [stop] = await db.select().from(disTable).where(and(eq(disTable.id, req.params.stopId), eq(disTable.dailyItineraryId, itinerary.id)));
+      if (!stop) return res.status(404).json({ message: "Stop not found" });
+      if (stop.calendarEventId) {
+        await db.delete(events).where(eq(events.id, stop.calendarEventId));
+      }
+      await db.delete(disTable).where(eq(disTable.id, stop.id));
+      const remaining = await db.select().from(disTable).where(eq(disTable.dailyItineraryId, itinerary.id)).orderBy(disTable.stopOrder);
+      const times = calcStopTimes(itinerary.date as string, itinerary.startTime, remaining);
+      for (let i = 0; i < remaining.length; i++) {
+        await db.update(disTable).set({ stopOrder: i, scheduledStart: times[i].scheduledStart, scheduledEnd: times[i].scheduledEnd, updatedAt: new Date() }).where(eq(disTable.id, remaining[i].id));
+      }
+      const totalWork = remaining.reduce((a, s) => a + s.estimatedWorkMinutes, 0);
+      const totalTravel = remaining.reduce((a, s) => a + s.travelMinutesFromPrevious, 0);
+      const totalBuffer = remaining.reduce((a, s) => a + s.bufferMinutes, 0);
+      await db.update(diTable).set({
+        totalWorkMinutes: totalWork,
+        totalTravelMinutes: totalTravel,
+        totalBufferMinutes: totalBuffer,
+        totalDayMinutes: totalWork + totalTravel + totalBuffer,
+        needsCalendarSync: itinerary.status === "published",
+        updatedAt: new Date(),
+      }).where(eq(diTable.id, itinerary.id));
+      res.json({ success: true });
+    } catch (err) {
+      console.error("[dispatch] DELETE /itineraries/:id/stops/:stopId", err);
+      res.status(500).json({ message: "Failed to delete stop" });
+    }
+  });
+
+  // ── Publish / Calendar Sync ───────────────────────────────────────────────────
+
+  app.post("/api/dispatch/itineraries/:id/publish", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!dispatchAdminGuard(req, res)) return;
+      const orgId = (req.user as any)?.claims?.orgId;
+      const userId = (req.user as any)?.claims?.sub;
+      const { dailyItineraries: diTable, dailyItineraryStops: disTable, properties: pTable, tasks: tTable } = await import("@shared/schema");
+      const [itinerary] = await db.select().from(diTable).where(and(eq(diTable.id, req.params.id), eq(diTable.orgId, orgId)));
+      if (!itinerary) return res.status(404).json({ message: "Itinerary not found" });
+      const stops = await db.select().from(disTable).where(eq(disTable.dailyItineraryId, itinerary.id)).orderBy(disTable.stopOrder);
+
+      const propIds = [...new Set(stops.map((s) => s.propertyId).filter(Boolean))] as number[];
+      const taskIds = [...new Set(stops.map((s) => s.taskId).filter(Boolean))] as number[];
+      const propMap: Record<number, any> = {};
+      const taskMap: Record<number, any> = {};
+      if (propIds.length > 0) {
+        const props = await db.select().from(pTable).where(inArray(pTable.id, propIds));
+        for (const p of props) propMap[p.id] = p;
+      }
+      if (taskIds.length > 0) {
+        const ts = await db.select().from(tTable).where(inArray(tTable.id, taskIds));
+        for (const t of ts) taskMap[t.id] = t;
+      }
+
+      let created = 0, updated = 0, deleted = 0;
+      const [defaultCalendar] = await db.select().from(await import("@shared/schema").then((m) => m.calendars)).where(and(eq((await import("@shared/schema")).calendars.orgId, orgId), eq((await import("@shared/schema")).calendars.isDefault, true))).limit(1);
+      const calendarId = defaultCalendar?.id ?? null;
+
+      for (const stop of stops) {
+        const prop = stop.propertyId ? propMap[stop.propertyId] : null;
+        const task = stop.taskId ? taskMap[stop.taskId] : null;
+        const title = [prop?.name, task?.title ?? stop.notes].filter(Boolean).join(" — ") || itinerary.name;
+        const location = prop ? [prop.address1, prop.address2, prop.city, prop.state, prop.zip].filter(Boolean).join(", ") : undefined;
+        const description = [
+          `Daily Itinerary: ${itinerary.name}`,
+          prop ? `Property: ${prop.name}` : null,
+          task ? `Task: ${task.title}` : null,
+          stop.notes ? `Notes: ${stop.notes}` : null,
+        ].filter(Boolean).join("\n");
+
+        const eventData = {
+          orgId,
+          calendarId,
+          title,
+          description,
+          location: location ?? null,
+          allDay: false,
+          start: stop.scheduledStart ?? new Date(),
+          end: stop.scheduledEnd ?? new Date(),
+          timezone: "UTC",
+          organizerId: userId,
+          createdById: userId,
+          propertyId: stop.propertyId ?? null,
+          taskId: stop.taskId ?? null,
+          visibility: "org" as const,
+        };
+
+        if (stop.calendarEventId) {
+          const [existingEvent] = await db.select().from(events).where(eq(events.id, stop.calendarEventId));
+          if (existingEvent) {
+            await db.update(events).set({ ...eventData, updatedAt: new Date() }).where(eq(events.id, stop.calendarEventId));
+            updated++;
+          } else {
+            const [newEvent] = await db.insert(events).values(eventData).returning();
+            await db.update(disTable).set({ calendarEventId: newEvent.id }).where(eq(disTable.id, stop.id));
+            created++;
+          }
+        } else {
+          const [newEvent] = await db.insert(events).values(eventData).returning();
+          await db.update(disTable).set({ calendarEventId: newEvent.id }).where(eq(disTable.id, stop.id));
+          created++;
+        }
+      }
+
+      const now = new Date();
+      await db.update(diTable).set({ status: "published", needsCalendarSync: false, publishedAt: now, updatedAt: now }).where(eq(diTable.id, itinerary.id));
+      res.json({ success: true, eventsCreated: created, eventsUpdated: updated, eventsDeleted: deleted });
+    } catch (err) {
+      console.error("[dispatch] POST /itineraries/:id/publish", err);
+      res.status(500).json({ message: "Failed to publish itinerary" });
+    }
+  });
+
+  // ── Unscheduled tasks for dispatch ───────────────────────────────────────────
+
+  app.get("/api/dispatch/unscheduled-tasks", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!dispatchAdminGuard(req, res)) return;
+      const orgId = (req.user as any)?.claims?.orgId;
+      const { tasks: tTable, properties: pTable, dailyItineraryStops: disTable, dailyItineraries: diTable } = await import("@shared/schema");
+      const conditions: any[] = [eq(tTable.status, "pending"), eq((tTable as any).orgId || tTable.id, tTable.id)];
+      if (req.query.assignedUserId) conditions.push(eq(tTable.assignedToId, req.query.assignedUserId as string));
+      const allTasks = await db.select().from(tTable)
+        .leftJoin(pTable, eq(tTable.propertyId, pTable.id))
+        .where(and(
+          or(eq(tTable.status, "pending"), eq(tTable.status, "in_progress")),
+          req.query.assignedUserId ? eq(tTable.assignedToId, req.query.assignedUserId as string) : undefined,
+          eq(pTable.orgId, orgId),
+        ))
+        .orderBy(tTable.dueDate);
+      if (req.query.date) {
+        const itinsOnDate = await db.select().from(diTable).where(and(eq(diTable.orgId, orgId), eq(diTable.date, req.query.date as string)));
+        const itinIds = itinsOnDate.map((i) => i.id);
+        const scheduledTaskIds = new Set<number>();
+        if (itinIds.length > 0) {
+          const stopsOnDate = await db.select().from(disTable).where(inArray(disTable.dailyItineraryId, itinIds));
+          for (const s of stopsOnDate) if (s.taskId) scheduledTaskIds.add(s.taskId);
+        }
+        return res.json(allTasks.filter((r) => !r.tasks.id || !scheduledTaskIds.has(r.tasks.id)).map((r) => ({ ...r.tasks, property: r.properties })));
+      }
+      res.json(allTasks.map((r) => ({ ...r.tasks, property: r.properties })));
+    } catch (err) {
+      console.error("[dispatch] GET /unscheduled-tasks", err);
+      res.status(500).json({ message: "Failed to fetch unscheduled tasks" });
+    }
+  });
+
   // Register the conflict detector for scheduled tasks
   const { setConflictDetector } = await import('./scheduledTasks');
   setConflictDetector(detectAndCreateEventConflicts);

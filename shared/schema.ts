@@ -3783,3 +3783,128 @@ export const insertAgreementAcceptanceSchema = createInsertSchema(agreementAccep
   id: true,
   createdAt: true,
 });
+
+// ── Dispatch Center ────────────────────────────────────────────────────────────
+
+export const itineraryTemplates = pgTable("itinerary_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => orgs.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  defaultAssignedUserId: varchar("default_assigned_user_id").references(() => users.id, { onDelete: "set null" }),
+  preferredStartTime: varchar("preferred_start_time", { length: 10 }).default("08:00"),
+  status: varchar("status", { length: 32 }).notNull().default("active"),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("itinerary_templates_org_id_idx").on(table.orgId),
+  index("itinerary_templates_status_idx").on(table.status),
+]);
+
+export type ItineraryTemplate = typeof itineraryTemplates.$inferSelect;
+export type InsertItineraryTemplate = typeof itineraryTemplates.$inferInsert;
+export const insertItineraryTemplateSchema = createInsertSchema(itineraryTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const itineraryTemplateStops = pgTable("itinerary_template_stops", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => orgs.id, { onDelete: "cascade" }),
+  templateId: uuid("template_id").notNull().references(() => itineraryTemplates.id, { onDelete: "cascade" }),
+  propertyId: integer("property_id").references(() => properties.id, { onDelete: "set null" }),
+  taskId: integer("task_id").references(() => tasks.id, { onDelete: "set null" }),
+  serviceType: varchar("service_type", { length: 128 }),
+  stopOrder: integer("stop_order").notNull().default(0),
+  estimatedWorkMinutes: integer("estimated_work_minutes").notNull().default(60),
+  travelMinutesFromPrevious: integer("travel_minutes_from_previous").notNull().default(15),
+  distanceFromPrevious: varchar("distance_from_previous", { length: 64 }),
+  bufferMinutes: integer("buffer_minutes").notNull().default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("itinerary_template_stops_template_id_idx").on(table.templateId),
+  index("itinerary_template_stops_property_id_idx").on(table.propertyId),
+  index("itinerary_template_stops_task_id_idx").on(table.taskId),
+]);
+
+export type ItineraryTemplateStop = typeof itineraryTemplateStops.$inferSelect;
+export type InsertItineraryTemplateStop = typeof itineraryTemplateStops.$inferInsert;
+export const insertItineraryTemplateStopSchema = createInsertSchema(itineraryTemplateStops).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const dailyItineraries = pgTable("daily_itineraries", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => orgs.id, { onDelete: "cascade" }),
+  date: date("date").notNull(),
+  assignedUserId: varchar("assigned_user_id").references(() => users.id, { onDelete: "set null" }),
+  templateId: uuid("template_id").references(() => itineraryTemplates.id, { onDelete: "set null" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  startTime: varchar("start_time", { length: 10 }).notNull().default("08:00"),
+  status: varchar("status", { length: 32 }).notNull().default("draft"),
+  totalWorkMinutes: integer("total_work_minutes").notNull().default(0),
+  totalTravelMinutes: integer("total_travel_minutes").notNull().default(0),
+  totalBufferMinutes: integer("total_buffer_minutes").notNull().default(0),
+  totalDayMinutes: integer("total_day_minutes").notNull().default(0),
+  needsCalendarSync: boolean("needs_calendar_sync").notNull().default(false),
+  publishedAt: timestamp("published_at"),
+  completedAt: timestamp("completed_at"),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("daily_itineraries_org_id_idx").on(table.orgId),
+  index("daily_itineraries_date_idx").on(table.date),
+  index("daily_itineraries_assigned_user_idx").on(table.assignedUserId),
+  index("daily_itineraries_template_id_idx").on(table.templateId),
+  index("daily_itineraries_status_idx").on(table.status),
+]);
+
+export type DailyItinerary = typeof dailyItineraries.$inferSelect;
+export type InsertDailyItinerary = typeof dailyItineraries.$inferInsert;
+export const insertDailyItinerarySchema = createInsertSchema(dailyItineraries).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const dailyItineraryStops = pgTable("daily_itinerary_stops", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => orgs.id, { onDelete: "cascade" }),
+  dailyItineraryId: uuid("daily_itinerary_id").notNull().references(() => dailyItineraries.id, { onDelete: "cascade" }),
+  propertyId: integer("property_id").references(() => properties.id, { onDelete: "set null" }),
+  taskId: integer("task_id").references(() => tasks.id, { onDelete: "set null" }),
+  assignedUserId: varchar("assigned_user_id").references(() => users.id, { onDelete: "set null" }),
+  stopOrder: integer("stop_order").notNull().default(0),
+  estimatedWorkMinutes: integer("estimated_work_minutes").notNull().default(60),
+  travelMinutesFromPrevious: integer("travel_minutes_from_previous").notNull().default(15),
+  distanceFromPrevious: varchar("distance_from_previous", { length: 64 }),
+  bufferMinutes: integer("buffer_minutes").notNull().default(0),
+  scheduledStart: timestamp("scheduled_start", { withTimezone: true }),
+  scheduledEnd: timestamp("scheduled_end", { withTimezone: true }),
+  status: varchar("status", { length: 32 }).notNull().default("pending"),
+  calendarEventId: uuid("calendar_event_id").references(() => events.id, { onDelete: "set null" }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("daily_itinerary_stops_itinerary_id_idx").on(table.dailyItineraryId),
+  index("daily_itinerary_stops_property_id_idx").on(table.propertyId),
+  index("daily_itinerary_stops_task_id_idx").on(table.taskId),
+  index("daily_itinerary_stops_assigned_user_idx").on(table.assignedUserId),
+  index("daily_itinerary_stops_calendar_event_id_idx").on(table.calendarEventId),
+]);
+
+export type DailyItineraryStop = typeof dailyItineraryStops.$inferSelect;
+export type InsertDailyItineraryStop = typeof dailyItineraryStops.$inferInsert;
+export const insertDailyItineraryStopSchema = createInsertSchema(dailyItineraryStops).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});

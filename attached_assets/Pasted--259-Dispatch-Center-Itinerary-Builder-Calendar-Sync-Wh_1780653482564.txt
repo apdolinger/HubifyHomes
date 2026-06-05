@@ -1,0 +1,644 @@
+#259 - Dispatch Center — Itinerary Builder & Calendar Sync
+
+## What & Why
+
+Managers need to act as dispatchers: select a staff member, pull in unscheduled tasks, order property visits into a Daily Itinerary with estimated work time, travel time, and buffer time, save repeatable patterns as Itinerary Templates, and publish the result to the staff calendar.
+
+This replaces ad-hoc task assignment with a structured daily-dispatch workflow.
+
+## Language Rule
+
+Never use the word **"route"** in any UI label.
+
+Use:
+
+- Dispatch Center
+- Itinerary
+- Itinerary Template
+- Daily Itinerary
+- Itinerary Stop
+- Travel Time
+- Field Schedule
+
+---
+
+## Done Looks Like
+
+- A **Dispatch Center** entry appears in the main navigation for admin/supervisor users only.
+- Use a new `dispatch_center` feature flag if feature flags are already being used; otherwise role-gate it only.
+- Remove any dependency on `mobile_field_mode`.
+- Manager opens Dispatch Center, picks a date, staff member, and start time.
+- Manager sees two columns:
+  - Unscheduled Tasks
+  - Today's Itinerary
+- Manager can add tasks into the Daily Itinerary.
+- Manager can set estimated work minutes, travel time from previous stop, buffer time, and notes per stop.
+- Hubify auto-calculates start/end times and cascades changes through all following stops.
+- Manager can manually reorder stops.
+- Manager clicks **Save as Template**, names it, and the template persists.
+- Templates appear in a Templates list/drawer.
+- Manager can generate a new Daily Itinerary from a saved template for any date.
+- Editing a generated Daily Itinerary does **not** change the template unless the manager chooses **Update Template**.
+- Manager clicks **Publish to Calendar**.
+- One calendar event per stop is created in the existing `events` table.
+- Calendar events link back to the itinerary stop.
+- Calendar event location uses the property address.
+- Calendar event description includes task/property details and a link back to Hubify.
+- Stops already published get their calendar events updated when the itinerary changes.
+- Removing a stop from a published itinerary deletes its calendar event.
+- Daily Itinerary status moves through:
+  - Draft
+  - Published
+  - Completed
+- If a published itinerary is edited, Hubify marks it as needing calendar sync.
+- No UI label anywhere on this page or in navigation uses the word “route.”
+
+---
+
+## Out of Scope
+
+- Automatic optimization.
+- Google Maps / Mapbox integration.
+- Turn-by-turn directions.
+- Staff-facing itinerary view in Field Mode.
+- iCal-specific export for itineraries.
+- External calendar provider integration beyond the existing `events` table.
+
+Existing iCal feed should pick up created events automatically if it already reads from the `events` table.
+
+---
+
+# Steps
+
+## 1. Schema — Add Four New Tables
+
+Update `shared/schema.ts`.
+
+Add:
+
+- `itinerary_templates`
+- `itinerary_template_stops`
+- `daily_itineraries`
+- `daily_itinerary_stops`
+
+All tables must be scoped by `orgId`.
+
+---
+
+## 2. itinerary_templates
+
+Suggested fields:
+
+- `id`
+- `orgId`
+- `name`
+- `description`
+- `defaultAssignedUserId` nullable
+- `preferredStartTime`
+- `status` default active
+- `createdBy`
+- `createdAt`
+- `updatedAt`
+
+Create insert schema and inferred types.
+
+---
+
+## 3. itinerary_template_stops
+
+Suggested fields:
+
+- `id`
+- `orgId`
+- `templateId`
+- `propertyId`
+- `taskId` nullable
+- `serviceType` nullable
+- `stopOrder`
+- `estimatedWorkMinutes`
+- `travelMinutesFromPrevious`
+- `distanceFromPrevious` nullable
+- `bufferMinutes`
+- `notes`
+- `createdAt`
+- `updatedAt`
+
+Important: `taskId` should be nullable because reusable templates may not always point to the same task every week.
+
+Example:
+
+“Tuesday Coastal Itinerary” may always include Smith Residence, but next Tuesday’s actual task may be newly generated from Service Assignment Automation.
+
+Create insert schema and inferred types.
+
+---
+
+## 4. daily_itineraries
+
+Suggested fields:
+
+- `id`
+- `orgId`
+- `date`
+- `assignedUserId`
+- `templateId` nullable
+- `name`
+- `startTime`
+- `status` default draft
+- `totalWorkMinutes`
+- `totalTravelMinutes`
+- `totalBufferMinutes`
+- `totalDayMinutes`
+- `needsCalendarSync` default false
+- `publishedAt` nullable
+- `completedAt` nullable
+- `createdBy`
+- `createdAt`
+- `updatedAt`
+
+Status enum:
+
+- `draft`
+- `published`
+- `completed`
+
+Important: `startTime` is required so scheduledStart/scheduledEnd can cascade properly.
+
+Example:
+
+Start Time: 8:00 AM  
+Stop 1: 8:00–8:30  
+Travel: 15 min  
+Stop 2: 8:45–9:15
+
+Create insert schema and inferred types.
+
+---
+
+## 5. daily_itinerary_stops
+
+Suggested fields:
+
+- `id`
+- `orgId`
+- `dailyItineraryId`
+- `propertyId`
+- `taskId` nullable
+- `assignedUserId`
+- `stopOrder`
+- `estimatedWorkMinutes`
+- `travelMinutesFromPrevious`
+- `distanceFromPrevious` nullable
+- `bufferMinutes`
+- `scheduledStart`
+- `scheduledEnd`
+- `status` default pending
+- `calendarEventId` nullable FK to `events.id`
+- `notes`
+- `createdAt`
+- `updatedAt`
+
+Status enum:
+
+- `pending`
+- `in_progress`
+- `completed`
+- `skipped`
+
+Create insert schema and inferred types.
+
+---
+
+## 6. Migration
+
+Update `server/runMigrations.ts`.
+
+Add:
+
+`ensureDispatchCenterTables()`
+
+This should create all four tables if they do not exist, including columns, indexes, and FK constraints.
+
+Register the function call in `server/index.ts` alongside the other migrations so it runs on every boot.
+
+Indexes to consider:
+
+- `orgId`
+- `templateId`
+- `dailyItineraryId`
+- `assignedUserId`
+- `date`
+- `calendarEventId`
+- `taskId`
+- `propertyId`
+
+---
+
+## 7. Backend API — Templates
+
+Add routes under:
+
+`/api/dispatch/templates`
+
+All routes must be:
+
+- authenticated
+- scoped to `req.user.orgId`
+- gated to admin/supervisor roles
+
+Routes:
+
+### GET `/api/dispatch/templates`
+
+List templates for org.
+
+### POST `/api/dispatch/templates`
+
+Create template with stops.
+
+### GET `/api/dispatch/templates/:id`
+
+Get template with stops.
+
+### PATCH `/api/dispatch/templates/:id`
+
+Update template header and stops.
+
+### DELETE `/api/dispatch/templates/:id`
+
+Delete or archive template.
+
+### POST `/api/dispatch/templates/:id/generate`
+
+Generate a new Daily Itinerary from template.
+
+Request body should include:
+
+- `date`
+- `assignedUserId`
+- optional `startTime`
+
+Behavior:
+
+- create `daily_itineraries` row
+- copy template stops into `daily_itinerary_stops`
+- recalculate scheduledStart/scheduledEnd
+- return the new Daily Itinerary id
+
+---
+
+## 8. Backend API — Daily Itineraries
+
+Add routes under:
+
+`/api/dispatch/itineraries`
+
+All routes must be:
+
+- authenticated
+- scoped to `req.user.orgId`
+- gated to admin/supervisor roles
+
+Routes:
+
+### GET `/api/dispatch/itineraries`
+
+List by date and/or assigned user.
+
+Query params:
+
+- `date`
+- `assignedUserId`
+
+### POST `/api/dispatch/itineraries`
+
+Create a Daily Itinerary from scratch.
+
+### GET `/api/dispatch/itineraries/:id`
+
+Get Daily Itinerary with stops.
+
+### PATCH `/api/dispatch/itineraries/:id`
+
+Update header fields:
+
+- date
+- assignedUserId
+- name
+- startTime
+- status
+
+If `startTime` changes, recalculate all stop scheduled times.
+
+If itinerary was already published, set `needsCalendarSync = true`.
+
+### DELETE `/api/dispatch/itineraries/:id`
+
+Delete itinerary and related stops.
+
+If published, delete related calendar events too.
+
+---
+
+## 9. Backend API — Stops
+
+### PATCH `/api/dispatch/itineraries/:id/stops`
+
+Accept the full ordered stop array and upsert stops.
+
+Behavior:
+
+- validate all properties/tasks belong to org
+- update stop order
+- upsert stop records
+- remove missing stops if intended by payload
+- recalculate scheduledStart/scheduledEnd from itinerary start time plus cumulative work, travel, and buffer minutes
+- update totals on `daily_itineraries`
+- if itinerary was published, set `needsCalendarSync = true`
+
+Scheduling calculation:
+
+For each stop in order:
+
+`scheduledStart = previousStop.scheduledEnd + travelMinutesFromPrevious + bufferMinutes`
+
+First stop:
+
+`scheduledStart = itinerary.date + itinerary.startTime + travelMinutesFromPrevious + bufferMinutes`
+
+Then:
+
+`scheduledEnd = scheduledStart + estimatedWorkMinutes`
+
+### DELETE `/api/dispatch/itineraries/:id/stops/:stopId`
+
+Remove one stop.
+
+If the stop has `calendarEventId`, delete that event from `events`.
+
+Recalculate all following stops.
+
+If itinerary was published, set `needsCalendarSync = true`.
+
+---
+
+## 10. Backend API — Publish / Calendar Sync
+
+### POST `/api/dispatch/itineraries/:id/publish`
+
+Behavior:
+
+- get itinerary with ordered stops
+- for each stop:
+  - create or update one row in existing `events` table
+  - title = property name + task title/service type
+  - location = property address
+  - description includes:
+    - Daily Itinerary name
+    - property name
+    - task/service type
+    - notes
+    - link back to Hubify task/property/itinerary if available
+  - start = `scheduledStart`
+  - end = `scheduledEnd`
+  - organizerId = requesting user
+  - assignedUserId = itinerary assigned user if supported
+  - orgId = request user org
+- store event id on `daily_itinerary_stops.calendarEventId`
+- delete events for removed stops
+- set itinerary status = `published`
+- set `needsCalendarSync = false`
+- set `publishedAt = now()`
+
+Return:
+
+- events created count
+- events updated count
+- events deleted count
+
+---
+
+## 11. Frontend — Dispatch Center Page
+
+Create:
+
+`client/src/pages/DispatchCenter.tsx`
+
+Layout:
+
+### Sidebar
+
+- Date picker
+- Staff member selector
+- Start time picker
+- Templates list/drawer
+
+### Main Area
+
+Two panels:
+
+#### Panel 1: Unscheduled Tasks
+
+Fetch tasks for selected date/staff member that are:
+
+- pending or in-progress
+- not already connected to a `daily_itinerary_stop` for that date
+
+Also allow manager to optionally view unassigned tasks.
+
+Task cards should show:
+
+- task title
+- property name
+- property address
+- estimated duration if available
+- due date
+- priority/status
+
+#### Panel 2: Today’s Itinerary
+
+Ordered itinerary stop cards.
+
+Each stop card should show:
+
+- stop number
+- property name
+- address
+- task/service type
+- estimated work minutes
+- travel time from previous stop
+- buffer minutes
+- scheduled start time
+- scheduled end time
+- notes
+- remove button
+- move up/down buttons
+
+Drag-and-drop can be a stretch goal. Up/down buttons are acceptable for first version.
+
+Header should show:
+
+- total work time
+- total travel time
+- total buffer time
+- total day length
+- itinerary status badge
+- `needsCalendarSync` warning if applicable
+
+---
+
+## 12. Frontend — Templates Panel
+
+Inside Dispatch Center:
+
+- collapsible Templates drawer
+- list saved templates
+- buttons:
+  - Generate
+  - Edit
+  - Delete/archive
+
+### Save as Template
+
+A button on a Daily Itinerary opens a dialog.
+
+Dialog fields:
+
+- Template name
+- Description
+- Default staff member optional
+- Preferred start time
+
+POST to templates API.
+
+### Generate from Template
+
+Generate button opens:
+
+- date picker
+- staff member picker
+- start time picker
+
+Then POST to:
+
+`/api/dispatch/templates/:id/generate`
+
+After successful generation, navigate/load the new Daily Itinerary.
+
+### Update Template
+
+If a Daily Itinerary came from a template, offer:
+
+`Update Template`
+
+This should update the original template only when explicitly clicked.
+
+Editing a Daily Itinerary should never automatically modify the saved template.
+
+---
+
+## 13. Frontend — Publish + Calendar Sync
+
+Add button:
+
+`Publish to Calendar`
+
+On click:
+
+- call publish endpoint
+- show toast:
+  - events created
+  - events updated
+  - events deleted
+- offer link:
+  - `View in Calendar`
+
+If Daily Itinerary is already published and manager edits stops, show banner:
+
+`Itinerary has unpublished changes — re-publish to sync the calendar.`
+
+---
+
+## 14. Navigation
+
+Update:
+
+- `client/src/App.tsx`
+- `client/src/components/Navigation.tsx`
+
+Add:
+
+`Dispatch Center`
+
+Path:
+
+`/dispatch`
+
+Visible to:
+
+- admin
+- supervisor
+
+Do not show to regular field staff/client users.
+
+Again: do not use the word “route” in the nav or UI.
+
+---
+
+## 15. Relevant Files
+
+- `shared/schema.ts`
+- `server/runMigrations.ts`
+- `server/index.ts`
+- `server/routes.ts`
+- `client/src/App.tsx`
+- `client/src/components/Navigation.tsx`
+- `client/src/pages/DispatchCenter.tsx`
+- `client/src/pages/Calendar.tsx`
+- `client/src/pages/Tasks.tsx`
+
+---
+
+# Acceptance Criteria
+
+- Admin/supervisor can access Dispatch Center from main navigation.
+- Regular users cannot access Dispatch Center.
+- Manager can create a Daily Itinerary from scratch.
+- Manager can choose date, staff member, and start time.
+- Manager can view unscheduled tasks.
+- Manager can add tasks to Today’s Itinerary.
+- Manager can manually reorder itinerary stops.
+- Hubify calculates each stop’s scheduled start/end time.
+- Hubify recalculates all following stops when work time, travel time, buffer time, order, or start time changes.
+- Manager can save a Daily Itinerary as a reusable Itinerary Template.
+- Manager can generate a new Daily Itinerary from a saved template.
+- Generated Daily Itineraries are separate from templates.
+- Editing a generated Daily Itinerary does not change the template unless “Update Template” is clicked.
+- Manager can publish a Daily Itinerary to the existing calendar/events system.
+- One calendar event is created per itinerary stop.
+- Re-publishing updates existing events.
+- Removing a published stop deletes its related calendar event.
+- Published itineraries show `published` status.
+- Completed itineraries can be marked `completed`.
+- Editing a published itinerary sets `needsCalendarSync = true`.
+- Re-publishing sets `needsCalendarSync = false`.
+- Existing iCal feed picks up the created calendar events if it already reads from `events`.
+- No UI label anywhere uses the word “route.”
+
+---
+
+# Build Priority
+
+Start with:
+
+1. Schema
+2. Migration
+3. Backend APIs
+4. Dispatch Center page
+5. Manual itinerary creation
+6. Template save/generate
+7. Calendar publishing
+
+Do not build optimization yet.
+Do not build Google Maps yet.
+Do not build turn-by-turn directions yet.

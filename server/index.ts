@@ -541,6 +541,12 @@ app.use((req, res, next) => {
       } catch (err) {
         console.error('Error ensuring org_subscriptions.setup_fee_cents column:', err);
       }
+      try {
+        const { ensureDispatchCenterTables } = await import('./runMigrations.js');
+        await ensureDispatchCenterTables();
+      } catch (err) {
+        console.error('Error ensuring Dispatch Center tables:', err);
+      }
     } catch (error) {
       console.error('Error loading startup migrations:', error);
     }

@@ -19,6 +19,7 @@ import PropertyProfile from "@/pages/PropertyProfile";
 import CommunityProfile from "@/pages/CommunityProfile";
 import Calendar from "@/pages/Calendar";
 import TimeTracking from "@/pages/TimeTracking";
+import DispatchCenter from "@/pages/DispatchCenter";
 import Team from "@/pages/Team";
 import TeamMemberProfile from "@/pages/TeamMemberProfile";
 import People from "@/pages/People";
@@ -209,6 +210,7 @@ function Router() {
             <Route path="/communities/:id" component={CommunityProfile} />
           )}
           <Route path="/calendar" component={Calendar} />
+          <Route path="/dispatch" component={DispatchCenter} />
           {isFeatureEnabled("task_cost_tracking") && (
             <Route path="/time-tracking" component={TimeTracking} />
           )}

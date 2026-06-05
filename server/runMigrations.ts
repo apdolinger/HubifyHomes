@@ -935,3 +935,102 @@ export async function ensureOrgSubscriptionSetupFeeColumn(): Promise<void> {
     client.release();
   }
 }
+
+export async function ensureDispatchCenterTables(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS itinerary_templates (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        default_assigned_user_id VARCHAR REFERENCES users(id) ON DELETE SET NULL,
+        preferred_start_time VARCHAR(10) DEFAULT '08:00',
+        status VARCHAR(32) NOT NULL DEFAULT 'active',
+        created_by VARCHAR REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS itinerary_templates_org_id_idx ON itinerary_templates(org_id);
+      CREATE INDEX IF NOT EXISTS itinerary_templates_status_idx ON itinerary_templates(status);
+
+      CREATE TABLE IF NOT EXISTS itinerary_template_stops (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+        template_id UUID NOT NULL REFERENCES itinerary_templates(id) ON DELETE CASCADE,
+        property_id INTEGER REFERENCES properties(id) ON DELETE SET NULL,
+        task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+        service_type VARCHAR(128),
+        stop_order INTEGER NOT NULL DEFAULT 0,
+        estimated_work_minutes INTEGER NOT NULL DEFAULT 60,
+        travel_minutes_from_previous INTEGER NOT NULL DEFAULT 15,
+        distance_from_previous VARCHAR(64),
+        buffer_minutes INTEGER NOT NULL DEFAULT 0,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS itinerary_template_stops_template_id_idx ON itinerary_template_stops(template_id);
+      CREATE INDEX IF NOT EXISTS itinerary_template_stops_property_id_idx ON itinerary_template_stops(property_id);
+      CREATE INDEX IF NOT EXISTS itinerary_template_stops_task_id_idx ON itinerary_template_stops(task_id);
+
+      CREATE TABLE IF NOT EXISTS daily_itineraries (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+        date DATE NOT NULL,
+        assigned_user_id VARCHAR REFERENCES users(id) ON DELETE SET NULL,
+        template_id UUID REFERENCES itinerary_templates(id) ON DELETE SET NULL,
+        name VARCHAR(255) NOT NULL,
+        start_time VARCHAR(10) NOT NULL DEFAULT '08:00',
+        status VARCHAR(32) NOT NULL DEFAULT 'draft',
+        total_work_minutes INTEGER NOT NULL DEFAULT 0,
+        total_travel_minutes INTEGER NOT NULL DEFAULT 0,
+        total_buffer_minutes INTEGER NOT NULL DEFAULT 0,
+        total_day_minutes INTEGER NOT NULL DEFAULT 0,
+        needs_calendar_sync BOOLEAN NOT NULL DEFAULT FALSE,
+        published_at TIMESTAMP,
+        completed_at TIMESTAMP,
+        created_by VARCHAR REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS daily_itineraries_org_id_idx ON daily_itineraries(org_id);
+      CREATE INDEX IF NOT EXISTS daily_itineraries_date_idx ON daily_itineraries(date);
+      CREATE INDEX IF NOT EXISTS daily_itineraries_assigned_user_idx ON daily_itineraries(assigned_user_id);
+      CREATE INDEX IF NOT EXISTS daily_itineraries_template_id_idx ON daily_itineraries(template_id);
+      CREATE INDEX IF NOT EXISTS daily_itineraries_status_idx ON daily_itineraries(status);
+
+      CREATE TABLE IF NOT EXISTS daily_itinerary_stops (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+        daily_itinerary_id UUID NOT NULL REFERENCES daily_itineraries(id) ON DELETE CASCADE,
+        property_id INTEGER REFERENCES properties(id) ON DELETE SET NULL,
+        task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+        assigned_user_id VARCHAR REFERENCES users(id) ON DELETE SET NULL,
+        stop_order INTEGER NOT NULL DEFAULT 0,
+        estimated_work_minutes INTEGER NOT NULL DEFAULT 60,
+        travel_minutes_from_previous INTEGER NOT NULL DEFAULT 15,
+        distance_from_previous VARCHAR(64),
+        buffer_minutes INTEGER NOT NULL DEFAULT 0,
+        scheduled_start TIMESTAMPTZ,
+        scheduled_end TIMESTAMPTZ,
+        status VARCHAR(32) NOT NULL DEFAULT 'pending',
+        calendar_event_id UUID REFERENCES events(id) ON DELETE SET NULL,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS daily_itinerary_stops_itinerary_id_idx ON daily_itinerary_stops(daily_itinerary_id);
+      CREATE INDEX IF NOT EXISTS daily_itinerary_stops_property_id_idx ON daily_itinerary_stops(property_id);
+      CREATE INDEX IF NOT EXISTS daily_itinerary_stops_task_id_idx ON daily_itinerary_stops(task_id);
+      CREATE INDEX IF NOT EXISTS daily_itinerary_stops_assigned_user_idx ON daily_itinerary_stops(assigned_user_id);
+      CREATE INDEX IF NOT EXISTS daily_itinerary_stops_calendar_event_id_idx ON daily_itinerary_stops(calendar_event_id);
+    `);
+    log("[MIGRATE] Dispatch Center tables (itinerary_templates, itinerary_template_stops, daily_itineraries, daily_itinerary_stops) verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to create Dispatch Center tables: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
