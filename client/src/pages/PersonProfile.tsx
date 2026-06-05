@@ -1297,7 +1297,7 @@ export default function PersonProfile() {
 
   // Send satisfaction survey mutation
   const sendSatisfactionSurveyMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/reviews/sentiment", { clientId }),
+    mutationFn: () => apiRequest("POST", "/api/reviews/sentiment/send", { clientId }),
     onSuccess: () => {
       toast({ title: "Survey sent", description: "Satisfaction survey email has been sent to this client." });
     },
