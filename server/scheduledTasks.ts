@@ -1587,6 +1587,19 @@ export function startScheduledTasks() {
   });
 
   log('[CRON] Trial lifecycle job initialized - will run daily at 7am');
+
+  // Review request reminder job — runs daily at 10am
+  cron.schedule('0 10 * * *', async () => {
+    try {
+      log('[CRON] Running review request reminder job...');
+      const result = await processReviewRequestReminders();
+      log(`[CRON] Review reminder job complete: ${result.sent} sent, ${result.expired} expired.`);
+    } catch (error) {
+      log(`[CRON] Error in review reminder job: ${error}`);
+    }
+  });
+
+  log('[CRON] Review request reminder job initialized - will run daily at 10am');
 }
 
 // ─── Trial lifecycle helpers ────────────────────────────────────────────────
@@ -1788,4 +1801,106 @@ export async function runTrialLifecycleJob(): Promise<{ warningSent: number; exp
 
   log(`[TRIAL] Lifecycle job done — ${warningSent} warning(s), ${expiredSent} expired notice(s).`);
   return { warningSent, expiredSent };
+}
+
+// ─── Review Request Reminder Job ────────────────────────────────────────────
+
+export async function processReviewRequestReminders(): Promise<{ sent: number; expired: number }> {
+  const { db } = await import('./db');
+  const { eq, and, lte, isNull, or, inArray } = await import('drizzle-orm');
+  const { reviewRequests, reviewAutomationSettings, clients, contacts } = await import('@shared/schema');
+
+  const now = new Date();
+  let sent = 0;
+  let expired = 0;
+
+  // Find review requests that need a reminder
+  const pending = await db
+    .select()
+    .from(reviewRequests)
+    .where(
+      and(
+        inArray(reviewRequests.status, ['sent', 'clicked']),
+        lte(reviewRequests.nextReminderAt, now),
+        isNull(reviewRequests.optedOutAt),
+        isNull(reviewRequests.alreadyReviewedAt),
+        isNull(reviewRequests.testimonialSubmittedAt)
+      )
+    )
+    .limit(100);
+
+  for (const rr of pending) {
+    try {
+      // Get org settings
+      const settingsRows = await db.select().from(reviewAutomationSettings).where(eq(reviewAutomationSettings.orgId, rr.orgId)).limit(1);
+      const settings = settingsRows[0];
+      if (!settings || !settings.enabled) continue;
+
+      const followUpDays: number[] = (settings.followUpDays as number[]) || [3, 7, 14];
+
+      // Check if we've exceeded max reminders
+      if (rr.reminderCount >= settings.maxReminders) {
+        await db.update(reviewRequests).set({ status: 'expired', updatedAt: now }).where(eq(reviewRequests.id, rr.id));
+        expired++;
+        continue;
+      }
+
+      // Get client contact info
+      let contactEmail = '';
+      let clientName = 'Client';
+      if (rr.contactId) {
+        const cRows = await db.select().from(contacts).where(eq(contacts.id, rr.contactId)).limit(1);
+        if (cRows[0]) { contactEmail = cRows[0].email || ''; clientName = [cRows[0].firstName, cRows[0].lastName].filter(Boolean).join(' ') || clientName; }
+      }
+      if (!contactEmail) {
+        const clRows = await db.select().from(clients).where(eq(clients.id, rr.clientId)).limit(1);
+        if (clRows[0]) { contactEmail = clRows[0].email || ''; clientName = clientName === 'Client' ? ([clRows[0].firstName, clRows[0].lastName].filter(Boolean).join(' ') || clRows[0].email || 'Client') : clientName; }
+      }
+      if (!contactEmail) {
+        log(`[REVIEW-CRON] Skipping rr ${rr.id} — no email found`);
+        continue;
+      }
+
+      const { storage: storageModule } = await import('./storage');
+      const org = await storageModule.getOrg(rr.orgId);
+      const orgName = org?.name || 'Your Property Manager';
+      const { getAppBaseUrl } = await import('./brandAsset');
+      const baseUrl = getAppBaseUrl();
+      const reviewLink = `${baseUrl}/r/review/${rr.token}`;
+
+      const REMINDER_SUBJECT = 'A quick reminder — your review means a lot to us';
+      const REMINDER_BODY = `Hi ${clientName},\n\nWe wanted to gently follow up on our request for a review. Your experience matters to us and to others looking for property management services they can trust.\n\n<a href="${reviewLink}" style="display:inline-block;background:#0066cc;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;margin:16px 0;">Leave a Review</a>\n\nIf you've already left a review, please let us know by clicking "I already reviewed" on the page above, and we won't send any more reminders.\n\nThank you so much!\n\n${orgName}`;
+
+      const emailSubject = (settings.reviewEmailSubject || REMINDER_SUBJECT).replace(/\{\{orgName\}\}/g, orgName).replace(/\{\{clientName\}\}/g, clientName);
+      const emailBody = (settings.reviewEmailBody || REMINDER_BODY)
+        .replace(/\{\{orgName\}\}/g, orgName)
+        .replace(/\{\{clientName\}\}/g, clientName)
+        .replace(/\{\{reviewLink\}\}/g, `<a href="${reviewLink}" style="display:inline-block;background:#0066cc;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;margin:16px 0;">Leave a Review</a>`);
+
+      await sendEmail({ to: contactEmail, subject: emailSubject, body: emailBody, orgId: rr.orgId });
+
+      // Compute next reminder date
+      const nextIdx = rr.reminderCount + 1;
+      const nextDays = followUpDays[nextIdx];
+      const nextReminderAt = nextDays ? new Date(now.getTime() + nextDays * 24 * 60 * 60 * 1000) : null;
+      const newCount = rr.reminderCount + 1;
+      const newStatus = newCount >= settings.maxReminders ? 'expired' : rr.status;
+
+      await db.update(reviewRequests).set({
+        reminderCount: newCount,
+        lastReminderSentAt: now,
+        nextReminderAt: nextReminderAt ?? undefined,
+        status: newStatus as any,
+        updatedAt: now,
+      }).where(eq(reviewRequests.id, rr.id));
+
+      if (newStatus === 'expired') expired++;
+      sent++;
+      log(`[REVIEW-CRON] Sent reminder to ${contactEmail} for rr ${rr.id}`);
+    } catch (err) {
+      log(`[REVIEW-CRON] Error processing rr ${rr.id}: ${err}`);
+    }
+  }
+
+  return { sent, expired };
 }

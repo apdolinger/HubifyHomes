@@ -1,0 +1,563 @@
+#260 - Client Sentiment & Review Automation
+
+## What & Why
+
+Add a customer review automation system for organizations using Hubify.
+
+Home Watch companies should be able to track their clients’ satisfaction over time and automatically request public reviews when a client has had a positive experience.
+
+The goal is not to ask every client for a review blindly. Hubify should first track private satisfaction/sentiment, then trigger a public review request only when the client gives a strong rating.
+
+This helps organizations:
+- measure client happiness
+- catch unhappy clients before they leave
+- request reviews at the right time
+- generate testimonials for marketing/social media
+- follow up automatically when a client does not complete the review
+
+## Important Compliance / Platform Rule
+
+Do not build this as “Hubify automatically posts a review to Google/Facebook on behalf of the client.”
+
+Instead:
+- Hubify can send the review request.
+- Hubify can collect private satisfaction feedback.
+- Hubify can collect a testimonial/review draft.
+- Hubify can provide links/buttons to Google, Facebook, Yelp, etc.
+- Hubify can prepare social media/testimonial copy for the organization.
+- The client must personally submit public reviews to third-party platforms.
+
+## Feature Name
+
+Use this language in the UI:
+
+- Client Sentiment
+- Review Automation
+- Review Requests
+- Testimonials
+- Satisfaction Score
+- Follow-Up Reminder
+
+Avoid language that implies fake, forced, or automatically posted third-party reviews.
+
+---
+
+# Core Flow
+
+## Flow 1: Private Satisfaction Check
+
+After a service season, completed project, completed inspection cycle, or manually selected milestone, Hubify sends the client a satisfaction check.
+
+Example:
+
+“How was your experience with [Organization Name] this season?”
+
+Client selects:
+
+- 5 stars / Very satisfied
+- 4 stars / Satisfied
+- 3 stars / Neutral
+- 2 stars / Unsatisfied
+- 1 star / Very unsatisfied
+
+Optional fields:
+
+- What went well?
+- What could have been better?
+- May we use your comments as a testimonial?
+
+## Flow 2: Positive Rating Triggers Review Request
+
+If rating is above threshold, default 4 or 5 stars:
+
+Hubify automatically sends a public review request.
+
+Example:
+
+“Thank you for the kind feedback. Would you be willing to share your experience publicly?”
+
+Buttons:
+- Review us on Google
+- Review us on Facebook
+- Leave a testimonial
+- Copy my feedback
+
+## Flow 3: Low Rating Creates Internal Alert
+
+If rating is below threshold, default 1–3 stars:
+
+Do not request a public review.
+
+Instead:
+- create internal alert
+- mark client as attention needed
+- notify organization admin/supervisor
+- optionally create follow-up task
+
+Example internal message:
+
+“Client gave a 2-star satisfaction score. Follow up recommended before requesting a review.”
+
+## Flow 4: Automatic Circle-Back
+
+If a client gives a high rating but does not complete the review request:
+
+Hubify should automatically follow up.
+
+Default follow-up cadence:
+
+- initial review request immediately after positive satisfaction score
+- reminder 3 days later
+- reminder 7 days later
+- final reminder 14 days later
+
+Stop reminders if:
+- client submits testimonial
+- client clicks “I already reviewed”
+- client opts out
+- max reminder count reached
+
+---
+
+# Admin Settings
+
+Add organization-level Review Automation settings.
+
+Settings should include:
+
+- enable/disable review automation
+- satisfaction threshold for review request, default 4
+- follow-up cadence in days, default [3, 7, 14]
+- max reminders, default 3
+- Google review URL
+- Facebook review URL
+- Yelp review URL optional
+- custom review URL optional
+- default email subject
+- default SMS/message body if messaging exists
+- allow testimonial collection yes/no
+- require approval before using testimonial publicly yes/no
+- auto-create follow-up task for low ratings yes/no
+- staff/admin notification recipients
+
+---
+
+# Schema Suggestions
+
+Add tables similar to:
+
+## client_sentiment_surveys
+
+Fields:
+- id
+- orgId
+- clientId
+- propertyId nullable
+- serviceAssignmentId nullable
+- taskId nullable
+- inspectionId nullable
+- reportId nullable
+- invoiceId nullable
+- triggerType
+- status
+- rating nullable
+- feedbackText nullable
+- improvementText nullable
+- testimonialPermission boolean
+- submittedAt nullable
+- createdAt
+- updatedAt
+
+triggerType examples:
+- manual
+- season_completed
+- task_completed
+- report_sent
+- invoice_paid
+- recurring_checkin
+
+status examples:
+- pending
+- sent
+- completed
+- low_rating_followup_needed
+- review_requested
+- closed
+
+## review_requests
+
+Fields:
+- id
+- orgId
+- clientId
+- propertyId nullable
+- sentimentSurveyId nullable
+- status
+- ratingAtTrigger
+- publicReviewUrlClicked nullable
+- googleClickedAt nullable
+- facebookClickedAt nullable
+- yelpClickedAt nullable
+- customClickedAt nullable
+- testimonialSubmittedAt nullable
+- alreadyReviewedAt nullable
+- optedOutAt nullable
+- nextReminderAt nullable
+- reminderCount
+- maxReminders
+- createdAt
+- updatedAt
+
+status examples:
+- pending
+- sent
+- clicked
+- testimonial_submitted
+- already_reviewed
+- opted_out
+- expired
+
+## testimonials
+
+Fields:
+- id
+- orgId
+- clientId
+- propertyId nullable
+- reviewRequestId nullable
+- sentimentSurveyId nullable
+- rating
+- testimonialText
+- clientDisplayName
+- clientCompanyName nullable
+- permissionGranted boolean
+- approvedForMarketing boolean
+- approvedAt nullable
+- approvedBy nullable
+- source
+- createdAt
+- updatedAt
+
+source examples:
+- private_feedback
+- testimonial_form
+- manual_entry
+
+## review_automation_settings
+
+Fields:
+- id
+- orgId
+- enabled
+- satisfactionThreshold
+- followUpDaysJson
+- maxReminders
+- googleReviewUrl nullable
+- facebookReviewUrl nullable
+- yelpReviewUrl nullable
+- customReviewUrl nullable
+- customReviewLabel nullable
+- defaultEmailSubject
+- defaultEmailBody
+- lowRatingAlertEnabled
+- lowRatingCreateTask
+- testimonialCollectionEnabled
+- requireTestimonialApproval
+- createdAt
+- updatedAt
+
+---
+
+# Backend API
+
+Add API routes under:
+
+`/api/reviews`
+
+All organization admin/supervisor routes should be authenticated and scoped to `req.user.orgId`.
+
+## Admin Routes
+
+### GET `/api/reviews/settings`
+Get org review automation settings.
+
+### PATCH `/api/reviews/settings`
+Update org review automation settings.
+
+### GET `/api/reviews/sentiment`
+List client sentiment surveys with filters:
+- status
+- rating
+- clientId
+- propertyId
+- date range
+
+### POST `/api/reviews/sentiment/send`
+Manually send satisfaction survey.
+
+Request body:
+- clientId
+- propertyId optional
+- triggerType
+- customMessage optional
+
+### GET `/api/reviews/requests`
+List review requests.
+
+### POST `/api/reviews/requests/:id/remind`
+Manually send reminder.
+
+### POST `/api/reviews/requests/:id/mark-reviewed`
+Mark client as already reviewed.
+
+### GET `/api/reviews/testimonials`
+List testimonials.
+
+### PATCH `/api/reviews/testimonials/:id`
+Update approval status / marketing permission.
+
+## Public Client Routes
+
+Use secure tokenized links.
+
+### GET `/r/satisfaction/:token`
+Public satisfaction form.
+
+### POST `/r/satisfaction/:token`
+Submit rating and private feedback.
+
+If rating >= threshold:
+- create review request
+- show public review options
+- send review request follow-up email if needed
+
+If rating < threshold:
+- create internal alert/task
+- do not show public review links aggressively
+
+### GET `/r/review/:token`
+Public review request page.
+
+Shows:
+- Google review button
+- Facebook review button
+- Yelp review button if configured
+- testimonial form
+- “I already reviewed”
+- opt-out option
+
+### POST `/r/review/:token/testimonial`
+Submit testimonial.
+
+### POST `/r/review/:token/already-reviewed`
+Mark already reviewed.
+
+### POST `/r/review/:token/opt-out`
+Opt out from reminders.
+
+---
+
+# Automation / Scheduled Job
+
+Add a scheduled job to send review reminders.
+
+Suggested function:
+
+`processReviewRequestReminders()`
+
+Runs daily.
+
+Logic:
+- find review_requests where status is sent/pending/clicked
+- nextReminderAt <= now
+- reminderCount < maxReminders
+- not opted out
+- not already reviewed
+- not testimonial submitted
+- send reminder email/message
+- increment reminderCount
+- set nextReminderAt based on settings follow-up cadence
+- expire when max reminders reached
+
+---
+
+# Trigger Points
+
+Do not trigger everywhere at first.
+
+Start with manual trigger plus one automatic trigger.
+
+Phase 1 triggers:
+- manual send from client/property profile
+- season completed/manual milestone
+
+Phase 2 triggers:
+- after report sent
+- after invoice paid
+- after a recurring service period ends
+- after final visit of a seasonal itinerary/service assignment
+
+---
+
+# Frontend Pages
+
+## Review Automation Settings Page
+
+Could live under Organization Settings or Super Admin/Org Admin settings.
+
+Fields:
+- enable automation
+- satisfaction threshold
+- follow-up schedule
+- Google review URL
+- Facebook review URL
+- Yelp/custom URL
+- message templates
+- low-rating alert behavior
+- testimonial approval behavior
+
+## Client Sentiment Dashboard
+
+Shows:
+- average satisfaction rating
+- rating trend over time
+- number of surveys sent
+- number completed
+- review requests sent
+- testimonials collected
+- low-rating alerts
+- clients needing follow-up
+
+## Client / Property Profile Integration
+
+Add buttons:
+- Send Satisfaction Check
+- Request Review
+- View Sentiment History
+- View Testimonials
+
+## Review Request Pipeline
+
+Statuses:
+- Sent
+- Opened/clicked if tracking exists
+- Reminder Due
+- Testimonial Submitted
+- Already Reviewed
+- Opted Out
+- Expired
+
+## Testimonials Library
+
+Shows:
+- testimonial text
+- rating
+- client display name
+- property optional
+- permission status
+- approved for marketing toggle
+- copy for social button
+
+---
+
+# Email Templates
+
+Create default templates.
+
+## Satisfaction Check Email
+
+Subject:
+How was your experience with {{organizationName}}?
+
+Body:
+Hi {{clientName}},
+
+Thank you for trusting {{organizationName}} with your property. We would appreciate your feedback on your recent service experience.
+
+Please take a moment to rate your experience here:
+
+{{satisfactionLink}}
+
+Your feedback helps us improve and continue providing excellent property care.
+
+Thank you,
+{{organizationName}}
+
+## Review Request Email
+
+Subject:
+Would you be willing to share your experience?
+
+Body:
+Hi {{clientName}},
+
+Thank you for your kind feedback. We are grateful to hear you had a positive experience with {{organizationName}}.
+
+Would you be willing to share your experience publicly? Your review helps other homeowners feel confident choosing our team.
+
+Leave a review here:
+
+{{reviewLink}}
+
+Thank you,
+{{organizationName}}
+
+## Low Rating Internal Alert
+
+Subject:
+Client follow-up recommended: {{clientName}}
+
+Body:
+{{clientName}} submitted a {{rating}}-star satisfaction score.
+
+Feedback:
+{{feedbackText}}
+
+Recommended action:
+Please follow up with this client before requesting a public review.
+
+---
+
+# Acceptance Criteria
+
+- Organization admin can enable/disable review automation.
+- Organization admin can configure review platform URLs.
+- Admin/supervisor can manually send satisfaction survey to a client.
+- Client can submit private satisfaction rating from a secure public link.
+- Positive ratings create a review request.
+- Low ratings create internal follow-up alert and do not trigger public review request.
+- Review request page shows configured external review links.
+- Client can submit a testimonial.
+- Client can mark “I already reviewed.”
+- Client can opt out of reminders.
+- Reminder job follows up automatically when review is not completed.
+- Reminder job stops when completed, opted out, already reviewed, or expired.
+- Testimonials can be approved before marketing use.
+- Dashboard shows sentiment/review metrics.
+- All records are scoped by orgId.
+- No third-party public review is auto-posted without client action.
+
+---
+
+# Build Priority
+
+Phase 1:
+1. Schema + migration
+2. Settings
+3. Manual satisfaction survey sending
+4. Public satisfaction form
+5. Positive rating review request flow
+6. Low rating internal alert
+7. Reminder job
+8. Testimonials library
+
+Phase 2:
+1. Automatic triggers after reports/invoices/season completion
+2. Sentiment trend dashboard
+3. Social copy generator
+4. Client/property sentiment history
+
+Phase 3:
+1. AI-assisted testimonial polishing with approval
+2. Review performance analytics
+3. Integration with social media scheduling tools

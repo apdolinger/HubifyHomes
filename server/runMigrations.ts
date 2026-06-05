@@ -1034,3 +1034,109 @@ export async function ensureDispatchCenterTables(): Promise<void> {
     client.release();
   }
 }
+
+export async function ensureReviewAutomationTables(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS review_automation_settings (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id UUID NOT NULL UNIQUE REFERENCES orgs(id) ON DELETE CASCADE,
+        enabled BOOLEAN NOT NULL DEFAULT FALSE,
+        satisfaction_threshold INTEGER NOT NULL DEFAULT 4,
+        follow_up_days JSONB DEFAULT '[3,7,14]',
+        max_reminders INTEGER NOT NULL DEFAULT 3,
+        google_review_url VARCHAR,
+        facebook_review_url VARCHAR,
+        yelp_review_url VARCHAR,
+        custom_review_url VARCHAR,
+        custom_review_platform_name VARCHAR,
+        low_rating_alert_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+        low_rating_create_task BOOLEAN NOT NULL DEFAULT FALSE,
+        testimonial_collection_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+        require_testimonial_approval BOOLEAN NOT NULL DEFAULT TRUE,
+        satisfaction_email_subject VARCHAR,
+        satisfaction_email_body TEXT,
+        review_email_subject VARCHAR,
+        review_email_body TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS client_sentiment_surveys (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+        client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+        contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+        sent_by_user_id VARCHAR REFERENCES users(id) ON DELETE SET NULL,
+        token VARCHAR NOT NULL UNIQUE,
+        expires_at TIMESTAMP NOT NULL,
+        status VARCHAR NOT NULL DEFAULT 'sent',
+        rating INTEGER,
+        feedback_text TEXT,
+        improvement_text TEXT,
+        testimonial_permission BOOLEAN NOT NULL DEFAULT FALSE,
+        trigger_type VARCHAR NOT NULL DEFAULT 'manual',
+        property_id INTEGER REFERENCES properties(id) ON DELETE SET NULL,
+        custom_message TEXT,
+        sent_at TIMESTAMP DEFAULT NOW(),
+        opened_at TIMESTAMP,
+        completed_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS css_org_idx ON client_sentiment_surveys(org_id);
+      CREATE INDEX IF NOT EXISTS css_client_idx ON client_sentiment_surveys(client_id);
+      CREATE INDEX IF NOT EXISTS css_token_idx ON client_sentiment_surveys(token);
+
+      CREATE TABLE IF NOT EXISTS review_requests (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+        survey_id UUID NOT NULL REFERENCES client_sentiment_surveys(id) ON DELETE CASCADE,
+        client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+        contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+        token VARCHAR NOT NULL UNIQUE,
+        status VARCHAR NOT NULL DEFAULT 'sent',
+        reminder_count INTEGER NOT NULL DEFAULT 0,
+        next_reminder_at TIMESTAMP,
+        clicked_at TIMESTAMP,
+        already_reviewed_at TIMESTAMP,
+        opted_out_at TIMESTAMP,
+        testimonial_submitted_at TIMESTAMP,
+        last_reminder_sent_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS rr_org_idx ON review_requests(org_id);
+      CREATE INDEX IF NOT EXISTS rr_client_idx ON review_requests(client_id);
+      CREATE INDEX IF NOT EXISTS rr_token_idx ON review_requests(token);
+      CREATE INDEX IF NOT EXISTS rr_status_next_reminder_idx ON review_requests(status, next_reminder_at);
+
+      CREATE TABLE IF NOT EXISTS testimonials (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+        client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+        contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+        survey_id UUID REFERENCES client_sentiment_surveys(id) ON DELETE SET NULL,
+        review_request_id UUID REFERENCES review_requests(id) ON DELETE SET NULL,
+        rating INTEGER NOT NULL,
+        text TEXT NOT NULL,
+        source VARCHAR NOT NULL DEFAULT 'private_feedback',
+        testimonial_permission BOOLEAN NOT NULL DEFAULT FALSE,
+        approved_for_marketing BOOLEAN NOT NULL DEFAULT FALSE,
+        approved_at TIMESTAMP,
+        approved_by VARCHAR REFERENCES users(id) ON DELETE SET NULL,
+        client_display_name VARCHAR,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS testimonials_org_idx ON testimonials(org_id);
+      CREATE INDEX IF NOT EXISTS testimonials_client_idx ON testimonials(client_id);
+      CREATE INDEX IF NOT EXISTS testimonials_approved_idx ON testimonials(org_id, approved_for_marketing);
+    `);
+    log("[MIGRATE] Review Automation tables verified (review_automation_settings, client_sentiment_surveys, review_requests, testimonials).");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to create Review Automation tables: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}

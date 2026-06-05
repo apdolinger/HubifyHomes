@@ -21843,6 +21843,541 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Review Automation Routes ────────────────────────────────────────────────
+  // Phase 1: email-only, manual-trigger only. Phase 2 auto-triggers are stubbed.
+
+  function getReviewOrgId(req: any): string | null {
+    return req.user?.claims?.orgId || req.user?.orgId || null;
+  }
+  function getReviewUserId(req: any): string | null {
+    return req.user?.claims?.sub || req.user?.id || null;
+  }
+  function generateReviewToken(): string {
+    return crypto.randomUUID();
+  }
+
+  const DEFAULT_SATISFACTION_EMAIL_SUBJECT = "How are we doing? Share your feedback";
+  const DEFAULT_SATISFACTION_EMAIL_BODY = `Hi {{clientName}},
+
+We hope you've been enjoying our service! We'd love to hear your thoughts.
+
+It only takes 30 seconds to rate your experience. Your feedback helps us keep improving.
+
+Click the button below to share your rating:
+{{surveyLink}}
+
+Thank you for being a valued client.
+
+{{orgName}}`;
+
+  const DEFAULT_REVIEW_EMAIL_SUBJECT = "Thank you! Would you share your experience?";
+  const DEFAULT_REVIEW_EMAIL_BODY = `Hi {{clientName}},
+
+Thank you so much for your kind feedback! We're thrilled to hear you've had a great experience.
+
+If you have a moment, we'd be grateful if you could share your experience on a review platform. It helps others find us and means the world to our team.
+
+{{reviewLink}}
+
+Thank you for your continued support!
+
+{{orgName}}`;
+
+  const DEFAULT_REMINDER_EMAIL_SUBJECT = "A quick reminder — your review means a lot to us";
+  const DEFAULT_REMINDER_EMAIL_BODY = `Hi {{clientName}},
+
+We wanted to gently follow up on our request for a review. Your experience matters to us and to others looking for property management services they can trust.
+
+{{reviewLink}}
+
+If you've already left a review, please let us know by clicking "I already reviewed" on the page above, and we won't send any more reminders.
+
+Thank you so much!
+
+{{orgName}}`;
+
+  async function getOrCreateReviewSettings(orgId: string) {
+    const { eq } = await import("drizzle-orm");
+    const { reviewAutomationSettings } = await import("@shared/schema");
+    const rows = await db.select().from(reviewAutomationSettings).where(eq(reviewAutomationSettings.orgId, orgId)).limit(1);
+    if (rows[0]) return rows[0];
+    const inserted = await db.insert(reviewAutomationSettings).values({ orgId }).returning();
+    return inserted[0];
+  }
+
+  // GET /api/reviews/settings
+  app.get("/api/reviews/settings", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orgId = getReviewOrgId(req);
+      if (!orgId) return res.status(400).json({ message: "No org context" });
+      const settings = await getOrCreateReviewSettings(orgId);
+      res.json(settings);
+    } catch (err) {
+      console.error("GET /api/reviews/settings", err);
+      res.status(500).json({ message: "Failed to load review settings" });
+    }
+  });
+
+  // PATCH /api/reviews/settings
+  app.patch("/api/reviews/settings", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orgId = getReviewOrgId(req);
+      if (!orgId) return res.status(400).json({ message: "No org context" });
+      const { eq } = await import("drizzle-orm");
+      const { reviewAutomationSettings } = await import("@shared/schema");
+      await getOrCreateReviewSettings(orgId);
+      const allowed = [
+        "enabled","satisfactionThreshold","followUpDays","maxReminders",
+        "googleReviewUrl","facebookReviewUrl","yelpReviewUrl","customReviewUrl","customReviewPlatformName",
+        "lowRatingAlertEnabled","lowRatingCreateTask","testimonialCollectionEnabled","requireTestimonialApproval",
+        "satisfactionEmailSubject","satisfactionEmailBody","reviewEmailSubject","reviewEmailBody",
+      ];
+      const patch: any = {};
+      for (const k of allowed) if (k in req.body) patch[k] = req.body[k];
+      patch.updatedAt = new Date();
+      const updated = await db.update(reviewAutomationSettings).set(patch).where(eq(reviewAutomationSettings.orgId, orgId)).returning();
+      res.json(updated[0]);
+    } catch (err) {
+      console.error("PATCH /api/reviews/settings", err);
+      res.status(500).json({ message: "Failed to update review settings" });
+    }
+  });
+
+  // GET /api/reviews/metrics
+  app.get("/api/reviews/metrics", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orgId = getReviewOrgId(req);
+      if (!orgId) return res.status(400).json({ message: "No org context" });
+      const { eq, and, isNotNull, avg, count, sql: sqlExpr } = await import("drizzle-orm");
+      const { clientSentimentSurveys: cssTable, reviewRequests: rrTable, testimonials: testiTable, alerts: alertsTable } = await import("@shared/schema");
+      const [surveyMetrics] = await db.select({
+        totalSent: count(),
+        completed: sqlExpr<number>`count(*) filter (where ${cssTable.status} in ('completed','review_requested','low_rating_followup_needed'))`,
+        avgRating: avg(cssTable.rating),
+        reviewRequested: sqlExpr<number>`count(*) filter (where ${cssTable.status} = 'review_requested')`,
+      }).from(cssTable).where(eq(cssTable.orgId, orgId));
+      const [testiMetrics] = await db.select({ total: count() }).from(testiTable).where(eq(testiTable.orgId, orgId));
+      const [alertMetrics] = await db.select({ total: count() }).from(alertsTable).where(and(eq(alertsTable.orgId, orgId), eq(alertsTable.type, "client"), eq(alertsTable.isActive, true)));
+      res.json({
+        totalSurveySent: Number(surveyMetrics.totalSent) || 0,
+        totalCompleted: Number(surveyMetrics.completed) || 0,
+        avgRating: surveyMetrics.avgRating ? parseFloat(String(surveyMetrics.avgRating)).toFixed(1) : null,
+        totalReviewRequested: Number(surveyMetrics.reviewRequested) || 0,
+        totalTestimonials: Number(testiMetrics.total) || 0,
+        totalLowRatingAlerts: Number(alertMetrics.total) || 0,
+      });
+    } catch (err) {
+      console.error("GET /api/reviews/metrics", err);
+      res.status(500).json({ message: "Failed to load review metrics" });
+    }
+  });
+
+  // GET /api/reviews/sentiment
+  app.get("/api/reviews/sentiment", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orgId = getReviewOrgId(req);
+      if (!orgId) return res.status(400).json({ message: "No org context" });
+      const { eq, and, desc } = await import("drizzle-orm");
+      const { clientSentimentSurveys: cssTable, contacts: contactsTable, clients: clientsTable } = await import("@shared/schema");
+      const rows = await db
+        .select({ survey: cssTable, contact: contactsTable, client: clientsTable })
+        .from(cssTable)
+        .leftJoin(contactsTable, eq(cssTable.contactId, contactsTable.id))
+        .leftJoin(clientsTable, eq(cssTable.clientId, clientsTable.id))
+        .where(eq(cssTable.orgId, orgId))
+        .orderBy(desc(cssTable.createdAt))
+        .limit(200);
+      res.json(rows.map(r => ({ ...r.survey, contactName: r.contact ? `${r.contact.firstName} ${r.contact.lastName}`.trim() : r.client?.firstName || r.client?.email || "Client", clientEmail: r.client?.email })));
+    } catch (err) {
+      console.error("GET /api/reviews/sentiment", err);
+      res.status(500).json({ message: "Failed to load sentiment surveys" });
+    }
+  });
+
+  // POST /api/reviews/sentiment/send — manually send a satisfaction survey
+  app.post("/api/reviews/sentiment/send", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orgId = getReviewOrgId(req);
+      const userId = getReviewUserId(req);
+      if (!orgId) return res.status(400).json({ message: "No org context" });
+      const { clientId, customMessage, propertyId } = req.body;
+      if (!clientId) return res.status(400).json({ message: "clientId required" });
+      const { eq } = await import("drizzle-orm");
+      const { clientSentimentSurveys: cssTable, clients: clientsTable, contacts: contactsTable } = await import("@shared/schema");
+      const settings = await getOrCreateReviewSettings(orgId);
+      const clientRows = await db.select().from(clientsTable).where(eq(clientsTable.id, clientId)).limit(1);
+      const client = clientRows[0];
+      if (!client || client.orgId !== orgId) return res.status(404).json({ message: "Client not found" });
+      let contactEmail = client.email;
+      let contactName = [client.firstName, client.lastName].filter(Boolean).join(" ") || client.email;
+      let contactId: number | null = client.contactId ?? null;
+      if (contactId) {
+        const cRows = await db.select().from(contactsTable).where(eq(contactsTable.id, contactId)).limit(1);
+        if (cRows[0]) {
+          contactEmail = cRows[0].email || contactEmail;
+          contactName = [cRows[0].firstName, cRows[0].lastName].filter(Boolean).join(" ") || contactName;
+        }
+      }
+      if (!contactEmail) return res.status(400).json({ message: "Client has no email address" });
+      const token = generateReviewToken();
+      const baseUrl = getAppBaseUrl();
+      const surveyLink = `${baseUrl}/r/satisfaction/${token}`;
+      const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+      const orgRows = await storage.getOrg(orgId);
+      const orgName = orgRows?.name || "Your Property Manager";
+      const emailSubject = (settings.satisfactionEmailSubject || DEFAULT_SATISFACTION_EMAIL_SUBJECT).replace(/\{\{orgName\}\}/g, orgName).replace(/\{\{clientName\}\}/g, contactName);
+      const emailBody = (settings.satisfactionEmailBody || DEFAULT_SATISFACTION_EMAIL_BODY)
+        .replace(/\{\{orgName\}\}/g, orgName)
+        .replace(/\{\{clientName\}\}/g, contactName)
+        .replace(/\{\{surveyLink\}\}/g, `<a href="${surveyLink}" style="display:inline-block;background:#0066cc;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;margin:16px 0;">Rate Your Experience</a>`);
+      const inserted = await db.insert(cssTable).values({
+        orgId,
+        clientId,
+        contactId: contactId ?? undefined,
+        sentByUserId: userId ?? undefined,
+        token,
+        expiresAt,
+        triggerType: "manual",
+        propertyId: propertyId ?? undefined,
+        customMessage: customMessage ?? undefined,
+        sentAt: new Date(),
+      }).returning();
+      const survey = inserted[0];
+      try {
+        const { sendEmail } = await import("./email-service");
+        await sendEmail({ to: contactEmail, subject: emailSubject, body: emailBody, orgId });
+      } catch (emailErr) {
+        console.error("Failed to send satisfaction survey email:", emailErr);
+      }
+      res.json(survey);
+    } catch (err) {
+      console.error("POST /api/reviews/sentiment/send", err);
+      res.status(500).json({ message: "Failed to send satisfaction survey" });
+    }
+  });
+
+  // GET /api/reviews/requests
+  app.get("/api/reviews/requests", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orgId = getReviewOrgId(req);
+      if (!orgId) return res.status(400).json({ message: "No org context" });
+      const { eq, desc } = await import("drizzle-orm");
+      const { reviewRequests: rrTable, contacts: contactsTable, clients: clientsTable } = await import("@shared/schema");
+      const rows = await db
+        .select({ rr: rrTable, contact: contactsTable, client: clientsTable })
+        .from(rrTable)
+        .leftJoin(contactsTable, eq(rrTable.contactId, contactsTable.id))
+        .leftJoin(clientsTable, eq(rrTable.clientId, clientsTable.id))
+        .where(eq(rrTable.orgId, orgId))
+        .orderBy(desc(rrTable.createdAt))
+        .limit(200);
+      res.json(rows.map(r => ({ ...r.rr, contactName: r.contact ? `${r.contact.firstName} ${r.contact.lastName}`.trim() : r.client?.firstName || r.client?.email || "Client", clientEmail: r.client?.email })));
+    } catch (err) {
+      console.error("GET /api/reviews/requests", err);
+      res.status(500).json({ message: "Failed to load review requests" });
+    }
+  });
+
+  // POST /api/reviews/requests/:id/remind — manually send a reminder
+  app.post("/api/reviews/requests/:id/remind", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orgId = getReviewOrgId(req);
+      if (!orgId) return res.status(400).json({ message: "No org context" });
+      const { eq, and } = await import("drizzle-orm");
+      const { reviewRequests: rrTable, clients: clientsTable, contacts: contactsTable } = await import("@shared/schema");
+      const rows = await db.select().from(rrTable).where(and(eq(rrTable.id, req.params.id), eq(rrTable.orgId, orgId))).limit(1);
+      const rr = rows[0];
+      if (!rr) return res.status(404).json({ message: "Review request not found" });
+      const settings = await getOrCreateReviewSettings(orgId);
+      const clientRows = await db.select().from(clientsTable).where(eq(clientsTable.id, rr.clientId)).limit(1);
+      const client = clientRows[0];
+      let contactEmail = client?.email || "";
+      let contactName = [client?.firstName, client?.lastName].filter(Boolean).join(" ") || client?.email || "Client";
+      if (rr.contactId) {
+        const cRows = await db.select().from(contactsTable).where(eq(contactsTable.id, rr.contactId)).limit(1);
+        if (cRows[0]) { contactEmail = cRows[0].email || contactEmail; contactName = [cRows[0].firstName, cRows[0].lastName].filter(Boolean).join(" ") || contactName; }
+      }
+      const orgRow = await storage.getOrg(orgId);
+      const orgName = orgRow?.name || "Your Property Manager";
+      const baseUrl = getAppBaseUrl();
+      const reviewLink = `${baseUrl}/r/review/${rr.token}`;
+      const emailSubject = (settings.reviewEmailSubject || DEFAULT_REMINDER_EMAIL_SUBJECT).replace(/\{\{orgName\}\}/g, orgName).replace(/\{\{clientName\}\}/g, contactName);
+      const emailBody = (settings.reviewEmailBody || DEFAULT_REMINDER_EMAIL_BODY)
+        .replace(/\{\{orgName\}\}/g, orgName)
+        .replace(/\{\{clientName\}\}/g, contactName)
+        .replace(/\{\{reviewLink\}\}/g, `<a href="${reviewLink}" style="display:inline-block;background:#0066cc;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;margin:16px 0;">Leave a Review</a>`);
+      try {
+        const { sendEmail } = await import("./email-service");
+        await sendEmail({ to: contactEmail, subject: emailSubject, body: emailBody, orgId });
+      } catch (emailErr) {
+        console.error("Failed to send reminder email:", emailErr);
+      }
+      const now = new Date();
+      const updated = await db.update(rrTable).set({ reminderCount: rr.reminderCount + 1, lastReminderSentAt: now, updatedAt: now }).where(eq(rrTable.id, rr.id)).returning();
+      res.json(updated[0]);
+    } catch (err) {
+      console.error("POST /api/reviews/requests/:id/remind", err);
+      res.status(500).json({ message: "Failed to send reminder" });
+    }
+  });
+
+  // POST /api/reviews/requests/:id/mark-reviewed
+  app.post("/api/reviews/requests/:id/mark-reviewed", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orgId = getReviewOrgId(req);
+      if (!orgId) return res.status(400).json({ message: "No org context" });
+      const { eq, and } = await import("drizzle-orm");
+      const { reviewRequests: rrTable } = await import("@shared/schema");
+      const now = new Date();
+      const updated = await db.update(rrTable).set({ status: "already_reviewed", alreadyReviewedAt: now, updatedAt: now }).where(and(eq(rrTable.id, req.params.id), eq(rrTable.orgId, orgId))).returning();
+      if (!updated[0]) return res.status(404).json({ message: "Review request not found" });
+      res.json(updated[0]);
+    } catch (err) {
+      console.error("POST /api/reviews/requests/:id/mark-reviewed", err);
+      res.status(500).json({ message: "Failed to mark as reviewed" });
+    }
+  });
+
+  // GET /api/reviews/testimonials
+  app.get("/api/reviews/testimonials", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orgId = getReviewOrgId(req);
+      if (!orgId) return res.status(400).json({ message: "No org context" });
+      const { eq, desc } = await import("drizzle-orm");
+      const { testimonials: testiTable, contacts: contactsTable, clients: clientsTable } = await import("@shared/schema");
+      const rows = await db
+        .select({ testi: testiTable, contact: contactsTable, client: clientsTable })
+        .from(testiTable)
+        .leftJoin(contactsTable, eq(testiTable.contactId, contactsTable.id))
+        .leftJoin(clientsTable, eq(testiTable.clientId, clientsTable.id))
+        .where(eq(testiTable.orgId, orgId))
+        .orderBy(desc(testiTable.createdAt))
+        .limit(200);
+      res.json(rows.map(r => ({ ...r.testi, contactName: r.contact ? `${r.contact.firstName} ${r.contact.lastName}`.trim() : r.client?.firstName || r.client?.email || "Client" })));
+    } catch (err) {
+      console.error("GET /api/reviews/testimonials", err);
+      res.status(500).json({ message: "Failed to load testimonials" });
+    }
+  });
+
+  // PATCH /api/reviews/testimonials/:id
+  app.patch("/api/reviews/testimonials/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orgId = getReviewOrgId(req);
+      const userId = getReviewUserId(req);
+      if (!orgId) return res.status(400).json({ message: "No org context" });
+      const { eq, and } = await import("drizzle-orm");
+      const { testimonials: testiTable } = await import("@shared/schema");
+      const allowed = ["approvedForMarketing","clientDisplayName","text"];
+      const patch: any = {};
+      for (const k of allowed) if (k in req.body) patch[k] = req.body[k];
+      if (req.body.approvedForMarketing === true) { patch.approvedAt = new Date(); patch.approvedBy = userId; }
+      if (req.body.approvedForMarketing === false) { patch.approvedAt = null; patch.approvedBy = null; }
+      patch.updatedAt = new Date();
+      const updated = await db.update(testiTable).set(patch).where(and(eq(testiTable.id, req.params.id), eq(testiTable.orgId, orgId))).returning();
+      if (!updated[0]) return res.status(404).json({ message: "Testimonial not found" });
+      res.json(updated[0]);
+    } catch (err) {
+      console.error("PATCH /api/reviews/testimonials/:id", err);
+      res.status(500).json({ message: "Failed to update testimonial" });
+    }
+  });
+
+  // ── Public Review Routes (no auth — token-gated) ─────────────────────────
+
+  // GET /api/public/r/satisfaction/:token — load survey data for the public page
+  app.get("/api/public/r/satisfaction/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { eq } = await import("drizzle-orm");
+      const { clientSentimentSurveys: cssTable, orgs: orgsTable, clients: clientsTable, contacts: contactsTable } = await import("@shared/schema");
+      const rows = await db.select({ survey: cssTable }).from(cssTable).where(eq(cssTable.token, token)).limit(1);
+      const survey = rows[0]?.survey;
+      if (!survey) return res.status(410).json({ message: "This survey link is not valid or has expired." });
+      if (new Date(survey.expiresAt) < new Date()) {
+        await db.update(cssTable).set({ status: "expired" }).where(eq(cssTable.token, token));
+        return res.status(410).json({ message: "This survey link has expired." });
+      }
+      if (survey.status === "completed" || survey.status === "review_requested" || survey.status === "low_rating_followup_needed") {
+        return res.json({ alreadyCompleted: true, status: survey.status, rating: survey.rating });
+      }
+      if (survey.status === "sent") {
+        await db.update(cssTable).set({ status: "opened", openedAt: new Date() }).where(eq(cssTable.token, token));
+      }
+      const orgRows = await db.select({ name: orgsTable.name }).from(orgsTable).where(eq(orgsTable.id, survey.orgId)).limit(1);
+      const orgName = orgRows[0]?.name || "Your Property Manager";
+      let clientName = "Client";
+      if (survey.contactId) {
+        const cRows = await db.select().from(contactsTable).where(eq(contactsTable.id, survey.contactId)).limit(1);
+        if (cRows[0]) clientName = [cRows[0].firstName, cRows[0].lastName].filter(Boolean).join(" ") || clientName;
+      } else {
+        const clRows = await db.select().from(clientsTable).where(eq(clientsTable.id, survey.clientId)).limit(1);
+        if (clRows[0]) clientName = [clRows[0].firstName, clRows[0].lastName].filter(Boolean).join(" ") || clRows[0].email || clientName;
+      }
+      const settings = await getOrCreateReviewSettings(survey.orgId);
+      res.json({ orgName, clientName, status: survey.status, testimonialCollectionEnabled: settings.testimonialCollectionEnabled });
+    } catch (err) {
+      console.error("GET /api/public/r/satisfaction/:token", err);
+      res.status(500).json({ message: "Failed to load survey" });
+    }
+  });
+
+  // POST /api/public/r/satisfaction/:token — submit survey response
+  app.post("/api/public/r/satisfaction/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { rating, feedbackText, improvementText, testimonialPermission } = req.body;
+      if (!rating || rating < 1 || rating > 5) return res.status(400).json({ message: "Rating must be 1–5" });
+      const { eq } = await import("drizzle-orm");
+      const { clientSentimentSurveys: cssTable, reviewRequests: rrTable, testimonials: testiTable, alerts: alertsTable, contacts: contactsTable, clients: clientsTable, orgs: orgsTable } = await import("@shared/schema");
+      const rows = await db.select({ survey: cssTable }).from(cssTable).where(eq(cssTable.token, token)).limit(1);
+      const survey = rows[0]?.survey;
+      if (!survey) return res.status(410).json({ message: "This survey link is not valid." });
+      if (new Date(survey.expiresAt) < new Date()) return res.status(410).json({ message: "This survey link has expired." });
+      if (["completed","review_requested","low_rating_followup_needed"].includes(survey.status)) return res.status(409).json({ message: "Survey already completed." });
+      const settings = await getOrCreateReviewSettings(survey.orgId);
+      const isPositive = rating >= settings.satisfactionThreshold;
+      const now = new Date();
+      await db.update(cssTable).set({ rating, feedbackText, improvementText, testimonialPermission: !!testimonialPermission, status: isPositive ? "review_requested" : "low_rating_followup_needed", completedAt: now }).where(eq(cssTable.token, token));
+      const orgRows = await db.select({ name: orgsTable.name, branding: orgsTable.branding }).from(orgsTable).where(eq(orgsTable.id, survey.orgId)).limit(1);
+      const orgName = orgRows[0]?.name || "Your Property Manager";
+      let clientName = "Client";
+      let contactEmail = "";
+      if (survey.contactId) {
+        const cRows = await db.select().from(contactsTable).where(eq(contactsTable.id, survey.contactId)).limit(1);
+        if (cRows[0]) { clientName = [cRows[0].firstName, cRows[0].lastName].filter(Boolean).join(" ") || clientName; contactEmail = cRows[0].email || ""; }
+      }
+      if (!contactEmail) {
+        const clRows = await db.select().from(clientsTable).where(eq(clientsTable.id, survey.clientId)).limit(1);
+        if (clRows[0]) { contactEmail = clRows[0].email || ""; clientName = clientName === "Client" ? ([clRows[0].firstName, clRows[0].lastName].filter(Boolean).join(" ") || clRows[0].email || "Client") : clientName; }
+      }
+      if (isPositive) {
+        const reviewToken = generateReviewToken();
+        const baseUrl = getAppBaseUrl();
+        const reviewLink = `${baseUrl}/r/review/${reviewToken}`;
+        const followUpDays: number[] = (settings.followUpDays as number[]) || [3, 7, 14];
+        const nextReminderAt = followUpDays[0] ? new Date(now.getTime() + followUpDays[0] * 24 * 60 * 60 * 1000) : null;
+        const rrInserted = await db.insert(rrTable).values({ orgId: survey.orgId, surveyId: survey.id, clientId: survey.clientId, contactId: survey.contactId ?? undefined, token: reviewToken, nextReminderAt: nextReminderAt ?? undefined }).returning();
+        const rr = rrInserted[0];
+        if (testimonialPermission && settings.testimonialCollectionEnabled && feedbackText) {
+          await db.insert(testiTable).values({ orgId: survey.orgId, clientId: survey.clientId, contactId: survey.contactId ?? undefined, surveyId: survey.id, reviewRequestId: rr.id, rating, text: feedbackText, source: "private_feedback", testimonialPermission: true, approvedForMarketing: settings.requireTestimonialApproval ? false : true });
+        }
+        if (contactEmail) {
+          const emailSubject = (settings.reviewEmailSubject || DEFAULT_REVIEW_EMAIL_SUBJECT).replace(/\{\{orgName\}\}/g, orgName).replace(/\{\{clientName\}\}/g, clientName);
+          const emailBody = (settings.reviewEmailBody || DEFAULT_REVIEW_EMAIL_BODY)
+            .replace(/\{\{orgName\}\}/g, orgName)
+            .replace(/\{\{clientName\}\}/g, clientName)
+            .replace(/\{\{reviewLink\}\}/g, `<a href="${reviewLink}" style="display:inline-block;background:#0066cc;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;margin:16px 0;">Leave a Review</a>`);
+          try { const { sendEmail } = await import("./email-service"); await sendEmail({ to: contactEmail, subject: emailSubject, body: emailBody, orgId: survey.orgId }); } catch (_) {}
+        }
+        return res.json({ nextStep: "review", reviewToken, orgName, clientName, googleReviewUrl: settings.googleReviewUrl, facebookReviewUrl: settings.facebookReviewUrl, yelpReviewUrl: settings.yelpReviewUrl, customReviewUrl: settings.customReviewUrl, customReviewPlatformName: settings.customReviewPlatformName });
+      } else {
+        if (settings.lowRatingAlertEnabled && survey.contactId) {
+          try {
+            const { alerts: alertsTableInner } = await import("@shared/schema");
+            const systemUserId = survey.sentByUserId;
+            if (systemUserId) {
+              await db.insert(alertsTableInner).values({ orgId: survey.orgId, type: "client", entityId: survey.contactId, message: `Low satisfaction rating (${rating}★) from client${clientName !== "Client" ? " " + clientName : ""}. Feedback: ${improvementText || feedbackText || "No specific feedback provided."}`, severity: rating <= 2 ? "critical" : "warning", isActive: true, targetType: "roles", targetRoles: ["admin", "supervisor"], createdBy: systemUserId });
+            }
+          } catch (alertErr) { console.error("Failed to create low-rating alert:", alertErr); }
+        }
+        if (settings.lowRatingCreateTask && survey.contactId) {
+          try {
+            const { tasks: tasksTable } = await import("@shared/schema");
+            await db.insert(tasksTable).values({ title: `Follow up with ${clientName} — low satisfaction rating (${rating}★)`, description: `Client submitted a ${rating}★ satisfaction rating.\n\nFeedback: ${improvementText || feedbackText || "No specific feedback provided."}`, priority: rating <= 2 ? "urgent" : "high", status: "pending", contactId: survey.contactId, category: "administrative" } as any);
+          } catch (taskErr) { console.error("Failed to create follow-up task:", taskErr); }
+        }
+        return res.json({ nextStep: "done", orgName, clientName });
+      }
+    } catch (err) {
+      console.error("POST /api/public/r/satisfaction/:token", err);
+      res.status(500).json({ message: "Failed to submit survey" });
+    }
+  });
+
+  // GET /api/public/r/review/:token — load review request page data
+  app.get("/api/public/r/review/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { eq } = await import("drizzle-orm");
+      const { reviewRequests: rrTable, orgs: orgsTable, contacts: contactsTable, clients: clientsTable } = await import("@shared/schema");
+      const rows = await db.select({ rr: rrTable }).from(rrTable).where(eq(rrTable.token, token)).limit(1);
+      const rr = rows[0]?.rr;
+      if (!rr) return res.status(410).json({ message: "This review link is not valid." });
+      if (rr.optedOutAt) return res.json({ status: "opted_out", orgName: "" });
+      const settings = await getOrCreateReviewSettings(rr.orgId);
+      const orgRows = await db.select({ name: orgsTable.name }).from(orgsTable).where(eq(orgsTable.id, rr.orgId)).limit(1);
+      const orgName = orgRows[0]?.name || "Your Property Manager";
+      let clientName = "Client";
+      if (rr.contactId) {
+        const cRows = await db.select().from(contactsTable).where(eq(contactsTable.id, rr.contactId)).limit(1);
+        if (cRows[0]) clientName = [cRows[0].firstName, cRows[0].lastName].filter(Boolean).join(" ") || clientName;
+      } else {
+        const clRows = await db.select().from(clientsTable).where(eq(clientsTable.id, rr.clientId)).limit(1);
+        if (clRows[0]) clientName = [clRows[0].firstName, clRows[0].lastName].filter(Boolean).join(" ") || clRows[0].email || clientName;
+      }
+      if (rr.status === "sent" || rr.status === "clicked") {
+        await db.update(rrTable).set({ status: "clicked", clickedAt: rr.clickedAt ?? new Date(), updatedAt: new Date() }).where(eq(rrTable.token, token));
+      }
+      res.json({ status: rr.status, orgName, clientName, googleReviewUrl: settings.googleReviewUrl, facebookReviewUrl: settings.facebookReviewUrl, yelpReviewUrl: settings.yelpReviewUrl, customReviewUrl: settings.customReviewUrl, customReviewPlatformName: settings.customReviewPlatformName, testimonialCollectionEnabled: settings.testimonialCollectionEnabled, alreadyReviewed: !!rr.alreadyReviewedAt, testimonialSubmitted: !!rr.testimonialSubmittedAt });
+    } catch (err) {
+      console.error("GET /api/public/r/review/:token", err);
+      res.status(500).json({ message: "Failed to load review page" });
+    }
+  });
+
+  // POST /api/public/r/review/:token/testimonial
+  app.post("/api/public/r/review/:token/testimonial", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { text, permission } = req.body;
+      if (!text?.trim()) return res.status(400).json({ message: "Testimonial text is required" });
+      const { eq } = await import("drizzle-orm");
+      const { reviewRequests: rrTable, testimonials: testiTable, clientSentimentSurveys: cssTable } = await import("@shared/schema");
+      const rows = await db.select({ rr: rrTable }).from(rrTable).where(eq(rrTable.token, token)).limit(1);
+      const rr = rows[0]?.rr;
+      if (!rr) return res.status(410).json({ message: "Review link not valid." });
+      const settings = await getOrCreateReviewSettings(rr.orgId);
+      let rating = 5;
+      if (rr.surveyId) {
+        const sRows = await db.select().from(cssTable).where(eq(cssTable.id, rr.surveyId)).limit(1);
+        if (sRows[0]?.rating) rating = sRows[0].rating;
+      }
+      await db.insert(testiTable).values({ orgId: rr.orgId, clientId: rr.clientId, contactId: rr.contactId ?? undefined, surveyId: rr.surveyId ?? undefined, reviewRequestId: rr.id, rating, text: text.trim(), source: "review_page", testimonialPermission: !!permission, approvedForMarketing: settings.requireTestimonialApproval ? false : true });
+      await db.update(rrTable).set({ testimonialSubmittedAt: new Date(), updatedAt: new Date() }).where(eq(rrTable.token, token));
+      res.json({ success: true });
+    } catch (err) {
+      console.error("POST /api/public/r/review/:token/testimonial", err);
+      res.status(500).json({ message: "Failed to submit testimonial" });
+    }
+  });
+
+  // POST /api/public/r/review/:token/already-reviewed
+  app.post("/api/public/r/review/:token/already-reviewed", async (req, res) => {
+    try {
+      const { eq } = await import("drizzle-orm");
+      const { reviewRequests: rrTable } = await import("@shared/schema");
+      const now = new Date();
+      await db.update(rrTable).set({ alreadyReviewedAt: now, status: "already_reviewed", updatedAt: now }).where(eq(rrTable.token, req.params.token));
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update status" });
+    }
+  });
+
+  // POST /api/public/r/review/:token/opt-out
+  app.post("/api/public/r/review/:token/opt-out", async (req, res) => {
+    try {
+      const { eq } = await import("drizzle-orm");
+      const { reviewRequests: rrTable } = await import("@shared/schema");
+      const now = new Date();
+      await db.update(rrTable).set({ optedOutAt: now, status: "opted_out", updatedAt: now }).where(eq(rrTable.token, req.params.token));
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to opt out" });
+    }
+  });
+
   // Register the conflict detector for scheduled tasks
   const { setConflictDetector } = await import('./scheduledTasks');
   setConflictDetector(detectAndCreateEventConflicts);

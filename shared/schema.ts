@@ -3908,3 +3908,116 @@ export const insertDailyItineraryStopSchema = createInsertSchema(dailyItineraryS
   createdAt: true,
   updatedAt: true,
 });
+
+// ── Client Sentiment & Review Automation ──────────────────────────────────────
+// Phase 1: email-only, manual-trigger only.
+// Phase 2 triggers (invoice_paid, report_sent, season_completed) are stubbed.
+
+export const reviewAutomationSettings = pgTable("review_automation_settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id, { onDelete: "cascade" }).notNull().unique(),
+  enabled: boolean("enabled").notNull().default(false),
+  satisfactionThreshold: integer("satisfaction_threshold").notNull().default(4),
+  followUpDays: jsonb("follow_up_days").$type<number[]>().default([3, 7, 14]),
+  maxReminders: integer("max_reminders").notNull().default(3),
+  googleReviewUrl: varchar("google_review_url"),
+  facebookReviewUrl: varchar("facebook_review_url"),
+  yelpReviewUrl: varchar("yelp_review_url"),
+  customReviewUrl: varchar("custom_review_url"),
+  customReviewPlatformName: varchar("custom_review_platform_name"),
+  lowRatingAlertEnabled: boolean("low_rating_alert_enabled").notNull().default(true),
+  lowRatingCreateTask: boolean("low_rating_create_task").notNull().default(false),
+  testimonialCollectionEnabled: boolean("testimonial_collection_enabled").notNull().default(true),
+  requireTestimonialApproval: boolean("require_testimonial_approval").notNull().default(true),
+  satisfactionEmailSubject: varchar("satisfaction_email_subject"),
+  satisfactionEmailBody: text("satisfaction_email_body"),
+  reviewEmailSubject: varchar("review_email_subject"),
+  reviewEmailBody: text("review_email_body"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type ReviewAutomationSettings = typeof reviewAutomationSettings.$inferSelect;
+export type InsertReviewAutomationSettings = typeof reviewAutomationSettings.$inferInsert;
+
+export const clientSentimentSurveys = pgTable("client_sentiment_surveys", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id, { onDelete: "cascade" }).notNull(),
+  clientId: uuid("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
+  contactId: integer("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+  sentByUserId: varchar("sent_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  token: varchar("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  status: varchar("status").$type<"sent"|"opened"|"completed"|"review_requested"|"low_rating_followup_needed"|"expired">().notNull().default("sent"),
+  rating: integer("rating"),
+  feedbackText: text("feedback_text"),
+  improvementText: text("improvement_text"),
+  testimonialPermission: boolean("testimonial_permission").notNull().default(false),
+  triggerType: varchar("trigger_type").$type<"manual"|"invoice_paid"|"report_sent"|"season_completed">().notNull().default("manual"),
+  propertyId: integer("property_id").references(() => properties.id, { onDelete: "set null" }),
+  customMessage: text("custom_message"),
+  sentAt: timestamp("sent_at").defaultNow(),
+  openedAt: timestamp("opened_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("css_org_idx").on(table.orgId),
+  index("css_client_idx").on(table.clientId),
+  index("css_token_idx").on(table.token),
+]);
+
+export type ClientSentimentSurvey = typeof clientSentimentSurveys.$inferSelect;
+export type InsertClientSentimentSurvey = typeof clientSentimentSurveys.$inferInsert;
+
+export const reviewRequests = pgTable("review_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id, { onDelete: "cascade" }).notNull(),
+  surveyId: uuid("survey_id").references(() => clientSentimentSurveys.id, { onDelete: "cascade" }).notNull(),
+  clientId: uuid("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
+  contactId: integer("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+  token: varchar("token").notNull().unique(),
+  status: varchar("status").$type<"sent"|"clicked"|"already_reviewed"|"opted_out"|"expired">().notNull().default("sent"),
+  reminderCount: integer("reminder_count").notNull().default(0),
+  nextReminderAt: timestamp("next_reminder_at"),
+  clickedAt: timestamp("clicked_at"),
+  alreadyReviewedAt: timestamp("already_reviewed_at"),
+  optedOutAt: timestamp("opted_out_at"),
+  testimonialSubmittedAt: timestamp("testimonial_submitted_at"),
+  lastReminderSentAt: timestamp("last_reminder_sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("rr_org_idx").on(table.orgId),
+  index("rr_client_idx").on(table.clientId),
+  index("rr_token_idx").on(table.token),
+  index("rr_status_next_reminder_idx").on(table.status, table.nextReminderAt),
+]);
+
+export type ReviewRequest = typeof reviewRequests.$inferSelect;
+export type InsertReviewRequest = typeof reviewRequests.$inferInsert;
+
+export const testimonials = pgTable("testimonials", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id, { onDelete: "cascade" }).notNull(),
+  clientId: uuid("client_id").references(() => clients.id, { onDelete: "cascade" }).notNull(),
+  contactId: integer("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+  surveyId: uuid("survey_id").references(() => clientSentimentSurveys.id, { onDelete: "set null" }),
+  reviewRequestId: uuid("review_request_id").references(() => reviewRequests.id, { onDelete: "set null" }),
+  rating: integer("rating").notNull(),
+  text: text("text").notNull(),
+  source: varchar("source").$type<"private_feedback"|"review_page"|"manual">().notNull().default("private_feedback"),
+  testimonialPermission: boolean("testimonial_permission").notNull().default(false),
+  approvedForMarketing: boolean("approved_for_marketing").notNull().default(false),
+  approvedAt: timestamp("approved_at"),
+  approvedBy: varchar("approved_by").references(() => users.id, { onDelete: "set null" }),
+  clientDisplayName: varchar("client_display_name"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("testimonials_org_idx").on(table.orgId),
+  index("testimonials_client_idx").on(table.clientId),
+  index("testimonials_approved_idx").on(table.orgId, table.approvedForMarketing),
+]);
+
+export type Testimonial = typeof testimonials.$inferSelect;
+export type InsertTestimonial = typeof testimonials.$inferInsert;

@@ -47,7 +47,8 @@ import {
   Check,
   Smartphone,
   X,
-  Briefcase
+  Briefcase,
+  Star
 } from "lucide-react";
 
 const getNavigationItems = (user: any) => {
@@ -410,6 +411,12 @@ export default function Navigation() {
                       <DropdownMenuItem onClick={() => window.location.href = '/admin/services'}>
                         <Briefcase className="w-4 h-4 mr-2" />
                         Service Catalog
+                      </DropdownMenuItem>
+                    )}
+                    {(user as any)?.role === 'admin' && (
+                      <DropdownMenuItem onClick={() => window.location.href = '/admin/reviews'}>
+                        <Star className="w-4 h-4 mr-2" />
+                        Reviews & Sentiment
                       </DropdownMenuItem>
                     )}
                   </>

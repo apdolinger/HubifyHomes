@@ -1295,6 +1295,17 @@ export default function PersonProfile() {
     },
   });
 
+  // Send satisfaction survey mutation
+  const sendSatisfactionSurveyMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/reviews/sentiment", { clientId }),
+    onSuccess: () => {
+      toast({ title: "Survey sent", description: "Satisfaction survey email has been sent to this client." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to send survey", description: error?.message || "Please try again.", variant: "destructive" });
+    },
+  });
+
   // Reschedule email mutation
   const rescheduleEmailMutation = useMutation({
     mutationFn: async ({ emailId, scheduledFor }: { emailId: number; scheduledFor: string }) => {
@@ -1540,6 +1551,18 @@ export default function PersonProfile() {
               >
                 <Send className="w-4 h-4 mr-2" />
                 Invite to Portal
+              </Button>
+            )}
+            {(person as any)?.type === "client" && (person as any)?.email && clientRecord && (
+              <Button
+                variant="outline"
+                onClick={() => sendSatisfactionSurveyMutation.mutate()}
+                disabled={sendSatisfactionSurveyMutation.isPending}
+                data-testid="button-send-satisfaction-survey"
+                title="Send a satisfaction rating email to this client"
+              >
+                <Star className="w-4 h-4 mr-2" />
+                {sendSatisfactionSurveyMutation.isPending ? "Sending…" : "Satisfaction Check"}
               </Button>
             )}
             <Button variant="outline" onClick={handleEditContact}>

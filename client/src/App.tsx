@@ -69,6 +69,11 @@ import OnboardingPortal from "@/pages/OnboardingPortal";
 import InspectionReport from "@/pages/InspectionReport";
 import InspectionSchedules from "@/pages/InspectionSchedules";
 import SetupChecklist from "@/pages/SetupChecklist";
+import ReviewDashboard from "@/pages/ReviewDashboard";
+import ReviewSettings from "@/pages/ReviewSettings";
+import TestimonialsLibrary from "@/pages/TestimonialsLibrary";
+import SatisfactionSurveyPage from "@/pages/SatisfactionSurveyPage";
+import ReviewRequestPage from "@/pages/ReviewRequestPage";
 import Navigation from "@/components/Navigation";
 import QuickSearchModal from "@/components/QuickSearchModal";
 import QuickAddTaskModal from "@/components/QuickAddTaskModal";
@@ -134,6 +139,8 @@ function Router() {
       <Route path="/super-admin" component={SuperAdmin} />
       <Route path="/payment-collection/:token" component={PaymentCollectionPage} />
       <Route path="/onboarding/:token" component={OnboardingPortal} />
+      <Route path="/r/satisfaction/:token" component={SatisfactionSurveyPage} />
+      <Route path="/r/review/:token" component={ReviewRequestPage} />
       <Route path="/submit" component={Submissions} />
       <Route path="/inquire">{() => { window.location.replace("/submit"); return null; }}</Route>
       <Route path="/contact" component={Contact} />
@@ -228,6 +235,9 @@ function Router() {
           <Route path="/hubify-console/:propertyId" component={AdminClientPortalProperty} />
           
           {/* Admin Routes */}
+          <Route path="/admin/reviews/settings" component={ReviewSettings} />
+          <Route path="/admin/reviews/testimonials" component={TestimonialsLibrary} />
+          <Route path="/admin/reviews" component={ReviewDashboard} />
           <Route path="/admin/import" component={ImportManager} />
           <Route path="/admin/services" component={ServiceCatalog} />
           <Route path="/admin/vendors" component={Vendors} />

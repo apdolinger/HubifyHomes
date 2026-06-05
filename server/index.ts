@@ -547,6 +547,12 @@ app.use((req, res, next) => {
       } catch (err) {
         console.error('Error ensuring Dispatch Center tables:', err);
       }
+      try {
+        const { ensureReviewAutomationTables } = await import('./runMigrations.js');
+        await ensureReviewAutomationTables();
+      } catch (err) {
+        console.error('Error ensuring Review Automation tables:', err);
+      }
     } catch (error) {
       console.error('Error loading startup migrations:', error);
     }
