@@ -1438,7 +1438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User routes
   app.get("/api/current-user", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
@@ -1468,7 +1468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // to log in and what to expect when they get there.
   app.post("/api/users", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
-      const orgId = req.user?.claims?.orgId;
+      const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       if (!orgId) return res.status(400).json({ message: "Organization not found" });
 
       const { id, firstName, lastName, email, role = "staff", isActive = true } = req.body;
@@ -1588,7 +1588,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.params.id;
       const updateData = req.body;
-      const currentUserId = (req.user as any)?.claims?.sub;
+      const currentUserId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       
       // Get current user to check their role
       const currentUser = await storage.getUser(currentUserId);
@@ -1633,7 +1633,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Team routes
   app.get("/api/teams", isAuthenticated, async (req, res) => {
     try {
-      const userOrgId = (req.user as any)?.claims?.orgId;
+      const userOrgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
       if (!userOrgId) {
         return res.status(400).json({ message: "Organization ID not found" });
       }
@@ -1648,8 +1648,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/teams", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      const userOrgId = (req.user as any)?.claims?.orgId;
-      const userId = (req.user as any)?.claims?.sub;
+      const userOrgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
+      const userId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       if (!userOrgId || !userId) {
         return res.status(400).json({ message: "Organization ID or User ID not found" });
       }
@@ -1785,7 +1785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { processMergeFields, buildMergeFieldData, sendEmail } = await import('./email-service');
       
-      const orgId = req.user?.claims?.orgId;
+      const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       const userId = req.user?.claims?.sub || req.user?.id;
       
       if (!orgId || !userId) {
@@ -3113,7 +3113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/out-of-office/:userId", isAuthenticated, async (req, res) => {
     try {
       const userId = req.params.userId;
-      const currentUserId = (req.user as any)?.claims?.sub;
+      const currentUserId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const currentUser = await storage.getUser(currentUserId);
 
       if (!currentUser) {
@@ -3144,7 +3144,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/out-of-office/:userId/active", isAuthenticated, async (req, res) => {
     try {
       const userId = req.params.userId;
-      const currentUserId = (req.user as any)?.claims?.sub;
+      const currentUserId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const currentUser = await storage.getUser(currentUserId);
 
       // Authorization: users can view anyone in their organization
@@ -3170,7 +3170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get active OOO statuses for all users in the organization
   app.get("/api/out-of-office/active-statuses", isAuthenticated, async (req, res) => {
     try {
-      const currentUserId = (req.user as any)?.claims?.sub;
+      const currentUserId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const currentUser = await storage.getUser(currentUserId);
       
       if (!currentUser) {
@@ -3198,7 +3198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/out-of-office", isAuthenticated, async (req, res) => {
     try {
-      const currentUserId = (req.user as any)?.claims?.sub;
+      const currentUserId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const currentUser = await storage.getUser(currentUserId);
       
       if (!currentUser) {
@@ -3242,7 +3242,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid ID' });
       }
 
-      const currentUserId = (req.user as any)?.claims?.sub;
+      const currentUserId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const currentUser = await storage.getUser(currentUserId);
       
       if (!currentUser) {
@@ -3296,7 +3296,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid ID' });
       }
 
-      const currentUserId = (req.user as any)?.claims?.sub;
+      const currentUserId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const currentUser = await storage.getUser(currentUserId);
       
       if (!currentUser) {
@@ -3328,7 +3328,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/users/:id/management-notes", isAuthenticated, async (req, res) => {
     try {
       const targetUserId = req.params.id;
-      const currentUserId = (req.user as any)?.claims?.sub;
+      const currentUserId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const currentUser = await storage.getUser(currentUserId);
       
       if (!currentUser) {
@@ -3362,7 +3362,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/users/:id/management-notes", isAuthenticated, async (req, res) => {
     try {
       const targetUserId = req.params.id;
-      const currentUserId = (req.user as any)?.claims?.sub;
+      const currentUserId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const currentUser = await storage.getUser(currentUserId);
       
       if (!currentUser) {
@@ -3411,7 +3411,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid ID' });
       }
 
-      const currentUserId = (req.user as any)?.claims?.sub;
+      const currentUserId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const currentUser = await storage.getUser(currentUserId);
       
       if (!currentUser) {
@@ -3455,7 +3455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/users/:id/hr-permissions", isAuthenticated, async (req, res) => {
     try {
       const targetUserId = req.params.id;
-      const currentUserId = (req.user as any)?.claims?.sub;
+      const currentUserId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const currentUser = await storage.getUser(currentUserId);
       
       if (!currentUser) {
@@ -3588,7 +3588,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Super Admin: Get all communities across all organizations  
   app.get("/api/super-admin/communities-report", isAuthenticated, isSuperAdmin, requireMFA, requireAllowedIP, async (req, res) => {
     try {
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       
       const communitiesData = await storage.getAllCommunitiesForSuperAdmin();
       
@@ -3622,7 +3622,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Super Admin: Get all vendors across all organizations with rating statistics
   app.get("/api/super-admin/vendors-report", isAuthenticated, isSuperAdmin, requireMFA, requireAllowedIP, async (req, res) => {
     try {
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       
       const vendorsData = await storage.getAllVendorsForSuperAdmin();
       
@@ -5710,7 +5710,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/communities", isAuthenticated, requireCommunities, async (req, res) => {
     try {
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       console.log("Creating community with data:", req.body);
       console.log("User ID:", userId);
       
@@ -8432,8 +8432,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/time-entries/missing-clockout", isAuthenticated, requireFeatureFlag("task_cost_tracking"), async (req: any, res) => {
     try {
       const user = req.user;
-      const orgId = user.orgId;
-      const canViewAll = user.role === 'admin' || user.role === 'supervisor';
+      const orgId = user.claims?.orgId || user.orgId;
+      const role = user.claims?.role || user.role;
+      const canViewAll = role === 'admin' || role === 'supervisor';
       const userId = user.claims?.sub || user.id;
       const thresholdHours = 12;
       const cutoff = new Date(Date.now() - thresholdHours * 60 * 60 * 1000);
@@ -8470,9 +8471,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/time-entries/clock-in", isAuthenticated, requireFeatureFlag("task_cost_tracking"), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
       const user = req.user;
-      const orgId = user.orgId;
+      const userId = user.claims?.sub || user.id;
+      const orgId = user.claims?.orgId || user.orgId;
       
       if (!orgId) {
         return res.status(400).json({ message: "Organization ID is required" });
@@ -8587,7 +8588,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/time-entries/bulk-action", isAuthenticated, requireFeatureFlag("task_cost_tracking"), async (req: any, res) => {
     try {
       const user = req.user;
-      const canManage = user.role === 'admin' || user.role === 'supervisor';
+      const role = user.claims?.role || user.role;
+      const canManage = role === 'admin' || role === 'supervisor';
       if (!canManage) return res.status(403).json({ message: "Only admins and supervisors can approve or reject entries" });
 
       const { action, ids, rejectionNote } = req.body as { action: 'approve' | 'reject'; ids: number[]; rejectionNote?: string };
@@ -8625,8 +8627,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/time-entries/generate-invoice", isAuthenticated, requireFeatureFlag("task_cost_tracking"), async (req: any, res) => {
     try {
       const user = req.user;
-      const orgId = user.orgId;
-      const canManage = user.role === 'admin' || user.role === 'supervisor';
+      const orgId = user.claims?.orgId || user.orgId;
+      const role = user.claims?.role || user.role;
+      const canManage = role === 'admin' || role === 'supervisor';
       if (!canManage) return res.status(403).json({ message: "Only admins and supervisors can generate invoices" });
 
       const { timeEntryIds, clientId, notes } = req.body as { timeEntryIds: number[]; clientId: string; notes?: string };
@@ -8711,7 +8714,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user has permission to fully edit time entries
-      const canFullyEdit = user.role === 'admin' || user.role === 'supervisor';
+      const userRole = user.claims?.role || user.role;
+      const canFullyEdit = userRole === 'admin' || userRole === 'supervisor';
       const userId = user.claims?.sub || user.id;
 
       // Staff can only edit their own entries
@@ -11110,7 +11114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/orgs/:orgId", isAuthenticated, async (req, res) => {
     try {
       const orgId = req.params.orgId;
-      const userOrgId = req.user?.claims?.orgId;
+      const userOrgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       
       // Ensure user belongs to the organization
       if (userOrgId !== orgId) {
@@ -11133,7 +11137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/orgs/:orgId/audit-logs", isAuthenticated, async (req: any, res) => {
     try {
       const orgId = req.params.orgId;
-      const userOrgId = req.user?.claims?.orgId;
+      const userOrgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       const userRole = req.user?.claims?.role;
       if (userOrgId !== orgId) return res.status(403).json({ message: "Access denied" });
       if (!["admin", "manager"].includes(userRole)) return res.status(403).json({ message: "Admin access required" });
@@ -11165,7 +11169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/orgs/:orgId", isAuthenticated, async (req, res) => {
     try {
       const orgId = req.params.orgId;
-      const userOrgId = req.user?.claims?.orgId;
+      const userOrgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       const userRole = req.user?.claims?.role;
       
       // Ensure user belongs to the organization and has admin privileges
@@ -11251,7 +11255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/orgs/:orgId/branding", isAuthenticated, async (req: any, res) => {
     try {
       const orgId = req.params.orgId;
-      const callerOrgId = req.user?.claims?.orgId;
+      const callerOrgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       const callerRole = req.user?.claims?.role;
       const superAdminSession = (req.session as any)?.superAdmin?.authenticated === true;
       if (!superAdminSession && (callerOrgId !== orgId || (callerRole !== "admin" && callerRole !== "owner"))) {
@@ -11301,7 +11305,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/orgs/:orgId/api-keys", isAuthenticated, async (req, res) => {
     try {
       const orgId = req.params.orgId;
-      const userOrgId = req.user?.claims?.orgId;
+      const userOrgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       const userRole = req.user?.claims?.role;
       
       if (userOrgId !== orgId) {
@@ -11323,7 +11327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/orgs/:orgId/api-keys", isAuthenticated, async (req, res) => {
     try {
       const orgId = req.params.orgId;
-      const userOrgId = req.user?.claims?.orgId;
+      const userOrgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       const userRole = req.user?.claims?.role;
       
       if (userOrgId !== orgId) {
@@ -11354,7 +11358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const orgId = req.params.orgId;
       const keyId = parseInt(req.params.keyId);
-      const userOrgId = req.user?.claims?.orgId;
+      const userOrgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       const userRole = req.user?.claims?.role;
       
       if (userOrgId !== orgId) {
@@ -11513,7 +11517,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { orgId, propertyId } = req.params;
 
-      const callerOrgId = req.user?.claims?.orgId;
+      const callerOrgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       const callerRole = req.user?.claims?.role;
       const superAdminSession = (req.session as any)?.superAdmin?.authenticated === true;
       if (!superAdminSession && (callerOrgId !== orgId || (callerRole !== "admin" && callerRole !== "owner"))) {
@@ -11579,7 +11583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { orgId, settingsId } = req.params;
 
-      const callerOrgId = req.user?.claims?.orgId;
+      const callerOrgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       const callerRole = req.user?.claims?.role;
       const superAdminSession = (req.session as any)?.superAdmin?.authenticated === true;
       if (!superAdminSession && (callerOrgId !== orgId || (callerRole !== "admin" && callerRole !== "owner"))) {
@@ -11626,7 +11630,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { orgId, propertyId } = req.params;
 
-      const callerOrgId = req.user?.claims?.orgId;
+      const callerOrgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       const callerRole = req.user?.claims?.role;
       const superAdminSession = (req.session as any)?.superAdmin?.authenticated === true;
       if (!superAdminSession && (callerOrgId !== orgId || (callerRole !== "admin" && callerRole !== "owner"))) {
@@ -12837,7 +12841,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { orgId } = req.params;
       
       // Get full user data from database
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const user = await storage.getUser(userId);
       
       if (!user) {
@@ -12882,7 +12886,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { status } = req.query;
       
       // Get full user data from database
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const user = await storage.getUser(userId);
       
       if (!user) {
@@ -12912,7 +12916,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { orgId, id } = req.params;
       
       // Get full user data from database
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const user = await storage.getUser(userId);
       
       if (!user) {
@@ -12946,7 +12950,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { orgId } = req.params;
       
       // Get full user data from database
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const user = await storage.getUser(userId);
       
       if (!user) {
@@ -12987,7 +12991,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { notes } = req.body;
       
       // Get full user data from database
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const user = await storage.getUser(userId);
       
       if (!user) {
@@ -13023,7 +13027,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { notes } = req.body;
       
       // Get full user data from database
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const user = await storage.getUser(userId);
       
       if (!user) {
@@ -13059,7 +13063,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { notes } = req.body;
       
       // Get full user data from database
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const user = await storage.getUser(userId);
       
       if (!user) {
@@ -13094,7 +13098,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { orgId, id } = req.params;
       
       // Get full user data from database
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const user = await storage.getUser(userId);
       
       if (!user) {
@@ -13595,7 +13599,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/organizations/:id/supply-settings", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
-      const userOrgId = req.user?.claims?.orgId;
+      const userOrgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       
       // Verify user belongs to org or is platform admin
       if (userOrgId !== id && req.user?.role !== "admin") {
@@ -13618,7 +13622,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { supplyTypes, supplyUnits } = req.body;
-      const userOrgId = req.user?.claims?.orgId;
+      const userOrgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       
       // Verify user belongs to org or is platform admin
       if (userOrgId !== id && req.user?.role !== "admin") {
@@ -13649,7 +13653,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     app.get("/api/admin/services", isAuthenticated, isAdmin, async (req: any, res) => {
       try {
-        const orgId = req.user?.claims?.orgId;
+        const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
         if (!orgId) return res.status(403).json({ message: "No organization context" });
         const services = await db
           .select({
@@ -13687,7 +13691,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     app.post("/api/admin/services", isAuthenticated, isAdmin, async (req: any, res) => {
       try {
-        const orgId = req.user?.claims?.orgId;
+        const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
         if (!orgId) return res.status(403).json({ message: "No organization context" });
         const parsed = insertOrganizationServiceSchema.safeParse({ ...req.body, orgId });
         if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten() });
@@ -13704,7 +13708,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     app.patch("/api/admin/services/:id", isAuthenticated, isAdmin, async (req: any, res) => {
       try {
-        const orgId = req.user?.claims?.orgId;
+        const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
         const serviceId = parseInt(req.params.id, 10);
         if (!orgId) return res.status(403).json({ message: "No organization context" });
         const [existing] = await db
@@ -13732,7 +13736,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     app.delete("/api/admin/services/:id", isAuthenticated, isAdmin, async (req: any, res) => {
       try {
-        const orgId = req.user?.claims?.orgId;
+        const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
         const serviceId = parseInt(req.params.id, 10);
         if (!orgId) return res.status(403).json({ message: "No organization context" });
         const [existing] = await db
@@ -13768,7 +13772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // GET /api/properties/:propertyId/service-assignments — list with joined service data
     app.get("/api/properties/:propertyId/service-assignments", isAuthenticated, async (req: any, res) => {
       try {
-        const orgId = req.user?.claims?.orgId;
+        const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
         const propertyId = parseInt(req.params.propertyId, 10);
         if (!orgId) return res.status(403).json({ message: "No organization context" });
         const assignments = await db
@@ -13818,7 +13822,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // POST /api/properties/:propertyId/service-assignments — create
     app.post("/api/properties/:propertyId/service-assignments", isAuthenticated, isAdmin, async (req: any, res) => {
       try {
-        const orgId = req.user?.claims?.orgId;
+        const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
         const propertyId = parseInt(req.params.propertyId, 10);
         if (!orgId) return res.status(403).json({ message: "No organization context" });
         // Verify property belongs to caller's org
@@ -13854,7 +13858,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // PATCH /api/properties/:propertyId/service-assignments/:id — update
     app.patch("/api/properties/:propertyId/service-assignments/:id", isAuthenticated, isAdmin, async (req: any, res) => {
       try {
-        const orgId = req.user?.claims?.orgId;
+        const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
         const assignmentId = req.params.id;
         const propertyId = parseInt(req.params.propertyId, 10);
         if (!orgId) return res.status(403).json({ message: "No organization context" });
@@ -13917,7 +13921,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // DELETE /api/properties/:propertyId/service-assignments/:id — remove
     app.delete("/api/properties/:propertyId/service-assignments/:id", isAuthenticated, isAdmin, async (req: any, res) => {
       try {
-        const orgId = req.user?.claims?.orgId;
+        const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
         const assignmentId = req.params.id;
         const propertyId = parseInt(req.params.propertyId, 10);
         if (!orgId) return res.status(403).json({ message: "No organization context" });
@@ -13950,7 +13954,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     // GET /api/admin/services/:serviceId/bulk-assign/progress — SSE stream for bulk-assign progress
     app.get("/api/admin/services/:serviceId/bulk-assign/progress", isAuthenticated, isAdmin, async (req: any, res) => {
-      const orgId = req.user?.claims?.orgId;
+      const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       const serviceId = parseInt(req.params.serviceId, 10);
       if (!orgId) { res.status(403).json({ message: "No organization context" }); return; }
 
@@ -14029,7 +14033,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // POST /api/admin/services/:serviceId/bulk-assign — assign service to multiple properties at once
     app.post("/api/admin/services/:serviceId/bulk-assign", isAuthenticated, isAdmin, async (req: any, res) => {
       try {
-        const orgId = req.user?.claims?.orgId;
+        const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
         const serviceId = parseInt(req.params.serviceId, 10);
         if (!orgId) return res.status(403).json({ message: "No organization context" });
         const { propertyIds, startDate, customPriceCents, billingFrequencyOverride } = req.body;
@@ -14086,7 +14090,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // POST /api/admin/services/:serviceId/bulk-unassign — undo a bulk-assign by removing only newly created assignments
     app.post("/api/admin/services/:serviceId/bulk-unassign", isAuthenticated, isAdmin, async (req: any, res) => {
       try {
-        const orgId = req.user?.claims?.orgId;
+        const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
         const serviceId = parseInt(req.params.serviceId, 10);
         if (!orgId) return res.status(403).json({ message: "No organization context" });
         const { propertyIds } = req.body;
@@ -14123,7 +14127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     // GET /api/admin/services/:serviceId/bulk-remove/progress — SSE progress stream for bulk-remove
     app.get("/api/admin/services/:serviceId/bulk-remove/progress", isAuthenticated, isAdmin, async (req: any, res) => {
-      const orgId = req.user?.claims?.orgId;
+      const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       const serviceId = parseInt(req.params.serviceId, 10);
       if (!orgId) { res.status(403).json({ message: "No organization context" }); return; }
 
@@ -14195,7 +14199,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // POST /api/admin/services/:serviceId/bulk-remove — remove service from multiple properties at once
     app.post("/api/admin/services/:serviceId/bulk-remove", isAuthenticated, isAdmin, async (req: any, res) => {
       try {
-        const orgId = req.user?.claims?.orgId;
+        const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
         const serviceId = parseInt(req.params.serviceId, 10);
         if (!orgId) return res.status(403).json({ message: "No organization context" });
         const { propertyIds } = req.body;
@@ -14246,7 +14250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // GET /api/admin/services/:serviceId/assignments — list properties assigned to a service
     app.get("/api/admin/services/:serviceId/assignments", isAuthenticated, isAdmin, async (req: any, res) => {
       try {
-        const orgId = req.user?.claims?.orgId;
+        const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
         const serviceId = parseInt(req.params.serviceId, 10);
         if (!orgId) return res.status(403).json({ message: "No organization context" });
         const { organizationServices: orgSvcForList } = await import('@shared/schema');
@@ -14392,7 +14396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { q: searchQuery } = req.query;
-      const orgId = req.user?.claims?.orgId;
+      const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
 
       if (!orgId) {
         return res.status(403).json({ message: "Organization required" });
@@ -19414,7 +19418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Custom Fields endpoints
   app.get("/api/custom-fields", isAuthenticated, async (req: any, res) => {
     try {
-      const orgId = req.user?.claims?.orgId;
+      const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       if (!orgId) {
         return res.status(400).json({ message: "Organization ID not found" });
       }
@@ -19430,7 +19434,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/custom-fields", isAuthenticated, async (req: any, res) => {
     try {
-      const orgId = req.user?.claims?.orgId;
+      const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       if (!orgId) {
         return res.status(400).json({ message: "Organization ID not found" });
       }
@@ -19462,7 +19466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/custom-fields/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const orgId = req.user?.claims?.orgId;
+      const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       if (!orgId) {
         return res.status(400).json({ message: "Organization ID not found" });
       }
@@ -19485,7 +19489,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/custom-fields/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const orgId = req.user?.claims?.orgId;
+      const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       if (!orgId) {
         return res.status(400).json({ message: "Organization ID not found" });
       }
@@ -19504,7 +19508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/custom-fields/reorder", isAuthenticated, async (req: any, res) => {
     try {
-      const orgId = req.user?.claims?.orgId;
+      const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       if (!orgId) {
         return res.status(400).json({ message: "Organization ID not found" });
       }
@@ -19528,7 +19532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Email template routes
   app.get("/api/email-templates", isAuthenticated, async (req: any, res) => {
     try {
-      const orgId = req.user?.claims?.orgId;
+      const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       if (!orgId) {
         return res.status(400).json({ message: "Organization ID not found" });
       }
@@ -19543,7 +19547,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/email-templates/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const orgId = req.user?.claims?.orgId;
+      const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       if (!orgId) {
         return res.status(400).json({ message: "Organization ID not found" });
       }
@@ -19564,7 +19568,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/email-templates", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
-      const orgId = req.user?.claims?.orgId;
+      const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       if (!orgId) {
         return res.status(400).json({ message: "Organization ID not found" });
       }
@@ -19587,7 +19591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/email-templates/:id", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
-      const orgId = req.user?.claims?.orgId;
+      const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       if (!orgId) {
         return res.status(400).json({ message: "Organization ID not found" });
       }
@@ -19606,7 +19610,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/email-templates/:id", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
-      const orgId = req.user?.claims?.orgId;
+      const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       if (!orgId) {
         return res.status(400).json({ message: "Organization ID not found" });
       }
@@ -19628,7 +19632,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { processMergeFields, buildMergeFieldData, sendEmail } = await import('./email-service');
       
-      const orgId = req.user?.claims?.orgId;
+      const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       const userId = req.user?.claims?.sub || req.user?.id;
       
       if (!orgId || !userId) {
@@ -19764,7 +19768,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Try to log failed send to email history
       try {
-        const orgId = req.user?.claims?.orgId;
+        const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
         const userId = req.user?.claims?.sub || req.user?.id;
         const sender = await storage.getUser(userId);
         const senderName = sender ? [sender.firstName, sender.lastName].filter(Boolean).join(' ') || sender.email : 'Unknown';
@@ -19797,7 +19801,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Email history routes
   app.get("/api/contacts/:id/email-history", isAuthenticated, async (req: any, res) => {
     try {
-      const orgId = req.user?.claims?.orgId;
+      const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       if (!orgId) {
         return res.status(400).json({ message: "Organization ID not found" });
       }
@@ -19814,7 +19818,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Scheduled emails routes
   app.get("/api/scheduled-emails", isAuthenticated, async (req: any, res) => {
     try {
-      const orgId = req.user?.claims?.orgId;
+      const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       if (!orgId) {
         return res.status(400).json({ message: "Organization ID not found" });
       }
@@ -19830,7 +19834,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/scheduled-emails/:id/cancel", isAuthenticated, async (req: any, res) => {
     try {
-      const orgId = req.user?.claims?.orgId;
+      const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       if (!orgId) {
         return res.status(400).json({ message: "Organization ID not found" });
       }
@@ -19856,7 +19860,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/scheduled-emails/:id/reschedule", isAuthenticated, async (req: any, res) => {
     try {
-      const orgId = req.user?.claims?.orgId;
+      const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       if (!orgId) {
         return res.status(400).json({ message: "Organization ID not found" });
       }
@@ -21144,7 +21148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Notification logs routes (admin-only: contains org-wide recipient emails + error details)
   app.get("/api/notification-logs", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
-      const orgId = req.user?.claims?.orgId;
+      const orgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
       if (!orgId) return res.status(400).json({ message: "Organization ID not found" });
       const type = req.query.type as string | undefined;
       const rawLimit = req.query.limit ? parseInt(req.query.limit as string, 10) : 200;
@@ -21335,12 +21339,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   /** Helper: cascade-calculate scheduledStart/End for ordered stops given itinerary startTime + date */
   function calcStopTimes(
-    isoDate: string,
+    isoDate: string | Date,
     startTime: string,
     stops: Array<{ estimatedWorkMinutes: number; travelMinutesFromPrevious: number; bufferMinutes: number }>
   ): Array<{ scheduledStart: Date; scheduledEnd: Date }> {
+    // Normalize date — Drizzle may return a Date object or "YYYY-MM-DD" string
+    const dateStr = isoDate instanceof Date
+      ? isoDate.toISOString().split("T")[0]
+      : String(isoDate).split("T")[0];
     const [hh, mm] = startTime.split(":").map(Number);
-    let cursor = new Date(`${isoDate}T${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}:00`);
+    let cursor = new Date(`${dateStr}T${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}:00`);
     return stops.map((s) => {
       cursor = new Date(cursor.getTime() + (s.travelMinutesFromPrevious + s.bufferMinutes) * 60000);
       const scheduledStart = new Date(cursor.getTime());
@@ -21363,7 +21371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dispatch/templates", isAuthenticated, async (req: any, res) => {
     try {
       if (!dispatchAdminGuard(req, res)) return;
-      const orgId = (req.user as any)?.claims?.orgId;
+      const orgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
       const { itineraryTemplates: tTable, itineraryTemplateStops: sTable } = await import("@shared/schema");
       const templates = await db.select().from(tTable).where(and(eq(tTable.orgId, orgId), ne(tTable.status, "deleted"))).orderBy(desc(tTable.createdAt));
       const templateIds = templates.map((t) => t.id);
@@ -21382,8 +21390,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/dispatch/templates", isAuthenticated, async (req: any, res) => {
     try {
       if (!dispatchAdminGuard(req, res)) return;
-      const orgId = (req.user as any)?.claims?.orgId;
-      const userId = (req.user as any)?.claims?.sub;
+      const orgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
+      const userId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const { itineraryTemplates: tTable, itineraryTemplateStops: sTable } = await import("@shared/schema");
       const { stops: rawStops, ...headerData } = req.body;
       const [template] = await db.insert(tTable).values({ ...headerData, orgId, createdBy: userId }).returning();
@@ -21399,7 +21407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dispatch/templates/:id", isAuthenticated, async (req: any, res) => {
     try {
       if (!dispatchAdminGuard(req, res)) return;
-      const orgId = (req.user as any)?.claims?.orgId;
+      const orgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
       const { itineraryTemplates: tTable, itineraryTemplateStops: sTable } = await import("@shared/schema");
       const [template] = await db.select().from(tTable).where(and(eq(tTable.id, req.params.id), eq(tTable.orgId, orgId)));
       if (!template) return res.status(404).json({ message: "Template not found" });
@@ -21414,7 +21422,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/dispatch/templates/:id", isAuthenticated, async (req: any, res) => {
     try {
       if (!dispatchAdminGuard(req, res)) return;
-      const orgId = (req.user as any)?.claims?.orgId;
+      const orgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
       const { itineraryTemplates: tTable, itineraryTemplateStops: sTable } = await import("@shared/schema");
       const [existing] = await db.select().from(tTable).where(and(eq(tTable.id, req.params.id), eq(tTable.orgId, orgId)));
       if (!existing) return res.status(404).json({ message: "Template not found" });
@@ -21437,7 +21445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/dispatch/templates/:id", isAuthenticated, async (req: any, res) => {
     try {
       if (!dispatchAdminGuard(req, res)) return;
-      const orgId = (req.user as any)?.claims?.orgId;
+      const orgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
       const { itineraryTemplates: tTable } = await import("@shared/schema");
       const [existing] = await db.select().from(tTable).where(and(eq(tTable.id, req.params.id), eq(tTable.orgId, orgId)));
       if (!existing) return res.status(404).json({ message: "Template not found" });
@@ -21452,8 +21460,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/dispatch/templates/:id/generate", isAuthenticated, async (req: any, res) => {
     try {
       if (!dispatchAdminGuard(req, res)) return;
-      const orgId = (req.user as any)?.claims?.orgId;
-      const userId = (req.user as any)?.claims?.sub;
+      const orgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
+      const userId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const { itineraryTemplates: tTable, itineraryTemplateStops: tsTable, dailyItineraries: diTable, dailyItineraryStops: disTable } = await import("@shared/schema");
       const [template] = await db.select().from(tTable).where(and(eq(tTable.id, req.params.id), eq(tTable.orgId, orgId)));
       if (!template) return res.status(404).json({ message: "Template not found" });
@@ -21506,7 +21514,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dispatch/itineraries", isAuthenticated, async (req: any, res) => {
     try {
       if (!dispatchAdminGuard(req, res)) return;
-      const orgId = (req.user as any)?.claims?.orgId;
+      const orgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
       const { dailyItineraries: diTable, dailyItineraryStops: disTable } = await import("@shared/schema");
       const { eq: eqOp, and: andOp } = await import("drizzle-orm");
       const conditions: any[] = [eqOp(diTable.orgId, orgId)];
@@ -21529,8 +21537,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/dispatch/itineraries", isAuthenticated, async (req: any, res) => {
     try {
       if (!dispatchAdminGuard(req, res)) return;
-      const orgId = (req.user as any)?.claims?.orgId;
-      const userId = (req.user as any)?.claims?.sub;
+      const orgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
+      const userId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const { dailyItineraries: diTable } = await import("@shared/schema");
       const { date, name, assignedUserId, startTime, ...rest } = req.body;
       if (!date || !name) return res.status(400).json({ message: "date and name are required" });
@@ -21554,7 +21562,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dispatch/itineraries/:id", isAuthenticated, async (req: any, res) => {
     try {
       if (!dispatchAdminGuard(req, res)) return;
-      const orgId = (req.user as any)?.claims?.orgId;
+      const orgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
       const { dailyItineraries: diTable, dailyItineraryStops: disTable, properties: pTable, tasks: tTable } = await import("@shared/schema");
       const [itinerary] = await db.select().from(diTable).where(and(eq(diTable.id, req.params.id), eq(diTable.orgId, orgId)));
       if (!itinerary) return res.status(404).json({ message: "Itinerary not found" });
@@ -21586,7 +21594,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/dispatch/itineraries/:id", isAuthenticated, async (req: any, res) => {
     try {
       if (!dispatchAdminGuard(req, res)) return;
-      const orgId = (req.user as any)?.claims?.orgId;
+      const orgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
       const { dailyItineraries: diTable, dailyItineraryStops: disTable } = await import("@shared/schema");
       const [existing] = await db.select().from(diTable).where(and(eq(diTable.id, req.params.id), eq(diTable.orgId, orgId)));
       if (!existing) return res.status(404).json({ message: "Itinerary not found" });
@@ -21614,7 +21622,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/dispatch/itineraries/:id", isAuthenticated, async (req: any, res) => {
     try {
       if (!dispatchAdminGuard(req, res)) return;
-      const orgId = (req.user as any)?.claims?.orgId;
+      const orgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
       const { dailyItineraries: diTable, dailyItineraryStops: disTable } = await import("@shared/schema");
       const [existing] = await db.select().from(diTable).where(and(eq(diTable.id, req.params.id), eq(diTable.orgId, orgId)));
       if (!existing) return res.status(404).json({ message: "Itinerary not found" });
@@ -21636,7 +21644,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/dispatch/itineraries/:id/stops", isAuthenticated, async (req: any, res) => {
     try {
       if (!dispatchAdminGuard(req, res)) return;
-      const orgId = (req.user as any)?.claims?.orgId;
+      const orgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
       const { dailyItineraries: diTable, dailyItineraryStops: disTable } = await import("@shared/schema");
       const [itinerary] = await db.select().from(diTable).where(and(eq(diTable.id, req.params.id), eq(diTable.orgId, orgId)));
       if (!itinerary) return res.status(404).json({ message: "Itinerary not found" });
@@ -21684,7 +21692,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/dispatch/itineraries/:id/stops/:stopId", isAuthenticated, async (req: any, res) => {
     try {
       if (!dispatchAdminGuard(req, res)) return;
-      const orgId = (req.user as any)?.claims?.orgId;
+      const orgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
       const { dailyItineraries: diTable, dailyItineraryStops: disTable } = await import("@shared/schema");
       const [itinerary] = await db.select().from(diTable).where(and(eq(diTable.id, req.params.id), eq(diTable.orgId, orgId)));
       if (!itinerary) return res.status(404).json({ message: "Itinerary not found" });
@@ -21722,8 +21730,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/dispatch/itineraries/:id/publish", isAuthenticated, async (req: any, res) => {
     try {
       if (!dispatchAdminGuard(req, res)) return;
-      const orgId = (req.user as any)?.claims?.orgId;
-      const userId = (req.user as any)?.claims?.sub;
+      const orgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
+      const userId = (req.user as any)?.claims?.sub || (req.user as any)?.id;
       const { dailyItineraries: diTable, dailyItineraryStops: disTable, properties: pTable, tasks: tTable } = await import("@shared/schema");
       const [itinerary] = await db.select().from(diTable).where(and(eq(diTable.id, req.params.id), eq(diTable.orgId, orgId)));
       if (!itinerary) return res.status(404).json({ message: "Itinerary not found" });
@@ -21806,7 +21814,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dispatch/unscheduled-tasks", isAuthenticated, async (req: any, res) => {
     try {
       if (!dispatchAdminGuard(req, res)) return;
-      const orgId = (req.user as any)?.claims?.orgId;
+      const orgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
       const { tasks: tTable, properties: pTable, dailyItineraryStops: disTable, dailyItineraries: diTable } = await import("@shared/schema");
       const conditions: any[] = [eq(tTable.status, "pending"), eq((tTable as any).orgId || tTable.id, tTable.id)];
       if (req.query.assignedUserId) conditions.push(eq(tTable.assignedToId, req.query.assignedUserId as string));

@@ -144,13 +144,20 @@ export default function DispatchCenter() {
   }, [qc]);
 
   const createItinerary = useMutation({
-    mutationFn: (body: any) => apiRequest("POST", "/api/dispatch/itineraries", body),
-    onSuccess: async (res: any) => {
-      const data = await res.json();
-      invalidateAll();
+    // Parse JSON in mutationFn so onSuccess is synchronous — ensures React
+    // batches setActiveItineraryId + setNewItineraryOpen in the same render
+    mutationFn: async (body: any) => {
+      const res = await apiRequest("POST", "/api/dispatch/itineraries", body);
+      return await res.json();
+    },
+    onSuccess: (data: any) => {
+      // Immediately seed the detail cache so activeItinerary is available
+      // before the invalidation refetch completes — fixes disabled "Add to Itinerary" buttons
+      qc.setQueryData(["/api/dispatch/itineraries", data.id], { ...data, stops: data.stops ?? [] });
       setActiveItineraryId(data.id);
       setNewItineraryOpen(false);
       toast({ title: "Itinerary created" });
+      invalidateAll();
     },
     onError: () => toast({ title: "Failed to create itinerary", variant: "destructive" }),
   });
@@ -174,9 +181,11 @@ export default function DispatchCenter() {
   });
 
   const publishItinerary = useMutation({
-    mutationFn: (id: string) => apiRequest("POST", `/api/dispatch/itineraries/${id}/publish`, {}),
-    onSuccess: async (res: any) => {
-      const data = await res.json();
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/dispatch/itineraries/${id}/publish`, {});
+      return await res.json();
+    },
+    onSuccess: (data: any) => {
       qc.invalidateQueries({ queryKey: ["/api/dispatch/itineraries", activeItineraryId] });
       qc.invalidateQueries({ queryKey: ["/api/dispatch/itineraries"] });
       toast({ title: `Published — ${data.eventsCreated} event(s) created, ${data.eventsUpdated} updated` });
@@ -197,13 +206,16 @@ export default function DispatchCenter() {
   });
 
   const generateFromTemplate = useMutation({
-    mutationFn: ({ templateId, body }: { templateId: string; body: any }) => apiRequest("POST", `/api/dispatch/templates/${templateId}/generate`, body),
-    onSuccess: async (res: any) => {
-      const data = await res.json();
-      invalidateAll();
+    mutationFn: async ({ templateId, body }: { templateId: string; body: any }) => {
+      const res = await apiRequest("POST", `/api/dispatch/templates/${templateId}/generate`, body);
+      return await res.json();
+    },
+    onSuccess: (data: any) => {
+      qc.setQueryData(["/api/dispatch/itineraries", data.id], { ...data, stops: data.stops ?? [] });
       setActiveItineraryId(data.id);
       setGenerateOpen(false);
       toast({ title: "Daily Itinerary generated" });
+      invalidateAll();
     },
     onError: () => toast({ title: "Failed to generate itinerary", variant: "destructive" }),
   });
@@ -224,8 +236,10 @@ export default function DispatchCenter() {
   }
 
   function addTaskToItinerary(task: any) {
-    if (!activeItinerary) return;
-    const current = activeItinerary.stops ?? [];
+    if (!activeItineraryId) return;
+    // Use already-loaded stops if available, otherwise start with empty list
+    // (correct for a brand-new itinerary whose detail query hasn't returned yet)
+    const current = activeItinerary?.stops ?? [];
     const newStop: any = {
       propertyId: task.property?.id ?? task.propertyId ?? null,
       taskId: task.id,
@@ -247,7 +261,7 @@ export default function DispatchCenter() {
       status: s.status ?? "pending",
       calendarEventId: s.calendarEventId ?? null,
     }));
-    updateStops.mutate({ id: activeItinerary.id, stops: newStops });
+    updateStops.mutate({ id: activeItineraryId, stops: newStops });
   }
 
   function moveStop(index: number, dir: -1 | 1) {
@@ -413,7 +427,7 @@ export default function DispatchCenter() {
                   {task.dueDate && (
                     <p className="text-xs text-muted-foreground">Due {format(new Date(task.dueDate), "MMM d")}</p>
                   )}
-                  <Button size="sm" variant="outline" className="w-full h-7 text-xs mt-1" disabled={!activeItinerary || updateStops.isPending} onClick={() => addTaskToItinerary(task)}>
+                  <Button size="sm" variant="outline" className="w-full h-7 text-xs mt-1" disabled={!activeItineraryId || updateStops.isPending} onClick={() => addTaskToItinerary(task)}>
                     <Plus className="w-3 h-3 mr-1" /> Add to Itinerary
                   </Button>
                 </div>

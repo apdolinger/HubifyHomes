@@ -273,13 +273,13 @@ export default function TimeTracking() {
     setEditingEntry(entry);
     setEditNotes(entry.notes || "");
     setEditBillableRate(entry.billableRateCents ? (entry.billableRateCents / 100).toString() : "");
-    setEditWorkType(entry.workType || "");
+    setEditWorkType(entry.workType || "none");
     setEditMileage(entry.mileage?.toString() || "");
     if (canManage) {
       setEditClockIn(format(new Date(entry.clockIn), "yyyy-MM-dd'T'HH:mm"));
       setEditClockOut(entry.clockOut ? format(new Date(entry.clockOut), "yyyy-MM-dd'T'HH:mm") : "");
-      setEditPropertyId(entry.propertyId?.toString() || "");
-      setEditTaskId(entry.taskId?.toString() || "");
+      setEditPropertyId(entry.propertyId?.toString() || "none");
+      setEditTaskId(entry.taskId?.toString() || "none");
       setEditUserId(entry.userId || "");
     }
     setShowEditDialog(true);
@@ -290,14 +290,14 @@ export default function TimeTracking() {
     const updates: Partial<TimeEntry> = {
       notes: editNotes || null,
       billableRateCents: editBillableRate ? Math.round(parseFloat(editBillableRate) * 100) : null,
-      workType: editWorkType || null,
+      workType: (editWorkType && editWorkType !== "none") ? editWorkType : null,
       mileage: editMileage ? parseInt(editMileage) : null,
     };
     if (canManage) {
       if (editClockIn) updates.clockIn = new Date(editClockIn).toISOString();
       if (editClockOut) updates.clockOut = new Date(editClockOut).toISOString();
-      updates.propertyId = editPropertyId ? parseInt(editPropertyId) : null;
-      updates.taskId = editTaskId ? parseInt(editTaskId) : null;
+      updates.propertyId = (editPropertyId && editPropertyId !== "none") ? parseInt(editPropertyId) : null;
+      updates.taskId = (editTaskId && editTaskId !== "none") ? parseInt(editTaskId) : null;
       updates.userId = editUserId || editingEntry.userId;
     }
     updateMutation.mutate({ id: editingEntry.id, updates });
@@ -827,7 +827,7 @@ export default function TimeTracking() {
                     <Select value={editPropertyId} onValueChange={setEditPropertyId}>
                       <SelectTrigger data-testid="select-edit-property"><SelectValue placeholder="No property" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No property</SelectItem>
+                        <SelectItem value="none">No property</SelectItem>
                         {properties.map((p) => (
                           <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
                         ))}
@@ -839,7 +839,7 @@ export default function TimeTracking() {
                     <Select value={editTaskId} onValueChange={setEditTaskId}>
                       <SelectTrigger data-testid="select-edit-task"><SelectValue placeholder="No task" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No task</SelectItem>
+                        <SelectItem value="none">No task</SelectItem>
                         {tasks.map((t) => (
                           <SelectItem key={t.id} value={t.id.toString()}>{t.title}</SelectItem>
                         ))}
@@ -855,7 +855,7 @@ export default function TimeTracking() {
                 <Select value={editWorkType} onValueChange={setEditWorkType}>
                   <SelectTrigger data-testid="select-edit-work-type"><SelectValue placeholder="Select work type" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No work type</SelectItem>
+                    <SelectItem value="none">No work type</SelectItem>
                     {WORK_TYPES.map((wt) => (
                       <SelectItem key={wt} value={wt}>{wt}</SelectItem>
                     ))}
@@ -943,7 +943,7 @@ export default function TimeTracking() {
                   <SelectValue placeholder="Select work type (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No work type</SelectItem>
+                  <SelectItem value="none">No work type</SelectItem>
                   {WORK_TYPES.map((wt) => (
                     <SelectItem key={wt} value={wt}>{wt}</SelectItem>
                   ))}
@@ -958,7 +958,7 @@ export default function TimeTracking() {
                     <SelectValue placeholder="No property" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No property</SelectItem>
+                    <SelectItem value="none">No property</SelectItem>
                     {properties.map((p) => (
                       <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
                     ))}
@@ -972,7 +972,7 @@ export default function TimeTracking() {
                     <SelectValue placeholder="No task" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No task</SelectItem>
+                    <SelectItem value="none">No task</SelectItem>
                     {tasks.map((t) => (
                       <SelectItem key={t.id} value={t.id.toString()}>{t.title}</SelectItem>
                     ))}
@@ -1021,9 +1021,9 @@ export default function TimeTracking() {
               data-testid="button-confirm-clock-in"
               onClick={() =>
                 clockInMutation.mutate({
-                  propertyId: clockInPropertyId ? parseInt(clockInPropertyId) : null,
-                  taskId: clockInTaskId ? parseInt(clockInTaskId) : null,
-                  workType: clockInWorkType || undefined,
+                  propertyId: (clockInPropertyId && clockInPropertyId !== "none") ? parseInt(clockInPropertyId) : null,
+                  taskId: (clockInTaskId && clockInTaskId !== "none") ? parseInt(clockInTaskId) : null,
+                  workType: (clockInWorkType && clockInWorkType !== "none") ? clockInWorkType : undefined,
                   mileage: clockInMileage ? parseInt(clockInMileage) : null,
                   notes: clockInNotes || undefined,
                   isBillable: clockInIsBillable,
