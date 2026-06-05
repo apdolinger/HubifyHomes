@@ -1666,6 +1666,13 @@ export const taskChecklistItems = pgTable("task_checklist_items", {
   notes: text("notes"),
   completedAt: timestamp("completed_at"),
   completedBy: varchar("completed_by").references(() => users.id),
+  // V2 inspection fields
+  fieldType: varchar("field_type").default("pass_fail"), // pass_fail | yes_no | text_input | number_input | photo_required | before_after
+  beforePhotoUrls: text("before_photo_urls").array().default([]),
+  afterPhotoUrls: text("after_photo_urls").array().default([]),
+  recommendation: text("recommendation"),
+  textAnswer: text("text_answer"),
+  numberAnswer: varchar("number_answer"), // stored as string for precision
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -4021,3 +4028,38 @@ export const testimonials = pgTable("testimonials", {
 
 export type Testimonial = typeof testimonials.$inferSelect;
 export type InsertTestimonial = typeof testimonials.$inferInsert;
+
+// Visit Reports — completed inspection/visit report records connected to tasks and properties
+export const visitReports = pgTable("visit_reports", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").references(() => orgs.id, { onDelete: "cascade" }).notNull(),
+  taskId: integer("task_id").references(() => tasks.id, { onDelete: "set null" }),
+  propertyId: integer("property_id").references(() => properties.id, { onDelete: "set null" }),
+  clientContactId: integer("client_contact_id").references(() => contacts.id, { onDelete: "set null" }),
+  itineraryStopId: integer("itinerary_stop_id"), // links to daily_itinerary_stops.id (soft ref)
+  title: varchar("title").notNull(),
+  status: varchar("status").$type<"draft"|"completed"|"published">().notNull().default("draft"),
+  overallResult: varchar("overall_result").$type<"pass"|"fail"|"attention_needed"|"na">(),
+  notes: text("notes"),
+  recommendations: text("recommendations"),
+  publishedToPortal: boolean("published_to_portal").notNull().default(false),
+  publishedAt: timestamp("published_at"),
+  completedAt: timestamp("completed_at"),
+  completedBy: varchar("completed_by").references(() => users.id, { onDelete: "set null" }),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("visit_reports_org_idx").on(table.orgId),
+  index("visit_reports_property_idx").on(table.propertyId),
+  index("visit_reports_task_idx").on(table.taskId),
+  index("visit_reports_status_idx").on(table.orgId, table.status),
+]);
+
+export const insertVisitReportSchema = createInsertSchema(visitReports).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertVisitReport = z.infer<typeof insertVisitReportSchema>;
+export type VisitReport = typeof visitReports.$inferSelect;

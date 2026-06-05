@@ -419,6 +419,12 @@ export default function Navigation() {
                         Reviews & Sentiment
                       </DropdownMenuItem>
                     )}
+                    {((user as any)?.role === 'admin' || (user as any)?.role === 'manager') && (
+                      <DropdownMenuItem onClick={() => window.location.href = '/admin/inspection-templates'}>
+                        <ClipboardCheck className="w-4 h-4 mr-2" />
+                        Inspection Templates
+                      </DropdownMenuItem>
+                    )}
                   </>
                 )}
                 <DropdownMenuSeparator />

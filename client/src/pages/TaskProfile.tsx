@@ -3089,6 +3089,12 @@ export default function TaskProfile() {
                             </PopoverContent>
                           </Popover>
                         )}
+                        <a href={`/visit/${taskId}`}>
+                          <Button variant="outline" size="sm" className="text-teal-700 border-teal-300 hover:bg-teal-50">
+                            <ClipboardCheck className="w-3 h-3 mr-1" />
+                            Complete Visit
+                          </Button>
+                        </a>
                         <a href={`/inspection-report/${taskId}`} target="_blank" rel="noopener noreferrer">
                           <Button variant="outline" size="sm">
                             <ExternalLink className="w-3 h-3 mr-1" />

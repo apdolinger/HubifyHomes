@@ -1,0 +1,99 @@
+Yes — please commit the Dispatch Center + Time Tracking QA fixes first, then start the next major phase:
+
+#261 - Inspection Template Builder + Visit Engine + Report Builder
+
+## What & Why
+
+Now that Dispatch Center and Time Tracking V1 are working end-to-end, Hubify needs the next core Home Watch feature: inspections and client-ready reports.
+
+The goal is:
+
+Service Assignment / Task / Dispatch Itinerary Stop
+→ Start Visit
+→ Complete Inspection Checklist
+→ Add Findings + Photos
+→ Generate Client Report
+→ Send/Publish to Client Portal
+
+This is one of the most important competitive features for Home Watch companies.
+
+---
+
+## Phase 1 Goal
+
+Build the foundation for:
+
+1. Reusable Inspection Templates
+2. Property-specific template assignment
+3. Visit/Inspection completion flow
+4. Findings, notes, and photos
+5. Client-ready PDF report
+6. Report history connected to property/client/task/itinerary stop
+
+---
+
+## Core Language
+
+Use:
+
+- Inspection Templates
+- Visit
+- Visit Report
+- Findings
+- Recommendations
+- Photos
+- Before Photos
+- After Photos
+- Client Report
+- Property Report History
+
+---
+
+## Done Looks Like
+
+- Admin/supervisor can create reusable inspection templates.
+- Template has sections and checklist items.
+- Checklist items support:
+  - pass/fail
+  - yes/no
+  - text
+  - number
+  - photo required
+  - before/after photos
+  - recommendation required
+- Template can be assigned to a property or service type.
+- A task or Daily Itinerary Stop can launch a Visit.
+- Staff can complete checklist responses.
+- Staff can add findings, recommendations, and photos.
+- Completed Visit can generate a client-ready report.
+- Report includes:
+  - organization logo/name
+  - property name/address
+  - client name
+  - inspector/staff name
+  - visit date/time
+  - checklist results
+  - findings
+  - recommendations
+  - before/after photos
+  - upcoming tasks/services if available
+- Report can be saved as PDF.
+- Report is connected to property, client, task, itinerary stop, and inspection visit.
+- Report appears in property history.
+- Optional: report can be marked visible to client portal.
+
+---
+
+## Build Priority
+
+1. Schema + migrations
+2. Backend APIs
+3. Admin template builder UI
+4. Visit completion UI
+5. Report generation
+6. Property report history
+7. Client portal visibility
+
+Please do not add AI yet.
+Please do not overbuild scoring yet.
+Please keep the first version simple, reliable, and connected to Dispatch Center.

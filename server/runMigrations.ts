@@ -1140,3 +1140,53 @@ export async function ensureReviewAutomationTables(): Promise<void> {
     client.release();
   }
 }
+
+export async function ensureInspectionV1Tables(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    // Add V2 inspection columns to task_checklist_items
+    await client.query(`
+      ALTER TABLE task_checklist_items
+        ADD COLUMN IF NOT EXISTS field_type VARCHAR DEFAULT 'pass_fail',
+        ADD COLUMN IF NOT EXISTS before_photo_urls TEXT[] DEFAULT '{}',
+        ADD COLUMN IF NOT EXISTS after_photo_urls TEXT[] DEFAULT '{}',
+        ADD COLUMN IF NOT EXISTS recommendation TEXT,
+        ADD COLUMN IF NOT EXISTS text_answer TEXT,
+        ADD COLUMN IF NOT EXISTS number_answer VARCHAR;
+    `);
+
+    // Create visit_reports table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS visit_reports (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+        task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+        property_id INTEGER REFERENCES properties(id) ON DELETE SET NULL,
+        client_contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+        itinerary_stop_id INTEGER,
+        title VARCHAR NOT NULL,
+        status VARCHAR NOT NULL DEFAULT 'draft',
+        overall_result VARCHAR,
+        notes TEXT,
+        recommendations TEXT,
+        published_to_portal BOOLEAN NOT NULL DEFAULT FALSE,
+        published_at TIMESTAMP,
+        completed_at TIMESTAMP,
+        completed_by VARCHAR REFERENCES users(id) ON DELETE SET NULL,
+        created_by VARCHAR REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS visit_reports_org_idx ON visit_reports(org_id);
+      CREATE INDEX IF NOT EXISTS visit_reports_property_idx ON visit_reports(property_id);
+      CREATE INDEX IF NOT EXISTS visit_reports_task_idx ON visit_reports(task_id);
+      CREATE INDEX IF NOT EXISTS visit_reports_status_idx ON visit_reports(org_id, status);
+    `);
+
+    log("[MIGRATE] Inspection V1 tables verified (task_checklist_items V2 columns + visit_reports).");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to ensure Inspection V1 tables: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}

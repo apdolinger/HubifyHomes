@@ -20115,6 +20115,160 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================================
+  // Visit Report Routes
+  // ============================================================
+
+  // Get visit report for a task (creates one if none exists)
+  app.get("/api/tasks/:taskId/visit-report", isAuthenticated, async (req: any, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId);
+      if (isNaN(taskId)) return res.status(400).json({ message: "Invalid task ID" });
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (!orgId) return res.status(400).json({ message: "Organization not found" });
+      const { rows } = await (await import("./db")).pool.query(
+        `SELECT * FROM visit_reports WHERE task_id = $1 AND org_id = $2 ORDER BY created_at DESC LIMIT 1`,
+        [taskId, orgId]
+      );
+      if (rows.length === 0) return res.status(404).json({ message: "No visit report found" });
+      res.json(rows[0]);
+    } catch (err: any) {
+      console.error("Error fetching visit report:", err);
+      res.status(500).json({ message: "Failed to fetch visit report" });
+    }
+  });
+
+  // Create or upsert visit report for a task
+  app.post("/api/tasks/:taskId/visit-report", isAuthenticated, async (req: any, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId);
+      if (isNaN(taskId)) return res.status(400).json({ message: "Invalid task ID" });
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!orgId) return res.status(400).json({ message: "Organization not found" });
+
+      const task = await storage.getTask(taskId);
+      if (!task) return res.status(404).json({ message: "Task not found" });
+      if (task.orgId !== orgId) return res.status(403).json({ message: "Forbidden" });
+
+      const { status = "draft", notes, recommendations, publishedToPortal } = req.body;
+      const db = await import("./db");
+
+      // Check for existing report
+      const { rows: existing } = await db.pool.query(
+        `SELECT id FROM visit_reports WHERE task_id = $1 AND org_id = $2 ORDER BY created_at DESC LIMIT 1`,
+        [taskId, orgId]
+      );
+
+      let row;
+      if (existing.length > 0) {
+        const vrId = existing[0].id;
+        const now = new Date();
+        const { rows } = await db.pool.query(
+          `UPDATE visit_reports SET
+            status = $1, notes = COALESCE($2, notes), recommendations = COALESCE($3, recommendations),
+            published_to_portal = COALESCE($4, published_to_portal),
+            completed_at = CASE WHEN $1 IN ('completed','published') AND completed_at IS NULL THEN $5 ELSE completed_at END,
+            completed_by = CASE WHEN $1 IN ('completed','published') AND completed_by IS NULL THEN $6 ELSE completed_by END,
+            published_at = CASE WHEN $1 = 'published' AND published_at IS NULL THEN $5 ELSE published_at END,
+            updated_at = $5
+          WHERE id = $7 RETURNING *`,
+          [status, notes ?? null, recommendations ?? null, publishedToPortal ?? null, now, userId, vrId]
+        );
+        row = rows[0];
+      } else {
+        const title = task.title || `Visit Report — ${new Date().toLocaleDateString()}`;
+        const propertyId = (task as any).propertyId || null;
+        const now = new Date();
+        const { rows } = await db.pool.query(
+          `INSERT INTO visit_reports (org_id, task_id, property_id, title, status, notes, recommendations,
+            published_to_portal, completed_at, completed_by, published_at, created_by, created_at, updated_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,
+            CASE WHEN $5 IN ('completed','published') THEN $9 ELSE NULL END,
+            CASE WHEN $5 IN ('completed','published') THEN $10 ELSE NULL END,
+            CASE WHEN $5 = 'published' THEN $9 ELSE NULL END,
+            $10,$9,$9) RETURNING *`,
+          [orgId, taskId, propertyId, title, status, notes ?? null, recommendations ?? null,
+           publishedToPortal ?? false, now, userId]
+        );
+        row = rows[0];
+      }
+
+      // If published, update checklist items' task to completed
+      if (status === "completed" || status === "published") {
+        const currentTask = await storage.getTask(taskId);
+        if (currentTask && (currentTask as any).status !== "completed") {
+          await storage.updateTask(taskId, { status: "completed", completedAt: new Date() } as any);
+        }
+      }
+
+      res.status(201).json(row);
+    } catch (err: any) {
+      console.error("Error saving visit report:", err);
+      res.status(500).json({ message: "Failed to save visit report" });
+    }
+  });
+
+  // Update visit report by ID
+  app.patch("/api/visit-reports/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!orgId) return res.status(400).json({ message: "Organization not found" });
+      const db = await import("./db");
+      const { rows: existing } = await db.pool.query(
+        `SELECT * FROM visit_reports WHERE id = $1 AND org_id = $2`, [id, orgId]
+      );
+      if (existing.length === 0) return res.status(404).json({ message: "Visit report not found" });
+      const { status, notes, recommendations, publishedToPortal, overallResult } = req.body;
+      const now = new Date();
+      const { rows } = await db.pool.query(
+        `UPDATE visit_reports SET
+          status = COALESCE($1, status),
+          notes = COALESCE($2, notes),
+          recommendations = COALESCE($3, recommendations),
+          published_to_portal = COALESCE($4, published_to_portal),
+          overall_result = COALESCE($5, overall_result),
+          completed_at = CASE WHEN $1 IN ('completed','published') AND completed_at IS NULL THEN $6 ELSE completed_at END,
+          completed_by = CASE WHEN $1 IN ('completed','published') AND completed_by IS NULL THEN $7 ELSE completed_by END,
+          published_at = CASE WHEN $1 = 'published' AND published_at IS NULL THEN $6 ELSE published_at END,
+          updated_at = $6
+        WHERE id = $8 RETURNING *`,
+        [status ?? null, notes ?? null, recommendations ?? null, publishedToPortal ?? null, overallResult ?? null, now, userId, id]
+      );
+      res.json(rows[0]);
+    } catch (err: any) {
+      console.error("Error updating visit report:", err);
+      res.status(500).json({ message: "Failed to update visit report" });
+    }
+  });
+
+  // Get all visit reports for a property
+  app.get("/api/properties/:propertyId/visit-reports", isAuthenticated, async (req: any, res) => {
+    try {
+      const propertyId = parseInt(req.params.propertyId);
+      if (isNaN(propertyId)) return res.status(400).json({ message: "Invalid property ID" });
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (!orgId) return res.status(400).json({ message: "Organization not found" });
+      const db = await import("./db");
+      const { rows } = await db.pool.query(
+        `SELECT vr.*, u.first_name || ' ' || u.last_name AS completed_by_name,
+          t.title AS task_title
+        FROM visit_reports vr
+        LEFT JOIN users u ON u.id = vr.completed_by
+        LEFT JOIN tasks t ON t.id = vr.task_id
+        WHERE vr.property_id = $1 AND vr.org_id = $2
+        ORDER BY vr.created_at DESC`,
+        [propertyId, orgId]
+      );
+      res.json(rows);
+    } catch (err: any) {
+      console.error("Error fetching property visit reports:", err);
+      res.status(500).json({ message: "Failed to fetch visit reports" });
+    }
+  });
+
+  // ============================================================
   // Task Checklist Item Routes (inspection-enhanced)
   // ============================================================
 
@@ -20158,7 +20312,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const userId = req.user?.claims?.sub || req.user?.id;
-      const { text, completed, result, resultNote, photoUrl, photoUrls, required, notes, priority, sortOrder } = req.body;
+      const {
+        text, completed, result, resultNote, photoUrl, photoUrls, required, notes, priority, sortOrder,
+        // V2 inspection fields
+        fieldType, beforePhotoUrls, afterPhotoUrls, recommendation, textAnswer, numberAnswer,
+      } = req.body;
       const updates: Record<string, any> = {};
       if (text !== undefined) updates.text = text;
       if (required !== undefined) updates.required = required;
@@ -20169,6 +20327,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (resultNote !== undefined) updates.resultNote = resultNote;
       if (photoUrl !== undefined) updates.photoUrl = photoUrl;
       if (photoUrls !== undefined) updates.photoUrls = photoUrls;
+      // V2 fields
+      if (fieldType !== undefined) updates.fieldType = fieldType;
+      if (beforePhotoUrls !== undefined) updates.beforePhotoUrls = beforePhotoUrls;
+      if (afterPhotoUrls !== undefined) updates.afterPhotoUrls = afterPhotoUrls;
+      if (recommendation !== undefined) updates.recommendation = recommendation;
+      if (textAnswer !== undefined) updates.textAnswer = textAnswer;
+      if (numberAnswer !== undefined) updates.numberAnswer = numberAnswer;
       if (completed !== undefined) {
         updates.completed = completed;
         updates.completedAt = completed ? new Date() : null;
@@ -20218,16 +20383,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!templateId) return res.status(400).json({ message: "templateId is required" });
       const template = await storage.getChecklistTemplate(templateId);
       if (!template) return res.status(404).json({ message: "Template not found" });
-      const items = (template.items as Array<{ text: string; required?: boolean; category?: string }>) || [];
+      const items = (template.items as Array<{
+        text: string; required?: boolean; category?: string;
+        fieldType?: string; requiresRecommendation?: boolean; notes?: string;
+      }>) || [];
       const created = [];
       for (let i = 0; i < items.length; i++) {
+        const tmplItem = items[i];
         const item = await storage.createTaskChecklistItem({
           taskId,
-          text: items[i].text,
-          required: items[i].required || false,
-          category: items[i].category || null,
+          text: tmplItem.text,
+          required: tmplItem.required || false,
+          category: tmplItem.category || null,
           sortOrder: i,
-        });
+          fieldType: (tmplItem.fieldType as any) || "pass_fail",
+          notes: tmplItem.notes || null,
+        } as any);
         created.push(item);
       }
       res.status(201).json(created);
@@ -20491,6 +20662,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // ── Recommendations ──
+      const itemsWithRecommendations = checklistItems.filter((i: any) => i.recommendation && i.recommendation.trim());
+      if (itemsWithRecommendations.length > 0) {
+        if (doc.y > 680) doc.addPage();
+        doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor("#e2e8f0").stroke();
+        doc.moveDown(0.6);
+        doc.fontSize(12).fillColor("#92400e").text(`Recommendations (${itemsWithRecommendations.length})`);
+        doc.moveDown(0.4);
+        for (const item of itemsWithRecommendations) {
+          if (doc.y > 700) doc.addPage();
+          const recommH = doc.heightOfString(item.recommendation, { fontSize: 9, width: 440 }) + 16;
+          doc.rect(50, doc.y, 495, recommH).fillColor("#fffbeb").fill();
+          doc.rect(50, doc.y, 495, recommH).strokeColor("#fde68a").stroke();
+          const boxY = doc.y;
+          doc.fontSize(8).fillColor("#78350f").text(item.text || "", 58, boxY + 6, { width: 430 });
+          doc.fontSize(9).fillColor("#451a03").text(item.recommendation, 58, doc.y + 2, { width: 430 });
+          doc.y = boxY + recommH + 4;
+          doc.moveDown(0.2);
+        }
+        doc.moveDown(0.4);
+      }
+
       // ── Pending Warning ──
       if (pendingCount > 0) {
         if (doc.y > 700) doc.addPage();
@@ -20527,7 +20720,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const failCount = checklistItems.filter((i: any) => i.result === "fail").length;
       const naCount = checklistItems.filter((i: any) => i.result === "na").length;
       const pendingCount = checklistItems.filter((i: any) => !i.result).length;
-      res.json({ task, checklistItems, summary: { passCount, failCount, naCount, pendingCount } });
+      // Load visit report if one exists
+      const dbMod = await import("./db");
+      const { rows: vrRows } = await dbMod.pool.query(
+        `SELECT * FROM visit_reports WHERE task_id = $1 AND org_id = $2 ORDER BY created_at DESC LIMIT 1`,
+        [taskId, orgId]
+      );
+      const visitReport = vrRows.length > 0 ? vrRows[0] : null;
+      res.json({ task, checklistItems, summary: { passCount, failCount, naCount, pendingCount }, visitReport });
     } catch (error) {
       console.error("Error fetching inspection report:", error);
       res.status(500).json({ message: "Failed to fetch inspection report" });

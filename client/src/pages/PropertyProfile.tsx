@@ -168,6 +168,91 @@ const FREQ_COLORS: Record<string, string> = {
 };
 
 
+function VisitReportHistory({ propertyId }: { propertyId: string }) {
+  const { data: reports = [], isLoading } = useQuery<any[]>({
+    queryKey: [`/api/properties/${propertyId}/visit-reports`],
+    enabled: !!propertyId,
+  });
+
+  const statusColor: Record<string, string> = {
+    draft: "bg-gray-100 text-gray-600",
+    completed: "bg-green-100 text-green-700",
+    published: "bg-teal-100 text-teal-700",
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <ClipboardCheck className="w-5 h-5 text-indigo-500" />
+          Visit Reports
+        </CardTitle>
+        <p className="text-sm text-slate-500">Completed visit reports for this property.</p>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1,2].map(n => <div key={n} className="h-12 bg-slate-100 rounded animate-pulse" />)}
+          </div>
+        ) : reports.length === 0 ? (
+          <div className="text-center py-8">
+            <ClipboardCheck className="w-10 h-10 text-slate-200 mx-auto mb-2" />
+            <p className="text-slate-400 text-sm">No visit reports yet.</p>
+            <p className="text-slate-300 text-xs mt-0.5">Reports are created from the Visit Completion page.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {reports.map((r: any) => (
+              <div key={r.id} className="flex items-start justify-between p-3 border rounded-lg hover:bg-slate-50 transition-colors">
+                <div className="space-y-0.5">
+                  <p className="font-medium text-sm text-slate-900">{r.title}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${statusColor[r.status] || "bg-gray-100 text-gray-600"}`}>
+                      {r.status}
+                    </span>
+                    {r.published_to_portal && (
+                      <span className="text-xs text-teal-600">Published to portal</span>
+                    )}
+                    {r.completed_by_name && (
+                      <span className="text-xs text-slate-400">By {r.completed_by_name}</span>
+                    )}
+                    {r.completed_at && (
+                      <span className="text-xs text-slate-400">
+                        {new Date(r.completed_at).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                  {r.recommendations && (
+                    <p className="text-xs text-amber-700 mt-0.5 line-clamp-1">
+                      Rec: {r.recommendations}
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-1.5 ml-3 shrink-0">
+                  {r.task_id && (
+                    <a href={`/visit/${r.task_id}`}>
+                      <Button variant="outline" size="sm" className="text-xs h-7">
+                        Complete Visit
+                      </Button>
+                    </a>
+                  )}
+                  {r.task_id && (
+                    <a href={`/inspection-report/${r.task_id}`} target="_blank" rel="noopener noreferrer">
+                      <Button variant="ghost" size="sm" className="text-xs h-7">
+                        View Report
+                      </Button>
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function InspectionScheduleSection({ propertyId }: { propertyId: string }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -6575,6 +6660,9 @@ export default function PropertyProfile() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Visit Reports History */}
+            <VisitReportHistory propertyId={propertyId!} />
             </div>
           </TabsContent>
         </Tabs>

@@ -68,6 +68,9 @@ import PaymentCollectionPage from "@/pages/PaymentCollectionPage";
 import OnboardingPortal from "@/pages/OnboardingPortal";
 import InspectionReport from "@/pages/InspectionReport";
 import InspectionSchedules from "@/pages/InspectionSchedules";
+import InspectionTemplates from "@/pages/InspectionTemplates";
+import InspectionTemplateEditor from "@/pages/InspectionTemplateEditor";
+import VisitCompletion from "@/pages/VisitCompletion";
 import SetupChecklist from "@/pages/SetupChecklist";
 import ReviewDashboard from "@/pages/ReviewDashboard";
 import ReviewSettings from "@/pages/ReviewSettings";
@@ -254,6 +257,13 @@ function Router() {
           
           {/* Inspection Schedules overview */}
           <Route path="/inspection-schedules" component={InspectionSchedules} />
+
+          {/* Inspection Template Builder */}
+          <Route path="/admin/inspection-templates/:id" component={InspectionTemplateEditor} />
+          <Route path="/admin/inspection-templates" component={InspectionTemplates} />
+
+          {/* Visit Completion */}
+          <Route path="/visit/:taskId" component={VisitCompletion} />
           
           {/* Billing Routes */}
           <Route path="/billing" component={Billing} />

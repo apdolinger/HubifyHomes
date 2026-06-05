@@ -553,6 +553,12 @@ app.use((req, res, next) => {
       } catch (err) {
         console.error('Error ensuring Review Automation tables:', err);
       }
+      try {
+        const { ensureInspectionV1Tables } = await import('./runMigrations.js');
+        await ensureInspectionV1Tables();
+      } catch (err) {
+        console.error('Error ensuring Inspection V1 tables:', err);
+      }
     } catch (error) {
       console.error('Error loading startup migrations:', error);
     }
