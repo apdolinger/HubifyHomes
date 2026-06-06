@@ -17312,12 +17312,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (intent === "beta_application") {
         const fromEmail = process.env.RESEND_FROM_EMAIL;
         if (resend && fromEmail) {
-          resend.emails.send({
-            from: fromEmail,
-            to: data.email,
-            replyTo: "contact@hubifyhomes.com",
-            subject: `${data.firstName}, your Hubify beta application is in!`,
-            html: `
+          try {
+            const confirmResult = await resend.emails.send({
+              from: fromEmail,
+              to: data.email,
+              replyTo: "contact@hubifyhomes.com",
+              subject: `${data.firstName}, your Hubify beta application is in!`,
+              html: `
               <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
                 <div style="text-align:center;margin-bottom:28px">
                   <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="180" style="width:180px;max-width:180px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
@@ -17344,7 +17345,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 </p>
               </div>
             `,
-          }).then((r: any) => console.log(`[beta-application] confirmation sent resend_id=${r?.data?.id}`)).catch((err: any) => console.warn("[beta-application] confirmation email failed:", err));
+            });
+            if ((confirmResult as any)?.error) {
+              const errMsg = (confirmResult as any).error?.message ?? JSON.stringify((confirmResult as any).error);
+              console.warn("[beta-application] confirmation email Resend error:", errMsg);
+              await storage.updateOnboardingProspect(prospect.id, {
+                confirmationEmailStatus: `failed: ${errMsg}`,
+                confirmationEmailSentAt: new Date(),
+              } as any);
+            } else {
+              console.log(`[beta-application] confirmation sent resend_id=${(confirmResult as any)?.data?.id}`);
+              await storage.updateOnboardingProspect(prospect.id, {
+                confirmationEmailStatus: "sent",
+                confirmationEmailSentAt: new Date(),
+              } as any);
+            }
+          } catch (confirmErr: any) {
+            const errMsg = confirmErr?.message ?? String(confirmErr);
+            console.warn("[beta-application] confirmation email failed:", errMsg);
+            await storage.updateOnboardingProspect(prospect.id, {
+              confirmationEmailStatus: `failed: ${errMsg}`,
+              confirmationEmailSentAt: new Date(),
+            } as any);
+          }
         }
         const alertTo = process.env.SUPPORT_EMAIL || process.env.ADMIN_EMAIL;
         if (resend && fromEmail && alertTo) {
