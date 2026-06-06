@@ -1117,13 +1117,14 @@ function SubmissionStatusBadge({ status }: { status: string | null }) {
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${opt.color}`}>{opt.label}</span>;
 }
 
-function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesChange, onMoveToPipeline, focusResend }: {
+function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesChange, onMoveToPipeline, focusResend, onEdit }: {
   submission: Prospect;
   onClose: () => void;
   onStatusChange: (id: string, status: string) => void;
   onNotesChange: (id: string, notes: string) => void;
   onMoveToPipeline?: (submission: Prospect) => void;
   focusResend?: boolean;
+  onEdit?: (p: Prospect) => void;
 }) {
   const { toast } = useToast();
   const [notesValue, setNotesValue] = useState(submission.notes ?? "");
@@ -1264,10 +1265,25 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
     <Sheet open onOpenChange={handleClose}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader className="mb-4">
-          <SheetTitle className="text-xl">{displayName}</SheetTitle>
-          <SheetDescription className="text-left">
-            Submitted {submission.createdAt ? new Date(submission.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "—"}
-          </SheetDescription>
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <SheetTitle className="text-xl">{displayName}</SheetTitle>
+              <SheetDescription className="text-left">
+                Submitted {submission.createdAt ? new Date(submission.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "—"}
+              </SheetDescription>
+            </div>
+            {onEdit && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 mt-1"
+                onClick={() => { handleClose(); onEdit(submission); }}
+              >
+                <Edit className="w-3.5 h-3.5 mr-1.5" />
+                Edit
+              </Button>
+            )}
+          </div>
         </SheetHeader>
 
         <div className="space-y-6">
@@ -1957,7 +1973,7 @@ const SOURCE_FILTER_OPTIONS = [
   { value: "pricing_enterprise",   label: "Pricing · Enterprise" },
 ];
 
-function SubmissionsTab({ onMoveToPipeline, defaultSourceFilter, statusFilter }: { onMoveToPipeline?: (submission: Prospect) => void; defaultSourceFilter?: string; statusFilter?: string }) {
+function SubmissionsTab({ onMoveToPipeline, defaultSourceFilter, statusFilter, onEdit }: { onMoveToPipeline?: (submission: Prospect) => void; defaultSourceFilter?: string; statusFilter?: string; onEdit?: (p: Prospect) => void }) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState(defaultSourceFilter ?? "all");
@@ -2183,6 +2199,7 @@ function SubmissionsTab({ onMoveToPipeline, defaultSourceFilter, statusFilter }:
                     <TableHead>Notes</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Submitted</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -2265,6 +2282,23 @@ function SubmissionsTab({ onMoveToPipeline, defaultSourceFilter, statusFilter }:
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                         {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : "—"}
                       </TableCell>
+                      <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                        {onEdit && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={() => onEdit(s)}
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Edit submission</TooltipContent>
+                          </Tooltip>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -2291,6 +2325,7 @@ function SubmissionsTab({ onMoveToPipeline, defaultSourceFilter, statusFilter }:
             setSelectedSubmission(prev => prev ? { ...prev, submissionStatus: "converted" } : prev);
             onMoveToPipeline(sub);
           } : undefined}
+          onEdit={onEdit ? (p) => { setSelectedSubmission(null); onEdit(p); } : undefined}
         />
       )}
 
@@ -10770,6 +10805,7 @@ export default function SuperAdmin() {
             <TabsContent value="new">
               <SubmissionsTab
                 statusFilter="new"
+                onEdit={openEdit}
                 onMoveToPipeline={(submission) => {
                   const displayName = submission.firstName && submission.lastName
                     ? `${submission.firstName} ${submission.lastName}`
