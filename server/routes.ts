@@ -18070,8 +18070,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // $0 total (e.g. 100% founding discount + no setup fee) — bypass Stripe entirely.
       if (lineItems.length === 0) {
-        return res.status(400).json({ message: "No pricing configured for this prospect. Please contact support." });
+        const now = new Date();
+        await db.update(onboardingProspects).set({
+          paymentStatus: "paid",
+          paymentCompletedAt: now,
+          stage: "platform_initializing",
+          betaStripeCheckoutSessionId: "waived_100pct_discount",
+        } as any).where(eq(onboardingProspects.id, prospect.id));
+        return res.json({ free: true });
       }
 
       const session = await stripe.checkout.sessions.create({

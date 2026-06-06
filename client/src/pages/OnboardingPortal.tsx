@@ -1125,6 +1125,8 @@ function PaymentStep({ data, token }: { data: OnboardingDetails; token: string }
   const { toast } = useToast();
   const totalDueToday = (data.setupFee ?? 0) + (data.discountedMonthlyPrice ?? 0);
 
+  const isFree = totalDueToday === 0;
+
   const checkoutMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch(`/api/public/onboarding/${token}/create-checkout`, {
@@ -1133,10 +1135,17 @@ function PaymentStep({ data, token }: { data: OnboardingDetails; token: string }
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.message ?? "Failed to create payment session.");
-      return body as { checkoutUrl: string };
+      return body as { checkoutUrl: string } | { free: true };
     },
-    onSuccess: ({ checkoutUrl }) => {
-      window.location.href = checkoutUrl;
+    onSuccess: (result) => {
+      if ("free" in result && result.free) {
+        // $0 total — no Stripe redirect needed; go straight to payment=success
+        const url = new URL(window.location.href);
+        url.searchParams.set("payment", "success");
+        window.location.href = url.toString();
+      } else if ("checkoutUrl" in result) {
+        window.location.href = result.checkoutUrl;
+      }
     },
     onError: (err: any) => {
       toast({ title: "Payment setup failed", description: err.message, variant: "destructive" });
@@ -1147,7 +1156,7 @@ function PaymentStep({ data, token }: { data: OnboardingDetails; token: string }
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="bg-gradient-to-r from-teal-600 to-indigo-600 px-6 py-5">
         <p className="text-white font-semibold text-lg">Payment Setup</p>
-        <p className="text-teal-100 text-sm mt-0.5">Secure checkout via Stripe</p>
+        <p className="text-teal-100 text-sm mt-0.5">{isFree ? "No payment required — 100% founding discount applied" : "Secure checkout via Stripe"}</p>
       </div>
 
       <div className="p-6">
@@ -1187,9 +1196,14 @@ function PaymentStep({ data, token }: { data: OnboardingDetails; token: string }
         </div>
 
         <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-6 text-xs text-slate-500 leading-relaxed">
-          After today, you'll be billed <strong className="text-slate-700">{fmt(data.discountedMonthlyPrice)}/month</strong>.
-          Your beta discount of <strong className="text-slate-700">{data.discountPercentage ?? 0}%</strong> is locked in for the lifetime
-          of your subscription. You may cancel at any time.
+          {isFree ? (
+            <>Your <strong className="text-slate-700">100% founding discount</strong> covers your entire subscription — no card required today.
+            Your discount is locked in for the lifetime of your subscription.</>
+          ) : (
+            <>After today, you'll be billed <strong className="text-slate-700">{fmt(data.discountedMonthlyPrice)}/month</strong>.
+            Your beta discount of <strong className="text-slate-700">{data.discountPercentage ?? 0}%</strong> is locked in for the lifetime
+            of your subscription. You may cancel at any time.</>
+          )}
         </div>
 
         <Button
@@ -1198,7 +1212,9 @@ function PaymentStep({ data, token }: { data: OnboardingDetails; token: string }
           disabled={checkoutMutation.isPending}
         >
           {checkoutMutation.isPending ? (
-            <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Redirecting to Stripe…</>
+            <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{isFree ? "Activating your account…" : "Redirecting to Stripe…"}</>
+          ) : isFree ? (
+            <><CheckCircle className="w-4 h-4 mr-2" />Activate My Account <ArrowRight className="w-4 h-4 ml-1" /></>
           ) : (
             <><CreditCard className="w-4 h-4 mr-2" />Continue to Secure Payment <ArrowRight className="w-4 h-4 ml-1" /></>
           )}
@@ -1206,7 +1222,7 @@ function PaymentStep({ data, token }: { data: OnboardingDetails; token: string }
 
         <div className="flex items-center justify-center gap-1.5 mt-3 text-xs text-slate-400">
           <Lock className="w-3 h-3" />
-          <span>Secured by Stripe · 256-bit SSL encryption</span>
+          <span>{isFree ? "No payment information required" : "Secured by Stripe · 256-bit SSL encryption"}</span>
         </div>
       </div>
     </div>
