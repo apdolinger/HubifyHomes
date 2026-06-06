@@ -439,10 +439,27 @@ function AuthWrapper() {
   const fieldModeEnabled = isFlagEnabled("mobile_field_mode");
   const isSuperAdmin = !isLoading && isAuthenticated && (user as any)?.isSuperAdmin;
   const isOnSuperAdminRoute = location.startsWith("/super-admin");
+  // Public and token-based routes must never be interrupted by the Super Admin
+  // redirect — they identify the intended recipient via a URL token, not by the
+  // browser session, so an active Super Admin session must not hijack them.
+  const isPublicOrTokenRoute =
+    location.startsWith("/onboarding/") ||
+    location.startsWith("/payment-collection/") ||
+    location.startsWith("/r/") ||
+    location.startsWith("/portal") ||
+    location === "/staff/login" ||
+    location === "/privacy" ||
+    location === "/terms" ||
+    location === "/submit" ||
+    location === "/inquire" ||
+    location === "/contact" ||
+    location === "/signup";
+  const shouldRedirectSuperAdmin = isSuperAdmin && !isOnSuperAdminRoute && !isPublicOrTokenRoute;
 
   useEffect(() => {
     // Super Admin sessions belong in the Super Admin panel, not the staff dashboard.
-    if (isSuperAdmin && !isOnSuperAdminRoute) {
+    // Public/token routes are exempt — they identify recipients via URL tokens.
+    if (shouldRedirectSuperAdmin) {
       navigate("/super-admin");
       return;
     }
@@ -458,10 +475,10 @@ function AuthWrapper() {
     if (pref === "true" && !isFieldRoute && isMobile) {
       navigate("/field");
     }
-  }, [isAuthenticated, isLoading, flagsLoading, isFieldRoute, isMobile, fieldModeEnabled, navigate, isSuperAdmin, isOnSuperAdminRoute]);
+  }, [isAuthenticated, isLoading, flagsLoading, isFieldRoute, isMobile, fieldModeEnabled, navigate, shouldRedirectSuperAdmin]);
 
   // Prevent any flash of the staff dashboard while the redirect fires.
-  if (isSuperAdmin && !isOnSuperAdminRoute) {
+  if (shouldRedirectSuperAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <RefreshCw className="w-8 h-8 animate-spin text-teal-600" />
