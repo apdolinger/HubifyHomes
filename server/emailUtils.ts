@@ -666,7 +666,7 @@ export function generateInvoiceEmailHTML(data: InvoiceEmailData): string {
     
     <div class="footer">
       <p style="margin: 0 0 10px 0;">This is an automated invoice notification from ${organizationName}</p>
-      <p style="margin: 0;">Please do not reply directly to this email.</p>
+      <p style="margin: 0;">If you have questions, please email <a href="mailto:contact@hubifyhomes.com" style="color:#666666;">contact@hubifyhomes.com</a></p>
       <p style="margin: 10px 0 0 0; font-size: 12px; color: #999999;">Hubify · [ADD MAILING ADDRESS] · [City, FL ZIP] · <a href="https://hubify.com/privacy" style="color:#999999;">Privacy Policy</a></p>
     </div>
   </div>
