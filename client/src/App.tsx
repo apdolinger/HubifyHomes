@@ -129,8 +129,36 @@ function FieldModeRouter() {
   );
 }
 
+function NoOrgPage() {
+  const { user } = useAuth();
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 max-w-md w-full p-10 text-center">
+        <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-5">
+          <svg className="w-7 h-7 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+        </div>
+        <h1 className="text-xl font-semibold text-slate-900 mb-2">No organization assigned</h1>
+        <p className="text-sm text-slate-500 mb-1">
+          Your account ({(user as any)?.email ?? "unknown"}) is not linked to any organization.
+        </p>
+        <p className="text-sm text-slate-500 mb-8">
+          Contact your administrator to be added to a team.
+        </p>
+        <a
+          href="/api/logout"
+          className="inline-flex items-center justify-center rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium px-5 py-2.5 transition-colors"
+        >
+          Sign out
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const { isFeatureEnabled } = useFeatureFlags();
 
   return (
@@ -370,14 +398,8 @@ function AuthenticatedAppContent() {
             Cookie preferences
           </button>
         </div>
-        <div className="text-xs">
-          <a 
-            href="/super-admin/login" 
-            className="text-slate-400 hover:text-slate-600 transition-colors"
-            title="Super Admin Access"
-          >
-            Super Admin
-          </a>
+        <div className="text-xs text-slate-400">
+          v{new Date().getFullYear()}
         </div>
       </div>
     </footer>}
@@ -409,14 +431,21 @@ function AuthenticatedApp() {
 }
 
 function AuthWrapper() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const { isFeatureEnabled: isFlagEnabled, isLoading: flagsLoading } = useFeatureFlags();
   const [location, navigate] = useLocation();
   const isMobile = useIsMobile();
   const isFieldRoute = location.startsWith("/field");
   const fieldModeEnabled = isFlagEnabled("mobile_field_mode");
+  const isSuperAdmin = !isLoading && isAuthenticated && (user as any)?.isSuperAdmin;
+  const isOnSuperAdminRoute = location.startsWith("/super-admin");
 
   useEffect(() => {
+    // Super Admin sessions belong in the Super Admin panel, not the staff dashboard.
+    if (isSuperAdmin && !isOnSuperAdminRoute) {
+      navigate("/super-admin");
+      return;
+    }
     if (!isAuthenticated || isLoading || flagsLoading) return;
     // If the flag is off, force any user on /field back to the desktop app.
     if (isFieldRoute && !fieldModeEnabled) {
@@ -429,13 +458,27 @@ function AuthWrapper() {
     if (pref === "true" && !isFieldRoute && isMobile) {
       navigate("/field");
     }
-  }, [isAuthenticated, isLoading, flagsLoading, isFieldRoute, isMobile, fieldModeEnabled, navigate]);
+  }, [isAuthenticated, isLoading, flagsLoading, isFieldRoute, isMobile, fieldModeEnabled, navigate, isSuperAdmin, isOnSuperAdminRoute]);
+
+  // Prevent any flash of the staff dashboard while the redirect fires.
+  if (isSuperAdmin && !isOnSuperAdminRoute) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <RefreshCw className="w-8 h-8 animate-spin text-teal-600" />
+      </div>
+    );
+  }
+
+  // Authenticated user with no org and not a super admin → gate page.
+  const hasNoOrg = !isLoading && isAuthenticated && !(user as any)?.orgId && !isSuperAdmin;
 
   return (
     <TooltipProvider>
       <Toaster />
       {isLoading || !isAuthenticated ? (
         <Router />
+      ) : hasNoOrg ? (
+        <NoOrgPage />
       ) : isFieldRoute ? (
         <FieldModeRouter />
       ) : (

@@ -1,0 +1,94 @@
+We have a multi-tenant SaaS app for Hubify Homes.
+
+Issue:
+When I visit https://hubifyhomesonline.com directly, I am automatically logged into a dashboard even though this should only happen if my user account has a valid tenant/organization. The page appears to show a generic platform dashboard and the footer shows “Super Admin.”
+
+Expected behavior:
+1. If user is not authenticated → redirect to login.
+2. If user is authenticated and has a tenant/organization → redirect to that tenant’s dashboard.
+3. If user is authenticated but has no tenant/organization membership → block access and show a “No organization assigned” or “Contact administrator” page.
+4. If user is a real platform super admin → only allow access through a protected admin route, not the default customer dashboard.
+
+Please investigate and fix the auth/tenant resolution flow.
+
+Check the following:
+
+1. Trace the full login flow:
+- Where is the user authenticated?
+- After login, where is tenant/organization membership loaded?
+- What route is selected after login?
+- What happens if tenantId, organizationId, workspaceId, or currentTenant is null?
+
+2. Trace session restoration:
+- On page load, how is an existing session restored?
+- Does the app only check “authenticated,” or does it also verify tenant membership?
+- If the user has no valid tenant, why is the dashboard still loading?
+
+3. Check dashboard route protection:
+- Find the route guard, middleware, loader, or protected route wrapper for the dashboard.
+- The dashboard should require BOTH:
+  - authenticated user
+  - valid tenant/organization membership
+- It should not render for users with no tenant.
+
+4. Search the codebase for:
+- tenantId
+- organizationId
+- workspaceId
+- currentTenant
+- Super Admin
+- superAdmin
+- isSuperAdmin
+- admin
+- system
+- default tenant
+- fallback tenant
+
+5. Check role assignment:
+- Why is “Super Admin” showing in the footer?
+- Is the app assigning Super Admin by default?
+- Is there a fallback role when no tenant exists?
+- Is a user without tenant membership being treated as platform admin?
+
+6. Check database relationships:
+- users
+- tenants
+- organizations
+- memberships
+- team_members
+- roles
+- user_roles
+
+Confirm what links a user to a tenant and what happens when that link is missing.
+
+7. Check domain routing:
+- How does hubifyhomesonline.com determine which tenant to load?
+- Is there a default workspace or system tenant being loaded when no tenant is found?
+- There should be no silent fallback into a dashboard.
+
+Required fix:
+Implement a strict tenant gate before rendering the app dashboard.
+
+Pseudo-logic:
+
+if (!user) {
+  redirect("/login");
+}
+
+const membership = await getUserTenantMembership(user.id);
+
+if (!membership && !user.isSuperAdmin) {
+  redirect("/no-organization");
+}
+
+if (membership) {
+  loadTenantContext(membership.tenantId);
+  redirect("/dashboard");
+}
+
+if (user.isSuperAdmin) {
+  redirect("/admin");
+}
+
+Important:
+Do not allow an authenticated user with no tenant membership to access the main app dashboard. Do not fallback to Super Admin, system, default tenant, or generic dashboard.
