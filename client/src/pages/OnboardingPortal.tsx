@@ -143,9 +143,9 @@ function TokenError({ status, message }: { status: number; message: string }) {
         </h1>
         <p className="text-slate-600 text-sm leading-relaxed">{message}</p>
         <p className="mt-4 text-slate-500 text-xs">
-          Need help?{" "}
-          <a href="mailto:hello@hubifyhomesonline.com" className="text-teal-600 hover:underline">
-            hello@hubifyhomesonline.com
+          If you have questions please email{" "}
+          <a href="mailto:contact@hubifyhomes.com" className="text-teal-600 hover:underline">
+            contact@hubifyhomes.com
           </a>
         </p>
       </div>
@@ -343,7 +343,7 @@ function BetaAgreementContent({ company }: { company?: string }) {
       </div>
 
       <div className="border-t border-slate-200 pt-4 space-y-1 text-xs text-slate-400">
-        <p><strong className="text-slate-600">Hubify Homes Inc.</strong> · <a href="mailto:hello@hubifyhomesonline.com" className="text-teal-600 hover:underline">hello@hubifyhomesonline.com</a></p>
+        <p><strong className="text-slate-600">Hubify Homes Inc.</strong> · <a href="mailto:contact@hubifyhomes.com" className="text-teal-600 hover:underline">contact@hubifyhomes.com</a></p>
         <p>Agreement Version: {AGREEMENT_VERSION}</p>
         {company && <p>Participant Organization: {company}</p>}
       </div>
@@ -1429,9 +1429,9 @@ export default function OnboardingPortal() {
         {paymentPaid && <PaymentSuccess data={data} />}
 
         <p className="text-center text-xs text-slate-400 mt-6">
-          Questions?{" "}
-          <a href="mailto:hello@hubifyhomesonline.com" className="text-teal-600 hover:underline">
-            hello@hubifyhomesonline.com
+          If you have questions please email{" "}
+          <a href="mailto:contact@hubifyhomes.com" className="text-teal-600 hover:underline">
+            contact@hubifyhomes.com
           </a>
         </p>
       </div>

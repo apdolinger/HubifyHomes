@@ -1,0 +1,93 @@
+Please run a full QA pass on the Hubify Homes beta onboarding flow because we found auth routing issues and I’m concerned there may be related email/onboarding problems.
+
+Primary concern:
+A beta onboarding email had to be resent manually. It did not appear to send automatically. Also, when clicking the onboarding button while logged in as Super Admin, the route previously redirected incorrectly. That part was fixed, but I want to confirm the full flow is healthy.
+
+Please QA these flows end-to-end:
+
+1. Beta application submission
+
+* Submit a new beta application from the public form.
+* Confirm the application is saved correctly in the database.
+* Confirm the applicant receives the “you’re on the list” confirmation email automatically.
+* Confirm the footer text says:
+  “If you have questions please email [contact@hubifyhomes.com](mailto:contact@hubifyhomes.com)”
+* Do not use “reply to this email” language.
+
+2. Super Admin beta approval
+
+* Log into `/super-admin/login`.
+* Approve a pending beta application.
+* Confirm approval creates or updates the correct customer/application record.
+* Confirm the correct beta cohort, discount, property count, pricing tier, and monthly price are assigned.
+* Confirm the approval action automatically sends the onboarding email.
+* Confirm no manual resend is required.
+
+3. Onboarding email
+
+* Confirm the onboarding email is sent to the applicant email address, not the Super Admin email.
+* Confirm the “Start Onboarding” button uses a valid `/onboarding/:token` link.
+* Confirm the token is created, stored, unexpired, and tied to the intended applicant/customer.
+* Confirm the email footer also uses:
+  “If you have questions please email [contact@hubifyhomes.com](mailto:contact@hubifyhomes.com)”
+* Remove/replace any remaining references to:
+
+  * “reply to this email”
+  * `hello@hubifyhomesonline.com`
+
+4. Token onboarding link behavior
+   Test the onboarding link in these browser/session states:
+
+* Unauthenticated user → onboarding loads.
+* Applicant already logged in → onboarding loads.
+* Super Admin logged in → onboarding loads, not `/super-admin`.
+* Regular staff logged in → onboarding loads if token is valid, not dashboard.
+* Expired/invalid token → clear error page.
+
+5. Email sending reliability
+   Please inspect the exact code path responsible for sending:
+
+* beta application confirmation email
+* beta approval/onboarding email
+* resend onboarding email
+
+Confirm:
+
+* automatic send is triggered after application submission where expected
+* automatic send is triggered after approval where expected
+* failures are logged clearly
+* failures do not silently pass
+* UI shows success/failure accurately
+* resend uses the same email template and token logic as the automatic send
+
+6. Database verification
+   Please verify the relevant tables/fields for:
+
+* beta applications
+* onboarding tokens
+* customer/org records
+* email sent status if tracked
+* token expiration
+* applicant email
+* approvedBy/sentBy if tracked
+
+7. Regression checks
+   Confirm the previous auth fixes still pass:
+
+* Super Admin visiting `/` redirects to `/super-admin`.
+* Super Admin visiting `/onboarding/:token` loads onboarding.
+* Staff with valid `orgId` reaches dashboard.
+* Staff with `orgId: null` sees NoOrgPage.
+* `/super-admin` and `/super-admin/login` still work.
+* Public routes still work.
+
+8. Deliverables
+   Please report back with:
+
+* Whether the automatic application confirmation email sends.
+* Whether the automatic onboarding email sends on approval.
+* Whether manual resend is still needed.
+* Any logs or errors found in the email provider/API.
+* Any email templates updated.
+* Any routes added to the public/token allowlist.
+* Any remaining risks or edge cases.

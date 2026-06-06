@@ -30,13 +30,13 @@ export default function TenantStatusPage({ status, orgName }: Props) {
       icon: "⚠️",
       title: "Workspace Suspended",
       body: `${label} has been suspended. Please contact Hubify support to restore access.`,
-      action: { label: "Contact Support", href: "mailto:support@hubifyhomesonline.com" },
+      action: { label: "Contact Support", href: "mailto:contact@hubifyhomes.com" },
     },
     archived: {
       icon: "🗄️",
       title: "Workspace No Longer Active",
       body: `${label} has been archived and is no longer accessible. Please contact Hubify support if you believe this is an error.`,
-      action: { label: "Contact Support", href: "mailto:support@hubifyhomesonline.com" },
+      action: { label: "Contact Support", href: "mailto:contact@hubifyhomes.com" },
     },
   };
 

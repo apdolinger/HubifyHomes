@@ -4641,7 +4641,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 </table>
               </div>
               <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
-                Our team will reach out shortly with your next steps and onboarding details. In the meantime, feel free to reply to this email with any questions.
+                Our team will reach out shortly with your next steps and onboarding details. If you have questions please email <a href="mailto:contact@hubifyhomes.com" style="color:#0d9488">contact@hubifyhomes.com</a>.
               </p>
               <p style="color:#6b7280;font-size:14px;margin-top:30px;">Best regards,<br>The Hubify Team</p>
             </div>
@@ -17315,7 +17315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           resend.emails.send({
             from: fromEmail,
             to: data.email,
-            replyTo: "contact@hubifyhomesonline.com",
+            replyTo: "contact@hubifyhomes.com",
             subject: `${data.firstName}, your Hubify beta application is in!`,
             html: `
               <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
@@ -17340,7 +17340,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 </div>
                 <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
                 <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
-                  Questions? Simply reply to this email — we're happy to help.
+                  If you have questions please email <a href="mailto:contact@hubifyhomes.com" style="color:#0d9488">contact@hubifyhomes.com</a>
                 </p>
               </div>
             `,
@@ -17433,7 +17433,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   </div>
                   <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
                   <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
-                    Questions? Simply reply to this email — we're happy to help.<br/>
+                    If you have questions please email <a href="mailto:contact@hubifyhomes.com" style="color:#0d9488">contact@hubifyhomes.com</a><br/>
                     You received this because you submitted a demo request at Hubify Homes.
                   </p>
                 </div>
@@ -17699,7 +17699,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resend.emails.send({
           from: fromEmail,
           to: email,
-          replyTo: "contact@hubifyhomesonline.com",
+          replyTo: "contact@hubifyhomes.com",
           subject: `We received your message — Hubify Homes`,
           html: `
             <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
@@ -17776,7 +17776,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "This link is not associated with an approved beta application." });
       }
       if (prospect.onboardingTokenExpiresAt && new Date(prospect.onboardingTokenExpiresAt) < new Date()) {
-        return res.status(410).json({ message: "This onboarding link has expired. Please reply to your approval email to request a new one." });
+        return res.status(410).json({ message: "This onboarding link has expired. Please email contact@hubifyhomes.com to request a new one." });
       }
       // Return safe subset — never expose internal UUID in this endpoint
       const p = prospect as any;
@@ -17964,7 +17964,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               </div>
               <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px">
               <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
-                You received this because you signed the Hubify Beta Agreement. If you have questions, reply to this email or contact <a href="mailto:support@hubifyhomesonline.com" style="color:#0d9488">support@hubifyhomesonline.com</a>.
+                You received this because you signed the Hubify Beta Agreement. If you have questions please email <a href="mailto:contact@hubifyhomes.com" style="color:#0d9488">contact@hubifyhomes.com</a>.
               </p>
             </div>
           `,
@@ -18392,7 +18392,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const sendResult = await resend.emails.send({
           from: fromEmail,
           to: existing.email,
-          replyTo: "contact@hubifyhomesonline.com",
+          replyTo: "contact@hubifyhomes.com",
           subject: `${recipientName}, you've been approved for Hubify Beta!`,
           html: `
             <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;background:#ffffff">
@@ -18464,13 +18464,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 </a>
               </div>
               <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0 0 4px">
-                This link expires in 7 days. If you need a new link, reply to this email and we'll send one.
+                This link expires in 7 days. If you need a new link, please email <a href="mailto:contact@hubifyhomes.com" style="color:#94a3b8">contact@hubifyhomes.com</a>
               </p>
 
               <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0 20px" />
               <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
-                Questions? Reply to this email — we're happy to help.<br/>
-                Hubify Homes · hello@hubifyhomesonline.com
+                If you have questions please email <a href="mailto:contact@hubifyhomes.com" style="color:#0d9488">contact@hubifyhomes.com</a>
               </p>
             </div>
           `,
@@ -18566,7 +18565,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const resendResult = await resend.emails.send({
           from: fromEmail,
           to: existing.email,
-          replyTo: "contact@hubifyhomesonline.com",
+          replyTo: "contact@hubifyhomes.com",
           subject: `${recipientName}, your Hubify Beta onboarding link is ready`,
           html: `
             <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;background:#ffffff">
@@ -18622,13 +18621,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 </a>
               </div>
               <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0 0 4px">
-                This link expires in 7 days. If you need another one, reply to this email.
+                This link expires in 7 days. If you need another one, please email <a href="mailto:contact@hubifyhomes.com" style="color:#94a3b8">contact@hubifyhomes.com</a>
               </p>
 
               <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0 20px" />
               <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
-                Questions? Reply to this email — we're happy to help.<br/>
-                Hubify Homes · hello@hubifyhomesonline.com
+                If you have questions please email <a href="mailto:contact@hubifyhomes.com" style="color:#0d9488">contact@hubifyhomes.com</a>
               </p>
             </div>
           `,

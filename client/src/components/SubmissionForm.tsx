@@ -332,7 +332,7 @@ function BetaVariantForm({ onSuccess, compact }: { onSuccess?: () => void; compa
           All {betaStatus.totalCap} beta spots have been filled. We'll announce when new spots become available — follow us to stay in the loop.
         </p>
         <a
-          href="mailto:contact@hubifyhomesonline.com"
+          href="mailto:contact@hubifyhomes.com"
           className="inline-block text-sm text-teal-600 underline underline-offset-2"
         >
           Contact us to join the waitlist

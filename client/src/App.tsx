@@ -492,7 +492,7 @@ function AuthWrapper() {
   return (
     <TooltipProvider>
       <Toaster />
-      {isLoading || !isAuthenticated || isSuperAdmin ? (
+      {isLoading || !isAuthenticated || isSuperAdmin || isPublicOrTokenRoute ? (
         <Router />
       ) : hasNoOrg ? (
         <NoOrgPage />
