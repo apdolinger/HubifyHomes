@@ -1,0 +1,49 @@
+New onboarding/payment bug found.
+
+During beta onboarding, after the agreement was signed, Step 2 “Payment Setup” failed with this error:
+
+“Payment setup failed — No pricing configured for this prospect. Please contact support.”
+
+Context:
+
+* Prospect/customer: Andrew Dolinger / [Andrew.dolinger@gmail.com](mailto:Andrew.dolinger@gmail.com) test account
+* Plan shown on screen: Hubify Homes Beta — Starter Portfolio Plan
+* Beta Cohort: Member #1
+* Discount: 100% founding discount
+* Monthly price shown: $0.00/mo
+* Total due today: $0.00
+* Error appears when clicking “Continue to Secure Payment”
+
+Expected behavior:
+A beta prospect with assigned plan, cohort, discount, and price should be able to continue onboarding. If the price is $0.00 because of a 100% discount, the app should either:
+
+1. Skip Stripe/payment collection and move directly to initialization, OR
+2. Create the correct $0 checkout/subscription flow if Stripe supports the intended setup.
+
+Please investigate:
+
+1. Where pricing is configured for a beta prospect.
+2. Why this prospect displays pricing details on the page but the backend says “No pricing configured.”
+3. Whether beta cohort #1 with 100% discount creates a valid pricing configuration.
+4. Whether 100% discount / $0.00 monthly price is supposed to bypass Stripe.
+5. Whether setup fees are also waived for 100% founding discount users.
+6. Whether the onboarding flow requires a Stripe price ID even when monthly price is $0.
+7. Whether approval/resend onboarding is failing to save pricing fields onto the prospect/customer record.
+
+Please check:
+
+* beta application approval logic
+* pricing tier assignment
+* beta discount assignment
+* onboarding token/prospect lookup
+* payment setup endpoint
+* Stripe checkout/session creation
+* database fields for plan, tier, priceId, discountPercent, setupFee, monthlyPrice, and cohort
+
+Acceptance criteria:
+
+* This test account can complete payment setup without error.
+* If total due today is $0.00 and monthly price is $0.00, onboarding should not block on missing Stripe pricing.
+* The UI should not show a valid plan/price while the backend has no pricing configured.
+* Any missing pricing configuration should be caught during approval, not during customer onboarding.
+* Error messaging should be clearer if pricing data is incomplete.
