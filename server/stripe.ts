@@ -637,7 +637,7 @@ async function sendPaymentFailureNotification(invoiceId: string, errorMessage: s
     </div>
     <div class="footer">
       <p>${org.name}<br/>
-      This is an automated notification. Please do not reply to this email.</p>
+      If you have questions, please email <a href="mailto:contact@hubifyhomes.com">contact@hubifyhomes.com</a></p>
     </div>
   </div>
 </body>
@@ -763,7 +763,7 @@ async function sendPaymentSuccessNotification(invoiceId: string, amountCents: nu
     
     <div class="footer">
       <p>${org.name}<br/>
-      This is an automated notification. Please do not reply to this email.</p>
+      If you have questions, please email <a href="mailto:contact@hubifyhomes.com">contact@hubifyhomes.com</a></p>
     </div>
   </div>
 </body>

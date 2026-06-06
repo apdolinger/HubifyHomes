@@ -1536,7 +1536,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 </p>
 
                 <p style="font-size:13px;color:#94a3b8;margin:0;">
-                  Questions? Reply to this email or reach out to ${inviterName} directly.
+                  If you have questions, please email <a href="mailto:contact@hubifyhomes.com" style="color:#94a3b8">contact@hubifyhomes.com</a>
                 </p>
 
                 <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;" />
@@ -4911,7 +4911,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
           <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
-            Questions? Reply to this email and we'll get back to you.<br/>
+            If you have questions, please email <a href="mailto:contact@hubifyhomes.com" style="color:#94a3b8">contact@hubifyhomes.com</a><br/>
             Hubify Homes · Property Management Platform
           </p>
         </div>
@@ -17151,7 +17151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 </p>
 
                 <p style="font-size:13px;color:#94a3b8;margin:0;">
-                  Questions? Reply to this email and someone from the Hubify team will get back to you.
+                  If you have questions, please email <a href="mailto:contact@hubifyhomes.com" style="color:#94a3b8">contact@hubifyhomes.com</a>
                 </p>
 
                 <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;" />
@@ -19015,7 +19015,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               </div>
               <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
               <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
-                Questions? Simply reply — we're happy to walk you through anything.<br/>
+                If you have questions, please email <a href="mailto:contact@hubifyhomes.com" style="color:#94a3b8">contact@hubifyhomes.com</a><br/>
                 You received this because you requested a demo at Hubify Homes.
               </p>
             </div>
@@ -19320,7 +19320,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 </div>
                 <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
                 <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
-                  Questions? Reply to this email — we're happy to help.<br/>
+                  If you have questions, please email <a href="mailto:contact@hubifyhomes.com" style="color:#94a3b8">contact@hubifyhomes.com</a><br/>
                   Trial ends ${trialEndFormatted}. No charges until you upgrade.
                 </p>
               </div>

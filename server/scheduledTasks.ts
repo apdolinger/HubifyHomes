@@ -1639,7 +1639,7 @@ export function buildTrialWelcomeEmail(prospect: { name: string; email: string; 
         </div>
         <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
         <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
-          Questions? Simply reply to this email — we're happy to help.<br/>
+          If you have questions, please email <a href="mailto:contact@hubifyhomes.com" style="color:#94a3b8">contact@hubifyhomes.com</a><br/>
           You received this because you submitted an inquiry at Hubify Homes.
         </p>
       </div>
@@ -1669,7 +1669,7 @@ function buildTrialExpiringEmail(prospect: { name: string; email: string; compan
           </ul>
         </div>
         <p style="font-size:14px;color:#475569;line-height:1.7;margin:0 0 24px">
-          We want to make sure your transition to Hubify is as smooth as possible. If there's anything we can help with before your demo expires, don't hesitate to reply to this email.
+          We want to make sure your transition to Hubify is as smooth as possible. If there's anything we can help with before your demo expires, don't hesitate to email us at <a href="mailto:contact@hubifyhomes.com" style="color:#0d9488">contact@hubifyhomes.com</a>.
         </p>
         <div style="text-align:center;margin-bottom:32px">
           <a href="https://hubifyhomes.com" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
@@ -1679,7 +1679,7 @@ function buildTrialExpiringEmail(prospect: { name: string; email: string; compan
         <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
         <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
           You received this because you started a demo at Hubify Homes.<br/>
-          Questions? Reply to this email and our team will get back to you.
+          If you have questions, please email <a href="mailto:contact@hubifyhomes.com" style="color:#94a3b8">contact@hubifyhomes.com</a>
         </p>
       </div>
     `,
@@ -1703,12 +1703,12 @@ function buildTrialExpiredEmail(prospect: { name: string; email: string; company
           <p style="font-size:14px;font-weight:700;color:#0f172a;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.05em">Next steps</p>
           <ol style="padding-left:18px;margin:0;color:#0f172a;font-size:14px;line-height:1.9">
             <li>A member of our team will reach out to guide you through the full onboarding process.</li>
-            <li>If you have any outstanding setup questions, reply to this email and we'll help you get sorted.</li>
+            <li>If you have any outstanding setup questions, email us at <a href="mailto:contact@hubifyhomes.com" style="color:#0d9488">contact@hubifyhomes.com</a> and we'll help you get sorted.</li>
             <li>We're excited to support ${prospect.company ? escapeHtml(prospect.company) : 'your organization'} as you move forward with Hubify.</li>
           </ol>
         </div>
         <p style="font-size:14px;color:#475569;line-height:1.7;margin:0 0 24px">
-          If your billing or setup is still in progress, don't worry — our team is here to help you complete the process. Simply reply to this email or reach out directly.
+          If your billing or setup is still in progress, don't worry — our team is here to help. Please email us at <a href="mailto:contact@hubifyhomes.com" style="color:#0d9488">contact@hubifyhomes.com</a> and we'll get you sorted.
         </p>
         <div style="text-align:center;margin-bottom:32px">
           <a href="https://hubifyhomes.com" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
@@ -1718,7 +1718,7 @@ function buildTrialExpiredEmail(prospect: { name: string; email: string; company
         <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
         <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
           You received this because you started a demo at Hubify Homes.<br/>
-          Questions? Reply to this email and our team will get back to you.
+          If you have questions, please email <a href="mailto:contact@hubifyhomes.com" style="color:#94a3b8">contact@hubifyhomes.com</a>
         </p>
       </div>
     `,
