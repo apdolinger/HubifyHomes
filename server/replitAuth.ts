@@ -268,6 +268,26 @@ export async function setupAuth(app: Express) {
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const staffUser = (req.session as any)?.staffUser;
+
+  // Also allow through if a valid super-admin session is present
+  const superAdmin = (req.session as any)?.superAdmin;
+  if (superAdmin?.authenticated) {
+    // Populate req.user with a synthetic super-admin identity so downstream
+    // middleware (requireMFA, etc.) can inspect role without crashing.
+    if (!(req as any).user) {
+      (req as any).user = {
+        id: "super_admin",
+        claims: {
+          sub: "super_admin",
+          role: "super_admin",
+          email: superAdmin.username ?? "",
+        },
+        expires_at: Infinity,
+      };
+    }
+    return next();
+  }
+
   if (!staffUser?.id) {
     return res.status(401).json({ message: "Unauthorized" });
   }

@@ -337,6 +337,13 @@ export function auditMiddleware(req: Request, res: any, next: any) {
 
 // Middleware for MFA enforcement on admin routes
 export async function requireMFA(req: Request, res: any, next: any) {
+  // Super-admin sessions authenticate via a separate mechanism (email + password);
+  // they are not stored in userMfaSettings and don't need this check.
+  const superAdmin = (req.session as any)?.superAdmin;
+  if (superAdmin?.authenticated) {
+    return next();
+  }
+
   const hasValidMFA = await MFAEnforcement.requireMFAForAdmin(req);
   
   if (!hasValidMFA) {
