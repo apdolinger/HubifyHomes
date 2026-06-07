@@ -11871,9 +11871,9 @@ export default function SuperAdmin() {
         {/* ── ORGANIZATIONS ── */}
         <TabsContent value="organizations">
           <Tabs value={orgsInnerTab} onValueChange={setOrgsInnerTab} className="space-y-4">
-            <TabsList className="flex flex-wrap gap-1 h-auto bg-muted/60 p-1">
-              <TabsTrigger value="orgs">Organizations</TabsTrigger>
-              <TabsTrigger value="users">All Users</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 h-auto bg-muted/60 p-1">
+              <TabsTrigger value="orgs" className="text-xs py-2">Organizations</TabsTrigger>
+              <TabsTrigger value="users" className="text-xs py-2">All Users</TabsTrigger>
             </TabsList>
             <TabsContent value="orgs">
               <OrganizationsTab openOrgId={pendingOpenOrgId} onOrgOpened={() => setPendingOpenOrgId(null)} />
