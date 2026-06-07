@@ -168,6 +168,79 @@ export async function provisionBetaOrg(
       } satisfies ProvisionResult;
     }
 
+    // ── 2b. Email/slug idempotency — handles accounts provisioned before the
+    //        slug picker existed where org_id was never written back to the
+    //        prospect row. If a user with this email already exists, link the
+    //        prospect to that existing org and return the login URL.
+    // ─────────────────────────────────────────────────────────────────────────
+    const prospectEmail = prospect.email as string | null;
+    const prospectSlug  = prospect.workspace_slug as string | null;
+
+    // 2b-i. Slug collision: find an org that owns the chosen slug
+    if (prospectSlug) {
+      const slugOrgRes = await tx.execute(
+        sql`SELECT id FROM orgs WHERE slug = ${prospectSlug} LIMIT 1`
+      );
+      const slugOrg = (slugOrgRes as any).rows?.[0] as { id: string } | undefined;
+      if (slugOrg) {
+        // Check whether the prospect's email is already a member of that org
+        const memberRes = prospectEmail
+          ? await tx.execute(
+              sql`SELECT id FROM users
+                  WHERE org_id = ${slugOrg.id}
+                    AND lower(email) = lower(${prospectEmail})
+                  LIMIT 1`
+            )
+          : { rows: [] };
+        const member = (memberRes as any).rows?.[0] as { id: string } | undefined;
+        if (member) {
+          // Prospect owns this org — link and mark converted
+          await tx.execute(
+            sql`UPDATE onboarding_prospects
+                SET org_id = ${slugOrg.id}, stage = 'converted',
+                    provisioned_at = NOW(), provisioning_failed = false
+                WHERE id = ${prospectId}`
+          );
+          log(`[betaProvisioning] Linked prospect ${prospectId} to existing org ${slugOrg.id} via slug match`);
+          return {
+            orgId: slugOrg.id,
+            userId: member.id,
+            setupToken: "",
+            setupUrl: `${baseUrl}/staff/login`,
+          } satisfies ProvisionResult;
+        }
+        // Slug is taken by a different org — allow provisioning to continue
+        // without a slug so the INSERT doesn't fail on a unique constraint.
+        (prospect as any).workspace_slug = null;
+      }
+    }
+
+    // 2b-ii. Email collision: find any existing user with this email
+    if (prospectEmail) {
+      const emailUserRes = await tx.execute(
+        sql`SELECT id, org_id FROM users
+            WHERE lower(email) = lower(${prospectEmail})
+            LIMIT 1`
+      );
+      const emailUser = (emailUserRes as any).rows?.[0] as { id: string; org_id: string } | undefined;
+      if (emailUser?.org_id) {
+        // A user with this email already exists — link and mark converted
+        await tx.execute(
+          sql`UPDATE onboarding_prospects
+              SET org_id = ${emailUser.org_id}, stage = 'converted',
+                  provisioned_at = NOW(), provisioning_failed = false
+              WHERE id = ${prospectId}`
+        );
+        log(`[betaProvisioning] Linked prospect ${prospectId} to existing org ${emailUser.org_id} via email match`);
+        return {
+          orgId: emailUser.org_id,
+          userId: emailUser.id,
+          setupToken: "",
+          setupUrl: `${baseUrl}/staff/login`,
+        } satisfies ProvisionResult;
+      }
+    }
+
     // ── 3. Derive metadata from prospect ─────────────────────────────────────
     const orgName =
       (prospect.agreement_organization_name as string) ||
