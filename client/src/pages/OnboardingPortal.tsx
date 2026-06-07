@@ -53,6 +53,7 @@ interface OnboardingDetails {
   publicSetupUrl?: string | null;
   provisioningFailed?: boolean;
   workspaceSlug?: string | null;
+  accountPasswordSet?: boolean;
 }
 
 // ── Form schema ───────────────────────────────────────────────────────────────
@@ -77,9 +78,10 @@ type AgreementForm = z.infer<typeof agreementSchema>;
 const STEPS = [
   { n: 1, label: "Agreement" },
   { n: 2, label: "Workspace" },
-  { n: 3, label: "Payment" },
-  { n: 4, label: "Setup" },
-  { n: 5, label: "Welcome" },
+  { n: 3, label: "Account" },
+  { n: 4, label: "Payment" },
+  { n: 5, label: "Setup" },
+  { n: 6, label: "Welcome" },
 ];
 
 function StepIndicator({ current }: { current: number }) {
@@ -1391,28 +1393,31 @@ function SlugPicker({
   );
 }
 
-function WorkspaceReady({ setupUrl, email, slug }: { setupUrl: string; email?: string; slug?: string | null }) {
+function WorkspaceReady({ setupUrl, email, slug, accountPasswordSet }: { setupUrl: string; email?: string; slug?: string | null; accountPasswordSet?: boolean }) {
   const workspaceUrl = slug
     ? `https://${slug}.hubifyhomesonline.com`
     : `${window.location.origin}/staff/login`;
 
-  // Detect whether this is a new account setup or an existing account login
-  const isExistingAccount = !setupUrl || setupUrl.includes("/staff/login");
+  // Three cases:
+  // 1. Password set in-wizard → setupUrl is /staff/login, accountPasswordSet=true
+  // 2. Existing account (e.g. duplicate email) → setupUrl is /staff/login, accountPasswordSet=false
+  // 3. New account via email → setupUrl is /setup-account/:token
+  const isDirectLogin = setupUrl.includes("/staff/login");
+
+  const heading = isDirectLogin ? "Your Workspace Is Ready!" : "One Last Step";
+  const subtitle = isDirectLogin && accountPasswordSet
+    ? "Your account and organization are fully set up. Log in with the email and password you just created."
+    : isDirectLogin
+    ? "Your Hubify organization is set up. Log in with your email and password."
+    : `Your Hubify organization is set up. Click below to set your password and start using Hubify.${email ? ` We've also sent a link to ${email}.` : ""}`;
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center">
       <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center mx-auto mb-4">
         <CheckCircle className="w-9 h-9 text-teal-600" />
       </div>
-      <h2 className="text-2xl font-bold text-slate-900 mb-2">Your Workspace Is Ready!</h2>
-      <p className="text-slate-600 text-sm leading-relaxed mb-4">
-        {isExistingAccount
-          ? <>Your Hubify organization is set up and ready. Use your existing password to log in.</>
-          : <>Your Hubify organization has been set up. Click the button below to set your password and start using Hubify.
-              {email && <> A confirmation email has been sent to <strong>{email}</strong>.</>}
-            </>
-        }
-      </p>
+      <h2 className="text-2xl font-bold text-slate-900 mb-2">{heading}</h2>
+      <p className="text-slate-600 text-sm leading-relaxed mb-4">{subtitle}</p>
       {slug && (
         <div className="flex items-center justify-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 mb-5 text-sm text-slate-600">
           <Globe className="w-3.5 h-3.5 text-teal-600 shrink-0" />
@@ -1428,29 +1433,164 @@ function WorkspaceReady({ setupUrl, email, slug }: { setupUrl: string; email?: s
         </div>
       )}
       <a
-        href={isExistingAccount ? `${window.location.origin}/staff/login` : setupUrl}
+        href={isDirectLogin ? `${window.location.origin}/staff/login` : setupUrl}
         className="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm px-7 py-3 rounded-lg transition-colors mb-6"
       >
-        {isExistingAccount ? "Go to Your Workspace" : "Enter Your Workspace"} <ArrowRight className="w-4 h-4" />
+        {isDirectLogin ? "Go to Your Workspace" : "Set Your Password"} <ArrowRight className="w-4 h-4" />
       </a>
       <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-4 text-left">
         <p className="text-slate-700 text-sm font-semibold mb-2">What's next</p>
         <ol className="text-slate-600 text-sm space-y-1 list-decimal list-inside">
-          {isExistingAccount ? (
-            <>
-              <li>Log in with your existing email and password</li>
-              <li>Complete your company profile in Settings</li>
-              <li>Add your first property and invite your team</li>
-            </>
-          ) : (
-            <>
-              <li>Set your password using the button above</li>
-              <li>Complete your company profile in Settings</li>
-              <li>Add your first property and invite your team</li>
-            </>
-          )}
+          <li>{isDirectLogin ? "Log in with your email and password" : "Set your password using the button above"}</li>
+          <li>Complete your company profile in Settings</li>
+          <li>Add your first property and invite your team</li>
         </ol>
       </div>
+    </div>
+  );
+}
+
+// ── Account setup step (collect name + password before payment) ───────────────
+
+const accountSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  confirmPassword: z.string().min(1, "Please confirm your password"),
+}).refine(d => d.password === d.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+type AccountForm = z.infer<typeof accountSchema>;
+
+function AccountSetupStep({
+  data,
+  token,
+  onAccountSet,
+}: {
+  data: OnboardingDetails;
+  token: string;
+  onAccountSet: () => void;
+}) {
+  const { toast } = useToast();
+  const form = useForm<AccountForm>({
+    resolver: zodResolver(accountSchema),
+    defaultValues: {
+      firstName: data.firstName || "",
+      lastName: data.lastName || "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
+
+  const mutation = useMutation({
+    mutationFn: async (values: AccountForm) => {
+      const res = await fetch(`/api/public/onboarding/${token}/save-account`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName: values.firstName,
+          lastName: values.lastName,
+          password: values.password,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message ?? "Failed to save account details.");
+      }
+      return res.json();
+    },
+    onSuccess: () => { onAccountSet(); },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
+          <Lock className="w-5 h-5 text-teal-600" />
+        </div>
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Create Your Login</h2>
+          <p className="text-slate-500 text-sm">You'll use these to access your workspace.</p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 mb-5 text-sm text-slate-600">
+        <ShieldCheck className="w-4 h-4 text-teal-500 shrink-0" />
+        <span>Signing in as <strong>{data.email}</strong></span>
+      </div>
+
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(v => mutation.mutate(v))} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <FormField
+              control={form.control}
+              name="firstName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-slate-700 text-sm font-medium">First name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Jane" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="lastName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-slate-700 text-sm font-medium">Last name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Smith" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-slate-700 text-sm font-medium">Password</FormLabel>
+                <FormControl>
+                  <Input type="password" placeholder="Min. 8 characters" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="confirmPassword"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-slate-700 text-sm font-medium">Confirm password</FormLabel>
+                <FormControl>
+                  <Input type="password" placeholder="Re-enter your password" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <Button
+            type="submit"
+            className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold"
+            disabled={mutation.isPending}
+          >
+            {mutation.isPending
+              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving…</>
+              : <>Continue to Payment <ArrowRight className="w-4 h-4 ml-2" /></>
+            }
+          </Button>
+        </form>
+      </Form>
     </div>
   );
 }
@@ -1598,6 +1738,7 @@ export default function OnboardingPortal() {
   const [signerNameLocal, setSignerNameLocal] = useState("");
   const [workspaceSetupUrl, setWorkspaceSetupUrl] = useState<string | null>(null);
   const [localSlugConfirmed, setLocalSlugConfirmed] = useState(false);
+  const [localAccountSet, setLocalAccountSet] = useState(false);
 
   const { data, isLoading, error } = useQuery<OnboardingDetails, { status: number; message: string }>({
     queryKey: ["/api/public/onboarding", token],
@@ -1641,12 +1782,13 @@ export default function OnboardingPortal() {
 
   const agreementSigned = data.alreadySigned || localSigned;
   const slugConfirmed = localSlugConfirmed || !!data.workspaceSlug || data.paymentStatus === "paid" || data.stage === "platform_initializing" || data.stage === "converted";
+  const accountSet = localAccountSet || !!data.accountPasswordSet || data.paymentStatus === "paid" || data.stage === "platform_initializing" || data.stage === "converted";
   const paymentPaid = data.paymentStatus === "paid" || data.stage === "platform_initializing" || data.stage === "converted";
   const workspaceReady = data.stage === "converted" || !!workspaceSetupUrl;
   const activeSetupUrl = workspaceSetupUrl ?? data.publicSetupUrl ?? null;
   const activeSlug = data.workspaceSlug ?? null;
 
-  const currentStep = workspaceReady ? 5 : paymentPaid ? 4 : slugConfirmed ? 3 : agreementSigned ? 2 : 1;
+  const currentStep = workspaceReady ? 6 : paymentPaid ? 5 : accountSet ? 4 : slugConfirmed ? 3 : agreementSigned ? 2 : 1;
 
   // Derive a default slug from company name for pre-filling the picker
   const defaultSlug = (data.company || data.name || "")
@@ -1662,7 +1804,7 @@ export default function OnboardingPortal() {
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-8">
             <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="h-16 w-auto mx-auto mb-6" />
-            <StepIndicator current={4} />
+            <StepIndicator current={5} />
             <h1 className="text-2xl font-bold text-slate-900 mb-1">Setting Up Your Workspace</h1>
             <p className="text-slate-500 text-sm">Payment received. Hang tight while we get everything ready.</p>
           </div>
@@ -1694,7 +1836,13 @@ export default function OnboardingPortal() {
               <p className="text-slate-500 text-sm">Pick the identifier for your Hubify workspace before completing payment.</p>
             </>
           )}
-          {slugConfirmed && !paymentPaid && (
+          {slugConfirmed && !accountSet && (
+            <>
+              <h1 className="text-2xl font-bold text-slate-900 mb-1">Create Your Login</h1>
+              <p className="text-slate-500 text-sm">Set your name and password — you'll use these to access your workspace.</p>
+            </>
+          )}
+          {accountSet && !paymentPaid && (
             <>
               <h1 className="text-2xl font-bold text-slate-900 mb-1">Complete Your Payment</h1>
               <p className="text-slate-500 text-sm">Your agreement is signed. Complete payment to activate your platform.</p>
@@ -1744,13 +1892,25 @@ export default function OnboardingPortal() {
           </>
         )}
 
-        {slugConfirmed && !paymentPaid && (
+        {slugConfirmed && !accountSet && (
           <>
             <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 mb-4 text-sm text-teal-700">
               <CheckCircle className="w-4 h-4 shrink-0" />
-              <span>
-                Steps 1 &amp; 2 complete — agreement signed and workspace name chosen.
-              </span>
+              <span>Steps 1 &amp; 2 complete — agreement signed and workspace name chosen.</span>
+            </div>
+            <AccountSetupStep
+              data={data}
+              token={token!}
+              onAccountSet={() => setLocalAccountSet(true)}
+            />
+          </>
+        )}
+
+        {accountSet && !paymentPaid && (
+          <>
+            <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 mb-4 text-sm text-teal-700">
+              <CheckCircle className="w-4 h-4 shrink-0" />
+              <span>Steps 1–3 complete — agreement signed, workspace named, and login created.</span>
             </div>
             <PaymentStep data={data} token={token!} />
           </>
@@ -1759,7 +1919,7 @@ export default function OnboardingPortal() {
         {paymentPaid && !workspaceReady && <SettingUp />}
 
         {workspaceReady && activeSetupUrl && (
-          <WorkspaceReady setupUrl={activeSetupUrl} email={data.email} slug={activeSlug} />
+          <WorkspaceReady setupUrl={activeSetupUrl} email={data.email} slug={activeSlug} accountPasswordSet={data.accountPasswordSet} />
         )}
 
         {workspaceReady && !activeSetupUrl && (
@@ -1769,9 +1929,14 @@ export default function OnboardingPortal() {
             </div>
             <h2 className="text-xl font-bold text-slate-900 mb-2">Workspace Ready</h2>
             <p className="text-slate-600 text-sm mb-6">
-              Check your email for the setup link, or{" "}
-              <a href="/staff/login" className="text-teal-600 hover:underline">sign in directly</a> if you've already set your password.
+              {data.accountPasswordSet
+                ? <>Your account is all set. <a href="/staff/login" className="text-teal-600 hover:underline font-medium">Log in</a> with the email and password you created.</>
+                : <>Check your email for the setup link, or{" "}<a href="/staff/login" className="text-teal-600 hover:underline">sign in directly</a> if you've already set your password.</>
+              }
             </p>
+            <a href="/staff/login" className="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors">
+              Go to Your Workspace <ArrowRight className="w-4 h-4" />
+            </a>
           </div>
         )}
 

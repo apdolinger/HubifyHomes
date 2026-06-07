@@ -635,6 +635,12 @@ app.use((req, res, next) => {
       } catch (err) {
         console.error('Error ensuring prospect workspace_slug column:', err);
       }
+      try {
+        const { ensureProspectAccountPasswordHashColumn } = await import('./runMigrations.js');
+        await ensureProspectAccountPasswordHashColumn();
+      } catch (err) {
+        console.error('Error ensuring prospect account_password_hash column:', err);
+      }
     } catch (error) {
       console.error('Error loading startup migrations:', error);
     }

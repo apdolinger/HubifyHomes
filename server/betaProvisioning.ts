@@ -297,7 +297,10 @@ export async function provisionBetaOrg(
     // ── 6. Create setup progress ──────────────────────────────────────────────
     await tx.insert(orgSetupProgress).values({ orgId: org.id });
 
-    // ── 7. Create admin user (password set later via setup-account flow) ──────
+    // ── 7. Create admin user ──────────────────────────────────────────────────
+    // If the prospect set their password in the onboarding wizard, use it directly.
+    // Otherwise leave passwordHash null — a setup email will be sent.
+    const storedPasswordHash = (prospect.account_password_hash as string | null) ?? null;
     const userId = crypto.randomUUID();
     await tx.insert(users).values({
       id: userId,
@@ -308,19 +311,33 @@ export async function provisionBetaOrg(
       role: "admin",
       isAdminAccount: true,
       isActive: true,
-      passwordHash: null,
+      passwordHash: storedPasswordHash,
     });
 
-    // ── 8. Generate 7-day account-setup token ─────────────────────────────────
-    const setupToken = crypto.randomBytes(32).toString("hex"); // 64 hex chars
-    const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    // ── 8. Setup token — only needed when password was NOT set in-wizard ──────
+    let setupToken = "";
+    let setupUrl = `${baseUrl}/staff/login`;
 
-    await tx.insert(accountSetupTokens).values({
-      prospectId,
-      userId,
-      token: setupToken,
-      expiresAt: tokenExpiresAt,
-    });
+    if (!storedPasswordHash) {
+      setupToken = crypto.randomBytes(32).toString("hex"); // 64 hex chars
+      const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await tx.insert(accountSetupTokens).values({
+        prospectId,
+        userId,
+        token: setupToken,
+        expiresAt: tokenExpiresAt,
+      });
+      setupUrl = `${baseUrl}/setup-account/${setupToken}`;
+
+      // Capture email data — email is sent after the transaction commits
+      emailPayload = {
+        to: (prospect.email as string) ?? "",
+        firstName,
+        orgName,
+        setupUrl,
+        tokenExpiresAt,
+      };
+    }
 
     // ── 9. Update prospect (inside same transaction) ──────────────────────────
     const now = new Date();
@@ -346,18 +363,7 @@ export async function provisionBetaOrg(
       } as any)
       .where(eq(onboardingProspects.id, prospectId));
 
-    const setupUrl = `${baseUrl}/setup-account/${setupToken}`;
-
-    // Capture email data — email is sent after the transaction commits
-    emailPayload = {
-      to: (prospect.email as string) ?? "",
-      firstName,
-      orgName,
-      setupUrl,
-      tokenExpiresAt,
-    };
-
-    log(`[betaProvisioning] Provisioned org ${org.id} for prospect ${prospectId}`);
+    log(`[betaProvisioning] Provisioned org ${org.id} for prospect ${prospectId}${storedPasswordHash ? " (password set in-wizard)" : " (setup email queued)"}`);
     return {
       orgId: org.id,
       userId,

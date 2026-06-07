@@ -1250,3 +1250,18 @@ export async function ensureProspectWorkspaceSlugColumn(): Promise<void> {
     client.release();
   }
 }
+
+export async function ensureProspectAccountPasswordHashColumn(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE onboarding_prospects
+        ADD COLUMN IF NOT EXISTS account_password_hash TEXT;
+    `);
+    log("[MIGRATE] onboarding_prospects.account_password_hash column verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add account_password_hash column to onboarding_prospects: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}

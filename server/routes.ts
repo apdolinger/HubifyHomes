@@ -17933,20 +17933,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       // Look up any active (unclaimed) account setup token for this prospect
       let publicSetupUrl: string | null = null;
+      const p = prospect as any;
+      const accountPasswordSet = !!(p.account_password_hash || p.accountPasswordHash);
       if (prospect.stage === "converted" && prospect.orgId) {
-        const tokenRows = await db
-          .select()
-          .from(accountSetupTokens)
-          .where(and(eq(accountSetupTokens.prospectId, prospect.id), isNull(accountSetupTokens.claimedAt)))
-          .limit(1);
-        if (tokenRows[0] && new Date(tokenRows[0].expiresAt) > new Date()) {
+        if (accountPasswordSet) {
+          // Password was set in-wizard — direct login, no email link needed
           const baseUrl = `${req.protocol}://${req.get("host")}`;
-          publicSetupUrl = `${baseUrl}/setup-account/${tokenRows[0].token}`;
+          publicSetupUrl = `${baseUrl}/staff/login`;
+        } else {
+          const tokenRows = await db
+            .select()
+            .from(accountSetupTokens)
+            .where(and(eq(accountSetupTokens.prospectId, prospect.id), isNull(accountSetupTokens.claimedAt)))
+            .limit(1);
+          if (tokenRows[0] && new Date(tokenRows[0].expiresAt) > new Date()) {
+            const baseUrl = `${req.protocol}://${req.get("host")}`;
+            publicSetupUrl = `${baseUrl}/setup-account/${tokenRows[0].token}`;
+          }
         }
       }
 
       // Return safe subset — never expose internal UUID in this endpoint
-      const p = prospect as any;
       res.json({
         alreadySigned: p.agreementStatus === "signed",
         agreementSignedAt: prospect.agreementSignedAt,
@@ -17972,6 +17979,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         publicSetupUrl,
         provisioningFailed: p.provisioningFailed ?? false,
         workspaceSlug: prospect.workspaceSlug ?? null,
+        accountPasswordSet,
       });
     } catch (error) {
       console.error("Error fetching onboarding details:", error);
@@ -18382,6 +18390,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err: any) {
       console.error("Error saving workspace slug:", err);
       res.status(500).json({ message: "Failed to save workspace name." });
+    }
+  });
+
+  // POST /api/public/onboarding/:token/save-account
+  // Saves the prospect's first name, last name, and hashed password so provisioning
+  // can activate the account directly — no setup email needed.
+  app.post("/api/public/onboarding/:token/save-account", async (req, res) => {
+    try {
+      const { token } = req.params;
+      if (!token || token.length !== 64 || !/^[0-9a-f]+$/.test(token)) {
+        return res.status(400).json({ message: "Invalid onboarding link." });
+      }
+      const { firstName, lastName, password } = req.body ?? {};
+      if (typeof firstName !== "string" || !firstName.trim()) {
+        return res.status(400).json({ message: "First name is required." });
+      }
+      if (typeof lastName !== "string" || !lastName.trim()) {
+        return res.status(400).json({ message: "Last name is required." });
+      }
+      if (typeof password !== "string" || password.length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters." });
+      }
+
+      const { eq } = await import("drizzle-orm");
+      const rows = await db.select().from(onboardingProspects).where(eq(onboardingProspects.onboardingToken, token)).limit(1);
+      const prospect = rows[0];
+      if (!prospect) return res.status(404).json({ message: "Onboarding link not found." });
+      if (!prospect.isBetaMember || !prospect.betaApprovedAt) {
+        return res.status(403).json({ message: "Application not approved." });
+      }
+      if (prospect.onboardingTokenExpiresAt && new Date(prospect.onboardingTokenExpiresAt) < new Date()) {
+        return res.status(410).json({ message: "This onboarding link has expired." });
+      }
+      if (prospect.stage === "converted") {
+        return res.json({ ok: true });
+      }
+
+      const passwordHash = await bcrypt.hash(password, 12);
+      const { pool: pgPool } = await import("./db");
+      await pgPool.query(
+        `UPDATE onboarding_prospects
+            SET first_name = $1, last_name = $2, account_password_hash = $3
+          WHERE id = $4`,
+        [firstName.trim(), lastName.trim(), passwordHash, prospect.id]
+      );
+
+      res.json({ ok: true });
+    } catch (err: any) {
+      console.error("Error saving account details:", err);
+      res.status(500).json({ message: "Failed to save account details." });
     }
   });
 
