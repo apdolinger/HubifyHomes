@@ -382,7 +382,7 @@ function OnboardingTrackerSection({
   prospects: Prospect[];
   onEdit: (p: Prospect) => void;
   onDrop: (p: Prospect) => void;
-  onGoToOrganizations?: () => void;
+  onGoToOrganizations?: (orgId: string) => void;
 }) {
   const { toast } = useToast();
   const [drawerOpen, setDrawerOpen]       = useState(false);
@@ -831,7 +831,7 @@ function ProspectCard({
   forceLinkingExistingOrg?: boolean;
   onSendDemoEmail?: () => void;
   sendingDemoEmail?: boolean;
-  onGoToOrganizations?: () => void;
+  onGoToOrganizations?: (orgId: string) => void;
 }) {
   const [, setLocation] = useLocation();
   const days = stageDays(prospect);
@@ -1041,7 +1041,7 @@ function ProspectCard({
           {prospect.orgId ? (
             <button
               className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium w-full"
-              onClick={() => onGoToOrganizations?.()}
+              onClick={() => onGoToOrganizations?.(prospect.orgId!)}
               title={`Org ID: ${prospect.orgId}`}
             >
               <CheckCircle className="w-3 h-3 shrink-0" />
@@ -2534,7 +2534,7 @@ function SubmissionsTab({ onMoveToPipeline, defaultSourceFilter, statusFilter, o
   );
 }
 
-function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, initialDemoOnly, onGoToOrganizations }: { prefill?: ProspectFormValues | null; onPrefillConsumed?: () => void; initialBetaOnly?: boolean; initialDemoOnly?: boolean; onGoToOrganizations?: () => void }) {
+function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, initialDemoOnly, onGoToOrganizations }: { prefill?: ProspectFormValues | null; onPrefillConsumed?: () => void; initialBetaOnly?: boolean; initialDemoOnly?: boolean; onGoToOrganizations?: (orgId: string) => void }) {
   const { toast } = useToast();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingProspect, setEditingProspect] = useState<Prospect | null>(null);
@@ -10638,7 +10638,7 @@ function OrgDetailSheet({ org, open, onClose }: { org: OrgOverviewRow | null; op
   );
 }
 
-function OrganizationsTab() {
+function OrganizationsTab({ openOrgId, onOrgOpened }: { openOrgId?: string | null; onOrgOpened?: () => void }) {
   const { toast } = useToast();
   const { data: orgs = [], isLoading } = useQuery<OrgOverviewRow[]>({
     queryKey: ["/api/super-admin/orgs-overview"],
@@ -10646,6 +10646,16 @@ function OrganizationsTab() {
 
   const [detailOrg, setDetailOrg] = useState<OrgOverviewRow | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+
+  useEffect(() => {
+    if (!openOrgId || !orgs.length) return;
+    const match = orgs.find(o => o.id === openOrgId);
+    if (match) {
+      setDetailOrg(match);
+      setDetailOpen(true);
+      onOrgOpened?.();
+    }
+  }, [openOrgId, orgs]);
 
   // Inline slug editing state: orgId -> draft value (null = not editing)
   const [slugDraft, setSlugDraft] = useState<Record<string, string>>({});
@@ -11200,6 +11210,7 @@ export default function SuperAdmin() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("onboarding");
+  const [pendingOpenOrgId, setPendingOpenOrgId] = useState<string | null>(null);
   const [isSuperAdminAuthenticated, setIsSuperAdminAuthenticated] = useState<boolean | null>(null);
   const [superAdminUsername, setSuperAdminUsername] = useState<string>("");
   const [pipelinePrefill, setPipelinePrefill] = useState<ProspectFormValues | null>(null);
@@ -11388,13 +11399,13 @@ export default function SuperAdmin() {
               <OnboardingPipelineTab
                 prefill={pipelinePrefill}
                 onPrefillConsumed={() => setPipelinePrefill(null)}
-                onGoToOrganizations={() => { setActiveTab("organizations"); setOrgsInnerTab("orgs"); }}
+                onGoToOrganizations={(orgId) => { setActiveTab("organizations"); setOrgsInnerTab("orgs"); setPendingOpenOrgId(orgId); }}
               />
             </TabsContent>
             <TabsContent value="beta">
               <OnboardingPipelineTab
                 initialBetaOnly={true}
-                onGoToOrganizations={() => { setActiveTab("organizations"); setOrgsInnerTab("orgs"); }}
+                onGoToOrganizations={(orgId) => { setActiveTab("organizations"); setOrgsInnerTab("orgs"); setPendingOpenOrgId(orgId); }}
               />
               <div className="mt-6">
                 <BetaProgramTab />
@@ -11403,7 +11414,7 @@ export default function SuperAdmin() {
             <TabsContent value="demo-requests">
               <OnboardingPipelineTab
                 initialDemoOnly={true}
-                onGoToOrganizations={() => { setActiveTab("organizations"); setOrgsInnerTab("orgs"); }}
+                onGoToOrganizations={(orgId) => { setActiveTab("organizations"); setOrgsInnerTab("orgs"); setPendingOpenOrgId(orgId); }}
               />
               <div className="mt-6">
                 <DemoRequestsTab />
@@ -11423,7 +11434,7 @@ export default function SuperAdmin() {
               <TabsTrigger value="users">All Users</TabsTrigger>
             </TabsList>
             <TabsContent value="orgs">
-              <OrganizationsTab />
+              <OrganizationsTab openOrgId={pendingOpenOrgId} onOrgOpened={() => setPendingOpenOrgId(null)} />
             </TabsContent>
             <TabsContent value="users">
               <AllUsersTab />
