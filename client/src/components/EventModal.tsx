@@ -688,6 +688,7 @@ export function EventModal({
     },
     onSuccess: (newProperty) => {
       queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       toast({
         title: "Property added",
         description: `"${newProperty.name}" has been added successfully.`,

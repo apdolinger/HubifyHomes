@@ -1175,6 +1175,7 @@ export default function PersonProfile() {
     },
     onSuccess: (newProperty) => {
       queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       toast({
         title: "Property Created",
         description: `Property "${newProperty.name}" has been created successfully.`,
