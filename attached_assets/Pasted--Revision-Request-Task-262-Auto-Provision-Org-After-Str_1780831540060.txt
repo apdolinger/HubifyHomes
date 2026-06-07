@@ -1,0 +1,145 @@
+# Revision Request – Task #262 Auto-Provision Org After Stripe Payment
+
+The overall direction is correct and should be implemented. However, add the following requirements before development begins.
+
+## 1. Idempotency Requirement (Critical)
+
+Stripe webhooks can retry multiple times. The provisioning process must be safe to execute repeatedly without creating duplicate records.
+
+Update `provisionBetaOrg()` so that:
+
+* If `prospect.orgId` already exists, immediately return the existing organization and latest valid setup token.
+* If an organization has already been created for this prospect, do not create another.
+* If the admin user already exists for the prospect email, reuse the existing user.
+* If an unused account setup token already exists for that user, return it instead of generating a duplicate.
+* Creating duplicate organizations, subscriptions, users, or setup tokens must be prevented.
+
+The function should be safely callable from:
+
+* Stripe webhooks
+* Free-tier provisioning
+* Super Admin "Convert to Org"
+* Any future retry/recovery jobs
+
+## 2. Setup Link Recovery
+
+Update the "Workspace Ready" experience:
+
+Primary button:
+
+* "Enter Your Workspace"
+
+Behavior:
+
+* If a valid unused setup token exists, direct the user to `/setup-account/:token`.
+* If no valid setup token exists, show a clear message:
+
+  * "Check your email for your secure setup link."
+* Future-ready the API for a resend setup link action.
+
+## 3. Stripe Webhook Reliability
+
+The webhook should:
+
+1. Mark payment as paid.
+2. Provision the organization.
+3. Send the setup email.
+4. Update prospect stage.
+
+If email delivery fails:
+
+* Provisioning should remain successful.
+* Prospect should still be marked converted.
+* Error should be logged.
+* Admin notification should be sent.
+* Customer should still be able to access setup through the onboarding portal.
+
+Email failures must not roll back provisioning.
+
+## 4. Prevent Partial Provisioning
+
+Use a database transaction for all provisioning operations.
+
+The following should succeed or fail together:
+
+* Organization creation
+* Subscription creation
+* User creation
+* Setup token creation
+* Prospect update
+
+If any step fails:
+
+* Roll back the transaction.
+* Set prospect stage to `provisioning_failed`.
+* Log the error.
+* Notify `ADMIN_EMAIL`.
+
+This prevents orphaned organizations or users.
+
+## 5. Setup Token Security
+
+For `account_setup_tokens`:
+
+* Token length should be cryptographically secure (minimum 32-byte random value represented as 64 hex characters).
+* Expiration should default to 7 days.
+* Tokens are single-use.
+* Tokens should be invalidated immediately after password creation.
+* Expired tokens should fail verification cleanly.
+
+## 6. Future Authentication Compatibility
+
+When creating the admin user:
+
+* Store `passwordHash = null` until setup is completed.
+* Do not create placeholder passwords.
+* Ensure the setup-account flow works with the existing authentication system without requiring future user migration.
+
+## 7. User Experience Adjustment
+
+Replace the current onboarding messaging:
+
+Current:
+
+* "Platform Initializing"
+* "You'll receive an email when it's ready"
+
+New flow:
+
+While provisioning:
+
+* "Setting up your workspace..."
+* Auto-refresh every 2 seconds
+
+After provisioning:
+
+Title:
+
+* "Your Hubify Homes Workspace Is Ready"
+
+Subtitle:
+
+* "Payment received. Your platform has been created."
+
+Primary Button:
+
+* "Enter Your Workspace"
+
+Secondary Text:
+
+* "We also emailed you a secure access link."
+
+Error State:
+
+* "We encountered an issue while setting up your workspace. Our team has been notified."
+
+## 8. Success Metrics
+
+Task is complete only when:
+
+* Paid Stripe customers are automatically provisioned within seconds.
+* Free-tier customers are automatically provisioned.
+* No Super Admin action is required.
+* Duplicate webhook executions do not create duplicate records.
+* Users can immediately access account setup.
+* Existing manual "Convert to Org" functionality continues to work as a fallback.
