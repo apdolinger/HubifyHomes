@@ -17850,20 +17850,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { eq } = await import("drizzle-orm");
 
       // If a valid onboarding token is provided, check whether the slug belongs
-      // to this prospect's own record so we don't falsely report "taken".
+      // to this prospect's own workspace so we don't falsely report "taken".
+      let prospectEmail: string | null = null;
+      let prospectOrgId: string | null = null;
+      let prospectSavedSlug: string | null = null;
       if (tokenParam && tokenParam.length === 64 && /^[0-9a-f]+$/.test(tokenParam)) {
         const prospectRows = await db
-          .select({ workspaceSlug: onboardingProspects.workspaceSlug, orgId: onboardingProspects.orgId })
+          .select({ workspaceSlug: onboardingProspects.workspaceSlug, orgId: onboardingProspects.orgId, email: onboardingProspects.email })
           .from(onboardingProspects)
           .where(eq(onboardingProspects.onboardingToken, tokenParam))
           .limit(1);
         const prospect = prospectRows[0];
         if (prospect) {
-          // Slug matches what this prospect already saved — it's theirs, allow it.
+          prospectEmail = prospect.email ?? null;
+          prospectOrgId = prospect.orgId ?? null;
+          prospectSavedSlug = prospect.workspaceSlug ?? null;
+          // 1. Slug matches what this prospect already saved — it's theirs.
           if (prospect.workspaceSlug === slug) {
             return res.json({ available: true });
           }
-          // The org that was provisioned for this prospect owns the slug — still theirs.
+          // 2. The org provisioned for this prospect directly owns the slug.
           if (prospect.orgId) {
             const orgRows = await db
               .select({ id: orgs.id })
@@ -17877,6 +17883,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const existing = await db.select({ id: orgs.id }).from(orgs).where(eq(orgs.slug, slug)).limit(1);
       if (existing.length > 0) {
+        // 3. Slug is taken by some org — last-resort check: is the prospect an
+        //    admin/owner of that org? Handles the case where provisioning ran
+        //    before the slug picker existed (orgId on prospect may not link
+        //    back via slug, but the user record ties them to the org).
+        if (prospectEmail) {
+          const memberRows = await db
+            .select({ userId: users.id })
+            .from(users)
+            .where(and(eq(users.orgId, existing[0].id), eq(users.email, prospectEmail)))
+            .limit(1);
+          if (memberRows.length > 0) return res.json({ available: true });
+        }
         return res.json({ available: false, reason: "This workspace name is already taken" });
       }
 
