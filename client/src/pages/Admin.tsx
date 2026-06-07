@@ -257,13 +257,9 @@ function SupplySettingsManager({ orgId }: { orgId: string }) {
 function InvoiceTemplatePreview({ templateId }: { templateId: string }) {
   const sampleData = {
     invoiceNumber: "INV-2024-001",
-    date: "November 5, 2024",
-    dueDate: "December 5, 2024",
-    billTo: {
-      name: "Sample Client",
-      address: "123 Main Street",
-      city: "Miami, FL 33101"
-    },
+    date: "Nov 5, 2024",
+    dueDate: "Dec 5, 2024",
+    billTo: { name: "Sample Client", address: "123 Main Street", city: "Miami, FL 33101" },
     items: [
       { description: "Property Inspection", quantity: 1, rate: 150.00, amount: 150.00 },
       { description: "Maintenance Service", quantity: 2, rate: 75.00, amount: 150.00 },
@@ -274,118 +270,76 @@ function InvoiceTemplatePreview({ templateId }: { templateId: string }) {
     total: 535.00
   };
 
-  const getTemplateStyles = (id: string) => {
-    const styles = {
-      modern: {
-        header: "bg-gradient-to-r from-teal-600 to-purple-600 text-white",
-        accent: "text-teal-600",
-        border: "border-teal-200"
-      },
-      minimal: {
-        header: "bg-gray-50 text-gray-900 border-b-2 border-gray-200",
-        accent: "text-gray-700",
-        border: "border-gray-100"
-      },
-      classic: {
-        header: "bg-slate-800 text-white border-4 border-slate-600",
-        accent: "text-slate-800",
-        border: "border-slate-300"
-      },
-      compact: {
-        header: "bg-emerald-700 text-white",
-        accent: "text-emerald-700",
-        border: "border-emerald-200"
-      },
-      bold: {
-        header: "bg-red-600 text-white",
-        accent: "text-red-600",
-        border: "border-red-300"
-      }
-    };
-    return styles[id as keyof typeof styles] || styles.modern;
+  const styles: Record<string, { header: string; accent: string; border: string }> = {
+    modern:  { header: "bg-gradient-to-r from-teal-600 to-purple-600 text-white", accent: "text-teal-600",   border: "border-teal-200"   },
+    minimal: { header: "bg-gray-50 text-gray-900 border-b-2 border-gray-200",    accent: "text-gray-700",   border: "border-gray-100"   },
+    classic: { header: "bg-slate-800 text-white border-4 border-slate-600",       accent: "text-slate-800",  border: "border-slate-300"  },
+    compact: { header: "bg-emerald-700 text-white",                               accent: "text-emerald-700",border: "border-emerald-200" },
+    bold:    { header: "bg-red-600 text-white",                                   accent: "text-red-600",    border: "border-red-300"    },
   };
-
-  const styles = getTemplateStyles(templateId);
+  const s = styles[templateId] ?? styles.modern;
 
   return (
-    <div className="border-2 border-slate-200 rounded-lg overflow-hidden bg-white shadow-lg scale-90 origin-top">
-      {/* Header */}
-      <div className={`p-6 ${styles.header}`}>
+    <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
+      <div className={`px-5 py-4 ${s.header}`}>
         <div className="flex justify-between items-start">
           <div>
-            <h2 className="text-2xl font-bold mb-1">INVOICE</h2>
-            <p className="text-sm opacity-90">{sampleData.invoiceNumber}</p>
+            <h2 className="text-xl font-bold mb-0.5">INVOICE</h2>
+            <p className="text-xs opacity-80">{sampleData.invoiceNumber}</p>
           </div>
-          <div className="text-right">
-            <p className="font-semibold">Your Company Name</p>
-            <p className="text-sm opacity-90">123 Business Ave</p>
-            <p className="text-sm opacity-90">City, ST 12345</p>
+          <div className="text-right text-xs opacity-90">
+            <p className="font-semibold">Your Company</p>
+            <p>123 Business Ave</p>
+            <p>City, ST 12345</p>
           </div>
         </div>
       </div>
-
-      {/* Body */}
-      <div className="p-6 space-y-6">
-        {/* Dates and Bill To */}
-        <div className="grid grid-cols-2 gap-6">
+      <div className="px-5 py-4 space-y-4">
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <h3 className={`font-semibold mb-2 ${styles.accent}`}>Bill To:</h3>
-            <div className="text-sm">
-              <p className="font-medium">{sampleData.billTo.name}</p>
-              <p className="text-slate-600">{sampleData.billTo.address}</p>
-              <p className="text-slate-600">{sampleData.billTo.city}</p>
-            </div>
+            <p className={`text-xs font-semibold mb-1 ${s.accent}`}>Bill To:</p>
+            <p className="text-xs font-medium">{sampleData.billTo.name}</p>
+            <p className="text-xs text-slate-500">{sampleData.billTo.address}</p>
+            <p className="text-xs text-slate-500">{sampleData.billTo.city}</p>
           </div>
-          <div className="text-right">
-            <div className="mb-3">
-              <span className="text-slate-600 text-sm">Invoice Date: </span>
-              <span className="font-medium text-sm">{sampleData.date}</span>
-            </div>
-            <div>
-              <span className="text-slate-600 text-sm">Due Date: </span>
-              <span className="font-medium text-sm">{sampleData.dueDate}</span>
-            </div>
+          <div className="text-right text-xs text-slate-500 space-y-1">
+            <p><span className="font-medium text-slate-700">Date:</span> {sampleData.date}</p>
+            <p><span className="font-medium text-slate-700">Due:</span> {sampleData.dueDate}</p>
           </div>
         </div>
-
-        {/* Items Table */}
-        <div className={`border ${styles.border} rounded`}>
-          <table className="w-full">
+        <div className={`border ${s.border} rounded overflow-hidden`}>
+          <table className="w-full text-xs">
             <thead className="bg-slate-50">
               <tr>
-                <th className="text-left p-3 text-sm font-semibold text-slate-700">Description</th>
-                <th className="text-right p-3 text-sm font-semibold text-slate-700">Qty</th>
-                <th className="text-right p-3 text-sm font-semibold text-slate-700">Rate</th>
-                <th className="text-right p-3 text-sm font-semibold text-slate-700">Amount</th>
+                <th className="text-left px-3 py-2 font-semibold text-slate-600">Description</th>
+                <th className="text-right px-3 py-2 font-semibold text-slate-600">Qty</th>
+                <th className="text-right px-3 py-2 font-semibold text-slate-600">Rate</th>
+                <th className="text-right px-3 py-2 font-semibold text-slate-600">Amt</th>
               </tr>
             </thead>
             <tbody>
               {sampleData.items.map((item, i) => (
                 <tr key={i} className="border-t border-slate-100">
-                  <td className="p-3 text-sm">{item.description}</td>
-                  <td className="p-3 text-sm text-right">{item.quantity}</td>
-                  <td className="p-3 text-sm text-right">${item.rate.toFixed(2)}</td>
-                  <td className="p-3 text-sm text-right font-medium">${item.amount.toFixed(2)}</td>
+                  <td className="px-3 py-1.5 text-slate-700">{item.description}</td>
+                  <td className="px-3 py-1.5 text-right text-slate-500">{item.quantity}</td>
+                  <td className="px-3 py-1.5 text-right text-slate-500">${item.rate.toFixed(0)}</td>
+                  <td className="px-3 py-1.5 text-right font-medium">${item.amount.toFixed(0)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-
-        {/* Totals */}
         <div className="flex justify-end">
-          <div className="w-64 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-600">Subtotal:</span>
-              <span className="font-medium">${sampleData.subtotal.toFixed(2)}</span>
+          <div className="w-40 space-y-1 text-xs">
+            <div className="flex justify-between text-slate-500">
+              <span>Subtotal</span><span>${sampleData.subtotal.toFixed(0)}</span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-600">Tax (7%):</span>
-              <span className="font-medium">${sampleData.tax.toFixed(2)}</span>
+            <div className="flex justify-between text-slate-500">
+              <span>Tax (7%)</span><span>${sampleData.tax.toFixed(0)}</span>
             </div>
-            <div className={`flex justify-between pt-2 border-t ${styles.border}`}>
-              <span className={`font-bold ${styles.accent}`}>Total:</span>
-              <span className={`font-bold text-lg ${styles.accent}`}>${sampleData.total.toFixed(2)}</span>
+            <div className={`flex justify-between pt-1.5 border-t ${s.border} font-bold`}>
+              <span className={s.accent}>Total</span>
+              <span className={s.accent}>${sampleData.total.toFixed(0)}</span>
             </div>
           </div>
         </div>
@@ -399,39 +353,14 @@ function InvoiceTemplateSelector({ orgId }: { orgId: string }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedTemplate, setSelectedTemplate] = useState<string>("modern");
-  const [previewTemplate, setPreviewTemplate] = useState<string | null>(null);
+  const [hoveredTemplate, setHoveredTemplate] = useState<string | null>(null);
 
   const templates = [
-    {
-      id: "modern",
-      name: "Modern",
-      description: "Clean design with gradient header and side-by-side layout. Professional and contemporary.",
-      icon: "✨",
-    },
-    {
-      id: "minimal",
-      name: "Minimal",
-      description: "Ultra-clean design with minimal colors and maximum white space. Simple and elegant.",
-      icon: "🎨",
-    },
-    {
-      id: "classic",
-      name: "Classic",
-      description: "Traditional invoice layout with borders and structured sections. Timeless and formal.",
-      icon: "📄",
-    },
-    {
-      id: "compact",
-      name: "Compact",
-      description: "Space-efficient layout perfect for detailed invoices. Maximum information density.",
-      icon: "📋",
-    },
-    {
-      id: "bold",
-      name: "Bold",
-      description: "Eye-catching design with strong colors and large typography. Makes a statement.",
-      icon: "💥",
-    },
+    { id: "modern",  name: "Modern",  dot: "bg-teal-500",    description: "Gradient header · contemporary" },
+    { id: "minimal", name: "Minimal", dot: "bg-gray-400",    description: "White space · ultra-clean" },
+    { id: "classic", name: "Classic", dot: "bg-slate-700",   description: "Bordered · timeless" },
+    { id: "compact", name: "Compact", dot: "bg-emerald-600", description: "Dense · information-rich" },
+    { id: "bold",    name: "Bold",    dot: "bg-red-500",     description: "Strong colors · high-impact" },
   ];
 
   const { data: templateSettings, isLoading } = useQuery({
@@ -446,24 +375,14 @@ function InvoiceTemplateSelector({ orgId }: { orgId: string }) {
   }, [templateSettings]);
 
   const updateMutation = useMutation({
-    mutationFn: async (templateId: string) => {
-      return apiRequest("PATCH", `/api/organizations/${orgId}/invoice-template`, {
-        invoiceTemplateId: templateId,
-      });
-    },
+    mutationFn: async (templateId: string) =>
+      apiRequest("PATCH", `/api/organizations/${orgId}/invoice-template`, { invoiceTemplateId: templateId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/organizations/${orgId}/invoice-template`] });
-      toast({
-        title: "Template updated",
-        description: "Invoice template has been updated successfully.",
-      });
+      toast({ title: "Template updated", description: "Invoice template saved." });
     },
     onError: (error: any) => {
-      toast({
-        title: "Failed to update template",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Failed to update template", description: error.message, variant: "destructive" });
     },
   });
 
@@ -472,85 +391,61 @@ function InvoiceTemplateSelector({ orgId }: { orgId: string }) {
     updateMutation.mutate(templateId);
   };
 
+  const previewId = hoveredTemplate || selectedTemplate;
+
   if (isLoading) {
-    return <div className="text-sm text-slate-500">Loading invoice templates...</div>;
+    return <div className="text-sm text-slate-400">Loading templates…</div>;
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       <div>
-        <h4 className="font-medium mb-2">Invoice Template</h4>
-        <p className="text-sm text-slate-600 mb-4">
-          Choose a professional invoice layout for your organization. All future invoices will use this template.
-        </p>
+        <h4 className="font-medium text-sm">Invoice Template</h4>
+        <p className="text-xs text-slate-500 mt-0.5">Choose a layout — hover to preview, click to select.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {templates.map((template) => (
-          <div
-            key={template.id}
-            className={`p-4 border-2 rounded-lg transition-all ${
-              selectedTemplate === template.id
-                ? "border-teal-500 bg-teal-50"
-                : "border-slate-200 hover:border-slate-300"
-            }`}
-            data-testid={`template-${template.id}`}
-          >
-            <div className="flex items-start justify-between mb-2">
-              <span className="text-2xl">{template.icon}</span>
-              {selectedTemplate === template.id && (
-                <CheckCircle className="w-5 h-5 text-teal-500" />
-              )}
-            </div>
-            <h5 className="font-semibold text-slate-900 mb-1">{template.name}</h5>
-            <p className="text-xs text-slate-600 mb-3">{template.description}</p>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setPreviewTemplate(template.id)}
-                className="flex-1"
-                data-testid={`button-preview-${template.id}`}
+      <div className="flex gap-4 items-start">
+        {/* Left: compact option list */}
+        <div className="w-48 shrink-0 space-y-1">
+          {templates.map((t) => {
+            const isSelected = selectedTemplate === t.id;
+            return (
+              <button
+                key={t.id}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-left transition-all ${
+                  isSelected
+                    ? "bg-teal-50 border border-teal-300"
+                    : "border border-transparent hover:bg-slate-50 hover:border-slate-200"
+                }`}
+                onClick={() => handleTemplateSelect(t.id)}
+                onMouseEnter={() => setHoveredTemplate(t.id)}
+                onMouseLeave={() => setHoveredTemplate(null)}
+                disabled={updateMutation.isPending}
+                data-testid={`template-${t.id}`}
               >
-                <Eye className="w-3 h-3 mr-1" />
-                Preview
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => handleTemplateSelect(template.id)}
-                disabled={updateMutation.isPending || selectedTemplate === template.id}
-                className="flex-1"
-                data-testid={`button-select-${template.id}`}
-              >
-                {selectedTemplate === template.id ? "Selected" : "Select"}
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
+                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${t.dot}`} />
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium leading-none ${isSelected ? "text-teal-900" : "text-slate-800"}`}>
+                    {t.name}
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-0.5 truncate">{t.description}</p>
+                </div>
+                {isSelected && <Check className="w-3.5 h-3.5 text-teal-600 shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
 
-      {selectedTemplate && (
-        <div className="mt-4 p-4 bg-teal-50 rounded-lg border border-teal-200">
-          <p className="text-sm text-teal-800">
-            <strong>Selected:</strong> {templates.find(t => t.id === selectedTemplate)?.name} template
+        {/* Right: live preview */}
+        <div className="flex-1 min-w-0">
+          <InvoiceTemplatePreview templateId={previewId} />
+          <p className="text-[10px] text-slate-400 text-center mt-1.5">
+            {hoveredTemplate
+              ? `Previewing ${templates.find(t => t.id === hoveredTemplate)?.name}`
+              : `Active: ${templates.find(t => t.id === selectedTemplate)?.name}`}
           </p>
         </div>
-      )}
-
-      {/* Preview Dialog */}
-      <Dialog open={!!previewTemplate} onOpenChange={() => setPreviewTemplate(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {templates.find(t => t.id === previewTemplate)?.name} Template Preview
-            </DialogTitle>
-            <DialogDescription>
-              Preview of how your invoices will look with this template
-            </DialogDescription>
-          </DialogHeader>
-          <InvoiceTemplatePreview templateId={previewTemplate || 'modern'} />
-        </DialogContent>
-      </Dialog>
+      </div>
     </div>
   );
 }
