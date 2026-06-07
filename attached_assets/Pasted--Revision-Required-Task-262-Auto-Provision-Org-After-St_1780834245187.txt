@@ -1,0 +1,72 @@
+# Revision Required – Task #262 Auto-Provision Org After Stripe Payment
+
+The current implementation proposal changes the beta approval workflow, which is not acceptable. The beta approval process must remain exactly as it exists today.
+
+## Correct Workflow
+
+The workflow must remain:
+
+1. Prospect submits Beta Application.
+2. Prospect enters the Beta Pipeline.
+3. Hubify reviews the application.
+4. Prospect is manually approved by Hubify.
+5. Prospect receives the Approval Email.
+6. Prospect clicks the approval link.
+7. Prospect completes the Beta Agreement.
+8. Prospect completes Stripe Checkout (or free-tier equivalent).
+9. Platform provisioning occurs automatically.
+10. Customer receives setup link and accesses their workspace.
+
+## What Should NOT Change
+
+Do NOT:
+
+* Automatically approve beta applicants.
+* Automatically move prospects around the beta pipeline.
+* Bypass the approval process.
+* Provision organizations immediately after application submission.
+* Create organizations before approval.
+* Create users before approval.
+* Create subscriptions before approval.
+* Change any existing beta application, review, approval, or rejection workflow.
+
+The approval gate is intentional because Hubify is selectively accepting beta participants and may reject applicants based on company size, fit, or other criteria.
+
+## What Should Change
+
+The ONLY automation being added is after a prospect has:
+
+* Been approved
+* Signed the agreement
+* Completed Stripe payment (or qualified free-tier checkout)
+
+At that point the system should:
+
+1. Automatically provision the organization.
+2. Create the subscription record.
+3. Create the admin user.
+4. Generate the account setup token.
+5. Send the setup email.
+6. Mark the prospect as converted.
+7. Display the "Your Workspace Is Ready" screen.
+
+## Existing Approval Flow Must Remain Untouched
+
+The following existing functionality should continue to operate exactly as it does today:
+
+* Beta application submission
+* Beta pipeline stages
+* Approval process
+* Approval email process
+* Agreement signing process
+* Stripe checkout process
+
+Task #262 is only intended to eliminate the manual "Convert to Org" step that currently occurs AFTER payment has been successfully completed.
+
+In summary:
+
+Keep everything before approval exactly as-is.
+
+Keep everything between approval and payment exactly as-is.
+
+Only automate what currently happens after payment is received.
