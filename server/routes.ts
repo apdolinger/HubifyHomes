@@ -1505,9 +1505,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/users", isAuthenticated, async (req, res) => {
+  app.get("/api/users", isAuthenticated, async (req: any, res) => {
     try {
-      const users = await storage.getUsers();
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (!orgId) return res.status(400).json({ message: "Organization not found" });
+      const users = await storage.getUsersByOrg(orgId);
       res.json(users);
     } catch (error) {
       console.error("Error fetching users:", error);
