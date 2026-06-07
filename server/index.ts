@@ -345,6 +345,24 @@ app.use((req, res, next) => {
         }),
       );
     }
+
+    // Force browsers to always fetch a fresh copy of index.html.
+    // "public, max-age=0" allows Safari to serve a cached copy without
+    // revalidating in some navigation paths, which can load a stale bundle
+    // reference that 404s → no JS → blank page.  "no-store" prevents all
+    // caching of the HTML shell.  The send/sendFile modules only set
+    // Cache-Control when the header is absent, so this survives serveStatic.
+    app.use((req: Request, res: Response, next: NextFunction) => {
+      if (
+        req.method === "GET" &&
+        !req.path.startsWith("/api") &&
+        !req.path.startsWith("/assets")
+      ) {
+        res.setHeader("Cache-Control", "no-store");
+      }
+      next();
+    });
+
     serveStatic(app);
   }
 

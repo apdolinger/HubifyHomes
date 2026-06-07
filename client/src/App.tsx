@@ -538,17 +538,109 @@ function TenantGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+import { Component, type ErrorInfo, type ReactNode } from "react";
+
+class AppErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("[AppErrorBoundary] Uncaught render error:", error, info);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div
+          style={{
+            fontFamily: "system-ui, sans-serif",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: "100vh",
+            background: "#f9fafb",
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 12,
+              padding: "40px 48px",
+              textAlign: "center",
+              boxShadow: "0 2px 16px rgba(0,0,0,.08)",
+              maxWidth: 480,
+            }}
+          >
+            <h1 style={{ fontSize: "1.25rem", color: "#111", margin: "0 0 8px" }}>
+              Something went wrong
+            </h1>
+            <p style={{ color: "#6b7280", margin: "0 0 4px", fontSize: ".9rem" }}>
+              {this.state.error.message}
+            </p>
+            <p style={{ color: "#9ca3af", margin: "0 0 24px", fontSize: ".8rem", fontFamily: "monospace" }}>
+              {this.state.error.stack?.split("\n")[1]?.trim()}
+            </p>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+              <a
+                href="/super-admin/clear-session"
+                style={{
+                  background: "#4f46e5",
+                  color: "#fff",
+                  padding: "8px 20px",
+                  borderRadius: 8,
+                  textDecoration: "none",
+                  fontSize: ".9rem",
+                  fontWeight: 500,
+                }}
+              >
+                Clear session &amp; reload
+              </a>
+              <button
+                onClick={() => window.location.reload()}
+                style={{
+                  background: "#e5e7eb",
+                  color: "#374151",
+                  padding: "8px 20px",
+                  borderRadius: 8,
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: ".9rem",
+                  fontWeight: 500,
+                }}
+              >
+                Reload page
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TenantProvider>
-        <TenantGate>
-          <PortalAuthProvider>
-            <AuthWrapper />
-          </PortalAuthProvider>
-        </TenantGate>
-      </TenantProvider>
-    </QueryClientProvider>
+    <AppErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TenantProvider>
+          <TenantGate>
+            <PortalAuthProvider>
+              <AuthWrapper />
+            </PortalAuthProvider>
+          </TenantGate>
+        </TenantProvider>
+      </QueryClientProvider>
+    </AppErrorBoundary>
   );
 }
 
