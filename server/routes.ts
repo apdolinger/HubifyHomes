@@ -1198,6 +1198,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         loginTime: new Date().toISOString(),
       };
 
+      // Explicitly persist the session before responding so the PostgreSQL
+      // session store has committed the data before the browser's next request.
+      await new Promise<void>((resolve, reject) =>
+        req.session.save((err) => (err ? reject(err) : resolve()))
+      );
+
       await AuditLogger.log({
         req,
         action: 'super_admin_login_success',

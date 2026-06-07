@@ -10805,7 +10805,21 @@ export default function SuperAdmin() {
             <TabsContent value="new">
               <SubmissionsTab
                 statusFilter="new"
-                onEdit={openEdit}
+                onEdit={(submission) => {
+                  const displayName = submission.firstName && submission.lastName
+                    ? `${submission.firstName} ${submission.lastName}`
+                    : submission.name;
+                  setPipelinePrefill({
+                    name: displayName ?? "",
+                    email: submission.email ?? "",
+                    company: submission.company ?? "",
+                    phone: submission.phone ?? "",
+                    notes: submission.notes ?? "",
+                    agreementContent: submission.agreementContent ?? "",
+                  });
+                  setOnboardingInnerTab("pipeline");
+                  toast({ title: "Opening pipeline editor", description: `Pre-filled with ${displayName}'s data.` });
+                }}
                 onMoveToPipeline={(submission) => {
                   const displayName = submission.firstName && submission.lastName
                     ? `${submission.firstName} ${submission.lastName}`
