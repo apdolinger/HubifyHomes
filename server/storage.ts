@@ -775,7 +775,7 @@ export interface IStorage {
   }>;
   
   // Team message operations
-  getTeamMessages(limit?: number): Promise<TeamMessage[]>;
+  getTeamMessages(orgId: string, limit?: number): Promise<TeamMessage[]>;
   createTeamMessage(message: InsertTeamMessage): Promise<TeamMessage>;
   updateTeamMessage(id: number, content: string, userId: string): Promise<TeamMessage>;
   deleteTeamMessage(id: number, userId: string): Promise<void>;
@@ -811,7 +811,7 @@ export interface IStorage {
   }>;
   
   // Forms operations
-  getFormsWithFields(): Promise<any[]>;
+  getFormsWithFields(orgId: string): Promise<any[]>;
   getFormBySlug(slug: string): Promise<any>;
   createForm(form: any): Promise<any>;
   createFormFields(formId: number, fields: any[]): Promise<void>;
@@ -828,11 +828,11 @@ export interface IStorage {
   publishPropertyPortalSettings(orgId: string, propertyId: number, version: number): Promise<PropertyPortalSettings>;
   
   // Duplicate detection operations
-  scanForDuplicates(criteria: any): Promise<any[]>;
-  getDuplicates(): Promise<any[]>;
-  ignoreDuplicate(recordType: string, recordIds: number[], userId: string, reason?: string, notes?: string): Promise<void>;
-  getDuplicateHistory(): Promise<DuplicateHistory[]>;
-  addDuplicateHistory(action: string, recordType: string, recordIds: number[], userId: string, details?: any, notes?: string): Promise<void>;
+  scanForDuplicates(criteria: any, orgId: string): Promise<any[]>;
+  getDuplicates(orgId: string): Promise<any[]>;
+  ignoreDuplicate(recordType: string, recordIds: number[], userId: string, orgId: string, reason?: string, notes?: string): Promise<void>;
+  getDuplicateHistory(orgId: string): Promise<DuplicateHistory[]>;
+  addDuplicateHistory(action: string, recordType: string, recordIds: number[], userId: string, orgId: string, details?: any, notes?: string): Promise<void>;
   
   // Calendar operations
   getCalendars(orgId: string): Promise<Calendar[]>;
@@ -4951,7 +4951,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Team message operations
-  async getTeamMessages(limit: number = 10): Promise<any[]> {
+  async getTeamMessages(orgId: string, limit: number = 10): Promise<any[]> {
     const messages = await db
       .select({
         id: teamMessages.id,
@@ -4971,7 +4971,10 @@ export class DatabaseStorage implements IStorage {
       })
       .from(teamMessages)
       .leftJoin(users, eq(teamMessages.authorId, users.id))
-      .where(sql`${teamMessages.parentId} IS NULL`) // Only top-level messages
+      .where(and(
+        sql`${teamMessages.parentId} IS NULL`,
+        eq(teamMessages.orgId, orgId)
+      ))
       .orderBy(desc(teamMessages.createdAt))
       .limit(limit);
 
@@ -5313,8 +5316,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Forms operations
-  async getFormsWithFields(): Promise<any[]> {
-    const formsData = await db.select().from(forms).orderBy(desc(forms.createdAt));
+  async getFormsWithFields(orgId: string): Promise<any[]> {
+    const formsData = await db.select().from(forms).where(eq(forms.orgId, orgId)).orderBy(desc(forms.createdAt));
     
     // Get fields and submission count for each form
     const formsWithFields = await Promise.all(formsData.map(async (form) => {
@@ -5548,16 +5551,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Duplicate detection operations
-  async scanForDuplicates(criteria: any): Promise<any[]> {
+  async scanForDuplicates(criteria: any, orgId: string): Promise<any[]> {
     const duplicates = [];
     
     if (criteria.includeContacts) {
-      const contactDuplicates = await this.findContactDuplicates(criteria);
+      const contactDuplicates = await this.findContactDuplicates(criteria, orgId);
       duplicates.push(...contactDuplicates);
     }
     
     if (criteria.includeProperties) {
-      const propertyDuplicates = await this.findPropertyDuplicates(criteria);
+      const propertyDuplicates = await this.findPropertyDuplicates(criteria, orgId);
       duplicates.push(...propertyDuplicates);
     }
     
@@ -5587,9 +5590,7 @@ export class DatabaseStorage implements IStorage {
     return finalDuplicates;
   }
 
-  async getDuplicates(): Promise<any[]> {
-    // Return cached/stored duplicates from a previous scan
-    // For now, just return the result of a default scan
+  async getDuplicates(orgId: string): Promise<any[]> {
     const defaultCriteria = {
       nameThreshold: 85,
       emailExact: true,
@@ -5600,11 +5601,11 @@ export class DatabaseStorage implements IStorage {
       minimumConfidence: 70
     };
     
-    return await this.scanForDuplicates(defaultCriteria);
+    return await this.scanForDuplicates(defaultCriteria, orgId);
   }
 
-  private async findContactDuplicates(criteria: any): Promise<any[]> {
-    const allContacts = await db.select().from(contacts);
+  private async findContactDuplicates(criteria: any, orgId: string): Promise<any[]> {
+    const allContacts = await db.select().from(contacts).where(eq(contacts.orgId, orgId));
     const duplicateGroups = [];
     const processedIds = new Set();
 
@@ -5693,8 +5694,8 @@ export class DatabaseStorage implements IStorage {
     return score;
   }
 
-  private async findPropertyDuplicates(criteria: any): Promise<any[]> {
-    const allProperties = await db.select().from(properties);
+  private async findPropertyDuplicates(criteria: any, orgId: string): Promise<any[]> {
+    const allProperties = await db.select().from(properties).where(eq(properties.orgId, orgId));
     const duplicateGroups = [];
     const processedIds = new Set();
 
@@ -5933,7 +5934,7 @@ export class DatabaseStorage implements IStorage {
     return matchFields;
   }
 
-  async ignoreDuplicate(recordType: string, recordIds: number[], userId: string, reason?: string, notes?: string): Promise<void> {
+  async ignoreDuplicate(recordType: string, recordIds: number[], userId: string, orgId: string, reason?: string, notes?: string): Promise<void> {
     await db.insert(ignoredDuplicates).values({
       recordType,
       recordIds: recordIds.map(id => id.toString()),
@@ -5945,16 +5946,17 @@ export class DatabaseStorage implements IStorage {
     await this.addDuplicateHistory('ignore', recordType, recordIds, userId, { reason }, notes);
   }
 
-  async getDuplicateHistory(): Promise<DuplicateHistory[]> {
+  async getDuplicateHistory(orgId: string): Promise<DuplicateHistory[]> {
     const results = await db
       .select()
       .from(duplicateHistory)
+      .where(eq(duplicateHistory.orgId, orgId))
       .orderBy(desc(duplicateHistory.performedAt));
 
     return results;
   }
 
-  async addDuplicateHistory(action: string, recordType: string, recordIds: number[], userId: string, details?: any, notes?: string): Promise<void> {
+  async addDuplicateHistory(action: string, recordType: string, recordIds: number[], userId: string, orgId: string, details?: any, notes?: string): Promise<void> {
     // Get user name for the history record
     const user = await this.getUser(userId);
     const userName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown User' : 'Unknown User';
@@ -5963,6 +5965,7 @@ export class DatabaseStorage implements IStorage {
       action,
       recordType,
       recordIds: recordIds,
+      orgId: orgId || null,
       performedBy: userId,
       performedByName: userName,
       details: details || null,

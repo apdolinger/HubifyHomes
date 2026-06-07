@@ -2,3 +2,4 @@
 - [Tasks table has no org_id](tasks-org-scoping.md) — tasks scope through propertyId→properties.org_id; never check task.orgId directly
 - [Portal inspection scoping](portal-inspection-scoping.md) — portal inspection endpoints gate on portal_user_properties list, not task.orgId; getTasksByPropertyIds must include category column
 - [Password-auth vs OIDC user object](password-auth-user-object.md) — staff password login puts orgId/role on req.user directly; OIDC puts them under req.user.claims.*; always use defensive `claims?.orgId || orgId` pattern
+- [Multi-tenancy flat route audit](multitenancy-flat-routes.md) — flat API routes (no /orgs/:orgId/ prefix) must explicitly extract orgId from session; /api/orgs/:orgId/* namespace is safe (middleware at routes.ts ~line 11180); audit pattern and all fixed routes documented

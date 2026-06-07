@@ -1265,3 +1265,44 @@ export async function ensureProspectAccountPasswordHashColumn(): Promise<void> {
     client.release();
   }
 }
+
+/**
+ * Add org_id column to team_messages, forms, and duplicate_history tables.
+ * Backfills team_messages rows via the author's org_id.
+ * Idempotent (ADD COLUMN IF NOT EXISTS).
+ */
+export async function ensureMultiTenancyOrgIdColumns(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE team_messages
+        ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES orgs(id);
+    `);
+
+    // Backfill existing team_messages rows from the author's org
+    await client.query(`
+      UPDATE team_messages tm
+      SET org_id = u.org_id
+      FROM users u
+      WHERE u.id = tm.author_id
+        AND tm.org_id IS NULL
+        AND u.org_id IS NOT NULL;
+    `);
+
+    await client.query(`
+      ALTER TABLE forms
+        ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES orgs(id);
+    `);
+
+    await client.query(`
+      ALTER TABLE duplicate_history
+        ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES orgs(id);
+    `);
+
+    log("[MIGRATE] Multi-tenancy org_id columns verified (team_messages, forms, duplicate_history).");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to ensure multi-tenancy org_id columns: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}

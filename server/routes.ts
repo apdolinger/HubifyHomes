@@ -9678,9 +9678,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Team message routes
-  app.get("/api/team-messages", isAuthenticated, async (req, res) => {
+  app.get("/api/team-messages", isAuthenticated, async (req: any, res) => {
     try {
-      const messages = await storage.getTeamMessages();
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (!orgId) return res.status(403).json({ message: "Organization context required" });
+      const messages = await storage.getTeamMessages(orgId);
       res.json(messages);
     } catch (error) {
       console.error("Error fetching team messages:", error);
@@ -9691,17 +9693,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/team-messages", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const msgOrgId = req.user?.claims?.orgId || req.user?.orgId;
       const validatedData = insertTeamMessageSchema.parse({
         ...req.body,
         authorId: userId,
+        orgId: msgOrgId || undefined,
       });
       
       // Create the message
       const message = await storage.createTeamMessage(validatedData);
       
-      // Parse @mentions
-      const allUsers = await storage.getUsers();
-      const mentionedUserIds = parseMentions(validatedData.content, allUsers);
+      // Parse @mentions — scoped to this org only
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      const orgUsers = orgId ? await storage.getUsersByOrg(orgId) : [];
+      const mentionedUserIds = parseMentions(validatedData.content, orgUsers);
       
       // Get author info (used for both mentions and broadcasts)
       const author = await storage.getUser(userId);
@@ -9732,7 +9737,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Send broadcast emails if emailNotification is enabled
       if (validatedData.emailNotification) {
-        for (const user of allUsers) {
+        for (const user of orgUsers) {
           // Skip the author
           if (user.id === userId) continue;
           
@@ -9787,9 +9792,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Message not found or you don't have permission to edit it" });
       }
 
-      // Update @mentions
-      const allUsers = await storage.getUsers();
-      const mentionedUserIds = parseMentions(content.trim(), allUsers);
+      // Update @mentions — scoped to this org only
+      const patchOrgId = (req as any).user?.claims?.orgId || (req as any).user?.orgId;
+      const patchOrgUsers = patchOrgId ? await storage.getUsersByOrg(patchOrgId) : [];
+      const mentionedUserIds = parseMentions(content.trim(), patchOrgUsers);
       
       // Delete old mentions and create new ones
       await storage.deleteMentions(messageId);
@@ -9846,16 +9852,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Reply content is required" });
       }
 
+      const replyOrgId = req.user?.claims?.orgId || req.user?.orgId;
       const reply = await storage.createTeamMessage({
         content: content.trim(),
         authorId: req.user.claims.sub,
         parentId,
+        orgId: replyOrgId || undefined,
         emailNotification,
       });
 
-      // Parse @mentions in reply
-      const allUsers = await storage.getUsers();
-      const mentionedUserIds = parseMentions(content.trim(), allUsers);
+      // Parse @mentions in reply — scoped to this org only
+      const replyOrgUsers = replyOrgId ? await storage.getUsersByOrg(replyOrgId) : [];
+      const mentionedUserIds = parseMentions(content.trim(), replyOrgUsers);
       
       // Get author info (used for both mentions and broadcasts)
       const author = await storage.getUser(req.user.claims.sub);
@@ -10073,8 +10081,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Duplicate detection and management
-  app.post("/api/duplicates/scan", isAuthenticated, async (req, res) => {
+  app.post("/api/duplicates/scan", isAuthenticated, async (req: any, res) => {
     try {
+      const scanOrgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (!scanOrgId) return res.status(403).json({ message: "Organization context required" });
       const criteria = req.body.criteria || {
         nameThreshold: 85,
         emailExact: true,
@@ -10085,7 +10095,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         minimumConfidence: 70
       };
 
-      const duplicates = await storage.scanForDuplicates(criteria);
+      const duplicates = await storage.scanForDuplicates(criteria, scanOrgId);
       res.json({ duplicates, scanTime: new Date().toISOString() });
     } catch (error) {
       console.error("Error scanning for duplicates:", error);
@@ -10093,9 +10103,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/duplicates", isAuthenticated, async (req, res) => {
+  app.get("/api/duplicates", isAuthenticated, async (req: any, res) => {
     try {
-      const duplicates = await storage.getDuplicates();
+      const dupOrgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (!dupOrgId) return res.status(403).json({ message: "Organization context required" });
+      const duplicates = await storage.getDuplicates(dupOrgId);
       res.json(duplicates);
     } catch (error) {
       console.error("Error fetching duplicates:", error);
@@ -10111,7 +10123,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "recordType and recordIds array are required" });
       }
       
-      await storage.ignoreDuplicate(recordType, recordIds, req.user.claims.sub, reason, mergeNotes);
+      const ignoreOrgId = req.user?.claims?.orgId || req.user?.orgId || '';
+      await storage.ignoreDuplicate(recordType, recordIds, req.user.claims.sub, ignoreOrgId, reason, mergeNotes);
       res.json({ message: "Duplicate ignored successfully" });
     } catch (error) {
       console.error("Error ignoring duplicate:", error);
@@ -10119,9 +10132,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/duplicates/history", isAuthenticated, async (req, res) => {
+  app.get("/api/duplicates/history", isAuthenticated, async (req: any, res) => {
     try {
-      const history = await storage.getDuplicateHistory();
+      const histOrgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (!histOrgId) return res.status(403).json({ message: "Organization context required" });
+      const history = await storage.getDuplicateHistory(histOrgId);
       res.json(history);
     } catch (error) {
       console.error("Error fetching duplicate history:", error);
@@ -10379,11 +10394,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         // Add to duplicate history with notes
+        const mergeContactOrgId = req.user?.claims?.orgId || (req.user as any)?.orgId || '';
         await storage.addDuplicateHistory(
           'merge',
           'contact',
           recordIds,
           req.user?.claims?.sub,
+          mergeContactOrgId,
           { 
             mergedContactIds: duplicateIds,
             totalRecords: contactsToMerge.length,
@@ -10640,11 +10657,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         // Add to duplicate history with notes
+        const mergePropOrgId = req.user?.claims?.orgId || (req.user as any)?.orgId || '';
         await storage.addDuplicateHistory(
           'merge',
           'property',
           recordIds,
           req.user?.claims?.sub,
+          mergePropOrgId,
           { 
             mergedPropertyIds: duplicateIds,
             totalRecords: propertiesToMerge.length,
@@ -10674,13 +10693,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Forms API routes
   app.get("/api/forms", isAuthenticated, async (req: any, res) => {
     try {
-      const user = await storage.getUser((req.user as any).claims.sub);
-      if (!user?.orgId) {
-        return res.status(404).json({ message: "User organization not found" });
+      const orgId = req.user?.claims?.orgId || req.user?.orgId;
+      if (!orgId) {
+        return res.status(403).json({ message: "Organization context required" });
       }
       
-      // Get forms with their fields
-      const forms = await storage.getFormsWithFields();
+      // Get forms with their fields — scoped to this org
+      const forms = await storage.getFormsWithFields(orgId);
       res.json(forms);
     } catch (error) {
       console.error("Error fetching forms:", error);
@@ -10713,8 +10732,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
+      const formOrgId = req.user?.claims?.orgId || req.user?.orgId;
       // Create form using new schema
-      const form = await storage.createForm(formData);
+      const form = await storage.createForm({ ...formData, orgId: formOrgId || undefined });
       
       // Create form fields if provided
       if (req.body.schema?.fields && Array.isArray(req.body.schema.fields)) {

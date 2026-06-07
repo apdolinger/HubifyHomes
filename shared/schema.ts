@@ -1330,6 +1330,7 @@ export const teamMessages = pgTable("team_messages", {
   content: text("content").notNull(),
   authorId: varchar("author_id").references(() => users.id),
   parentId: integer("parent_id").references(() => teamMessages.id), // For replies
+  orgId: uuid("org_id").references(() => orgs.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   isEdited: boolean("is_edited").notNull().default(false),
@@ -1520,6 +1521,7 @@ export const userSessions = pgTable("user_sessions", {
 // Advanced Forms Library (organization creates; client sees/uses)
 export const forms = pgTable("forms", {
   id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id),
   formTitle: text("form_title").notNull(),
   slug: text("slug").notNull().unique(),
   contexts: text("contexts").array().notNull(), // ['people', 'property', 'task']
@@ -1700,6 +1702,7 @@ export const ignoredDuplicates = pgTable("ignored_duplicates", {
 // Duplicate history table for tracking all duplicate actions
 export const duplicateHistory = pgTable("duplicate_history", {
   id: serial("id").primaryKey(),
+  orgId: uuid("org_id").references(() => orgs.id),
   action: varchar("action", { length: 20 }).notNull(), // 'merge' or 'ignore'
   recordType: varchar("record_type", { length: 50 }).notNull(), // 'contact' or 'property'
   recordIds: jsonb("record_ids").notNull(), // Array of record IDs involved

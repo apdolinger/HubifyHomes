@@ -641,6 +641,12 @@ app.use((req, res, next) => {
       } catch (err) {
         console.error('Error ensuring prospect account_password_hash column:', err);
       }
+      try {
+        const { ensureMultiTenancyOrgIdColumns } = await import('./runMigrations.js');
+        await ensureMultiTenancyOrgIdColumns();
+      } catch (err) {
+        console.error('Error ensuring multi-tenancy org_id columns:', err);
+      }
     } catch (error) {
       console.error('Error loading startup migrations:', error);
     }
