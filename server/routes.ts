@@ -18341,27 +18341,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ ok: true, slug });
       }
 
-      // Idempotent: if the prospect already saved this exact slug, just return OK.
-      if ((prospect as any).workspaceSlug === slug || (prospect as any).workspace_slug === slug) {
-        return res.json({ ok: true, slug });
-      }
+      // If the prospect already has a provisioned org (orgId set), they own their
+      // workspace — skip the collision check and just record their slug choice.
+      const prospectAny = prospect as any;
+      const alreadyProvisioned = !!(prospectAny.orgId || prospectAny.org_id);
 
-      const existing = await db.select({ id: orgs.id }).from(orgs).where(eq(orgs.slug, slug)).limit(1);
-      if (existing.length > 0) {
-        // Allow if the org with this slug is the prospect's own provisioned org.
-        const existingOrgId = existing[0].id;
-        let isOwn = prospect.orgId === existingOrgId;
-        if (!isOwn && prospect.email) {
-          // Fallback: check whether the prospect's email is a member of that org
-          // (handles provisioning done before slug picker existed).
-          const memberRows = await db
-            .select({ id: users.id })
-            .from(users)
-            .where(and(eq(users.orgId, existingOrgId), eq(users.email, prospect.email)))
-            .limit(1);
-          isOwn = memberRows.length > 0;
-        }
-        if (!isOwn) {
+      if (!alreadyProvisioned) {
+        // Only do the collision check for prospects that don't yet have an org.
+        const existing = await db
+          .select({ id: orgs.id })
+          .from(orgs)
+          .where(eq(orgs.slug, slug))
+          .limit(1);
+        if (existing.length > 0) {
           return res.status(409).json({ message: "This workspace name is already taken" });
         }
       }
