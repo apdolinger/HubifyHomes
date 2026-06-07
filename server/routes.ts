@@ -18024,10 +18024,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid onboarding link." });
       }
 
-      if (!process.env.STRIPE_SECRET_KEY) {
-        return res.status(503).json({ message: "Payment processing is not configured. Please contact support." });
-      }
-
       const { eq } = await import("drizzle-orm");
       const rows = await db
         .select()
@@ -18050,15 +18046,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ message: "Payment has already been completed." });
       }
 
-      const { getMasterStripe } = await import("./stripe");
-      const stripe = getMasterStripe();
-
       const discountedMonthlyPriceCents = Math.round((p.discountedMonthlyPrice ?? 0) * 100);
       const setupFeeCents = Math.round((p.setupFee ?? 0) * 100);
-
-      const baseUrl = `${req.protocol}://${req.get("host")}`;
-      const successUrl = `${baseUrl}/onboarding/${token}?payment=success&session_id={CHECKOUT_SESSION_ID}`;
-      const cancelUrl = `${baseUrl}/onboarding/${token}?payment=cancelled`;
 
       const lineItems: any[] = [];
 
@@ -18104,6 +18093,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } as any).where(eq(onboardingProspects.id, prospect.id));
         return res.json({ free: true });
       }
+
+      // Only require Stripe when there's an actual charge to collect.
+      if (!process.env.STRIPE_SECRET_KEY) {
+        return res.status(503).json({ message: "Payment processing is not configured. Please contact support." });
+      }
+
+      const { getMasterStripe } = await import("./stripe");
+      const stripe = getMasterStripe();
+
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      const successUrl = `${baseUrl}/onboarding/${token}?payment=success&session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = `${baseUrl}/onboarding/${token}?payment=cancelled`;
 
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",

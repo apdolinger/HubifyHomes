@@ -1,0 +1,70 @@
+I’m still seeing the issue on my side after pushing the latest deploy. Please do not assume it is fixed only because one screenshot loaded.
+
+Please help verify production from the actual failing path and account/session state.
+
+Current issue:
+I pushed the latest changes, but I am still getting a blank page / nothing loading when trying to continue the onboarding/payment flow.
+
+Please check:
+
+1. Production deploy status
+
+* Confirm the latest commit is actually deployed to Render.
+* Confirm Render is serving the newest build artifact, not a cached old build.
+* Confirm there are no deploy warnings/errors in Render logs.
+
+2. Browser/runtime errors
+
+* Open production in Playwright with console logging enabled.
+* Capture:
+
+  * console errors
+  * network failures
+  * failed JS chunks
+  * failed API requests
+  * white-screen/blank-screen stack traces
+
+3. Test the exact failing route, not just the homepage
+   Please test the actual onboarding URL/token flow, not only `https://hubifyhomesonline.com`.
+
+Specifically verify:
+
+* `/onboarding/:token`
+* Agreement step
+* Payment step
+* $0 payment bypass
+* Redirect to `?payment=success`
+* Platform initialization step
+
+4. Test with active Super Admin session
+   The prior bug depended on session state. Please test while logged in as Super Admin and while logged out:
+
+* Super Admin session + onboarding link
+* No session + onboarding link
+* Regular staff session + onboarding link
+
+5. Confirm the $0 bypass is live in production
+   On the server handling production:
+
+* Confirm `/api/public/onboarding/:token/create-checkout` returns `{ free: true }` for a 100% discount / $0 total prospect.
+* Confirm it updates the prospect to:
+
+  * `paymentStatus = "paid"`
+  * `stage = "platform_initializing"`
+* Confirm the frontend handles `{ free: true }` and redirects to `?payment=success`.
+
+6. Cache check
+   Please hard-refresh/incognito test and confirm the JS bundle hash changed after deploy. If production is caching old assets, please identify and clear the cache issue.
+
+7. Provide evidence
+   Please send back:
+
+* the production URL tested
+* the exact token route tested
+* whether latest commit hash is deployed
+* console output
+* failed network requests, if any
+* screenshot of the onboarding route after clicking the payment button
+* Render log excerpt around the test
+
+The homepage loading is not enough to confirm this is fixed. I need the exact onboarding/payment path tested in production.
