@@ -1007,7 +1007,6 @@ function AgreementStep({ data, token, onSigned }: {
             {data.estimatedHomes != null && <Row label="Properties Managed" value={data.estimatedHomes.toLocaleString()} />}
             {data.teamSize != null && <Row label="Staff Users Expected" value={data.teamSize.toLocaleString()} />}
             <Row label="Portfolio Tier" value={data.portfolioTier ?? "—"} />
-            <Row label="Beta Cohort" value={data.betaCohortNumber != null ? `Member #${data.betaCohortNumber}` : "—"} />
             <Row label="Agreement Status" value={
               <span className="inline-flex items-center gap-1 text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full text-xs font-semibold">
                 <Clock className="w-3 h-3" />
@@ -1174,7 +1173,7 @@ function PaymentStep({ data, token }: { data: OnboardingDetails; token: string }
                 Hubify Homes Beta — {data.portfolioTier ?? "Standard"} Plan
               </p>
               <p className="text-xs text-slate-500">
-                {data.discountPercentage ?? 0}% founding discount · Beta Cohort #{data.betaCohortNumber ?? "?"}
+                {data.discountPercentage ?? 0}% founding discount · locked for life
               </p>
             </div>
             <span className="text-sm font-semibold text-slate-800 shrink-0 ml-4">
