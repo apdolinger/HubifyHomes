@@ -18632,88 +18632,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       try {
+        const betaApprovalText = `Hi ${recipientName},
+
+Great news — ${orgName} has been approved for the Hubify Beta Program.
+
+Here are your membership details:
+
+  Organization:   ${orgName}
+  Portfolio Tier: ${portfolioTier}${homes > 0 ? `\n  Properties:     ${homes}` : ""}
+  Beta Cohort:    Member #${cohortNumber}
+  Monthly Rate:   $${discountedMonthlyPrice.toFixed(2)}/mo (${discountPct}% beta rate, grandfathered)${tierSetupFee > 0 ? `\n  Setup Fee:      $${tierSetupFee.toFixed(2)} one-time` : ""}
+
+Your next step is to complete the Beta Agreement, set up billing, and activate your workspace. Use the link below — it walks you through the whole process:
+
+${onboardingUrl}
+
+This link expires in 7 days. If it expires, just reply to this email and we'll send a new one.
+
+Let us know if you have any questions.
+
+— The Hubify Team
+contact@hubifyhomes.com`;
+
         const sendResult = await resend.emails.send({
           from: fromEmail,
           to: existing.email,
           replyTo: "contact@hubifyhomes.com",
-          subject: `${recipientName}, you've been approved for Hubify Beta!`,
+          subject: `Your Hubify Beta access is confirmed`,
+          text: betaApprovalText,
           html: `
-            <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;background:#ffffff">
-              <div style="text-align:center;margin-bottom:28px">
-                <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="180" style="width:180px;max-width:180px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
-              </div>
-
-              <h1 style="font-size:24px;font-weight:700;color:#0f172a;margin:0 0 8px">Congratulations, ${recipientName}!</h1>
-              <p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 20px">
-                We're excited to confirm that <strong>${orgName}</strong> has been approved for the Hubify Beta Program.
-                Your spot is reserved — here are the details of your membership:
-              </p>
-
-              <!-- Approval details card -->
-              <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:12px;padding:24px;margin-bottom:28px">
-                <p style="font-size:12px;font-weight:700;color:#0d9488;margin:0 0 14px;text-transform:uppercase;letter-spacing:0.06em">Your Beta Membership Details</p>
-                <table style="width:100%;border-collapse:collapse;font-size:14px">
-                  <tr>
-                    <td style="padding:7px 0;color:#64748b;width:200px;vertical-align:top">Organization</td>
-                    <td style="padding:7px 0;color:#0f172a;font-weight:600">${orgName}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:7px 0;color:#64748b;vertical-align:top">Portfolio Tier</td>
-                    <td style="padding:7px 0;color:#0f172a;font-weight:600">${portfolioTier}</td>
-                  </tr>
-                  ${homes > 0 ? `<tr>
-                    <td style="padding:7px 0;color:#64748b;vertical-align:top">Properties</td>
-                    <td style="padding:7px 0;color:#0f172a">${homes} properties</td>
-                  </tr>` : ""}
-                  <tr>
-                    <td style="padding:7px 0;color:#64748b;vertical-align:top">Beta Cohort</td>
-                    <td style="padding:7px 0;color:#0f172a">Member #${cohortNumber}</td>
-                  </tr>
-                  <tr><td colspan="2" style="padding:8px 0"><hr style="border:none;border-top:1px solid #ccfbf1;margin:0"/></td></tr>
-                  <tr>
-                    <td style="padding:7px 0;color:#64748b;vertical-align:top">List Price</td>
-                    <td style="padding:7px 0;color:#94a3b8;text-decoration:line-through">$${originalMonthlyPrice.toFixed(2)}/mo</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:7px 0;color:#64748b;vertical-align:top">Beta Discount</td>
-                    <td style="padding:7px 0;color:#0d9488;font-weight:600">${discountPct}% off — locked for life</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:7px 0;color:#64748b;vertical-align:top">Your Monthly Price</td>
-                    <td style="padding:7px 0;color:#0f172a;font-weight:700;font-size:18px">$${discountedMonthlyPrice.toFixed(2)}<span style="font-size:13px;font-weight:400;color:#64748b">/mo</span></td>
-                  </tr>
-                  ${tierSetupFee > 0 ? `<tr>
-                    <td style="padding:7px 0;color:#64748b;vertical-align:top">Database Init Fee</td>
-                    <td style="padding:7px 0;color:#0f172a">$${tierSetupFee.toFixed(2)} one-time</td>
-                  </tr>` : ""}
-                </table>
-              </div>
-
-              <!-- Lifetime lock guarantee -->
-              <div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:16px;margin-bottom:28px">
-                <p style="font-size:14px;color:#92400e;margin:0;line-height:1.6">
-                  🔒 <strong>Your beta pricing is locked in for life</strong> — as long as your subscription remains in good standing, your rate will never increase.
-                </p>
-              </div>
-
-              <!-- CTA -->
-              <p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 24px">
-                To get started, complete your Beta Agreement, set up payment, and initialize your platform. The button below will take you through the entire onboarding process step by step.
-              </p>
-              <div style="text-align:center;margin-bottom:32px">
-                <a href="${onboardingUrl}"
-                   style="display:inline-block;background:#0d9488;color:#ffffff;font-size:16px;font-weight:700;text-decoration:none;padding:14px 40px;border-radius:9px;letter-spacing:0.01em">
-                  Start Onboarding →
-                </a>
-              </div>
-              <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0 0 4px">
-                This link expires in 7 days. If you need a new link, please email <a href="mailto:contact@hubifyhomes.com" style="color:#94a3b8">contact@hubifyhomes.com</a>
-              </p>
-
-              <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0 20px" />
-              <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
-                If you have questions please email <a href="mailto:contact@hubifyhomes.com" style="color:#0d9488">contact@hubifyhomes.com</a>
-              </p>
+            <div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;padding:40px 24px;background:#ffffff;color:#1e293b;font-size:16px;line-height:1.7">
+              <p style="margin:0 0 18px">Hi ${recipientName},</p>
+              <p style="margin:0 0 18px">Great news — <strong>${orgName}</strong> has been approved for the Hubify Beta Program.</p>
+              <p style="margin:0 0 18px">Here are your membership details:</p>
+              <table style="border-collapse:collapse;font-size:15px;margin:0 0 24px">
+                <tr>
+                  <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Organization</td>
+                  <td style="padding:4px 0;color:#0f172a;font-weight:600">${orgName}</td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Portfolio Tier</td>
+                  <td style="padding:4px 0;color:#0f172a">${portfolioTier}</td>
+                </tr>
+                ${homes > 0 ? `<tr>
+                  <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Properties</td>
+                  <td style="padding:4px 0;color:#0f172a">${homes}</td>
+                </tr>` : ""}
+                <tr>
+                  <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Beta Cohort</td>
+                  <td style="padding:4px 0;color:#0f172a">Member #${cohortNumber}</td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Monthly Rate</td>
+                  <td style="padding:4px 0;color:#0f172a;font-weight:600">$${discountedMonthlyPrice.toFixed(2)}/mo <span style="color:#64748b;font-weight:400;font-size:13px">(${discountPct}% beta rate, grandfathered)</span></td>
+                </tr>
+                ${tierSetupFee > 0 ? `<tr>
+                  <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Setup Fee</td>
+                  <td style="padding:4px 0;color:#0f172a">$${tierSetupFee.toFixed(2)} one-time</td>
+                </tr>` : ""}
+              </table>
+              <p style="margin:0 0 18px">Your next step is to complete the Beta Agreement, set up billing, and activate your workspace. The link below walks you through the whole process:</p>
+              <p style="margin:0 0 18px"><a href="${onboardingUrl}" style="color:#0d9488;font-weight:600">${onboardingUrl}</a></p>
+              <p style="margin:0 0 24px;color:#64748b;font-size:14px">This link expires in 7 days. If it expires before you get to it, just reply to this email and we'll send a new one.</p>
+              <p style="margin:0 0 4px">Let us know if you have any questions.</p>
+              <p style="margin:0 0 32px">— The Hubify Team</p>
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 16px" />
+              <p style="font-size:13px;color:#94a3b8;margin:0"><a href="mailto:contact@hubifyhomes.com" style="color:#94a3b8">contact@hubifyhomes.com</a></p>
             </div>
           `,
         });
@@ -18804,73 +18788,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cohortNumber = (existing as any).betaCohortNumber ?? 1;
       const prospectHomes = (existing as any).estimatedHomes ?? 0;
 
-      try {
+        const resendApprovalText = `Hi ${recipientName},
+
+Here is a fresh onboarding link for ${orgName} — this one expires in 7 days:
+
+${onboardingUrl}
+
+Your membership details:
+
+  Portfolio Tier: ${portfolioTier}${prospectHomes > 0 ? `\n  Properties:     ${prospectHomes}` : ""}
+  Beta Cohort:    Member #${cohortNumber}
+  Monthly Rate:   $${discountedMonthlyPrice.toFixed(2)}/mo (${discountPct}% beta rate, grandfathered)${tierSetupFee > 0 ? `\n  Setup Fee:      $${tierSetupFee.toFixed(2)} one-time` : ""}
+
+If you have any trouble, just reply to this email and we'll help.
+
+— The Hubify Team
+contact@hubifyhomes.com`;
+
         const resendResult = await resend.emails.send({
           from: fromEmail,
           to: existing.email,
           replyTo: "contact@hubifyhomes.com",
-          subject: `${recipientName}, your Hubify Beta onboarding link is ready`,
+          subject: `Your Hubify Beta onboarding link`,
+          text: resendApprovalText,
           html: `
-            <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;background:#ffffff">
-              <div style="text-align:center;margin-bottom:28px">
-                <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="180" style="width:180px;max-width:180px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
-              </div>
-
-              <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Your onboarding link is ready</h1>
-              <p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 20px">
-                Hi ${recipientName} — here is your Hubify Beta onboarding link for <strong>${orgName}</strong>.
-                We've generated a fresh link that expires in 7 days.
-              </p>
-
-              <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:12px;padding:24px;margin-bottom:28px">
-                <p style="font-size:12px;font-weight:700;color:#0d9488;margin:0 0 14px;text-transform:uppercase;letter-spacing:0.06em">Your Beta Membership Details</p>
-                <table style="width:100%;border-collapse:collapse;font-size:14px">
-                  <tr>
-                    <td style="padding:7px 0;color:#64748b;width:200px">Portfolio Tier</td>
-                    <td style="padding:7px 0;color:#0f172a;font-weight:600">${portfolioTier}</td>
-                  </tr>
-                  ${prospectHomes > 0 ? `<tr><td style="padding:7px 0;color:#64748b">Properties</td><td style="padding:7px 0;color:#0f172a">${prospectHomes} properties</td></tr>` : ""}
-                  <tr>
-                    <td style="padding:7px 0;color:#64748b">Beta Cohort</td>
-                    <td style="padding:7px 0;color:#0f172a">Member #${cohortNumber}</td>
-                  </tr>
-                  <tr><td colspan="2" style="padding:8px 0"><hr style="border:none;border-top:1px solid #ccfbf1;margin:0"/></td></tr>
-                  <tr>
-                    <td style="padding:7px 0;color:#64748b">List Price</td>
-                    <td style="padding:7px 0;color:#94a3b8;text-decoration:line-through">$${originalMonthlyPrice.toFixed(2)}/mo</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:7px 0;color:#64748b">Beta Discount</td>
-                    <td style="padding:7px 0;color:#0d9488;font-weight:600">${discountPct}% off — locked for life</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:7px 0;color:#64748b">Your Monthly Price</td>
-                    <td style="padding:7px 0;color:#0f172a;font-weight:700;font-size:18px">$${discountedMonthlyPrice.toFixed(2)}<span style="font-size:13px;font-weight:400;color:#64748b">/mo</span></td>
-                  </tr>
-                  ${tierSetupFee > 0 ? `<tr><td style="padding:7px 0;color:#64748b">Database Init Fee</td><td style="padding:7px 0;color:#0f172a">$${tierSetupFee.toFixed(2)} one-time</td></tr>` : ""}
-                </table>
-              </div>
-
-              <div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:16px;margin-bottom:28px">
-                <p style="font-size:14px;color:#92400e;margin:0;line-height:1.6">
-                  🔒 <strong>Your beta pricing is locked in for life</strong> — as long as your subscription remains in good standing, your rate will never increase.
-                </p>
-              </div>
-
-              <div style="text-align:center;margin-bottom:32px">
-                <a href="${onboardingUrl}"
-                   style="display:inline-block;background:#0d9488;color:#ffffff;font-size:16px;font-weight:700;text-decoration:none;padding:14px 40px;border-radius:9px;letter-spacing:0.01em">
-                  Start Onboarding →
-                </a>
-              </div>
-              <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0 0 4px">
-                This link expires in 7 days. If you need another one, please email <a href="mailto:contact@hubifyhomes.com" style="color:#94a3b8">contact@hubifyhomes.com</a>
-              </p>
-
-              <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0 20px" />
-              <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
-                If you have questions please email <a href="mailto:contact@hubifyhomes.com" style="color:#0d9488">contact@hubifyhomes.com</a>
-              </p>
+            <div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;padding:40px 24px;background:#ffffff;color:#1e293b;font-size:16px;line-height:1.7">
+              <p style="margin:0 0 18px">Hi ${recipientName},</p>
+              <p style="margin:0 0 18px">Here is a fresh onboarding link for <strong>${orgName}</strong> — this one expires in 7 days:</p>
+              <p style="margin:0 0 24px"><a href="${onboardingUrl}" style="color:#0d9488;font-weight:600">${onboardingUrl}</a></p>
+              <p style="margin:0 0 18px">Your membership details:</p>
+              <table style="border-collapse:collapse;font-size:15px;margin:0 0 24px">
+                <tr>
+                  <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Portfolio Tier</td>
+                  <td style="padding:4px 0;color:#0f172a">${portfolioTier}</td>
+                </tr>
+                ${prospectHomes > 0 ? `<tr>
+                  <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Properties</td>
+                  <td style="padding:4px 0;color:#0f172a">${prospectHomes}</td>
+                </tr>` : ""}
+                <tr>
+                  <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Beta Cohort</td>
+                  <td style="padding:4px 0;color:#0f172a">Member #${cohortNumber}</td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Monthly Rate</td>
+                  <td style="padding:4px 0;color:#0f172a;font-weight:600">$${discountedMonthlyPrice.toFixed(2)}/mo <span style="color:#64748b;font-weight:400;font-size:13px">(${discountPct}% beta rate, grandfathered)</span></td>
+                </tr>
+                ${tierSetupFee > 0 ? `<tr>
+                  <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Setup Fee</td>
+                  <td style="padding:4px 0;color:#0f172a">$${tierSetupFee.toFixed(2)} one-time</td>
+                </tr>` : ""}
+              </table>
+              <p style="margin:0 0 24px">If you have any trouble, just reply to this email and we'll help.</p>
+              <p style="margin:0 0 4px">— The Hubify Team</p>
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0 16px" />
+              <p style="font-size:13px;color:#94a3b8;margin:0"><a href="mailto:contact@hubifyhomes.com" style="color:#94a3b8">contact@hubifyhomes.com</a></p>
             </div>
           `,
         });
