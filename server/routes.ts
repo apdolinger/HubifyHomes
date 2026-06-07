@@ -18662,6 +18662,9 @@ contact@hubifyhomes.com`;
           text: betaApprovalText,
           html: `
             <div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;padding:40px 24px;background:#ffffff;color:#1e293b;font-size:16px;line-height:1.7">
+              <div style="text-align:center;margin-bottom:32px">
+                <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="180" style="width:180px;max-width:180px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
+              </div>
               <p style="margin:0 0 18px">Hi ${recipientName},</p>
               <p style="margin:0 0 18px">Great news — <strong>${orgName}</strong> has been approved for the Hubify Beta Program.</p>
               <p style="margin:0 0 18px">Here are your membership details:</p>
@@ -18819,6 +18822,9 @@ contact@hubifyhomes.com`;
           text: resendApprovalText,
           html: `
             <div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;padding:40px 24px;background:#ffffff;color:#1e293b;font-size:16px;line-height:1.7">
+              <div style="text-align:center;margin-bottom:32px">
+                <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="180" style="width:180px;max-width:180px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
+              </div>
               <p style="margin:0 0 18px">Hi ${recipientName},</p>
               <p style="margin:0 0 18px">Here is a fresh onboarding link for <strong>${orgName}</strong> — this one expires in 7 days:</p>
               <p style="margin:0 0 24px"><a href="${onboardingUrl}" style="color:#0d9488;font-weight:600">${onboardingUrl}</a></p>
