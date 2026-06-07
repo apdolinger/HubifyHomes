@@ -2182,6 +2182,7 @@ function SubmissionsTab({ onMoveToPipeline, defaultSourceFilter, statusFilter, o
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return submissions
+      .filter(s => !s.orgId && s.stage !== "converted")
       .filter(s => {
         if (statusFilter && statusFilter !== "all") {
           return (s.submissionStatus ?? "new") === statusFilter;
