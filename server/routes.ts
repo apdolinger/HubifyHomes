@@ -1236,6 +1236,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ message: "Logged out successfully" });
   });
 
+  // GET /super-admin/clear-session
+  // Browser-navigable escape hatch — works even if the JS bundle never loads.
+  // Clears both SA and staff session state then issues a redirect to the SA
+  // login page.  Useful when Safari (or any browser) has an old cached bundle
+  // that crashes before React mounts, leaving no way to click a "Logout"
+  // button.
+  app.get('/super-admin/clear-session', async (req, res) => {
+    (req.session as any).superAdmin = null;
+    (req.session as any).staffUser = null;
+    await new Promise<void>((resolve) => req.session.save(() => resolve()));
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(200).send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="refresh" content="2;url=/super-admin/login" />
+  <title>Clearing session…</title>
+  <style>
+    body { font-family: system-ui, sans-serif; display: flex; align-items: center;
+           justify-content: center; min-height: 100vh; margin: 0; background: #f9fafb; }
+    .card { background: #fff; border-radius: 12px; padding: 40px 48px; text-align: center;
+            box-shadow: 0 2px 16px rgba(0,0,0,.08); max-width: 360px; }
+    h1 { font-size: 1.25rem; color: #111; margin: 0 0 8px; }
+    p  { color: #6b7280; margin: 0 0 20px; font-size: .95rem; }
+    a  { color: #4f46e5; text-decoration: none; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Session cleared</h1>
+    <p>Redirecting you to the Super Admin login page…</p>
+    <a href="/super-admin/login">Click here if you are not redirected</a>
+  </div>
+</body>
+</html>`);
+  });
+
   // ── Platform Admin Management ──────────────────────────────────────────────
 
   // GET /api/super-admin/admins — list all platform admins

@@ -1,4 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
+import path from "path";
+import fs from "fs";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
@@ -327,6 +329,22 @@ app.use((req, res, next) => {
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
+    // Serve content-addressed Vite assets (/assets/*.js, /assets/*.css, etc.)
+    // with long-lived immutable cache headers.  fallthrough:false means a
+    // request for a file that no longer exists (e.g. an old bundle hash cached
+    // by Safari) returns 404 instead of falling through to the SPA catch-all
+    // and receiving index.html as if it were JavaScript.
+    const assetsDir = path.resolve(import.meta.dirname, "public", "assets");
+    if (fs.existsSync(assetsDir)) {
+      app.use(
+        "/assets",
+        express.static(assetsDir, {
+          maxAge: "1y",
+          immutable: true,
+          fallthrough: false,
+        }),
+      );
+    }
     serveStatic(app);
   }
 
