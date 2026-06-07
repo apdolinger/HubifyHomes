@@ -10381,6 +10381,17 @@ function FeatureFlagsTabContent() {
 // Super Admin: Real-data tabs (Organizations, All Users, Platform Overview, Compliance)
 // ===========================================================================
 
+type OrgUserRow = {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  role: string;
+  isActive: boolean;
+  isAdminAccount: boolean | null;
+  createdAt: string | null;
+};
+
 type OrgOverviewRow = {
   id: string;
   name: string;
@@ -10507,11 +10518,133 @@ const ORG_STATUS_BADGE: Record<OrgStatusValue, { label: string; className: strin
   archived:   { label: "Archived",   className: "bg-slate-100 text-slate-600 border-slate-200" },
 };
 
+function OrgDetailSheet({ org, open, onClose }: { org: OrgOverviewRow | null; open: boolean; onClose: () => void }) {
+  const [innerTab, setInnerTab] = useState("users");
+  const { data: orgUsers = [], isLoading: usersLoading } = useQuery<OrgUserRow[]>({
+    queryKey: ["/api/super-admin/orgs", org?.id, "users"],
+    queryFn: async () => {
+      const res = await fetch(`/api/super-admin/orgs/${org!.id}/users`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load users");
+      return res.json();
+    },
+    enabled: open && !!org?.id,
+  });
+
+  if (!org) return null;
+
+  const ROLE_LABEL: Record<string, string> = {
+    admin: "Admin",
+    supervisor: "Supervisor",
+    staff: "Staff",
+    super_admin: "Super Admin",
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+        <SheetHeader className="mb-4">
+          <SheetTitle className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-slate-500" />
+            {org.name}
+          </SheetTitle>
+          <SheetDescription>
+            {org.slug ? <span className="font-mono text-xs">{org.slug}.hubifyhomesonline.com</span> : <span className="text-slate-400 italic text-xs">No slug set</span>}
+          </SheetDescription>
+        </SheetHeader>
+
+        <Tabs value={innerTab} onValueChange={setInnerTab} className="space-y-4">
+          <TabsList className="w-full">
+            <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
+            <TabsTrigger value="users" className="flex-1">
+              Users
+              {orgUsers.length > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-slate-200 text-slate-700 text-[10px] font-semibold leading-none min-w-[16px] h-4 px-1">
+                  {orgUsers.length}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="space-y-3">
+            {[
+              ["Organization", org.name],
+              ["Slug", org.slug ?? "—"],
+              ["Plan", org.tier],
+              ["Subscription", org.subscriptionStatus.replace("_", " ")],
+              ["Status", org.orgStatus ?? "—"],
+              ["Primary Admin", org.primaryAdminEmail ?? "—"],
+              ["Properties", String(org.propertyCount)],
+              ["Users", String(org.userCount)],
+              ["MRR", `$${(org.mrrCents / 100).toFixed(0)}/mo`],
+              ["Created", org.createdAt ? new Date(org.createdAt).toLocaleDateString() : "—"],
+            ].map(([label, value]) => (
+              <div key={label} className="flex justify-between text-sm border-b border-slate-100 pb-2 last:border-0">
+                <span className="text-slate-500">{label}</span>
+                <span className="font-medium text-slate-800 capitalize">{value}</span>
+              </div>
+            ))}
+          </TabsContent>
+
+          <TabsContent value="users">
+            {usersLoading ? (
+              <div className="text-sm text-slate-500 py-4 text-center">Loading users…</div>
+            ) : orgUsers.length === 0 ? (
+              <div className="text-sm text-slate-500 py-4 text-center">No users in this organization yet.</div>
+            ) : (
+              <div className="space-y-2">
+                {orgUsers.map((u) => {
+                  const name = [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "—";
+                  const isOwner = !!u.isAdminAccount;
+                  return (
+                    <div
+                      key={u.id}
+                      className={`flex items-start justify-between rounded-lg border p-3 text-sm ${isOwner ? "border-teal-200 bg-teal-50/40" : "border-slate-100 bg-white"}`}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-medium text-slate-900 truncate">{name}</span>
+                          {isOwner && (
+                            <Badge className="text-[10px] px-1.5 py-0 h-4 bg-teal-100 text-teal-800 border-teal-200 hover:bg-teal-100">
+                              Account Owner
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-slate-500 text-xs mt-0.5 truncate">{u.email ?? "—"}</div>
+                        {u.createdAt && (
+                          <div className="text-slate-400 text-xs mt-0.5">
+                            Joined {new Date(u.createdAt).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-1 ml-2 shrink-0">
+                        <Badge variant="outline" className="text-[10px] capitalize">{ROLE_LABEL[u.role] ?? u.role}</Badge>
+                        <Badge
+                          variant={u.isActive ? "default" : "secondary"}
+                          className={`text-[10px] ${u.isActive ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border-emerald-200" : ""}`}
+                        >
+                          {u.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 function OrganizationsTab() {
   const { toast } = useToast();
   const { data: orgs = [], isLoading } = useQuery<OrgOverviewRow[]>({
     queryKey: ["/api/super-admin/orgs-overview"],
   });
+
+  const [detailOrg, setDetailOrg] = useState<OrgOverviewRow | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   // Inline slug editing state: orgId -> draft value (null = not editing)
   const [slugDraft, setSlugDraft] = useState<Record<string, string>>({});
@@ -10674,32 +10807,48 @@ function OrganizationsTab() {
                       </TableCell>
 
                       <TableCell className="text-right">{o.propertyCount}</TableCell>
-                      <TableCell className="text-right">{o.userCount}</TableCell>
+                      <TableCell className="text-right">
+                        <button
+                          className="text-teal-700 hover:underline font-medium"
+                          onClick={() => { setDetailOrg(o); setDetailOpen(true); }}
+                          title="View org users"
+                        >
+                          {o.userCount}
+                        </button>
+                      </TableCell>
                       <TableCell className="text-right">${(o.mrrCents / 100).toFixed(0)}</TableCell>
                       <TableCell>
-                        {o.isActive ? (
+                        <div className="flex items-center gap-1">
                           <Button
-                            size="sm" variant="ghost" title="Suspend organization"
-                            disabled={updateOrgMut.isPending}
-                            onClick={() => {
-                              if (confirm(`Suspend ${o.name}? Users will lose access until reactivated.`)) {
-                                updateOrgMut.mutate({ orgId: o.id, payload: { isActive: false, orgStatus: "suspended" } });
-                              }
-                            }}
-                            data-testid={`button-suspend-${o.id}`}
+                            size="sm" variant="ghost" title="View organization"
+                            onClick={() => { setDetailOrg(o); setDetailOpen(true); }}
                           >
-                            <Pause className="w-4 h-4" />
+                            <Eye className="w-4 h-4" />
                           </Button>
-                        ) : (
-                          <Button
-                            size="sm" variant="ghost" title="Reactivate organization"
-                            disabled={updateOrgMut.isPending}
-                            onClick={() => updateOrgMut.mutate({ orgId: o.id, payload: { isActive: true, orgStatus: "active" } })}
-                            data-testid={`button-activate-${o.id}`}
-                          >
-                            <Play className="w-4 h-4" />
-                          </Button>
-                        )}
+                          {o.isActive ? (
+                            <Button
+                              size="sm" variant="ghost" title="Suspend organization"
+                              disabled={updateOrgMut.isPending}
+                              onClick={() => {
+                                if (confirm(`Suspend ${o.name}? Users will lose access until reactivated.`)) {
+                                  updateOrgMut.mutate({ orgId: o.id, payload: { isActive: false, orgStatus: "suspended" } });
+                                }
+                              }}
+                              data-testid={`button-suspend-${o.id}`}
+                            >
+                              <Pause className="w-4 h-4" />
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm" variant="ghost" title="Reactivate organization"
+                              disabled={updateOrgMut.isPending}
+                              onClick={() => updateOrgMut.mutate({ orgId: o.id, payload: { isActive: true, orgStatus: "active" } })}
+                              data-testid={`button-activate-${o.id}`}
+                            >
+                              <Play className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -10709,6 +10858,12 @@ function OrganizationsTab() {
           </div>
         )}
       </CardContent>
+
+      <OrgDetailSheet
+        org={detailOrg}
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+      />
     </Card>
   );
 }

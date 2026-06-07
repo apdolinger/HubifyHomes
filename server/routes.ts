@@ -5359,6 +5359,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/super-admin/orgs/:orgId/users
+  app.get("/api/super-admin/orgs/:orgId/users", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const org = await storage.getOrg(orgId);
+      if (!org) return res.status(404).json({ message: "Organization not found" });
+      const rows = await db
+        .select({
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          role: users.role,
+          isActive: users.isActive,
+          isAdminAccount: users.isAdminAccount,
+          createdAt: users.createdAt,
+        })
+        .from(users)
+        .where(eq(users.orgId, orgId))
+        .orderBy(asc(users.createdAt));
+      res.json(rows);
+    } catch (err: any) {
+      console.error("[super-admin/orgs/users]", err?.message ?? err);
+      res.status(500).json({ message: "Failed to fetch org users" });
+    }
+  });
+
   // GET /api/super-admin/orgs/:orgId/agreement-history
   app.get("/api/super-admin/orgs/:orgId/agreement-history", isSuperAdmin, requireMFA, async (req, res) => {
     try {
