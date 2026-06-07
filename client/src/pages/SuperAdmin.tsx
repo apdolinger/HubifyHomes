@@ -11056,7 +11056,7 @@ export default function SuperAdmin() {
     queryKey: ["/api/super-admin/submissions"],
     enabled: isSuperAdminAuthenticated === true,
   });
-  const newSubmissionsCount = submissionsData.filter(s => (s.submissionStatus ?? "new") === "new").length;
+  const newSubmissionsCount = submissionsData.filter(s => !s.orgId).length;
 
   // Check super admin session
   useEffect(() => {
@@ -11182,7 +11182,7 @@ export default function SuperAdmin() {
           <Tabs value={onboardingInnerTab} onValueChange={setOnboardingInnerTab} className="space-y-4">
             <TabsList className="flex flex-wrap gap-1 h-auto bg-muted/60 p-1">
               <TabsTrigger value="new" className="relative">
-                New Submissions
+                Submissions
                 {newSubmissionsCount > 0 && (
                   <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none min-w-[16px] h-4 px-1">
                     {newSubmissionsCount}
@@ -11196,7 +11196,6 @@ export default function SuperAdmin() {
             </TabsList>
             <TabsContent value="new">
               <SubmissionsTab
-                statusFilter="new"
                 onEdit={(submission) => {
                   const displayName = submission.firstName && submission.lastName
                     ? `${submission.firstName} ${submission.lastName}`
