@@ -10577,6 +10577,8 @@ const TICKET_STATUS_CONFIG: Record<string, { label: string; className: string }>
 
 function OrgDetailSheet({ org, open, onClose }: { org: OrgOverviewRow | null; open: boolean; onClose: () => void }) {
   const [innerTab, setInnerTab] = useState("overview");
+  const [detailUser, setDetailUser] = useState<UserDetailRow | null>(null);
+  const [detailUserOpen, setDetailUserOpen] = useState(false);
 
   const { data: orgUsers = [], isLoading: usersLoading } = useQuery<OrgUserRow[]>({
     queryKey: ["/api/super-admin/orgs", org?.id, "users"],
@@ -10739,11 +10741,15 @@ function OrgDetailSheet({ org, open, onClose }: { org: OrgOverviewRow | null; op
                   return (
                     <div
                       key={u.id}
-                      className={`flex items-start justify-between rounded-lg border p-3 text-sm ${isOwner ? "border-teal-200 bg-teal-50/40" : "border-slate-100 bg-white"}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => { setDetailUser(u); setDetailUserOpen(true); }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { setDetailUser(u); setDetailUserOpen(true); } }}
+                      className={`flex items-start justify-between rounded-lg border p-3 text-sm cursor-pointer transition-colors hover:bg-slate-50 ${isOwner ? "border-teal-200 bg-teal-50/40 hover:bg-teal-50" : "border-slate-100 bg-white"}`}
                     >
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-medium text-slate-900 truncate">{name}</span>
+                          <span className="font-medium text-slate-900 truncate hover:text-teal-700">{name}</span>
                           {isOwner && (
                             <Badge className="text-[10px] px-1.5 py-0 h-4 bg-teal-100 text-teal-800 border-teal-200 hover:bg-teal-100">
                               Account Owner
@@ -10817,6 +10823,11 @@ function OrgDetailSheet({ org, open, onClose }: { org: OrgOverviewRow | null; op
           </TabsContent>
         </Tabs>
       </SheetContent>
+      <UserDetailSheet
+        user={detailUser}
+        open={detailUserOpen}
+        onClose={() => setDetailUserOpen(false)}
+      />
     </Sheet>
   );
 }
@@ -11070,10 +11081,237 @@ function OrganizationsTab({ openOrgId, onOrgOpened }: { openOrgId?: string | nul
   );
 }
 
+type UserDetailRow = {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  role: string;
+  isActive: boolean;
+  isAdminAccount?: boolean | null;
+  lastActiveAt?: string | null;
+  createdAt: string | null;
+  orgId?: string | null;
+  orgName?: string | null;
+};
+
+function UserDetailSheet({ user, open, onClose }: { user: UserDetailRow | null; open: boolean; onClose: () => void }) {
+  const { toast } = useToast();
+  const [innerTab, setInnerTab] = useState("profile");
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const { data: tickets = [], isLoading: ticketsLoading } = useQuery<OrgSupportTicket[]>({
+    queryKey: ["/api/super-admin/users", user?.id, "support"],
+    queryFn: async () => {
+      const res = await fetch(`/api/super-admin/users/${user!.id}/support`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load tickets");
+      return res.json();
+    },
+    enabled: open && !!user?.id,
+  });
+
+  const resetMut = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/super-admin/users/${user!.id}/reset-password`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to reset password");
+      return res.json() as Promise<{ tempPassword: string }>;
+    },
+    onSuccess: (data) => {
+      setTempPassword(data.tempPassword);
+    },
+    onError: (err: any) => {
+      toast({ title: "Reset failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  if (!user) return null;
+
+  const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || "—";
+  const openTickets   = tickets.filter(t => t.status !== "resolved");
+  const closedTickets = tickets.filter(t => t.status === "resolved");
+
+  function handleCopy() {
+    if (!tempPassword) return;
+    navigator.clipboard.writeText(tempPassword).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  function handleClose() {
+    setTempPassword(null);
+    setCopied(false);
+    onClose();
+  }
+
+  const ROLE_LABEL: Record<string, string> = {
+    admin: "Admin", supervisor: "Supervisor", staff: "Staff", super_admin: "Super Admin",
+  };
+
+  function TicketList({ items }: { items: OrgSupportTicket[] }) {
+    if (ticketsLoading) return <div className="text-sm text-slate-400 py-6 text-center">Loading…</div>;
+    if (items.length === 0) return (
+      <div className="flex flex-col items-center gap-2 py-10 text-slate-400">
+        <CheckCircle className="w-8 h-8 text-slate-300" />
+        <p className="text-sm">No tickets</p>
+      </div>
+    );
+    return (
+      <div className="space-y-2">
+        {items.map(t => {
+          const urg = URGENCY_CONFIG[t.urgency] ?? URGENCY_CONFIG.medium;
+          const sta = TICKET_STATUS_CONFIG[t.status] ?? TICKET_STATUS_CONFIG.new;
+          return (
+            <div key={t.id} className={`rounded-lg border p-3 text-sm space-y-1.5 ${t.status === "resolved" ? "opacity-60 bg-slate-50" : "bg-white"}`}>
+              <div className="flex items-start justify-between gap-2">
+                <span className="font-medium text-slate-900 leading-snug">{t.subject}</span>
+                <div className="flex gap-1 shrink-0">
+                  <Badge className={`text-[10px] px-1.5 py-0 h-4 border ${urg.className} hover:${urg.className}`}>{urg.label}</Badge>
+                  <Badge className={`text-[10px] px-1.5 py-0 h-4 border ${sta.className} hover:${sta.className}`}>{sta.label}</Badge>
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 line-clamp-2">{t.message}</p>
+              <div className="text-xs text-slate-400 text-right">{new Date(t.createdAt).toLocaleDateString()}</div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
+      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+        <SheetHeader className="mb-4">
+          <SheetTitle className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-slate-500" />
+            {name}
+          </SheetTitle>
+          <SheetDescription className="flex items-center gap-2 flex-wrap">
+            <code className="text-[11px] bg-slate-100 rounded px-1.5 py-0.5 font-mono text-slate-600">{user.id}</code>
+            <Badge variant={user.isActive ? "default" : "destructive"} className="text-[10px]">
+              {user.isActive ? "Active" : "Suspended"}
+            </Badge>
+            {openTickets.length > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 text-[10px] font-semibold px-2 py-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                {openTickets.length} open ticket{openTickets.length !== 1 ? "s" : ""}
+              </span>
+            )}
+          </SheetDescription>
+        </SheetHeader>
+
+        <Tabs value={innerTab} onValueChange={setInnerTab} className="space-y-4">
+          <TabsList className="w-full grid grid-cols-3">
+            <TabsTrigger value="profile">Profile</TabsTrigger>
+            <TabsTrigger value="open">
+              Open
+              {openTickets.length > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-amber-200 text-amber-800 text-[10px] font-semibold min-w-[16px] h-4 px-1">
+                  {openTickets.length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="closed">
+              Closed
+              {closedTickets.length > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-slate-200 text-slate-600 text-[10px] font-semibold min-w-[16px] h-4 px-1">
+                  {closedTickets.length}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          {/* PROFILE */}
+          <TabsContent value="profile" className="space-y-5">
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">User Details</p>
+              <div className="space-y-2">
+                {([
+                  ["Name",        name],
+                  ["Email",       user.email ?? "—"],
+                  ["Role",        ROLE_LABEL[user.role] ?? user.role],
+                  ["Organization",user.orgName ?? "—"],
+                  ["Status",      user.isActive ? "Active" : "Suspended"],
+                  ["Joined",      formatDateOnly(user.createdAt)],
+                  ["Last Active", formatRelative(user.lastActiveAt ?? null)],
+                  ["Account Owner", user.isAdminAccount ? "Yes" : "No"],
+                ] as [string, string][]).map(([label, value]) => (
+                  <div key={label} className="flex justify-between text-sm border-b border-slate-100 pb-1.5 last:border-0">
+                    <span className="text-slate-500">{label}</span>
+                    <span className="font-medium text-slate-800">{value}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between text-sm pt-0.5">
+                  <span className="text-slate-500">Platform User ID</span>
+                  <code className="text-xs font-mono bg-slate-100 rounded px-1.5 py-0.5 text-slate-700 max-w-[260px] truncate">{user.id}</code>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Password Reset</p>
+              {tempPassword ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+                  <p className="text-xs text-amber-800 font-medium">Temporary password set. Share this with the user — it will not be shown again.</p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 font-mono text-sm bg-white border border-amber-200 rounded px-3 py-2 text-amber-900 tracking-wide">
+                      {tempPassword}
+                    </code>
+                    <Button size="sm" variant="outline" onClick={handleCopy} className="shrink-0">
+                      <Copy className="w-3.5 h-3.5 mr-1" />
+                      {copied ? "Copied!" : "Copy"}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+                  <p className="text-xs text-slate-600">
+                    Generate a temporary password for this user. They can log in with it and change it afterward.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={resetMut.isPending}
+                    onClick={() => {
+                      if (confirm(`Reset password for ${name}? A new temporary password will be generated.`)) {
+                        resetMut.mutate();
+                      }
+                    }}
+                  >
+                    <KeyRound className="w-3.5 h-3.5 mr-1.5" />
+                    {resetMut.isPending ? "Resetting…" : "Generate Temporary Password"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* OPEN TICKETS */}
+          <TabsContent value="open">
+            <TicketList items={openTickets} />
+          </TabsContent>
+
+          {/* CLOSED TICKETS */}
+          <TabsContent value="closed">
+            <TicketList items={closedTickets} />
+          </TabsContent>
+        </Tabs>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 function AllUsersTab() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [detailUser, setDetailUser] = useState<UserDetailRow | null>(null);
+  const [detailUserOpen, setDetailUserOpen] = useState(false);
 
   const { data: users = [], isLoading } = useQuery<UserOverviewRow[]>({
     queryKey: ["/api/super-admin/users-overview"],
@@ -11162,7 +11400,15 @@ function AllUsersTab() {
                   const name = [u.firstName, u.lastName].filter(Boolean).join(" ") || "—";
                   return (
                     <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
-                      <TableCell className="font-medium">{name}</TableCell>
+                      <TableCell className="font-medium">
+                        <button
+                          className="text-slate-900 hover:text-teal-700 hover:underline text-left font-medium"
+                          onClick={() => { setDetailUser(u); setDetailUserOpen(true); }}
+                          title="View user details"
+                        >
+                          {name}
+                        </button>
+                      </TableCell>
                       <TableCell>{u.email || <span className="text-slate-400">—</span>}</TableCell>
                       <TableCell>{u.orgName || <span className="text-slate-400">—</span>}</TableCell>
                       <TableCell>
@@ -11186,6 +11432,11 @@ function AllUsersTab() {
           </>
         )}
       </CardContent>
+      <UserDetailSheet
+        user={detailUser}
+        open={detailUserOpen}
+        onClose={() => setDetailUserOpen(false)}
+      />
     </Card>
   );
 }

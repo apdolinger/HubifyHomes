@@ -5446,6 +5446,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Public effective flag map for the calling user's org
+  // GET /api/super-admin/users/:userId/support — support tickets submitted by this user
+  app.get("/api/super-admin/users/:userId/support", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const tickets = await db
+        .select()
+        .from(supportRequests)
+        .where(eq(supportRequests.userId, userId))
+        .orderBy(desc(supportRequests.createdAt));
+      res.json(tickets);
+    } catch (err: any) {
+      console.error("[super-admin/users/support]", err?.message ?? err);
+      res.status(500).json({ message: "Failed to fetch user support tickets" });
+    }
+  });
+
+  // POST /api/super-admin/users/:userId/reset-password — set a temporary password
+  app.post("/api/super-admin/users/:userId/reset-password", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      const tempPassword = nanoid(12);
+      const hash = await bcrypt.hash(tempPassword, 12);
+      await db.update(users).set({ passwordHash: hash, updatedAt: new Date() }).where(eq(users.id, userId));
+      res.json({ tempPassword });
+    } catch (err: any) {
+      console.error("[super-admin/users/reset-password]", err?.message ?? err);
+      res.status(500).json({ message: "Failed to reset password" });
+    }
+  });
+
   app.get("/api/feature-flags/me", isAuthenticated, async (req: any, res) => {
     try {
       const { getEffectiveFeatureFlags } = await import("./featureFlags");
