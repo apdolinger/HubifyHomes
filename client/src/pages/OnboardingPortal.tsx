@@ -1499,6 +1499,10 @@ function VerifyingPayment({
   token: string;
   onWorkspaceReady: (setupUrl: string) => void;
 }) {
+  // Track how long we've been polling — after 3 min show a "taking too long" message
+  const startedAt = useRef(Date.now());
+  const [timedOut, setTimedOut] = useState(false);
+
   const { data, isError } = useQuery<OnboardingDetails>({
     queryKey: ["/api/public/onboarding", token, "verify"],
     queryFn: async () => {
@@ -1509,10 +1513,18 @@ function VerifyingPayment({
     refetchInterval: (query) => {
       const d = query.state.data;
       if (d?.stage === "converted" || d?.stage === "provisioning_failed" || d?.provisioningFailed) return false;
+      // Stop polling after 3 minutes — will be showing the timeout message by then
+      if (Date.now() - startedAt.current > 3 * 60 * 1000) return false;
       return 3000;
     },
     retry: 5,
   });
+
+  // Kick off a 3-minute timeout timer
+  useEffect(() => {
+    const id = setTimeout(() => setTimedOut(true), 3 * 60 * 1000);
+    return () => clearTimeout(id);
+  }, []);
 
   useEffect(() => {
     if (data?.stage === "converted") {
@@ -1521,6 +1533,8 @@ function VerifyingPayment({
     }
   }, [data, onWorkspaceReady]);
 
+  const isStuck = data?.provisioningFailed || data?.stage === "provisioning_failed" || timedOut;
+
   if (isError) return (
     <div className="text-center py-10 text-slate-500 text-sm">
       <AlertTriangle className="w-6 h-6 text-amber-400 mx-auto mb-2" />
@@ -1528,19 +1542,25 @@ function VerifyingPayment({
     </div>
   );
 
-  if (data?.provisioningFailed || data?.stage === "provisioning_failed") return (
-    <div className="text-center py-10 text-slate-500 text-sm">
-      <AlertTriangle className="w-6 h-6 text-amber-400 mx-auto mb-2" />
-      <p className="font-medium text-slate-700 mb-1">Setup encountered an issue</p>
-      <p className="mb-3">
-        Your payment was received, but workspace setup hit a snag. Our team has been notified — check your email or contact{" "}
-        <a href="mailto:contact@hubifyhomes.com" className="text-teal-600 hover:underline">contact@hubifyhomes.com</a>.
+  if (isStuck) return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center">
+      <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-4">
+        <AlertTriangle className="w-7 h-7 text-amber-400" />
+      </div>
+      <h2 className="text-lg font-bold text-slate-900 mb-2">This is taking longer than expected</h2>
+      <p className="text-slate-600 text-sm leading-relaxed mb-2">
+        Your payment was received — your workspace is being set up. Sometimes this takes a little longer.
+      </p>
+      <p className="text-slate-500 text-sm mb-5">
+        Try refreshing — if your workspace is ready you'll move straight to the next step. If you keep seeing this, email us at{" "}
+        <a href="mailto:contact@hubifyhomes.com" className="text-teal-600 hover:underline font-medium">contact@hubifyhomes.com</a>{" "}
+        and we'll get you sorted within the hour.
       </p>
       <button
         onClick={() => window.location.reload()}
-        className="inline-flex items-center gap-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium px-4 py-2 rounded-lg transition-colors"
+        className="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors"
       >
-        <RefreshCw className="w-3.5 h-3.5" /> Try again
+        <RefreshCw className="w-4 h-4" /> Refresh page
       </button>
     </div>
   );
