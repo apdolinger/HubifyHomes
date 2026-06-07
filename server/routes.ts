@@ -18342,7 +18342,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if slug is already taken by another org.
-      const { rows: existingOrgs } = await db.pool.query(
+      const { pool: pgPool } = await import("./db");
+      const { rows: existingOrgs } = await pgPool.query(
         "SELECT id FROM orgs WHERE slug = $1 LIMIT 1",
         [slug]
       );
@@ -18360,7 +18361,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // 2) Email membership fallback (org provisioned before slug picker)
         if (!isOwn && prospect.email) {
-          const { rows: memberRows } = await db.pool.query(
+          const { rows: memberRows } = await pgPool.query(
             "SELECT id FROM users WHERE org_id = $1 AND lower(email) = lower($2) LIMIT 1",
             [takenByOrgId, prospect.email]
           );
@@ -18372,7 +18373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      await db.pool.query(
+      await pgPool.query(
         "UPDATE onboarding_prospects SET workspace_slug = $1 WHERE id = $2",
         [slug, prospect.id]
       );
