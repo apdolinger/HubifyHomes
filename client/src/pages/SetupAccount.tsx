@@ -122,11 +122,11 @@ export default function SetupAccount() {
     },
     onSuccess: (result) => {
       const emailParam = result.email ? `?email=${encodeURIComponent(result.email)}` : "";
-      setLocation(`/staff/login${emailParam}`);
+      window.location.href = `/staff/login${emailParam}`;
     },
     onError: (err: any) => {
       if (err?.alreadyClaimed) {
-        setLocation("/staff/login");
+        window.location.href = "/staff/login";
         return;
       }
       toast({

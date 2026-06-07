@@ -1229,3 +1229,24 @@ export async function ensureBetaProvisioningTables(): Promise<void> {
     client.release();
   }
 }
+
+/**
+ * Add workspace_slug column to onboarding_prospects.
+ * Stores the slug chosen by the prospect during the onboarding wizard so
+ * provisionBetaOrg can apply it directly to the org instead of auto-generating.
+ * Idempotent (ADD COLUMN IF NOT EXISTS).
+ */
+export async function ensureProspectWorkspaceSlugColumn(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE onboarding_prospects
+        ADD COLUMN IF NOT EXISTS workspace_slug VARCHAR(63);
+    `);
+    log("[MIGRATE] onboarding_prospects.workspace_slug column verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to add workspace_slug column to onboarding_prospects: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}

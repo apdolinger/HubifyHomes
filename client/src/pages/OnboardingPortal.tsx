@@ -17,7 +17,7 @@ import { openCookiePreferences } from "@/lib/cookieConsent";
 import {
   CheckCircle, Clock, AlertTriangle, Loader2, Lock,
   ShieldCheck, CreditCard, ArrowRight, RefreshCw, XCircle,
-  FileText, ChevronDown, Scale, Shield, Building2,
+  FileText, ChevronDown, Scale, Shield, Building2, Globe,
 } from "lucide-react";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -52,6 +52,7 @@ interface OnboardingDetails {
   paymentCompletedAt?: string | null;
   publicSetupUrl?: string | null;
   provisioningFailed?: boolean;
+  workspaceSlug?: string | null;
 }
 
 // ── Form schema ───────────────────────────────────────────────────────────────
@@ -75,9 +76,10 @@ type AgreementForm = z.infer<typeof agreementSchema>;
 
 const STEPS = [
   { n: 1, label: "Agreement" },
-  { n: 2, label: "Payment Setup" },
-  { n: 3, label: "Initialization" },
-  { n: 4, label: "Welcome" },
+  { n: 2, label: "Workspace" },
+  { n: 3, label: "Payment" },
+  { n: 4, label: "Setup" },
+  { n: 5, label: "Welcome" },
 ];
 
 function StepIndicator({ current }: { current: number }) {
@@ -1247,19 +1249,145 @@ function PaymentStepLocked() {
 
 // ── Workspace ready screen ──────────────────────────────────────────────────────
 
-function WorkspaceReady({ setupUrl, email }: { setupUrl: string; email?: string }) {
+// ── Slug picker step ────────────────────────────────────────────────────────
+
+function SlugPicker({
+  token,
+  initialSlug,
+  onConfirmed,
+}: {
+  token: string;
+  initialSlug: string;
+  onConfirmed: (slug: string) => void;
+}) {
+  const { toast } = useToast();
+  const [slug, setSlug] = useState(initialSlug);
+  const [checkResult, setCheckResult] = useState<{ available: boolean; reason?: string } | null>(null);
+  const [checking, setChecking] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function slugify(s: string) {
+    return s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 63);
+  }
+
+  function handleChange(val: string) {
+    const clean = slugify(val);
+    setSlug(clean);
+    setCheckResult(null);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!clean || clean.length < 3) return;
+    debounceRef.current = setTimeout(async () => {
+      setChecking(true);
+      try {
+        const res = await fetch(`/api/public/check-slug?slug=${encodeURIComponent(clean)}`);
+        const body = await res.json();
+        setCheckResult(body);
+      } catch {
+        setCheckResult({ available: false, reason: "Could not check availability" });
+      } finally {
+        setChecking(false);
+      }
+    }, 500);
+  }
+
+  const saveMutation = useMutation({
+    mutationFn: async (chosenSlug: string) => {
+      const res = await fetch(`/api/public/onboarding/${token}/save-slug`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: chosenSlug }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message ?? "Could not save workspace name");
+      }
+      return res.json() as Promise<{ ok: boolean; slug: string }>;
+    },
+    onSuccess: (data) => onConfirmed(data.slug),
+    onError: (err: any) => toast({ title: "Error", description: err?.message, variant: "destructive" }),
+  });
+
+  const canSubmit = slug.length >= 3 && checkResult?.available === true && !saveMutation.isPending;
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
+      <div className="flex items-center gap-3 mb-5">
+        <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
+          <Globe className="w-5 h-5 text-teal-600" />
+        </div>
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Choose Your Workspace Name</h2>
+          <p className="text-slate-500 text-sm">This is how your organization is identified in Hubify.</p>
+        </div>
+      </div>
+
+      <div className="mb-5">
+        <label className="block text-sm font-medium text-slate-700 mb-1.5">Workspace identifier</label>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={slug}
+            onChange={(e) => handleChange(e.target.value)}
+            placeholder="my-company"
+            maxLength={63}
+            className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent font-mono"
+          />
+          {checking && <Loader2 className="w-4 h-4 text-slate-400 animate-spin shrink-0" />}
+          {!checking && checkResult?.available === true && <CheckCircle className="w-5 h-5 text-teal-600 shrink-0" />}
+          {!checking && checkResult?.available === false && <XCircle className="w-5 h-5 text-red-500 shrink-0" />}
+        </div>
+        {slug.length > 0 && slug.length < 3 && (
+          <p className="text-xs text-amber-600 mt-1.5">Must be at least 3 characters</p>
+        )}
+        {checkResult?.available === false && (
+          <p className="text-xs text-red-600 mt-1.5">{checkResult.reason}</p>
+        )}
+        {checkResult?.available === true && (
+          <p className="text-xs text-teal-600 mt-1.5">✓ This name is available</p>
+        )}
+        <p className="text-xs text-slate-400 mt-2">
+          Only lowercase letters, numbers, and hyphens. Min 3 characters.
+        </p>
+      </div>
+
+      <button
+        onClick={() => saveMutation.mutate(slug)}
+        disabled={!canSubmit}
+        className="w-full flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-semibold text-sm px-6 py-3 rounded-lg transition-colors"
+      >
+        {saveMutation.isPending ? (
+          <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
+        ) : (
+          <>Confirm Workspace Name <ArrowRight className="w-4 h-4" /></>
+        )}
+      </button>
+    </div>
+  );
+}
+
+function WorkspaceReady({ setupUrl, email, slug }: { setupUrl: string; email?: string; slug?: string | null }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center">
       <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center mx-auto mb-4">
         <CheckCircle className="w-9 h-9 text-teal-600" />
       </div>
       <h2 className="text-2xl font-bold text-slate-900 mb-2">Your Workspace Is Ready!</h2>
-      <p className="text-slate-600 text-sm leading-relaxed mb-6">
+      <p className="text-slate-600 text-sm leading-relaxed mb-4">
         Your Hubify organization has been set up. Click the button below to set your password and start using Hubify.
         {email && (
           <> A confirmation email has been sent to <strong>{email}</strong>.</>
         )}
       </p>
+      {slug && (
+        <div className="flex items-center justify-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 mb-5 text-sm text-slate-600 font-mono">
+          <Globe className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+          <span>Workspace: <strong className="text-slate-800">{slug}</strong></span>
+        </div>
+      )}
       <a
         href={setupUrl}
         className="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm px-7 py-3 rounded-lg transition-colors mb-6"
@@ -1391,6 +1519,7 @@ export default function OnboardingPortal() {
   const [localSigned, setLocalSigned] = useState(false);
   const [signerNameLocal, setSignerNameLocal] = useState("");
   const [workspaceSetupUrl, setWorkspaceSetupUrl] = useState<string | null>(null);
+  const [localSlugConfirmed, setLocalSlugConfirmed] = useState(false);
 
   const { data, isLoading, error } = useQuery<OnboardingDetails, { status: number; message: string }>({
     queryKey: ["/api/public/onboarding", token],
@@ -1433,10 +1562,20 @@ export default function OnboardingPortal() {
   }
 
   const agreementSigned = data.alreadySigned || localSigned;
+  const slugConfirmed = localSlugConfirmed || !!data.workspaceSlug || data.paymentStatus === "paid" || data.stage === "platform_initializing" || data.stage === "converted";
   const paymentPaid = data.paymentStatus === "paid" || data.stage === "platform_initializing" || data.stage === "converted";
   const workspaceReady = data.stage === "converted" || !!workspaceSetupUrl;
   const activeSetupUrl = workspaceSetupUrl ?? data.publicSetupUrl ?? null;
-  const currentStep = workspaceReady ? 4 : paymentPaid ? 3 : agreementSigned ? 2 : 1;
+  const activeSlug = data.workspaceSlug ?? null;
+
+  const currentStep = workspaceReady ? 5 : paymentPaid ? 4 : slugConfirmed ? 3 : agreementSigned ? 2 : 1;
+
+  // Derive a default slug from company name for pre-filling the picker
+  const defaultSlug = (data.company || data.name || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 50) || "my-company";
 
   // When Stripe redirects back with ?payment=success, show polling screen
   if (paymentParam === "success" && !workspaceReady) {
@@ -1445,7 +1584,7 @@ export default function OnboardingPortal() {
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-8">
             <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="h-16 w-auto mx-auto mb-6" />
-            <StepIndicator current={3} />
+            <StepIndicator current={4} />
             <h1 className="text-2xl font-bold text-slate-900 mb-1">Setting Up Your Workspace</h1>
             <p className="text-slate-500 text-sm">Payment received. Hang tight while we get everything ready.</p>
           </div>
@@ -1471,7 +1610,13 @@ export default function OnboardingPortal() {
               <p className="text-slate-500 text-sm">Review your membership details and sign your Beta Agreement to continue.</p>
             </>
           )}
-          {agreementSigned && !paymentPaid && (
+          {agreementSigned && !slugConfirmed && (
+            <>
+              <h1 className="text-2xl font-bold text-slate-900 mb-1">Choose Your Workspace Name</h1>
+              <p className="text-slate-500 text-sm">Pick the identifier for your Hubify workspace before completing payment.</p>
+            </>
+          )}
+          {slugConfirmed && !paymentPaid && (
             <>
               <h1 className="text-2xl font-bold text-slate-900 mb-1">Complete Your Payment</h1>
               <p className="text-slate-500 text-sm">Your agreement is signed. Complete payment to activate your platform.</p>
@@ -1504,13 +1649,29 @@ export default function OnboardingPortal() {
           />
         )}
 
-        {agreementSigned && !paymentPaid && (
+        {agreementSigned && !slugConfirmed && (
           <>
             <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 mb-4 text-sm text-teal-700">
               <CheckCircle className="w-4 h-4 shrink-0" />
               <span>
                 Step 1 complete — agreement signed
                 {(data.agreementSignerName || signerNameLocal) && ` by ${data.agreementSignerName ?? signerNameLocal}`}.
+              </span>
+            </div>
+            <SlugPicker
+              token={token!}
+              initialSlug={data.workspaceSlug || defaultSlug}
+              onConfirmed={() => setLocalSlugConfirmed(true)}
+            />
+          </>
+        )}
+
+        {slugConfirmed && !paymentPaid && (
+          <>
+            <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 mb-4 text-sm text-teal-700">
+              <CheckCircle className="w-4 h-4 shrink-0" />
+              <span>
+                Steps 1 &amp; 2 complete — agreement signed and workspace name chosen.
               </span>
             </div>
             <PaymentStep data={data} token={token!} />
@@ -1520,7 +1681,7 @@ export default function OnboardingPortal() {
         {paymentPaid && !workspaceReady && <SettingUp />}
 
         {workspaceReady && activeSetupUrl && (
-          <WorkspaceReady setupUrl={activeSetupUrl} email={data.email} />
+          <WorkspaceReady setupUrl={activeSetupUrl} email={data.email} slug={activeSlug} />
         )}
 
         {workspaceReady && !activeSetupUrl && (

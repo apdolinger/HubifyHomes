@@ -184,10 +184,12 @@ export async function provisionBetaOrg(
       "";
 
     // ── 4. Create org ─────────────────────────────────────────────────────────
+    const chosenSlug = (prospect.workspace_slug as string | null) || undefined;
     const [org] = await tx
       .insert(orgs)
       .values({
         name: orgName,
+        slug: chosenSlug,
         isActive: true,
         orgStatus: "onboarding",
         phone: (prospect.phone as string) ?? undefined,

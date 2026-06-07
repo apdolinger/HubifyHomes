@@ -17827,6 +17827,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Slug availability check (public, no token required) ─────────────────
+  // GET /api/public/check-slug?slug=xxx
+  // Returns { available: boolean, reason?: string }
+  // Must be registered BEFORE the /:token route to avoid slug="check-slug" clash.
+  app.get("/api/public/check-slug", async (req, res) => {
+    try {
+      const raw = (req.query.slug as string | undefined) ?? "";
+      const slug = raw.toLowerCase().trim();
+
+      if (!slug) return res.json({ available: false, reason: "Slug is required" });
+
+      const RESERVED = new Set(["www", "admin", "api", "app", "support", "demo", "mail", "smtp", "ftp", "dev", "staging", "test", "beta", "login", "signup", "register", "help", "docs", "status", "billing", "pay"]);
+      if (RESERVED.has(slug)) {
+        return res.json({ available: false, reason: `"${slug}" is a reserved word` });
+      }
+      if (!/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(slug)) {
+        return res.json({ available: false, reason: "Must be 3–63 characters: lowercase letters, numbers, and hyphens (not at start or end)" });
+      }
+
+      const { eq } = await import("drizzle-orm");
+      const existing = await db.select({ id: orgs.id }).from(orgs).where(eq(orgs.slug, slug)).limit(1);
+      if (existing.length > 0) {
+        return res.json({ available: false, reason: "This workspace name is already taken" });
+      }
+
+      res.json({ available: true });
+    } catch (err) {
+      console.error("Error checking slug availability:", err);
+      res.status(500).json({ available: false, reason: "Server error — please try again" });
+    }
+  });
+
   // ── Public Onboarding (tokenized, no auth) ───────────────────────────────
   // GET /api/public/onboarding/:token
   // Returns approved prospect details needed to render the agreement screen.
@@ -17893,6 +17925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stage: prospect.stage,
         publicSetupUrl,
         provisioningFailed: p.provisioningFailed ?? false,
+        workspaceSlug: p.workspace_slug ?? null,
       });
     } catch (error) {
       console.error("Error fetching onboarding details:", error);
@@ -18221,6 +18254,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error creating beta checkout session:", error);
       res.status(500).json({ message: error?.message ?? "Failed to create payment session." });
+    }
+  });
+
+  // POST /api/public/onboarding/:token/save-slug
+  // Saves the chosen workspace slug onto the prospect before checkout begins.
+  // Validates uniqueness + format. Idempotent (re-saving the same slug is OK).
+  app.post("/api/public/onboarding/:token/save-slug", async (req, res) => {
+    try {
+      const { token } = req.params;
+      if (!token || token.length !== 64 || !/^[0-9a-f]+$/.test(token)) {
+        return res.status(400).json({ message: "Invalid onboarding link." });
+      }
+      const { slug: rawSlug } = req.body ?? {};
+      if (typeof rawSlug !== "string" || !rawSlug.trim()) {
+        return res.status(400).json({ message: "slug is required" });
+      }
+      const slug = rawSlug.toLowerCase().trim();
+
+      const RESERVED = new Set(["www", "admin", "api", "app", "support", "demo", "mail", "smtp", "ftp", "dev", "staging", "test", "beta", "login", "signup", "register", "help", "docs", "status", "billing", "pay"]);
+      if (RESERVED.has(slug)) {
+        return res.status(400).json({ message: `"${slug}" is a reserved word` });
+      }
+      if (!/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(slug)) {
+        return res.status(400).json({ message: "Must be 3–63 characters: lowercase letters, numbers, and hyphens (not at start or end)" });
+      }
+
+      const { eq, and, ne } = await import("drizzle-orm");
+
+      const rows = await db.select().from(onboardingProspects).where(eq(onboardingProspects.onboardingToken, token)).limit(1);
+      const prospect = rows[0];
+      if (!prospect) return res.status(404).json({ message: "Onboarding link not found." });
+      if (!prospect.isBetaMember || !prospect.betaApprovedAt) {
+        return res.status(403).json({ message: "Application not approved." });
+      }
+      if (prospect.onboardingTokenExpiresAt && new Date(prospect.onboardingTokenExpiresAt) < new Date()) {
+        return res.status(410).json({ message: "This onboarding link has expired." });
+      }
+      if (prospect.stage === "converted") {
+        return res.json({ ok: true, slug });
+      }
+
+      const existing = await db.select({ id: orgs.id }).from(orgs).where(eq(orgs.slug, slug)).limit(1);
+      if (existing.length > 0) {
+        return res.status(409).json({ message: "This workspace name is already taken" });
+      }
+
+      await db.execute(
+        sql`UPDATE onboarding_prospects SET workspace_slug = ${slug} WHERE id = ${prospect.id}`
+      );
+
+      res.json({ ok: true, slug });
+    } catch (err: any) {
+      console.error("Error saving workspace slug:", err);
+      res.status(500).json({ message: "Failed to save workspace name." });
     }
   });
 

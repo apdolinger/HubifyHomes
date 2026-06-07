@@ -629,6 +629,12 @@ app.use((req, res, next) => {
       } catch (err) {
         console.error('Error ensuring beta provisioning tables:', err);
       }
+      try {
+        const { ensureProspectWorkspaceSlugColumn } = await import('./runMigrations.js');
+        await ensureProspectWorkspaceSlugColumn();
+      } catch (err) {
+        console.error('Error ensuring prospect workspace_slug column:', err);
+      }
     } catch (error) {
       console.error('Error loading startup migrations:', error);
     }
