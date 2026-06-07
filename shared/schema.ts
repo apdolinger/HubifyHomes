@@ -3477,6 +3477,7 @@ export const onboardingProspects = pgTable("onboarding_prospects", {
   // Beta payment details (populated after Stripe Checkout completes)
   paymentStatus: varchar("payment_status"),
   paymentCompletedAt: timestamp("payment_completed_at"),
+  paymentReceiptEmailSentAt: timestamp("payment_receipt_email_sent_at"),
   betaStripeCustomerId: varchar("beta_stripe_customer_id"),
   betaStripeSubscriptionId: varchar("beta_stripe_subscription_id"),
   betaStripeCheckoutSessionId: varchar("beta_stripe_checkout_session_id"),

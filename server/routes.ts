@@ -18296,6 +18296,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
           betaStripeCheckoutSessionId: "waived_100pct_discount",
         } as any).where(eq(onboardingProspects.id, prospect.id));
 
+        // Send payment receipt email for $0 tier
+        const pEmail = prospect.email ?? "";
+        if (pEmail) {
+          try {
+            const resendKey = process.env.RESEND_API_KEY;
+            if (resendKey) {
+              const { Resend } = await import("resend");
+              const { buildPaymentReceiptEmail } = await import("./emailUtils");
+              const r = new Resend(resendKey);
+              const fromEmail = process.env.RESEND_FROM_EMAIL || "no-reply@hubifyhomesonline.com";
+              const firstName = (p.firstName as string) || ((p.name as string) || "").split(" ")[0] || "there";
+              const orgName = (p.company as string) || (p.name as string) || "your organization";
+              await r.emails.send({
+                from: fromEmail,
+                replyTo: "contact@hubifyhomes.com",
+                to: pEmail,
+                subject: "Payment received — your Hubify workspace is being set up",
+                html: buildPaymentReceiptEmail({ firstName, orgName, amountCents: 0, currency: "usd", paidAt: now }),
+              });
+              await db.update(onboardingProspects).set({
+                paymentReceiptEmailSentAt: now,
+              } as any).where(eq(onboardingProspects.id, prospect.id));
+              console.log(`[create-checkout] Payment receipt sent to ${pEmail}`);
+            }
+          } catch (emailErr) {
+            console.error(`[create-checkout] Failed to send payment receipt:`, emailErr);
+          }
+        }
+
         // Auto-provision immediately for $0 tier (no Stripe webhook will fire)
         const baseUrl = `${req.protocol}://${req.get("host")}`;
         try {

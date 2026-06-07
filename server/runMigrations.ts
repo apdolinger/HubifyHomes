@@ -1306,3 +1306,18 @@ export async function ensureMultiTenancyOrgIdColumns(): Promise<void> {
     client.release();
   }
 }
+
+export async function ensurePaymentReceiptEmailColumn(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE onboarding_prospects
+        ADD COLUMN IF NOT EXISTS payment_receipt_email_sent_at TIMESTAMP;
+    `);
+    log("[MIGRATE] onboarding_prospects.payment_receipt_email_sent_at column verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to ensure payment_receipt_email_sent_at column: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}

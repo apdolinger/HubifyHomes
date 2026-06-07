@@ -191,6 +191,7 @@ interface Prospect {
   // Payment setup fields (Task #231)
   paymentStatus: string | null;
   paymentCompletedAt: string | null;
+  paymentReceiptEmailSentAt: string | null;
   betaStripeCustomerId: string | null;
   betaStripeSubscriptionId: string | null;
   betaStripeCheckoutSessionId: string | null;
@@ -303,6 +304,7 @@ const TRACKER_CHECKLIST: {
       { key: "payment_method_added",     label: "Payment method added",     auto: null },
       { key: "subscription_active",      label: "Subscription active",      auto: (p) => !!p.betaStripeSubscriptionId },
       { key: "initial_payment_complete", label: "Initial payment complete", auto: (p) => p.paymentStatus === "paid" },
+      { key: "payment_receipt_sent",     label: "Payment receipt email sent", auto: (p) => !!p.paymentReceiptEmailSentAt },
     ],
   },
   {
@@ -561,15 +563,22 @@ function OnboardingTrackerSection({
 
                     {/* Payment Status */}
                     <TableCell>
-                      {p.paymentStatus ? (
-                        <Badge variant="outline" className={`text-xs capitalize ${
-                          p.paymentStatus === "paid"    ? "border-green-300 text-green-700 bg-green-50" :
-                          p.paymentStatus === "pending" ? "border-amber-300 text-amber-700 bg-amber-50" :
-                          "border-gray-300 text-gray-600"
-                        }`}>
-                          {p.paymentStatus}
-                        </Badge>
-                      ) : <span className="text-gray-300 text-xs">—</span>}
+                      <div className="flex flex-col gap-1">
+                        {p.paymentStatus ? (
+                          <Badge variant="outline" className={`text-xs capitalize ${
+                            p.paymentStatus === "paid"    ? "border-green-300 text-green-700 bg-green-50" :
+                            p.paymentStatus === "pending" ? "border-amber-300 text-amber-700 bg-amber-50" :
+                            "border-gray-300 text-gray-600"
+                          }`}>
+                            {p.paymentStatus}
+                          </Badge>
+                        ) : <span className="text-gray-300 text-xs">—</span>}
+                        {p.paymentReceiptEmailSentAt && (
+                          <span className="text-xs text-green-600 flex items-center gap-0.5" title={`Receipt sent ${new Date(p.paymentReceiptEmailSentAt).toLocaleString()}`}>
+                            ✉ Receipt sent
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
 
                     {/* Setup Progress % */}

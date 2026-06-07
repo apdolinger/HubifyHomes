@@ -675,6 +675,72 @@ export function generateInvoiceEmailHTML(data: InvoiceEmailData): string {
 `;
 }
 
+// ── Payment receipt email ────────────────────────────────────────────────────
+export function buildPaymentReceiptEmail(opts: {
+  firstName: string;
+  orgName: string;
+  amountCents: number;
+  currency: string;
+  paidAt: Date;
+}): string {
+  const { firstName, orgName, amountCents, currency, paidAt } = opts;
+  const logoUrl = getHubifyHomesEmailLogoUrl();
+  const amount = amountCents > 0
+    ? new Intl.NumberFormat("en-US", { style: "currency", currency: currency.toUpperCase() }).format(amountCents / 100)
+    : "$0.00 (100% founding member discount applied)";
+  const dateStr = paidAt.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+
+  return `<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f1f5f9;font-family:sans-serif">
+<div style="max-width:540px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+  <div style="background:#0097BD;padding:24px 32px;text-align:center">
+    <img src="${logoUrl}" alt="Hubify Homes" width="160" style="width:160px;height:auto;display:block;margin:0 auto">
+  </div>
+  <div style="padding:32px">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;background:#d1fae5;border-radius:50%;margin-bottom:12px">
+        <span style="font-size:28px">&#10003;</span>
+      </div>
+      <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 4px">Payment received</h1>
+      <p style="font-size:14px;color:#64748b;margin:0">Thank you, ${firstName}. Your payment has been confirmed.</p>
+    </div>
+
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px;margin-bottom:24px">
+      <table style="width:100%;border-collapse:collapse;font-size:14px">
+        <tr>
+          <td style="padding:6px 0;color:#64748b">Organization</td>
+          <td style="padding:6px 0;color:#0f172a;font-weight:600;text-align:right">${orgName}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;color:#64748b">Date</td>
+          <td style="padding:6px 0;color:#0f172a;text-align:right">${dateStr}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;color:#64748b;border-top:1px solid #e2e8f0">Amount charged</td>
+          <td style="padding:6px 0;color:#16a34a;font-weight:700;text-align:right;border-top:1px solid #e2e8f0">${amount}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:16px;margin-bottom:24px">
+      <p style="font-size:13px;color:#1e40af;margin:0;line-height:1.6">
+        <strong>What happens next?</strong><br>
+        We are setting up your Hubify workspace now. You will receive a separate email with your login link and setup instructions shortly.
+      </p>
+    </div>
+
+    <p style="font-size:13px;color:#64748b;margin:0;text-align:center">
+      Questions? Reply to this email or contact us at
+      <a href="mailto:contact@hubifyhomes.com" style="color:#0097BD">contact@hubifyhomes.com</a>
+    </p>
+  </div>
+  <div style="background:#f8fafc;padding:16px 32px;text-align:center;border-top:1px solid #e2e8f0">
+    <p style="font-size:12px;color:#94a3b8;margin:0">Hubify Homes &middot; <a href="https://hubifyhomesonline.com/privacy" style="color:#94a3b8">Privacy Policy</a></p>
+  </div>
+</div>
+</body></html>`;
+}
+
 // Generic function to send simple HTML emails via Resend
 export async function sendGenericEmail({
   to,
