@@ -18342,10 +18342,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if slug is already taken by another org.
-      const existingRows = await db.execute(
-        sql`SELECT id FROM orgs WHERE slug = ${slug} LIMIT 1`
+      const { rows: existingOrgs } = await db.pool.query(
+        "SELECT id FROM orgs WHERE slug = $1 LIMIT 1",
+        [slug]
       );
-      const existingOrg = (existingRows as any).rows?.[0] ?? existingRows[0] ?? null;
+      const existingOrg = existingOrgs[0] ?? null;
 
       if (existingOrg) {
         const takenByOrgId = existingOrg.id as string;
@@ -18359,11 +18360,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // 2) Email membership fallback (org provisioned before slug picker)
         if (!isOwn && prospect.email) {
-          const memberRows = await db.execute(
-            sql`SELECT id FROM users WHERE org_id = ${takenByOrgId} AND lower(email) = lower(${prospect.email}) LIMIT 1`
+          const { rows: memberRows } = await db.pool.query(
+            "SELECT id FROM users WHERE org_id = $1 AND lower(email) = lower($2) LIMIT 1",
+            [takenByOrgId, prospect.email]
           );
-          const member = (memberRows as any).rows?.[0] ?? memberRows[0] ?? null;
-          if (member) isOwn = true;
+          if (memberRows[0]) isOwn = true;
         }
 
         if (!isOwn) {
@@ -18371,8 +18372,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      await db.execute(
-        sql`UPDATE onboarding_prospects SET workspace_slug = ${slug} WHERE id = ${prospect.id}`
+      await db.pool.query(
+        "UPDATE onboarding_prospects SET workspace_slug = $1 WHERE id = $2",
+        [slug, prospect.id]
       );
 
       res.json({ ok: true, slug });
