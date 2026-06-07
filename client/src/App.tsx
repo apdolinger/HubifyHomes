@@ -540,7 +540,7 @@ function TenantGate({ children }: { children: React.ReactNode }) {
     if (tenant.orgStatus === "archived") {
       return <TenantStatusPage status="archived" orgName={tenant.name ?? tenant.subdomain} />;
     }
-    if (tenant.orgStatus === "pending" || tenant.orgStatus === "onboarding") {
+    if (tenant.orgStatus === "pending") {
       return <TenantStatusPage status="pending" orgName={tenant.name ?? tenant.subdomain} />;
     }
   }
