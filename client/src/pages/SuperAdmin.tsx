@@ -97,6 +97,7 @@ import {
   Layers,
   FileCheck,
   LogOut,
+  Link,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -804,6 +805,8 @@ function ProspectCard({
   sendingEmail,
   onConvertToOrg,
   convertingToOrg,
+  onForceLinkExistingOrg,
+  forceLinkingExistingOrg,
   onSendDemoEmail,
   sendingDemoEmail,
   onGoToOrganizations,
@@ -818,6 +821,8 @@ function ProspectCard({
   sendingEmail: boolean;
   onConvertToOrg: () => void;
   convertingToOrg: boolean;
+  onForceLinkExistingOrg?: () => void;
+  forceLinkingExistingOrg?: boolean;
   onSendDemoEmail?: () => void;
   sendingDemoEmail?: boolean;
   onGoToOrganizations?: () => void;
@@ -1052,6 +1057,23 @@ function ProspectCard({
             </Button>
           )}
         </div>
+      )}
+
+      {/* Force-link button — shown when provisioning is stuck or failed and no org linked yet */}
+      {!prospect.orgId && (prospect.provisioningFailed || prospect.stage === "provisioning_failed" || prospect.stage === "platform_initializing") && onForceLinkExistingOrg && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-6 text-xs px-2 w-full border-amber-300 text-amber-700 hover:bg-amber-50"
+          onClick={onForceLinkExistingOrg}
+          disabled={forceLinkingExistingOrg}
+          title="Find existing user by email and link this prospect to their org — use when provisioning failed with a duplicate-email error"
+        >
+          {forceLinkingExistingOrg
+            ? <><RefreshCw className="w-3 h-3 mr-1 animate-spin" /> Linking…</>
+            : <><Link className="w-3 h-3 mr-1" /> Force Link Existing Org</>
+          }
+        </Button>
       )}
 
       <div className="flex items-center gap-1 pt-1">
@@ -2893,6 +2915,30 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
     }),
   });
 
+  const forceLinkMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/force-link-existing-org`, {});
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || "Force link failed");
+      }
+      return await res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/organizations"] });
+      toast({
+        title: "Prospect linked!",
+        description: `Linked to org: ${data.org?.name ?? data.orgId}. They can log in at /staff/login.`,
+      });
+    },
+    onError: (e: Error) => toast({
+      title: "Force link failed",
+      description: e?.message || "Could not link prospect to existing org",
+      variant: "destructive",
+    }),
+  });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -3051,6 +3097,8 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
                         sendingEmail={welcomeEmailMutation.isPending && welcomeEmailMutation.variables === p.id}
                         onConvertToOrg={() => convertToOrgMutation.mutate(p.id)}
                         convertingToOrg={convertToOrgMutation.isPending && convertToOrgMutation.variables === p.id}
+                        onForceLinkExistingOrg={() => forceLinkMutation.mutate(p.id)}
+                        forceLinkingExistingOrg={forceLinkMutation.isPending && forceLinkMutation.variables === p.id}
                         onSendDemoEmail={() => demoEmailMutation.mutate(p.id)}
                         sendingDemoEmail={demoEmailMutation.isPending && demoEmailMutation.variables === p.id}
                         onGoToOrganizations={onGoToOrganizations}

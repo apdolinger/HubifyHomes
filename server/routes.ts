@@ -19650,6 +19650,62 @@ contact@hubifyhomes.com`;
     }
   });
 
+  // Emergency force-link: directly attach a prospect to the org that already owns
+  // their email, bypassing provisionBetaOrg entirely. Use when provisioning
+  // failed with a duplicate-email error and the org already exists.
+  app.post("/api/super-admin/onboarding-prospects/:id/force-link-existing-org", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { pool } = await import("./db");
+
+      // Fetch the prospect
+      const prospectRes = await pool.query(
+        "SELECT id, email, org_id, stage FROM onboarding_prospects WHERE id = $1 LIMIT 1",
+        [id]
+      );
+      const prospect = prospectRes.rows[0];
+      if (!prospect) return res.status(404).json({ message: "Prospect not found" });
+      if (prospect.org_id) {
+        return res.status(409).json({ message: "Prospect is already linked to an org", orgId: prospect.org_id });
+      }
+      if (!prospect.email) return res.status(400).json({ message: "Prospect has no email" });
+
+      // Find an existing user with the same email
+      const userRes = await pool.query(
+        "SELECT id, org_id FROM users WHERE lower(email) = lower($1) LIMIT 1",
+        [prospect.email]
+      );
+      const existingUser = userRes.rows[0];
+      if (!existingUser?.org_id) {
+        return res.status(404).json({ message: `No existing user+org found for email ${prospect.email}` });
+      }
+
+      // Directly link the prospect
+      await pool.query(
+        `UPDATE onboarding_prospects
+         SET org_id = $1, stage = 'converted', provisioned_at = NOW(),
+             provisioning_failed = false, provisioning_error = NULL
+         WHERE id = $2`,
+        [existingUser.org_id, id]
+      );
+
+      // Fetch the org for context
+      const orgRes = await pool.query("SELECT id, name, slug FROM orgs WHERE id = $1 LIMIT 1", [existingUser.org_id]);
+      const org = orgRes.rows[0];
+
+      res.json({
+        message: "Prospect force-linked to existing org",
+        orgId: existingUser.org_id,
+        userId: existingUser.id,
+        org,
+        loginUrl: `${req.protocol}://${req.get("host")}/staff/login`,
+      });
+    } catch (error) {
+      console.error("Error force-linking prospect:", error);
+      res.status(500).json({ message: "Failed to force-link prospect" });
+    }
+  });
+
   // Org setup progress endpoints
   // Middleware that permits either a staff session (isAuthenticated) or an active super-admin session.
   const isAuthenticatedOrSuperAdmin = (req: any, res: any, next: any) => {
