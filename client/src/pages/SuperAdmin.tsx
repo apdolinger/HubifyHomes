@@ -2679,22 +2679,22 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
   };
 
   const saveMutation = useMutation({
-    mutationFn: async (values: ProspectFormValues) => {
-      if (editingProspect) {
+    mutationFn: async ({ values, editId, agreementSigned }: { values: ProspectFormValues; editId?: string; agreementSigned?: boolean }) => {
+      if (editId) {
         // Strip agreementContent from PATCH payload when the agreement is already
         // signed — the server guards immutability and would reject unrelated edits.
         const payload = { ...values };
-        if (editingProspect.agreementSignedAt) {
+        if (agreementSigned) {
           delete (payload as Partial<typeof payload>).agreementContent;
         }
-        return apiRequest("PATCH", `/api/super-admin/onboarding-prospects/${editingProspect.id}`, payload);
+        return apiRequest("PATCH", `/api/super-admin/onboarding-prospects/${editId}`, payload);
       }
       return apiRequest("POST", "/api/super-admin/onboarding-prospects", values);
     },
-    onSuccess: () => {
+    onSuccess: (_, { editId }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
       setSheetOpen(false);
-      toast({ title: editingProspect ? "Prospect updated" : "Prospect added to Submission" });
+      toast({ title: editId ? "Prospect updated" : "Prospect added to Submission" });
     },
     onError: (error: Error) => {
       const match = error.message.match(/^\d+: (.+)$/);
@@ -3211,7 +3211,7 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
           </SheetHeader>
           <Separator className="my-4" />
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(v => saveMutation.mutate(v))} className="space-y-4">
+            <form onSubmit={form.handleSubmit(v => saveMutation.mutate({ values: v, editId: editingProspect?.id, agreementSigned: !!editingProspect?.agreementSignedAt }))} className="space-y-4">
               <FormField
                 control={form.control}
                 name="name"
