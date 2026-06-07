@@ -3392,6 +3392,8 @@ export type OnboardingStage =
   | "inquiry"
   | "agreement"
   | "payment_setup"
+  | "platform_initializing"
+  | "provisioning_failed"
   | "initial_payment"
   | "welcome"
   | "dropped"

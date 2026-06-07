@@ -112,7 +112,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 // Onboarding Pipeline Tab
 // ============================================================================
 
-type OnboardingStage = "contact" | "inquiry" | "agreement" | "payment_pending" | "payment_setup" | "platform_initializing" | "initial_payment" | "welcome" | "dropped" | "demo_requested" | "demo_sent" | "demo_completed" | "follow_up_needed" | "converted" | "not_a_fit" | "beta_approved" | "agreement_pending";
+type OnboardingStage = "contact" | "inquiry" | "agreement" | "payment_pending" | "payment_setup" | "platform_initializing" | "provisioning_failed" | "initial_payment" | "welcome" | "dropped" | "demo_requested" | "demo_sent" | "demo_completed" | "follow_up_needed" | "converted" | "not_a_fit" | "beta_approved" | "agreement_pending";
 
 interface StageHistoryEntry { stage: OnboardingStage; enteredAt: string; }
 
@@ -194,6 +194,11 @@ interface Prospect {
   betaStripeCustomerId: string | null;
   betaStripeSubscriptionId: string | null;
   betaStripeCheckoutSessionId: string | null;
+  // Provisioning state
+  provisioningFailed: boolean | null;
+  provisioningError: string | null;
+  provisionedAt: string | null;
+  workspaceSlug: string | null;
   // Onboarding tracker fields
   owner: string | null;
   nextAction: string | null;
@@ -228,6 +233,7 @@ const PIPELINE_STAGES: { key: OnboardingStage; label: string; color: string }[] 
   { key: "payment_pending",      label: "Payment Pending",      color: "border-orange-300 bg-orange-50" },
   { key: "payment_setup",        label: "Payment Setup",        color: "border-orange-400 bg-orange-50" },
   { key: "platform_initializing", label: "Platform Initializing", color: "border-violet-400 bg-violet-50" },
+  { key: "provisioning_failed",   label: "Provisioning Failed",   color: "border-red-400 bg-red-50" },
   { key: "initial_payment",   label: "Initial Payment",    color: "border-purple-400 bg-purple-50" },
   { key: "welcome",           label: "Welcome",            color: "border-green-400 bg-green-50" },
   { key: "demo_requested",    label: "Demo Requested",     color: "border-sky-400 bg-sky-50" },
