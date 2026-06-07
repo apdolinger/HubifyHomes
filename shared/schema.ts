@@ -3497,6 +3497,8 @@ export const onboardingProspects = pgTable("onboarding_prospects", {
   nextAction: text("next_action"),
   lastContactedAt: timestamp("last_contacted_at"),
   onboardingChecklist: jsonb("onboarding_checklist").$type<Record<string, boolean>>(),
+  // Workspace slug chosen during onboarding wizard (used by provisionBetaOrg as orgs.slug)
+  workspaceSlug: varchar("workspace_slug", { length: 63 }),
   // Auto-provisioning status (populated by provisionBetaOrg())
   provisioningFailed: boolean("provisioning_failed").default(false),
   provisioningError: text("provisioning_error"),

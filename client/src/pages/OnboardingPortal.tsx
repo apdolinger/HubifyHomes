@@ -1283,7 +1283,7 @@ function SlugPicker({
     debounceRef.current = setTimeout(async () => {
       setChecking(true);
       try {
-        const res = await fetch(`/api/public/check-slug?slug=${encodeURIComponent(clean)}`);
+        const res = await fetch(`/api/public/onboarding/check-slug?slug=${encodeURIComponent(clean)}`);
         const body = await res.json();
         setCheckResult(body);
       } catch {
@@ -1370,6 +1370,10 @@ function SlugPicker({
 }
 
 function WorkspaceReady({ setupUrl, email, slug }: { setupUrl: string; email?: string; slug?: string | null }) {
+  const workspaceUrl = slug
+    ? `https://${slug}.hubifyhomesonline.com`
+    : `${window.location.origin}/staff/login`;
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center">
       <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center mx-auto mb-4">
@@ -1383,9 +1387,17 @@ function WorkspaceReady({ setupUrl, email, slug }: { setupUrl: string; email?: s
         )}
       </p>
       {slug && (
-        <div className="flex items-center justify-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 mb-5 text-sm text-slate-600 font-mono">
+        <div className="flex items-center justify-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 mb-5 text-sm text-slate-600">
           <Globe className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-          <span>Workspace: <strong className="text-slate-800">{slug}</strong></span>
+          <span className="text-slate-500 text-xs">Your workspace URL:</span>
+          <a
+            href={workspaceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="font-mono text-teal-700 hover:text-teal-900 hover:underline font-medium"
+          >
+            {workspaceUrl}
+          </a>
         </div>
       )}
       <a

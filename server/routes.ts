@@ -17828,10 +17828,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ── Slug availability check (public, no token required) ─────────────────
-  // GET /api/public/check-slug?slug=xxx
+  // GET /api/public/onboarding/check-slug?slug=xxx
   // Returns { available: boolean, reason?: string }
   // Must be registered BEFORE the /:token route to avoid slug="check-slug" clash.
-  app.get("/api/public/check-slug", async (req, res) => {
+  app.get("/api/public/onboarding/check-slug", async (req, res) => {
     try {
       const raw = (req.query.slug as string | undefined) ?? "";
       const slug = raw.toLowerCase().trim();
@@ -17925,7 +17925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stage: prospect.stage,
         publicSetupUrl,
         provisioningFailed: p.provisioningFailed ?? false,
-        workspaceSlug: p.workspace_slug ?? null,
+        workspaceSlug: prospect.workspaceSlug ?? null,
       });
     } catch (error) {
       console.error("Error fetching onboarding details:", error);
