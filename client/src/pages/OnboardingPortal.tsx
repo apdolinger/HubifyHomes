@@ -1396,6 +1396,9 @@ function WorkspaceReady({ setupUrl, email, slug, accountPasswordSet }: { setupUr
   const workspaceUrl = slug
     ? `https://${slug}.hubifyhomesonline.com`
     : `${window.location.origin}/staff/login`;
+  const loginUrl = slug
+    ? `https://${slug}.hubifyhomesonline.com/staff/login`
+    : `${window.location.origin}/staff/login`;
 
   // Three cases:
   // 1. Password set in-wizard → setupUrl is /staff/login, accountPasswordSet=true
@@ -1432,7 +1435,7 @@ function WorkspaceReady({ setupUrl, email, slug, accountPasswordSet }: { setupUr
         </div>
       )}
       <a
-        href={isDirectLogin ? `${window.location.origin}/staff/login` : setupUrl}
+        href={isDirectLogin ? loginUrl : setupUrl}
         className="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm px-7 py-3 rounded-lg transition-colors mb-6"
       >
         {isDirectLogin ? "Go to Your Workspace" : "Set Your Password"} <ArrowRight className="w-4 h-4" />
@@ -1927,15 +1930,24 @@ export default function OnboardingPortal() {
               <CheckCircle className="w-9 h-9 text-teal-600" />
             </div>
             <h2 className="text-xl font-bold text-slate-900 mb-2">Workspace Ready</h2>
-            <p className="text-slate-600 text-sm mb-6">
-              {data.accountPasswordSet
-                ? <>Your account is all set. <a href="/staff/login" className="text-teal-600 hover:underline font-medium">Log in</a> with the email and password you created.</>
-                : <>Check your email for the setup link, or{" "}<a href="/staff/login" className="text-teal-600 hover:underline">sign in directly</a> if you've already set your password.</>
-              }
-            </p>
-            <a href="/staff/login" className="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors">
-              Go to Your Workspace <ArrowRight className="w-4 h-4" />
-            </a>
+            {(() => {
+              const fallbackLogin = activeSlug
+                ? `https://${activeSlug}.hubifyhomesonline.com/staff/login`
+                : `${window.location.origin}/staff/login`;
+              return (
+                <>
+                  <p className="text-slate-600 text-sm mb-6">
+                    {data.accountPasswordSet
+                      ? <>Your account is all set. <a href={fallbackLogin} className="text-teal-600 hover:underline font-medium">Log in</a> with the email and password you created.</>
+                      : <>Check your email for the setup link, or{" "}<a href={fallbackLogin} className="text-teal-600 hover:underline">sign in directly</a> if you've already set your password.</>
+                    }
+                  </p>
+                  <a href={fallbackLogin} className="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors">
+                    Go to Your Workspace <ArrowRight className="w-4 h-4" />
+                  </a>
+                </>
+              );
+            })()}
           </div>
         )}
 
