@@ -70,6 +70,8 @@ export async function setupAuth(app: Express) {
         return res.status(401).json({ message: "Invalid email or password." });
       }
 
+      // Ensure SA and staff sessions never coexist — clear SA session on staff login.
+      (req.session as any).superAdmin = null;
       (req.session as any).staffUser = {
         id: user.id,
         email: user.email,

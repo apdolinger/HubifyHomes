@@ -1066,7 +1066,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update user with orgId
       await storage.updateUser(user.id, { orgId: testOrg.id });
       
-      // Set staff session for dev login
+      // Set staff session for dev login — clear SA session to avoid collision.
+      (req.session as any).superAdmin = null;
       (req.session as any).staffUser = {
         id: user.id,
         email: user.email,
@@ -1130,6 +1131,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(401).json({ message: "Invalid credentials" });
         }
 
+        // Ensure SA and staff sessions never coexist — clear staff session on SA login.
+        (req.session as any).staffUser = null;
         (req.session as any).superAdmin = {
           authenticated: true,
           username: email,
@@ -1187,6 +1190,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
+      // Ensure SA and staff sessions never coexist — clear staff session on SA login.
+      (req.session as any).staffUser = null;
       (req.session as any).superAdmin = {
         authenticated: true,
         username,
@@ -1227,6 +1232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     (req.session as any).superAdmin = null;
+    await new Promise<void>((resolve) => req.session.save(() => resolve()));
     res.json({ message: "Logged out successfully" });
   });
 

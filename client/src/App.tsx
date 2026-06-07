@@ -443,6 +443,7 @@ function AuthWrapper() {
   // redirect — they identify the intended recipient via a URL token, not by the
   // browser session, so an active Super Admin session must not hijack them.
   const isPublicOrTokenRoute =
+    location === "/" ||
     location.startsWith("/onboarding/") ||
     location.startsWith("/payment-collection/") ||
     location.startsWith("/r/") ||
