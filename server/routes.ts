@@ -18293,48 +18293,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: parsed.error.errors[0]?.message ?? "Invalid input." });
       }
 
-      // Preliminary read to get userId and validate state before entering transaction
-      const tokenRows = await db
+      // Quick preliminary check before hashing (avoids bcrypt cost on obviously invalid tokens)
+      const precheck = await db
         .select()
         .from(accountSetupTokens)
         .where(eq(accountSetupTokens.token, token))
         .limit(1);
-      const tokenRow = tokenRows[0];
-      if (!tokenRow) return res.status(404).json({ message: "Setup link not found." });
-      if (tokenRow.claimedAt) return res.status(409).json({ message: "This setup link has already been used. Please sign in.", alreadyClaimed: true });
-      if (new Date(tokenRow.expiresAt) < new Date()) return res.status(410).json({ message: "This setup link has expired." });
+      const pre = precheck[0];
+      if (!pre) return res.status(404).json({ message: "Setup link not found." });
+      if (pre.claimedAt) return res.status(409).json({ message: "This setup link has already been used. Please sign in.", alreadyClaimed: true });
+      if (new Date(pre.expiresAt) < new Date()) return res.status(410).json({ message: "This setup link has expired." });
 
+      // Hash password before the transaction (CPU-bound; does not need a DB connection)
       const passwordHash = await bcrypt.hash(parsed.data.password, 12);
 
-      // Atomic claim: UPDATE WHERE claimed_at IS NULL ensures single-use even under race conditions
-      const claimed = await db
-        .update(accountSetupTokens)
-        .set({ claimedAt: new Date() })
-        .where(
-          and(
-            eq(accountSetupTokens.token, token),
-            isNull(accountSetupTokens.claimedAt),
-            gt(accountSetupTokens.expiresAt, new Date())
+      // Atomic transaction: claim token AND set password together.
+      // If either write fails the whole transaction rolls back, leaving the token unclaimed.
+      let email: string | null = null;
+      await db.transaction(async (tx) => {
+        // Conditional claim: only succeeds if token is still unclaimed and unexpired
+        const claimed = await tx
+          .update(accountSetupTokens)
+          .set({ claimedAt: new Date() })
+          .where(
+            and(
+              eq(accountSetupTokens.token, token),
+              isNull(accountSetupTokens.claimedAt),
+              gt(accountSetupTokens.expiresAt, new Date())
+            )
           )
-        )
-        .returning({ id: accountSetupTokens.id, userId: accountSetupTokens.userId });
+          .returning({ id: accountSetupTokens.id, userId: accountSetupTokens.userId });
 
-      if (claimed.length === 0) {
-        // Another concurrent request won the race
-        return res.status(409).json({ message: "This setup link has already been used. Please sign in.", alreadyClaimed: true });
-      }
+        if (claimed.length === 0) {
+          // Another concurrent request won the race — abort and signal caller
+          throw Object.assign(new Error("ALREADY_CLAIMED"), { alreadyClaimed: true });
+        }
 
-      const updates: any = { passwordHash, updatedAt: new Date() };
-      if (parsed.data.firstName) updates.firstName = parsed.data.firstName;
-      if (parsed.data.lastName !== undefined) updates.lastName = parsed.data.lastName;
-      await db.update(users).set(updates).where(eq(users.id, claimed[0].userId));
+        const updates: any = { passwordHash, updatedAt: new Date() };
+        if (parsed.data.firstName) updates.firstName = parsed.data.firstName;
+        if (parsed.data.lastName !== undefined) updates.lastName = parsed.data.lastName;
+        await tx.update(users).set(updates).where(eq(users.id, claimed[0].userId));
 
-      // Fetch user email for the frontend redirect
-      const userRows = await db.select({ email: users.email }).from(users).where(eq(users.id, claimed[0].userId)).limit(1);
-      const email = userRows[0]?.email ?? null;
+        // Fetch email inside the transaction so we have it for the redirect
+        const userRows = await tx
+          .select({ email: users.email })
+          .from(users)
+          .where(eq(users.id, claimed[0].userId))
+          .limit(1);
+        email = userRows[0]?.email ?? null;
+      });
 
       res.json({ email });
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.alreadyClaimed) {
+        return res.status(409).json({ message: "This setup link has already been used. Please sign in.", alreadyClaimed: true });
+      }
       console.error("Error claiming setup token:", error);
       res.status(500).json({ message: "Failed to set up account." });
     }
