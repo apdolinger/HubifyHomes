@@ -120,7 +120,12 @@ export default function StaffLogin() {
               )}
             </Button>
           </form>
-          <div className="mt-6 text-center text-sm text-muted-foreground">
+          <div className="mt-6 space-y-2 text-center text-sm text-muted-foreground">
+            <p>
+              <Link href="/staff/forgot-password" className="text-primary hover:underline">
+                Forgot password?
+              </Link>
+            </p>
             <p>
               Client portal?{' '}
               <Link href="/portal/login" className="text-primary hover:underline">

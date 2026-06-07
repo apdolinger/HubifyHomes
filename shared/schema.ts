@@ -634,7 +634,7 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
   id: uuid("id").primaryKey().defaultRandom(),
   token: varchar("token").notNull().unique(),
   email: varchar("email").notNull(),
-  userType: varchar("user_type").$type<"portal_user"|"super_admin">().notNull(),
+  userType: varchar("user_type").$type<"portal_user"|"super_admin"|"staff">().notNull(),
   portalUserId: uuid("portal_user_id").references(() => portalUsers.id, { onDelete: "cascade" }),
   orgId: uuid("org_id").references(() => orgs.id, { onDelete: "cascade" }),
   isUsed: boolean("is_used").notNull().default(false),

@@ -141,6 +141,129 @@ export async function setupAuth(app: Express) {
       res.status(500).json({ message: "Failed to set password." });
     }
   });
+
+  // Staff forgot-password — sends a reset link via email
+  app.post("/api/staff/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) return res.status(400).json({ message: "Email is required." });
+
+      const normalEmail = String(email).toLowerCase().trim();
+      const user = await storage.getUserByEmail(normalEmail);
+
+      // Always respond with success to prevent email enumeration
+      if (!user || !user.isActive) {
+        return res.json({ message: "If an account exists with this email, you will receive a password reset link." });
+      }
+
+      await storage.invalidatePasswordResetTokensForEmail(normalEmail);
+
+      const { nanoid } = await import("nanoid");
+      const resetToken = nanoid(48);
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      await storage.createPasswordResetToken({
+        token: resetToken,
+        email: normalEmail,
+        userType: "staff",
+        expiresAt,
+      });
+
+      const baseUrl = process.env.REPLIT_DOMAINS
+        ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}`
+        : "http://localhost:5000";
+      const resetUrl = `${baseUrl}/staff/reset-password?token=${resetToken}`;
+      const firstName = user.firstName || "there";
+
+      const htmlContent = `
+        <!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+        <body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">
+          <div style="max-width:600px;margin:0 auto;padding:20px;">
+            <h2 style="color:#0d9488;">Hubify — Password Reset</h2>
+            <p>Hi ${firstName},</p>
+            <p>We received a request to reset the password for your Hubify staff account (<strong>${normalEmail}</strong>).</p>
+            <p>Click the button below to set a new password. This link expires in <strong>1 hour</strong>.</p>
+            <div style="text-align:center;margin:30px 0;">
+              <a href="${resetUrl}" style="background-color:#0d9488;color:white;padding:12px 30px;text-decoration:none;border-radius:6px;display:inline-block;font-weight:bold;">Reset Password</a>
+            </div>
+            <p style="color:#666;font-size:13px;">If you didn't request this, you can safely ignore this email — your password won't change.</p>
+            <hr style="border:none;border-top:1px solid #eee;margin:30px 0;">
+            <p style="color:#999;font-size:12px;">Hubify Homes · <a href="https://hubifyhomesonline.com" style="color:#0d9488;">hubifyhomesonline.com</a></p>
+          </div>
+        </body></html>
+      `;
+
+      try {
+        const { sendGenericEmail } = await import("./emailUtils");
+        await sendGenericEmail({ to: normalEmail, subject: "Reset your Hubify password", htmlContent });
+        log(`[AUTH] Password reset email sent to ${normalEmail}`);
+      } catch (emailErr) {
+        console.error("[AUTH] Failed to send password reset email:", emailErr);
+      }
+
+      res.json({ message: "If an account exists with this email, you will receive a password reset link." });
+    } catch (error) {
+      console.error("[AUTH] staff forgot-password error:", error);
+      res.status(500).json({ message: "Failed to process request." });
+    }
+  });
+
+  // Staff reset-password — verify token
+  app.get("/api/staff/reset-password/verify", async (req, res) => {
+    try {
+      const { token } = req.query;
+      if (!token || typeof token !== "string") {
+        return res.status(400).json({ valid: false, message: "Token is required." });
+      }
+      const resetToken = await storage.getPasswordResetToken(token);
+      if (!resetToken || resetToken.userType !== "staff") {
+        return res.json({ valid: false, message: "Invalid or expired reset link." });
+      }
+      if (resetToken.isUsed) {
+        return res.json({ valid: false, message: "This reset link has already been used." });
+      }
+      if (new Date(resetToken.expiresAt) < new Date()) {
+        return res.json({ valid: false, message: "This reset link has expired." });
+      }
+      res.json({ valid: true, email: resetToken.email });
+    } catch (error) {
+      console.error("[AUTH] staff reset-password/verify error:", error);
+      res.status(500).json({ valid: false, message: "Failed to verify token." });
+    }
+  });
+
+  // Staff reset-password — apply new password
+  app.post("/api/staff/reset-password", async (req, res) => {
+    try {
+      const { token, newPassword } = req.body;
+      if (!token || !newPassword) {
+        return res.status(400).json({ message: "Token and new password are required." });
+      }
+      if (String(newPassword).length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters." });
+      }
+
+      const resetToken = await storage.getPasswordResetToken(String(token));
+      if (!resetToken || resetToken.userType !== "staff" || resetToken.isUsed || new Date(resetToken.expiresAt) < new Date()) {
+        return res.status(400).json({ message: "Invalid or expired reset link." });
+      }
+
+      const user = await storage.getUserByEmail(resetToken.email);
+      if (!user) {
+        return res.status(400).json({ message: "Account not found." });
+      }
+
+      const passwordHash = await bcrypt.hash(String(newPassword), 12);
+      await storage.updateUser(user.id, { passwordHash });
+      await storage.markPasswordResetTokenUsed(String(token));
+
+      log(`[AUTH] Staff password reset completed for ${resetToken.email}`);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("[AUTH] staff reset-password error:", error);
+      res.status(500).json({ message: "Failed to reset password." });
+    }
+  });
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {

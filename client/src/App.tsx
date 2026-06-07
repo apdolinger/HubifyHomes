@@ -40,6 +40,8 @@ import Account from "@/pages/Account";
 import SuperAdmin from "@/pages/SuperAdmin";
 import SuperAdminLogin from "@/pages/SuperAdminLogin";
 import StaffLogin from "@/pages/StaffLogin";
+import StaffForgotPassword from "@/pages/StaffForgotPassword";
+import StaffResetPassword from "@/pages/StaffResetPassword";
 import PortalLogin from "@/pages/PortalLogin";
 import PortalRegister from "@/pages/PortalRegister";
 import PortalForgotPassword from "@/pages/PortalForgotPassword";
@@ -181,6 +183,8 @@ function Router() {
       
       {/* Portal routes (separate auth system) */}
       <Route path="/staff/login" component={StaffLogin} />
+      <Route path="/staff/forgot-password" component={StaffForgotPassword} />
+      <Route path="/staff/reset-password" component={StaffResetPassword} />
       <Route path="/portal/login" component={PortalLogin} />
       <Route path="/portal/register" component={PortalRegister} />
       <Route path="/portal/forgot-password" component={PortalForgotPassword} />
@@ -451,6 +455,8 @@ function AuthWrapper() {
     location.startsWith("/r/") ||
     location.startsWith("/portal") ||
     location === "/staff/login" ||
+    location === "/staff/forgot-password" ||
+    location === "/staff/reset-password" ||
     location === "/privacy" ||
     location === "/terms" ||
     location === "/submit" ||
