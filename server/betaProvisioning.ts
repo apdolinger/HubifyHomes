@@ -65,7 +65,7 @@ function buildWorkspaceReadyEmail(opts: {
       </p>
       <div style="text-align:center;margin-bottom:28px">
         <a href="${setupUrl}"
-          style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 36px;border-radius:8px">
+          style="display:inline-block;background:#0097BD;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 36px;border-radius:8px">
           Enter Your Workspace →
         </a>
       </div>

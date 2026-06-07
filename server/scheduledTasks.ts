@@ -1633,7 +1633,7 @@ export function buildTrialWelcomeEmail(prospect: { name: string; email: string; 
           Hubify is built specifically for home watch and estate management companies — streamlining invoice batching, client billing, team scheduling, task management, and property documentation, all in one place.
         </p>
         <div style="text-align:center;margin-bottom:32px">
-          <a href="https://hubifyhomes.com" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
+          <a href="https://hubifyhomes.com" style="display:inline-block;background:#0097BD;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
             Explore Hubify Homes
           </a>
         </div>
@@ -1672,7 +1672,7 @@ function buildTrialExpiringEmail(prospect: { name: string; email: string; compan
           We want to make sure your transition to Hubify is as smooth as possible. If there's anything we can help with before your demo expires, don't hesitate to email us at <a href="mailto:contact@hubifyhomes.com" style="color:#0d9488">contact@hubifyhomes.com</a>.
         </p>
         <div style="text-align:center;margin-bottom:32px">
-          <a href="https://hubifyhomes.com" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
+          <a href="https://hubifyhomes.com" style="display:inline-block;background:#0097BD;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
             Contact Us
           </a>
         </div>
@@ -1711,7 +1711,7 @@ function buildTrialExpiredEmail(prospect: { name: string; email: string; company
           If your billing or setup is still in progress, don't worry — our team is here to help. Please email us at <a href="mailto:contact@hubifyhomes.com" style="color:#0d9488">contact@hubifyhomes.com</a> and we'll get you sorted.
         </p>
         <div style="text-align:center;margin-bottom:32px">
-          <a href="https://hubifyhomes.com" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
+          <a href="https://hubifyhomes.com" style="display:inline-block;background:#0097BD;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
             Get in Touch
           </a>
         </div>

@@ -594,7 +594,7 @@ async function sendPaymentFailureNotification(invoiceId: string, errorMessage: s
     .detail-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
     .detail-label { font-weight: 600; color: #6b7280; }
     .detail-value { color: #111827; }
-    .button { display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+    .button { display: inline-block; background-color: #0097BD; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
     .footer { background-color: #f9fafb; padding: 30px; text-align: center; color: #6b7280; font-size: 14px; }
   </style>
 </head>

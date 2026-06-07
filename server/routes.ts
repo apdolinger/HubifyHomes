@@ -1555,7 +1555,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           subject: `You've been added to ${orgName} on Hubify`,
           html: `
             <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:600px;margin:0 auto;color:#1e293b;">
-              <div style="background:#2563eb;padding:32px 40px;border-radius:12px 12px 0 0;">
+              <div style="background:#0097BD;padding:32px 40px;border-radius:12px 12px 0 0;">
                 <h1 style="color:white;margin:0;font-size:24px;font-weight:700;">You're on the team.</h1>
               </div>
               <div style="background:#ffffff;padding:32px 40px;border-radius:0 0 12px 12px;border:1px solid #e2e8f0;border-top:none;">
@@ -1582,7 +1582,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
                 <p style="margin:0 0 32px;text-align:center;">
                   <a href="${loginUrl}"
-                     style="display:inline-block;background:#2563eb;color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">
+                     style="display:inline-block;background:#0097BD;color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">
                     Log in to Hubify
                   </a>
                 </p>
@@ -2160,7 +2160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             <p>We received a request to reset your password for your ${orgName} portal account.</p>
             <p>Click the button below to reset your password:</p>
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${resetUrl}" style="background-color: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block;">Reset Password</a>
+              <a href="${resetUrl}" style="background-color: #0097BD; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block;">Reset Password</a>
             </div>
             <p>This link will expire in 1 hour.</p>
             <p>If you did not request a password reset, please ignore this email.</p>
@@ -4956,7 +4956,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           </p>
 
           <div style="text-align:center;margin-bottom:32px">
-            <a href="${staffUrl}" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
+            <a href="${staffUrl}" style="display:inline-block;background:#0097BD;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
               Open Demo
             </a>
           </div>
@@ -17151,7 +17151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           subject: `${company} is live on Hubify — here's how to get in`,
           html: `
             <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:600px;margin:0 auto;color:#1e293b;">
-              <div style="background:#2563eb;padding:32px 40px;border-radius:12px 12px 0 0;">
+              <div style="background:#0097BD;padding:32px 40px;border-radius:12px 12px 0 0;">
                 <h1 style="color:white;margin:0;font-size:24px;font-weight:700;">Welcome to Hubify, ${firstName}.</h1>
               </div>
               <div style="background:#ffffff;padding:32px 40px;border-radius:0 0 12px 12px;border:1px solid #e2e8f0;border-top:none;">
@@ -17197,7 +17197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
                 <p style="margin:28px 0 32px;text-align:center;">
                   <a href="${loginUrl}"
-                     style="display:inline-block;background:#2563eb;color:white;padding:14px 36px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">
+                     style="display:inline-block;background:#0097BD;color:white;padding:14px 36px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">
                     Log in to Hubify
                   </a>
                 </p>
@@ -17502,7 +17502,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     The shared demo environment includes 10 sample properties, real task and invoice workflows, staff scheduling, client portal access, and more — so you can explore Hubify at your own pace.
                   </p>
                   <div style="text-align:center;margin-bottom:32px">
-                    <a href="https://demo.hubifyhomesonline.com" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
+                    <a href="https://demo.hubifyhomesonline.com" style="display:inline-block;background:#0097BD;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
                       Explore the Demo
                     </a>
                   </div>
@@ -17718,7 +17718,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     <!-- CTA -->
                     <div style="text-align:center;margin-bottom:32px">
                       <a href="https://hubifyhomes.com"
-                         style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
+                         style="display:inline-block;background:#0097BD;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
                         Learn more about Hubify
                       </a>
                     </div>
@@ -18138,7 +18138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 </tr>
               </table>
               <div style="text-align:center;margin:0 0 28px">
-                <a href="${onboardingUrl}" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:6px">Continue to Payment Setup</a>
+                <a href="${onboardingUrl}" style="display:inline-block;background:#0097BD;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:6px">Continue to Payment Setup</a>
               </div>
               <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px">
               <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
@@ -18915,7 +18915,7 @@ contact@hubifyhomes.com`;
               </table>
               <p style="margin:0 0 20px">Your next step is to complete the Beta Agreement, set up billing, and activate your workspace.</p>
               <div style="text-align:center;margin:0 0 20px">
-                <a href="${onboardingUrl}" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 36px;border-radius:8px">Get Started →</a>
+                <a href="${onboardingUrl}" style="display:inline-block;background:#0097BD;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 36px;border-radius:8px">Get Started →</a>
               </div>
               <p style="margin:0 0 24px;color:#64748b;font-size:13px;text-align:center">This link expires in 7 days. If it expires before you get to it, just reply to this email and we'll send a new one.</p>
               <p style="margin:0 0 4px">Let us know if you have any questions.</p>
@@ -19368,7 +19368,7 @@ contact@hubifyhomes.com`;
                 </ol>
                 <div style="text-align:center;margin-bottom:32px">
                   <a href="https://hubifyhomes.com"
-                     style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
+                     style="display:inline-block;background:#0097BD;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
                     Learn more about Hubify
                   </a>
                 </div>
@@ -19457,7 +19457,7 @@ contact@hubifyhomes.com`;
                 The demo includes 10 FL properties, task and invoice workflows, client portal access, staff scheduling, and more. It's a shared environment — your session won't affect others.
               </p>
               <div style="text-align:center;margin-bottom:32px">
-                <a href="https://demo.hubifyhomesonline.com" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
+                <a href="https://demo.hubifyhomesonline.com" style="display:inline-block;background:#0097BD;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
                   Launch Demo
                 </a>
               </div>

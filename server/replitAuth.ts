@@ -184,7 +184,7 @@ export async function setupAuth(app: Express) {
             <p>We received a request to reset the password for your Hubify staff account (<strong>${normalEmail}</strong>).</p>
             <p>Click the button below to set a new password. This link expires in <strong>1 hour</strong>.</p>
             <div style="text-align:center;margin:30px 0;">
-              <a href="${resetUrl}" style="background-color:#0d9488;color:white;padding:12px 30px;text-decoration:none;border-radius:6px;display:inline-block;font-weight:bold;">Reset Password</a>
+              <a href="${resetUrl}" style="background-color:#0097BD;color:white;padding:12px 30px;text-decoration:none;border-radius:6px;display:inline-block;font-weight:bold;">Reset Password</a>
             </div>
             <p style="color:#666;font-size:13px;">If you didn't request this, you can safely ignore this email — your password won't change.</p>
             <hr style="border:none;border-top:1px solid #eee;margin:30px 0;">
