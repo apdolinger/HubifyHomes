@@ -18748,7 +18748,7 @@ contact@hubifyhomes.com`;
           subject: `Your Hubify Beta access is confirmed`,
           text: betaApprovalText,
           html: `
-            <div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;padding:40px 24px;background:#ffffff;color:#1e293b;font-size:16px;line-height:1.7">
+            <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:40px 24px;background:#ffffff;color:#1e293b;font-size:15px;line-height:1.7">
               <div style="text-align:center;margin-bottom:32px">
                 <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="180" style="width:180px;max-width:180px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
               </div>
@@ -18781,9 +18781,11 @@ contact@hubifyhomes.com`;
                   <td style="padding:4px 0;color:#0f172a">$${tierSetupFee.toFixed(2)} one-time</td>
                 </tr>` : ""}
               </table>
-              <p style="margin:0 0 18px">Your next step is to complete the Beta Agreement, set up billing, and activate your workspace. The link below walks you through the whole process:</p>
-              <p style="margin:0 0 18px"><a href="${onboardingUrl}" style="color:#0d9488;font-weight:600">${onboardingUrl}</a></p>
-              <p style="margin:0 0 24px;color:#64748b;font-size:14px">This link expires in 7 days. If it expires before you get to it, just reply to this email and we'll send a new one.</p>
+              <p style="margin:0 0 20px">Your next step is to complete the Beta Agreement, set up billing, and activate your workspace.</p>
+              <div style="text-align:center;margin:0 0 20px">
+                <a href="${onboardingUrl}" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 36px;border-radius:8px">Get Started →</a>
+              </div>
+              <p style="margin:0 0 24px;color:#64748b;font-size:13px;text-align:center">This link expires in 7 days. If it expires before you get to it, just reply to this email and we'll send a new one.</p>
               <p style="margin:0 0 4px">Let us know if you have any questions.</p>
               <p style="margin:0 0 32px">— The Hubify Team</p>
               <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 16px" />
