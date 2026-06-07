@@ -1331,7 +1331,7 @@ function VerifyingPayment({
     },
     refetchInterval: (query) => {
       const d = query.state.data;
-      if (d?.stage === "converted" || d?.provisioningFailed) return false;
+      if (d?.stage === "converted" || d?.stage === "provisioning_failed" || d?.provisioningFailed) return false;
       return 3000;
     },
     retry: 5,
@@ -1350,7 +1350,7 @@ function VerifyingPayment({
     </div>
   );
 
-  if (data?.provisioningFailed) return (
+  if (data?.provisioningFailed || data?.stage === "provisioning_failed") return (
     <div className="text-center py-10 text-slate-500 text-sm">
       <AlertTriangle className="w-6 h-6 text-amber-400 mx-auto mb-2" />
       <p className="font-medium text-slate-700 mb-1">Setup encountered an issue</p>

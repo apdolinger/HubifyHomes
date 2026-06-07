@@ -104,7 +104,7 @@ import {
 import { z } from "zod";
 import { createSetupIntentForClient, detachPaymentMethod, createPortalPayIntentForInvoice, chargeInvoice } from "./stripe";
 import { db } from "./db";
-import { eq, lt, and, or, desc, inArray, count, ne, isNull } from "drizzle-orm";
+import { eq, lt, and, or, desc, inArray, count, ne, isNull, gt } from "drizzle-orm";
 import { Resend } from "resend";
 import { dispatchWebhookEvent, sendTestWebhookEvent, validateWebhookUrlSafe } from "./webhookDispatcher";
 import { seedDemoTenant, resetDemoTenant, DEMO_ORG_ID, DEMO_DOMAIN, DEMO_ADMIN_EMAIL } from "./demoSeed";
@@ -18226,9 +18226,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ── Account setup (beta provisioning) ────────────────────────────────────────
 
-  // GET /api/public/setup-account/:token
+  // GET /api/public/setup-account/:token/verify
   // Validates the token and returns safe data to pre-populate the setup form.
-  app.get("/api/public/setup-account/:token", async (req, res) => {
+  app.get("/api/public/setup-account/:token/verify", async (req, res) => {
     try {
       const { token } = req.params;
       if (!token || token.length !== 64 || !/^[0-9a-f]+$/.test(token)) {
@@ -18244,7 +18244,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Setup link not found or already used." });
       }
       if (tokenRow.claimedAt) {
-        return res.status(410).json({ message: "This setup link has already been used. Please sign in.", alreadyClaimed: true });
+        return res.status(409).json({ message: "This setup link has already been used. Please sign in.", alreadyClaimed: true });
       }
       if (new Date(tokenRow.expiresAt) < new Date()) {
         return res.status(410).json({ message: "This setup link has expired. Please email contact@hubifyhomes.com to request a new one.", expired: true });
@@ -18276,7 +18276,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/public/setup-account/:token
-  // Sets the admin user's password and marks the setup token as claimed.
+  // Atomically claims the token, sets the admin user's password.
   app.post("/api/public/setup-account/:token", async (req, res) => {
     try {
       const { token } = req.params;
@@ -18293,6 +18293,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: parsed.error.errors[0]?.message ?? "Invalid input." });
       }
 
+      // Preliminary read to get userId and validate state before entering transaction
       const tokenRows = await db
         .select()
         .from(accountSetupTokens)
@@ -18300,18 +18301,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .limit(1);
       const tokenRow = tokenRows[0];
       if (!tokenRow) return res.status(404).json({ message: "Setup link not found." });
-      if (tokenRow.claimedAt) return res.status(410).json({ message: "This setup link has already been used." });
+      if (tokenRow.claimedAt) return res.status(409).json({ message: "This setup link has already been used. Please sign in.", alreadyClaimed: true });
       if (new Date(tokenRow.expiresAt) < new Date()) return res.status(410).json({ message: "This setup link has expired." });
 
       const passwordHash = await bcrypt.hash(parsed.data.password, 12);
+
+      // Atomic claim: UPDATE WHERE claimed_at IS NULL ensures single-use even under race conditions
+      const claimed = await db
+        .update(accountSetupTokens)
+        .set({ claimedAt: new Date() })
+        .where(
+          and(
+            eq(accountSetupTokens.token, token),
+            isNull(accountSetupTokens.claimedAt),
+            gt(accountSetupTokens.expiresAt, new Date())
+          )
+        )
+        .returning({ id: accountSetupTokens.id, userId: accountSetupTokens.userId });
+
+      if (claimed.length === 0) {
+        // Another concurrent request won the race
+        return res.status(409).json({ message: "This setup link has already been used. Please sign in.", alreadyClaimed: true });
+      }
+
       const updates: any = { passwordHash, updatedAt: new Date() };
       if (parsed.data.firstName) updates.firstName = parsed.data.firstName;
       if (parsed.data.lastName !== undefined) updates.lastName = parsed.data.lastName;
+      await db.update(users).set(updates).where(eq(users.id, claimed[0].userId));
 
-      await db.update(users).set(updates).where(eq(users.id, tokenRow.userId));
-      await db.update(accountSetupTokens).set({ claimedAt: new Date() }).where(eq(accountSetupTokens.id, tokenRow.id));
+      // Fetch user email for the frontend redirect
+      const userRows = await db.select({ email: users.email }).from(users).where(eq(users.id, claimed[0].userId)).limit(1);
+      const email = userRows[0]?.email ?? null;
 
-      res.json({ success: true });
+      res.json({ email });
     } catch (error) {
       console.error("Error claiming setup token:", error);
       res.status(500).json({ message: "Failed to set up account." });

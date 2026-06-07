@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, Eye, EyeOff, Loader2, AlertTriangle, ArrowRight } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
 
 interface SetupAccountData {
   email: string;
@@ -63,39 +62,16 @@ function InvalidLink({ status, message, alreadyClaimed }: { status: number; mess
   );
 }
 
-function SuccessScreen({ orgName }: { orgName: string }) {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center px-4">
-      <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center">
-        <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center mx-auto mb-4">
-          <CheckCircle className="w-9 h-9 text-teal-600" />
-        </div>
-        <h1 className="text-xl font-bold text-slate-900 mb-2">You're all set!</h1>
-        <p className="text-slate-500 text-sm mb-6">
-          Your account for <strong>{orgName}</strong> is ready. Sign in to start using Hubify.
-        </p>
-        <a
-          href="/staff/login"
-          className="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-6 py-3 rounded-lg transition-colors"
-        >
-          Sign in to your workspace <ArrowRight className="w-4 h-4" />
-        </a>
-      </div>
-    </div>
-  );
-}
-
 export default function SetupAccount() {
   const { token } = useParams<{ token: string }>();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [done, setDone] = useState(false);
   const { toast } = useToast();
 
   const { data, isLoading, error } = useQuery<SetupAccountData, any>({
-    queryKey: ["/api/public/setup-account", token],
+    queryKey: ["/api/public/setup-account", token, "verify"],
     queryFn: async () => {
-      const res = await fetch(`/api/public/setup-account/${token}`);
+      const res = await fetch(`/api/public/setup-account/${token}/verify`);
       if (!res.ok) {
         const body = await res.json().catch(() => ({ message: "Invalid link." }));
         const err: any = new Error(body.message ?? "Invalid link.");
@@ -123,19 +99,36 @@ export default function SetupAccount() {
   const firstName = data?.firstName ?? "";
   const lastName = data?.lastName ?? "";
 
+  const [, setLocation] = useLocation();
+
   const mutation = useMutation({
     mutationFn: async (values: SetupForm) => {
-      const res = await apiRequest("POST", `/api/public/setup-account/${token}`, {
-        password: values.password,
-        firstName: values.firstName || undefined,
-        lastName: values.lastName || undefined,
+      const res = await fetch(`/api/public/setup-account/${token}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password: values.password,
+          firstName: values.firstName || undefined,
+          lastName: values.lastName || undefined,
+        }),
       });
-      return res;
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const err: any = new Error(body.message ?? "Could not set up account.");
+        err.alreadyClaimed = body.alreadyClaimed;
+        throw err;
+      }
+      return body as { email: string | null };
     },
-    onSuccess: () => {
-      setDone(true);
+    onSuccess: (result) => {
+      const emailParam = result.email ? `?email=${encodeURIComponent(result.email)}` : "";
+      setLocation(`/staff/login${emailParam}`);
     },
     onError: (err: any) => {
+      if (err?.alreadyClaimed) {
+        setLocation("/staff/login");
+        return;
+      }
       toast({
         title: "Something went wrong",
         description: err?.message ?? "Could not set up account. Please try again.",
@@ -168,10 +161,6 @@ export default function SetupAccount() {
         alreadyClaimed={err?.alreadyClaimed}
       />
     );
-  }
-
-  if (done) {
-    return <SuccessScreen orgName={data.orgName} />;
   }
 
   return (

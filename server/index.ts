@@ -110,41 +110,55 @@ app.post("/api/stripe/webhooks/beta-onboarding", express.raw({ type: "applicatio
           .where(eq(onboardingProspects.onboardingToken, prospectToken)).limit(1);
         const prospect = rows[0];
         if (prospect) {
-          const now = new Date();
-          const existingHistory: any[] = (prospect as any).stageHistory ?? [];
-          await db.update(onboardingProspects).set({
-            paymentStatus: "paid",
-            paymentCompletedAt: now,
-            betaStripeCustomerId: session.customer ?? null,
-            betaStripeSubscriptionId: session.subscription ?? null,
-            stage: "platform_initializing",
-            stageHistory: [
-              ...existingHistory,
-              { stage: "platform_initializing", enteredAt: now.toISOString(), note: "Stripe Checkout completed" },
-            ],
-          } as any).where(eq(onboardingProspects.id, prospect.id));
+          // Only update payment metadata if not already provisioned
+          if (!(prospect as any).orgId) {
+            const now = new Date();
+            const existingHistory: any[] = (prospect as any).stageHistory ?? [];
+            await db.update(onboardingProspects).set({
+              paymentStatus: "paid",
+              paymentCompletedAt: now,
+              betaStripeCustomerId: session.customer ?? null,
+              betaStripeSubscriptionId: session.subscription ?? null,
+              stage: "platform_initializing",
+              stageHistory: [
+                ...existingHistory,
+                { stage: "platform_initializing", enteredAt: now.toISOString(), note: "Stripe Checkout completed" },
+              ],
+            } as any).where(eq(onboardingProspects.id, prospect.id));
+          }
           console.log(`[beta-onboarding-webhook] Payment confirmed for prospect ${prospect.id} — starting provisioning`);
 
-          // Auto-provision the org immediately after payment
+          // Auto-provision the org immediately after payment (idempotent — safe to retry)
           const baseUrl = `${req.protocol}://${req.get("host")}`;
           try {
             const { provisionBetaOrg } = await import("./betaProvisioning");
-            await provisionBetaOrg(prospect.id, baseUrl);
+            await provisionBetaOrg(prospect.id, baseUrl, {
+              stripeCustomerId: session.customer ?? null,
+              stripeSubscriptionId: session.subscription ?? null,
+            });
             console.log(`[beta-onboarding-webhook] Provisioning complete for prospect ${prospect.id}`);
           } catch (provisionErr) {
             console.error(`[beta-onboarding-webhook] Provisioning failed for prospect ${prospect.id}:`, provisionErr);
-            await db.update(onboardingProspects).set({
-              provisioningFailed: true,
-              provisioningError: String(provisionErr),
-            } as any).where(eq(onboardingProspects.id, prospect.id));
+            // Mark failure — do NOT throw so Stripe gets 200 and won't retry
+            try {
+              await db.update(onboardingProspects).set({
+                stage: "provisioning_failed",
+                provisioningFailed: true,
+                provisioningError: String(provisionErr),
+              } as any).where(eq(onboardingProspects.id, prospect.id));
+            } catch (dbErr) {
+              console.error("[beta-onboarding-webhook] Failed to persist provisioning error:", dbErr);
+            }
           }
         }
       }
     }
 
+    // Always return 200 so Stripe won't retry for application-level issues
     res.json({ received: true });
   } catch (error) {
-    console.error("[beta-onboarding-webhook] Error:", error);
+    console.error("[beta-onboarding-webhook] Signature/parse error:", error);
+    // Only return 400 for signature verification failures (legitimate reason to retry)
     res.status(400).json({ message: `Webhook Error: ${(error as Error).message}` });
   }
 });

@@ -1,26 +1,35 @@
 /**
  * Beta org auto-provisioning
  *
- * Called by the Stripe webhook (and the free-tier path) immediately after payment
- * is confirmed. Creates the org, admin user, and account-setup token in one go,
- * then sends the "Workspace Ready" email so the prospect can set their password.
+ * Called by the Stripe webhook (and the free-tier path) immediately after
+ * payment is confirmed. ALL database writes run inside a single transaction
+ * that starts by locking the prospect row with SELECT...FOR UPDATE, so
+ * concurrent webhook retries are serialized and cannot create duplicate orgs.
  *
  * Idempotent: if the prospect already has an orgId the function returns the
- * existing setup token (or the login URL if the token was already claimed).
+ * existing (unclaimed) setup token or the login URL if already claimed.
  */
 
 import crypto from "crypto";
-import { eq, and, isNull } from "drizzle-orm";
+import { sql, eq, and, isNull } from "drizzle-orm";
 import { db } from "./db";
-import { onboardingProspects, accountSetupTokens, users } from "@shared/schema";
-import { storage } from "./storage";
+import {
+  onboardingProspects,
+  accountSetupTokens,
+  orgs,
+  orgSubscriptions,
+  orgSetupProgress,
+  users,
+} from "@shared/schema";
 import { log } from "./vite";
 
 function getHubifyLogoUrl(): string {
   return "https://storage.googleapis.com/hubify-assets/hubify-homes-logo.png";
 }
 
-function mapTier(suggested: string | null | undefined): "starter" | "pro" | "grow" | "enterprise" {
+function mapTier(
+  suggested: string | null | undefined
+): "starter" | "pro" | "grow" | "enterprise" {
   if (!suggested) return "starter";
   const s = suggested.toLowerCase();
   if (s.includes("growth") || s === "grow" || s === "pricing_growth") return "grow";
@@ -36,7 +45,11 @@ function buildWorkspaceReadyEmail(opts: {
   expiresAt: Date;
 }): string {
   const { firstName, orgName, setupUrl, expiresAt } = opts;
-  const expiry = expiresAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const expiry = expiresAt.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
   return `
     <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
       <div style="text-align:center;margin-bottom:28px">
@@ -48,7 +61,7 @@ function buildWorkspaceReadyEmail(opts: {
       </h1>
       <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 20px">
         Your organization <strong>${orgName}</strong> has been set up. Click the button below
-        to set your password and start using Hubify — the whole thing takes under two minutes.
+        to set your password and start using Hubify.
       </p>
       <div style="text-align:center;margin-bottom:28px">
         <a href="${setupUrl}"
@@ -70,8 +83,7 @@ function buildWorkspaceReadyEmail(opts: {
       <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
         This setup link expires on ${expiry}. After that, email
         <a href="mailto:contact@hubifyhomes.com" style="color:#94a3b8">contact@hubifyhomes.com</a>
-        to request a new one.<br/>
-        Questions? Reply to this email — we're happy to help.
+        to request a new one.
       </p>
     </div>
   `;
@@ -84,138 +96,229 @@ export interface ProvisionResult {
   setupUrl: string;
 }
 
+export interface ProvisionOpts {
+  /** Stripe customer ID from the checkout session */
+  stripeCustomerId?: string | null;
+  /** Stripe subscription ID from the checkout session */
+  stripeSubscriptionId?: string | null;
+}
+
 /**
  * Provisions a beta org for the given prospect.
- * @param prospectId  UUID of the onboarding_prospects row
- * @param baseUrl     e.g. "https://app.hubifyhomesonline.com"
+ *
+ * All DB writes are inside a single transaction that begins with a
+ * SELECT ... FOR UPDATE lock on the prospect row, ensuring concurrent
+ * Stripe webhook retries serialize cleanly without creating duplicates.
+ *
+ * @param prospectId UUID of the onboarding_prospects row
+ * @param baseUrl    e.g. "https://app.hubifyhomesonline.com"
+ * @param opts       Optional Stripe IDs forwarded from the webhook session
  */
 export async function provisionBetaOrg(
   prospectId: string,
-  baseUrl: string
+  baseUrl: string,
+  opts: ProvisionOpts = {}
 ): Promise<ProvisionResult> {
-  const rows = await db
-    .select()
-    .from(onboardingProspects)
-    .where(eq(onboardingProspects.id, prospectId))
-    .limit(1);
-  const prospect = rows[0];
-  if (!prospect) throw new Error(`Prospect ${prospectId} not found`);
+  let emailPayload: {
+    to: string;
+    firstName: string;
+    orgName: string;
+    setupUrl: string;
+    tokenExpiresAt: Date;
+  } | null = null;
 
-  // ── Idempotency guard ─────────────────────────────────────────────────────
-  if (prospect.orgId) {
-    const tokenRows = await db
-      .select()
-      .from(accountSetupTokens)
-      .where(
-        and(
-          eq(accountSetupTokens.prospectId, prospectId),
-          isNull(accountSetupTokens.claimedAt)
+  const result = await db.transaction(async (tx) => {
+    // ── 1. Lock the prospect row for the duration of this transaction ─────────
+    // Concurrent retries will block here until the first transaction commits,
+    // so only one will proceed past the orgId check.
+    const lockRes = await tx.execute(
+      sql`SELECT * FROM onboarding_prospects WHERE id = ${prospectId} FOR UPDATE LIMIT 1`
+    );
+    const prospect = (lockRes as any).rows?.[0] as Record<string, any> | undefined;
+    if (!prospect) throw new Error(`Prospect ${prospectId} not found`);
+
+    // ── 2. Idempotency guard ──────────────────────────────────────────────────
+    if (prospect.org_id) {
+      // Already provisioned — return existing unclaimed token if available
+      const tokenRows = await tx
+        .select()
+        .from(accountSetupTokens)
+        .where(
+          and(
+            eq(accountSetupTokens.prospectId, prospectId),
+            isNull(accountSetupTokens.claimedAt)
+          )
         )
-      )
-      .limit(1);
-    if (tokenRows[0]) {
-      const setupUrl = `${baseUrl}/setup-account/${tokenRows[0].token}`;
-      return { orgId: prospect.orgId, userId: tokenRows[0].userId, setupToken: tokenRows[0].token, setupUrl };
+        .limit(1);
+      const tok = tokenRows[0];
+      if (tok && new Date(tok.expiresAt) > new Date()) {
+        const setupUrl = `${baseUrl}/setup-account/${tok.token}`;
+        return {
+          orgId: prospect.org_id as string,
+          userId: tok.userId,
+          setupToken: tok.token,
+          setupUrl,
+        } satisfies ProvisionResult;
+      }
+      return {
+        orgId: prospect.org_id as string,
+        userId: "",
+        setupToken: "",
+        setupUrl: `${baseUrl}/staff/login`,
+      } satisfies ProvisionResult;
     }
-    return { orgId: prospect.orgId, userId: "", setupToken: "", setupUrl: `${baseUrl}/staff/login` };
-  }
 
-  const p = prospect as any;
+    // ── 3. Derive metadata from prospect ─────────────────────────────────────
+    const orgName =
+      (prospect.agreement_organization_name as string) ||
+      (prospect.company as string) ||
+      (prospect.name as string) ||
+      "My Organization";
+    const firstName =
+      (prospect.first_name as string) ||
+      ((prospect.name as string) || "").split(" ")[0] ||
+      "";
+    const lastName =
+      (prospect.last_name as string) ||
+      ((prospect.name as string) || "").split(" ").slice(1).join(" ") ||
+      "";
 
-  // ── Create org ─────────────────────────────────────────────────────────────
-  const orgName = p.agreementOrganizationName || prospect.company || prospect.name;
-  const org = await storage.createOrg({
-    name: orgName,
-    isActive: true,
-    orgStatus: "onboarding",
-    phone: prospect.phone ?? undefined,
-  });
+    // ── 4. Create org ─────────────────────────────────────────────────────────
+    const [org] = await tx
+      .insert(orgs)
+      .values({
+        name: orgName,
+        isActive: true,
+        orgStatus: "onboarding",
+        phone: (prospect.phone as string) ?? undefined,
+      })
+      .returning();
 
-  // ── Create subscription ────────────────────────────────────────────────────
-  const trialStart = new Date();
-  const trialEnd = new Date(trialStart);
-  trialEnd.setDate(trialEnd.getDate() + 30);
+    // ── 5. Create subscription with Stripe linkage ────────────────────────────
+    const trialStart = new Date();
+    const trialEnd = new Date(trialStart);
+    trialEnd.setDate(trialEnd.getDate() + 30);
 
-  await storage.upsertOrgSubscription({
-    orgId: org.id,
-    tier: mapTier(p.suggestedTier),
-    status: "trialing",
-    currentPeriodStart: trialStart,
-    currentPeriodEnd: trialEnd,
-    betaPriceLocked: !!p.discountedMonthlyPrice,
-    setupFeeCents: Math.round((p.setupFee ?? 0) * 100),
-  } as any);
-
-  // ── Create setup progress ──────────────────────────────────────────────────
-  await storage.createOrgSetupProgress(org.id);
-
-  // ── Create admin user (password set later via setup-account flow) ──────────
-  const userId = crypto.randomUUID();
-  const firstName = p.firstName || (prospect.name || "").split(" ")[0] || "";
-  const lastName = p.lastName || (prospect.name || "").split(" ").slice(1).join(" ") || "";
-
-  await storage.upsertUser({
-    id: userId,
-    orgId: org.id,
-    email: prospect.email ?? undefined,
-    firstName,
-    lastName,
-    role: "admin",
-    isAdminAccount: true,
-    isActive: true,
-    passwordHash: null,
-  } as any);
-
-  // ── Generate account-setup token ───────────────────────────────────────────
-  const setupToken = crypto.randomBytes(32).toString("hex");
-  const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-
-  await db.insert(accountSetupTokens).values({
-    prospectId: prospect.id,
-    userId,
-    token: setupToken,
-    expiresAt: tokenExpiresAt,
-  });
-
-  // ── Update prospect ────────────────────────────────────────────────────────
-  const now = new Date();
-  const existingHistory: any[] = p.stageHistory ?? [];
-  await db
-    .update(onboardingProspects)
-    .set({
+    await tx.insert(orgSubscriptions).values({
       orgId: org.id,
-      stage: "converted",
-      convertedAt: now,
-      provisionedAt: now,
-      provisioningFailed: false,
-      stageHistory: [
-        ...existingHistory,
-        { stage: "converted", enteredAt: now.toISOString(), note: "Auto-provisioned after payment" },
-      ],
-    } as any)
-    .where(eq(onboardingProspects.id, prospect.id));
+      tier: mapTier(
+        (prospect.suggested_tier as string) ?? (prospect.portfolio_tier as string)
+      ),
+      status: "trialing",
+      currentPeriodStart: trialStart,
+      currentPeriodEnd: trialEnd,
+      betaPriceLocked: !!(prospect.discounted_monthly_price),
+      setupFeeCents: Math.round((Number(prospect.setup_fee) || 0) * 100),
+      stripeCustomerId:
+        opts.stripeCustomerId ??
+        (prospect.beta_stripe_customer_id as string | null) ??
+        null,
+      stripeSubscriptionId:
+        opts.stripeSubscriptionId ??
+        (prospect.beta_stripe_subscription_id as string | null) ??
+        null,
+    });
 
-  // ── Send workspace-ready email ─────────────────────────────────────────────
-  const setupUrl = `${baseUrl}/setup-account/${setupToken}`;
-  try {
-    const resendKey = process.env.RESEND_API_KEY;
-    if (resendKey) {
-      const { Resend } = await import("resend");
-      const resend = new Resend(resendKey);
-      const fromEmail = process.env.RESEND_FROM_EMAIL || "no-reply@hubifyhomesonline.com";
-      await resend.emails.send({
-        from: fromEmail,
-        replyTo: "contact@hubifyhomes.com",
-        to: prospect.email ?? "",
-        subject: "Your Hubify workspace is ready — set up your account",
-        html: buildWorkspaceReadyEmail({ firstName, orgName, setupUrl, expiresAt: tokenExpiresAt }),
-      });
-      log(`[betaProvisioning] Workspace-ready email sent to ${prospect.email}`);
+    // ── 6. Create setup progress ──────────────────────────────────────────────
+    await tx.insert(orgSetupProgress).values({ orgId: org.id });
+
+    // ── 7. Create admin user (password set later via setup-account flow) ──────
+    const userId = crypto.randomUUID();
+    await tx.insert(users).values({
+      id: userId,
+      orgId: org.id,
+      email: (prospect.email as string) ?? undefined,
+      firstName,
+      lastName,
+      role: "admin",
+      isAdminAccount: true,
+      isActive: true,
+      passwordHash: null,
+    });
+
+    // ── 8. Generate 7-day account-setup token ─────────────────────────────────
+    const setupToken = crypto.randomBytes(32).toString("hex"); // 64 hex chars
+    const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    await tx.insert(accountSetupTokens).values({
+      prospectId,
+      userId,
+      token: setupToken,
+      expiresAt: tokenExpiresAt,
+    });
+
+    // ── 9. Update prospect (inside same transaction) ──────────────────────────
+    const now = new Date();
+    const existingHistory: any[] = Array.isArray(prospect.stage_history)
+      ? prospect.stage_history
+      : [];
+    await tx
+      .update(onboardingProspects)
+      .set({
+        orgId: org.id,
+        stage: "converted",
+        convertedAt: now,
+        provisionedAt: now,
+        provisioningFailed: false,
+        stageHistory: [
+          ...existingHistory,
+          {
+            stage: "converted",
+            enteredAt: now.toISOString(),
+            note: "Auto-provisioned after payment",
+          },
+        ],
+      } as any)
+      .where(eq(onboardingProspects.id, prospectId));
+
+    const setupUrl = `${baseUrl}/setup-account/${setupToken}`;
+
+    // Capture email data — email is sent after the transaction commits
+    emailPayload = {
+      to: (prospect.email as string) ?? "",
+      firstName,
+      orgName,
+      setupUrl,
+      tokenExpiresAt,
+    };
+
+    log(`[betaProvisioning] Provisioned org ${org.id} for prospect ${prospectId}`);
+    return {
+      orgId: org.id,
+      userId,
+      setupToken,
+      setupUrl,
+    } satisfies ProvisionResult;
+  });
+
+  // ── Send workspace-ready email (outside transaction — failure is non-fatal) ─
+  if (emailPayload) {
+    const { to, firstName, orgName, setupUrl, tokenExpiresAt } = emailPayload;
+    try {
+      const resendKey = process.env.RESEND_API_KEY;
+      if (resendKey) {
+        const { Resend } = await import("resend");
+        const resend = new Resend(resendKey);
+        const fromEmail =
+          process.env.RESEND_FROM_EMAIL || "no-reply@hubifyhomesonline.com";
+        await resend.emails.send({
+          from: fromEmail,
+          replyTo: "contact@hubifyhomes.com",
+          to,
+          subject: "Your Hubify workspace is ready — set up your account",
+          html: buildWorkspaceReadyEmail({
+            firstName,
+            orgName,
+            setupUrl,
+            expiresAt: tokenExpiresAt,
+          }),
+        });
+        log(`[betaProvisioning] Workspace-ready email sent to ${to}`);
+      }
+    } catch (emailErr) {
+      log(`[betaProvisioning] Failed to send workspace-ready email: ${emailErr}`);
     }
-  } catch (emailErr) {
-    log(`[betaProvisioning] Failed to send workspace-ready email: ${emailErr}`);
   }
 
-  log(`[betaProvisioning] Provisioned org ${org.id} for prospect ${prospect.id}`);
-  return { orgId: org.id, userId, setupToken, setupUrl };
+  return result;
 }
