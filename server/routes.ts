@@ -99,12 +99,14 @@ import {
   onboardingProspects,
   accountSetupTokens,
   orgs,
+  supportRequests,
+  orgSubscriptions,
   type InsertDiscountCode,
 } from "@shared/schema";
 import { z } from "zod";
 import { createSetupIntentForClient, detachPaymentMethod, createPortalPayIntentForInvoice, chargeInvoice } from "./stripe";
 import { db } from "./db";
-import { eq, lt, and, or, desc, inArray, count, ne, isNull, gt } from "drizzle-orm";
+import { eq, lt, and, or, desc, asc, inArray, count, ne, isNull, gt } from "drizzle-orm";
 import { Resend } from "resend";
 import { dispatchWebhookEvent, sendTestWebhookEvent, validateWebhookUrlSafe } from "./webhookDispatcher";
 import { seedDemoTenant, resetDemoTenant, DEMO_ORG_ID, DEMO_DOMAIN, DEMO_ADMIN_EMAIL } from "./demoSeed";
@@ -5399,6 +5401,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err: any) {
       console.error("[agreement-history]", err?.message ?? err);
       res.status(500).json({ message: "Failed to fetch agreement history" });
+    }
+  });
+
+  // GET /api/super-admin/orgs/:orgId/support — support requests for an org
+  app.get("/api/super-admin/orgs/:orgId/support", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const org = await storage.getOrg(orgId);
+      if (!org) return res.status(404).json({ message: "Organization not found" });
+      const tickets = await db
+        .select()
+        .from(supportRequests)
+        .where(eq(supportRequests.organizationId, orgId))
+        .orderBy(desc(supportRequests.createdAt))
+        .limit(30);
+      res.json(tickets);
+    } catch (err: any) {
+      console.error("[super-admin/orgs/support]", err?.message ?? err);
+      res.status(500).json({ message: "Failed to fetch support tickets" });
+    }
+  });
+
+  // GET /api/super-admin/orgs/:orgId/details — rich org + subscription details
+  app.get("/api/super-admin/orgs/:orgId/details", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      const [orgRow] = await db
+        .select()
+        .from(orgs)
+        .where(eq(orgs.id, orgId))
+        .limit(1);
+      if (!orgRow) return res.status(404).json({ message: "Organization not found" });
+      const [subRow] = await db
+        .select()
+        .from(orgSubscriptions)
+        .where(eq(orgSubscriptions.orgId, orgId))
+        .limit(1);
+      res.json({ org: orgRow, subscription: subRow ?? null });
+    } catch (err: any) {
+      console.error("[super-admin/orgs/details]", err?.message ?? err);
+      res.status(500).json({ message: "Failed to fetch org details" });
     }
   });
 

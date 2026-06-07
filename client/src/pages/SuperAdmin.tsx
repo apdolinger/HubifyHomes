@@ -10402,6 +10402,40 @@ type OrgUserRow = {
   createdAt: string | null;
 };
 
+type OrgSupportTicket = {
+  id: number;
+  userName: string;
+  email: string;
+  subject: string;
+  message: string;
+  status: "new" | "in_progress" | "resolved";
+  urgency: "low" | "medium" | "high" | "critical";
+  resolvedAt: string | null;
+  createdAt: string;
+};
+
+type OrgDetailsData = {
+  org: {
+    id: string;
+    name: string;
+    slug: string | null;
+    phone: string | null;
+    city: string | null;
+    state: string | null;
+    country: string | null;
+  };
+  subscription: {
+    tier: string;
+    status: string | null;
+    billingCycle: string | null;
+    currentPeriodEnd: string | null;
+    cancelAtPeriodEnd: boolean | null;
+    betaPriceLocked: boolean | null;
+    stripeCustomerId: string | null;
+    stripeSubscriptionId: string | null;
+  } | null;
+};
+
 type OrgOverviewRow = {
   id: string;
   name: string;
@@ -10528,13 +10562,47 @@ const ORG_STATUS_BADGE: Record<OrgStatusValue, { label: string; className: strin
   archived:   { label: "Archived",   className: "bg-slate-100 text-slate-600 border-slate-200" },
 };
 
+const URGENCY_CONFIG: Record<string, { label: string; className: string }> = {
+  low:      { label: "Low",      className: "bg-slate-100 text-slate-600 border-slate-200" },
+  medium:   { label: "Medium",   className: "bg-amber-50 text-amber-700 border-amber-200" },
+  high:     { label: "High",     className: "bg-orange-50 text-orange-700 border-orange-200" },
+  critical: { label: "Critical", className: "bg-red-50 text-red-700 border-red-200" },
+};
+
+const TICKET_STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  new:         { label: "New",         className: "bg-blue-50 text-blue-700 border-blue-200" },
+  in_progress: { label: "In Progress", className: "bg-amber-50 text-amber-700 border-amber-200" },
+  resolved:    { label: "Resolved",    className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+};
+
 function OrgDetailSheet({ org, open, onClose }: { org: OrgOverviewRow | null; open: boolean; onClose: () => void }) {
-  const [innerTab, setInnerTab] = useState("users");
+  const [innerTab, setInnerTab] = useState("overview");
+
   const { data: orgUsers = [], isLoading: usersLoading } = useQuery<OrgUserRow[]>({
     queryKey: ["/api/super-admin/orgs", org?.id, "users"],
     queryFn: async () => {
       const res = await fetch(`/api/super-admin/orgs/${org!.id}/users`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load users");
+      return res.json();
+    },
+    enabled: open && !!org?.id,
+  });
+
+  const { data: tickets = [], isLoading: ticketsLoading } = useQuery<OrgSupportTicket[]>({
+    queryKey: ["/api/super-admin/orgs", org?.id, "support"],
+    queryFn: async () => {
+      const res = await fetch(`/api/super-admin/orgs/${org!.id}/support`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load support tickets");
+      return res.json();
+    },
+    enabled: open && !!org?.id,
+  });
+
+  const { data: details, isLoading: detailsLoading } = useQuery<OrgDetailsData>({
+    queryKey: ["/api/super-admin/orgs", org?.id, "details"],
+    queryFn: async () => {
+      const res = await fetch(`/api/super-admin/orgs/${org!.id}/details`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load org details");
       return res.json();
     },
     enabled: open && !!org?.id,
@@ -10549,23 +10617,34 @@ function OrgDetailSheet({ org, open, onClose }: { org: OrgOverviewRow | null; op
     super_admin: "Super Admin",
   };
 
+  const sub = details?.subscription;
+  const openTickets = tickets.filter(t => t.status !== "resolved");
+
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
         <SheetHeader className="mb-4">
           <SheetTitle className="flex items-center gap-2">
             <Building2 className="w-4 h-4 text-slate-500" />
             {org.name}
           </SheetTitle>
-          <SheetDescription>
-            {org.slug ? <span className="font-mono text-xs">{org.slug}.hubifyhomesonline.com</span> : <span className="text-slate-400 italic text-xs">No slug set</span>}
+          <SheetDescription className="flex items-center gap-3">
+            {org.slug
+              ? <span className="font-mono text-xs">{org.slug}.hubifyhomesonline.com</span>
+              : <span className="text-slate-400 italic text-xs">No slug set</span>}
+            {openTickets.length > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 text-[10px] font-semibold px-2 py-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                {openTickets.length} open ticket{openTickets.length !== 1 ? "s" : ""}
+              </span>
+            )}
           </SheetDescription>
         </SheetHeader>
 
         <Tabs value={innerTab} onValueChange={setInnerTab} className="space-y-4">
-          <TabsList className="w-full">
-            <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
-            <TabsTrigger value="users" className="flex-1">
+          <TabsList className="w-full grid grid-cols-3">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="users">
               Users
               {orgUsers.length > 0 && (
                 <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-slate-200 text-slate-700 text-[10px] font-semibold leading-none min-w-[16px] h-4 px-1">
@@ -10573,28 +10652,80 @@ function OrgDetailSheet({ org, open, onClose }: { org: OrgOverviewRow | null; op
                 </span>
               )}
             </TabsTrigger>
+            <TabsTrigger value="support">
+              Support
+              {openTickets.length > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-amber-200 text-amber-800 text-[10px] font-semibold leading-none min-w-[16px] h-4 px-1">
+                  {openTickets.length}
+                </span>
+              )}
+            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-3">
-            {[
-              ["Organization", org.name],
-              ["Slug", org.slug ?? "—"],
-              ["Plan", org.tier],
-              ["Subscription", org.subscriptionStatus.replace("_", " ")],
-              ["Status", org.orgStatus ?? "—"],
-              ["Primary Admin", org.primaryAdminEmail ?? "—"],
-              ["Properties", String(org.propertyCount)],
-              ["Users", String(org.userCount)],
-              ["MRR", `$${(org.mrrCents / 100).toFixed(0)}/mo`],
-              ["Created", org.createdAt ? new Date(org.createdAt).toLocaleDateString() : "—"],
-            ].map(([label, value]) => (
-              <div key={label} className="flex justify-between text-sm border-b border-slate-100 pb-2 last:border-0">
-                <span className="text-slate-500">{label}</span>
-                <span className="font-medium text-slate-800 capitalize">{value}</span>
+          {/* ── OVERVIEW ── */}
+          <TabsContent value="overview" className="space-y-5">
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Organization</p>
+              <div className="space-y-2">
+                {([
+                  ["Name",          org.name],
+                  ["Slug",          org.slug ?? "—"],
+                  ["Status",        org.orgStatus ?? "—"],
+                  ["Primary Admin", org.primaryAdminEmail ?? "—"],
+                  ["Properties",    String(org.propertyCount)],
+                  ["Users",         String(org.userCount)],
+                  ["Created",       org.createdAt ? new Date(org.createdAt).toLocaleDateString() : "—"],
+                ] as [string, string][]).map(([label, value]) => (
+                  <div key={label} className="flex justify-between text-sm border-b border-slate-100 pb-1.5 last:border-0">
+                    <span className="text-slate-500">{label}</span>
+                    <span className="font-medium text-slate-800 capitalize">{value}</span>
+                  </div>
+                ))}
+                {details?.org.phone && (
+                  <div className="flex justify-between text-sm border-b border-slate-100 pb-1.5">
+                    <span className="text-slate-500">Phone</span>
+                    <span className="font-medium text-slate-800">{details.org.phone}</span>
+                  </div>
+                )}
+                {(details?.org.city || details?.org.state) && (
+                  <div className="flex justify-between text-sm pb-1.5">
+                    <span className="text-slate-500">Location</span>
+                    <span className="font-medium text-slate-800">
+                      {[details.org.city, details.org.state].filter(Boolean).join(", ")}
+                    </span>
+                  </div>
+                )}
               </div>
-            ))}
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Subscription</p>
+              {detailsLoading ? (
+                <div className="text-sm text-slate-400">Loading…</div>
+              ) : (
+                <div className="space-y-2">
+                  {([
+                    ["Plan",           org.tier],
+                    ["Status",         org.subscriptionStatus.replace(/_/g, " ")],
+                    ["MRR",            `$${(org.mrrCents / 100).toFixed(0)}/mo`],
+                    ["Billing Cycle",  sub?.billingCycle ?? "—"],
+                    ["Period Ends",    sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString() : "—"],
+                    ["Cancel at End",  sub?.cancelAtPeriodEnd ? "Yes" : "No"],
+                    ["Beta Pricing",   sub?.betaPriceLocked ? "Locked" : "—"],
+                    ["Stripe Customer",sub?.stripeCustomerId ? "Connected" : "None"],
+                    ["Stripe Sub",     sub?.stripeSubscriptionId ? "Active" : "None"],
+                  ] as [string, string][]).map(([label, value]) => (
+                    <div key={label} className="flex justify-between text-sm border-b border-slate-100 pb-1.5 last:border-0">
+                      <span className="text-slate-500">{label}</span>
+                      <span className="font-medium text-slate-800 capitalize">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </TabsContent>
 
+          {/* ── USERS ── */}
           <TabsContent value="users">
             {usersLoading ? (
               <div className="text-sm text-slate-500 py-4 text-center">Loading users…</div>
@@ -10634,6 +10765,49 @@ function OrgDetailSheet({ org, open, onClose }: { org: OrgOverviewRow | null; op
                         >
                           {u.isActive ? "Active" : "Inactive"}
                         </Badge>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* ── SUPPORT ── */}
+          <TabsContent value="support">
+            {ticketsLoading ? (
+              <div className="text-sm text-slate-500 py-4 text-center">Loading tickets…</div>
+            ) : tickets.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-400">
+                <CheckCircle className="w-8 h-8 text-emerald-300" />
+                <p className="text-sm font-medium">No support tickets</p>
+                <p className="text-xs">This organization has not submitted any requests.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {tickets.map((t) => {
+                  const urgencyCfg = URGENCY_CONFIG[t.urgency] ?? URGENCY_CONFIG.medium;
+                  const statusCfg  = TICKET_STATUS_CONFIG[t.status] ?? TICKET_STATUS_CONFIG.new;
+                  return (
+                    <div
+                      key={t.id}
+                      className={`rounded-lg border p-3 text-sm space-y-1.5 ${t.status === "resolved" ? "opacity-60 bg-slate-50" : "bg-white"}`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-medium text-slate-900 leading-snug">{t.subject}</span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Badge className={`text-[10px] px-1.5 py-0 h-4 border ${urgencyCfg.className} hover:${urgencyCfg.className}`}>
+                            {urgencyCfg.label}
+                          </Badge>
+                          <Badge className={`text-[10px] px-1.5 py-0 h-4 border ${statusCfg.className} hover:${statusCfg.className}`}>
+                            {statusCfg.label}
+                          </Badge>
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-500 line-clamp-2">{t.message}</p>
+                      <div className="flex items-center justify-between text-xs text-slate-400">
+                        <span>{t.userName} &lt;{t.email}&gt;</span>
+                        <span>{new Date(t.createdAt).toLocaleDateString()}</span>
                       </div>
                     </div>
                   );
@@ -10735,7 +10909,15 @@ function OrganizationsTab({ openOrgId, onOrgOpened }: { openOrgId?: string | nul
                   const statusConfig = ORG_STATUS_BADGE[currentStatus] ?? ORG_STATUS_BADGE.active;
                   return (
                     <TableRow key={o.id} data-testid={`row-org-${o.id}`}>
-                      <TableCell className="font-medium whitespace-nowrap">{o.name}</TableCell>
+                      <TableCell className="font-medium whitespace-nowrap">
+                        <button
+                          className="text-slate-900 hover:text-teal-700 hover:underline text-left font-medium"
+                          onClick={() => { setDetailOrg(o); setDetailOpen(true); }}
+                          title="View organization details"
+                        >
+                          {o.name}
+                        </button>
+                      </TableCell>
 
                       {/* Slug — inline edit */}
                       <TableCell className="min-w-[140px]">
