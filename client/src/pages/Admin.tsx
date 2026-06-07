@@ -2359,46 +2359,46 @@ export default function Admin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-10">
-          <TabsTrigger value="forms" className="flex items-center gap-2">
-            <FileText className="w-4 h-4" />
+        <TabsList className="grid w-full grid-cols-10 h-auto">
+          <TabsTrigger value="forms" className="flex flex-col items-center gap-1 py-2 px-1 text-xs">
+            <FileText className="w-3.5 h-3.5" />
             Forms
           </TabsTrigger>
-          <TabsTrigger value="data" className="flex items-center gap-2">
-            <Database className="w-4 h-4" />
+          <TabsTrigger value="data" className="flex flex-col items-center gap-1 py-2 px-1 text-xs">
+            <Database className="w-3.5 h-3.5" />
             Data
           </TabsTrigger>
-          <TabsTrigger value="billing" className="flex items-center gap-2">
-            <DollarSign className="w-4 h-4" />
+          <TabsTrigger value="billing" className="flex flex-col items-center gap-1 py-2 px-1 text-xs">
+            <DollarSign className="w-3.5 h-3.5" />
             Billing
           </TabsTrigger>
-          <TabsTrigger value="communities" className="flex items-center gap-2">
-            <Building className="w-4 h-4" />
-            Communities
+          <TabsTrigger value="communities" className="flex flex-col items-center gap-1 py-2 px-1 text-xs">
+            <Building className="w-3.5 h-3.5" />
+            Community
           </TabsTrigger>
-          <TabsTrigger value="templates" className="flex items-center gap-2">
-            <Mail className="w-4 h-4" />
+          <TabsTrigger value="templates" className="flex flex-col items-center gap-1 py-2 px-1 text-xs">
+            <Mail className="w-3.5 h-3.5" />
             Templates
           </TabsTrigger>
-          <TabsTrigger value="customization" className="flex items-center gap-2">
-            <Sliders className="w-4 h-4" />
-            Customization
+          <TabsTrigger value="customization" className="flex flex-col items-center gap-1 py-2 px-1 text-xs">
+            <Sliders className="w-3.5 h-3.5" />
+            Customize
           </TabsTrigger>
-          <TabsTrigger value="roles" className="flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            Roles & Permissions
+          <TabsTrigger value="roles" className="flex flex-col items-center gap-1 py-2 px-1 text-xs">
+            <Users className="w-3.5 h-3.5" />
+            Roles
           </TabsTrigger>
-          <TabsTrigger value="alerts" className="flex items-center gap-2" data-testid="tab-alerts">
-            <AlertCircle className="w-4 h-4" />
-            System Alerts
+          <TabsTrigger value="alerts" className="flex flex-col items-center gap-1 py-2 px-1 text-xs" data-testid="tab-alerts">
+            <AlertCircle className="w-3.5 h-3.5" />
+            Alerts
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center gap-2">
-            <Bell className="w-4 h-4" />
+          <TabsTrigger value="notifications" className="flex flex-col items-center gap-1 py-2 px-1 text-xs">
+            <Bell className="w-3.5 h-3.5" />
             Notifications
           </TabsTrigger>
-          <TabsTrigger value="tools" className="flex items-center gap-2">
-            <Settings className="w-4 h-4" />
-            Tools & Support
+          <TabsTrigger value="tools" className="flex flex-col items-center gap-1 py-2 px-1 text-xs">
+            <Settings className="w-3.5 h-3.5" />
+            Tools
           </TabsTrigger>
         </TabsList>
 

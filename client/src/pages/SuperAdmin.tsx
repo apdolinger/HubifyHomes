@@ -11769,8 +11769,8 @@ export default function SuperAdmin() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="flex w-full overflow-x-auto h-auto flex-wrap gap-1 justify-start bg-muted p-1">
-          <TabsTrigger value="onboarding" className="relative">
+        <TabsList className="grid w-full grid-cols-7 h-auto">
+          <TabsTrigger value="onboarding" className="relative text-xs py-2">
             Onboarding
             {newSubmissionsCount > 0 && (
               <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none min-w-[16px] h-4 px-1">
@@ -11778,19 +11778,19 @@ export default function SuperAdmin() {
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="organizations">Organizations</TabsTrigger>
-          <TabsTrigger value="revenue">Revenue</TabsTrigger>
-          <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
-          <TabsTrigger value="platform">Platform</TabsTrigger>
-          <TabsTrigger value="support">Support</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
+          <TabsTrigger value="organizations" className="text-xs py-2">Organizations</TabsTrigger>
+          <TabsTrigger value="revenue" className="text-xs py-2">Revenue</TabsTrigger>
+          <TabsTrigger value="monitoring" className="text-xs py-2">Monitoring</TabsTrigger>
+          <TabsTrigger value="platform" className="text-xs py-2">Platform</TabsTrigger>
+          <TabsTrigger value="support" className="text-xs py-2">Support</TabsTrigger>
+          <TabsTrigger value="reports" className="text-xs py-2">Reports</TabsTrigger>
         </TabsList>
 
         {/* ── ONBOARDING ── */}
         <TabsContent value="onboarding">
           <Tabs value={onboardingInnerTab} onValueChange={setOnboardingInnerTab} className="space-y-4">
-            <TabsList className="flex flex-wrap gap-1 h-auto bg-muted/60 p-1">
-              <TabsTrigger value="new" className="relative">
+            <TabsList className="grid w-full grid-cols-5 h-auto bg-muted/60 p-1">
+              <TabsTrigger value="new" className="relative text-xs py-2">
                 Submissions
                 {newSubmissionsCount > 0 && (
                   <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none min-w-[16px] h-4 px-1">
@@ -11798,10 +11798,10 @@ export default function SuperAdmin() {
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
-              <TabsTrigger value="beta">Beta Applications</TabsTrigger>
-              <TabsTrigger value="demo-requests">Demo Requests</TabsTrigger>
-              <TabsTrigger value="dropped">Dropped</TabsTrigger>
+              <TabsTrigger value="pipeline" className="text-xs py-2">Pipeline</TabsTrigger>
+              <TabsTrigger value="beta" className="text-xs py-2">Beta Applications</TabsTrigger>
+              <TabsTrigger value="demo-requests" className="text-xs py-2">Demo Requests</TabsTrigger>
+              <TabsTrigger value="dropped" className="text-xs py-2">Dropped</TabsTrigger>
             </TabsList>
             <TabsContent value="new">
               <SubmissionsTab
