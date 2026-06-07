@@ -2511,6 +2511,15 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
   const [editingProspect, setEditingProspect] = useState<Prospect | null>(null);
   const [detailProspect, setDetailProspect] = useState<Prospect | null>(null);
   const [detailFocusResend, setDetailFocusResend] = useState(false);
+  const [editingPricingInSheet, setEditingPricingInSheet] = useState(false);
+  const [pricingDraftInSheet, setPricingDraftInSheet] = useState({
+    portfolioTier: "",
+    betaCohortNumber: "",
+    discountPercentage: "",
+    originalMonthlyPrice: "",
+    discountedMonthlyPrice: "",
+    setupFee: "",
+  });
 
   const detailStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
@@ -2600,8 +2609,36 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
     setSheetOpen(true);
   };
 
+  const savePricingInSheetMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest("PATCH", `/api/super-admin/onboarding-prospects/${id}`, {
+        portfolioTier: pricingDraftInSheet.portfolioTier || null,
+        betaCohortNumber: pricingDraftInSheet.betaCohortNumber ? Number(pricingDraftInSheet.betaCohortNumber) : null,
+        discountPercentage: pricingDraftInSheet.discountPercentage ? Number(pricingDraftInSheet.discountPercentage) : null,
+        originalMonthlyPrice: pricingDraftInSheet.originalMonthlyPrice ? Number(pricingDraftInSheet.originalMonthlyPrice) : null,
+        discountedMonthlyPrice: pricingDraftInSheet.discountedMonthlyPrice ? Number(pricingDraftInSheet.discountedMonthlyPrice) : null,
+        setupFee: pricingDraftInSheet.setupFee ? Number(pricingDraftInSheet.setupFee) : null,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/submissions"] });
+      setEditingPricingInSheet(false);
+      toast({ title: "Pricing saved" });
+    },
+    onError: () => toast({ title: "Failed to save pricing", variant: "destructive" }),
+  });
+
   const openEdit = (p: Prospect) => {
     setEditingProspect(p);
+    setEditingPricingInSheet(false);
+    setPricingDraftInSheet({
+      portfolioTier: (p as any).portfolioTier ?? "",
+      betaCohortNumber: (p as any).betaCohortNumber != null ? String((p as any).betaCohortNumber) : "",
+      discountPercentage: (p as any).discountPercentage != null ? String((p as any).discountPercentage) : "",
+      originalMonthlyPrice: (p as any).originalMonthlyPrice != null ? String((p as any).originalMonthlyPrice) : "",
+      discountedMonthlyPrice: (p as any).discountedMonthlyPrice != null ? String((p as any).discountedMonthlyPrice) : "",
+      setupFee: (p as any).setupFee != null ? String((p as any).setupFee) : "",
+    });
     form.reset({
       name: p.name,
       email: p.email,
@@ -3335,6 +3372,153 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
                       <p className="text-xs text-muted-foreground">
                         Last resent: {new Date(editingProspect.approvalEmailLastResentAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                       </p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Beta Pricing — shown for any beta application prospect */}
+              {((editingProspect as any).isBetaMember || (editingProspect as any).source === "beta_application" || (editingProspect as any).trialIntent === "beta_application") && (
+                <>
+                  <Separator className="my-4" />
+                  <div className="rounded-lg border border-teal-200 bg-teal-50 p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-teal-700 flex items-center gap-1.5">
+                        <DollarSign className="w-3.5 h-3.5" /> Beta Pricing
+                      </p>
+                      {!editingPricingInSheet ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-6 text-xs border-teal-300 text-teal-700 hover:bg-teal-100"
+                          onClick={() => setEditingPricingInSheet(true)}
+                        >
+                          <Edit className="w-3 h-3 mr-1" /> Edit
+                        </Button>
+                      ) : (
+                        <div className="flex gap-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-6 text-xs"
+                            onClick={() => setEditingPricingInSheet(false)}
+                            disabled={savePricingInSheetMutation.isPending}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-6 text-xs bg-teal-600 hover:bg-teal-700 text-white"
+                            onClick={() => savePricingInSheetMutation.mutate(editingProspect.id)}
+                            disabled={savePricingInSheetMutation.isPending}
+                          >
+                            {savePricingInSheetMutation.isPending ? "Saving…" : "Save"}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    {!editingPricingInSheet ? (
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                        <div>
+                          <p className="text-teal-600 mb-0.5">Portfolio Tier</p>
+                          <p className="font-medium text-teal-900">{(editingProspect as any).portfolioTier ?? <span className="text-gray-400 italic">Not set</span>}</p>
+                        </div>
+                        <div>
+                          <p className="text-teal-600 mb-0.5">Cohort #</p>
+                          <p className="font-medium text-teal-900">{(editingProspect as any).betaCohortNumber ?? <span className="text-gray-400 italic">—</span>}</p>
+                        </div>
+                        <div>
+                          <p className="text-teal-600 mb-0.5">Discount</p>
+                          <p className="font-medium text-teal-900">{(editingProspect as any).discountPercentage != null ? `${(editingProspect as any).discountPercentage}%` : <span className="text-gray-400 italic">—</span>}</p>
+                        </div>
+                        <div>
+                          <p className="text-teal-600 mb-0.5">List Price</p>
+                          <p className="font-medium text-teal-900">{(editingProspect as any).originalMonthlyPrice != null ? `$${(editingProspect as any).originalMonthlyPrice}/mo` : <span className="text-gray-400 italic">—</span>}</p>
+                        </div>
+                        <div>
+                          <p className="text-teal-600 mb-0.5">Beta Price</p>
+                          <p className="font-medium text-teal-900">{(editingProspect as any).discountedMonthlyPrice != null ? `$${(editingProspect as any).discountedMonthlyPrice}/mo` : <span className="text-gray-400 italic">—</span>}</p>
+                        </div>
+                        <div>
+                          <p className="text-teal-600 mb-0.5">Setup Fee</p>
+                          <p className="font-medium text-teal-900">{(editingProspect as any).setupFee != null ? `$${(editingProspect as any).setupFee}` : <span className="text-gray-400 italic">—</span>}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div>
+                          <Label className="text-xs text-teal-700 mb-1 block">Portfolio Tier</Label>
+                          <Select
+                            value={pricingDraftInSheet.portfolioTier}
+                            onValueChange={v => setPricingDraftInSheet(d => ({ ...d, portfolioTier: v }))}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Select tier…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Starter Portfolio">Starter Portfolio</SelectItem>
+                              <SelectItem value="Growth Portfolio">Growth Portfolio</SelectItem>
+                              <SelectItem value="Professional Portfolio">Professional Portfolio</SelectItem>
+                              <SelectItem value="Enterprise Portfolio">Enterprise Portfolio</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label className="text-xs text-teal-700 mb-1 block">Cohort #</Label>
+                            <Input
+                              type="number"
+                              className="h-8 text-xs"
+                              placeholder="1"
+                              value={pricingDraftInSheet.betaCohortNumber}
+                              onChange={e => setPricingDraftInSheet(d => ({ ...d, betaCohortNumber: e.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-teal-700 mb-1 block">Discount %</Label>
+                            <Input
+                              type="number"
+                              className="h-8 text-xs"
+                              placeholder="20"
+                              value={pricingDraftInSheet.discountPercentage}
+                              onChange={e => setPricingDraftInSheet(d => ({ ...d, discountPercentage: e.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-teal-700 mb-1 block">List Price ($/mo)</Label>
+                            <Input
+                              type="number"
+                              className="h-8 text-xs"
+                              placeholder="199"
+                              value={pricingDraftInSheet.originalMonthlyPrice}
+                              onChange={e => setPricingDraftInSheet(d => ({ ...d, originalMonthlyPrice: e.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-teal-700 mb-1 block">Beta Price ($/mo)</Label>
+                            <Input
+                              type="number"
+                              className="h-8 text-xs"
+                              placeholder="159"
+                              value={pricingDraftInSheet.discountedMonthlyPrice}
+                              onChange={e => setPricingDraftInSheet(d => ({ ...d, discountedMonthlyPrice: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-teal-700 mb-1 block">Setup Fee ($)</Label>
+                          <Input
+                            type="number"
+                            className="h-8 text-xs"
+                            placeholder="0"
+                            value={pricingDraftInSheet.setupFee}
+                            onChange={e => setPricingDraftInSheet(d => ({ ...d, setupFee: e.target.value }))}
+                          />
+                        </div>
+                      </div>
                     )}
                   </div>
                 </>
