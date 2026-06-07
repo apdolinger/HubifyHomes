@@ -18788,23 +18788,29 @@ contact@hubifyhomes.com`;
       const cohortNumber = (existing as any).betaCohortNumber ?? 1;
       const prospectHomes = (existing as any).estimatedHomes ?? 0;
 
-        const resendApprovalText = `Hi ${recipientName},
+      const resendApprovalLines = [
+        `Hi ${recipientName},`,
+        "",
+        `Here is a fresh onboarding link for ${orgName} — this one expires in 7 days:`,
+        "",
+        onboardingUrl,
+        "",
+        "Your membership details:",
+        "",
+        `  Portfolio Tier: ${portfolioTier}`,
+        ...(prospectHomes > 0 ? [`  Properties:     ${prospectHomes}`] : []),
+        `  Beta Cohort:    Member #${cohortNumber}`,
+        `  Monthly Rate:   $${discountedMonthlyPrice.toFixed(2)}/mo (${discountPct}% beta rate, grandfathered)`,
+        ...(tierSetupFee > 0 ? [`  Setup Fee:      $${tierSetupFee.toFixed(2)} one-time`] : []),
+        "",
+        "If you have any trouble, just reply to this email and we'll help.",
+        "",
+        "— The Hubify Team",
+        "contact@hubifyhomes.com",
+      ];
+      const resendApprovalText = resendApprovalLines.join("\n");
 
-Here is a fresh onboarding link for ${orgName} — this one expires in 7 days:
-
-${onboardingUrl}
-
-Your membership details:
-
-  Portfolio Tier: ${portfolioTier}${prospectHomes > 0 ? `\n  Properties:     ${prospectHomes}` : ""}
-  Beta Cohort:    Member #${cohortNumber}
-  Monthly Rate:   $${discountedMonthlyPrice.toFixed(2)}/mo (${discountPct}% beta rate, grandfathered)${tierSetupFee > 0 ? `\n  Setup Fee:      $${tierSetupFee.toFixed(2)} one-time` : ""}
-
-If you have any trouble, just reply to this email and we'll help.
-
-— The Hubify Team
-contact@hubifyhomes.com`;
-
+      try {
         const resendResult = await resend.emails.send({
           from: fromEmail,
           to: existing.email,

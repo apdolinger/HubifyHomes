@@ -1197,6 +1197,16 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
   const [overrideBetaPrice, setOverrideBetaPrice] = useState<string>("");
   const [overrideSetupFee, setOverrideSetupFee] = useState<string>("");
 
+  const [editingPricing, setEditingPricing] = useState(false);
+  const [pricingDraft, setPricingDraft] = useState({
+    portfolioTier: submission.portfolioTier ?? "",
+    betaCohortNumber: String(submission.betaCohortNumber ?? ""),
+    discountPercentage: String(submission.discountPercentage ?? ""),
+    originalMonthlyPrice: String(submission.originalMonthlyPrice ?? ""),
+    discountedMonthlyPrice: String(submission.discountedMonthlyPrice ?? ""),
+    setupFee: String(submission.setupFee ?? ""),
+  });
+
   const betaPricingPreview = useQuery({
     queryKey: ["/api/super-admin/onboarding-prospects", submission.id, "approve-beta", "preview"],
     queryFn: () =>
@@ -1255,6 +1265,36 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
       toast({ title: "Email failed", description: err?.message ?? "Failed to resend approval email", variant: "destructive" });
     },
   });
+
+  const savePricingMutation = useMutation({
+    mutationFn: (patch: Record<string, unknown>) =>
+      apiRequest("PATCH", `/api/super-admin/onboarding-prospects/${submission.id}`, patch),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/submissions"] });
+      setEditingPricing(false);
+      toast({ title: "Pricing updated", description: "The pricing structure has been saved." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Save failed", description: err?.message ?? "Failed to update pricing", variant: "destructive" });
+    },
+  });
+
+  const handleSavePricing = () => {
+    const patch: Record<string, unknown> = {};
+    if (pricingDraft.portfolioTier) patch.portfolioTier = pricingDraft.portfolioTier;
+    const cohort = parseInt(pricingDraft.betaCohortNumber, 10);
+    if (!isNaN(cohort)) patch.betaCohortNumber = cohort;
+    const disc = parseFloat(pricingDraft.discountPercentage);
+    if (!isNaN(disc)) patch.discountPercentage = disc;
+    const listPrice = parseFloat(pricingDraft.originalMonthlyPrice);
+    if (!isNaN(listPrice)) patch.originalMonthlyPrice = listPrice;
+    const betaPrice = parseFloat(pricingDraft.discountedMonthlyPrice);
+    if (!isNaN(betaPrice)) patch.discountedMonthlyPrice = betaPrice;
+    const setup = parseFloat(pricingDraft.setupFee);
+    if (!isNaN(setup)) patch.setupFee = setup;
+    savePricingMutation.mutate(patch);
+  };
 
   const handleClose = () => {
     flushNotesSave();
@@ -1523,60 +1563,174 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
             <>
               <Separator />
               <div className="rounded-lg border border-teal-200 bg-teal-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-teal-700 mb-3 flex items-center gap-1.5">
-                  <CheckCircle className="h-3.5 w-3.5" />
-                  Beta Approval Details
-                </p>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  {submission.betaCohortNumber != null && (
-                    <div>
-                      <p className="text-teal-600 text-xs mb-0.5">Cohort #</p>
-                      <p className="font-semibold text-teal-900">{submission.betaCohortNumber}</p>
-                    </div>
-                  )}
-                  {submission.portfolioTier && (
-                    <div>
-                      <p className="text-teal-600 text-xs mb-0.5">Portfolio Tier</p>
-                      <p className="font-semibold text-teal-900">{submission.portfolioTier}</p>
-                    </div>
-                  )}
-                  {submission.discountPercentage != null && (
-                    <div>
-                      <p className="text-teal-600 text-xs mb-0.5">Discount</p>
-                      <p className="font-semibold text-teal-900">{submission.discountPercentage}% off (life-locked)</p>
-                    </div>
-                  )}
-                  {submission.originalMonthlyPrice != null && (
-                    <div>
-                      <p className="text-teal-600 text-xs mb-0.5">List Price</p>
-                      <p className="font-semibold text-teal-900">${submission.originalMonthlyPrice.toFixed(2)}/mo</p>
-                    </div>
-                  )}
-                  {submission.discountedMonthlyPrice != null && (
-                    <div>
-                      <p className="text-teal-600 text-xs mb-0.5">Beta Price</p>
-                      <p className="font-bold text-teal-900 text-base">${submission.discountedMonthlyPrice.toFixed(2)}/mo</p>
-                    </div>
-                  )}
-                  {submission.setupFee != null && (
-                    <div>
-                      <p className="text-teal-600 text-xs mb-0.5">Setup Fee</p>
-                      <p className="font-semibold text-teal-900">${submission.setupFee.toFixed(2)}</p>
-                    </div>
-                  )}
-                  {submission.agreementStatus && (
-                    <div>
-                      <p className="text-teal-600 text-xs mb-0.5">Agreement</p>
-                      <p className="font-semibold text-teal-900 capitalize">{submission.agreementStatus.replace(/_/g, " ")}</p>
-                    </div>
-                  )}
-                  {submission.betaApprovedAt && (
-                    <div>
-                      <p className="text-teal-600 text-xs mb-0.5">Approved On</p>
-                      <p className="font-semibold text-teal-900">{new Date(submission.betaApprovedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-teal-700 flex items-center gap-1.5">
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    Beta Approval Details
+                  </p>
+                  {!editingPricing ? (
+                    <button
+                      onClick={() => {
+                        setPricingDraft({
+                          portfolioTier: submission.portfolioTier ?? "",
+                          betaCohortNumber: String(submission.betaCohortNumber ?? ""),
+                          discountPercentage: String(submission.discountPercentage ?? ""),
+                          originalMonthlyPrice: String(submission.originalMonthlyPrice ?? ""),
+                          discountedMonthlyPrice: String(submission.discountedMonthlyPrice ?? ""),
+                          setupFee: String(submission.setupFee ?? ""),
+                        });
+                        setEditingPricing(true);
+                      }}
+                      className="text-xs text-teal-600 hover:text-teal-800 flex items-center gap-1 font-medium"
+                    >
+                      <Edit className="h-3 w-3" /> Edit
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setEditingPricing(false)}
+                        className="text-xs text-slate-500 hover:text-slate-700 font-medium"
+                        disabled={savePricingMutation.isPending}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSavePricing}
+                        disabled={savePricingMutation.isPending}
+                        className="text-xs bg-teal-600 hover:bg-teal-700 text-white px-2.5 py-1 rounded-md font-medium disabled:opacity-50"
+                      >
+                        {savePricingMutation.isPending ? "Saving…" : "Save"}
+                      </button>
                     </div>
                   )}
                 </div>
+
+                {editingPricing ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2">
+                      <Label className="text-teal-600 text-xs mb-1 block">Portfolio Tier</Label>
+                      <Select
+                        value={pricingDraft.portfolioTier}
+                        onValueChange={v => setPricingDraft(d => ({ ...d, portfolioTier: v }))}
+                      >
+                        <SelectTrigger className="h-8 text-sm bg-white">
+                          <SelectValue placeholder="Select tier" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Starter Portfolio">Starter Portfolio</SelectItem>
+                          <SelectItem value="Growth Portfolio">Growth Portfolio</SelectItem>
+                          <SelectItem value="Enterprise Portfolio">Enterprise Portfolio</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-teal-600 text-xs mb-1 block">Cohort #</Label>
+                      <Input
+                        type="number"
+                        className="h-8 text-sm bg-white"
+                        value={pricingDraft.betaCohortNumber}
+                        onChange={e => setPricingDraft(d => ({ ...d, betaCohortNumber: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-teal-600 text-xs mb-1 block">Discount %</Label>
+                      <Input
+                        type="number"
+                        className="h-8 text-sm bg-white"
+                        value={pricingDraft.discountPercentage}
+                        onChange={e => setPricingDraft(d => ({ ...d, discountPercentage: e.target.value }))}
+                        placeholder="e.g. 50"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-teal-600 text-xs mb-1 block">List Price ($/mo)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        className="h-8 text-sm bg-white"
+                        value={pricingDraft.originalMonthlyPrice}
+                        onChange={e => setPricingDraft(d => ({ ...d, originalMonthlyPrice: e.target.value }))}
+                        placeholder="e.g. 65.00"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-teal-600 text-xs mb-1 block">Beta Price ($/mo)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        className="h-8 text-sm bg-white"
+                        value={pricingDraft.discountedMonthlyPrice}
+                        onChange={e => setPricingDraft(d => ({ ...d, discountedMonthlyPrice: e.target.value }))}
+                        placeholder="e.g. 32.50"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-teal-600 text-xs mb-1 block">Setup Fee ($)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        className="h-8 text-sm bg-white"
+                        value={pricingDraft.setupFee}
+                        onChange={e => setPricingDraft(d => ({ ...d, setupFee: e.target.value }))}
+                        placeholder="e.g. 149.00"
+                      />
+                    </div>
+                    <div className="col-span-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5">
+                      Note: changing prices here updates the record only. If Stripe payment links have already been created, you will need to handle that separately.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    {submission.betaCohortNumber != null && (
+                      <div>
+                        <p className="text-teal-600 text-xs mb-0.5">Cohort #</p>
+                        <p className="font-semibold text-teal-900">{submission.betaCohortNumber}</p>
+                      </div>
+                    )}
+                    {submission.portfolioTier && (
+                      <div>
+                        <p className="text-teal-600 text-xs mb-0.5">Portfolio Tier</p>
+                        <p className="font-semibold text-teal-900">{submission.portfolioTier}</p>
+                      </div>
+                    )}
+                    {submission.discountPercentage != null && (
+                      <div>
+                        <p className="text-teal-600 text-xs mb-0.5">Discount</p>
+                        <p className="font-semibold text-teal-900">{submission.discountPercentage}% off (life-locked)</p>
+                      </div>
+                    )}
+                    {submission.originalMonthlyPrice != null && (
+                      <div>
+                        <p className="text-teal-600 text-xs mb-0.5">List Price</p>
+                        <p className="font-semibold text-teal-900">${submission.originalMonthlyPrice.toFixed(2)}/mo</p>
+                      </div>
+                    )}
+                    {submission.discountedMonthlyPrice != null && (
+                      <div>
+                        <p className="text-teal-600 text-xs mb-0.5">Beta Price</p>
+                        <p className="font-bold text-teal-900 text-base">${submission.discountedMonthlyPrice.toFixed(2)}/mo</p>
+                      </div>
+                    )}
+                    {submission.setupFee != null && (
+                      <div>
+                        <p className="text-teal-600 text-xs mb-0.5">Setup Fee</p>
+                        <p className="font-semibold text-teal-900">${submission.setupFee.toFixed(2)}</p>
+                      </div>
+                    )}
+                    {submission.agreementStatus && (
+                      <div>
+                        <p className="text-teal-600 text-xs mb-0.5">Agreement</p>
+                        <p className="font-semibold text-teal-900 capitalize">{submission.agreementStatus.replace(/_/g, " ")}</p>
+                      </div>
+                    )}
+                    {submission.betaApprovedAt && (
+                      <div>
+                        <p className="text-teal-600 text-xs mb-0.5">Approved On</p>
+                        <p className="font-semibold text-teal-900">{new Date(submission.betaApprovedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </>
           )}
