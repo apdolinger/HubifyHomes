@@ -97,6 +97,8 @@ import {
   type InsertOnboardingProspect,
   type OnboardingStage,
   onboardingProspects,
+  accountSetupTokens,
+  orgs,
   type InsertDiscountCode,
 } from "@shared/schema";
 import { z } from "zod";
@@ -17851,6 +17853,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (prospect.onboardingTokenExpiresAt && new Date(prospect.onboardingTokenExpiresAt) < new Date()) {
         return res.status(410).json({ message: "This onboarding link has expired. Please email contact@hubifyhomes.com to request a new one." });
       }
+      // Look up any active (unclaimed) account setup token for this prospect
+      let publicSetupUrl: string | null = null;
+      if (prospect.stage === "converted" && prospect.orgId) {
+        const tokenRows = await db
+          .select()
+          .from(accountSetupTokens)
+          .where(and(eq(accountSetupTokens.prospectId, prospect.id), isNull(accountSetupTokens.claimedAt)))
+          .limit(1);
+        if (tokenRows[0] && new Date(tokenRows[0].expiresAt) > new Date()) {
+          const baseUrl = `${req.protocol}://${req.get("host")}`;
+          publicSetupUrl = `${baseUrl}/setup-account/${tokenRows[0].token}`;
+        }
+      }
+
       // Return safe subset — never expose internal UUID in this endpoint
       const p = prospect as any;
       res.json({
@@ -17875,6 +17891,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentStatus: p.paymentStatus ?? null,
         paymentCompletedAt: p.paymentCompletedAt ?? null,
         stage: prospect.stage,
+        publicSetupUrl,
+        provisioningFailed: p.provisioningFailed ?? false,
       });
     } catch (error) {
       console.error("Error fetching onboarding details:", error);
@@ -18141,7 +18159,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           stage: "platform_initializing",
           betaStripeCheckoutSessionId: "waived_100pct_discount",
         } as any).where(eq(onboardingProspects.id, prospect.id));
-        return res.json({ free: true });
+
+        // Auto-provision immediately for $0 tier (no Stripe webhook will fire)
+        const baseUrl = `${req.protocol}://${req.get("host")}`;
+        try {
+          const { provisionBetaOrg } = await import("./betaProvisioning");
+          const result = await provisionBetaOrg(prospect.id, baseUrl);
+          return res.json({ free: true, setupUrl: result.setupUrl });
+        } catch (provisionErr) {
+          console.error(`[create-checkout] Free-tier provisioning failed for prospect ${prospect.id}:`, provisionErr);
+          await db.update(onboardingProspects).set({
+            provisioningFailed: true,
+            provisioningError: String(provisionErr),
+          } as any).where(eq(onboardingProspects.id, prospect.id));
+          return res.json({ free: true });
+        }
       }
 
       // Only require Stripe when there's an actual charge to collect.
@@ -18189,6 +18221,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error creating beta checkout session:", error);
       res.status(500).json({ message: error?.message ?? "Failed to create payment session." });
+    }
+  });
+
+  // ── Account setup (beta provisioning) ────────────────────────────────────────
+
+  // GET /api/public/setup-account/:token
+  // Validates the token and returns safe data to pre-populate the setup form.
+  app.get("/api/public/setup-account/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      if (!token || token.length !== 64 || !/^[0-9a-f]+$/.test(token)) {
+        return res.status(400).json({ message: "Invalid setup link." });
+      }
+      const tokenRows = await db
+        .select()
+        .from(accountSetupTokens)
+        .where(eq(accountSetupTokens.token, token))
+        .limit(1);
+      const tokenRow = tokenRows[0];
+      if (!tokenRow) {
+        return res.status(404).json({ message: "Setup link not found or already used." });
+      }
+      if (tokenRow.claimedAt) {
+        return res.status(410).json({ message: "This setup link has already been used. Please sign in.", alreadyClaimed: true });
+      }
+      if (new Date(tokenRow.expiresAt) < new Date()) {
+        return res.status(410).json({ message: "This setup link has expired. Please email contact@hubifyhomes.com to request a new one.", expired: true });
+      }
+      const userRows = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, tokenRow.userId))
+        .limit(1);
+      const user = userRows[0];
+      if (!user) return res.status(404).json({ message: "Account not found." });
+
+      const orgRows = user.orgId
+        ? await db.select().from(orgs).where(eq(orgs.id, user.orgId)).limit(1)
+        : [];
+      const org = orgRows[0];
+
+      res.json({
+        email: user.email,
+        firstName: user.firstName ?? "",
+        lastName: user.lastName ?? "",
+        orgName: org?.name ?? "",
+        expiresAt: tokenRow.expiresAt,
+      });
+    } catch (error) {
+      console.error("Error verifying setup token:", error);
+      res.status(500).json({ message: "Failed to verify setup link." });
+    }
+  });
+
+  // POST /api/public/setup-account/:token
+  // Sets the admin user's password and marks the setup token as claimed.
+  app.post("/api/public/setup-account/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      if (!token || token.length !== 64 || !/^[0-9a-f]+$/.test(token)) {
+        return res.status(400).json({ message: "Invalid setup link." });
+      }
+      const bodySchema = z.object({
+        password: z.string().min(8, "Password must be at least 8 characters"),
+        firstName: z.string().min(1).optional(),
+        lastName: z.string().optional(),
+      });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors[0]?.message ?? "Invalid input." });
+      }
+
+      const tokenRows = await db
+        .select()
+        .from(accountSetupTokens)
+        .where(eq(accountSetupTokens.token, token))
+        .limit(1);
+      const tokenRow = tokenRows[0];
+      if (!tokenRow) return res.status(404).json({ message: "Setup link not found." });
+      if (tokenRow.claimedAt) return res.status(410).json({ message: "This setup link has already been used." });
+      if (new Date(tokenRow.expiresAt) < new Date()) return res.status(410).json({ message: "This setup link has expired." });
+
+      const passwordHash = await bcrypt.hash(parsed.data.password, 12);
+      const updates: any = { passwordHash, updatedAt: new Date() };
+      if (parsed.data.firstName) updates.firstName = parsed.data.firstName;
+      if (parsed.data.lastName !== undefined) updates.lastName = parsed.data.lastName;
+
+      await db.update(users).set(updates).where(eq(users.id, tokenRow.userId));
+      await db.update(accountSetupTokens).set({ claimedAt: new Date() }).where(eq(accountSetupTokens.id, tokenRow.id));
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error claiming setup token:", error);
+      res.status(500).json({ message: "Failed to set up account." });
     }
   });
 
@@ -19318,109 +19444,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ message: "Prospect is already linked to an organization", orgId: prospect.orgId });
       }
 
-      const { insertOrgSchema, insertOrgSubscriptionSchema } = await import("@shared/schema");
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      const { provisionBetaOrg } = await import("./betaProvisioning");
+      const result = await provisionBetaOrg(id, baseUrl);
 
-      // Map suggestedTier (from public form) → org_subscriptions tier
-      function mapToSubscriptionTier(suggested: string | null): "starter" | "pro" | "grow" | "enterprise" {
-        if (!suggested) return "starter";
-        const s = suggested.toLowerCase();
-        if (s.includes("growth") || s === "grow" || s === "pricing_growth") return "grow";
-        if (s.includes("professional") || s === "pro" || s === "pricing_professional") return "pro";
-        if (s.includes("enterprise")) return "enterprise";
-        return "starter";
-      }
-
-      const orgData = insertOrgSchema.parse({
-        name: prospect.company || prospect.name,
-        phone: prospect.phone || undefined,
-        isActive: true,
-        orgStatus: "onboarding",
-      });
-      const org = await storage.createOrg(orgData);
-
-      // Create trial subscription (30-day trial)
-      const trialStart = new Date();
-      const trialEnd = new Date(trialStart);
-      trialEnd.setDate(trialEnd.getDate() + 30);
-
-      const subData = insertOrgSubscriptionSchema.parse({
-        orgId: org.id,
-        tier: mapToSubscriptionTier(prospect.suggestedTier),
-        status: "trialing",
-        currentPeriodStart: trialStart,
-        currentPeriodEnd: trialEnd,
-        setupFeeCents: Math.round(((prospect as any).setupFee ?? 0) * 100),
-      });
-      await storage.upsertOrgSubscription(subData);
-
-      // Create setup progress record
-      await storage.createOrgSetupProgress(org.id);
-
-      // Update prospect: mark as converted, record timestamp
-      const now = new Date();
-      const updated = await storage.updateOnboardingProspect(id, {
-        orgId: org.id,
-        stage: "converted",
-        convertedAt: now,
-      } as any);
-
-      // Send invite/welcome email to new org admin
-      const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@hubifyhomes.com";
-      const loginUrl = `${req.protocol}://${req.get("host")}/staff/login`;
-      const trialEndFormatted = trialEnd.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-      const firstName = (prospect.firstName || prospect.name.split(" ")[0] || prospect.name);
-      const orgName = org.name;
-
-      if (resend) {
-        try {
-          await resend.emails.send({
-            from: fromEmail,
-            to: prospect.email,
-            subject: `You're invited to Hubify — ${orgName} is ready`,
-            html: `
-              <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
-                <div style="text-align:center;margin-bottom:28px">
-                  <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="180" style="width:180px;max-width:180px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
-                </div>
-                <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Welcome, ${firstName}! Your organization is ready.</h1>
-                <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 20px">
-                  Your Hubify organization <strong>${orgName}</strong> has been set up and is ready to use.
-                  You have a <strong>30-day free trial</strong> — no credit card needed — running through <strong>${trialEndFormatted}</strong>.
-                </p>
-                <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;padding:20px;margin-bottom:28px">
-                  <p style="font-size:14px;font-weight:700;color:#0d9488;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.05em">What to do first</p>
-                  <ol style="padding-left:18px;margin:0;color:#0f172a;font-size:14px;line-height:1.9">
-                    <li>Sign in at the link below and set up your company profile.</li>
-                    <li>Add your first property and invite a team member.</li>
-                    <li>Explore the dashboard — tasks, billing, and scheduling are all ready for you.</li>
-                  </ol>
-                </div>
-                <div style="text-align:center;margin-bottom:32px">
-                  <a href="${loginUrl}" style="display:inline-block;background:#0d9488;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
-                    Sign In to Hubify
-                  </a>
-                </div>
-                <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
-                <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
-                  If you have questions, please email <a href="mailto:contact@hubifyhomes.com" style="color:#94a3b8">contact@hubifyhomes.com</a><br/>
-                  Trial ends ${trialEndFormatted}. No charges until you upgrade.
-                </p>
-              </div>
-            `,
-          });
-        } catch (emailErr) {
-          console.error("[CONVERT] Failed to send invite email:", emailErr);
-        }
-      }
+      const updatedProspect = await storage.getOnboardingProspect(id);
+      const orgRows = await db.select().from(orgs).where(eq(orgs.id, result.orgId)).limit(1);
+      const org = orgRows[0];
 
       res.status(201).json({
-        prospect: updated,
+        prospect: updatedProspect,
         org,
+        setupUrl: result.setupUrl,
         summary: {
-          orgName,
+          orgName: org?.name ?? "",
           adminEmail: prospect.email,
-          trialEndsAt: trialEnd.toISOString(),
-          trialEndFormatted,
+          setupUrl: result.setupUrl,
         },
       });
     } catch (error) {

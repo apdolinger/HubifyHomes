@@ -66,6 +66,7 @@ import Signup from "@/pages/Signup";
 import Billing from "@/pages/Billing";
 import PaymentCollectionPage from "@/pages/PaymentCollectionPage";
 import OnboardingPortal from "@/pages/OnboardingPortal";
+import SetupAccount from "@/pages/SetupAccount";
 import InspectionReport from "@/pages/InspectionReport";
 import InspectionSchedules from "@/pages/InspectionSchedules";
 import InspectionTemplates from "@/pages/InspectionTemplates";
@@ -170,6 +171,7 @@ function Router() {
       <Route path="/super-admin" component={SuperAdmin} />
       <Route path="/payment-collection/:token" component={PaymentCollectionPage} />
       <Route path="/onboarding/:token" component={OnboardingPortal} />
+      <Route path="/setup-account/:token" component={SetupAccount} />
       <Route path="/r/satisfaction/:token" component={SatisfactionSurveyPage} />
       <Route path="/r/review/:token" component={ReviewRequestPage} />
       <Route path="/submit" component={Submissions} />

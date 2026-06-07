@@ -17,7 +17,7 @@ import { openCookiePreferences } from "@/lib/cookieConsent";
 import {
   CheckCircle, Clock, AlertTriangle, Loader2, Lock,
   ShieldCheck, CreditCard, ArrowRight, RefreshCw, XCircle,
-  FileText, ChevronDown, Scale, Shield,
+  FileText, ChevronDown, Scale, Shield, Building2,
 } from "lucide-react";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -50,6 +50,8 @@ interface OnboardingDetails {
   agreementStatus?: string;
   paymentStatus?: string | null;
   paymentCompletedAt?: string | null;
+  publicSetupUrl?: string | null;
+  provisioningFailed?: boolean;
 }
 
 // ── Form schema ───────────────────────────────────────────────────────────────
@@ -1243,29 +1245,57 @@ function PaymentStepLocked() {
   );
 }
 
-// ── Payment success / processing screen ────────────────────────────────────────
+// ── Workspace ready screen ──────────────────────────────────────────────────────
 
-function PaymentSuccess({ data }: { data: OnboardingDetails }) {
-  const isPaid = data.paymentStatus === "paid" || data.stage === "platform_initializing";
+function WorkspaceReady({ setupUrl, email }: { setupUrl: string; email?: string }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center">
       <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center mx-auto mb-4">
         <CheckCircle className="w-9 h-9 text-teal-600" />
       </div>
-      <h2 className="text-xl font-bold text-slate-900 mb-2">
-        {isPaid ? "Payment Received!" : "Payment Processing…"}
-      </h2>
+      <h2 className="text-2xl font-bold text-slate-900 mb-2">Your Workspace Is Ready!</h2>
       <p className="text-slate-600 text-sm leading-relaxed mb-6">
-        {isPaid
-          ? "Your payment was successful. Your platform setup is now starting — you'll receive an email when it's ready."
-          : "Your payment is being processed. This usually takes just a moment. You'll receive a confirmation email shortly."}
+        Your Hubify organization has been set up. Click the button below to set your password and start using Hubify.
+        {email && (
+          <> A confirmation email has been sent to <strong>{email}</strong>.</>
+        )}
+      </p>
+      <a
+        href={setupUrl}
+        className="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm px-7 py-3 rounded-lg transition-colors mb-6"
+      >
+        Enter Your Workspace <ArrowRight className="w-4 h-4" />
+      </a>
+      <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-4 text-left">
+        <p className="text-slate-700 text-sm font-semibold mb-2">What's next</p>
+        <ol className="text-slate-600 text-sm space-y-1 list-decimal list-inside">
+          <li>Set your password using the button above</li>
+          <li>Complete your company profile in Settings</li>
+          <li>Add your first property and invite your team</li>
+        </ol>
+      </div>
+    </div>
+  );
+}
+
+// ── Setting up screen (payment done, provisioning in progress) ──────────────────
+
+function SettingUp() {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center">
+      <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center mx-auto mb-4">
+        <RefreshCw className="w-8 h-8 text-teal-600 animate-spin" />
+      </div>
+      <h2 className="text-xl font-bold text-slate-900 mb-2">Setting Up Your Workspace…</h2>
+      <p className="text-slate-600 text-sm leading-relaxed mb-6">
+        Payment confirmed! We're creating your organization now. This usually takes just a few seconds.
       </p>
       <div className="bg-teal-50 border border-teal-200 rounded-xl px-5 py-4 text-left">
-        <p className="text-teal-800 text-sm font-semibold mb-1">What happens next</p>
+        <p className="text-teal-800 text-sm font-semibold mb-1">Almost there</p>
         <ul className="text-teal-700 text-sm space-y-1 list-disc list-inside">
-          <li>Our team initializes your Hubify platform</li>
-          <li>You'll receive login credentials via email</li>
-          <li>Onboarding call scheduled within 2 business days</li>
+          <li>Creating your organization</li>
+          <li>Setting up your admin account</li>
+          <li>Sending your workspace link via email</li>
         </ul>
       </div>
     </div>
@@ -1283,9 +1313,15 @@ function PaymentCancelledBanner() {
   );
 }
 
-// ── Verifying payment screen ─────────────────────────────────────────────────
+// ── Verifying payment / provisioning screen ──────────────────────────────────
 
-function VerifyingPayment({ token, onVerified }: { token: string; onVerified: () => void }) {
+function VerifyingPayment({
+  token,
+  onWorkspaceReady,
+}: {
+  token: string;
+  onWorkspaceReady: (setupUrl: string) => void;
+}) {
   const { data, isError } = useQuery<OnboardingDetails>({
     queryKey: ["/api/public/onboarding", token, "verify"],
     queryFn: async () => {
@@ -1295,17 +1331,17 @@ function VerifyingPayment({ token, onVerified }: { token: string; onVerified: ()
     },
     refetchInterval: (query) => {
       const d = query.state.data;
-      if (d?.paymentStatus === "paid" || d?.stage === "platform_initializing") return false;
-      return 2000;
+      if (d?.stage === "converted" || d?.provisioningFailed) return false;
+      return 3000;
     },
     retry: 5,
   });
 
   useEffect(() => {
-    if (data?.paymentStatus === "paid" || data?.stage === "platform_initializing") {
-      onVerified();
+    if (data?.stage === "converted" && data?.publicSetupUrl) {
+      onWorkspaceReady(data.publicSetupUrl);
     }
-  }, [data, onVerified]);
+  }, [data, onWorkspaceReady]);
 
   if (isError) return (
     <div className="text-center py-10 text-slate-500 text-sm">
@@ -1314,11 +1350,32 @@ function VerifyingPayment({ token, onVerified }: { token: string; onVerified: ()
     </div>
   );
 
+  if (data?.provisioningFailed) return (
+    <div className="text-center py-10 text-slate-500 text-sm">
+      <AlertTriangle className="w-6 h-6 text-amber-400 mx-auto mb-2" />
+      <p className="font-medium text-slate-700 mb-1">Setup encountered an issue</p>
+      Your payment was received, but workspace setup hit a snag. Our team has been notified — check your email or contact{" "}
+      <a href="mailto:contact@hubifyhomes.com" className="text-teal-600 hover:underline">contact@hubifyhomes.com</a>.
+    </div>
+  );
+
+  const isProvisioning = data?.paymentStatus === "paid" || data?.stage === "platform_initializing";
+
   return (
     <div className="text-center py-10">
-      <RefreshCw className="w-7 h-7 animate-spin text-teal-600 mx-auto mb-3" />
-      <p className="text-slate-600 text-sm font-medium">Verifying your payment…</p>
-      <p className="text-slate-400 text-xs mt-1">This usually takes just a moment.</p>
+      {isProvisioning ? (
+        <>
+          <Building2 className="w-8 h-8 text-teal-600 mx-auto mb-3" />
+          <p className="text-slate-700 text-sm font-medium">Setting up your workspace…</p>
+          <p className="text-slate-400 text-xs mt-1">Payment confirmed. Creating your organization — almost done.</p>
+        </>
+      ) : (
+        <>
+          <RefreshCw className="w-7 h-7 animate-spin text-teal-600 mx-auto mb-3" />
+          <p className="text-slate-600 text-sm font-medium">Verifying your payment…</p>
+          <p className="text-slate-400 text-xs mt-1">This usually takes just a moment.</p>
+        </>
+      )}
     </div>
   );
 }
@@ -1333,9 +1390,9 @@ export default function OnboardingPortal() {
 
   const [localSigned, setLocalSigned] = useState(false);
   const [signerNameLocal, setSignerNameLocal] = useState("");
-  const [paymentVerified, setPaymentVerified] = useState(false);
+  const [workspaceSetupUrl, setWorkspaceSetupUrl] = useState<string | null>(null);
 
-  const { data, isLoading, error, refetch } = useQuery<OnboardingDetails, { status: number; message: string }>({
+  const { data, isLoading, error } = useQuery<OnboardingDetails, { status: number; message: string }>({
     queryKey: ["/api/public/onboarding", token],
     queryFn: async () => {
       const res = await fetch(`/api/public/onboarding/${token}`);
@@ -1350,6 +1407,13 @@ export default function OnboardingPortal() {
     retry: false,
     enabled: !!token,
   });
+
+  // Sync workspace URL from server data when it arrives (handles page reload after payment)
+  useEffect(() => {
+    if (data?.stage === "converted" && data?.publicSetupUrl && !workspaceSetupUrl) {
+      setWorkspaceSetupUrl(data.publicSetupUrl);
+    }
+  }, [data, workspaceSetupUrl]);
 
   if (isLoading) {
     return (
@@ -1369,21 +1433,26 @@ export default function OnboardingPortal() {
   }
 
   const agreementSigned = data.alreadySigned || localSigned;
-  const paymentPaid = data.paymentStatus === "paid" || data.stage === "platform_initializing" || paymentVerified;
-  const currentStep = paymentPaid ? 3 : agreementSigned ? 2 : 1;
+  const paymentPaid = data.paymentStatus === "paid" || data.stage === "platform_initializing" || data.stage === "converted";
+  const workspaceReady = data.stage === "converted" || !!workspaceSetupUrl;
+  const activeSetupUrl = workspaceSetupUrl ?? data.publicSetupUrl ?? null;
+  const currentStep = workspaceReady ? 4 : paymentPaid ? 3 : agreementSigned ? 2 : 1;
 
-  if (paymentParam === "success" && !paymentPaid) {
+  // When Stripe redirects back with ?payment=success, show polling screen
+  if (paymentParam === "success" && !workspaceReady) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-10 px-4">
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-8">
             <img src={HUBIFY_HOMES_LOGO_URL} alt={HUBIFY_HOMES_LOGO_ALT} className="h-16 w-auto mx-auto mb-6" />
             <StepIndicator current={3} />
+            <h1 className="text-2xl font-bold text-slate-900 mb-1">Setting Up Your Workspace</h1>
+            <p className="text-slate-500 text-sm">Payment received. Hang tight while we get everything ready.</p>
           </div>
-          <VerifyingPayment token={token!} onVerified={() => {
-            setPaymentVerified(true);
-            refetch();
-          }} />
+          <VerifyingPayment
+            token={token!}
+            onWorkspaceReady={(url) => setWorkspaceSetupUrl(url)}
+          />
         </div>
       </div>
     );
@@ -1408,10 +1477,16 @@ export default function OnboardingPortal() {
               <p className="text-slate-500 text-sm">Your agreement is signed. Complete payment to activate your platform.</p>
             </>
           )}
-          {paymentPaid && (
+          {paymentPaid && !workspaceReady && (
             <>
-              <h1 className="text-2xl font-bold text-slate-900 mb-1">Platform Initializing</h1>
-              <p className="text-slate-500 text-sm">Payment received. Your platform is being set up.</p>
+              <h1 className="text-2xl font-bold text-slate-900 mb-1">Setting Up Your Workspace</h1>
+              <p className="text-slate-500 text-sm">Payment received. Your workspace is being prepared.</p>
+            </>
+          )}
+          {workspaceReady && (
+            <>
+              <h1 className="text-2xl font-bold text-slate-900 mb-1">Your Workspace Is Ready!</h1>
+              <p className="text-slate-500 text-sm">Your Hubify organization has been set up successfully.</p>
             </>
           )}
         </div>
@@ -1442,7 +1517,24 @@ export default function OnboardingPortal() {
           </>
         )}
 
-        {paymentPaid && <PaymentSuccess data={data} />}
+        {paymentPaid && !workspaceReady && <SettingUp />}
+
+        {workspaceReady && activeSetupUrl && (
+          <WorkspaceReady setupUrl={activeSetupUrl} email={data.email} />
+        )}
+
+        {workspaceReady && !activeSetupUrl && (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center">
+            <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-9 h-9 text-teal-600" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 mb-2">Workspace Ready</h2>
+            <p className="text-slate-600 text-sm mb-6">
+              Check your email for the setup link, or{" "}
+              <a href="/staff/login" className="text-teal-600 hover:underline">sign in directly</a> if you've already set your password.
+            </p>
+          </div>
+        )}
 
         <p className="text-center text-xs text-slate-400 mt-6">
           If you have questions please email{" "}

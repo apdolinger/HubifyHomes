@@ -1190,3 +1190,42 @@ export async function ensureInspectionV1Tables(): Promise<void> {
     client.release();
   }
 }
+
+/**
+ * Add auto-provisioning status columns to onboarding_prospects and create the
+ * account_setup_tokens table used by the beta org provisioning flow.
+ * Idempotent (ADD COLUMN IF NOT EXISTS / CREATE TABLE IF NOT EXISTS).
+ */
+export async function ensureBetaProvisioningTables(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    // New columns on onboarding_prospects
+    await client.query(`
+      ALTER TABLE onboarding_prospects
+        ADD COLUMN IF NOT EXISTS provisioning_failed BOOLEAN NOT NULL DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS provisioning_error TEXT,
+        ADD COLUMN IF NOT EXISTS provisioned_at TIMESTAMP;
+    `);
+
+    // account_setup_tokens table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS account_setup_tokens (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        prospect_id UUID NOT NULL REFERENCES onboarding_prospects(id) ON DELETE CASCADE,
+        user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token VARCHAR(64) NOT NULL UNIQUE,
+        expires_at TIMESTAMP NOT NULL,
+        claimed_at TIMESTAMP,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS account_setup_tokens_prospect_idx ON account_setup_tokens(prospect_id);
+      CREATE INDEX IF NOT EXISTS account_setup_tokens_token_idx ON account_setup_tokens(token);
+    `);
+
+    log("[MIGRATE] Beta provisioning tables verified (account_setup_tokens + provisioning columns).");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to ensure beta provisioning tables: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}

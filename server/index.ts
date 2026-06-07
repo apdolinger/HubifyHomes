@@ -123,7 +123,21 @@ app.post("/api/stripe/webhooks/beta-onboarding", express.raw({ type: "applicatio
               { stage: "platform_initializing", enteredAt: now.toISOString(), note: "Stripe Checkout completed" },
             ],
           } as any).where(eq(onboardingProspects.id, prospect.id));
-          console.log(`[beta-onboarding-webhook] Payment confirmed for prospect ${prospect.id}`);
+          console.log(`[beta-onboarding-webhook] Payment confirmed for prospect ${prospect.id} — starting provisioning`);
+
+          // Auto-provision the org immediately after payment
+          const baseUrl = `${req.protocol}://${req.get("host")}`;
+          try {
+            const { provisionBetaOrg } = await import("./betaProvisioning");
+            await provisionBetaOrg(prospect.id, baseUrl);
+            console.log(`[beta-onboarding-webhook] Provisioning complete for prospect ${prospect.id}`);
+          } catch (provisionErr) {
+            console.error(`[beta-onboarding-webhook] Provisioning failed for prospect ${prospect.id}:`, provisionErr);
+            await db.update(onboardingProspects).set({
+              provisioningFailed: true,
+              provisioningError: String(provisionErr),
+            } as any).where(eq(onboardingProspects.id, prospect.id));
+          }
         }
       }
     }
@@ -594,6 +608,12 @@ app.use((req, res, next) => {
         await ensureInspectionV1Tables();
       } catch (err) {
         console.error('Error ensuring Inspection V1 tables:', err);
+      }
+      try {
+        const { ensureBetaProvisioningTables } = await import('./runMigrations.js');
+        await ensureBetaProvisioningTables();
+      } catch (err) {
+        console.error('Error ensuring beta provisioning tables:', err);
       }
     } catch (error) {
       console.error('Error loading startup migrations:', error);

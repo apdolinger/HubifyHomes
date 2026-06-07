@@ -3497,11 +3497,29 @@ export const onboardingProspects = pgTable("onboarding_prospects", {
   nextAction: text("next_action"),
   lastContactedAt: timestamp("last_contacted_at"),
   onboardingChecklist: jsonb("onboarding_checklist").$type<Record<string, boolean>>(),
+  // Auto-provisioning status (populated by provisionBetaOrg())
+  provisioningFailed: boolean("provisioning_failed").default(false),
+  provisioningError: text("provisioning_error"),
+  provisionedAt: timestamp("provisioned_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   index("onboarding_prospects_stage_idx").on(table.stage),
   index("onboarding_prospects_email_idx").on(table.email),
+]);
+
+// Account setup tokens — single-use links for provisioned beta org admins to set their password
+export const accountSetupTokens = pgTable("account_setup_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  prospectId: uuid("prospect_id").notNull().references(() => onboardingProspects.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  claimedAt: timestamp("claimed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("account_setup_tokens_prospect_idx").on(table.prospectId),
+  index("account_setup_tokens_token_idx").on(table.token),
 ]);
 
 export const onboardingStageEnum = z.enum([
