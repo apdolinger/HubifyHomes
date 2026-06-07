@@ -493,19 +493,21 @@ function AuthWrapper() {
   const hasNoOrg = !isLoading && isAuthenticated && !(user as any)?.orgId && !isSuperAdmin;
 
   return (
-    <TooltipProvider>
-      <Toaster />
-      {isLoading || !isAuthenticated || isSuperAdmin || isPublicOrTokenRoute ? (
-        <Router />
-      ) : hasNoOrg ? (
-        <NoOrgPage />
-      ) : isFieldRoute ? (
-        <FieldModeRouter />
-      ) : (
-        <AuthenticatedApp />
-      )}
-      <CookieConsentBanner />
-    </TooltipProvider>
+    <TaskModalProvider>
+      <TooltipProvider>
+        <Toaster />
+        {isLoading || !isAuthenticated || isSuperAdmin || isPublicOrTokenRoute ? (
+          <Router />
+        ) : hasNoOrg ? (
+          <NoOrgPage />
+        ) : isFieldRoute ? (
+          <FieldModeRouter />
+        ) : (
+          <AuthenticatedApp />
+        )}
+        <CookieConsentBanner />
+      </TooltipProvider>
+    </TaskModalProvider>
   );
 }
 
