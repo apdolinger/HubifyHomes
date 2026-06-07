@@ -17835,6 +17835,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const raw = (req.query.slug as string | undefined) ?? "";
       const slug = raw.toLowerCase().trim();
+      const tokenParam = (req.query.token as string | undefined) ?? "";
 
       if (!slug) return res.json({ available: false, reason: "Slug is required" });
 
@@ -17847,6 +17848,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { eq } = await import("drizzle-orm");
+
+      // If a valid onboarding token is provided, check whether the slug belongs
+      // to this prospect's own record so we don't falsely report "taken".
+      if (tokenParam && tokenParam.length === 64 && /^[0-9a-f]+$/.test(tokenParam)) {
+        const prospectRows = await db
+          .select({ workspaceSlug: onboardingProspects.workspaceSlug, orgId: onboardingProspects.orgId })
+          .from(onboardingProspects)
+          .where(eq(onboardingProspects.onboardingToken, tokenParam))
+          .limit(1);
+        const prospect = prospectRows[0];
+        if (prospect) {
+          // Slug matches what this prospect already saved — it's theirs, allow it.
+          if (prospect.workspaceSlug === slug) {
+            return res.json({ available: true });
+          }
+          // The org that was provisioned for this prospect owns the slug — still theirs.
+          if (prospect.orgId) {
+            const orgRows = await db
+              .select({ id: orgs.id })
+              .from(orgs)
+              .where(and(eq(orgs.id, prospect.orgId), eq(orgs.slug, slug)))
+              .limit(1);
+            if (orgRows.length > 0) return res.json({ available: true });
+          }
+        }
+      }
+
       const existing = await db.select({ id: orgs.id }).from(orgs).where(eq(orgs.slug, slug)).limit(1);
       if (existing.length > 0) {
         return res.json({ available: false, reason: "This workspace name is already taken" });

@@ -1274,24 +1274,37 @@ function SlugPicker({
       .slice(0, 63);
   }
 
+  async function runCheck(clean: string) {
+    if (!clean || clean.length < 3) return;
+    setChecking(true);
+    try {
+      const url = `/api/public/onboarding/check-slug?slug=${encodeURIComponent(clean)}&token=${encodeURIComponent(token)}`;
+      const res = await fetch(url);
+      const body = await res.json();
+      setCheckResult(body);
+    } catch {
+      setCheckResult({ available: false, reason: "Could not check availability" });
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  // Run the check immediately on mount so the initial pre-filled slug is validated
+  // without requiring the user to type anything first.
+  useEffect(() => {
+    if (initialSlug && initialSlug.length >= 3) {
+      runCheck(initialSlug);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function handleChange(val: string) {
     const clean = slugify(val);
     setSlug(clean);
     setCheckResult(null);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!clean || clean.length < 3) return;
-    debounceRef.current = setTimeout(async () => {
-      setChecking(true);
-      try {
-        const res = await fetch(`/api/public/onboarding/check-slug?slug=${encodeURIComponent(clean)}`);
-        const body = await res.json();
-        setCheckResult(body);
-      } catch {
-        setCheckResult({ available: false, reason: "Could not check availability" });
-      } finally {
-        setChecking(false);
-      }
-    }, 500);
+    debounceRef.current = setTimeout(() => runCheck(clean), 500);
   }
 
   const saveMutation = useMutation({
@@ -1321,7 +1334,7 @@ function SlugPicker({
         </div>
         <div>
           <h2 className="text-lg font-bold text-slate-900">Choose Your Workspace Name</h2>
-          <p className="text-slate-500 text-sm">This is how your organization is identified in Hubify.</p>
+          <p className="text-slate-500 text-sm">This sets up your unique workspace link.</p>
         </div>
       </div>
 
@@ -1340,6 +1353,15 @@ function SlugPicker({
           {!checking && checkResult?.available === true && <CheckCircle className="w-5 h-5 text-teal-600 shrink-0" />}
           {!checking && checkResult?.available === false && <XCircle className="w-5 h-5 text-red-500 shrink-0" />}
         </div>
+
+        {/* Live URL preview — shown whenever the slug is long enough */}
+        {slug.length >= 3 && (
+          <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+            <span>Your workspace URL:</span>
+            <span className="font-mono text-teal-700 font-medium">{slug}.hubifyhomesonline.com</span>
+          </div>
+        )}
+
         {slug.length > 0 && slug.length < 3 && (
           <p className="text-xs text-amber-600 mt-1.5">Must be at least 3 characters</p>
         )}
