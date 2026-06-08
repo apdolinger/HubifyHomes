@@ -63,7 +63,10 @@ import {
   Check,
   ChevronsUpDown,
   ClipboardCheck,
-  FileCode
+  FileCode,
+  Briefcase,
+  Star,
+  ExternalLink,
 } from "lucide-react";
 import TableCustomizationModal, { ColumnConfig } from "@/components/TableCustomizationModal";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -3320,6 +3323,49 @@ export default function Admin() {
             <h3 className="text-xl font-semibold">Tools & Support</h3>
             <p className="text-slate-600">Export/import data and access support resources</p>
           </div>
+
+          {/* Quick Access: admin tools previously in the dropdown */}
+          {((user as any)?.role === 'admin' || (user as any)?.role === 'manager') && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <ExternalLink className="w-5 h-5 mr-2" />
+                  Quick Access
+                </CardTitle>
+                <p className="text-sm text-slate-500">Admin tools and specialized pages</p>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <Link href="/hubify-console">
+                    <Button variant="outline" className="w-full justify-start">
+                      <Home className="w-4 h-4 mr-2 text-teal-600" />
+                      Hubify Console
+                    </Button>
+                  </Link>
+                  <Link href="/admin/services">
+                    <Button variant="outline" className="w-full justify-start">
+                      <Briefcase className="w-4 h-4 mr-2 text-teal-600" />
+                      Service Catalog
+                    </Button>
+                  </Link>
+                  {(user as any)?.role === 'admin' && (
+                    <Link href="/admin/reviews">
+                      <Button variant="outline" className="w-full justify-start">
+                        <Star className="w-4 h-4 mr-2 text-teal-600" />
+                        Reviews & Sentiment
+                      </Button>
+                    </Link>
+                  )}
+                  <Link href="/admin/inspection-templates">
+                    <Button variant="outline" className="w-full justify-start">
+                      <ClipboardCheck className="w-4 h-4 mr-2 text-teal-600" />
+                      Inspection Templates
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>

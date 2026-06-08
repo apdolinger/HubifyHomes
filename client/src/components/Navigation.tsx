@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
-import { routes } from "@/lib/routes";
 import { useTaskModal } from "@/contexts/TaskModalContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -13,7 +12,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { TimeTrackingDropdownItems } from "@/components/TimeTracking";
 import { apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
 import { enterFieldMode } from "@/components/FieldModeLayout";
@@ -26,7 +24,6 @@ import {
   Building, 
   Users, 
   UserCheck, 
-  Home, 
   Search,
   Menu,
   ChevronDown,
@@ -34,11 +31,8 @@ import {
   Calendar,
   MapPin,
   Clock,
-  CreditCard,
-  Wrench,
   Bell,
   MessageSquare,
-  DollarSign,
   ClipboardCheck,
   AlertCircle,
   Info,
@@ -47,24 +41,35 @@ import {
   Check,
   Smartphone,
   X,
-  Briefcase,
-  Star
 } from "lucide-react";
 
-const getNavigationItems = (user: any) => {
-  const baseItems = [
+const getNavigationItems = (user: any, flagEnabled: (key: string) => boolean) => {
+  const items: Array<{ name: string; href: string; icon: any; testId?: string }> = [
     { name: "Dashboard", href: "/", icon: BarChart3 },
     { name: "Tasks", href: "/tasks", icon: CheckSquare },
-    { name: "Properties", href: "/properties", icon: Building },
-    { name: "Clients", href: "/people", icon: UserCheck },
-    { name: "Team", href: "/team", icon: Users },
   ];
 
-  if ((user as any)?.role === 'admin' || (user as any)?.role === 'manager') {
-    baseItems.push({ name: "Admin", href: "/admin", icon: Settings });
+  if ((user as any)?.role === 'admin' || (user as any)?.role === 'supervisor') {
+    items.push({ name: "Dispatch", href: "/dispatch", icon: MapPin });
   }
 
-  return baseItems;
+  items.push(
+    { name: "Properties", href: "/properties", icon: Building },
+    { name: "Clients", href: "/people", icon: UserCheck },
+    { name: "Calendar", href: "/calendar", icon: Calendar },
+    { name: "Messages", href: "/messages", icon: MessageSquare },
+    { name: "Team", href: "/team", icon: Users },
+  );
+
+  if (flagEnabled("task_cost_tracking")) {
+    items.push({ name: "Time", href: "/time-tracking", icon: Clock, testId: "nav-time-tracking" });
+  }
+
+  if ((user as any)?.role === 'admin' || (user as any)?.role === 'manager') {
+    items.push({ name: "Admin", href: "/admin", icon: Settings });
+  }
+
+  return items;
 };
 
 const notificationTypeConfig: Record<string, { icon: any; color: string; label: string }> = {
@@ -105,7 +110,7 @@ export default function Navigation() {
     setShowFieldModeBanner(false);
   };
   
-  const navigationItems = getNavigationItems(user);
+  const navigationItems = getNavigationItems(user, isFlagEnabled);
 
   // Unread notification count — polls every 60s
   const { data: unreadData } = useQuery<{ count: number }>({
@@ -359,74 +364,14 @@ export default function Navigation() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {isFlagEnabled("task_cost_tracking") && <TimeTrackingDropdownItems />}
-                <DropdownMenuItem onClick={() => window.location.href = '/messages'}>
-                  <MessageSquare className="w-4 h-4 mr-2" />
-                  Messages
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => window.location.href = '/calendar'}>
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Calendar
-                </DropdownMenuItem>
-                {((user as any)?.role === 'admin' || (user as any)?.role === 'supervisor') && (
-                  <DropdownMenuItem onClick={() => window.location.href = '/dispatch'}>
-                    <MapPin className="w-4 h-4 mr-2" />
-                    Dispatch Center
-                  </DropdownMenuItem>
-                )}
-                {isFlagEnabled("task_cost_tracking") && (
-                  <DropdownMenuItem onClick={() => window.location.href = '/time-tracking'} data-testid="menu-time-tracking">
-                    <Clock className="w-4 h-4 mr-2" />
-                    Time Tracking
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onClick={() => window.location.href = '/settings/stripe'}>
-                  <CreditCard className="w-4 h-4 mr-2" />
-                  Stripe Settings
+                <DropdownMenuItem onClick={() => window.location.href = '/account'}>
+                  <Settings className="w-4 h-4 mr-2" />
+                  Account Settings
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setIsNotificationSettingsOpen(true)}>
                   <Bell className="w-4 h-4 mr-2" />
                   Notification Settings
                 </DropdownMenuItem>
-                {fieldModeEnabled && (
-                  <DropdownMenuItem onClick={enterFieldMode}>
-                    <Smartphone className="w-4 h-4 mr-2" />
-                    Field Mode
-                  </DropdownMenuItem>
-                )}
-                {((user as any)?.role === 'admin' || (user as any)?.role === 'manager') && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => window.location.href = routes.hubifyConsole()}>
-                      <Home className="w-4 h-4 mr-2" />
-                      Hubify Console
-                    </DropdownMenuItem>
-                    {(user as any)?.role === 'admin' && (
-                      <DropdownMenuItem onClick={() => window.location.href = '/admin?tab=billing'}>
-                        <DollarSign className="w-4 h-4 mr-2" />
-                        Billing
-                      </DropdownMenuItem>
-                    )}
-                    {((user as any)?.role === 'admin' || (user as any)?.role === 'manager') && (
-                      <DropdownMenuItem onClick={() => window.location.href = '/admin/services'}>
-                        <Briefcase className="w-4 h-4 mr-2" />
-                        Service Catalog
-                      </DropdownMenuItem>
-                    )}
-                    {(user as any)?.role === 'admin' && (
-                      <DropdownMenuItem onClick={() => window.location.href = '/admin/reviews'}>
-                        <Star className="w-4 h-4 mr-2" />
-                        Reviews & Sentiment
-                      </DropdownMenuItem>
-                    )}
-                    {((user as any)?.role === 'admin' || (user as any)?.role === 'manager') && (
-                      <DropdownMenuItem onClick={() => window.location.href = '/admin/inspection-templates'}>
-                        <ClipboardCheck className="w-4 h-4 mr-2" />
-                        Inspection Templates
-                      </DropdownMenuItem>
-                    )}
-                  </>
-                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>
                   Logout
@@ -465,64 +410,20 @@ export default function Navigation() {
                   })}
                   
                   <div className="pt-4 mt-4 border-t border-slate-200">
-                    <p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      Settings
-                    </p>
+                    <Link href="/account">
+                      <a
+                        className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
+                          location === '/account'
+                            ? "bg-teal-50 text-teal-700"
+                            : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                        }`}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <Settings className="w-5 h-5 mr-3" />
+                        Account Settings
+                      </a>
+                    </Link>
                   </div>
-                  
-                  <Link href="/settings/stripe">
-                    <a
-                      className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
-                        location === '/settings/stripe'
-                          ? "bg-teal-50 text-teal-700"
-                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                      }`}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      <CreditCard className="w-5 h-5 mr-3" />
-                      Stripe Settings
-                    </a>
-                  </Link>
-
-                  {((user as any)?.role === 'admin' || (user as any)?.role === 'manager') && (
-                    <>
-                      <div className="pt-4 mt-4 border-t border-slate-200">
-                        <p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                          Admin
-                        </p>
-                      </div>
-
-                      <Link href={routes.hubifyConsole()}>
-                        <a
-                          className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
-                            location === routes.hubifyConsole()
-                              ? "bg-teal-50 text-teal-700"
-                              : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                          }`}
-                          onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                          <Home className="w-5 h-5 mr-3" />
-                          Hubify Console
-                        </a>
-                      </Link>
-                      
-                      {(user as any)?.role === 'admin' && (
-                        <Link href="/admin/billing">
-                          <a
-                            className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
-                              location === '/admin/billing'
-                                ? "bg-teal-50 text-teal-700"
-                                : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                            }`}
-                            onClick={() => setIsMobileMenuOpen(false)}
-                          >
-                            <Wrench className="w-5 h-5 mr-3" />
-                            Billing Management
-                          </a>
-                        </Link>
-                      )}
-                    </>
-                  )}
                 </div>
               </SheetContent>
             </Sheet>
