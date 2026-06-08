@@ -1227,28 +1227,78 @@ export default function Account() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-14">
-          <TabsTrigger value="account-info" data-testid="tab-account-info">Account Info</TabsTrigger>
-          <TabsTrigger value="billing" data-testid="tab-billing">Billing</TabsTrigger>
-          <TabsTrigger value="forms" data-testid="tab-forms">Forms</TabsTrigger>
-          <TabsTrigger value="custom-fields" data-testid="tab-custom-fields">Custom Fields</TabsTrigger>
-          <TabsTrigger value="email-templates" data-testid="tab-email-templates">Email Templates</TabsTrigger>
-          <TabsTrigger value="branding" data-testid="tab-branding">Branding</TabsTrigger>
-          <TabsTrigger value="task-templates" data-testid="tab-task-templates">Task Templates</TabsTrigger>
-          {isFeatureEnabled("advanced_reporting") && (
-            <TabsTrigger value="reports" data-testid="tab-reports">Reports</TabsTrigger>
-          )}
-          <TabsTrigger value="notifications" data-testid="tab-notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="team-roles" data-testid="tab-team-roles">Team & Roles</TabsTrigger>
-          <TabsTrigger value="automation" data-testid="tab-automation">Automation</TabsTrigger>
-          <TabsTrigger value="audit-log" data-testid="tab-audit-log">Audit Log</TabsTrigger>
-          {(user as any)?.role === 'admin' || (user as any)?.role === 'supervisor' || (user as any)?.role === 'super_admin' ? (
-            <TabsTrigger value="notification-log" data-testid="tab-notification-log">Notification Log</TabsTrigger>
-          ) : null}
-          <TabsTrigger value="integrations" data-testid="tab-integrations">Integrations</TabsTrigger>
-        </TabsList>
+      {/* Settings: sidebar + content */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="flex gap-6 items-start">
+
+          {/* ── Left sidebar nav ── */}
+          <nav className="w-48 shrink-0 rounded-xl border border-slate-200 bg-white p-3 space-y-4 sticky top-20">
+            {([
+              {
+                label: "General",
+                items: [
+                  { tab: "account-info", text: "Account Info",   icon: Building2  },
+                  { tab: "billing",      text: "Billing",        icon: CreditCard },
+                ],
+              },
+              {
+                label: "Content",
+                items: [
+                  { tab: "forms",           text: "Forms",           icon: FileText    },
+                  { tab: "email-templates", text: "Email Templates", icon: Mail        },
+                  { tab: "task-templates",  text: "Task Templates",  icon: CheckCircle },
+                  { tab: "branding",        text: "Branding",        icon: Palette     },
+                ],
+              },
+              {
+                label: "Configuration",
+                items: [
+                  { tab: "custom-fields",  text: "Custom Fields",  icon: Settings },
+                  { tab: "notifications",  text: "Notifications",  icon: Bell     },
+                  { tab: "automation",     text: "Automation",     icon: Zap      },
+                  { tab: "integrations",   text: "Integrations",   icon: Webhook  },
+                ],
+              },
+              {
+                label: "Team",
+                items: [
+                  { tab: "team-roles", text: "Team & Roles", icon: Users },
+                ],
+              },
+              {
+                label: "Logs",
+                items: [
+                  { tab: "audit-log", text: "Audit Log", icon: Activity },
+                  ...((user as any)?.role === 'admin' || (user as any)?.role === 'supervisor' || (user as any)?.role === 'super_admin'
+                    ? [{ tab: "notification-log", text: "Notification Log", icon: Bell }] : []),
+                  ...(isFeatureEnabled("advanced_reporting")
+                    ? [{ tab: "reports", text: "Reports", icon: Database }] : []),
+                ],
+              },
+            ] as { label: string; items: { tab: string; text: string; icon: any }[] }[]).map(({ label, items }) => (
+              <div key={label} className="space-y-0.5">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-2 pb-0.5">{label}</p>
+                {items.map(({ tab, text, icon: Icon }) => (
+                  <button
+                    key={tab}
+                    data-testid={`tab-${tab}`}
+                    onClick={() => setActiveTab(tab)}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${
+                      activeTab === tab
+                        ? "bg-teal-50 text-teal-700 font-medium"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    {text}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </nav>
+
+          {/* ── Right content area ── */}
+          <div className="flex-1 min-w-0 space-y-6">
 
         {/* Account Information Tab */}
         <TabsContent value="account-info">
@@ -1971,6 +2021,9 @@ export default function Account() {
             </CardContent>
           </Card>
         </TabsContent>
+
+          </div>{/* end right content */}
+        </div>{/* end flex layout */}
       </Tabs>
 
       {/* Create API Key Dialog */}
