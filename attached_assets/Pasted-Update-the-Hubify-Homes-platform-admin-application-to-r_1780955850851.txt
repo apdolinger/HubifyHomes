@@ -1,0 +1,128 @@
+Update the Hubify Homes platform/admin application to replace all beta-facing language with Founding Member language and align pricing with the new public pricing.
+
+Important: This should update the platform itself, not just the marketing website.
+
+1. Replace beta language throughout the platform
+
+Search the codebase for all user-facing references to:
+
+* Beta
+* Beta Program
+* Beta User
+* Beta Tester
+* Beta Application
+* Beta Approval
+* Beta Pipeline
+* Beta Pricing
+* Join Beta
+
+Replace with language based on:
+
+* Founding Member
+* Founding Member Program
+* Founding Member Application
+* Founding Member Approval
+* Founding Member Pipeline
+* Founding Member Pricing
+* Become a Founding Member
+
+The goal is to make the platform feel like an early-access founding member program, not an unfinished beta product.
+
+2. Update pricing values used by the platform
+
+Use the following public pricing:
+
+Starter Portfolio
+1–10 homes
+$45/month
+$99 initialization fee
+
+Growth Portfolio
+11–25 homes
+$90/month
+$149 initialization fee
+
+Professional Portfolio
+26–50 homes
+$180/month
+$249 initialization fee
+
+Operator Portfolio
+51–100 homes
+$300/month
+$399 initialization fee
+
+Enterprise Portfolio
+101+ homes
+$450/month
+$599+ initialization fee
+
+3. Update Founding Member discount logic/copy
+
+Founding Members receive 50% off monthly pricing for life while their account remains active and in good standing.
+
+Founding Member monthly pricing should calculate/display as:
+
+Starter Portfolio: $22.50/month
+Growth Portfolio: $45/month
+Professional Portfolio: $90/month
+Operator Portfolio: $150/month
+Enterprise Portfolio: $225/month
+
+Remove any language that says:
+
+* first 10 beta users get 50% off
+* next 10 beta users get 25% off
+* beta tester pricing
+* beta discount tiers
+
+Replace it with:
+
+Limited Founding Member offer: lock in 50% off monthly pricing for life.
+
+4. Update Super Admin / pipeline areas
+
+If there are Super Admin pages, cards, filters, badges, statuses, or tabs using beta terminology, update the visible labels to Founding Member terminology.
+
+Examples:
+
+* “Beta Applications” → “Founding Member Applications”
+* “Beta Pipeline” → “Founding Member Pipeline”
+* “Approve Beta Applicant” → “Approve Founding Member”
+* “Send Beta Approval Email” → “Send Founding Member Approval Email”
+
+Do not break internal database fields or API routes unless necessary. If internal names still use beta terminology, that is acceptable for now as long as the user-facing platform language is updated.
+
+5. Update email templates
+
+Update any application, approval, welcome, resend approval, or onboarding emails that mention beta.
+
+Use “Founding Member” language instead.
+
+The approval email should communicate:
+
+Congratulations — you have been approved as a Hubify Homes Founding Member.
+
+As a Founding Member, you will receive 50% off monthly pricing for life while your account remains active and in good standing.
+
+6. Update onboarding / checkout / Stripe-related language
+
+Anywhere the user chooses a plan, reviews pricing, starts onboarding, or sees subscription details should reflect the new pricing and Founding Member discount.
+
+Make sure the displayed pricing and any backend pricing constants match.
+
+7. QA checks
+
+After updating, search the codebase again for remaining user-facing “beta” references.
+
+Leave internal technical names alone only if changing them would create unnecessary risk.
+
+Confirm:
+
+* marketing-visible pricing is updated
+* platform-visible pricing is updated
+* emails use Founding Member language
+* Super Admin pipeline uses Founding Member language
+* discount displays as 50% off for life
+* no 25% discount language remains
+* app builds successfully
