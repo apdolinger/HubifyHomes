@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { TourButton } from "@/components/TourButton";
+import { type TourStep } from "@/hooks/useTour";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -499,10 +501,46 @@ export default function Team() {
     return null;
   }
 
+  const teamTourSteps: TourStep[] = [
+    {
+      element: "[data-tour='team-header']",
+      popover: {
+        title: "Team",
+        description: "Manage everyone on your organization — view roles, track availability, and organize into sub-teams.",
+        side: "bottom",
+        align: "start",
+      },
+    },
+    {
+      element: "[data-tour='team-stats']",
+      popover: {
+        title: "Team Overview",
+        description: "At-a-glance counts of your total members, admins, supervisors, and staff.",
+        side: "bottom",
+      },
+    },
+    {
+      element: "[data-tour='team-tabs']",
+      popover: {
+        title: "Teams & Members",
+        description: "Switch between your sub-teams and the full member directory. Click a team card to message the group.",
+        side: "bottom",
+      },
+    },
+    {
+      element: "[data-testid='invite-team-member-btn']",
+      popover: {
+        title: "Invite a Member",
+        description: "Add a new staff member by email — choose their role and they'll receive an invitation.",
+        side: "left",
+      },
+    },
+  ];
+
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-8" data-tour="team-header">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Team</h1>
@@ -510,7 +548,8 @@ export default function Team() {
               Manage your team members and their roles
             </p>
           </div>
-          <div className="mt-4 sm:mt-0">
+          <div className="mt-4 sm:mt-0 flex items-center gap-2">
+            <TourButton tourKey="team" steps={teamTourSteps} />
             <Button 
               onClick={() => setIsInviteModalOpen(true)}
               data-testid="invite-team-member-btn"
@@ -523,7 +562,7 @@ export default function Team() {
       </div>
 
       {/* Teams Section - Tabbed Interface */}
-      <Card className="mb-8">
+      <Card className="mb-8" data-tour="team-tabs">
         <Tabs value={activeTeamsTab} onValueChange={setActiveTeamsTab}>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -746,7 +785,7 @@ export default function Team() {
       </Card>
 
       {/* Team Stats */}
-      <div className="mb-8">
+      <div className="mb-8" data-tour="team-stats">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-slate-900">Stats Overview</h2>
           <Button

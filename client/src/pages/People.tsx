@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import { TourButton } from "@/components/TourButton";
+import { type TourStep } from "@/hooks/useTour";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -739,10 +741,46 @@ export default function People() {
 
   const stats = getContactStats();
 
+  const peopleTourSteps: TourStep[] = [
+    {
+      element: "[data-tour='people-header']",
+      popover: {
+        title: "Clients & Contacts",
+        description: "Everyone connected to your properties — owners, tenants, vendors, and emergency contacts — all in one place.",
+        side: "bottom",
+        align: "start",
+      },
+    },
+    {
+      element: "[data-tour='people-stats']",
+      popover: {
+        title: "Contact Stats",
+        description: "A quick breakdown of your contacts by type — owners, tenants, vendors, and more.",
+        side: "bottom",
+      },
+    },
+    {
+      element: "[data-tour='people-tabs']",
+      popover: {
+        title: "Contact Type Tabs",
+        description: "Switch between Owners, Tenants, Vendors, Household Members, and Emergency Contacts.",
+        side: "bottom",
+      },
+    },
+    {
+      element: "[data-tour='people-add-btn']",
+      popover: {
+        title: "Add a Contact",
+        description: "Create a new contact and link them to properties they're associated with.",
+        side: "left",
+      },
+    },
+  ];
+
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-8" data-tour="people-header">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Clients</h1>
@@ -766,7 +804,8 @@ export default function People() {
               {showInactive ? "Hide Inactive" : "Show Inactive"}
             </Button>
             
-            <Button onClick={() => setIsAddModalOpen(true)}>
+            <TourButton tourKey="people" steps={peopleTourSteps} />
+            <Button onClick={() => setIsAddModalOpen(true)} data-tour="people-add-btn">
               <Plus className="w-4 h-4 mr-2" />
               Add Client
             </Button>
@@ -775,7 +814,7 @@ export default function People() {
       </div>
 
       {/* Stats Grid */}
-      <div className="mb-8">
+      <div className="mb-8" data-tour="people-stats">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-slate-900">Stats Overview</h2>
           <Button
@@ -897,7 +936,7 @@ export default function People() {
               />
             </div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4" data-tour="people-tabs">
               <div className="min-w-[140px]">
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
                   <SelectTrigger>

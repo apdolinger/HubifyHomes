@@ -1,4 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
+import { TourButton } from "@/components/TourButton";
+import { type TourStep } from "@/hooks/useTour";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation } from "wouter";
@@ -2338,9 +2340,37 @@ export default function Admin() {
     return null;
   }
 
+  const adminTourSteps: TourStep[] = [
+    {
+      element: "[data-tour='admin-header']",
+      popover: {
+        title: "Admin Panel",
+        description: "Configure your organization — manage templates, billing, roles, custom fields, and more.",
+        side: "bottom",
+        align: "start",
+      },
+    },
+    {
+      element: "[data-tour='admin-tabs']",
+      popover: {
+        title: "Admin Sections",
+        description: "Switch between sections: Overview, Forms, Billing, Email Templates, Task Templates, Roles, and more.",
+        side: "bottom",
+      },
+    },
+    {
+      element: "[data-testid='button-account-settings']",
+      popover: {
+        title: "Account Settings",
+        description: "Jump to full account settings — company profile, API keys, notification preferences, and Stripe.",
+        side: "bottom",
+      },
+    },
+  ];
+
   return (
     <main className="max-w-7xl mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between" data-tour="admin-header">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Admin Panel</h1>
           <p className="text-slate-600 mt-2">
@@ -2348,6 +2378,7 @@ export default function Admin() {
           </p>
         </div>
         <div className="flex items-center space-x-3">
+          <TourButton tourKey="admin" steps={adminTourSteps} />
           <Link href="/account">
             <Button variant="outline" data-testid="button-account-settings">
               <Settings className="w-4 h-4 mr-2" />
@@ -2361,7 +2392,7 @@ export default function Admin() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6" data-tour="admin-tabs">
         <TabsList className="grid w-full grid-cols-10 h-auto">
           <TabsTrigger value="forms" className="flex flex-col items-center gap-1 py-2 px-1 text-xs">
             <FileText className="w-3.5 h-3.5" />

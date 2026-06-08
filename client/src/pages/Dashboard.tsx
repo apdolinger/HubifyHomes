@@ -1,4 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
+import { TourButton } from "@/components/TourButton";
+import { type TourStep } from "@/hooks/useTour";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useTaskModal } from "@/contexts/TaskModalContext";
@@ -803,10 +805,71 @@ function renderMessageWithMentions(content: string) {
     return null;
   }
 
+  const dashboardTourSteps: TourStep[] = [
+    {
+      element: "[data-tour='dashboard-header']",
+      popover: {
+        title: "Dashboard",
+        description: "Your command center — see everything happening across your properties at a glance.",
+        side: "bottom",
+        align: "start",
+      },
+    },
+    {
+      element: "[data-testid='stat-properties']",
+      popover: {
+        title: "Properties",
+        description: "Total properties in your portfolio. Click to jump straight to the Properties page.",
+        side: "bottom",
+      },
+    },
+    {
+      element: "[data-testid='stat-urgent-tasks']",
+      popover: {
+        title: "Urgent Tasks",
+        description: "Tasks marked as urgent that need your attention right away.",
+        side: "bottom",
+      },
+    },
+    {
+      element: "[data-testid='stat-overdue']",
+      popover: {
+        title: "Overdue Tasks",
+        description: "Tasks past their due date. Keep this number low!",
+        side: "bottom",
+      },
+    },
+    {
+      element: "[data-testid='stat-team-members']",
+      popover: {
+        title: "Active Team",
+        description: "Number of active staff members in your organization.",
+        side: "bottom",
+      },
+    },
+    {
+      element: "[data-tour='dashboard-quick-actions']",
+      popover: {
+        title: "Quick Actions",
+        description: "Add a task fast — or press T anywhere to open the task dialog instantly.",
+        side: "bottom",
+        align: "end",
+      },
+    },
+    {
+      element: "[data-tour='dashboard-activity']",
+      popover: {
+        title: "Activity Feed",
+        description: "Recent changes across your portfolio — tasks, properties, and contacts — filtered by type.",
+        side: "top",
+      },
+    },
+  ];
+
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Dashboard Header */}
-      <div className="mb-8">
+      <div className="mb-8" data-tour="dashboard-header">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
@@ -814,7 +877,8 @@ function renderMessageWithMentions(content: string) {
               Welcome back! Here's what's happening with your properties.
             </p>
           </div>
-          <div className="mt-4 sm:mt-0 flex space-x-3">
+          <div className="mt-4 sm:mt-0 flex space-x-3 items-center" data-tour="dashboard-quick-actions">
+            <TourButton tourKey="dashboard" steps={dashboardTourSteps} />
             <Button 
               className="bg-primary hover:bg-primary/90"
               onClick={() => {
@@ -1287,7 +1351,7 @@ function renderMessageWithMentions(content: string) {
                 : [];
 
               return (
-                <Card key={widget.id} className="lg:col-span-6">
+                <Card key={widget.id} className="lg:col-span-6" data-tour="dashboard-activity">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium flex items-center justify-between">
                       <div className="flex items-center">

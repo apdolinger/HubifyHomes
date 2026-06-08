@@ -1,4 +1,6 @@
 import { useEffect, useState, useRef } from "react";
+import { TourButton } from "@/components/TourButton";
+import { type TourStep } from "@/hooks/useTour";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -344,10 +346,38 @@ export default function TeamMessages() {
     return null;
   }
 
+  const messagesTourSteps: TourStep[] = [
+    {
+      element: "[data-tour='messages-header']",
+      popover: {
+        title: "Team Messages",
+        description: "A shared message board for your whole team — post updates, ask questions, and keep everyone in the loop.",
+        side: "bottom",
+        align: "start",
+      },
+    },
+    {
+      element: "[data-tour='messages-list']",
+      popover: {
+        title: "Message Thread",
+        description: "All messages appear here, newest at the bottom. Hover over any message to react, reply, or edit it.",
+        side: "top",
+      },
+    },
+    {
+      element: "[data-tour='messages-compose']",
+      popover: {
+        title: "Compose a Message",
+        description: "Type your message here. Use @Name to mention a teammate. Enable email notification to ping them by email too.",
+        side: "top",
+      },
+    },
+  ];
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 h-screen flex flex-col">
       {/* Header */}
-      <div className="mb-6 flex-shrink-0">
+      <div className="mb-6 flex-shrink-0" data-tour="messages-header">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Button 
@@ -367,6 +397,7 @@ export default function TeamMessages() {
               <p className="text-slate-600 mt-1">Communicate with your team</p>
             </div>
           </div>
+          <TourButton tourKey="messages" steps={messagesTourSteps} />
         </div>
       </div>
 
@@ -384,6 +415,7 @@ export default function TeamMessages() {
             ref={messagesContainerRef}
             className="flex-1 overflow-y-auto p-6 space-y-4"
             style={{ maxHeight: 'calc(100vh - 400px)' }}
+            data-tour="messages-list"
           >
             {teamMessagesLoading ? (
               <div className="space-y-4">
@@ -655,7 +687,7 @@ export default function TeamMessages() {
           </div>
 
           {/* New Message Input - Fixed at bottom */}
-          <div className="flex-shrink-0 border-t bg-white p-6">
+          <div className="flex-shrink-0 border-t bg-white p-6" data-tour="messages-compose">
             <div className="space-y-3">
               <Textarea
                 placeholder="Send a message to your team..."

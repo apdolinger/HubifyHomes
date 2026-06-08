@@ -1,4 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
+import { TourButton } from "@/components/TourButton";
+import { type TourStep } from "@/hooks/useTour";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useTaskModal } from "@/contexts/TaskModalContext";
@@ -512,10 +514,54 @@ export default function Tasks() {
     return null;
   }
 
+  const tasksTourSteps: TourStep[] = [
+    {
+      element: "[data-tour='tasks-header']",
+      popover: {
+        title: "Tasks",
+        description: "All tasks across your properties in one place — create, assign, and track work from here.",
+        side: "bottom",
+        align: "start",
+      },
+    },
+    {
+      element: "[data-tour='tasks-filters']",
+      popover: {
+        title: "Filters & Search",
+        description: "Search by title, property, or person. Filter by status, priority, category, and assignee to zero in on what matters.",
+        side: "bottom",
+      },
+    },
+    {
+      element: "[data-testid='switch-show-archived']",
+      popover: {
+        title: "Archived Tasks",
+        description: "Toggle this on to see completed or archived tasks alongside active ones.",
+        side: "bottom",
+      },
+    },
+    {
+      element: "[data-testid='customize-table-btn']",
+      popover: {
+        title: "Customize Columns",
+        description: "Choose which columns appear in the task list — show only what's relevant to your workflow.",
+        side: "left",
+      },
+    },
+    {
+      element: "[data-tour='tasks-add-btn']",
+      popover: {
+        title: "Add a Task",
+        description: "Create a new task and assign it to a property, team member, and due date.",
+        side: "left",
+      },
+    },
+  ];
+
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-8" data-tour="tasks-header">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Tasks</h1>
@@ -523,8 +569,9 @@ export default function Tasks() {
               Manage and track all your tasks ({filteredAndSortedTasks.length} {filteredAndSortedTasks.length === 1 ? 'task' : 'tasks'})
             </p>
           </div>
-          <div className="mt-4 sm:mt-0">
-            <Button onClick={openTaskModal}>
+          <div className="mt-4 sm:mt-0 flex items-center gap-2">
+            <TourButton tourKey="tasks" steps={tasksTourSteps} />
+            <Button onClick={openTaskModal} data-tour="tasks-add-btn">
               <CheckSquare className="w-4 h-4 mr-2" />
               Add Task
             </Button>
@@ -533,7 +580,7 @@ export default function Tasks() {
       </div>
 
       {/* Filters and Search */}
-      <Card className="mb-6">
+      <Card className="mb-6" data-tour="tasks-filters">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
             {/* Search */}

@@ -1,4 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
+import { TourButton } from "@/components/TourButton";
+import { type TourStep } from "@/hooks/useTour";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -1096,10 +1098,38 @@ export default function Properties() {
     return null;
   }
 
+  const propertiesTourSteps: TourStep[] = [
+    {
+      element: "[data-tour='properties-header']",
+      popover: {
+        title: "Properties",
+        description: "Your full property portfolio — single-family homes, condos, multi-unit buildings, and more.",
+        side: "bottom",
+        align: "start",
+      },
+    },
+    {
+      element: "[data-tour='properties-search']",
+      popover: {
+        title: "Search & Filter",
+        description: "Search by address, city, or type. Use the type filter to narrow down to a specific property category.",
+        side: "bottom",
+      },
+    },
+    {
+      element: "[data-tour='properties-add-btn']",
+      popover: {
+        title: "Add a Property",
+        description: "Register a new property — address, type, unit count, and access details.",
+        side: "left",
+      },
+    },
+  ];
+
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-8" data-tour="properties-header">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Properties</h1>
@@ -1130,9 +1160,10 @@ export default function Properties() {
               {showInactive ? "Hide Inactive" : "Show Inactive"}
             </Button>
             
+            <TourButton tourKey="properties" steps={propertiesTourSteps} />
             <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
               <DialogTrigger asChild>
-                <Button className="bg-primary hover:bg-primary/90">
+                <Button className="bg-primary hover:bg-primary/90" data-tour="properties-add-btn">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Property
                 </Button>
@@ -1483,7 +1514,7 @@ export default function Properties() {
         </div>
         
         {/* Search and Filter Bar */}
-        <div className="flex flex-col sm:flex-row gap-4 items-center">
+        <div className="flex flex-col sm:flex-row gap-4 items-center" data-tour="properties-search">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
             <Input

@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { TourButton } from "@/components/TourButton";
+import { type TourStep } from "@/hooks/useTour";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { prefStorage } from "@/lib/cookieConsent";
@@ -423,6 +425,42 @@ export default function CalendarPage() {
     );
   }
 
+  const calendarTourSteps: TourStep[] = [
+    {
+      element: "[data-tour='calendar-header']",
+      popover: {
+        title: "Calendar",
+        description: "Schedule and track events, property visits, and team activities across your organization.",
+        side: "bottom",
+        align: "start",
+      },
+    },
+    {
+      element: "[data-testid='button-today']",
+      popover: {
+        title: "Navigate",
+        description: "Jump back to today, or use the arrows to move forward and backward through the calendar.",
+        side: "bottom",
+      },
+    },
+    {
+      element: "[data-tour='calendar-sidebar']",
+      popover: {
+        title: "My Calendars",
+        description: "Toggle individual calendars on and off to focus on what matters. Add a new calendar with the + button.",
+        side: "right",
+      },
+    },
+    {
+      element: "[data-testid='button-create-event']",
+      popover: {
+        title: "New Event",
+        description: "Create an event and link it to a property, calendar, and team members.",
+        side: "left",
+      },
+    },
+  ];
+
   return (
     <>
       <style>{`
@@ -442,12 +480,13 @@ export default function CalendarPage() {
         }
       `}</style>
       <div className="container mx-auto p-6 space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between" data-tour="calendar-header">
           <div className="flex items-center gap-3">
             <Calendar className="h-8 w-8 text-primary" />
             <h1 className="text-3xl font-bold">Calendar</h1>
           </div>
         <div className="flex items-center gap-2">
+          <TourButton tourKey="calendar" steps={calendarTourSteps} />
           <Button
             variant="outline"
             size="sm"
@@ -492,7 +531,7 @@ export default function CalendarPage() {
 
       <div className="grid grid-cols-12 gap-6">
         {/* Sidebar with calendars list */}
-        <Card className="col-span-3 p-4">
+        <Card className="col-span-3 p-4" data-tour="calendar-sidebar">
           <h2 className="font-semibold mb-4">My Calendars</h2>
           <div className="space-y-2">
             {calendars && Array.isArray(calendars) && calendars.length > 0 ? (
