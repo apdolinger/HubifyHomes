@@ -328,11 +328,11 @@ export const PLATFORM_SETTINGS_DEFAULTS: Record<string, any> = {
 
   // Pricing tiers (new portfolio-based structure)
   pricingTiers: [
-    { name: "Starter Portfolio",      homesMin: 1,   homesMax: 10,  monthlyPrice: 65,  setupFee: 149,  startsAt: false },
-    { name: "Growth Portfolio",       homesMin: 11,  homesMax: 25,  monthlyPrice: 145, setupFee: 249,  startsAt: false },
-    { name: "Professional Portfolio", homesMin: 26,  homesMax: 50,  monthlyPrice: 295, setupFee: 399,  startsAt: false },
-    { name: "Operator Portfolio",     homesMin: 51,  homesMax: 100, monthlyPrice: 495, setupFee: 599,  startsAt: false },
-    { name: "Enterprise Portfolio",   homesMin: 101, homesMax: 250, monthlyPrice: 795, setupFee: 999,  startsAt: true  },
+    { name: "Starter Portfolio",      homesMin: 1,   homesMax: 10,  monthlyPrice: 45,  setupFee: 99,   startsAt: false },
+    { name: "Growth Portfolio",       homesMin: 11,  homesMax: 25,  monthlyPrice: 90,  setupFee: 149,  startsAt: false },
+    { name: "Professional Portfolio", homesMin: 26,  homesMax: 50,  monthlyPrice: 180, setupFee: 249,  startsAt: false },
+    { name: "Operator Portfolio",     homesMin: 51,  homesMax: 100, monthlyPrice: 300, setupFee: 399,  startsAt: false },
+    { name: "Enterprise Portfolio",   homesMin: 101, homesMax: 250, monthlyPrice: 450, setupFee: 599,  startsAt: true  },
   ],
 
   // System Maintenance
