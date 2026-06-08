@@ -4654,13 +4654,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const nameParts = (prospect.name || "").trim().split(/\s+/);
         const firstName = nameParts[0] || prospect.name || "there";
         const tierLabelMap: Record<string, string> = {
-          founding_10: "Founding Member (10% lifetime discount)",
-          early_access_10: "Early Access (10% discount)",
+          founding_10: "Founding Member — 50% off for life",
+          early_access_10: "Founding Member — 50% off for life",
         };
         const tierLabel = prospect.betaDiscountTier ? tierLabelMap[prospect.betaDiscountTier] || prospect.betaDiscountTier : null;
         const tierRow = tierLabel
           ? `<tr>
-               <td style="padding:8px 0;color:#64748b;font-size:14px;width:160px;vertical-align:top">Beta tier</td>
+               <td style="padding:8px 0;color:#64748b;font-size:14px;width:160px;vertical-align:top">Founding Member tier</td>
                <td style="padding:8px 0;font-size:14px;vertical-align:top">
                  <span style="display:inline-block;background:#ccfbf1;color:#0d9488;font-weight:700;padding:3px 10px;border-radius:20px">${tierLabel}</span>
                </td>
@@ -4676,15 +4676,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resend.emails.send({
           to: prospect.email,
           from: fromEmail,
-          subject: `You're in — welcome to the Hubify beta!`,
+          subject: `Welcome to Hubify Homes — you're a Founding Member!`,
           html: `
             <div style="font-family:sans-serif;max-width:580px;margin:0 auto;padding:32px 24px;background:#ffffff">
               <div style="text-align:center;margin-bottom:28px">
                 <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px">Hubify</div>
               </div>
-              <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${firstName}, you're in!</h1>
+              <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${firstName}, you're a Founding Member!</h1>
               <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
-                You've been granted access to the Hubify beta program. We're excited to have you on board${prospect.company ? ` at <strong>${prospect.company}</strong>` : ""}.
+                You've been accepted into the Hubify Homes Founding Member Program. We're excited to have you on board${prospect.company ? ` at <strong>${prospect.company}</strong>` : ""}.
               </p>
               <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px;margin-bottom:28px">
                 <table style="width:100%;border-collapse:collapse">
@@ -4702,7 +4702,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               <p style="color:#6b7280;font-size:14px;margin-top:30px;">Best regards,<br>The Hubify Team</p>
             </div>
           `,
-          text: `Hi ${firstName},\n\nYou've been granted access to the Hubify beta program${prospect.company ? ` at ${prospect.company}` : ""}.\n\n${tierLabel ? `Beta tier: ${tierLabel}\n\n` : ""}Our team will reach out shortly with your next steps and onboarding details.\n\nBest regards,\nThe Hubify Team`,
+          text: `Hi ${firstName},\n\nYou've been accepted into the Hubify Homes Founding Member Program${prospect.company ? ` at ${prospect.company}` : ""}.\n\n${tierLabel ? `Founding Member tier: ${tierLabel}\n\n` : ""}Our team will reach out shortly with your next steps and onboarding details.\n\nBest regards,\nThe Hubify Team`,
         }).then(({ error }) => {
           if (error) {
             console.error(`[beta-members] Welcome email failed for ${prospect.email}:`, error.message);
@@ -17168,7 +17168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         label: inTier1
           ? `$${effectivePrice.toFixed(2)}/mo (${tier1DiscountPct}% off — Founding Member)`
           : inTier2
-          ? `$${effectivePrice.toFixed(2)}/mo (${tier2DiscountPct}% off — Early Access)`
+          ? `$${effectivePrice.toFixed(2)}/mo (${tier2DiscountPct}% off — Founding Member)`
           : `$${basePrice.toFixed(2)}/mo`,
       });
     } catch (error) {
@@ -17493,7 +17493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               from: fromEmail,
               to: data.email,
               replyTo: "contact@hubifyhomes.com",
-              subject: `${data.firstName}, your Hubify beta application is in!`,
+              subject: `${data.firstName}, your Hubify Homes Founding Member application is in!`,
               html: `
               <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
                 <div style="text-align:center;margin-bottom:28px">
@@ -17501,16 +17501,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 </div>
                 <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${data.firstName}, you're on the list!</h1>
                 <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 16px">
-                  We received your beta application for <strong>${data.company}</strong>. Our team will review your application and be in touch within one business day to confirm your spot and discount.
+                  We received your Founding Member application for <strong>${data.company}</strong>. Our team will review your application and be in touch within one business day to confirm your spot and discount.
                 </p>
                 <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
-                  We review each application to ensure beta participants are a good fit for the program and to maintain a high-quality testing experience while we continue refining the platform.
+                  We review each application to ensure Founding Members are a good fit for the program and to maintain a high standard as we continue refining the platform.
                 </p>
                 <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;padding:20px;margin-bottom:28px">
                   <p style="font-size:14px;font-weight:700;color:#0d9488;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.05em">What happens next</p>
                   <ul style="font-size:14px;color:#475569;line-height:1.8;margin:0;padding-left:18px">
                     <li>Our team reviews your application (usually within 24 hours)</li>
-                    <li>Your beta discount will be confirmed and assigned at the time of approval</li>
+                    <li>Your Founding Member discount will be confirmed and assigned at the time of approval</li>
                     <li>You'll receive a welcome email with onboarding instructions</li>
                     <li>Your discount is locked in for the lifetime of your subscription</li>
                   </ul>
@@ -17551,10 +17551,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             from: fromEmail,
             to: alertTo,
             replyTo: data.email,
-            subject: `New beta application — ${data.firstName} ${data.lastName} (${data.company})`,
+            subject: `New Founding Member application — ${data.firstName} ${data.lastName} (${data.company})`,
             html: `
               <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
-                <h2 style="color:#0d9488;margin-bottom:4px">New Beta Application</h2>
+                <h2 style="color:#0d9488;margin-bottom:4px">New Founding Member Application</h2>
                 <p style="color:#64748b;font-size:14px;margin-top:0">Submitted via the Hubify Homes marketing site</p>
                 <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0"/>
                 <table style="width:100%;border-collapse:collapse;font-size:14px">
@@ -18125,7 +18125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         organizationName: z.string().min(1, "Organization name is required"),
         agreeToTerms: z.literal(true, { errorMap: () => ({ message: "You must agree to the Terms of Service" }) }),
         agreeToPrivacy: z.literal(true, { errorMap: () => ({ message: "You must agree to the Privacy Policy" }) }),
-        agreeToBetaAgreement: z.literal(true, { errorMap: () => ({ message: "You must agree to the Beta Agreement" }) }),
+        agreeToBetaAgreement: z.literal(true, { errorMap: () => ({ message: "You must agree to the Founding Member Agreement" }) }),
         // Agreement engagement metadata (optional, recorded for audit trail)
         agreementVersion: z.string().optional(),
         tosVersion: z.string().optional(),
@@ -18232,7 +18232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resend.emails.send({
           from: fromEmail,
           to: prospect.email,
-          subject: "You've signed the Hubify Beta Agreement",
+          subject: "You've signed the Hubify Homes Founding Member Agreement",
           html: `
             <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
               <div style="text-align:center;margin-bottom:28px">
@@ -18240,7 +18240,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               </div>
               <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 16px">Agreement Signed — You're In!</h1>
               <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
-                Hi ${signerName}, thanks for signing the Hubify Beta Agreement${versionLabel}. Your onboarding step has been recorded — here's a summary for your records.
+                Hi ${signerName}, thanks for signing the Hubify Homes Founding Member Agreement${versionLabel}. Your onboarding step has been recorded — here's a summary for your records.
               </p>
               <table style="width:100%;border-collapse:collapse;font-size:14px;margin:0 0 28px">
                 <tr>
@@ -18266,7 +18266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               </div>
               <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px">
               <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
-                You received this because you signed the Hubify Beta Agreement. If you have questions please email <a href="mailto:contact@hubifyhomes.com" style="color:#0d9488">contact@hubifyhomes.com</a>.
+                You received this because you signed the Hubify Homes Founding Member Agreement. If you have questions please email <a href="mailto:contact@hubifyhomes.com" style="color:#0d9488">contact@hubifyhomes.com</a>.
               </p>
             </div>
           `,
@@ -19006,16 +19006,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const betaApprovalText = `Hi ${recipientName},
 
-Great news — ${orgName} has been approved for the Hubify Beta Program.
+Great news — ${orgName} has been approved as a Founding Member of Hubify Homes.
 
 Here are your membership details:
 
   Organization:   ${orgName}
   Portfolio Tier: ${portfolioTier}${homes > 0 ? `\n  Properties:     ${homes}` : ""}
-  Beta Cohort:    Member #${cohortNumber}
-  Monthly Rate:   $${discountedMonthlyPrice.toFixed(2)}/mo (${discountPct}% beta rate, grandfathered)${tierSetupFee > 0 ? `\n  Setup Fee:      $${tierSetupFee.toFixed(2)} one-time` : ""}
+  Founding Member: #${cohortNumber}
+  Monthly Rate:   $${discountedMonthlyPrice.toFixed(2)}/mo (${discountPct}% Founding Member rate, locked for life)${tierSetupFee > 0 ? `\n  Setup Fee:      $${tierSetupFee.toFixed(2)} one-time` : ""}
 
-Your next step is to complete the Beta Agreement, set up billing, and activate your workspace. Use the link below — it walks you through the whole process:
+Your next step is to complete the Founding Member Agreement, set up billing, and activate your workspace. Use the link below — it walks you through the whole process:
 
 ${onboardingUrl}
 
@@ -19030,7 +19030,7 @@ contact@hubifyhomes.com`;
           from: fromEmail,
           to: existing.email,
           replyTo: "contact@hubifyhomes.com",
-          subject: `Your Hubify Beta access is confirmed`,
+          subject: `You're a Hubify Homes Founding Member`,
           text: betaApprovalText,
           html: `
             <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:40px 24px;background:#ffffff;color:#1e293b;font-size:15px;line-height:1.7">
@@ -19038,7 +19038,7 @@ contact@hubifyhomes.com`;
                 <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="180" style="width:180px;max-width:180px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
               </div>
               <p style="margin:0 0 18px">Hi ${recipientName},</p>
-              <p style="margin:0 0 18px">Great news — <strong>${orgName}</strong> has been approved for the Hubify Beta Program.</p>
+              <p style="margin:0 0 18px">Great news — <strong>${orgName}</strong> has been approved as a Founding Member of Hubify Homes.</p>
               <p style="margin:0 0 18px">Here are your membership details:</p>
               <table style="border-collapse:collapse;font-size:15px;margin:0 0 24px">
                 <tr>
@@ -19054,19 +19054,19 @@ contact@hubifyhomes.com`;
                   <td style="padding:4px 0;color:#0f172a">${homes}</td>
                 </tr>` : ""}
                 <tr>
-                  <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Beta Cohort</td>
+                  <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Founding Member</td>
                   <td style="padding:4px 0;color:#0f172a">Member #${cohortNumber}</td>
                 </tr>
                 <tr>
                   <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Monthly Rate</td>
-                  <td style="padding:4px 0;color:#0f172a;font-weight:600">$${discountedMonthlyPrice.toFixed(2)}/mo <span style="color:#64748b;font-weight:400;font-size:13px">(${discountPct}% beta rate, grandfathered)</span></td>
+                  <td style="padding:4px 0;color:#0f172a;font-weight:600">$${discountedMonthlyPrice.toFixed(2)}/mo <span style="color:#64748b;font-weight:400;font-size:13px">(${discountPct}% Founding Member rate, locked for life)</span></td>
                 </tr>
                 ${tierSetupFee > 0 ? `<tr>
                   <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Setup Fee</td>
                   <td style="padding:4px 0;color:#0f172a">$${tierSetupFee.toFixed(2)} one-time</td>
                 </tr>` : ""}
               </table>
-              <p style="margin:0 0 20px">Your next step is to complete the Beta Agreement, set up billing, and activate your workspace.</p>
+              <p style="margin:0 0 20px">Your next step is to complete the Founding Member Agreement, set up billing, and activate your workspace.</p>
               <div style="text-align:center;margin:0 0 20px">
                 <a href="${onboardingUrl}" style="display:inline-block;background:#0097BD;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 36px;border-radius:8px">Get Started →</a>
               </div>
@@ -19176,8 +19176,8 @@ contact@hubifyhomes.com`;
         "",
         `  Portfolio Tier: ${portfolioTier}`,
         ...(prospectHomes > 0 ? [`  Properties:     ${prospectHomes}`] : []),
-        `  Beta Cohort:    Member #${cohortNumber}`,
-        `  Monthly Rate:   $${discountedMonthlyPrice.toFixed(2)}/mo (${discountPct}% beta rate, grandfathered)`,
+        `  Founding Member: #${cohortNumber}`,
+        `  Monthly Rate:   $${discountedMonthlyPrice.toFixed(2)}/mo (${discountPct}% Founding Member rate, locked for life)`,
         ...(tierSetupFee > 0 ? [`  Setup Fee:      $${tierSetupFee.toFixed(2)} one-time`] : []),
         "",
         "If you have any trouble, just reply to this email and we'll help.",
@@ -19192,7 +19192,7 @@ contact@hubifyhomes.com`;
           from: fromEmail,
           to: existing.email,
           replyTo: "contact@hubifyhomes.com",
-          subject: `Your Hubify Beta onboarding link`,
+          subject: `Your Hubify Homes Founding Member onboarding link`,
           text: resendApprovalText,
           html: `
             <div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;padding:40px 24px;background:#ffffff;color:#1e293b;font-size:16px;line-height:1.7">
@@ -19213,12 +19213,12 @@ contact@hubifyhomes.com`;
                   <td style="padding:4px 0;color:#0f172a">${prospectHomes}</td>
                 </tr>` : ""}
                 <tr>
-                  <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Beta Cohort</td>
+                  <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Founding Member</td>
                   <td style="padding:4px 0;color:#0f172a">Member #${cohortNumber}</td>
                 </tr>
                 <tr>
                   <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Monthly Rate</td>
-                  <td style="padding:4px 0;color:#0f172a;font-weight:600">$${discountedMonthlyPrice.toFixed(2)}/mo <span style="color:#64748b;font-weight:400;font-size:13px">(${discountPct}% beta rate, grandfathered)</span></td>
+                  <td style="padding:4px 0;color:#0f172a;font-weight:600">$${discountedMonthlyPrice.toFixed(2)}/mo <span style="color:#64748b;font-weight:400;font-size:13px">(${discountPct}% Founding Member rate, locked for life)</span></td>
                 </tr>
                 ${tierSetupFee > 0 ? `<tr>
                   <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Setup Fee</td>

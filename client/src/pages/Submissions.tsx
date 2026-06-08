@@ -12,7 +12,7 @@ const VALID_INTENTS = new Set<string>([
 const INTENT_LABELS: Record<string, string> = {
   get_started:           "Get Started",
   need_demo:             "Request a Demo",
-  beta_application:      "Apply for Beta",
+  beta_application:      "Founding Member Application",
   pricing_starter:       "Starter Portfolio",
   pricing_growth:        "Growth Portfolio",
   pricing_professional:  "Professional Portfolio",

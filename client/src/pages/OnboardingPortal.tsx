@@ -60,7 +60,7 @@ interface OnboardingDetails {
 
 const agreementSchema = z.object({
   agreeToBetaAgreement: z.literal(true, {
-    errorMap: () => ({ message: "You must review and accept the Hubify Homes Beta Agreement" }),
+    errorMap: () => ({ message: "You must review and accept the Hubify Homes Founding Member Agreement" }),
   }),
   agreeToTerms: z.literal(true, {
     errorMap: () => ({ message: "You must review and accept the Terms of Service" }),
@@ -166,22 +166,22 @@ function BetaAgreementContent({ company }: { company?: string }) {
     <div className="text-sm text-slate-700 leading-relaxed space-y-5">
       <p className="text-xs text-slate-400">Version {AGREEMENT_VERSION} · Effective June 2, 2026</p>
       <p>
-        This Hubify Homes Inc. Beta Participation Agreement ("<strong>Agreement</strong>") is entered into between{" "}
+        This Hubify Homes Inc. Founding Member Agreement ("<strong>Agreement</strong>") is entered into between{" "}
         <strong>Hubify Homes Inc.</strong> ("<strong>Hubify</strong>," "we," "us") and the organization identified
-        during onboarding ("<strong>Beta Participant</strong>" or "you"), and governs your participation in the
-        Hubify Homes closed beta program.
+        during onboarding ("<strong>Founding Member</strong>" or "you"), and governs your participation in the
+        Hubify Homes Founding Member Program.
       </p>
 
       <div>
-        <p className="font-semibold text-slate-900 mb-1">1. Beta Program Access</p>
-        <p className="mb-2">Subject to the terms of this Agreement, Hubify grants you a limited, non-exclusive, non-transferable, revocable license to access and use the Hubify platform ("Platform") solely for your internal business purposes during the Beta Period.</p>
+        <p className="font-semibold text-slate-900 mb-1">1. Founding Member Access</p>
+        <p className="mb-2">Subject to the terms of this Agreement, Hubify grants you a limited, non-exclusive, non-transferable, revocable license to access and use the Hubify platform ("Platform") solely for your internal business purposes.</p>
         <p>Access is provided on an invitation-only basis and may be suspended, restricted, or revoked in accordance with this Agreement.</p>
       </div>
 
       <div>
-        <p className="font-semibold text-slate-900 mb-1">2. Beta Pricing &amp; Lifetime Lock</p>
-        <p className="mb-2">In consideration of your early adoption and participation in the Beta Program, Hubify may offer a discounted monthly subscription rate ("Beta Price") as specified during onboarding.</p>
-        <p className="mb-2">The Beta Price is reserved exclusively for approved Beta Participants and remains available only while Participant maintains a continuous active subscription account in good standing.</p>
+        <p className="font-semibold text-slate-900 mb-1">2. Founding Member Pricing &amp; Lifetime Lock</p>
+        <p className="mb-2">In consideration of your early adoption and participation in the Founding Member Program, Hubify may offer a discounted monthly subscription rate ("Founding Member Price") as specified during onboarding.</p>
+        <p className="mb-2">The Founding Member Price is reserved exclusively for approved Founding Members and remains available only while Participant maintains a continuous active subscription account in good standing.</p>
         <p className="mb-1">Good standing requires:</p>
         <ul className="list-disc list-inside space-y-0.5 ml-3 mb-2">
           <li>Timely payment of all fees and charges</li>
@@ -190,7 +190,7 @@ function BetaAgreementContent({ company }: { company?: string }) {
           <li>Compliance with all applicable Platform policies</li>
           <li>No chargebacks, payment disputes, fraud, abuse, or misuse of the Platform</li>
         </ul>
-        <p className="mb-1">The Beta Price shall immediately terminate upon:</p>
+        <p className="mb-1">The Founding Member Price shall immediately terminate upon:</p>
         <ul className="list-disc list-inside space-y-0.5 ml-3 mb-2">
           <li>Cancellation of service</li>
           <li>Voluntary account closure</li>
@@ -200,13 +200,13 @@ function BetaAgreementContent({ company }: { company?: string }) {
           <li>Chargebacks or payment disputes</li>
           <li>Any lapse in active subscription status</li>
         </ul>
-        <p className="mb-2">If Participant's subscription ceases for any reason, Participant shall not be entitled to reinstatement of the Beta Price upon reactivation or creation of a new account.</p>
+        <p className="mb-2">If Participant's subscription ceases for any reason, Participant shall not be entitled to reinstatement of the Founding Member Price upon reactivation or creation of a new account.</p>
         <p>A one-time platform initialization fee may apply as disclosed during onboarding. Initialization fees become non-refundable once platform provisioning begins. Monthly subscription fees are billed in advance. Participant may cancel at any time, with cancellation becoming effective at the conclusion of the current billing cycle.</p>
       </div>
 
       <div>
-        <p className="font-semibold text-slate-900 mb-1">3. Beta Nature of the Platform</p>
-        <p className="mb-2">Participant acknowledges that the Platform is a pre-release beta product and may contain bugs, defects, interruptions, security vulnerabilities, incomplete functionality, or other errors.</p>
+        <p className="font-semibold text-slate-900 mb-1">3. Nature of the Platform</p>
+        <p className="mb-2">Participant acknowledges that the Platform is an evolving product and may contain bugs, defects, interruptions, security vulnerabilities, incomplete functionality, or other errors.</p>
         <p className="mb-1">Hubify makes no guarantees regarding:</p>
         <ul className="list-disc list-inside space-y-0.5 ml-3 mb-2">
           <li>Platform availability</li>
@@ -344,7 +344,7 @@ function BetaAgreementContent({ company }: { company?: string }) {
 
       <div>
         <p className="font-semibold text-slate-900 mb-1">16. Entire Agreement</p>
-        <p className="mb-2">This Agreement, together with the Hubify Terms of Service and Privacy Policy, constitutes the entire agreement between the parties concerning the Beta Program and supersedes all prior discussions, understandings, or agreements relating to the subject matter herein.</p>
+        <p className="mb-2">This Agreement, together with the Hubify Terms of Service and Privacy Policy, constitutes the entire agreement between the parties concerning the Founding Member Program and supersedes all prior discussions, understandings, or agreements relating to the subject matter herein.</p>
         <p>By selecting "I Agree" during onboarding, Participant acknowledges that it has read, understood, and agrees to be bound by this Agreement.</p>
       </div>
 
@@ -950,14 +950,14 @@ function AgreementStep({ data, token, onSigned }: {
 
   return (
     <>
-      {/* Beta Agreement modal */}
+      {/* Founding Member Agreement modal */}
       <LegalDocModal
         open={betaModalOpen}
         onOpenChange={setBetaModalOpen}
-        title="Hubify Homes Beta Participation Agreement"
+        title="Hubify Homes Founding Member Agreement"
         subtitle={`Version ${AGREEMENT_VERSION} — Read the full agreement before accepting`}
         icon={<FileText className="w-4 h-4 text-teal-600" />}
-        confirmLabel={`I have read, understand, and agree to the Hubify Homes Beta Participation Agreement (${AGREEMENT_VERSION}).`}
+        confirmLabel={`I have read, understand, and agree to the Hubify Homes Founding Member Agreement (${AGREEMENT_VERSION}).`}
         onAccept={handleAcceptBeta}
         scrolledToBottom={betaScrolledToBottom}
         onScroll={handleBetaScroll}
@@ -997,7 +997,7 @@ function AgreementStep({ data, token, onSigned }: {
 
       {/* Membership details card */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6">
-        <p className="text-xs font-bold uppercase tracking-widest text-teal-600 mb-4">Your Beta Membership</p>
+        <p className="text-xs font-bold uppercase tracking-widest text-teal-600 mb-4">Your Founding Membership</p>
         <table className="w-full border-collapse">
           <tbody>
             <Row label="Contact Name" value={displayName} />
@@ -1019,7 +1019,7 @@ function AgreementStep({ data, token, onSigned }: {
 
       {/* Pricing card */}
       <div className="bg-teal-50 border border-teal-200 rounded-2xl p-6 mb-6">
-        <p className="text-xs font-bold uppercase tracking-widest text-teal-600 mb-4">Beta Pricing</p>
+        <p className="text-xs font-bold uppercase tracking-widest text-teal-600 mb-4">Founding Member Pricing</p>
         <table className="w-full border-collapse">
           <tbody>
             {data.originalMonthlyPrice != null && (
@@ -1028,7 +1028,7 @@ function AgreementStep({ data, token, onSigned }: {
               } />
             )}
             {data.discountPercentage != null && (
-              <Row label="Beta Discount" value={
+              <Row label="Founding Member Discount" value={
                 <span className="text-teal-700 font-semibold">{data.discountPercentage}% off — locked for life</span>
               } accent />
             )}
@@ -1046,7 +1046,7 @@ function AgreementStep({ data, token, onSigned }: {
         </table>
         <div className="mt-4 flex items-start gap-2 text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs">
           <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-          <span>Your beta pricing is <strong>locked in for life</strong> — as long as your subscription remains in good standing, your rate will never increase.</span>
+          <span>Your founding member pricing is <strong>locked in for life</strong> — as long as your subscription remains in good standing, your rate will never increase.</span>
         </div>
       </div>
 
@@ -1054,7 +1054,7 @@ function AgreementStep({ data, token, onSigned }: {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
         <div className="flex items-center gap-2 mb-5">
           <ShieldCheck className="w-5 h-5 text-teal-600" />
-          <p className="font-semibold text-slate-900">Sign Your Beta Agreement</p>
+          <p className="font-semibold text-slate-900">Sign Your Founding Member Agreement</p>
         </div>
 
         <Form {...form}>
@@ -1062,7 +1062,7 @@ function AgreementStep({ data, token, onSigned }: {
             <div className="space-y-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
               <DocRow
                 accepted={betaAccepted}
-                label="Hubify Homes Beta Agreement"
+                label="Hubify Homes Founding Member Agreement"
                 onOpen={openBetaModal}
                 formField="agreeToBetaAgreement"
               />
@@ -1170,7 +1170,7 @@ function PaymentStep({ data, token }: { data: OnboardingDetails; token: string }
           <div className="flex justify-between items-start">
             <div>
               <p className="text-sm font-medium text-slate-800">
-                Hubify Homes Beta — {data.portfolioTier ?? "Standard"} Plan
+                Hubify Homes — {data.portfolioTier ?? "Standard"} Plan
               </p>
               <p className="text-xs text-slate-500">
                 {data.discountPercentage ?? 0}% founding discount · locked for life
@@ -1206,7 +1206,7 @@ function PaymentStep({ data, token }: { data: OnboardingDetails; token: string }
             Your discount is locked in for the lifetime of your subscription.</>
           ) : (
             <>After today, you'll be billed <strong className="text-slate-700">{fmt(data.discountedMonthlyPrice)}/month</strong>.
-            Your beta discount of <strong className="text-slate-700">{data.discountPercentage ?? 0}%</strong> is locked in for the lifetime
+            Your founding member discount of <strong className="text-slate-700">{data.discountPercentage ?? 0}%</strong> is locked in for the lifetime
             of your subscription. You may cancel at any time.</>
           )}
         </div>
@@ -1828,8 +1828,8 @@ export default function OnboardingPortal() {
           <StepIndicator current={currentStep} />
           {!agreementSigned && (
             <>
-              <h1 className="text-2xl font-bold text-slate-900 mb-1">Beta Agreement Review</h1>
-              <p className="text-slate-500 text-sm">Review your membership details and sign your Beta Agreement to continue.</p>
+              <h1 className="text-2xl font-bold text-slate-900 mb-1">Founding Member Agreement</h1>
+              <p className="text-slate-500 text-sm">Review your membership details and sign your Founding Member Agreement to continue.</p>
             </>
           )}
           {agreementSigned && !slugConfirmed && (

@@ -356,8 +356,8 @@ export const PLATFORM_SETTINGS_DEFAULTS: Record<string, any> = {
   // Prospect Alerts
   stuckProspectThresholdDays: 7,
 
-  // Beta Pricing (two-tier: first 10 = 50% off life-locked, next 10 = 25% off)
-  betaPricing: { basePrice: 199, tier1DiscountPct: 50, tier1Cap: 10, tier2DiscountPct: 25, tier2Cap: 10 },
+  // Beta Pricing (single tier: 50% off life-locked for Founding Members)
+  betaPricing: { basePrice: 199, tier1DiscountPct: 50, tier1Cap: 10, tier2DiscountPct: 25, tier2Cap: 0 },
 };
 import { alias } from "drizzle-orm/pg-core";
 import { nanoid } from "nanoid";

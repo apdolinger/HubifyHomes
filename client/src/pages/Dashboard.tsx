@@ -121,7 +121,7 @@ function SetupProgressCard({ user }: { user: any }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
             <span className={`text-sm font-semibold ${isComplete ? "text-emerald-700" : "text-slate-800"}`}>
-              {isComplete ? "Ready for Beta Use! 🎉" : "Getting Beta-Ready"}
+              {isComplete ? "Ready to Go Live! 🎉" : "Getting Ready"}
             </span>
             <span className="text-xs text-slate-500">
               {completedCount} of {total} steps complete

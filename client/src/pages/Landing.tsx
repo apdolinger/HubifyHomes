@@ -109,7 +109,7 @@ function BetaSection({ onApply }: { onApply: () => void }) {
         <div className="bg-gradient-to-r from-teal-600 to-teal-500 rounded-2xl p-8 sm:p-12 text-white text-center shadow-lg">
           <div className="flex items-center justify-center gap-2 mb-4">
             <Sparkles className="w-5 h-5 text-teal-200" />
-            <span className="text-teal-100 text-sm font-semibold uppercase tracking-widest">Founding Beta Program</span>
+            <span className="text-teal-100 text-sm font-semibold uppercase tracking-widest">Founding Member Program</span>
             <Sparkles className="w-5 h-5 text-teal-200" />
           </div>
           <h2 className="text-3xl font-bold mb-4">Lock In Your Founding Discount</h2>
@@ -138,33 +138,17 @@ function BetaSection({ onApply }: { onApply: () => void }) {
               )}
             </div>
 
-            {/* ── Tier 2: Early Access 10 ── */}
-            <div className={`bg-white/10 rounded-xl px-6 py-4 text-center transition-opacity duration-300 ${tier2Full ? "opacity-60" : ""}`}>
-              <div className="text-sm font-bold text-teal-100 mb-1">Early Access 10</div>
-              <div className="text-2xl font-extrabold text-white">25% off</div>
-              <div className="text-teal-200 text-xs mt-0.5">price locked for life</div>
-              {data && (
-                <>
-                  <TierFillBar filled={data.tier2Filled} cap={data.tier2Cap} />
-                  <p className="text-teal-100 text-xs">
-                    {tier2Full
-                      ? "Full"
-                      : `${data.tier2Filled} of ${data.tier2Cap} filled · ${data.tier2Remaining} left`}
-                  </p>
-                </>
-              )}
-            </div>
           </div>
 
           {betaFull ? (
-            <p className="text-white/70 text-base font-medium italic">Beta Program Is Currently Full</p>
+            <p className="text-white/70 text-base font-medium italic">Founding Member Program Is Currently Full</p>
           ) : (
             <Button
               onClick={onApply}
               size="lg"
               className="bg-white text-teal-700 hover:bg-teal-50 font-bold px-8"
             >
-              Apply for Beta Access
+              Become a Founding Member
             </Button>
           )}
 
@@ -172,7 +156,7 @@ function BetaSection({ onApply }: { onApply: () => void }) {
             {data ? (
               data.open
                 ? `${data.activeBetaCount} of ${data.totalCap} spots filled — ${data.totalRemaining} remaining · No credit card required`
-                : `All ${data.totalCap} beta spots are filled · No credit card required`
+                : `All ${data.totalCap} Founding Member spots are filled · No credit card required`
             ) : isLoading ? (
               <span className="inline-block bg-white/10 rounded animate-pulse w-56 h-3 align-middle" />
             ) : isError ? (
@@ -253,7 +237,7 @@ export default function Landing() {
                 Request a Demo
               </button>
               <button onClick={() => { setIsBetaOpen(true); closeMobile(); }} className="w-full text-left px-4 py-3 rounded-lg border border-slate-200 text-slate-700 font-semibold text-base hover:bg-slate-50 transition-colors">
-                Apply for Beta
+                Become a Founding Member
               </button>
               <button onClick={() => { setIsContactOpen(true); closeMobile(); }} className="w-full text-left px-4 py-3 rounded-lg border border-slate-200 text-slate-700 font-semibold text-base hover:bg-slate-50 transition-colors">
                 Get in Touch

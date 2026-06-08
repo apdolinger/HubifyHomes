@@ -88,8 +88,8 @@ function SuccessMessage({ type }: { type: "inquiry" | "demo" | "beta" | "contact
       body: "We'll review your information and send you access to the Hubify demo environment shortly. Check your inbox!",
     },
     beta: {
-      heading: "Beta application received!",
-      body: "Thanks for applying to our founding beta program! Our team will review your application and reach out within one business day.",
+      heading: "Founding Member application received!",
+      body: "Thanks for applying to our Founding Member Program! Our team will review your application and reach out within one business day.",
     },
     contact: {
       heading: "Message sent!",
@@ -327,9 +327,9 @@ function BetaVariantForm({ onSuccess, compact }: { onSuccess?: () => void; compa
         <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mx-auto">
           <Star className="w-7 h-7 text-slate-400" />
         </div>
-        <h2 className="text-xl font-bold text-slate-800">Beta Program Is Currently Full</h2>
+        <h2 className="text-xl font-bold text-slate-800">Founding Member Program Is Currently Full</h2>
         <p className="text-slate-500 text-sm max-w-sm mx-auto leading-relaxed">
-          All {betaStatus.totalCap} beta spots have been filled. We'll announce when new spots become available — follow us to stay in the loop.
+          All {betaStatus.totalCap} Founding Member spots have been filled. We'll announce when new spots become available — follow us to stay in the loop.
         </p>
         <a
           href="mailto:contact@hubifyhomes.com"
@@ -357,7 +357,7 @@ function BetaVariantForm({ onSuccess, compact }: { onSuccess?: () => void; compa
         <div className="flex items-start gap-3 p-4 bg-teal-50 border border-teal-200 rounded-xl">
           <Star className="w-4 h-4 text-teal-600 mt-0.5 shrink-0" />
           <div>
-            <p className="text-sm font-semibold text-teal-800">Beta discounts are automatically assigned</p>
+            <p className="text-sm font-semibold text-teal-800">Founding Member pricing is automatically assigned</p>
             <p className="text-xs text-teal-700 mt-0.5 leading-relaxed">
               Your discount tier will be confirmed at the time of approval based on slot availability.
               {betaStatus && (
@@ -470,7 +470,7 @@ function BetaVariantForm({ onSuccess, compact }: { onSuccess?: () => void; compa
 
         {/* ── Beta Questions ──────────────────────────────────────────────── */}
         <div>
-          <SectionHeader icon={ClipboardList} title="Beta Questions" />
+          <SectionHeader icon={ClipboardList} title="Founding Member Questions" />
           <div className="space-y-4">
             <FormField control={form.control} name="whyInterested" render={({ field }) => (
               <FormItem>
@@ -527,7 +527,7 @@ function BetaVariantForm({ onSuccess, compact }: { onSuccess?: () => void; compa
         >
           {mutation.isPending
             ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Submitting…</>
-            : "Submit Beta Application"}
+            : "Submit Application"}
         </Button>
       </form>
     </Form>

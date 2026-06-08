@@ -20,8 +20,8 @@ function modalMeta(intent?: SubmissionIntent): { title: string; description: str
       };
     case "beta_application":
       return {
-        title: "Apply for Beta Access",
-        description: "Join our founding members program and lock in your discount for the lifetime of your subscription.",
+        title: "Become a Founding Member",
+        description: "Join our Founding Member program and lock in your discount for the lifetime of your subscription.",
       };
     case "contact":
       return {

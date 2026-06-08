@@ -228,7 +228,7 @@ interface ProspectEmail {
 const PIPELINE_STAGES: { key: OnboardingStage; label: string; color: string }[] = [
   { key: "contact",           label: "Contact",            color: "border-slate-400 bg-slate-50" },
   { key: "inquiry",           label: "Submission",         color: "border-teal-400 bg-teal-50" },
-  { key: "beta_approved",     label: "Beta Approved",      color: "border-teal-500 bg-teal-100" },
+  { key: "beta_approved",     label: "Founding Member Approved", color: "border-teal-500 bg-teal-100" },
   { key: "agreement_pending", label: "Agreement Pending",  color: "border-yellow-500 bg-yellow-50" },
   { key: "agreement",         label: "Agreement",          color: "border-yellow-400 bg-yellow-50" },
   { key: "payment_pending",      label: "Payment Pending",      color: "border-orange-300 bg-orange-50" },
@@ -883,14 +883,14 @@ function ProspectCard({
         const tierLabel = prospect.betaDiscountTier === "founding_10"
           ? "Founding 10 — 50% off"
           : prospect.betaDiscountTier === "early_access_10"
-            ? "Early Access 10 — 25% off"
+            ? "Founding Member — 50% off"
             : prospect.betaDiscountTier ?? null;
 
         if (isActive) {
           return (
             <div className="flex flex-wrap gap-1">
               <Badge className="bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs px-1.5 py-0.5 font-semibold">
-                Active Beta Member
+                Founding Member
               </Badge>
               {tierLabel && (
                 <Badge
@@ -1467,7 +1467,7 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
             <>
               <Separator />
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-teal-600 mb-3">Beta Application</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-teal-600 mb-3">Founding Member Application</p>
                 <div className="grid grid-cols-2 gap-3 text-sm mb-4">
                   {/* Contact fields */}
                   <div className="col-span-2">
@@ -1603,7 +1603,7 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-teal-700 flex items-center gap-1.5">
                     <CheckCircle className="h-3.5 w-3.5" />
-                    Beta Approval Details
+                    Founding Member Approval Details
                   </p>
                   {!editingPricing ? (
                     <button
@@ -1691,7 +1691,7 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
                       />
                     </div>
                     <div>
-                      <Label className="text-teal-600 text-xs mb-1 block">Beta Price ($/mo)</Label>
+                      <Label className="text-teal-600 text-xs mb-1 block">Founding Member Price ($/mo)</Label>
                       <Input
                         type="number"
                         step="0.01"
@@ -1744,7 +1744,7 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
                     )}
                     {submission.discountedMonthlyPrice != null && (
                       <div>
-                        <p className="text-teal-600 text-xs mb-0.5">Beta Price</p>
+                        <p className="text-teal-600 text-xs mb-0.5">Founding Member Price</p>
                         <p className="font-bold text-teal-900 text-base">${submission.discountedMonthlyPrice.toFixed(2)}/mo</p>
                       </div>
                     )}
@@ -1888,7 +1888,7 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
               onClick={() => setApproveDialogOpen(true)}
             >
               <CheckCircle className="h-4 w-4 mr-2" />
-              Approve Beta Application
+              Approve Founding Member Application
             </Button>
             <p className="text-xs text-muted-foreground text-center">
               Assigns cohort slot, computes pricing, and sends onboarding email
@@ -1984,7 +1984,7 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
         <Dialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Approve Beta Application?</DialogTitle>
+              <DialogTitle>Approve Founding Member Application?</DialogTitle>
               <DialogDescription>
                 Review the computed pricing below, then confirm to move <strong>{displayName}</strong> to <strong>Agreement Pending</strong>.
               </DialogDescription>
@@ -2050,7 +2050,7 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
                       </div>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs text-amber-700 font-medium">Beta Price/mo</label>
+                      <label className="text-xs text-amber-700 font-medium">Founding Member Price/mo</label>
                       <div className="relative">
                         <span className="absolute left-2 top-1.5 text-xs text-muted-foreground">$</span>
                         <Input
@@ -2132,7 +2132,7 @@ const SOURCE_META: Record<string, { label: string; color: string }> = {
   get_started:           { label: "Get Started",          color: "bg-green-100 text-green-800" },
   demo_request:          { label: "Demo Request",          color: "bg-blue-100 text-blue-800" },
   marketing_demo_request:{ label: "Demo Request",          color: "bg-blue-100 text-blue-800" },
-  beta_application:      { label: "Beta Application",      color: "bg-teal-100 text-teal-800" },
+  beta_application:      { label: "Founding Member Application", color: "bg-teal-100 text-teal-800" },
   contact_form:          { label: "Contact Form",          color: "bg-slate-100 text-slate-700" },
   pricing_starter:       { label: "Pricing · Starter",     color: "bg-purple-100 text-purple-800" },
   pricing_growth:        { label: "Pricing · Growth",      color: "bg-purple-100 text-purple-800" },
@@ -2155,7 +2155,7 @@ const SOURCE_FILTER_OPTIONS = [
   { value: "all", label: "All sources" },
   { value: "get_started", label: "Get Started" },
   { value: "demo_request", label: "Demo Request" },
-  { value: "beta_application", label: "Beta Application" },
+  { value: "beta_application", label: "Founding Member Application" },
   { value: "contact_form", label: "Contact Form" },
   { value: "pricing_starter",      label: "Pricing · Starter" },
   { value: "pricing_growth",       label: "Pricing · Growth" },
@@ -3042,7 +3042,7 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
             onClick={() => setBetaOnly(v => !v)}
             className={betaOnly ? "bg-indigo-600 hover:bg-indigo-700 text-white" : ""}
           >
-            <Filter className="w-4 h-4 mr-2" /> Beta only ({allProspects.filter(p => p.stage !== "dropped" && (p.trialIntent === "beta_application" || p.source === "beta_application")).length})
+            <Filter className="w-4 h-4 mr-2" /> Founding Members only ({allProspects.filter(p => p.stage !== "dropped" && (p.trialIntent === "beta_application" || p.source === "beta_application")).length})
           </Button>
           <Button onClick={openCreate}>
             <Plus className="w-4 h-4 mr-2" /> Add Prospect
@@ -3448,7 +3448,7 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
                   <div className="rounded-lg border border-teal-200 bg-teal-50 p-3">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-xs font-semibold uppercase tracking-wide text-teal-700 flex items-center gap-1.5">
-                        <DollarSign className="w-3.5 h-3.5" /> Beta Pricing
+                        <DollarSign className="w-3.5 h-3.5" /> Founding Member Pricing
                       </p>
                       {!editingPricingInSheet ? (
                         <Button
@@ -3503,7 +3503,7 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
                           <p className="font-medium text-teal-900">{(editingProspect as any).originalMonthlyPrice != null ? `$${(editingProspect as any).originalMonthlyPrice}/mo` : <span className="text-gray-400 italic">—</span>}</p>
                         </div>
                         <div>
-                          <p className="text-teal-600 mb-0.5">Beta Price</p>
+                          <p className="text-teal-600 mb-0.5">Founding Member Price</p>
                           <p className="font-medium text-teal-900">{(editingProspect as any).discountedMonthlyPrice != null ? `$${(editingProspect as any).discountedMonthlyPrice}/mo` : <span className="text-gray-400 italic">—</span>}</p>
                         </div>
                         <div>
@@ -3562,7 +3562,7 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
                             />
                           </div>
                           <div>
-                            <Label className="text-xs text-teal-700 mb-1 block">Beta Price ($/mo)</Label>
+                            <Label className="text-xs text-teal-700 mb-1 block">Founding Member Price ($/mo)</Label>
                             <Input
                               type="number"
                               className="h-8 text-xs"
@@ -3959,12 +3959,12 @@ function BetaPricingCard() {
       {/* Header */}
       <div className="flex items-center gap-2 flex-wrap">
         <DollarSign className="w-4 h-4 text-emerald-600" />
-        <h3 className="font-semibold text-sm text-gray-800">Beta Pricing</h3>
-        <span className="text-xs text-gray-400 ml-1">— Two-tier early-adopter discounts for onboarding prospects</span>
+        <h3 className="font-semibold text-sm text-gray-800">Founding Member Pricing</h3>
+        <span className="text-xs text-gray-400 ml-1">— Lifetime discount for Founding Members</span>
         {isBetaOpen ? (
-          <Badge className="ml-auto bg-emerald-100 text-emerald-800 text-xs">Beta Open</Badge>
+          <Badge className="ml-auto bg-emerald-100 text-emerald-800 text-xs">Open</Badge>
         ) : (
-          <Badge className="ml-auto bg-gray-100 text-gray-600 text-xs">Beta Closed</Badge>
+          <Badge className="ml-auto bg-gray-100 text-gray-600 text-xs">Closed</Badge>
         )}
       </div>
 
@@ -4188,7 +4188,7 @@ function BetaProgramTab() {
 
   const tierLabel = (tier: string | null) => {
     if (tier === "founding_10") return { text: "Founding 10 — 50% off", cls: "bg-teal-100 text-teal-800 border-teal-200" };
-    if (tier === "early_access_10") return { text: "Early Access 10 — 25% off", cls: "bg-indigo-100 text-indigo-800 border-indigo-200" };
+    if (tier === "early_access_10") return { text: "Founding Member — 50% off", cls: "bg-teal-100 text-teal-800 border-teal-200" };
     return { text: "Unassigned", cls: "bg-gray-100 text-gray-600 border-gray-200" };
   };
 
@@ -4197,7 +4197,7 @@ function BetaProgramTab() {
       {/* Slot Summary with Open/Closed badge */}
       <div className="space-y-3">
         <div className="flex items-center gap-3">
-          <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Beta Program Status</h3>
+          <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Founding Member Program</h3>
           {!statusLoading && betaStatus && (
             betaStatus.open
               ? <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">● Open</span>
@@ -4219,12 +4219,12 @@ function BetaProgramTab() {
             <p className="text-xs text-teal-700 mt-1 font-medium uppercase tracking-wide">Founding 10</p>
             <p className="text-xs text-teal-600">50% off · {betaStatus?.tier1Remaining ?? "—"} left</p>
           </div>
-          <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-center">
-            <p className="text-2xl font-bold text-indigo-800">
-              {statusLoading ? "…" : `${betaStatus?.tier2Filled ?? 0} / ${betaStatus?.tier2Cap ?? 10}`}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center">
+            <p className="text-2xl font-bold text-slate-500">
+              {statusLoading ? "…" : `${betaStatus?.activeBetaCount ?? 0} / ${betaStatus?.totalCap ?? 10}`}
             </p>
-            <p className="text-xs text-indigo-700 mt-1 font-medium uppercase tracking-wide">Early Access 10</p>
-            <p className="text-xs text-indigo-600">25% off · {betaStatus?.tier2Remaining ?? "—"} left</p>
+            <p className="text-xs text-slate-500 mt-1 font-medium uppercase tracking-wide">Total Founding Members</p>
+            <p className="text-xs text-slate-400">{betaStatus?.totalRemaining ?? "—"} spots left</p>
           </div>
         </div>
       </div>
@@ -4236,8 +4236,8 @@ function BetaProgramTab() {
       <div className="bg-white border rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-slate-900">Active Beta Members</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Approved beta applicants holding a discounted slot</p>
+            <h3 className="font-semibold text-slate-900">Founding Members</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Approved Founding Members holding a discounted slot</p>
           </div>
           <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" onClick={() => refetch()}>
@@ -4336,9 +4336,9 @@ function BetaProgramTab() {
       <Dialog open={addDialogOpen} onOpenChange={(open) => { setAddDialogOpen(open); if (!open) setAddForm({ name: "", email: "", company: "", betaDiscountTier: "" }); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Beta Member Manually</DialogTitle>
+            <DialogTitle>Add Founding Member Manually</DialogTitle>
             <DialogDescription>
-              Grant a beta slot directly without requiring a pipeline application. The member will be saved with source "manual" and will not show a "From pipeline" badge.
+              Grant a Founding Member slot directly without requiring a pipeline application. The member will be saved with source "manual" and will not show a "From pipeline" badge.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -4379,7 +4379,7 @@ function BetaProgramTab() {
                 <SelectContent>
                   <SelectItem value="__none__">None (unassigned)</SelectItem>
                   <SelectItem value="founding_10">Founding 10 — 50% off</SelectItem>
-                  <SelectItem value="early_access_10">Early Access 10 — 25% off</SelectItem>
+                  <SelectItem value="early_access_10">Founding Member — 50% off</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -4396,7 +4396,7 @@ function BetaProgramTab() {
               }}
               disabled={addMutation.isPending}
             >
-              {addMutation.isPending ? <><RefreshCw className="w-3 h-3 mr-1.5 animate-spin" />Adding…</> : "Add Beta Member"}
+              {addMutation.isPending ? <><RefreshCw className="w-3 h-3 mr-1.5 animate-spin" />Adding…</> : "Add Founding Member"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -4428,7 +4428,7 @@ function BetaProgramTab() {
       <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-red-700">Delete Beta Member</DialogTitle>
+            <DialogTitle className="text-red-700">Delete Founding Member</DialogTitle>
             <DialogDescription>
               This permanently deletes <strong>{deleteTarget?.name}</strong> and frees their slot. This cannot be undone.
             </DialogDescription>
@@ -10713,7 +10713,7 @@ function OrgDetailSheet({ org, open, onClose }: { org: OrgOverviewRow | null; op
                     ["Billing Cycle",  sub?.billingCycle ?? "—"],
                     ["Period Ends",    sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString() : "—"],
                     ["Cancel at End",  sub?.cancelAtPeriodEnd ? "Yes" : "No"],
-                    ["Beta Pricing",   sub?.betaPriceLocked ? "Locked" : "—"],
+                    ["Founding Member Pricing", sub?.betaPriceLocked ? "Locked" : "—"],
                     ["Stripe Customer",sub?.stripeCustomerId ? "Connected" : "None"],
                     ["Stripe Sub",     sub?.stripeSubscriptionId ? "Active" : "None"],
                   ] as [string, string][]).map(([label, value]) => (
@@ -11799,7 +11799,7 @@ export default function SuperAdmin() {
                 )}
               </TabsTrigger>
               <TabsTrigger value="pipeline" className="text-xs py-2">Pipeline</TabsTrigger>
-              <TabsTrigger value="beta" className="text-xs py-2">Beta Applications</TabsTrigger>
+              <TabsTrigger value="beta" className="text-xs py-2">Founding Member Applications</TabsTrigger>
               <TabsTrigger value="demo-requests" className="text-xs py-2">Demo Requests</TabsTrigger>
               <TabsTrigger value="dropped" className="text-xs py-2">Dropped</TabsTrigger>
             </TabsList>

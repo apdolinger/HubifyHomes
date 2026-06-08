@@ -154,9 +154,9 @@ export default function SetupChecklist() {
             <CardContent className="flex items-center gap-4 p-6">
               <PartyPopper className="w-10 h-10 flex-shrink-0 opacity-90" />
               <div>
-                <h2 className="text-xl font-semibold">Ready for Beta Use!</h2>
+                <h2 className="text-xl font-semibold">Ready to Go Live!</h2>
                 <p className="text-emerald-100 text-sm mt-0.5">
-                  Your organization is fully configured and ready for beta testing with real clients.
+                  Your organization is fully configured and ready to serve your real clients.
                 </p>
               </div>
             </CardContent>
@@ -165,7 +165,7 @@ export default function SetupChecklist() {
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-1">
               <Rocket className="w-5 h-5 text-teal-600" />
-              <h1 className="text-xl font-semibold text-slate-900">Getting Beta-Ready</h1>
+              <h1 className="text-xl font-semibold text-slate-900">Getting Ready</h1>
             </div>
             <p className="text-slate-500 text-sm ml-7">
               Complete these steps to unlock the full Hubify experience for your team and clients.
@@ -290,7 +290,7 @@ export default function SetupChecklist() {
             {isComplete && (
               <div className="px-5 py-4 border-t border-slate-100 bg-emerald-50/60 text-center">
                 <span className="text-sm text-emerald-700 font-medium">
-                  🎉 All steps complete — you're ready for beta!
+                  🎉 All steps complete — you're ready to go live!
                 </span>
               </div>
             )}
