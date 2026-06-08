@@ -11,9 +11,10 @@ import type { SubmissionIntent } from "@/components/SubmissionForm";
 const PLANS = [
   {
     name: "Starter Portfolio",
-    price: "$65",
+    price: "$45",
     period: "/mo",
     range: "1–10 homes",
+    setupFee: "$99",
     description: "Everything you need to get your home watch business off the ground.",
     intent: "pricing_starter" as SubmissionIntent,
     features: ["Unlimited properties (up to 10)", "Task & inspection management", "Client portal", "Invoicing & billing"],
@@ -22,9 +23,10 @@ const PLANS = [
   },
   {
     name: "Growth Portfolio",
-    price: "$145",
+    price: "$90",
     period: "/mo",
     range: "11–25 homes",
+    setupFee: "$149",
     description: "Scale your operations with team tools and advanced workflows.",
     intent: "pricing_growth" as SubmissionIntent,
     features: ["Everything in Starter", "Team collaboration tools", "Calendar & scheduling", "Advanced reporting"],
@@ -33,14 +35,39 @@ const PLANS = [
   },
   {
     name: "Professional Portfolio",
-    price: "$295",
+    price: "$180",
     period: "/mo",
     range: "26–50 homes",
+    setupFee: "$249",
     description: "Full-featured platform for established estate management companies.",
     intent: "pricing_professional" as SubmissionIntent,
     features: ["Everything in Growth", "Multi-property portfolios", "Custom branding", "Priority support"],
     highlight: false,
     badge: null,
+  },
+  {
+    name: "Operator Portfolio",
+    price: "$300",
+    period: "/mo",
+    range: "51–100 homes",
+    setupFee: "$399",
+    description: "Enterprise-grade tools for large-scale property management operations.",
+    intent: "pricing_professional" as SubmissionIntent,
+    features: ["Everything in Professional", "Dedicated account manager", "Custom integrations", "SLA support"],
+    highlight: false,
+    badge: null,
+  },
+  {
+    name: "Enterprise Portfolio",
+    price: "$450",
+    period: "/mo",
+    range: "101–250 homes",
+    setupFee: "$599",
+    description: "Fully customizable platform for the largest estate management companies.",
+    intent: "pricing_professional" as SubmissionIntent,
+    features: ["Everything in Operator", "Custom contract", "White-label options", "Onsite onboarding"],
+    highlight: false,
+    badge: "Starts at",
   },
 ];
 
@@ -311,11 +338,11 @@ export default function Landing() {
               Choose the plan that fits your portfolio. Every plan includes a free trial — no credit card required.
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 max-w-7xl mx-auto">
             {PLANS.map((plan) => (
               <div
                 key={plan.name}
-                className={`relative rounded-2xl border-2 p-8 flex flex-col transition-shadow ${
+                className={`relative rounded-2xl border-2 p-6 flex flex-col transition-shadow ${
                   plan.highlight
                     ? "border-teal-500 shadow-xl shadow-teal-100 bg-white"
                     : "border-slate-200 bg-white hover:shadow-md"
@@ -323,30 +350,34 @@ export default function Landing() {
               >
                 {plan.badge && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="bg-teal-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+                    <span className="bg-teal-600 text-white text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">
                       {plan.badge}
                     </span>
                   </div>
                 )}
-                <div className="mb-6">
-                  <p className="text-sm font-semibold text-teal-600 uppercase tracking-wide mb-1">{plan.range}</p>
-                  <h3 className="text-xl font-bold text-slate-900">{plan.name}</h3>
-                  <div className="mt-3 flex items-baseline gap-1">
-                    <span className="text-4xl font-extrabold text-slate-900">{plan.price}</span>
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-teal-600 uppercase tracking-wide mb-1">{plan.range}</p>
+                  <h3 className="text-base font-bold text-slate-900">{plan.name}</h3>
+                  <div className="mt-2 flex items-baseline gap-1">
+                    <span className="text-3xl font-extrabold text-slate-900">{plan.price}</span>
                     <span className="text-slate-500 text-sm">{plan.period}</span>
                   </div>
-                  <p className="mt-2 text-sm text-slate-500">{plan.description}</p>
+                  {"setupFee" in plan && plan.setupFee && (
+                    <p className="text-xs text-slate-400 mt-0.5">{plan.setupFee} setup fee</p>
+                  )}
+                  <p className="mt-2 text-xs text-slate-500">{plan.description}</p>
                 </div>
-                <ul className="space-y-2 mb-8 flex-1">
+                <ul className="space-y-1.5 mb-6 flex-1">
                   {plan.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-sm text-slate-700">
-                      <ChevronRight className="w-4 h-4 text-teal-500 shrink-0" />
+                    <li key={f} className="flex items-center gap-1.5 text-xs text-slate-700">
+                      <ChevronRight className="w-3.5 h-3.5 text-teal-500 shrink-0" />
                       {f}
                     </li>
                   ))}
                 </ul>
                 <Button
                   onClick={() => setPricingIntent(plan.intent)}
+                  size="sm"
                   className={
                     plan.highlight
                       ? "w-full bg-teal-600 hover:bg-teal-700 text-white"
@@ -359,7 +390,7 @@ export default function Landing() {
             ))}
           </div>
           <p className="text-center text-sm text-slate-400 mt-8">
-            Need more than 50 homes? <button onClick={() => setIsContactOpen(true)} className="text-teal-600 hover:underline font-medium">Contact us</button> for Operator and Enterprise plans.
+            All plans include a free trial — no credit card required. <button onClick={() => setIsContactOpen(true)} className="text-teal-600 hover:underline font-medium">Contact us</button> with any questions.
           </p>
         </div>
 
