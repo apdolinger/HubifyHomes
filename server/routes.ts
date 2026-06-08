@@ -4548,8 +4548,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const basePrice = Number(bp?.basePrice ?? 199);
       const tier1DiscountPct = Number(bp?.tier1DiscountPct ?? bp?.discountPct ?? 50);
       const tier1Cap = Number(bp?.tier1Cap ?? 10);
-      const tier2DiscountPct = Number(bp?.tier2DiscountPct ?? 25);
-      const tier2Cap = Number(bp?.tier2Cap ?? 10);
+      const tier2DiscountPct = 0;
+      const tier2Cap = Number(bp?.tier2Cap ?? 0);
       res.json({ basePrice, tier1DiscountPct, tier1Cap, tier2DiscountPct, tier2Cap });
     } catch (error) {
       console.error("Error fetching beta pricing:", error);
@@ -17091,8 +17091,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settings = await storage.getPlatformSettings();
       const bp = settings.betaPricing as any | undefined;
       const tier1Cap = Number(bp?.tier1Cap ?? 10);
-      const tier2Cap = Number(bp?.tier2Cap ?? 10);
-      const totalCap = tier1Cap + tier2Cap;
+      const tier2Cap = 0;
+      const totalCap = tier1Cap;
 
       // Count active beta members by the durable isBetaMember flag (not stage)
       const [{ activeBetaCount }] = await db
@@ -17106,7 +17106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
 
       const tier1Filled = Math.min(activeBetaCount, tier1Cap);
-      const tier2Filled = Math.max(0, Math.min(activeBetaCount - tier1Cap, tier2Cap));
+      const tier2Filled = 0;
 
       res.json({
         open: activeBetaCount < totalCap,
@@ -17116,7 +17116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tier1Remaining: Math.max(0, tier1Cap - tier1Filled),
         tier2Filled,
         tier2Cap,
-        tier2Remaining: Math.max(0, tier2Cap - tier2Filled),
+        tier2Remaining: 0,
         totalCap,
         totalRemaining: Math.max(0, totalCap - activeBetaCount),
       });
@@ -17134,9 +17134,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const basePrice = Number(bp?.basePrice ?? 199);
       const tier1DiscountPct = Number(bp?.tier1DiscountPct ?? bp?.discountPct ?? 50);
       const tier1Cap = Number(bp?.tier1Cap ?? 10);
-      const tier2DiscountPct = Number(bp?.tier2DiscountPct ?? 25);
-      const tier2Cap = Number(bp?.tier2Cap ?? 10);
-      const totalCap = tier1Cap + tier2Cap;
+      const tier2DiscountPct = 0;
+      const tier2Cap = 0;
+      const totalCap = tier1Cap;
 
       const [{ welcomeCount }] = await db
         .select({ welcomeCount: count() })
@@ -17144,13 +17144,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(onboardingProspects.stage, "welcome"));
 
       const inTier1 = welcomeCount < tier1Cap;
-      const inTier2 = !inTier1 && welcomeCount < totalCap;
       const isBetaOpen = welcomeCount < totalCap;
-      const currentDiscountPct = inTier1 ? tier1DiscountPct : inTier2 ? tier2DiscountPct : 0;
+      const currentDiscountPct = inTier1 ? tier1DiscountPct : 0;
       const effectivePrice = isBetaOpen
         ? Math.round(basePrice * (1 - currentDiscountPct / 100) * 100) / 100
         : basePrice;
-      const currentTier = inTier1 ? 1 : inTier2 ? 2 : null;
+      const currentTier = inTier1 ? 1 : null;
 
       res.json({
         basePrice,
@@ -17166,9 +17165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         effectivePrice,
         currency: "USD",
         label: inTier1
-          ? `$${effectivePrice.toFixed(2)}/mo (${tier1DiscountPct}% off — Founding Member)`
-          : inTier2
-          ? `$${effectivePrice.toFixed(2)}/mo (${tier2DiscountPct}% off — Founding Member)`
+          ? `$${effectivePrice.toFixed(2)}/mo (${tier1DiscountPct}% off — Founding Member, locked for life)`
           : `$${basePrice.toFixed(2)}/mo`,
       });
     } catch (error) {
@@ -18906,19 +18903,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settings = await storage.getPlatformSettings();
       const bp = settings.betaPricing as any | undefined;
       const tier1DiscountPct = Number(bp?.tier1DiscountPct ?? bp?.discountPct ?? 50);
-      const tier2DiscountPct = Number(bp?.tier2DiscountPct ?? 25);
       const tier1Cap = Number(bp?.tier1Cap ?? 10);
-      const tier2Cap = Number(bp?.tier2Cap ?? 10);
-      const totalCap = tier1Cap + tier2Cap;
+      const totalCap = tier1Cap;
 
       if (activeBetaCount >= totalCap) {
         return res.status(409).json({
-          message: `Beta program is full (${totalCap} slots). Remove an existing beta member to free a slot.`,
+          message: `Founding Member program is full (${totalCap} slots). Remove an existing Founding Member to free a slot.`,
         });
       }
 
       const cohortNumber = activeBetaCount + 1;
-      const computedDiscountPct = cohortNumber <= tier1Cap ? tier1DiscountPct : tier2DiscountPct;
+      const computedDiscountPct = tier1DiscountPct;
 
       // Determine portfolio tier from estimatedHomes
       const homes = (existing as any).estimatedHomes ?? 0;
@@ -19319,14 +19314,12 @@ contact@hubifyhomes.com`;
       const settings = await storage.getPlatformSettings();
       const bp = settings.betaPricing as any | undefined;
       const tier1DiscountPct = Number(bp?.tier1DiscountPct ?? bp?.discountPct ?? 50);
-      const tier2DiscountPct = Number(bp?.tier2DiscountPct ?? 25);
       const tier1Cap = Number(bp?.tier1Cap ?? 10);
-      const tier2Cap = Number(bp?.tier2Cap ?? 10);
-      const totalCap = tier1Cap + tier2Cap;
+      const totalCap = tier1Cap;
 
       const slotsRemaining = totalCap - activeBetaCount;
       const cohortNumber = activeBetaCount + 1;
-      const discountPct = cohortNumber <= tier1Cap ? tier1DiscountPct : tier2DiscountPct;
+      const discountPct = tier1DiscountPct;
 
       const homes = (existing as any).estimatedHomes ?? 0;
       let portfolioTier: string;
