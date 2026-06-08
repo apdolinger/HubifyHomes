@@ -360,15 +360,23 @@ export default function TeamMessages() {
       element: "[data-tour='messages-list']",
       popover: {
         title: "Message Thread",
-        description: "All messages appear here, newest at the bottom. Hover over any message to react, reply, or edit it.",
+        description: "All messages appear here, newest at the bottom. Hover over any message to react with an emoji, edit it, or delete it.",
         side: "top",
+      },
+    },
+    {
+      element: "[data-testid='button-back-to-dashboard']",
+      popover: {
+        title: "Back to Dashboard",
+        description: "Use this link to return to the main dashboard from any message view.",
+        side: "bottom",
       },
     },
     {
       element: "[data-tour='messages-compose']",
       popover: {
-        title: "Compose a Message",
-        description: "Type your message here. Use @Name to mention a teammate. Enable email notification to ping them by email too.",
+        title: "Send a Message",
+        description: "Type your message here and hit Enter to send. Check \"Email team members\" to also deliver it as an email notification to everyone.",
         side: "top",
       },
     },

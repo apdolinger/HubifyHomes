@@ -444,11 +444,27 @@ export default function CalendarPage() {
       },
     },
     {
+      element: "[data-testid='button-calendar-settings']",
+      popover: {
+        title: "View Settings",
+        description: "Switch between Month, Week, and Day views — set your default view and first day of week from here.",
+        side: "bottom",
+      },
+    },
+    {
       element: "[data-tour='calendar-sidebar']",
       popover: {
         title: "My Calendars",
         description: "Toggle individual calendars on and off to focus on what matters. Add a new calendar with the + button.",
         side: "right",
+      },
+    },
+    {
+      element: "[data-tour='calendar-view']",
+      popover: {
+        title: "Events Grid",
+        description: "Events appear here as colored blocks. Click any event to view or edit details. Drag to reschedule. Striped events indicate a scheduling conflict.",
+        side: "left",
       },
     },
     {
@@ -582,7 +598,7 @@ export default function CalendarPage() {
         </Card>
 
         {/* Main calendar view */}
-        <Card className="col-span-9 p-4">
+        <Card className="col-span-9 p-4" data-tour="calendar-view">
           <FullCalendar
             ref={calendarRef}
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, rrulePlugin]}

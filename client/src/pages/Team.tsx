@@ -528,10 +528,19 @@ export default function Team() {
       },
     },
     {
+      element: "[data-tour='team-members']",
+      popover: {
+        title: "Member List",
+        description: "Every staff member with their role badge, contact info, and current status. Click a row to manage their assignments and permissions.",
+        side: "top",
+        align: "start",
+      },
+    },
+    {
       element: "[data-testid='invite-team-member-btn']",
       popover: {
         title: "Invite a Member",
-        description: "Add a new staff member by email — choose their role and they'll receive an invitation.",
+        description: "Add a new staff member by email — choose their role (Admin, Supervisor, or Staff) and they'll receive an invitation link.",
         side: "left",
       },
     },
@@ -952,7 +961,7 @@ export default function Team() {
       </Card>
 
       {/* Team Members Table */}
-      <Card>
+      <Card data-tour="team-members">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Team Members</CardTitle>

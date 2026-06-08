@@ -2354,7 +2354,39 @@ export default function Admin() {
       element: "[data-tour='admin-tabs']",
       popover: {
         title: "Admin Sections",
-        description: "Switch between sections: Overview, Forms, Billing, Email Templates, Task Templates, Roles, and more.",
+        description: "Each tab opens a different configuration area. Browse through them to set up your organization.",
+        side: "bottom",
+      },
+    },
+    {
+      element: "[data-tour='admin-forms-tab']",
+      popover: {
+        title: "Forms",
+        description: "Build and manage custom intake forms — attach them to properties or send them to clients for signatures and data collection.",
+        side: "bottom",
+      },
+    },
+    {
+      element: "[data-tour='admin-billing-tab']",
+      popover: {
+        title: "Billing",
+        description: "Set default rates, configure invoice settings, and manage your Stripe payment connection for collecting client payments.",
+        side: "bottom",
+      },
+    },
+    {
+      element: "[data-tour='admin-templates-tab']",
+      popover: {
+        title: "Email Templates",
+        description: "Create reusable email templates for invoices, reminders, and client communications. Use dynamic fields to personalize automatically.",
+        side: "bottom",
+      },
+    },
+    {
+      element: "[data-tour='admin-roles-tab']",
+      popover: {
+        title: "Roles",
+        description: "Define custom team roles and control what each role can see and do across the platform.",
         side: "bottom",
       },
     },
@@ -2394,7 +2426,7 @@ export default function Admin() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6" data-tour="admin-tabs">
         <TabsList className="grid w-full grid-cols-10 h-auto">
-          <TabsTrigger value="forms" className="flex flex-col items-center gap-1 py-2 px-1 text-xs">
+          <TabsTrigger value="forms" className="flex flex-col items-center gap-1 py-2 px-1 text-xs" data-tour="admin-forms-tab">
             <FileText className="w-3.5 h-3.5" />
             Forms
           </TabsTrigger>
@@ -2402,7 +2434,7 @@ export default function Admin() {
             <Database className="w-3.5 h-3.5" />
             Data
           </TabsTrigger>
-          <TabsTrigger value="billing" className="flex flex-col items-center gap-1 py-2 px-1 text-xs">
+          <TabsTrigger value="billing" className="flex flex-col items-center gap-1 py-2 px-1 text-xs" data-tour="admin-billing-tab">
             <DollarSign className="w-3.5 h-3.5" />
             Billing
           </TabsTrigger>
@@ -2410,7 +2442,7 @@ export default function Admin() {
             <Building className="w-3.5 h-3.5" />
             Community
           </TabsTrigger>
-          <TabsTrigger value="templates" className="flex flex-col items-center gap-1 py-2 px-1 text-xs">
+          <TabsTrigger value="templates" className="flex flex-col items-center gap-1 py-2 px-1 text-xs" data-tour="admin-templates-tab">
             <Mail className="w-3.5 h-3.5" />
             Templates
           </TabsTrigger>
@@ -2418,7 +2450,7 @@ export default function Admin() {
             <Sliders className="w-3.5 h-3.5" />
             Customize
           </TabsTrigger>
-          <TabsTrigger value="roles" className="flex flex-col items-center gap-1 py-2 px-1 text-xs">
+          <TabsTrigger value="roles" className="flex flex-col items-center gap-1 py-2 px-1 text-xs" data-tour="admin-roles-tab">
             <Users className="w-3.5 h-3.5" />
             Roles
           </TabsTrigger>

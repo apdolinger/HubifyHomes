@@ -1117,6 +1117,15 @@ export default function Properties() {
       },
     },
     {
+      element: "[data-tour='properties-list']",
+      popover: {
+        title: "Property List",
+        description: "All your properties appear here. Click any row to open the property detail page — tasks, contacts, access codes, and more.",
+        side: "top",
+        align: "start",
+      },
+    },
+    {
       element: "[data-tour='properties-add-btn']",
       popover: {
         title: "Add a Property",
@@ -1514,7 +1523,7 @@ export default function Properties() {
         </div>
         
         {/* Search and Filter Bar */}
-        <div className="flex flex-col sm:flex-row gap-4 items-center" data-tour="properties-search">
+        <div className="flex flex-col sm:flex-row gap-4 items-center mb-6" data-tour="properties-search">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
             <Input
@@ -1639,7 +1648,7 @@ export default function Properties() {
       )}
 
       {/* Properties Table */}
-      <Card>
+      <Card data-tour="properties-list">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <div className="flex-1">
             <div className="flex items-center justify-between">

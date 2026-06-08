@@ -527,8 +527,16 @@ export default function Tasks() {
     {
       element: "[data-tour='tasks-filters']",
       popover: {
-        title: "Filters & Search",
-        description: "Search by title, property, or person. Filter by status, priority, category, and assignee to zero in on what matters.",
+        title: "Search & Filters",
+        description: "Search by title, property, or person. Narrow down results using the filter dropdowns to the right.",
+        side: "bottom",
+      },
+    },
+    {
+      element: "[data-tour='tasks-status-filter']",
+      popover: {
+        title: "Status Filter",
+        description: "Filter tasks by their current status — Pending, In Progress, Completed, Overdue, or Cancelled.",
         side: "bottom",
       },
     },
@@ -538,6 +546,15 @@ export default function Tasks() {
         title: "Archived Tasks",
         description: "Toggle this on to see completed or archived tasks alongside active ones.",
         side: "bottom",
+      },
+    },
+    {
+      element: "[data-tour='tasks-table']",
+      popover: {
+        title: "Task List",
+        description: "Your tasks appear here — sortable by column. Click any row to open the full task details and history.",
+        side: "top",
+        align: "start",
       },
     },
     {
@@ -597,7 +614,7 @@ export default function Tasks() {
             </div>
             
             {/* Status Filter */}
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={setStatusFilter} data-tour="tasks-status-filter">
               <SelectTrigger>
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
@@ -698,7 +715,7 @@ export default function Tasks() {
       </Card>
 
       {/* Tasks Table */}
-      <Card>
+      <Card data-tour="tasks-table">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Tasks List</CardTitle>
           <Button

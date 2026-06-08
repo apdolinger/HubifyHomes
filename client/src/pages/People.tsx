@@ -760,10 +760,18 @@ export default function People() {
       },
     },
     {
+      element: "[data-tour='people-search']",
+      popover: {
+        title: "Search Contacts",
+        description: "Search by name, email, or phone number to quickly find any contact in your directory.",
+        side: "bottom",
+      },
+    },
+    {
       element: "[data-tour='people-tabs']",
       popover: {
-        title: "Contact Type Tabs",
-        description: "Switch between Owners, Tenants, Vendors, Household Members, and Emergency Contacts.",
+        title: "Filter by Type",
+        description: "Narrow down the list to Owners, Tenants, Vendors, Clients, or Emergency Contacts using this dropdown.",
         side: "bottom",
       },
     },
@@ -926,7 +934,7 @@ export default function People() {
       <Card className="mb-6">
         <CardContent className="p-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <div className="relative flex-1">
+            <div className="relative flex-1" data-tour="people-search">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
               <Input
                 placeholder="Search clients by name, email, or type..."
