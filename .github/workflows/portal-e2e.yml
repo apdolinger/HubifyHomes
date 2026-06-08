@@ -25,7 +25,12 @@ jobs:
       REPL_ID: ci-portal-e2e
       REPLIT_DOMAINS: localhost:5000
       ISSUER_URL: https://replit.com/oidc
-      NODE_ENV: development
+      # Use production mode so the server skips createViteServer() entirely.
+      # In development mode, server.listen() is not called until after
+      # createViteServer() resolves, which can take 60-120 s on a cold CI
+      # runner (no Vite cache) and has a process.exit(1) on any Vite error.
+      # Production mode calls server.listen() in seconds with no Vite involved.
+      NODE_ENV: production
       BASE_URL: http://localhost:5000
       PORTAL_EMAIL: client@beta.hubify.test
       PORTAL_PASSWORD: HubifyBeta!2025
@@ -59,24 +64,41 @@ jobs:
       - name: Push database schema
         run: npx drizzle-kit push --force
 
-      - name: Start dev server
-        run: |
-          npm run dev > /tmp/dev-server.log 2>&1 &
-          echo $! > /tmp/dev-server.pid
-          echo "started dev server, pid=$(cat /tmp/dev-server.pid)"
+      # Build the frontend + bundle the server. Required for NODE_ENV=production
+      # (serveStatic() throws if dist/public is missing).
+      - name: Build app
+        run: npm run build
 
-      - name: Wait for dev server on :5000
+      - name: Start server
         run: |
-          for i in {1..60}; do
-            if curl -fsS -o /dev/null -X OPTIONS \
-                 "http://localhost:5000/api/portal/login" 2>/dev/null; then
-              echo "dev server is up"
+          npm run start > /tmp/server.log 2>&1 &
+          echo $! > /tmp/server.pid
+          echo "started server, pid=$(cat /tmp/server.pid)"
+
+      - name: Wait for server on :5000
+        run: |
+          # Tail the log in the background so any crash is visible immediately,
+          # not only after the full 60 s wait exhausts.
+          tail -f /tmp/server.log &
+          TAIL_PID=$!
+
+          for i in {1..30}; do
+            # GET /api/tenant is a public endpoint that always returns 200 JSON.
+            # Avoids the previous OPTIONS /api/portal/login which returned 404
+            # (POST-only route) causing curl -f to fail even when the server
+            # was fully up.
+            if curl -fsS -o /dev/null "http://localhost:5000/api/tenant" 2>/dev/null; then
+              echo "server is up (attempt $i)"
+              kill "$TAIL_PID" 2>/dev/null || true
               exit 0
             fi
             sleep 2
           done
-          echo "::error::dev server did not come up within 120s"
-          tail -n 200 /tmp/dev-server.log || true
+
+          kill "$TAIL_PID" 2>/dev/null || true
+          echo "::error::server did not come up within 60s"
+          echo "===== /tmp/server.log (full) ====="
+          cat /tmp/server.log || true
           exit 1
 
       # Seed once up front so each e2e can run with SKIP_SEED=1 and we don't
@@ -85,7 +107,7 @@ jobs:
         run: npx tsx scripts/seed-beta-org.ts
 
       # Discover and run every tests/portal-*.e2e.ts file against the same
-      # already-running dev server. Any single failure fails the whole job.
+      # already-running server. Any single failure fails the whole job.
       - name: Run all portal e2e tests
         env:
           SKIP_SEED: '1'
@@ -114,15 +136,15 @@ jobs:
             exit 1
           fi
 
-      - name: Dump dev server logs on failure
+      - name: Dump server logs on failure
         if: failure()
         run: |
-          echo "===== /tmp/dev-server.log (tail) ====="
-          tail -n 500 /tmp/dev-server.log || true
+          echo "===== /tmp/server.log (tail) ====="
+          tail -n 500 /tmp/server.log || true
 
-      - name: Stop dev server
+      - name: Stop server
         if: always()
         run: |
-          if [ -f /tmp/dev-server.pid ]; then
-            kill "$(cat /tmp/dev-server.pid)" 2>/dev/null || true
+          if [ -f /tmp/server.pid ]; then
+            kill "$(cat /tmp/server.pid)" 2>/dev/null || true
           fi
