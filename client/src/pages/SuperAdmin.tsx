@@ -935,7 +935,7 @@ function ProspectCard({
           return (
             <div className="flex flex-wrap gap-1">
               <Badge className="bg-gray-100 text-gray-500 border border-gray-200 text-xs px-1.5 py-0.5 font-medium">
-                Beta Slot Freed
+                Founding Member Slot Freed
               </Badge>
               {tierLabel && (
                 <Badge className="bg-gray-50 text-gray-400 border border-gray-200 text-xs px-1.5 py-0.5 font-medium">
@@ -949,7 +949,7 @@ function ProspectCard({
         return (
           <div className="flex flex-wrap gap-1">
             <Badge className="bg-violet-100 text-violet-800 border border-violet-200 text-xs px-1.5 py-0.5 font-semibold">
-              Beta Applicant
+              Founding Member Applicant
             </Badge>
           </div>
         );
@@ -1269,11 +1269,11 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/submissions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
       setApproveDialogOpen(false);
-      toast({ title: "Beta application approved", description: "Approval email sent. Prospect moved to Agreement Pending." });
+      toast({ title: "Founding Member application approved", description: "Approval email sent. Prospect moved to Agreement Pending." });
       onClose();
     },
     onError: (err: any) => {
-      const msg = err?.message ?? "Failed to approve beta application";
+      const msg = err?.message ?? "Failed to approve Founding Member application";
       const isEmailFail = msg.toLowerCase().includes("email");
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/submissions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
@@ -2093,7 +2093,7 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
 
             {betaPricingPreview.data?.isFull && (
               <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-                ⚠ Beta program is full — no slots available. Remove an existing beta member before approving.
+                ⚠ Founding Member program is full — no slots available. Remove an existing Founding Member before approving.
               </div>
             )}
 
@@ -4098,9 +4098,9 @@ function BetaProgramTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/beta-members"] });
       queryClient.invalidateQueries({ queryKey: ["/api/public/beta-status"] });
       setRemoveTarget(null);
-      toast({ title: "Beta slot freed", description: "The member has been moved back to inquiry stage." });
+      toast({ title: "Founding Member slot freed", description: "The member has been moved back to inquiry stage." });
     },
-    onError: () => toast({ title: "Error", description: "Failed to free beta slot.", variant: "destructive" }),
+    onError: () => toast({ title: "Error", description: "Failed to free Founding Member slot.", variant: "destructive" }),
   });
 
   // Hard delete: permanently removes record
@@ -4110,12 +4110,12 @@ function BetaProgramTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/beta-members"] });
       queryClient.invalidateQueries({ queryKey: ["/api/public/beta-status"] });
       setDeleteTarget(null);
-      toast({ title: "Beta member permanently deleted" });
+      toast({ title: "Founding Member permanently deleted" });
     },
-    onError: () => toast({ title: "Error", description: "Failed to delete beta member.", variant: "destructive" }),
+    onError: () => toast({ title: "Error", description: "Failed to delete Founding Member.", variant: "destructive" }),
   });
 
-  // Manually add a beta member
+  // Manually add a Founding Member
   const addMutation = useMutation({
     mutationFn: (data: AddBetaMemberForm) => apiRequest("POST", "/api/super-admin/beta-members", data),
     onSuccess: () => {
@@ -4123,9 +4123,9 @@ function BetaProgramTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/public/beta-status"] });
       setAddDialogOpen(false);
       setAddForm({ name: "", email: "", company: "", betaDiscountTier: "" });
-      toast({ title: "Beta member added", description: "They have been manually granted a beta slot." });
+      toast({ title: "Founding Member added", description: "They have been manually granted a Founding Member slot." });
     },
-    onError: (err: any) => toast({ title: "Error", description: err?.message ?? "Failed to add beta member.", variant: "destructive" }),
+    onError: (err: any) => toast({ title: "Error", description: err?.message ?? "Failed to add Founding Member.", variant: "destructive" }),
   });
 
   const tierLabel = (tier: string | null) => {
@@ -4195,7 +4195,7 @@ function BetaProgramTab() {
           <div className="py-12 text-center text-muted-foreground text-sm">Loading…</div>
         ) : betaMembers.length === 0 ? (
           <div className="py-12 text-center text-muted-foreground text-sm">
-            No approved beta members yet. Approve a beta applicant in the Onboarding pipeline to assign a slot.
+            No approved Founding Members yet. Approve a Founding Member applicant in the Onboarding pipeline to assign a slot.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -4313,7 +4313,7 @@ function BetaProgramTab() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="add-tier">Beta Tier <span className="text-muted-foreground text-xs">(optional)</span></Label>
+              <Label htmlFor="add-tier">Discount Tier <span className="text-muted-foreground text-xs">(optional)</span></Label>
               <Select value={addForm.betaDiscountTier || "__none__"} onValueChange={(v) => setAddForm((f) => ({ ...f, betaDiscountTier: v === "__none__" ? "" : v }))}>
                 <SelectTrigger id="add-tier">
                   <SelectValue placeholder="Select a tier…" />
@@ -4348,7 +4348,7 @@ function BetaProgramTab() {
       <Dialog open={!!removeTarget} onOpenChange={() => setRemoveTarget(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Free Beta Slot</DialogTitle>
+            <DialogTitle>Free Founding Member Slot</DialogTitle>
             <DialogDescription>
               This will move <strong>{removeTarget?.name}</strong> back to inquiry stage and free their slot for a new applicant. Their record is preserved.
             </DialogDescription>
@@ -10174,7 +10174,7 @@ function FeatureFlagsTabContent() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="font-medium text-slate-900">{flag.displayName}</h4>
                       <code className="text-xs text-slate-500">{flag.key}</code>
-                      {flag.beta && <Badge variant="secondary" className="text-xs">Beta</Badge>}
+                      {flag.beta && <Badge variant="secondary" className="text-xs">Preview</Badge>}
                       {flag.category && <Badge variant="outline" className="text-xs">{flag.category}</Badge>}
                     </div>
                     {flag.description && <p className="text-sm text-slate-600 mt-1">{flag.description}</p>}
