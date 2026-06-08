@@ -216,7 +216,7 @@ function BetaAgreementContent({ company }: { company?: string }) {
           <li>Data durability</li>
           <li>Future feature availability</li>
         </ul>
-        <p className="mb-2">Participant understands that functionality may be modified, removed, delayed, or discontinued at any time during the Beta Period.</p>
+        <p className="mb-2">Participant understands that functionality may be modified, removed, delayed, or discontinued at any time during the Founding Member early-access period.</p>
         <p>Hubify will use commercially reasonable efforts to maintain service continuity and provide notice of planned maintenance when practical.</p>
       </div>
 
@@ -249,7 +249,7 @@ function BetaAgreementContent({ company }: { company?: string }) {
         <p className="mb-2">Participant retains ownership of all data submitted to the Platform. Participant grants Hubify a limited license to access, host, process, store, transmit, and display such data solely as necessary to provide, support, maintain, secure, improve, and operate the Platform.</p>
         <p className="mb-2">Hubify may use aggregated, anonymized, and de-identified information derived from Platform usage for analytics, benchmarking, service improvements, research, product development, and related business purposes, provided such information does not identify Participant, its customers, homeowners, vendors, or specific properties.</p>
         <p className="mb-2">Hubify will not sell Participant's identifiable data to third parties.</p>
-        <p>Participant acknowledges that Hubify does not guarantee against data loss, corruption, deletion, or unavailability during the Beta Period and remains solely responsible for maintaining independent backups of critical business information.</p>
+        <p>Participant acknowledges that Hubify does not guarantee against data loss, corruption, deletion, or unavailability during the Founding Member early-access period and remains solely responsible for maintaining independent backups of critical business information.</p>
       </div>
 
       <div>
@@ -413,7 +413,7 @@ function TermsContent() {
           <li>Failed, disputed, reversed, or chargeback payments may result in immediate suspension or termination</li>
           <li>You are responsible for all taxes associated with your use of the Service</li>
           <li>Pricing changes will be communicated at least thirty (30) days in advance</li>
-          <li>Beta pricing is governed separately by any applicable Beta Participation Agreement</li>
+          <li>Founding Member pricing is governed separately by any applicable Founding Member Agreement</li>
           <li>Subscription cancellations take effect at the conclusion of the current billing period and do not generate prorated refunds</li>
         </ul>
       </div>
@@ -520,7 +520,7 @@ function TermsContent() {
 
       <div>
         <p className="font-semibold text-slate-900 mb-1">17. General Provisions</p>
-        <p>These Terms, together with the Privacy Policy and any applicable Beta Participation Agreement, constitute the entire agreement between the parties. If any provision is determined unenforceable, the remaining provisions remain in full force and effect.</p>
+        <p>These Terms, together with the Privacy Policy and any applicable Founding Member Agreement, constitute the entire agreement between the parties. If any provision is determined unenforceable, the remaining provisions remain in full force and effect.</p>
       </div>
 
       <div>

@@ -18334,8 +18334,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             currency: "usd",
             unit_amount: discountedMonthlyPriceCents,
             product_data: {
-              name: `Hubify Homes Beta — ${p.portfolioTier ?? "Standard"} Plan`,
-              description: `Beta cohort #${p.betaCohortNumber ?? "?"} · ${p.discountPercentage ?? 0}% founding discount (locked for life)`,
+              name: `Hubify Homes — ${p.portfolioTier ?? "Standard"} Plan (Founding Member)`,
+              description: `Founding Member #${p.betaCohortNumber ?? "?"} · ${p.discountPercentage ?? 0}% discount, locked for life`,
             },
             recurring: { interval: "month" },
           },
