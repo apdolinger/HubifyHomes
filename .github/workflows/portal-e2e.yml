@@ -104,7 +104,7 @@ jobs:
       # Seed once up front so each e2e can run with SKIP_SEED=1 and we don't
       # pay for the (idempotent) seed script per test file.
       - name: Seed beta demo org
-        run: npx tsx scripts/seed-beta-org.ts
+        run: npx tsx scripts/seed-beta-org.ts --force
 
       # Discover and run every tests/portal-*.e2e.ts file against the same
       # already-running server. Any single failure fails the whole job.
