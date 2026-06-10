@@ -6760,6 +6760,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid supply ID" });
 
+      const userOrgId: string = (req as any).user?.claims?.orgId || (req as any).user?.orgId;
+
+      // Verify supply belongs to a property in the requester's org
+      const [supplyRow] = await db
+        .select({
+          id: roomSupplies.id,
+          replacementIntervalDays: roomSupplies.replacementIntervalDays,
+          propertyOrgId: properties.orgId,
+        })
+        .from(roomSupplies)
+        .leftJoin(rooms, eq(roomSupplies.roomId, rooms.id))
+        .leftJoin(properties, eq(rooms.propertyId, properties.id))
+        .where(eq(roomSupplies.id, id))
+        .limit(1);
+
+      if (!supplyRow) return res.status(404).json({ message: "Supply not found" });
+      if (supplyRow.propertyOrgId && supplyRow.propertyOrgId !== userOrgId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
       const { replacedDate, nextReplacementDate } = req.body as {
         replacedDate?: string;
         nextReplacementDate?: string;
@@ -6767,19 +6787,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const replaced = replacedDate || new Date().toISOString().split("T")[0];
 
-      // Fetch current supply to get interval if nextReplacementDate not provided
-      const [current] = await db
-        .select()
-        .from(roomSupplies)
-        .where(eq(roomSupplies.id, id))
-        .limit(1);
-
-      if (!current) return res.status(404).json({ message: "Supply not found" });
-
       let nextDate = nextReplacementDate ?? null;
-      if (!nextDate && (current as any).replacementIntervalDays) {
+      if (!nextDate && supplyRow.replacementIntervalDays) {
         const base = new Date(replaced);
-        base.setDate(base.getDate() + (current as any).replacementIntervalDays);
+        base.setDate(base.getDate() + supplyRow.replacementIntervalDays);
         nextDate = base.toISOString().split("T")[0];
       }
 
@@ -6795,35 +6806,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create a replacement task from a supply record
-  app.post("/api/room-supplies/:id/schedule-replacement", isAuthenticated, async (req, res) => {
+  // Create a replacement task from a supply — property-scoped for ownership verification
+  app.post("/api/properties/:propertyId/supplies/:supplyId/schedule-replacement", isAuthenticated, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ message: "Invalid supply ID" });
+      const propertyId = parseInt(req.params.propertyId);
+      const supplyId = parseInt(req.params.supplyId);
+      if (isNaN(propertyId) || isNaN(supplyId)) {
+        return res.status(400).json({ message: "Invalid property or supply ID" });
+      }
 
       const user = (req as any).user;
-      const orgId: string = user?.claims?.orgId || user?.orgId;
+      const userOrgId: string = user?.claims?.orgId || user?.orgId;
       const userId: string = user?.claims?.sub || user?.id;
 
-      // Fetch the supply with room and property info
+      // Verify property belongs to the requester's org
+      const property = await storage.getProperty(propertyId);
+      if (!property || property.orgId !== userOrgId) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+
+      // Fetch supply — verify it belongs to a room in this property
       const rows = await db
         .select({
           supplyId: roomSupplies.id,
           supplyName: roomSupplies.name,
           nextReplacement: roomSupplies.nextReplacement,
-          roomId: roomSupplies.roomId,
           roomName: rooms.name,
-          propertyId: rooms.propertyId,
+          roomPropertyId: rooms.propertyId,
         })
         .from(roomSupplies)
         .leftJoin(rooms, eq(roomSupplies.roomId, rooms.id))
-        .where(eq(roomSupplies.id, id))
+        .where(eq(roomSupplies.id, supplyId))
         .limit(1);
 
-      if (!rows.length) return res.status(404).json({ message: "Supply not found" });
+      if (!rows.length || rows[0].roomPropertyId !== propertyId) {
+        return res.status(404).json({ message: "Supply not found for this property" });
+      }
 
       const supply = rows[0];
-
       const title = `Replace ${supply.supplyName}${supply.roomName ? ` — ${supply.roomName}` : ""}`;
       const dueDate = supply.nextReplacement
         ? new Date(supply.nextReplacement + "T12:00:00")
@@ -6834,7 +6854,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         category: "maintenance",
         priority: "normal",
         status: "pending",
-        propertyId: supply.propertyId ?? undefined,
+        propertyId,
         dueDate: dueDate ?? null,
         description: req.body?.description ?? null,
         assignedToId: req.body?.assignedToId ?? null,

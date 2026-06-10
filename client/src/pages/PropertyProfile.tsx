@@ -296,7 +296,7 @@ function PropertySuppliesTab({ propertyId }: { propertyId: string }) {
 
   const scheduleReplacementMutation = useMutation({
     mutationFn: async (supplyId: number) => {
-      const res = await apiRequest("POST", `/api/room-supplies/${supplyId}/schedule-replacement`, {});
+      const res = await apiRequest("POST", `/api/properties/${propertyId}/supplies/${supplyId}/schedule-replacement`, {});
       return res.json();
     },
     onSuccess: () => {
