@@ -1001,6 +1001,7 @@ export const roomSupplies = pgTable("room_supplies", {
   purchaseUrl: varchar("purchase_url"), // hyperlink for future purchases
   lastChanged: date("last_changed"),
   nextReplacement: date("next_replacement"),
+  replacementIntervalDays: integer("replacement_interval_days"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

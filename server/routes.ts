@@ -6754,6 +6754,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Mark a supply as replaced — updates lastChanged and nextReplacement
+  app.patch("/api/room-supplies/:id/mark-replaced", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid supply ID" });
+
+      const { replacedDate, nextReplacementDate } = req.body as {
+        replacedDate?: string;
+        nextReplacementDate?: string;
+      };
+
+      const replaced = replacedDate || new Date().toISOString().split("T")[0];
+
+      // Fetch current supply to get interval if nextReplacementDate not provided
+      const [current] = await db
+        .select()
+        .from(roomSupplies)
+        .where(eq(roomSupplies.id, id))
+        .limit(1);
+
+      if (!current) return res.status(404).json({ message: "Supply not found" });
+
+      let nextDate = nextReplacementDate ?? null;
+      if (!nextDate && (current as any).replacementIntervalDays) {
+        const base = new Date(replaced);
+        base.setDate(base.getDate() + (current as any).replacementIntervalDays);
+        nextDate = base.toISOString().split("T")[0];
+      }
+
+      const updated = await storage.updateRoomSupply(id, {
+        lastChanged: replaced,
+        ...(nextDate ? { nextReplacement: nextDate } : {}),
+      } as any);
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error marking supply replaced:", error);
+      res.status(500).json({ message: "Failed to mark supply as replaced" });
+    }
+  });
+
+  // Create a replacement task from a supply record
+  app.post("/api/room-supplies/:id/schedule-replacement", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid supply ID" });
+
+      const user = (req as any).user;
+      const orgId: string = user?.claims?.orgId || user?.orgId;
+      const userId: string = user?.claims?.sub || user?.id;
+
+      // Fetch the supply with room and property info
+      const rows = await db
+        .select({
+          supplyId: roomSupplies.id,
+          supplyName: roomSupplies.name,
+          nextReplacement: roomSupplies.nextReplacement,
+          roomId: roomSupplies.roomId,
+          roomName: rooms.name,
+          propertyId: rooms.propertyId,
+        })
+        .from(roomSupplies)
+        .leftJoin(rooms, eq(roomSupplies.roomId, rooms.id))
+        .where(eq(roomSupplies.id, id))
+        .limit(1);
+
+      if (!rows.length) return res.status(404).json({ message: "Supply not found" });
+
+      const supply = rows[0];
+
+      const title = `Replace ${supply.supplyName}${supply.roomName ? ` — ${supply.roomName}` : ""}`;
+      const dueDate = supply.nextReplacement
+        ? new Date(supply.nextReplacement + "T12:00:00")
+        : undefined;
+
+      const task = await storage.createTask({
+        title,
+        category: "maintenance",
+        priority: "normal",
+        status: "pending",
+        propertyId: supply.propertyId ?? undefined,
+        dueDate: dueDate ?? null,
+        description: req.body?.description ?? null,
+        assignedToId: req.body?.assignedToId ?? null,
+        assignedById: userId ?? null,
+      } as any, userId);
+
+      res.status(201).json({ taskId: task.id, task });
+    } catch (error) {
+      console.error("Error scheduling supply replacement:", error);
+      res.status(500).json({ message: "Failed to schedule replacement task" });
+    }
+  });
+
   // Room note routes
   app.get("/api/rooms/:roomId/notes", isAuthenticated, async (req, res) => {
     try {

@@ -1321,3 +1321,18 @@ export async function ensurePaymentReceiptEmailColumn(): Promise<void> {
     client.release();
   }
 }
+
+export async function ensureRoomSupplyIntervalColumn(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE room_supplies
+        ADD COLUMN IF NOT EXISTS replacement_interval_days INTEGER;
+    `);
+    log("[MIGRATE] room_supplies.replacement_interval_days column verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to ensure replacement_interval_days column: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}

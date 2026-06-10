@@ -2656,6 +2656,7 @@ export class DatabaseStorage implements IStorage {
         purchaseUrl: roomSupplies.purchaseUrl,
         lastChanged: roomSupplies.lastChanged,
         nextReplacement: roomSupplies.nextReplacement,
+        replacementIntervalDays: roomSupplies.replacementIntervalDays,
         notes: roomSupplies.notes,
         createdAt: roomSupplies.createdAt,
       })

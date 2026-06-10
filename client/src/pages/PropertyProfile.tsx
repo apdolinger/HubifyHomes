@@ -253,6 +253,314 @@ function VisitReportHistory({ propertyId }: { propertyId: string }) {
   );
 }
 
+function PropertySuppliesTab({ propertyId }: { propertyId: string }) {
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [scheduleDialog, setScheduleDialog] = useState<{ open: boolean; supply: any | null }>({ open: false, supply: null });
+  const [markDialog, setMarkDialog] = useState<{ open: boolean; supply: any | null; replacedDate: string; nextDate: string }>({
+    open: false, supply: null, replacedDate: new Date().toISOString().split("T")[0], nextDate: "",
+  });
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: allSupplies = [], isLoading } = useQuery<any[]>({
+    queryKey: [`/api/properties/${propertyId}/supplies-report`],
+    enabled: !!propertyId,
+  });
+
+  const types: string[] = [...new Set((allSupplies as any[]).map((s: any) => s.type as string))].filter(Boolean);
+
+  const filtered = typeFilter === "all"
+    ? allSupplies as any[]
+    : (allSupplies as any[]).filter((s: any) => s.type === typeFilter);
+
+  const grouped: Record<string, any[]> = (filtered as any[]).reduce((acc: Record<string, any[]>, s: any) => {
+    const key = s.roomName || "No Room";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(s);
+    return acc;
+  }, {});
+
+  function getDueStatus(next: string | null): { label: string; cls: string } | null {
+    if (!next) return null;
+    const days = differenceInDays(new Date(next + "T12:00:00"), new Date());
+    if (days < 0) return { label: "Overdue", cls: "bg-red-100 text-red-700" };
+    if (days <= 30) return { label: "Due Soon", cls: "bg-amber-100 text-amber-700" };
+    return { label: "OK", cls: "bg-green-100 text-green-700" };
+  }
+
+  const TYPE_LABELS: Record<string, string> = {
+    filter: "Filter", hvac: "HVAC", lightbulb: "Lightbulb", paint: "Paint",
+    battery: "Battery", cleaning: "Cleaning", hardware: "Hardware",
+    electrical: "Electrical", plumbing: "Plumbing", other: "Other",
+  };
+
+  const scheduleReplacementMutation = useMutation({
+    mutationFn: async (supplyId: number) => {
+      const res = await apiRequest("POST", `/api/room-supplies/${supplyId}/schedule-replacement`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Replacement task created", description: "A maintenance task has been added to this property." });
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/tasks`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/tasks`] });
+      setScheduleDialog({ open: false, supply: null });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to create replacement task.", variant: "destructive" }),
+  });
+
+  const markReplacedMutation = useMutation({
+    mutationFn: async ({ supplyId, replacedDate, nextDate }: { supplyId: number; replacedDate: string; nextDate?: string }) => {
+      const res = await apiRequest("PATCH", `/api/room-supplies/${supplyId}/mark-replaced`, {
+        replacedDate,
+        nextReplacementDate: nextDate || undefined,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Supply updated", description: "Replacement date recorded." });
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/supplies-report`] });
+      setMarkDialog({ open: false, supply: null, replacedDate: new Date().toISOString().split("T")[0], nextDate: "" });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to update supply.", variant: "destructive" }),
+  });
+
+  const overdueCount = (allSupplies as any[]).filter((s: any) => {
+    if (!s.nextReplacement) return false;
+    return differenceInDays(new Date(s.nextReplacement + "T12:00:00"), new Date()) < 0;
+  }).length;
+  const dueSoonCount = (allSupplies as any[]).filter((s: any) => {
+    if (!s.nextReplacement) return false;
+    const d = differenceInDays(new Date(s.nextReplacement + "T12:00:00"), new Date());
+    return d >= 0 && d <= 30;
+  }).length;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900">Property Supplies</h3>
+          <p className="text-sm text-slate-500">All consumables tracked across every room — add supplies from the Rooms tab.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {overdueCount > 0 && <Badge className="bg-red-100 text-red-700 border-red-200">{overdueCount} overdue</Badge>}
+          {dueSoonCount > 0 && <Badge className="bg-amber-100 text-amber-700 border-amber-200">{dueSoonCount} due soon</Badge>}
+          <Badge variant="secondary">{(allSupplies as any[]).length} total</Badge>
+        </div>
+      </div>
+
+      {types.length > 1 && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setTypeFilter("all")}
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${typeFilter === "all" ? "bg-teal-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+          >
+            All
+          </button>
+          {types.map((t) => (
+            <button
+              key={t}
+              onClick={() => setTypeFilter(t)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${typeFilter === t ? "bg-teal-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+            >
+              {TYPE_LABELS[t] || t}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((n) => <div key={n} className="h-24 bg-slate-100 rounded-lg animate-pulse" />)}
+        </div>
+      ) : (filtered as any[]).length === 0 ? (
+        <div className="text-center py-16 border-2 border-dashed border-slate-200 rounded-xl">
+          <Package className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+          <p className="font-medium text-slate-500">No supplies tracked yet</p>
+          <p className="text-sm text-slate-400 mt-1">Go to the Rooms tab to add supplies to individual rooms.</p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {Object.entries(grouped).map(([roomName, supplies]) => (
+            <div key={roomName}>
+              <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <Home className="w-3.5 h-3.5" /> {roomName}
+                <span className="font-normal text-slate-400">({(supplies as any[]).length})</span>
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {(supplies as any[]).map((supply: any) => {
+                  const due = getDueStatus(supply.nextReplacement);
+                  return (
+                    <div key={supply.id} className="border rounded-lg p-4 bg-white hover:shadow-sm transition-shadow">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm text-slate-900 truncate">{supply.name}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                              {TYPE_LABELS[supply.type] || supply.type}
+                            </span>
+                            {supply.brand && (
+                              <span className="text-xs text-slate-400">
+                                {supply.brand}{supply.model ? ` · ${supply.model}` : ""}
+                              </span>
+                            )}
+                            {supply.quantity > 1 && (
+                              <span className="text-xs text-slate-400">×{supply.quantity}</span>
+                            )}
+                          </div>
+                        </div>
+                        {due && (
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${due.cls}`}>
+                            {due.label}
+                          </span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-4 text-xs text-slate-500 mb-3 gap-y-0.5">
+                        {supply.lastChanged && (
+                          <span>Last: {format(new Date(supply.lastChanged + "T12:00:00"), "MMM d, yyyy")}</span>
+                        )}
+                        {supply.nextReplacement && (
+                          <span>Next: {format(new Date(supply.nextReplacement + "T12:00:00"), "MMM d, yyyy")}</span>
+                        )}
+                        {supply.replacementIntervalDays && (
+                          <span>Every {supply.replacementIntervalDays}d</span>
+                        )}
+                        {supply.location && <span>📍 {supply.location}</span>}
+                      </div>
+                      <div className="flex gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs h-7 flex-1"
+                          onClick={() => setScheduleDialog({ open: true, supply })}
+                        >
+                          <Calendar className="w-3 h-3 mr-1" /> Schedule
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-xs h-7 flex-1 text-teal-700 hover:bg-teal-50"
+                          onClick={() => setMarkDialog({
+                            open: true,
+                            supply,
+                            replacedDate: new Date().toISOString().split("T")[0],
+                            nextDate: "",
+                          })}
+                        >
+                          <CheckSquare className="w-3 h-3 mr-1" /> Mark Replaced
+                        </Button>
+                        {supply.purchaseUrl && (
+                          <a href={supply.purchaseUrl} target="_blank" rel="noopener noreferrer">
+                            <Button size="sm" variant="ghost" className="text-xs h-7 px-2">
+                              <ExternalLink className="w-3 h-3" />
+                            </Button>
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Schedule Replacement Dialog */}
+      <Dialog
+        open={scheduleDialog.open}
+        onOpenChange={(v) => !v && setScheduleDialog({ open: false, supply: null })}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Schedule Replacement Task</DialogTitle>
+            <DialogDescription>
+              Create a maintenance task to replace{" "}
+              <span className="font-medium">{scheduleDialog.supply?.name}</span>
+              {scheduleDialog.supply?.roomName ? ` in ${scheduleDialog.supply.roomName}` : ""}
+              {scheduleDialog.supply?.nextReplacement
+                ? `. Due date: ${format(new Date(scheduleDialog.supply.nextReplacement + "T12:00:00"), "MMM d, yyyy")}.`
+                : "."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setScheduleDialog({ open: false, supply: null })}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => scheduleDialog.supply && scheduleReplacementMutation.mutate(scheduleDialog.supply.id)}
+              disabled={scheduleReplacementMutation.isPending}
+            >
+              {scheduleReplacementMutation.isPending ? "Creating…" : "Create Task"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mark Replaced Dialog */}
+      <Dialog
+        open={markDialog.open}
+        onOpenChange={(v) => !v && setMarkDialog({ open: false, supply: null, replacedDate: new Date().toISOString().split("T")[0], nextDate: "" })}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Mark as Replaced</DialogTitle>
+            <DialogDescription>
+              Record when <span className="font-medium">{markDialog.supply?.name}</span> was replaced.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label>Date Replaced</Label>
+              <Input
+                type="date"
+                value={markDialog.replacedDate}
+                onChange={(e) => setMarkDialog((d) => ({ ...d, replacedDate: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>
+                Next Replacement Date{" "}
+                <span className="text-slate-400 text-xs font-normal">(optional)</span>
+              </Label>
+              <Input
+                type="date"
+                value={markDialog.nextDate}
+                onChange={(e) => setMarkDialog((d) => ({ ...d, nextDate: e.target.value }))}
+              />
+              {markDialog.supply?.replacementIntervalDays && !markDialog.nextDate && (
+                <p className="text-xs text-slate-400">
+                  Leave blank to auto-calculate using the {markDialog.supply.replacementIntervalDays}-day interval.
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setMarkDialog({ open: false, supply: null, replacedDate: new Date().toISOString().split("T")[0], nextDate: "" })}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                markDialog.supply &&
+                markReplacedMutation.mutate({
+                  supplyId: markDialog.supply.id,
+                  replacedDate: markDialog.replacedDate,
+                  nextDate: markDialog.nextDate || undefined,
+                })
+              }
+              disabled={markReplacedMutation.isPending}
+            >
+              {markReplacedMutation.isPending ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 function InspectionScheduleSection({ propertyId }: { propertyId: string }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -4219,10 +4527,11 @@ export default function PropertyProfile() {
 
         {/* Tabs for detailed information */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-11">
+          <TabsList className="grid w-full grid-cols-12">
             <TabsTrigger value="tasks">Tasks</TabsTrigger>
             <TabsTrigger value="contacts">Residents</TabsTrigger>
             <TabsTrigger value="rooms">Rooms</TabsTrigger>
+            <TabsTrigger value="supplies">Supplies</TabsTrigger>
             <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
             <TabsTrigger value="community">Community</TabsTrigger>
             <TabsTrigger value="vendors">Vendors</TabsTrigger>
@@ -6584,6 +6893,11 @@ export default function PropertyProfile() {
           {/* Services Tab */}
           <TabsContent value="services">
             <PropertyServicesSection propertyId={propertyId!} />
+          </TabsContent>
+
+          {/* Supplies Tab */}
+          <TabsContent value="supplies">
+            <PropertySuppliesTab propertyId={propertyId!} />
           </TabsContent>
 
           {/* Inspection History Tab */}
