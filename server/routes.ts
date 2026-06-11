@@ -22543,6 +22543,9 @@ contact@hubifyhomes.com`;
             status: s.status ?? "pending",
             calendarEventId: s.calendarEventId ?? null,
             notes: s.notes ?? null,
+            actualStartedAt: s.actualStartedAt ? new Date(s.actualStartedAt) : null,
+            actualCompletedAt: s.actualCompletedAt ? new Date(s.actualCompletedAt) : null,
+            actualWorkMinutes: s.actualWorkMinutes ?? null,
           }))).returning()
         : [];
       const totalWork = rawStops.reduce((a, s) => a + (s.estimatedWorkMinutes ?? 60), 0);

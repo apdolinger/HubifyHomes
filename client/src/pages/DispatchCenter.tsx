@@ -280,15 +280,43 @@ export default function DispatchCenter() {
     );
   }
 
-  function addTaskToItinerary(task: any) {
+  function stopToPayload(s: any) {
+    return {
+      id: s.id ?? undefined,
+      propertyId: s.propertyId ?? null,
+      taskId: s.taskId ?? null,
+      assignedUserId: s.assignedUserId ?? null,
+      estimatedWorkMinutes: s.estimatedWorkMinutes ?? 60,
+      travelMinutesFromPrevious: s.travelMinutesFromPrevious ?? 15,
+      bufferMinutes: s.bufferMinutes ?? 0,
+      notes: s.notes ?? "",
+      status: s.status ?? "pending",
+      calendarEventId: s.calendarEventId ?? null,
+      actualStartedAt: s.actualStartedAt ?? null,
+      actualCompletedAt: s.actualCompletedAt ?? null,
+      actualWorkMinutes: s.actualWorkMinutes ?? null,
+    };
+  }
+
+  async function addTaskToItinerary(task: any) {
     if (!activeItineraryId) return;
-    // Use already-loaded stops if available, otherwise start with empty list
-    // (correct for a brand-new itinerary whose detail query hasn't returned yet)
     const current = activeItinerary?.stops ?? [];
+    const propertyId = task.property?.id ?? task.propertyId ?? null;
+    const userId = activeItinerary?.assignedUserId ?? null;
+
+    let estimatedMins = 60;
+    if (propertyId && userId) {
+      try {
+        const params = new URLSearchParams({ userId, propertyId: String(propertyId) });
+        const suggestion = await fetch(`/api/dispatch/time-suggestions?${params}`).then(r => r.json());
+        if (suggestion?.suggestedMinutes) estimatedMins = suggestion.suggestedMinutes;
+      } catch {}
+    }
+
     const newStop: any = {
-      propertyId: task.property?.id ?? task.propertyId ?? null,
+      propertyId,
       taskId: task.id,
-      estimatedWorkMinutes: 60,
+      estimatedWorkMinutes: estimatedMins,
       travelMinutesFromPrevious: 15,
       bufferMinutes: 0,
       notes: "",
@@ -296,16 +324,7 @@ export default function DispatchCenter() {
       property: task.property ?? null,
       task,
     };
-    const newStops = [...current, newStop].map(s => ({
-      propertyId: s.propertyId ?? null,
-      taskId: s.taskId ?? null,
-      estimatedWorkMinutes: s.estimatedWorkMinutes ?? 60,
-      travelMinutesFromPrevious: s.travelMinutesFromPrevious ?? 15,
-      bufferMinutes: s.bufferMinutes ?? 0,
-      notes: s.notes ?? "",
-      status: s.status ?? "pending",
-      calendarEventId: s.calendarEventId ?? null,
-    }));
+    const newStops = [...current, newStop].map(stopToPayload);
     updateStops.mutate({ id: activeItineraryId, stops: newStops });
   }
 
@@ -315,16 +334,7 @@ export default function DispatchCenter() {
     const target = index + dir;
     if (target < 0 || target >= stops.length) return;
     [stops[index], stops[target]] = [stops[target], stops[index]];
-    updateStops.mutate({ id: activeItinerary.id, stops: stops.map(s => ({
-      propertyId: s.propertyId ?? null,
-      taskId: s.taskId ?? null,
-      estimatedWorkMinutes: s.estimatedWorkMinutes ?? 60,
-      travelMinutesFromPrevious: s.travelMinutesFromPrevious ?? 15,
-      bufferMinutes: s.bufferMinutes ?? 0,
-      notes: s.notes ?? "",
-      status: s.status ?? "pending",
-      calendarEventId: s.calendarEventId ?? null,
-    }))});
+    updateStops.mutate({ id: activeItinerary.id, stops: stops.map(stopToPayload) });
   }
 
   function updateStopField(stopIndex: number, field: string, value: any) {
@@ -332,16 +342,7 @@ export default function DispatchCenter() {
     const stops = (activeItinerary.stops ?? []).map((s, i) =>
       i === stopIndex ? { ...s, [field]: value } : s
     );
-    updateStops.mutate({ id: activeItinerary.id, stops: stops.map(s => ({
-      propertyId: s.propertyId ?? null,
-      taskId: s.taskId ?? null,
-      estimatedWorkMinutes: s.estimatedWorkMinutes ?? 60,
-      travelMinutesFromPrevious: s.travelMinutesFromPrevious ?? 15,
-      bufferMinutes: s.bufferMinutes ?? 0,
-      notes: s.notes ?? "",
-      status: s.status ?? "pending",
-      calendarEventId: (s as any).calendarEventId ?? null,
-    }))});
+    updateStops.mutate({ id: activeItinerary.id, stops: stops.map(stopToPayload) });
   }
 
   const itin = activeItinerary;
@@ -553,7 +554,7 @@ export default function DispatchCenter() {
                   return (
                     <div className="flex flex-wrap gap-x-6 gap-y-1 mt-3 pt-3 border-t text-sm">
                       <div><span className="text-muted-foreground">Est. work: </span><strong>{formatMinutes(itin.totalWorkMinutes)}</strong></div>
-                      {actualTotal > 0 && (
+                      {completedStops.length > 0 && (
                         <div className="flex items-center gap-1 text-teal-700 dark:text-teal-400">
                           <TrendingUp className="w-3 h-3" />
                           <span className="text-muted-foreground">Actual: </span><strong>{formatMinutes(actualTotal)}</strong>
