@@ -3925,6 +3925,9 @@ export const dailyItineraryStops = pgTable("daily_itinerary_stops", {
   status: varchar("status", { length: 32 }).notNull().default("pending"),
   calendarEventId: uuid("calendar_event_id").references(() => events.id, { onDelete: "set null" }),
   notes: text("notes"),
+  actualStartedAt: timestamp("actual_started_at", { withTimezone: true }),
+  actualCompletedAt: timestamp("actual_completed_at", { withTimezone: true }),
+  actualWorkMinutes: integer("actual_work_minutes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [

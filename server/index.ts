@@ -694,6 +694,12 @@ app.use((req, res, next) => {
       } catch (err) {
         console.error('Error ensuring room_supplies.replacement_interval_days column:', err);
       }
+      try {
+        const { ensureDispatchStopActualTimeColumns } = await import('./runMigrations.js');
+        await ensureDispatchStopActualTimeColumns();
+      } catch (err) {
+        console.error('Error ensuring dispatch stop actual time columns:', err);
+      }
     } catch (error) {
       console.error('Error loading startup migrations:', error);
     }

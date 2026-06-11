@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
@@ -19,13 +19,14 @@ import {
   MapPin, Plus, ChevronDown, ChevronUp, ChevronRight,
   Clock, AlertTriangle, CheckCircle2, Send, FileText,
   Trash2, ArrowUp, ArrowDown, Calendar, RefreshCw, Save,
-  Copy, LayoutList, Pencil, X
+  Copy, LayoutList, Pencil, X, Play, Square, Timer, TrendingUp
 } from "lucide-react";
 
 type StopDraft = {
   id?: string;
   propertyId?: number | null;
   taskId?: number | null;
+  assignedUserId?: string | null;
   serviceType?: string;
   estimatedWorkMinutes: number;
   travelMinutesFromPrevious: number;
@@ -35,6 +36,9 @@ type StopDraft = {
   scheduledEnd?: string;
   calendarEventId?: string | null;
   status?: string;
+  actualStartedAt?: string | null;
+  actualCompletedAt?: string | null;
+  actualWorkMinutes?: number | null;
   property?: any;
   task?: any;
 };
@@ -87,6 +91,16 @@ function StatusBadge({ status }: { status: string }) {
   };
   const cfg = map[status] ?? { label: status, variant: "secondary" };
   return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
+}
+
+function ElapsedTimer({ startedAt }: { startedAt: string }) {
+  const calc = () => Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 60000));
+  const [elapsed, setElapsed] = useState(calc);
+  useEffect(() => {
+    const id = setInterval(() => setElapsed(calc()), 30000);
+    return () => clearInterval(id);
+  }, [startedAt]);
+  return <span className="text-teal-600 font-medium flex items-center gap-1"><Timer className="w-3 h-3" />{elapsed}m elapsed</span>;
 }
 
 export default function DispatchCenter() {
@@ -224,6 +238,37 @@ export default function DispatchCenter() {
     mutationFn: (id: string) => apiRequest("PATCH", `/api/dispatch/itineraries/${id}`, { status: "completed" }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/dispatch/itineraries", activeItineraryId] }); qc.invalidateQueries({ queryKey: ["/api/dispatch/itineraries"] }); toast({ title: "Marked as completed" }); },
     onError: () => toast({ title: "Failed to update status", variant: "destructive" }),
+  });
+
+  const startStop = useMutation({
+    mutationFn: ({ itinId, stopId }: { itinId: string; stopId: string }) =>
+      apiRequest("PATCH", `/api/dispatch/itineraries/${itinId}/stops/${stopId}/start`, {}),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/dispatch/itineraries", activeItineraryId] }); },
+    onError: () => toast({ title: "Failed to start stop", variant: "destructive" }),
+  });
+
+  const completeStop = useMutation({
+    mutationFn: ({ itinId, stopId }: { itinId: string; stopId: string }) =>
+      apiRequest("PATCH", `/api/dispatch/itineraries/${itinId}/stops/${stopId}/complete`, {}),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/dispatch/itineraries", activeItineraryId] }); },
+    onError: () => toast({ title: "Failed to complete stop", variant: "destructive" }),
+  });
+
+  const editingStopObj = activeItinerary?.stops?.find((s, i) =>
+    editingStopId === (s.id ?? String(i))
+  ) ?? null;
+  const suggestionUserId = (editingStopObj as any)?.assignedUserId || activeItinerary?.assignedUserId;
+  const suggestionPropertyId = editingStopObj?.propertyId;
+  const { data: timeSuggestion } = useQuery<{ suggestedMinutes: number; sampleCount: number } | null>({
+    queryKey: ["/api/dispatch/time-suggestions", suggestionUserId, suggestionPropertyId],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (suggestionUserId) params.append("userId", suggestionUserId);
+      if (suggestionPropertyId) params.append("propertyId", String(suggestionPropertyId));
+      return fetch(`/api/dispatch/time-suggestions?${params}`).then(r => r.json());
+    },
+    enabled: !!editingStopId && !!suggestionUserId && !!suggestionPropertyId,
+    staleTime: 5 * 60 * 1000,
   });
 
   if (!isManager) {
@@ -502,13 +547,26 @@ export default function DispatchCenter() {
                 </div>
 
                 {/* Totals bar */}
-                <div className="flex gap-6 mt-3 pt-3 border-t text-sm">
-                  <div><span className="text-muted-foreground">Work: </span><strong>{formatMinutes(itin.totalWorkMinutes)}</strong></div>
-                  <div><span className="text-muted-foreground">Travel: </span><strong>{formatMinutes(itin.totalTravelMinutes)}</strong></div>
-                  <div><span className="text-muted-foreground">Buffer: </span><strong>{formatMinutes(itin.totalBufferMinutes)}</strong></div>
-                  <div><span className="text-muted-foreground">Total day: </span><strong>{formatMinutes(itin.totalDayMinutes)}</strong></div>
-                  <div><span className="text-muted-foreground">Stops: </span><strong>{itin.stops?.length ?? 0}</strong></div>
-                </div>
+                {(() => {
+                  const completedStops = (itin.stops ?? []).filter(s => s.actualWorkMinutes != null);
+                  const actualTotal = completedStops.reduce((sum, s) => sum + (s.actualWorkMinutes ?? 0), 0);
+                  return (
+                    <div className="flex flex-wrap gap-x-6 gap-y-1 mt-3 pt-3 border-t text-sm">
+                      <div><span className="text-muted-foreground">Est. work: </span><strong>{formatMinutes(itin.totalWorkMinutes)}</strong></div>
+                      {actualTotal > 0 && (
+                        <div className="flex items-center gap-1 text-teal-700 dark:text-teal-400">
+                          <TrendingUp className="w-3 h-3" />
+                          <span className="text-muted-foreground">Actual: </span><strong>{formatMinutes(actualTotal)}</strong>
+                          <span className="text-xs text-muted-foreground">({completedStops.length}/{itin.stops?.length ?? 0} stops)</span>
+                        </div>
+                      )}
+                      <div><span className="text-muted-foreground">Travel: </span><strong>{formatMinutes(itin.totalTravelMinutes)}</strong></div>
+                      <div><span className="text-muted-foreground">Buffer: </span><strong>{formatMinutes(itin.totalBufferMinutes)}</strong></div>
+                      <div><span className="text-muted-foreground">Total day: </span><strong>{formatMinutes(itin.totalDayMinutes)}</strong></div>
+                      <div><span className="text-muted-foreground">Stops: </span><strong>{itin.stops?.length ?? 0}</strong></div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Stops list */}
@@ -554,12 +612,49 @@ export default function DispatchCenter() {
                               </div>
 
                               {/* Time info */}
-                              <div className="flex gap-4 mt-2 text-xs">
+                              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs">
                                 <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{formatTime(stop.scheduledStart)} – {formatTime(stop.scheduledEnd)}</span>
-                                <span className="text-muted-foreground">{formatMinutes(stop.estimatedWorkMinutes)} work</span>
+                                {stop.actualWorkMinutes != null ? (
+                                  <span className="flex items-center gap-1 text-teal-600 font-medium">
+                                    <CheckCircle2 className="w-3 h-3" />{stop.actualWorkMinutes}m actual
+                                    <span className="text-muted-foreground font-normal">(est. {formatMinutes(stop.estimatedWorkMinutes)})</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">{formatMinutes(stop.estimatedWorkMinutes)} est.</span>
+                                )}
+                                {stop.actualStartedAt && !stop.actualCompletedAt && (
+                                  <ElapsedTimer startedAt={stop.actualStartedAt} />
+                                )}
                                 {stop.bufferMinutes > 0 && <span className="text-muted-foreground">+{stop.bufferMinutes}m buffer</span>}
                                 {stop.calendarEventId && <span className="text-teal-600 flex items-center gap-1"><Calendar className="w-3 h-3" /> On calendar</span>}
                               </div>
+
+                              {/* Clock-in / Clock-out actions */}
+                              {stop.id && (itin.status === "published" || itin.status === "in_progress") && stop.status !== "completed" && (
+                                <div className="flex gap-2 mt-2">
+                                  {!stop.actualStartedAt ? (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs border-teal-300 text-teal-700 hover:bg-teal-50 dark:border-teal-700 dark:text-teal-400"
+                                      disabled={startStop.isPending}
+                                      onClick={() => startStop.mutate({ itinId: itin.id, stopId: stop.id! })}
+                                    >
+                                      <Play className="w-3 h-3 mr-1" /> Start
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-400"
+                                      disabled={completeStop.isPending}
+                                      onClick={() => completeStop.mutate({ itinId: itin.id, stopId: stop.id! })}
+                                    >
+                                      <Square className="w-3 h-3 mr-1" /> Complete
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
 
                               {stop.notes && !isEditing && <p className="text-xs text-muted-foreground mt-2 italic">"{stop.notes}"</p>}
                             </div>
@@ -571,6 +666,16 @@ export default function DispatchCenter() {
                               <div>
                                 <Label className="text-xs">Work time (min)</Label>
                                 <Input type="number" min={5} value={stop.estimatedWorkMinutes} className="h-8 mt-1" onChange={e => updateStopField(idx, "estimatedWorkMinutes", parseInt(e.target.value) || 60)} />
+                                {timeSuggestion && (
+                                  <button
+                                    type="button"
+                                    className="mt-1 text-[11px] text-teal-600 hover:text-teal-800 flex items-center gap-1"
+                                    onClick={() => updateStopField(idx, "estimatedWorkMinutes", timeSuggestion.suggestedMinutes)}
+                                  >
+                                    <TrendingUp className="w-3 h-3" />
+                                    Avg: {timeSuggestion.suggestedMinutes}m ({timeSuggestion.sampleCount} visits) — apply
+                                  </button>
+                                )}
                               </div>
                               <div>
                                 <Label className="text-xs">Travel from prev (min)</Label>

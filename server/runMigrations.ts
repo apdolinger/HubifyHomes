@@ -1336,3 +1336,20 @@ export async function ensureRoomSupplyIntervalColumn(): Promise<void> {
     client.release();
   }
 }
+
+export async function ensureDispatchStopActualTimeColumns(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE daily_itinerary_stops
+        ADD COLUMN IF NOT EXISTS actual_started_at TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS actual_completed_at TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS actual_work_minutes INTEGER;
+    `);
+    log("[MIGRATE] daily_itinerary_stops actual time columns verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to ensure dispatch stop actual time columns: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}

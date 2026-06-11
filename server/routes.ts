@@ -22600,6 +22600,94 @@ contact@hubifyhomes.com`;
     }
   });
 
+  // ── Stop clock-in / clock-out ─────────────────────────────────────────────────
+
+  app.patch("/api/dispatch/itineraries/:id/stops/:stopId/start", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!dispatchAdminGuard(req, res)) return;
+      const orgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
+      const { dailyItineraries: diTable, dailyItineraryStops: disTable } = await import("@shared/schema");
+      const [itinerary] = await db.select().from(diTable).where(and(eq(diTable.id, req.params.id), eq(diTable.orgId, orgId)));
+      if (!itinerary) return res.status(404).json({ message: "Itinerary not found" });
+      const [stop] = await db.select().from(disTable).where(and(eq(disTable.id, req.params.stopId), eq(disTable.dailyItineraryId, itinerary.id)));
+      if (!stop) return res.status(404).json({ message: "Stop not found" });
+      const [updated] = await db.update(disTable).set({
+        actualStartedAt: new Date(),
+        status: "in_progress",
+        updatedAt: new Date(),
+      }).where(eq(disTable.id, stop.id)).returning();
+      res.json(updated);
+    } catch (err) {
+      console.error("[dispatch] PATCH /stops/:stopId/start", err);
+      res.status(500).json({ message: "Failed to start stop" });
+    }
+  });
+
+  app.patch("/api/dispatch/itineraries/:id/stops/:stopId/complete", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!dispatchAdminGuard(req, res)) return;
+      const orgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
+      const { dailyItineraries: diTable, dailyItineraryStops: disTable } = await import("@shared/schema");
+      const [itinerary] = await db.select().from(diTable).where(and(eq(diTable.id, req.params.id), eq(diTable.orgId, orgId)));
+      if (!itinerary) return res.status(404).json({ message: "Itinerary not found" });
+      const [stop] = await db.select().from(disTable).where(and(eq(disTable.id, req.params.stopId), eq(disTable.dailyItineraryId, itinerary.id)));
+      if (!stop) return res.status(404).json({ message: "Stop not found" });
+      const completedAt = new Date();
+      const startedAt = (stop as any).actualStartedAt ?? completedAt;
+      const diffMs = completedAt.getTime() - new Date(startedAt).getTime();
+      const actualWorkMinutes = Math.max(1, Math.round(diffMs / 60000));
+      const [updated] = await db.update(disTable).set({
+        actualCompletedAt: completedAt,
+        actualWorkMinutes,
+        status: "completed",
+        updatedAt: new Date(),
+      }).where(eq(disTable.id, stop.id)).returning();
+      res.json(updated);
+    } catch (err) {
+      console.error("[dispatch] PATCH /stops/:stopId/complete", err);
+      res.status(500).json({ message: "Failed to complete stop" });
+    }
+  });
+
+  // ── Time suggestions (historical averages per staff + property) ──────────────
+
+  app.get("/api/dispatch/time-suggestions", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
+      const { userId, propertyId } = req.query as { userId?: string; propertyId?: string };
+      if (!userId || !propertyId) {
+        return res.status(400).json({ message: "userId and propertyId are required" });
+      }
+      const { pool: dbPool } = await import("./db");
+      const client = await dbPool.connect();
+      try {
+        const { rows } = await client.query<{ suggested_minutes: number | null; sample_count: string }>(
+          `SELECT ROUND(AVG(dis.actual_work_minutes))::integer AS suggested_minutes,
+                  COUNT(*) AS sample_count
+           FROM daily_itinerary_stops dis
+           JOIN daily_itineraries di ON di.id = dis.daily_itinerary_id
+           WHERE di.org_id = $1
+             AND dis.assigned_user_id = $2
+             AND dis.property_id = $3
+             AND dis.actual_work_minutes IS NOT NULL
+             AND dis.status = 'completed'`,
+          [orgId, userId, parseInt(propertyId)]
+        );
+        const row = rows[0];
+        const sampleCount = parseInt(row?.sample_count ?? "0");
+        if (sampleCount < 2 || row?.suggested_minutes == null) {
+          return res.json(null);
+        }
+        res.json({ suggestedMinutes: row.suggested_minutes, sampleCount });
+      } finally {
+        client.release();
+      }
+    } catch (err) {
+      console.error("[dispatch] GET /time-suggestions", err);
+      res.status(500).json({ message: "Failed to fetch time suggestions" });
+    }
+  });
+
   // ── Publish / Calendar Sync ───────────────────────────────────────────────────
 
   app.post("/api/dispatch/itineraries/:id/publish", isAuthenticated, async (req: any, res) => {
