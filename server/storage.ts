@@ -3250,7 +3250,7 @@ export class DatabaseStorage implements IStorage {
       or(eq(tasks.status, "pending"), eq(tasks.status, "in_progress")),
       eq(tasks.isArchived, false),
       eq(tasks.priority, "urgent"),
-      eq(tasks.orgId, orgId)
+      eq(properties.orgId, orgId)
     ))
     .orderBy(desc(tasks.createdAt));
   }
@@ -5225,24 +5225,27 @@ export class DatabaseStorage implements IStorage {
       .from(properties)
       .where(and(eq(properties.isActive, true), eq(properties.orgId, orgId)));
 
+    // Tasks have no orgId column — scope via join to properties.
     const [urgentTasksCount] = await db
       .select({ count: count() })
       .from(tasks)
+      .innerJoin(properties, eq(tasks.propertyId, properties.id))
       .where(and(
         or(eq(tasks.status, "pending"), eq(tasks.status, "in_progress")),
         eq(tasks.isArchived, false),
         eq(tasks.priority, "urgent"),
-        eq(tasks.orgId, orgId)
+        eq(properties.orgId, orgId)
       ));
 
     const [overdueTasksCount] = await db
       .select({ count: count() })
       .from(tasks)
+      .innerJoin(properties, eq(tasks.propertyId, properties.id))
       .where(and(
         or(eq(tasks.status, "pending"), eq(tasks.status, "in_progress")),
         eq(tasks.isArchived, false),
         sql`DATE(${tasks.dueDate}) < CURRENT_DATE`,
-        eq(tasks.orgId, orgId)
+        eq(properties.orgId, orgId)
       ));
 
     const [activeTeamCount] = await db

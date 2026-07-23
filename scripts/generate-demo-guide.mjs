@@ -1,14 +1,8 @@
 /**
  * Hubify Demo Walkthrough Guide Generator
  *
- * Generates a polished PDF guide for anyone going through the Hubify demo site.
- * Includes credentials, step-by-step flows, talking points, and a property roster.
- *
- * Usage:
- *   node scripts/generate-demo-guide.mjs
- *
- * Output:
- *   screenshots/Hubify_Demo_Guide.pdf
+ * Usage:  node scripts/generate-demo-guide.mjs
+ * Output: screenshots/Hubify_Demo_Guide.pdf
  */
 
 import PDFDocument from 'pdfkit';
@@ -17,42 +11,46 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const OUT_PDF = path.join(__dirname, '../screenshots/Hubify_Demo_Guide.pdf');
-fs.mkdirSync(path.dirname(OUT_PDF), { recursive: true });
+const OUT_PDF   = path.join(__dirname, '../screenshots/Hubify_Demo_Guide.pdf');
+const IMG_DIR   = path.join(__dirname, '../screenshots');
+fs.mkdirSync(IMG_DIR, { recursive: true });
 
 // ─── Brand palette ────────────────────────────────────────────────────────────
-const TEAL        = '#0d9488';
-const TEAL_DARK   = '#0f766e';
-const TEAL_LIGHT  = '#f0fdfa';
-const TEAL_BORDER = '#99f6e4';
-const SLATE_900   = '#0f172a';
-const SLATE_700   = '#334155';
-const SLATE_500   = '#64748b';
-const SLATE_200   = '#e2e8f0';
-const SLATE_50    = '#f8fafc';
-const WHITE       = '#ffffff';
-const GREEN       = '#16a34a';
-const GREEN_LIGHT = '#dcfce7';
-const ORANGE      = '#d97706';
-const RED         = '#dc2626';
-const RED_LIGHT   = '#fef2f2';
-const BLUE        = '#2563eb';
-const BLUE_LIGHT  = '#eff6ff';
-const PURPLE      = '#7c3aed';
-const PURPLE_LIGHT= '#f5f3ff';
-const AMBER_LIGHT = '#fffbeb';
+const TEAL         = '#0d9488';
+const TEAL_DARK    = '#0f766e';
+const TEAL_LIGHT   = '#f0fdfa';
+const TEAL_BORDER  = '#99f6e4';
+const SLATE_900    = '#0f172a';
+const SLATE_700    = '#334155';
+const SLATE_500    = '#64748b';
+const SLATE_300    = '#cbd5e1';
+const SLATE_200    = '#e2e8f0';
+const SLATE_100    = '#f1f5f9';
+const SLATE_50     = '#f8fafc';
+const WHITE        = '#ffffff';
+const GREEN        = '#16a34a';
+const GREEN_LIGHT  = '#dcfce7';
+const ORANGE       = '#d97706';
+const ORANGE_LIGHT = '#fff7ed';
+const RED          = '#dc2626';
+const RED_LIGHT    = '#fef2f2';
+const BLUE         = '#2563eb';
+const BLUE_LIGHT   = '#eff6ff';
+const PURPLE       = '#7c3aed';
+const PURPLE_LIGHT = '#f5f3ff';
+const AMBER_LIGHT  = '#fffbeb';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 const PW     = 612;
 const PH     = 792;
-const ML     = 56;
-const MR     = 56;
+const ML     = 52;
+const MR     = 52;
 const BODY_W = PW - ML - MR;
 
 // ─── PDF setup ────────────────────────────────────────────────────────────────
 const doc = new PDFDocument({ size: 'LETTER', margin: 0, autoFirstPage: false, bufferPages: true });
-const stream = fs.createWriteStream(OUT_PDF);
-doc.pipe(stream);
+const outStream = fs.createWriteStream(OUT_PDF);
+doc.pipe(outStream);
 
 let _pageNum = 0;
 doc.on('pageAdded', () => { _pageNum++; });
@@ -64,48 +62,57 @@ function newPage() {
 
 function footer() {
   if (_pageNum < 2) return;
+  const savedY = doc.y;
   doc.save();
-  doc.fillColor(SLATE_500).font('Helvetica').fontSize(8);
-  doc.text('Hubify · Demo Walkthrough Guide', ML, PH - 28, { width: 260 });
-  doc.text(`Page ${_pageNum}`, PW - ML - 40, PH - 28, { width: 40, align: 'right' });
+  doc.fillColor(SLATE_300).font('Helvetica').fontSize(8);
+  doc.text('Hubify · Demo Walkthrough Guide · Confidential', ML, PH - 26, { width: 280 });
+  doc.text(`Page ${_pageNum}`, PW - ML - 60, PH - 26, { width: 60, align: 'right' });
   doc.restore();
+  doc.y = savedY;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function checkPageRoom(needed = 80) {
-  if (doc.y > PH - MR - needed) {
+function checkRoom(needed = 80) {
+  if (doc.y > PH - 50 - needed) {
     footer();
     newPage();
-    doc.y = 50;
+    doc.y = 52;
   }
 }
 
 function hline(color = SLATE_200, weight = 0.5) {
-  doc.moveDown(0.4);
+  doc.moveDown(0.35);
   doc.moveTo(ML, doc.y).lineTo(PW - MR, doc.y).lineWidth(weight).strokeColor(color).stroke();
-  doc.moveDown(0.6);
+  doc.moveDown(0.55);
 }
 
-function para(text, { color = SLATE_700, size = 10.5, bold = false, indent = ML, width = BODY_W, gap = 5 } = {}) {
-  checkPageRoom(36);
+// Measure text height properly
+function textHeight(text, { font = 'Helvetica', size = 10.5, width = BODY_W, lineGap = 4 } = {}) {
+  doc.font(font).fontSize(size);
+  return doc.heightOfString(text, { width, lineGap });
+}
+
+function para(text, { color = SLATE_700, size = 10.5, bold = false, indent = ML, width = BODY_W, gap = 4 } = {}) {
+  checkRoom(textHeight(text, { width }) + 24);
   doc.fillColor(color)
      .font(bold ? 'Helvetica-Bold' : 'Helvetica')
      .fontSize(size)
      .text(text, indent, doc.y, { width, lineGap: gap });
-  doc.moveDown(0.5);
+  doc.moveDown(0.45);
 }
 
-function subheading(text, { color = SLATE_900 } = {}) {
-  checkPageRoom(50);
-  doc.moveDown(0.3);
+function subheading(text, { color = SLATE_900, topGap = 0.3 } = {}) {
+  checkRoom(44);
+  doc.moveDown(topGap);
   doc.fillColor(color).font('Helvetica-Bold').fontSize(11.5).text(text, ML, doc.y);
-  doc.moveDown(0.4);
+  doc.moveDown(0.35);
 }
 
 function bullet(items, { indent = ML + 14 } = {}) {
   items.forEach(item => {
-    checkPageRoom(22);
+    const h = textHeight(item, { width: BODY_W - (indent - ML), size: 10.5 }) + 12;
+    checkRoom(h);
     const y = doc.y;
     doc.circle(ML + 5, y + 5.5, 2.5).fill(TEAL);
     doc.fillColor(SLATE_700).font('Helvetica').fontSize(10.5)
@@ -117,7 +124,8 @@ function bullet(items, { indent = ML + 14 } = {}) {
 
 function steps(items) {
   items.forEach((item, i) => {
-    checkPageRoom(46);
+    const detailH = item.detail ? textHeight(item.detail, { width: BODY_W - 28, size: 10 }) : 0;
+    checkRoom(28 + detailH + 10);
     const y = doc.y;
     doc.circle(ML + 9, y + 9, 9).fill(TEAL);
     doc.fillColor(WHITE).font('Helvetica-Bold').fontSize(9)
@@ -128,192 +136,327 @@ function steps(items) {
       doc.fillColor(SLATE_500).font('Helvetica').fontSize(10)
          .text(item.detail, ML + 24, doc.y + 2, { width: BODY_W - 24, lineGap: 3 });
     }
-    doc.moveDown(0.75);
+    doc.moveDown(0.7);
   });
 }
 
 function tip(text) {
-  checkPageRoom(56);
+  const th = textHeight(text, { width: BODY_W - 56, size: 9.5 });
+  const bh = Math.max(42, th + 18);
+  checkRoom(bh + 16);
   const y = doc.y;
-  const bh = 42;
   doc.roundedRect(ML, y, BODY_W, bh, 6).fill(TEAL_LIGHT).stroke(TEAL_BORDER);
-  doc.fillColor(TEAL_DARK).font('Helvetica-Bold').fontSize(8.5).text('TIP', ML + 12, y + 9);
+  doc.fillColor(TEAL_DARK).font('Helvetica-Bold').fontSize(8.5).text('TIP', ML + 12, y + 10);
   doc.fillColor(TEAL_DARK).font('Helvetica').fontSize(9.5)
-     .text(text, ML + 44, y + 9, { width: BODY_W - 56, lineGap: 3 });
+     .text(text, ML + 44, y + 10, { width: BODY_W - 56, lineGap: 3 });
   doc.y = y + bh + 10;
   doc.moveDown(0.3);
 }
 
-function callout(text, { label = 'NOTE', bg = AMBER_LIGHT, border = '#fed7aa', labelColor = ORANGE, textColor = '#92400e' } = {}) {
-  checkPageRoom(56);
+function callout(text, { label = 'NOTE', bg = AMBER_LIGHT, border = '#fed7aa', labelColor = ORANGE, textColor = '#92400e', labelW = 44 } = {}) {
+  const th = textHeight(text, { width: BODY_W - labelW - 24, size: 9.5 });
+  const bh = Math.max(44, th + 18);
+  checkRoom(bh + 16);
   const y = doc.y;
-  const bh = 44;
   doc.roundedRect(ML, y, BODY_W, bh, 6).fill(bg).stroke(border);
-  doc.fillColor(labelColor).font('Helvetica-Bold').fontSize(8.5).text(label, ML + 12, y + 10);
+  doc.fillColor(labelColor).font('Helvetica-Bold').fontSize(8.5).text(label, ML + 12, y + 12);
   doc.fillColor(textColor).font('Helvetica').fontSize(9.5)
-     .text(text, ML + 52, y + 10, { width: BODY_W - 64, lineGap: 3 });
+     .text(text, ML + labelW + 12, y + 11, { width: BODY_W - labelW - 24, lineGap: 3 });
   doc.y = y + bh + 10;
   doc.moveDown(0.3);
 }
 
-function credBox(label, value, { labelColor = TEAL_DARK, bg = TEAL_LIGHT, border = TEAL_BORDER } = {}) {
-  checkPageRoom(36);
+function credBox(label, value, { labelColor = TEAL_DARK, bg = TEAL_LIGHT, border = TEAL_BORDER, labelW = 90 } = {}) {
+  const th = textHeight(value, { size: 10, width: BODY_W - labelW - 24 });
+  const bh = Math.max(30, th + 16);
+  checkRoom(bh + 8);
   const y = doc.y;
-  doc.roundedRect(ML, y, BODY_W, 30, 5).fill(bg).stroke(border);
-  doc.fillColor(labelColor).font('Helvetica-Bold').fontSize(9).text(label, ML + 12, y + 8);
-  doc.fillColor(SLATE_900).font('Helvetica').fontSize(10).text(value, ML + 110, y + 8);
-  doc.y = y + 36;
+  doc.roundedRect(ML, y, BODY_W, bh, 5).fill(bg).stroke(border);
+  doc.fillColor(labelColor).font('Helvetica-Bold').fontSize(9).text(label, ML + 12, y + (bh / 2) - 5, { width: labelW });
+  doc.fillColor(SLATE_900).font('Helvetica').fontSize(10).text(value, ML + labelW + 12, y + (bh / 2) - 5, { width: BODY_W - labelW - 24 });
+  doc.y = y + bh + 6;
 }
 
+// table2: properly calculates row heights using heightOfString to prevent overlap
 function table2(rows, col1Label = 'Item', col2Label = 'Description', { col1W = 150 } = {}) {
-  const C1 = col1W, C2 = BODY_W - C1 - 10;
+  const C2 = BODY_W - col1W - 8;
+  checkRoom(28);
+  // Header
   const y0 = doc.y;
-
   doc.rect(ML, y0, BODY_W, 22).fill(TEAL);
   doc.fillColor(WHITE).font('Helvetica-Bold').fontSize(9)
-     .text(col1Label, ML + 6, y0 + 7)
-     .text(col2Label, ML + C1 + 6, y0 + 7);
-  let y = y0 + 22;
+     .text(col1Label, ML + 6, y0 + 7, { width: col1W - 8 })
+     .text(col2Label, ML + col1W + 6, y0 + 7, { width: C2 - 4 });
+  doc.y = y0 + 22;
 
   rows.forEach((row, i) => {
-    const estH = 26;
-    checkPageRoom(estH + 10);
-    y = doc.y;
-    if (i % 2 === 0) doc.rect(ML, y, BODY_W, estH).fill(SLATE_50);
+    const col1H = textHeight(row[0], { font: 'Helvetica-Bold', size: 9.5, width: col1W - 12 });
+    const col2H = textHeight(row[1], { font: 'Helvetica', size: 9.5, width: C2 - 8 });
+    const rowH  = Math.max(col1H, col2H) + 14;
+    checkRoom(rowH + 4);
+    const y = doc.y;
+    if (i % 2 === 0) doc.rect(ML, y, BODY_W, rowH).fill(SLATE_50);
+    doc.moveTo(ML, y).lineTo(PW - MR, y).lineWidth(0.3).strokeColor(SLATE_200).stroke();
     doc.fillColor(SLATE_900).font('Helvetica-Bold').fontSize(9.5)
-       .text(row[0], ML + 6, y + 7, { width: C1 - 12 });
+       .text(row[0], ML + 6, y + 7, { width: col1W - 12 });
     doc.fillColor(SLATE_700).font('Helvetica').fontSize(9.5)
-       .text(row[1], ML + C1 + 6, y + 7, { width: C2 - 6, lineGap: 2 });
-    doc.y = y + estH;
+       .text(row[1], ML + col1W + 6, y + 7, { width: C2 - 8, lineGap: 2 });
+    doc.y = y + rowH;
   });
-
-  doc.moveDown(1);
+  doc.moveDown(0.9);
 }
 
 function inlinePill(x, y, text, bg, fg) {
-  const w = doc.widthOfString(text, { fontSize: 8 }) + 14;
-  doc.roundedRect(x, y - 1, w, 16, 3).fill(bg);
-  doc.fillColor(fg).font('Helvetica-Bold').fontSize(8).text(text, x + 7, y + 2);
+  doc.font('Helvetica-Bold').fontSize(8);
+  const w = doc.widthOfString(text) + 14;
+  doc.roundedRect(x, y - 1, w, 15, 3).fill(bg);
+  doc.fillColor(fg).text(text, x + 7, y + 2);
   return w + 6;
 }
 
 function section(num, title, subtitle = '') {
   footer();
   newPage();
-  doc.fillColor('#d1fae5').font('Helvetica-Bold').fontSize(80)
-     .text(String(num).padStart(2, '0'), PW - 120, 16, { width: 110, align: 'right' });
+  // Faint section number watermark
+  doc.save();
+  doc.opacity(0.05);
+  doc.fillColor(TEAL).font('Helvetica-Bold').fontSize(140)
+     .text(String(num).padStart(2, '0'), PW - 180, -10, { width: 200, align: 'right' });
+  doc.restore();
+  doc.fillColor(TEAL).font('Helvetica-Bold').fontSize(9).text(`SECTION ${String(num).padStart(2,'0')}`, ML, 22);
   doc.fillColor(SLATE_900).font('Helvetica-Bold').fontSize(22)
-     .text(title, ML, 26, { width: 420 });
+     .text(title, ML, 34, { width: 450 });
   if (subtitle) {
-    doc.fillColor(SLATE_500).font('Helvetica').fontSize(11)
-       .text(subtitle, ML, doc.y + 2, { width: 420 });
+    doc.fillColor(SLATE_500).font('Helvetica').fontSize(10.5)
+       .text(subtitle, ML, doc.y + 3, { width: 450 });
   }
-  doc.y = 96;
+  doc.y = 94;
   hline(TEAL_BORDER, 1.5);
 }
 
-// ─── PROPERTY SCENARIO ROW ────────────────────────────────────────────────────
-function propRow(num, name, type, city, scenario, talking) {
-  checkPageRoom(70);
+// ─── Screenshot frame: embeds a real image or draws a labelled placeholder ───
+function screenshotFrame(imgPath, caption, { h = 180 } = {}) {
+  checkRoom(h + 44);
   const y = doc.y;
+  const frameW = BODY_W;
+
+  // Outer frame
+  doc.roundedRect(ML, y, frameW, h + 26, 6)
+     .fill(SLATE_900).stroke(SLATE_700);
+
+  // Fake browser chrome bar
+  doc.roundedRect(ML + 1, y + 1, frameW - 2, 22, 5).fill('#1e293b');
+  // Traffic lights
+  doc.circle(ML + 14, y + 12, 4).fill('#ef4444');
+  doc.circle(ML + 26, y + 12, 4).fill('#f59e0b');
+  doc.circle(ML + 38, y + 12, 4).fill('#22c55e');
+  // Address bar
+  doc.roundedRect(ML + 52, y + 6, frameW - 100, 12, 3).fill('#0f172a');
+  doc.fillColor(SLATE_300).font('Helvetica').fontSize(7.5)
+     .text('hubifyhomesonline.com', ML + 58, y + 9, { width: frameW - 110 });
+
+  // Image or placeholder
+  const imgY = y + 24;
+  const imgH = h;
+
+  if (imgPath && fs.existsSync(imgPath)) {
+    try {
+      doc.image(imgPath, ML + 1, imgY, { width: frameW - 2, height: imgH, cover: [frameW - 2, imgH], align: 'center', valign: 'top' });
+    } catch {
+      drawPlaceholder(ML + 1, imgY, frameW - 2, imgH, caption);
+    }
+  } else {
+    drawPlaceholder(ML + 1, imgY, frameW - 2, imgH, caption);
+  }
+
+  // Caption bar
+  doc.rect(ML, y + h + 24, BODY_W, 2).fill(TEAL);
+
+  doc.y = y + h + 26 + 10;
+
+  if (caption) {
+    doc.fillColor(SLATE_500).font('Helvetica').fontSize(8.5)
+       .text(caption, ML, doc.y, { width: BODY_W, align: 'center' });
+    doc.moveDown(0.6);
+  }
+  doc.moveDown(0.3);
+}
+
+function drawPlaceholder(x, y, w, h, label = '') {
+  doc.rect(x, y, w, h).fill('#0f172a');
+  // Grid lines (subtle)
+  doc.save();
+  doc.opacity(0.07);
+  for (let gx = x; gx < x + w; gx += 40) {
+    doc.moveTo(gx, y).lineTo(gx, y + h).lineWidth(0.5).strokeColor(WHITE).stroke();
+  }
+  for (let gy = y; gy < y + h; gy += 40) {
+    doc.moveTo(x, gy).lineTo(x + w, gy).lineWidth(0.5).strokeColor(WHITE).stroke();
+  }
+  doc.restore();
+  // Center label
+  const lh = textHeight(label, { font: 'Helvetica-Bold', size: 12, width: w - 40 });
+  doc.fillColor(TEAL).font('Helvetica-Bold').fontSize(12)
+     .text(label, x, y + (h / 2) - lh / 2, { width: w, align: 'center' });
+}
+
+// ─── UI Preview Panel (for describing a screen section without a screenshot) ──
+function uiPanel(lines, { title = null, bg = SLATE_50, border = SLATE_200 } = {}) {
+  const contentH = lines.reduce((acc, l) => acc + textHeight(l.text || l, { size: l.size || 9.5, width: BODY_W - 32 }) + 10, 0);
+  const panelH   = contentH + (title ? 38 : 16);
+  checkRoom(panelH + 16);
+  const y = doc.y;
+  doc.roundedRect(ML, y, BODY_W, panelH, 6).fill(bg).stroke(border);
+  let cy = y + 8;
+  if (title) {
+    doc.fillColor(SLATE_900).font('Helvetica-Bold').fontSize(9).text(title, ML + 12, cy);
+    cy += 20;
+    doc.moveTo(ML + 12, cy).lineTo(ML + BODY_W - 12, cy).lineWidth(0.3).strokeColor(border).stroke();
+    cy += 8;
+  }
+  lines.forEach(l => {
+    const text  = typeof l === 'string' ? l : l.text;
+    const color = typeof l === 'string' ? SLATE_700 : (l.color || SLATE_700);
+    const bold  = typeof l === 'string' ? false : !!l.bold;
+    const size  = typeof l === 'string' ? 9.5 : (l.size || 9.5);
+    const lh = textHeight(text, { size, width: BODY_W - 32 });
+    doc.fillColor(color).font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(size)
+       .text(text, ML + 12, cy, { width: BODY_W - 24, lineGap: 3 });
+    cy += lh + 10;
+  });
+  doc.y = y + panelH + 12;
+}
+
+// ─── Property scenario row ────────────────────────────────────────────────────
+function propRow(num, name, type, city, scenario, talking) {
+  const scenH   = textHeight(scenario, { size: 9.5, width: BODY_W - 44 });
+  const talkH   = talking ? textHeight(`"${talking}"`, { size: 9, width: BODY_W - 44 }) : 0;
+  const totalH  = 10 + 16 + 12 + scenH + (talking ? talkH + 8 : 0) + 12;
+  checkRoom(totalH + 4);
+  const y = doc.y;
+
   // Number badge
-  doc.roundedRect(ML, y, 28, 28, 4).fill(TEAL);
+  doc.roundedRect(ML, y + 4, 28, 28, 4).fill(TEAL);
   doc.fillColor(WHITE).font('Helvetica-Bold').fontSize(11)
-     .text(String(num), ML, y + 7, { width: 28, align: 'center' });
-  // Name + type
+     .text(String(num), ML, y + 11, { width: 28, align: 'center' });
+
+  // Name
   doc.fillColor(SLATE_900).font('Helvetica-Bold').fontSize(10.5)
-     .text(name, ML + 36, y + 2, { width: BODY_W - 36 });
+     .text(name, ML + 36, y + 4, { width: BODY_W - 36 });
+
+  // Type + city
+  const metaY = y + 4 + textHeight(name, { font: 'Helvetica-Bold', size: 10.5, width: BODY_W - 36 }) + 2;
   doc.fillColor(SLATE_500).font('Helvetica').fontSize(9)
-     .text(`${type}  ·  ${city}`, ML + 36, doc.y + 1);
-  // Scenario line
+     .text(`${type}  ·  ${city}`, ML + 36, metaY);
+
+  // Scenario
+  const scenY = metaY + 14;
   doc.fillColor(TEAL_DARK).font('Helvetica-Bold').fontSize(9)
-     .text('Scenario: ', ML + 36, doc.y + 4, { continued: true, lineGap: 2 });
-  doc.fillColor(SLATE_700).font('Helvetica').fontSize(9).text(scenario, { lineGap: 2 });
+     .text('Scenario: ', ML + 36, scenY, { continued: true });
+  doc.fillColor(SLATE_700).font('Helvetica').fontSize(9).text(scenario);
+
   // Talking point
   if (talking) {
+    const talkY = doc.y + 4;
     doc.fillColor(SLATE_500).font('Helvetica').fontSize(9)
-       .text(`"${talking}"`, ML + 36, doc.y + 2, { width: BODY_W - 36, lineGap: 2 });
+       .text(`"${talking}"`, ML + 36, talkY, { width: BODY_W - 36, lineGap: 2 });
   }
-  doc.moveDown(0.6);
-  doc.moveTo(ML + 36, doc.y).lineTo(PW - MR, doc.y).lineWidth(0.3).strokeColor(SLATE_200).stroke();
   doc.moveDown(0.5);
+
+  // Divider
+  doc.moveTo(ML + 36, doc.y + 2).lineTo(PW - MR, doc.y + 2)
+     .lineWidth(0.3).strokeColor(SLATE_200).stroke();
+  doc.moveDown(0.65);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  COVER PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 doc.addPage();
-// Full-bleed teal gradient simulation
 doc.rect(0, 0, PW, PH).fill(TEAL);
+
+// Subtle geometric shapes
 doc.save();
-doc.opacity(0.07);
+doc.opacity(0.08);
 doc.circle(PW + 40, -40, 300).fill(WHITE);
 doc.circle(-20, PH + 20, 220).fill(WHITE);
-doc.rect(0, PH * 0.6, PW, PH * 0.4).fill(WHITE);
 doc.restore();
 
-// Bottom white section
+// Dark bottom third
 doc.save();
-doc.opacity(0.12);
-doc.rect(0, PH * 0.62, PW, PH).fill(WHITE);
+doc.opacity(0.22);
+doc.rect(0, PH * 0.60, PW, PH * 0.40).fill(SLATE_900);
 doc.restore();
 
-// Logo
-doc.fillColor(WHITE).font('Helvetica-Bold').fontSize(48).text('Hubify', ML, 140);
-doc.fillColor('rgba(255,255,255,0.65)').font('Helvetica').fontSize(16).text('Property Management Platform', ML + 3, 200);
+// Logo wordmark
+doc.fillColor(WHITE).font('Helvetica-Bold').fontSize(52).text('Hubify', ML, 130);
+doc.save();
+doc.opacity(0.65);
+doc.fillColor(WHITE).font('Helvetica').fontSize(16).text('Property Management Platform', ML + 3, 194);
+doc.restore();
 
+// Divider
 doc.moveDown(0.4);
-doc.moveTo(ML, doc.y).lineTo(ML + 220, doc.y).lineWidth(1).strokeColor('rgba(255,255,255,0.35)').stroke();
-doc.moveDown(1.2);
+doc.moveTo(ML, 220).lineTo(ML + 240, 220).lineWidth(1).strokeColor('rgba(255,255,255,0.3)').stroke();
 
-doc.fillColor(WHITE).font('Helvetica-Bold').fontSize(26).text('Demo Walkthrough Guide', ML, doc.y);
-doc.fillColor('rgba(255,255,255,0.75)').font('Helvetica').fontSize(12)
-   .text('Step-by-step tour of the Hubify demo environment\nfor sales calls, prospect walkthroughs, and self-guided evaluation', ML, doc.y + 6);
+// Guide title
+doc.fillColor(WHITE).font('Helvetica-Bold').fontSize(28).text('Demo Walkthrough Guide', ML, 236);
+doc.save();
+doc.opacity(0.72);
+doc.fillColor(WHITE).font('Helvetica').fontSize(11.5)
+   .text('A step-by-step tour of the Hubify demo environment\nfor sales calls, prospect walkthroughs, and self-guided evaluation', ML, 270);
+doc.restore();
 
-// Bottom bar
-doc.rect(0, PH - 100, PW, 100).fill('rgba(0,0,0,0.18)');
-doc.fillColor(WHITE).font('Helvetica-Bold').fontSize(10).text('DEMO CREDENTIALS', ML, PH - 84);
-doc.fillColor('rgba(255,255,255,0.85)').font('Helvetica').fontSize(9.5)
-   .text('Staff Admin:   demo@hubifyhomesonline.com  /  Demo2026!', ML, PH - 68);
-doc.fillColor('rgba(255,255,255,0.85)').font('Helvetica').fontSize(9.5)
-   .text('Portal Client:  client@demo.hubifyhomesonline.com  /  DemoClient2026!', ML, PH - 56);
-doc.fillColor('rgba(255,255,255,0.5)').font('Helvetica').fontSize(9)
-   .text(`Confidential · ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`, ML, PH - 34);
+// Credential strip
+doc.rect(0, PH - 92, PW, 92).fill('rgba(0,0,0,0.30)');
+doc.fillColor(WHITE).font('Helvetica-Bold').fontSize(8.5)
+   .text('STAFF ADMIN LOGIN', ML, PH - 76);
+doc.save();
+doc.opacity(0.85);
+doc.fillColor(WHITE).font('Helvetica').fontSize(10)
+   .text('demo@hubifyhomesonline.com   /   Demo2026!', ML, PH - 62);
+doc.restore();
+doc.save();
+doc.opacity(0.45);
+doc.fillColor(WHITE).font('Helvetica').fontSize(9)
+   .text(`Confidential  ·  ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`, ML, PH - 32);
+doc.restore();
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  TABLE OF CONTENTS
 // ─────────────────────────────────────────────────────────────────────────────
 newPage();
-doc.fillColor(SLATE_900).font('Helvetica-Bold').fontSize(20).text('What\'s in this Guide', ML, 28);
+doc.fillColor(SLATE_900).font('Helvetica-Bold').fontSize(20).text('Contents', ML, 24);
 hline(TEAL, 2);
-doc.y = 66;
+doc.y = 60;
 
 const toc = [
-  [1,  'Demo Credentials & First Login'],
-  [2,  'Dashboard — Your Opening Slide'],
-  [3,  'The 10 Demo Properties'],
-  [4,  'Tasks & Inspections'],
-  [5,  'Calendar'],
-  [6,  'Invoices & Billing'],
-  [7,  'Client Portal'],
-  [8,  'Dispatch Center'],
-  [9,  'Team Management'],
-  [10, 'Talking Points & Objection Responses'],
+  [1, 'Demo Credentials & First Login'],
+  [2, 'Dashboard — Your Opening Slide'],
+  [3, 'The 10 Demo Properties'],
+  [4, 'Tasks & Inspections'],
+  [5, 'Calendar'],
+  [6, 'Invoices & Billing'],
+  [7, 'Dispatch Center'],
+  [8, 'Team Management'],
+  [9, 'FAQs & Objection Responses'],
 ];
 
 toc.forEach(([num, title], i) => {
   const y = doc.y;
   if (i % 2 === 0) doc.rect(ML, y - 2, BODY_W, 24).fill(SLATE_50);
-  doc.roundedRect(ML + 4, y + 3, 22, 16, 3).fill(TEAL);
-  doc.fillColor(WHITE).font('Helvetica-Bold').fontSize(8).text(String(num), ML + 4, y + 7, { width: 22, align: 'center' });
-  doc.fillColor(SLATE_900).font('Helvetica').fontSize(11).text(title, ML + 34, y + 5);
+  doc.roundedRect(ML + 4, y + 3, 20, 16, 3).fill(TEAL);
+  doc.fillColor(WHITE).font('Helvetica-Bold').fontSize(8)
+     .text(String(num), ML + 4, y + 7, { width: 20, align: 'center' });
+  doc.fillColor(SLATE_900).font('Helvetica').fontSize(11)
+     .text(title, ML + 32, y + 5);
   doc.y = y + 24;
 });
 
 doc.moveDown(1);
 callout(
-  'This guide is for the person running the demo — not the prospect. Share the "Client Portal" section with prospects who want to self-explore.',
-  { label: 'HOW TO USE', bg: TEAL_LIGHT, border: TEAL_BORDER, labelColor: TEAL_DARK, textColor: TEAL_DARK }
+  'This guide is for the person running the demo. Keep it open alongside the live site as you walk through each section.',
+  { label: 'HOW TO USE', bg: TEAL_LIGHT, border: TEAL_BORDER, labelColor: TEAL_DARK, textColor: TEAL_DARK, labelW: 76 }
 );
 
 footer();
@@ -321,337 +464,334 @@ footer();
 // ─────────────────────────────────────────────────────────────────────────────
 //  1. CREDENTIALS & FIRST LOGIN
 // ─────────────────────────────────────────────────────────────────────────────
-section(1, 'Demo Credentials & First Login', 'Two accounts — one for staff, one for the client portal');
+section(1, 'Demo Credentials & First Login', 'One staff admin account — full platform access');
+
+// Embed real login screenshot
+const loginImg = path.join(IMG_DIR, 'demo_login.jpg');
+screenshotFrame(loginImg, 'Staff login page — /staff/login', { h: 200 });
 
 subheading('Staff Admin Account  (full platform access)');
-credBox('URL:', '/staff/login  →  log in with email + password');
+credBox('URL:', '/staff/login  →  sign in with email and password');
 credBox('Email:', 'demo@hubifyhomesonline.com');
 credBox('Password:', 'Demo2026!');
-doc.moveDown(0.5);
-
-subheading('Portal Client Account  (client-facing portal)');
-credBox('URL:', '/portal/login  →  separate login from staff', { bg: PURPLE_LIGHT, border: '#ddd6fe', labelColor: PURPLE });
-credBox('Email:', 'client@demo.hubifyhomesonline.com', { bg: PURPLE_LIGHT, border: '#ddd6fe', labelColor: PURPLE });
-credBox('Password:', 'DemoClient2026!', { bg: PURPLE_LIGHT, border: '#ddd6fe', labelColor: PURPLE });
 doc.moveDown(0.6);
 
-tip('Open both accounts in separate browser tabs — one for the staff view, one for the portal — so you can switch back and forth during the demo without logging in and out.');
-
-subheading('Who\'s on the Demo Team');
-table2([
-  ['Demo Admin',      'Full admin access — the primary account for staff walkthroughs'],
-  ['Demo Supervisor', 'Supervisor role — useful for showing permission differences'],
-  ['Demo Staff 1',    'Field staff — assigned to most on-site tasks in the demo'],
-  ['Demo Staff 2',    'Field staff — useful for showing task assignment and handoffs'],
-], 'Account', 'Role & Purpose', { col1W: 130 });
-
 subheading('Demo Organization');
-para('The demo organization is called "Hubify Demo Portfolio" — a fictional Florida-based property management company with 10 active properties ranging from luxury estates to seasonal snowbird condos. All data is pre-loaded and realistic.');
+para('The demo org is "Hubify Demo Portfolio" — a fictional Florida-based property management company. Everything you see after login is pre-loaded with realistic operational data across 10 active properties.');
 
 callout(
-  'Never enter real client data into the demo environment. The demo can be fully reset from the Super Admin panel at any time.',
-  { label: 'IMPORTANT', bg: RED_LIGHT, border: '#fecaca', labelColor: RED, textColor: '#991b1b' }
+  'Never enter real client data into the demo environment. The demo can be fully reset from Super Admin at any time.',
+  { label: 'IMPORTANT', bg: RED_LIGHT, border: '#fecaca', labelColor: RED, textColor: '#991b1b', labelW: 60 }
 );
+
+subheading('Demo Team Members');
+table2([
+  ['Demo Admin',      'Full admin access — the primary account for all staff walkthroughs'],
+  ['Demo Supervisor', 'Supervisor role — shows permission differences from admin'],
+  ['Demo Staff 1',    'Field staff — assigned to most on-site tasks in the demo'],
+  ['Demo Staff 2',    'Field staff — shows task assignment and handoff scenarios'],
+], 'Account', 'Role & Purpose', { col1W: 130 });
+
+tip('After logging in, the dashboard loads automatically with live data from all 10 demo properties — no setup or configuration needed.');
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  2. DASHBOARD
 // ─────────────────────────────────────────────────────────────────────────────
-section(2, 'Dashboard — Your Opening Slide', 'The first screen after login; sets the stage for the whole demo');
+section(2, 'Dashboard — Your Opening Slide', 'The first screen after login — sets the stage for the whole demo');
 
-para('The Dashboard is deliberately pre-loaded with realistic demo data. Every widget shows real numbers from the seeded properties, tasks, and invoices — nothing is mocked.');
+screenshotFrame(null, 'Dashboard — /  (opens automatically after login)', { h: 160 });
 
-subheading('What You\'ll See');
+para('The Dashboard loads the moment you sign in. Every widget pulls live data from the demo properties — nothing is hardcoded or mocked.');
+
+subheading('What You\'ll See on the Dashboard');
 table2([
-  ['Urgent Tasks',        '2–4 overdue and high-priority tasks across the demo properties — leads naturally into the Tasks section'],
-  ['Statistics Overview', 'Portfolio at a glance: 10 properties, active tasks, pending invoices, team size'],
-  ['Team Chat',           'Pre-seeded messages from demo staff — shows the real-time feed'],
-  ['Recent Activity',     'Latest platform actions — confirms everything is live data'],
-  ['Calendar widget',     'Upcoming scheduled visits and events — 5 pre-seeded calendar entries'],
-], 'Widget', 'What to Say / Point Out', { col1W: 140 });
+  ['Statistics Overview', '10 properties active; task counts by status; pending invoices; team members — a real portfolio at a glance'],
+  ['Urgent / Overdue Tasks', '3–5 overdue and high-priority tasks across the demo portfolio — use these as your entry point to Tasks'],
+  ['Recent Activity Feed', 'Latest platform actions — confirms everything is live operational data'],
+  ['Calendar Preview', 'Upcoming scheduled visits and vendor appointments — 5+ pre-seeded events'],
+  ['Team Chat',  'Pre-seeded messages from demo staff — shows the real-time communication feed'],
+], 'Widget', 'What to Point Out', { col1W: 150 });
 
-subheading('Suggested Opening Script');
-para('"When you log in every morning, this is your command center. You can see immediately if anything is on fire — right now there are two overdue tasks that need attention. Let me click into one of those..."', { color: TEAL_DARK, bold: true, size: 10 });
+subheading('Opening Script');
+para('"When you log in every morning, this is your command center. You can see immediately if anything is urgent — right now there are overdue tasks that need attention. Let me click into one..."', { color: TEAL_DARK, bold: true, size: 10 });
 
-tip('If the prospect\'s business is task-heavy, click an overdue task immediately. If they\'re billing-focused, go straight to Invoices. Always follow their pain point, not a fixed script.');
-
-subheading('Dashboard Customization');
-para('Point out the gear icon and mention that each widget can be toggled on/off and reordered by drag-and-drop. This is personal — their admin sees a different layout than their field staff.');
+tip('If the prospect\'s pain is billing, go straight to Invoices after the dashboard. If it\'s task management, click an overdue task. Always follow their pain point, not a fixed script.');
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  3. DEMO PROPERTIES
 // ─────────────────────────────────────────────────────────────────────────────
-section(3, 'The 10 Demo Properties', 'A diverse portfolio covering the most common property management scenarios');
+section(3, 'The 10 Demo Properties', 'A diverse Florida portfolio — every common property management scenario is covered');
 
-para('Each property is pre-loaded with tasks, access codes, contacts, and inspection data. Use the scenario that best matches the prospect\'s business.');
+screenshotFrame(null, 'Properties list — covers single-family, condos, luxury estates, and seasonal/snowbird homes', { h: 140 });
+
+para('Each property is pre-loaded with tasks, access codes, vendor links, contacts, and inspection checklists. Navigate to any property → use the tabs: Overview, Tasks, Rooms, Access Control, Inspections.');
 
 propRow(1, 'Beachside Breeze', 'Home Watch', 'Naples, FL',
-  'HVAC fault discovered before owner arrival — urgent task open',
-  'This is your bread-and-butter home watch property. Show the task, the photo, and how you notify the owner.');
+  'HVAC fault discovered before owner arrival — urgent task open, vendor dispatched',
+  'Bread-and-butter home watch scenario. Show the task, the photo attachment, and how the owner gets notified.');
 
-propRow(2, 'Sunset Key Villa', 'Luxury Estate', 'Key West, FL',
-  'Pool heater down + smart-home system offline — two open issues',
-  'Great for luxury clients. Point out the priority flag and the vendor contact already linked for the repair.');
+propRow(2, 'Sunset Key Villa', 'Luxury Estate', 'Naples, FL',
+  'Pool heater down + smart-home system offline — two open repair issues',
+  'Great for luxury clients. Show the priority flag and vendor contact already linked for the repair.');
 
-propRow(3, 'Coconut Harbor Retreat', 'Seasonal / Snowbird', 'Ft. Myers, FL',
-  'Hurricane prep tasks active — shows seasonal checklist workflow',
+propRow(3, 'Coconut Harbor Retreat', 'Seasonal / Snowbird', 'Fort Myers, FL',
+  'Hurricane prep tasks active — shows seasonal checklist and recurring schedule workflow',
   'Perfect for snowbird managers. Show the recurring inspection schedule and checklist items.');
 
-propRow(4, 'Pelican Point Cottage', 'Emergency', 'Captiva, FL',
-  'Active water leak discovered during routine check — critical alert',
-  'High-drama scenario. Click the critical alert badge and show how the team is notified instantly.');
+propRow(4, 'Pelican Point Cottage', 'Emergency', 'Naples, FL',
+  'Active water leak discovered during routine check — critical alert, plumber on-site today',
+  'High-drama scenario. Click the critical alert badge and show how the team gets notified instantly.');
 
 propRow(5, 'Royal Palm Estate', 'VIP Luxury', 'Palm Beach, FL',
-  'Owner event preparation in progress — multiple vendors coordinated',
-  'Shows vendor coordination and multi-step task management for high-end clients.');
+  'Owner event preparation — 6 vendors being coordinated, pre-event inspection completed',
+  'Shows multi-vendor coordination and multi-step task management for high-end clients.');
 
-propRow(6, 'Marina Bay Condo', 'Rental', 'Sarasota, FL',
-  'Guest turnover + smart lock reset — shows rental workflow',
-  'Ideal for property managers with rental inventory. Show the recurring turnover task template.');
+propRow(6, 'Marina Bay Condo', 'Rental', 'Fort Lauderdale, FL',
+  'Guest turnover in progress — smart lock reset overdue, new guests arriving tomorrow',
+  'Ideal for property managers with rental inventory. Show the urgent lock reset task.');
 
-propRow(7, 'Gulfstream Manor', 'High Maintenance', 'Naples, FL',
-  'Irrigation repair overdue + HOA violation open',
-  'Shows the priority escalation and vendor assignment workflow side-by-side.');
+propRow(7, 'Gulfstream Manor', 'High Maintenance', 'Bonita Springs, FL',
+  'Irrigation repair 3 days overdue + HOA violation risk if unresolved within 7 days',
+  'Shows priority escalation. The overdue badge and HOA countdown make the urgency clear.');
 
-propRow(8, 'The Sandpiper', 'Seasonal Arrival', 'Sanibel, FL',
-  'Owner arriving early — rush prep tasks auto-created',
-  'Great for showing how Hubify handles schedule changes. Rush tasks were created automatically when arrival moved up.');
+propRow(8, 'The Sandpiper', 'Seasonal Arrival', 'Sarasota, FL',
+  'Owner arriving 2 days early — rush prep tasks created, cleaning dispatched same-day',
+  'Shows how Hubify handles schedule changes. Rush tasks were created when arrival moved up.');
 
-propRow(9, 'Lighthouse Point', 'Storm Damage', 'Marco Island, FL',
-  'Roof leak from recent storm — insurance documentation tasks active',
-  'Point out the photo attachments on the tasks — field staff photographed the damage on-site.');
+propRow(9, 'Lighthouse Point', 'Storm Damage', 'Key West, FL',
+  'Roof leak after storm — insurance documentation tasks active, roofer on-site today',
+  'Point out the photo attachments — field staff photographed the damage on-site during the inspection.');
 
-propRow(10, 'Oceanfront Oasis', 'Stable Premium', 'Naples, FL',
-  'All tasks current, no open issues — shows a healthy account',
-  'The "good" comparison. Use this to contrast with the others: "When everything\'s running smoothly, this is what it looks like."');
+propRow(10, 'Oceanfront Oasis', 'Stable Premium', 'Delray Beach, FL',
+  'All tasks current, no open issues — 4-year client with weekly and monthly recurring schedule',
+  '"This is what a healthy account looks like." Use to contrast with the problem properties above.');
 
-doc.moveDown(0.5);
-tip('Navigate to Properties → select any property → walk through the tabs: Overview, Tasks, Rooms, Access Control, Inspections. Each tab has live data.');
+tip('Navigate to any property → Tasks tab to see all open, in-progress, and completed tasks for that address. The progress bar shows current status at a glance.');
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  4. TASKS & INSPECTIONS
 // ─────────────────────────────────────────────────────────────────────────────
-section(4, 'Tasks & Inspections', 'The operational heart of the platform');
+section(4, 'Tasks & Inspections', 'The operational heart of the platform — 40+ pre-seeded tasks across all 10 properties');
 
-para('There are 20 pre-seeded tasks across the 10 properties: a mix of overdue, in-progress, completed, and scheduled. Three full inspection checklists are active.');
+screenshotFrame(null, 'Task list — filter by status, property, assignee, or due date in real time', { h: 150 });
 
-subheading('Key Things to Demonstrate');
-steps([
-  { title: 'Show an overdue task', detail: 'Click the Urgent Tasks widget or filter the task list by "Overdue". Open the Pelican Point water leak — it has a critical priority and a staff note attached.' },
-  { title: 'Complete a task live', detail: 'Open any in-progress task and move it to Completed. The date-time stamps automatically. Point out: "This is what your field staff does on their phone when the job is done."' },
-  { title: 'Show the recurring task setup', detail: 'Navigate to Oceanfront Oasis → Tasks and find the recurring weekly check. Show the recurrence schedule — next instance auto-creates on completion.' },
-  { title: 'Open an inspection checklist', detail: 'Go to any property → Inspections tab. Open one of the three pre-seeded inspections. Walk through the checklist items — pass/fail/notes per room.' },
-  { title: 'Create a task from a template', detail: 'Click "+ Task", then "Use Template". Show the Hurricane Prep or Move-In/Move-Out templates — pre-filled with checklist, estimated time, and priority.' },
-]);
-
-subheading('Task Statuses in the Demo');
+subheading('Task Status Mix in the Demo');
 doc.y += 4;
 [
-  ['Pending',     BLUE_LIGHT,   BLUE,    '8 tasks — scheduled but not yet started'],
-  ['In Progress', '#fef9c3',    '#ca8a04','5 tasks — actively being worked on'],
-  ['Completed',   GREEN_LIGHT,  GREEN,   '4 tasks — done; useful for showing history'],
-  ['Overdue',     RED_LIGHT,    RED,     '3 tasks — intentionally overdue for demo drama'],
+  ['Pending',      BLUE_LIGHT,  BLUE,    'Scheduled, not yet started — due today or in coming days'],
+  ['In Progress',  '#fef9c3',   '#ca8a04','Actively being worked on — field staff on-site'],
+  ['Completed',    GREEN_LIGHT, GREEN,   'Done with timestamp — shows completed history'],
+  ['Overdue',      RED_LIGHT,   RED,     'Past due date, still open — creates urgency in the demo'],
 ].forEach(([label, bg, fg, desc]) => {
-  checkPageRoom(26);
+  checkRoom(26);
   const y = doc.y;
   const pw = inlinePill(ML, y, label, bg, fg);
   doc.fillColor(SLATE_700).font('Helvetica').fontSize(10.5)
-     .text(desc, ML + pw + 10, y, { width: BODY_W - pw - 10 });
+     .text(desc, ML + pw + 8, y, { width: BODY_W - pw - 8 });
   doc.y = y + 24;
 });
 doc.moveDown(0.5);
 
-tip('Press T from anywhere to open the quick-task form. Create a task for the property you just visited — it takes 15 seconds. This is the "wow" moment for most prospects.');
+subheading('Key Things to Demonstrate');
+steps([
+  { title: 'Open an overdue task', detail: 'Click an overdue item from the dashboard. Open the Gulfstream Manor irrigation task — it has an urgent priority badge, HOA note, and days-overdue indicator.' },
+  { title: 'Complete a task live', detail: 'Open any "In Progress" task and move it to Completed. The timestamp records automatically. Say: "This is what your field staff does on their phone when the job is done."' },
+  { title: 'Show recurring tasks', detail: 'Open Oceanfront Oasis → Tasks and find the weekly home watch. Show the recurrence schedule — next instance auto-creates on completion.' },
+  { title: 'Walk through an inspection checklist', detail: 'Open any property → Inspections tab. Walk through a pre-seeded checklist: pass/fail results, notes, and photo attachments per room.' },
+  { title: 'Create a task from a template', detail: 'Click "+ Task" → "Use Template". Show the Hurricane Prep or Turnover templates — pre-filled with checklist, estimated time, and priority.' },
+]);
+
+tip('Press T from anywhere to open the quick-task form — 15 seconds to create a task. This is the "wow" moment for most prospects.');
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  5. CALENDAR
 // ─────────────────────────────────────────────────────────────────────────────
-section(5, 'Calendar', '5 pre-seeded events — conflict detection live');
+section(5, 'Calendar', '10 pre-seeded events across all properties — conflict detection live');
 
-para('The Calendar has 5 demo events already in place. Two of them intentionally overlap on the same property for the same staff member — this triggers the conflict detection system.');
+screenshotFrame(null, 'Calendar — week and month views; staff scheduling and vendor appointments', { h: 155 });
+
+para('The calendar has 10 demo events already in place. Several are linked to specific properties and vendor visits. Two overlap on the same staff member — this triggers the live conflict detection system.');
 
 subheading('Pre-Seeded Events');
 table2([
-  ['Owner Arrival Prep',     'Sandpiper — linked to arrival rush tasks; shows property-event connection'],
-  ['Royal Palm Owner Event', 'Multi-vendor coordination event — shows attendee management'],
-  ['Pool Maintenance Visit', 'Sunset Key — recurring monthly; shows iCal subscription integration'],
-  ['Pelican Plumber On-site','Overlap event — intentional conflict with another staff assignment'],
-  ['Monthly Review Meeting', 'Team-internal; shows non-property events and staff scheduling'],
+  ['Weekly Team Standup',       'Recurring Monday 9am — whole team; shows non-property scheduling'],
+  ['CoolBreeze HVAC — Beachside','Tomorrow 10am — vendor visit linked to the HVAC task; shows property-event connection'],
+  ['SmartHome Tech — Sunset Key','Tomorrow 1pm — linked to the smart-home offline task'],
+  ['FastFlow Plumbing — Pelican','Today 8am — intentionally overlaps with another staff assignment (conflict trigger)'],
+  ['Owner Arrival — The Sandpiper','2 days out — shows rush-arrival prep event with multi-staff attendance'],
+  ['Hurricane Prep Deadline',   'Today 6am — Coconut Harbor deadline event with task link'],
+  ['StormGuard Roofing — Lighthouse','Today 9am — same-day vendor on-site; shows emergency scheduling'],
+  ['Owner Event — Royal Palm',  '6 days out — VIP event; shows supervisor managing high-value appointment'],
+  ['Pre-Event Walkthrough',     '5 days out — day-before inspection linked to Royal Palm event'],
+  ['Quarterly Portfolio Review','2 weeks out — management meeting; whole team attendees'],
 ], 'Event', 'What to Point Out', { col1W: 170 });
 
-subheading('Conflict Detection');
-para('When you navigate to the Calendar, click on the Pelican Plumber event and then the overlapping assignment. The conflict badge appears immediately. Say:');
-para('"Hubify checks for double-bookings automatically. Your supervisors see conflicts flagged in real time — no more discovering a problem when the client calls."', { color: TEAL_DARK, bold: true, size: 10 });
+subheading('Conflict Detection Demo');
+para('"Navigate to the Calendar and look at today\'s events. The FastFlow Plumbing visit overlaps with another staff assignment for the same person. Hubify flags this immediately — your supervisors see conflicts in real time."', { color: TEAL_DARK, bold: true, size: 10 });
 
-subheading('iCal Sync Demo');
+subheading('iCal Sync');
 steps([
-  { title: 'Open User Menu → Calendar', detail: 'The iCal feed URL is shown in the Subscribe section.' },
-  { title: 'Paste into Google Calendar', detail: '"Add by URL" imports all Hubify events into your personal calendar — read-only, synced automatically.' },
+  { title: 'Open User Menu → Settings → Calendar', detail: 'The iCal feed URL is shown in the Subscribe section.' },
+  { title: 'Paste into Google Calendar or Outlook', detail: '"Add calendar by URL" — all Hubify events flow into their existing calendar, read-only, and update automatically.' },
 ]);
-
-tip('If the prospect uses a shared team calendar (Outlook, Google), lead with the iCal sync — it\'s the fastest way to show Hubify fits into their existing workflow.');
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  6. INVOICES & BILLING
 // ─────────────────────────────────────────────────────────────────────────────
-section(6, 'Invoices & Billing', '5 invoices in every status + a consolidated batch');
+section(6, 'Invoices & Billing', '7 invoices across every status — including a consolidated batch invoice');
 
-para('The demo has invoices across every status, including a consolidated batch invoice — the feature prospects most frequently cite as a must-have.');
+screenshotFrame(null, 'Invoices list — sortable by status, client, amount, and due date', { h: 150 });
 
-subheading('Demo Invoices at a Glance');
+para('The demo has invoices in every possible state, including a consolidated batch invoice — the feature prospects most frequently cite as a must-have.');
+
+subheading('Demo Invoices');
 table2([
-  ['DEMO-2026-001', 'Draft       — $1,950    · Beachside Breeze · Pre-arrival HVAC inspection'],
-  ['DEMO-2026-002', 'Sent        — $3,800    · Coconut Harbor   · Hurricane prep + generator service'],
-  ['DEMO-2026-003', 'Overdue     — $2,200    · Lighthouse Point · Emergency water-intrusion response'],
-  ['DEMO-2026-004', 'Sent        — $2,460    · Royal Palm       · May owner-event coordination'],
-  ['DEMO-2026-005', 'Paid        — $2,850    · Marina Bay       · April turnover + inspection'],
-  ['DEMO-2026-CONSOL', 'Draft (Batch) — $9,850 · 3 properties  · Consolidated monthly portfolio'],
-], 'Invoice #', 'Status / Amount / Property', { col1W: 140 });
+  ['DEMO-2026-001', 'Paid · $385 · Beachside Breeze · April home watch + weekly inspections'],
+  ['DEMO-2026-002', 'Open · $520 · Beachside Breeze · May service + HVAC emergency coordination'],
+  ['DEMO-2026-003', 'Paid · $1,850 · Royal Palm Estate · April full estate management + event prep'],
+  ['DEMO-2026-004', 'Open · $2,460 · Royal Palm Estate · May estate + owner event (6 vendors)'],
+  ['DEMO-2026-005', 'Paid · $285 · Marina Bay Condo · April turnover management + inspection'],
+  ['DEMO-2026-006', 'Open · $310 · Marina Bay Condo · May turnover + guest prep'],
+  ['DEMO-2026-CONSOL', 'Draft (Batch) · $985 · Beachside + Royal Palm + Marina Bay · May 2026 preview'],
+], 'Invoice #', 'Status / Amount / Property', { col1W: 136 });
 
 subheading('What to Demo');
 steps([
-  { title: 'Show the batch invoice', detail: 'Go to Admin → Billing → Invoices. Open DEMO-2026-CONSOL. Scroll through the consolidated line items — all three properties, single PDF for the client.' },
-  { title: 'Change a status', detail: 'Open DEMO-2026-001 (Draft). Change it to Sent. Explain: "The moment you change this status, it appears in the client\'s portal. Until then, they can\'t see it — no accidental sends."' },
-  { title: 'Show the overdue invoice', detail: 'Open DEMO-2026-003. Point out the overdue badge and explain automated reminder emails — the system can be set to nudge clients automatically on day 3, 7, and 14.' },
-  { title: 'Stripe payment (if configured)', detail: 'If Stripe is connected, open the paid invoice DEMO-2026-005. Show the payment method, transaction date, and receipt URL — all captured automatically via webhook.' },
+  { title: 'Open the consolidated batch invoice', detail: 'Find DEMO-2026-CONSOL. Open it and scroll through the multi-property line items — three clients, single PDF. Say: "One invoice, one payment — instead of three separate sends."' },
+  { title: 'Change a status (draft → sent)', detail: 'Open DEMO-2026-CONSOL. Change status to Sent. "The moment you flip this, it becomes visible in the client portal — clients can\'t see drafts no matter what. No accidental sends."' },
+  { title: 'Show a paid invoice with Stripe receipt', detail: 'Open DEMO-2026-001. Show the payment method (Visa 4242), payment date, and Stripe receipt link — all captured automatically via webhook when the client paid online.' },
+  { title: 'Invoice PDF preview', detail: 'Click the PDF icon on any invoice. The formatted invoice opens in a new tab — ready to download, email, or print.' },
 ]);
 
 callout(
-  'Drafts are never visible in the client portal — regardless of any setting. Clients only ever see Sent or Paid invoices. This is a hard rule, not a toggle.',
-  { label: 'KEY POINT' }
+  'Draft invoices are never visible in the client portal — regardless of any setting. Clients only ever see Sent and Paid invoices.',
+  { label: 'KEY POINT', bg: BLUE_LIGHT, border: '#bfdbfe', labelColor: BLUE, textColor: '#1e40af', labelW: 66 }
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  7. CLIENT PORTAL
+//  7. DISPATCH CENTER
 // ─────────────────────────────────────────────────────────────────────────────
-section(7, 'Client Portal', 'A private window into their portfolio — no staff access required');
+section(7, 'Dispatch Center', 'Build daily itineraries and brief field staff before they leave');
 
-para('The portal is a completely separate interface. Log in as the demo client to show what your customers actually see — without exposing internal operations or other clients\' data.');
+screenshotFrame(null, 'Dispatch Center — daily itinerary builder with Route Brief slide-over', { h: 155 });
 
-subheading('Logging into the Portal');
-credBox('URL:', '/portal/login');
-credBox('Email:', 'client@demo.hubifyhomesonline.com');
-credBox('Password:', 'DemoClient2026!', { bg: PURPLE_LIGHT, border: '#ddd6fe', labelColor: PURPLE });
-doc.moveDown(0.5);
-
-subheading('What the Demo Client Sees');
-table2([
-  ['My Properties', 'Beachside Breeze + Marina Bay Condo — the 2 properties linked to this portal account'],
-  ['My Tasks',      'Active tasks on those 2 properties — field notes are stripped from client view'],
-  ['My Invoices',   'Only Sent and Paid invoices — DEMO-2026-004 and -005 appear; drafts are hidden'],
-  ['Documents',     'Any files explicitly shared by staff — shows secure document delivery'],
-], 'Portal Tab', 'What the Client Sees', { col1W: 130 });
-
-subheading('Suggested Portal Script');
-para('"Now I\'m going to log in as one of your clients. This is the exact experience they get — their properties, their tasks, their invoices. Nothing else. No other client\'s data. No internal notes."', { color: TEAL_DARK, bold: true, size: 10 });
-para('"When I go to Invoices, they can see what\'s been sent, download a PDF, and — if you\'ve connected Stripe — pay directly from this screen. You get notified the moment they do."', { color: TEAL_DARK, bold: true, size: 10 });
-
-tip('Open the portal and staff tabs side by side (two browser windows) during the demo. Update a task in the staff view, then refresh the portal — they\'ll see it update in real time.');
-
-subheading('Password Reset (for prospects)');
-steps([
-  { title: 'Direct them to /portal/login', detail: 'Click "Forgot password?" and follow the reset flow.' },
-  { title: 'They set their own password', detail: 'The portal uses email + password login, separate from Replit. Prospects can create their own account via invitation.' },
-]);
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  8. DISPATCH CENTER
-// ─────────────────────────────────────────────────────────────────────────────
-section(8, 'Dispatch Center', 'Build daily itineraries and brief field staff before they leave');
-
-para('The Dispatch Center is where supervisors plan the day\'s route for field staff — assigning which properties to visit, in what order, with estimated travel and stop durations.');
+para('The Dispatch Center is where supervisors plan the day\'s property route for field staff — assigning which properties to visit, in what order, with stop durations and a full pre-departure brief.');
 
 subheading('How to Demo It');
 steps([
-  { title: 'Navigate to Dispatch', detail: 'Click the Dispatch item in the main navigation (Admins and Supervisors only).' },
-  { title: 'Select or create an itinerary', detail: 'Today\'s itinerary appears if one exists. Click "New Itinerary" to create one from scratch, or select an existing itinerary from the left panel.' },
-  { title: 'Add stops', detail: 'Click "+ Add Stop" and select a property. Set an estimated duration. Drag stops to reorder.' },
-  { title: 'Open the Route Brief', detail: 'Click the "Route Brief" button in the itinerary header. A side panel opens with three tabs.' },
-  { title: 'Walk through the three tabs', detail: 'Access Codes (tap the eye icon to reveal), Alerts & Instructions (severity-coded), Supplies (what to bring vs. what to order).' },
-  { title: 'Publish the itinerary', detail: 'Click Publish. The itinerary pushes to the assigned staff member\'s calendar and phone.' },
+  { title: 'Navigate to Dispatch', detail: 'Click Dispatch in the main nav (Admin and Supervisor roles only). The today panel opens automatically.' },
+  { title: 'Select or create an itinerary', detail: 'Click "New Itinerary" to create from scratch, or select today\'s if one exists from the left panel.' },
+  { title: 'Add stops', detail: 'Click "+ Add Stop" → select a property → set an estimated duration. Drag to reorder the route.' },
+  { title: 'Open the Route Brief', detail: 'Click the "Route Brief" button in the itinerary header. A side panel slides open with three tabs.' },
+  { title: 'Walk through the Route Brief tabs', detail: 'Access Codes (tap eye icon to reveal), Alerts & Instructions (severity-sorted), Supplies (bring from stock vs. need to order).' },
+  { title: 'Publish the itinerary', detail: 'Click Publish. The itinerary pushes to the assigned staff member\'s schedule.' },
 ]);
 
-subheading('Route Brief Tabs');
+subheading('Route Brief — Three Tabs');
 table2([
-  ['Access Codes',           'All property codes for the route — door, gate, alarm, Wi-Fi. Values are blurred by default; tap the eye to reveal. Prevents codes being visible on screen during the briefing.'],
-  ['Alerts & Instructions',  'Active property alerts (critical, warning, info) + client notes. Critical alerts shown first. Say: "Before your team walks out the door, they know about the dog, the sensitive alarm, and the flooded back room."'],
-  ['Supplies',               '"Bring from stock" vs "Need to purchase" — items due for replacement within 30 days. Checkboxes let staff tick off what they\'ve loaded in the van.'],
-], 'Tab', 'What to Say / Point Out', { col1W: 150 });
+  ['Access Codes', 'All property codes for every stop on the route — door, gate, alarm, Wi-Fi. Values are masked by default; tap the eye icon to reveal. Prevents codes being visible during team briefings.'],
+  ['Alerts & Instructions', 'Active property alerts (critical → warning → info) plus client notes. Critical items appear first in red. "Before your team leaves, they know about the dog, the alarm quirk, and the flooded back room."'],
+  ['Supplies', '"Bring from stock" vs. "Need to purchase" — items due for replacement within 30 days, grouped by property. Checkboxes let staff tick off what\'s loaded in the van.'],
+], 'Tab', 'What to Say', { col1W: 140 });
 
-tip('"This replaces the paper clipboard, the group text, and the spreadsheet your dispatcher emailed this morning — all in one screen, always current."');
+tip('"This replaces the clipboard, the group text, and the spreadsheet your dispatcher emailed this morning — all in one screen, always current, for every property on the route."');
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  9. TEAM MANAGEMENT
+//  8. TEAM MANAGEMENT
 // ─────────────────────────────────────────────────────────────────────────────
-section(9, 'Team Management', 'Roles, assignments, and staff coordination');
+section(8, 'Team Management', 'Roles, assignments, and staff coordination');
 
-para('Navigate to the Team section to show staff management. The demo has 4 team members: 1 admin, 1 supervisor, and 2 staff — representing a typical small-to-mid size operation.');
+screenshotFrame(null, 'Team page — roster, roles, assignments, and invite flow', { h: 140 });
+
+para('The demo team has 4 members: 1 admin, 1 supervisor, and 2 field staff — representing a typical small-to-mid-size operation. Navigate to Team in the main nav to show staff management.');
 
 subheading('What to Show');
 bullet([
-  'Role hierarchy — Admin → Supervisor → Staff and what each role can and cannot do',
-  'Inviting a new team member — click "Invite Team Member", enter an email, assign a role. They receive the invitation automatically.',
-  'Supervisor relationships — click on Demo Staff 1 to see their assigned supervisor and how that affects task assignment workflow',
-  'Out-of-office — show how to flag a staff member as unavailable and how it blocks new task assignments for that period',
-  'Broadcast messaging — show how to email an entire team at once from the Messages section',
+  'Role hierarchy — Admin → Supervisor → Staff; each role sees a different version of the platform',
+  'Inviting a new team member — click "Invite Team Member", enter an email, assign a role; they receive the invitation automatically',
+  'Supervisor relationships — Demo Staff 1 has Demo Supervisor assigned; explains how task escalation flows',
+  'Broadcast messaging — send a message or notification to the entire team from the Messages section',
 ]);
 
-subheading('Role Permissions at a Glance');
+subheading('Role Permissions');
 table2([
-  ['Admin',      'Everything: billing, settings, team management, all data, super-admin actions'],
-  ['Supervisor', 'All operational data; cannot change org settings or billing; can manage tasks and team assignments'],
-  ['Staff',      'Own tasks and assigned properties only; no billing, no team management, no other clients\' data'],
-], 'Role', 'What They Can Access', { col1W: 110 });
+  ['Admin',      'Full access — billing, settings, team management, all property data'],
+  ['Supervisor', 'All operational data; cannot change org settings or billing; manages task assignments'],
+  ['Staff',      'Own tasks and assigned properties only — no billing, no team management'],
+], 'Role', 'What They Can Access', { col1W: 100 });
+
+subheading('Time Tracking (if enabled)');
+para('If the prospect needs billable time logging, confirm the Time Tracking feature flag is on in Settings → Feature Flags before the demo. When enabled, staff can clock in and out on tasks and supervisors see a live time report.');
 
 callout(
-  'Time Tracking is controlled by a feature flag. If the prospect needs billable time logging, confirm it\'s enabled in Settings → Feature Flags before the demo.',
-  { label: 'FEATURE FLAG' }
+  'Features like Time Tracking, Zapier integration, and advanced reports are controlled by feature flags — easily toggled per organization.',
+  { label: 'FEATURE FLAGS', bg: PURPLE_LIGHT, border: '#ddd6fe', labelColor: PURPLE, textColor: '#5b21b6', labelW: 80 }
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  10. TALKING POINTS & OBJECTIONS
+//  9. FAQs & OBJECTION RESPONSES
 // ─────────────────────────────────────────────────────────────────────────────
-section(10, 'Talking Points & Objection Responses', 'Common questions and how to answer them');
+section(9, 'FAQs & Objection Responses', 'Common questions and how to answer them confidently');
 
-subheading('"We already use spreadsheets / a different tool."');
-para('"Hubify isn\'t just a better spreadsheet — it connects the job (task), the place (property), the person (client), and the money (invoice) in one record. When you complete a task, it\'s already attached to the right property and ready to invoice. No retyping, no cross-referencing."', { color: SLATE_700 });
-doc.moveDown(0.3);
+const faqs = [
+  [
+    '"We already use spreadsheets / a different tool."',
+    'Hubify isn\'t just a better spreadsheet — it connects the job (task), the place (property), the person (client), and the money (invoice) in one record. When you complete a task, it\'s already attached to the right property and ready to invoice. No retyping, no cross-referencing between five tabs.',
+  ],
+  [
+    '"Our clients don\'t want a portal — they just call us."',
+    'The portal doesn\'t replace the phone call — it answers the questions that don\'t need one. "Did the inspector go today?" "Where\'s my invoice?" "Did that leak get fixed?" Clients check the portal and find the answer instantly. You get fewer interruptions; they get 24/7 visibility.',
+  ],
+  [
+    '"What about importing our existing data?"',
+    'We have a CSV import tool with AI-assisted field mapping — import your existing properties, contacts, and tasks. Most teams are fully migrated in a day. We also offer white-glove onboarding for larger portfolios.',
+  ],
+  [
+    '"Is our data secure?"',
+    'Hubify is fully multi-tenant — each organization is completely isolated. Client data is encrypted at rest and in transit. Access codes are stored encrypted. We\'re built on enterprise-grade infrastructure with SOC 2-aligned practices.',
+  ],
+  [
+    '"What does it cost?"',
+    'Pricing is based on the number of active properties in your portfolio. I can pull up the current plan options and we can walk through which tier fits your team. Would you like to do that now, or finish the demo first?',
+  ],
+  [
+    '"We tried software before and the team didn\'t adopt it."',
+    'Hubify\'s field staff interface works on any phone browser — no app to install, no training manual. Staff see only their assigned tasks. Supervisors see everything. The simpler the interface, the higher the adoption. Most teams are fully operational within a week.',
+  ],
+  [
+    '"Can we try it before committing?"',
+    'Absolutely — that\'s what this demo is for. After this walkthrough, we can set up a trial environment with your actual properties so you can see exactly how Hubify would work for your business.',
+  ],
+];
 
-subheading('"Our clients don\'t want a portal — they just want to call us."');
-para('"The portal doesn\'t replace the phone — it answers the questions that don\'t need a phone. \'Did the inspector go today?\' \'Where\'s my invoice?\' \'Did that leak get fixed?\' Clients check the portal instead of calling. You get fewer interruptions, they get instant answers."', { color: SLATE_700 });
-doc.moveDown(0.3);
+faqs.forEach(([q, a], i) => {
+  const aH = textHeight(a, { size: 10.5, width: BODY_W - 20 });
+  checkRoom(aH + 80);
+  subheading(q, { topGap: i === 0 ? 0 : 0.4 });
+  para(a);
+  if (i < faqs.length - 1) hline();
+});
 
-subheading('"What about our existing property data?"');
-para('"We have a CSV import tool with AI-assisted field mapping — you can import your existing properties, contacts, and tasks. Most teams are fully migrated in a day. We also offer a white-glove onboarding service for larger portfolios."', { color: SLATE_700 });
-doc.moveDown(0.3);
-
-subheading('"Is my data secure?"');
-para('"Hubify is multi-tenant — each organization is completely isolated. Your clients\' data is encrypted at rest and in transit. Access codes are stored encrypted. We\'re built on enterprise-grade infrastructure with SOC 2-aligned practices."', { color: SLATE_700 });
-doc.moveDown(0.3);
-
-subheading('"What\'s the pricing?"');
-para('"Pricing is based on the number of active properties in your portfolio. I can pull up the current plan options and we can walk through which tier fits your team. Would you like to do that now, or finish the demo first?"', { color: SLATE_700 });
 doc.moveDown(0.5);
-
 hline(TEAL, 1.5);
 
 subheading('Demo Reset', { color: SLATE_500 });
-para('If any demo data gets changed during the walkthrough and you want to restore the original state, go to Super Admin → Demo tab → Full Reset. This wipes and reseeds everything in about 30 seconds. The demo URL and admin login are never affected.', { color: SLATE_500 });
+para('If demo data gets changed during a walkthrough, reset it from Super Admin → Demo tab → "Reset Demo Data". This wipes and reseeds everything in about 30 seconds — the 10 properties, all tasks with their statuses, invoices, calendar events, and notifications are fully restored. The admin login is never changed.', { color: SLATE_500 });
 
 doc.moveDown(0.5);
 hline(TEAL, 1.5);
-doc.moveDown(0.5);
-para('Questions during the demo?  Press ? inside Hubify to open the support form, or email your Hubify account manager directly.', { color: SLATE_500, size: 10 });
-para('Hubify · hubifyhomesonline.com', { color: TEAL_DARK, bold: true, size: 10 });
+doc.moveDown(0.4);
+doc.fillColor(TEAL_DARK).font('Helvetica-Bold').fontSize(10).text('Hubify  ·  hubifyhomesonline.com', ML, doc.y);
 
-// ─── Finalize ──────────────────────────────────────────────────────────────
+// ─── Finalize ─────────────────────────────────────────────────────────────────
 footer();
 doc.end();
 
 await new Promise((resolve, reject) => {
-  stream.on('finish', resolve);
-  stream.on('error', reject);
+  outStream.on('finish', resolve);
+  outStream.on('error', reject);
 });
 
-console.log(`\n✓  PDF saved to: ${OUT_PDF}`);
-console.log(`   Size: ${(fs.statSync(OUT_PDF).size / 1024).toFixed(1)} KB`);
-console.log(`   Pages: ~10 sections + cover + TOC`);
+const stat = fs.statSync(OUT_PDF);
+console.log(`\n✓  PDF saved → ${OUT_PDF}`);
+console.log(`   Size:  ${(stat.size / 1024).toFixed(1)} KB`);
