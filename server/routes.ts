@@ -3581,7 +3581,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/dashboard/recent-activity", isAuthenticated, async (req, res) => {
     try {
-      const activity = await storage.getRecentActivity(10);
+      const orgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
+      const activity = await storage.getRecentActivity(orgId, 10);
       res.json(activity);
     } catch (error) {
       console.error("Error fetching recent activity:", error);

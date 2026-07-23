@@ -792,7 +792,7 @@ export interface IStorage {
   upsertUserNotificationPreferences(preferences: InsertUserNotificationPreferences): Promise<UserNotificationPreferences>;
   
   // Activity log operations
-  getRecentActivity(limit?: number): Promise<ActivityLog[]>;
+  getRecentActivity(orgId: string, limit?: number): Promise<ActivityLog[]>;
   logActivity(activity: InsertActivityLog): Promise<ActivityLog>;
   
   // Dashboard stats
@@ -5205,10 +5205,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Activity log operations
-  async getRecentActivity(limit: number = 10): Promise<ActivityLog[]> {
+  async getRecentActivity(orgId: string, limit: number = 10): Promise<ActivityLog[]> {
     return await db
-      .select()
+      .select({
+        id: activityLog.id,
+        userId: activityLog.userId,
+        action: activityLog.action,
+        entityType: activityLog.entityType,
+        entityId: activityLog.entityId,
+        description: activityLog.description,
+        createdAt: activityLog.createdAt,
+      })
       .from(activityLog)
+      .innerJoin(users, eq(activityLog.userId, users.id))
+      .where(eq(users.orgId, orgId))
       .orderBy(desc(activityLog.createdAt))
       .limit(limit);
   }
