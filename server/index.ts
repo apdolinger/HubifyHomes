@@ -9,6 +9,15 @@ import { startScheduledTasks } from "./scheduledTasks";
 import { logError } from "./errorLogger";
 import { tenantMiddleware } from "./tenantMiddleware";
 
+// Install process-level error guards as early as possible so transient
+// database / WebSocket drops during startup don't crash the process.
+process.on("uncaughtException", (err: Error) => {
+  console.error("[UNCAUGHT EXCEPTION – early guard]", err.message);
+});
+process.on("unhandledRejection", (reason: any) => {
+  console.error("[UNHANDLED REJECTION – early guard]", reason?.message ?? reason);
+});
+
 const app = express();
 
 // Security headers (production only — skip CSP in dev to keep Vite HMR working)

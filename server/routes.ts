@@ -22691,6 +22691,114 @@ contact@hubifyhomes.com`;
     }
   });
 
+  // ── Route Brief / Prep-kit ───────────────────────────────────────────────────
+
+  app.get("/api/dispatch/itineraries/:id/prep-kit", isAuthenticated, async (req: any, res) => {
+    try {
+      const orgId = (req.user as any)?.claims?.orgId || (req.user as any)?.orgId;
+      const {
+        dailyItineraries: diTable,
+        dailyItineraryStops: disTable,
+        propertyAccessItems: paiTable,
+        alerts: alertsTable,
+        rooms: roomsTable,
+        roomSupplies: rsTable,
+        properties: propsTable,
+      } = await import("@shared/schema");
+
+      const [itinerary] = await db.select().from(diTable).where(and(eq(diTable.id, req.params.id), eq(diTable.orgId, orgId)));
+      if (!itinerary) return res.status(404).json({ message: "Itinerary not found" });
+
+      const stops = await db.select().from(disTable).where(eq(disTable.dailyItineraryId, itinerary.id));
+      const propertyIds = [...new Set(stops.map(s => s.propertyId).filter((id): id is number => id != null))];
+
+      if (propertyIds.length === 0) {
+        return res.json({ accessByProperty: [], alertsByProperty: [], suppliesByProperty: [] });
+      }
+
+      const props = await db.select().from(propsTable).where(inArray(propsTable.id, propertyIds));
+      const propMap = Object.fromEntries(props.map(p => [p.id, p]));
+      const primaryContactIds = [...new Set(props.map(p => p.primaryContactId).filter((id): id is number => id != null))];
+
+      const thirtyOneDaysOut = new Date();
+      thirtyOneDaysOut.setDate(thirtyOneDaysOut.getDate() + 31);
+      const thirtyOneDaysOutStr = thirtyOneDaysOut.toISOString().split("T")[0];
+
+      const [accessItems, rawPropertyAlerts, rawClientAlerts, roomsList] = await Promise.all([
+        db.select().from(paiTable).where(inArray(paiTable.propertyId, propertyIds)),
+        db.select().from(alertsTable).where(and(
+          eq(alertsTable.orgId, orgId),
+          eq(alertsTable.isActive, true),
+          inArray(alertsTable.entityId, propertyIds)
+        )),
+        primaryContactIds.length > 0
+          ? db.select().from(alertsTable).where(and(
+              eq(alertsTable.orgId, orgId),
+              eq(alertsTable.isActive, true),
+              inArray(alertsTable.entityId, primaryContactIds)
+            ))
+          : Promise.resolve([]),
+        db.select().from(roomsTable).where(inArray(roomsTable.propertyId, propertyIds)),
+      ]);
+
+      const propertyAlerts = rawPropertyAlerts.filter(a => a.type === "property");
+      const clientAlerts = rawClientAlerts.filter(a => a.type === "client");
+
+      const roomIds = roomsList.map(r => r.id);
+      const supplies = roomIds.length > 0
+        ? await db.select().from(rsTable).where(and(
+            inArray(rsTable.roomId, roomIds),
+            lt(rsTable.nextReplacement, thirtyOneDaysOutStr)
+          ))
+        : [];
+
+      const sortBySeverity = (a: any, b: any) => {
+        const order: Record<string, number> = { critical: 0, warning: 1, info: 2 };
+        return (order[a.severity] ?? 2) - (order[b.severity] ?? 2);
+      };
+
+      const accessByProperty = propertyIds.map(pid => ({
+        propertyId: pid,
+        propertyName: (propMap[pid] as any)?.name ?? `Property #${pid}`,
+        items: accessItems.filter(a => a.propertyId === pid),
+      })).filter(g => g.items.length > 0);
+
+      const alertsByProperty = propertyIds.map(pid => {
+        const prop = propMap[pid] as any;
+        const propInstructions = propertyAlerts.filter(a => a.entityId === pid).sort(sortBySeverity);
+        const clientNotes = prop?.primaryContactId
+          ? clientAlerts.filter(a => a.entityId === prop.primaryContactId).sort(sortBySeverity)
+          : [];
+        if (propInstructions.length === 0 && clientNotes.length === 0) return null;
+        return {
+          propertyId: pid,
+          propertyName: prop?.name ?? `Property #${pid}`,
+          propertyAlerts: propInstructions,
+          clientAlerts: clientNotes,
+        };
+      }).filter(Boolean);
+
+      const roomToProperty = Object.fromEntries(roomsList.map(r => [r.id, r.propertyId]));
+      const roomNameMap = Object.fromEntries(roomsList.map(r => [r.id, r.name]));
+      const supplyWithRoom = supplies.map(s => ({
+        ...s,
+        propertyId: roomToProperty[s.roomId],
+        roomName: roomNameMap[s.roomId] ?? "Unknown Room",
+      }));
+
+      const suppliesByProperty = propertyIds.map(pid => ({
+        propertyId: pid,
+        propertyName: (propMap[pid] as any)?.name ?? `Property #${pid}`,
+        supplies: supplyWithRoom.filter(s => s.propertyId === pid),
+      })).filter(g => g.supplies.length > 0);
+
+      res.json({ accessByProperty, alertsByProperty, suppliesByProperty });
+    } catch (err) {
+      console.error("[dispatch] GET /itineraries/:id/prep-kit", err);
+      res.status(500).json({ message: "Failed to fetch route brief" });
+    }
+  });
+
   // ── Publish / Calendar Sync ───────────────────────────────────────────────────
 
   app.post("/api/dispatch/itineraries/:id/publish", isAuthenticated, async (req: any, res) => {

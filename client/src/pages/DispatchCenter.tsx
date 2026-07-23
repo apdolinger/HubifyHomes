@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -19,7 +21,9 @@ import {
   MapPin, Plus, ChevronDown, ChevronUp, ChevronRight,
   Clock, AlertTriangle, CheckCircle2, Send, FileText,
   Trash2, ArrowUp, ArrowDown, Calendar, RefreshCw, Save,
-  Copy, LayoutList, Pencil, X, Play, Square, Timer, TrendingUp
+  Copy, LayoutList, Pencil, X, Play, Square, Timer, TrendingUp,
+  ClipboardList, Eye, EyeOff, Wifi, DoorOpen, Bell, Car, KeyRound,
+  Info, ShoppingCart, Package, Printer
 } from "lucide-react";
 
 type StopDraft = {
@@ -103,6 +107,28 @@ function ElapsedTimer({ startedAt }: { startedAt: string }) {
   return <span className="text-teal-600 font-medium flex items-center gap-1"><Timer className="w-3 h-3" />{elapsed}m elapsed</span>;
 }
 
+function AccessIcon({ category }: { category: string }) {
+  const icons: Record<string, React.ReactNode> = {
+    door: <DoorOpen className="w-4 h-4" />,
+    gate: <KeyRound className="w-4 h-4" />,
+    alarm: <Bell className="w-4 h-4" />,
+    wifi: <Wifi className="w-4 h-4" />,
+    garage: <Car className="w-4 h-4" />,
+    other: <KeyRound className="w-4 h-4" />,
+  };
+  return <span className="text-muted-foreground">{icons[category] ?? icons.other}</span>;
+}
+
+function SeverityBadge({ severity }: { severity: string }) {
+  const map: Record<string, { label: string; className: string }> = {
+    info:     { label: "Info",     className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" },
+    warning:  { label: "Warning",  className: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" },
+    critical: { label: "Critical", className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" },
+  };
+  const cfg = map[severity] ?? map.info;
+  return <span className={`inline-flex items-center text-xs font-medium px-1.5 py-0.5 rounded-full ${cfg.className}`}>{cfg.label}</span>;
+}
+
 export default function DispatchCenter() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -126,6 +152,8 @@ export default function DispatchCenter() {
   const [newItineraryForm, setNewItineraryForm] = useState({ name: "", date: format(new Date(), "yyyy-MM-dd"), startTime: "08:00", assignedUserId: "" });
 
   const [editingStopId, setEditingStopId] = useState<string | null>(null);
+  const [routeBriefOpen, setRouteBriefOpen] = useState(false);
+  const [revealedValues, setRevealedValues] = useState<Set<number>>(new Set());
 
   const { data: users = [] } = useQuery<any[]>({ queryKey: ["/api/users"] });
   const { data: templates = [], isLoading: templatesLoading } = useQuery<Template[]>({ queryKey: ["/api/dispatch/templates"] });
@@ -270,6 +298,31 @@ export default function DispatchCenter() {
     enabled: !!editingStopId && !!suggestionUserId && !!suggestionPropertyId,
     staleTime: 5 * 60 * 1000,
   });
+
+  const { data: prepKit, isLoading: prepKitLoading } = useQuery<{
+    accessByProperty: Array<{ propertyId: number; propertyName: string; items: any[] }>;
+    alertsByProperty: Array<{ propertyId: number; propertyName: string; propertyAlerts: any[]; clientAlerts: any[] }>;
+    suppliesByProperty: Array<{ propertyId: number; propertyName: string; supplies: any[] }>;
+  }>({
+    queryKey: ["/api/dispatch/itineraries", activeItineraryId, "prep-kit"],
+    queryFn: () => fetch(`/api/dispatch/itineraries/${activeItineraryId}/prep-kit`).then(r => r.json()),
+    enabled: routeBriefOpen && !!activeItineraryId,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const totalAccessItems = prepKit?.accessByProperty.reduce((sum, g) => sum + g.items.length, 0) ?? 0;
+  const totalAlerts = prepKit?.alertsByProperty.reduce((sum, g) => sum + g.propertyAlerts.length + g.clientAlerts.length, 0) ?? 0;
+  const totalSupplies = prepKit?.suppliesByProperty.reduce((sum, g) => sum + g.supplies.length, 0) ?? 0;
+
+  const today = new Date().toISOString().split("T")[0];
+
+  function toggleReveal(id: number) {
+    setRevealedValues(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
 
   if (!isManager) {
     return (
@@ -525,6 +578,9 @@ export default function DispatchCenter() {
                         <CheckCircle2 className="w-4 h-4 mr-1" /> Mark Completed
                       </Button>
                     )}
+                    <Button size="sm" variant="outline" onClick={() => { setRevealedValues(new Set()); setRouteBriefOpen(true); }}>
+                      <ClipboardList className="w-4 h-4 mr-1" /> Route Brief
+                    </Button>
                     {itin.status !== "completed" && (
                       <Button size="sm" variant="outline" onClick={() => { setSaveTemplateForm(f => ({ ...f, preferredStartTime: itin.startTime })); setSaveTemplateOpen(true); }}>
                         <Save className="w-4 h-4 mr-1" /> Save as Template
@@ -825,6 +881,226 @@ export default function DispatchCenter() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Route Brief Sheet */}
+      <Sheet open={routeBriefOpen} onOpenChange={setRouteBriefOpen}>
+        <SheetContent side="right" className="sm:max-w-2xl w-full flex flex-col p-0 print:shadow-none">
+          <SheetHeader className="px-6 pt-6 pb-4 border-b shrink-0">
+            <div className="flex items-center justify-between">
+              <SheetTitle className="flex items-center gap-2">
+                <ClipboardList className="w-5 h-5 text-teal-600" />
+                Route Brief — {itin?.name}
+              </SheetTitle>
+              <Button size="sm" variant="ghost" className="text-muted-foreground print:hidden" onClick={() => window.print()}>
+                <Printer className="w-4 h-4 mr-1" /> Print
+              </Button>
+            </div>
+          </SheetHeader>
+
+          {prepKitLoading ? (
+            <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">Loading route data…</div>
+          ) : (
+            <Tabs defaultValue="access" className="flex-1 flex flex-col overflow-hidden">
+              <TabsList className="mx-6 mt-4 shrink-0 self-start print:hidden">
+                <TabsTrigger value="access" className="gap-1.5">
+                  Access Codes
+                  {totalAccessItems > 0 && <Badge variant="secondary" className="text-xs h-4 px-1">{totalAccessItems}</Badge>}
+                </TabsTrigger>
+                <TabsTrigger value="alerts" className="gap-1.5">
+                  Alerts &amp; Instructions
+                  {totalAlerts > 0 && <Badge variant="secondary" className="text-xs h-4 px-1">{totalAlerts}</Badge>}
+                </TabsTrigger>
+                <TabsTrigger value="supplies" className="gap-1.5">
+                  Supplies
+                  {totalSupplies > 0 && <Badge variant="secondary" className="text-xs h-4 px-1">{totalSupplies}</Badge>}
+                </TabsTrigger>
+              </TabsList>
+
+              {/* ACCESS CODES TAB */}
+              <TabsContent value="access" className="flex-1 overflow-auto mt-0">
+                <ScrollArea className="h-full">
+                  <div className="p-6 space-y-6">
+                    {(!prepKit?.accessByProperty || prepKit.accessByProperty.length === 0) && (
+                      <div className="text-center py-12 text-muted-foreground text-sm">
+                        <KeyRound className="w-8 h-8 mx-auto mb-3 opacity-20" />
+                        No access codes recorded for properties on this route.
+                      </div>
+                    )}
+                    {prepKit?.accessByProperty.map(group => (
+                      <div key={group.propertyId}>
+                        <h3 className="font-semibold text-sm mb-3 pb-2 border-b flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-teal-600 shrink-0" /> {group.propertyName}
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {group.items.map((item: any) => (
+                            <div key={item.id} className="rounded-lg border bg-card p-3 flex items-start gap-3">
+                              <AccessIcon category={item.category} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs text-muted-foreground capitalize">{item.category}</p>
+                                <p className="text-sm font-medium truncate">{item.description}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <code className={`text-sm font-mono transition-all ${revealedValues.has(item.id) ? "" : "blur-sm select-none"}`}>
+                                    {item.value}
+                                  </code>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleReveal(item.id)}
+                                    className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                                    aria-label={revealedValues.has(item.id) ? "Hide" : "Reveal"}
+                                  >
+                                    {revealedValues.has(item.id) ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                  </button>
+                                </div>
+                                {item.notes && <p className="text-xs text-muted-foreground mt-1 italic">{item.notes}</p>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+
+              {/* ALERTS & INSTRUCTIONS TAB */}
+              <TabsContent value="alerts" className="flex-1 overflow-auto mt-0">
+                <ScrollArea className="h-full">
+                  <div className="p-6 space-y-6">
+                    {(!prepKit?.alertsByProperty || prepKit.alertsByProperty.length === 0) && (
+                      <div className="text-center py-12 text-muted-foreground text-sm">
+                        <Info className="w-8 h-8 mx-auto mb-3 opacity-20" />
+                        No active alerts or instructions for properties on this route.
+                      </div>
+                    )}
+                    {prepKit?.alertsByProperty.map((group: any) => (
+                      <div key={group.propertyId}>
+                        <h3 className="font-semibold text-sm mb-3 pb-2 border-b flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-teal-600 shrink-0" /> {group.propertyName}
+                        </h3>
+                        {group.propertyAlerts.length > 0 && (
+                          <div className="mb-3">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Property Instructions</p>
+                            <div className="space-y-2">
+                              {group.propertyAlerts.map((alert: any) => (
+                                <div key={alert.id} className="rounded-lg border bg-card p-3 flex gap-3">
+                                  {alert.severity === "critical" && <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />}
+                                  {alert.severity === "warning" && <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />}
+                                  {alert.severity === "info" && <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                      <SeverityBadge severity={alert.severity} />
+                                    </div>
+                                    <p className="text-sm">{alert.message}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {group.clientAlerts.length > 0 && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Client Notes</p>
+                            <div className="space-y-2">
+                              {group.clientAlerts.map((alert: any) => (
+                                <div key={alert.id} className="rounded-lg border bg-card p-3 flex gap-3">
+                                  {alert.severity === "critical" && <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />}
+                                  {alert.severity === "warning" && <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />}
+                                  {alert.severity === "info" && <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                      <SeverityBadge severity={alert.severity} />
+                                    </div>
+                                    <p className="text-sm">{alert.message}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+
+              {/* SUPPLIES TAB */}
+              <TabsContent value="supplies" className="flex-1 overflow-auto mt-0">
+                <ScrollArea className="h-full">
+                  <div className="p-6 space-y-6">
+                    {(!prepKit?.suppliesByProperty || prepKit.suppliesByProperty.length === 0) && (
+                      <div className="text-center py-12 text-muted-foreground text-sm">
+                        <Package className="w-8 h-8 mx-auto mb-3 opacity-20" />
+                        No supplies due within 30 days for properties on this route.
+                      </div>
+                    )}
+                    {prepKit?.suppliesByProperty.map(group => {
+                      const stock = group.supplies.filter((s: any) => !s.purchaseUrl);
+                      const purchase = group.supplies.filter((s: any) => !!s.purchaseUrl);
+                      return (
+                        <div key={group.propertyId}>
+                          <h3 className="font-semibold text-sm mb-3 pb-2 border-b flex items-center gap-2">
+                            <MapPin className="w-4 h-4 text-teal-600 shrink-0" /> {group.propertyName}
+                          </h3>
+                          {stock.length > 0 && (
+                            <div className="mb-3">
+                              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
+                                <Package className="w-3 h-3" /> Bring from stock
+                              </p>
+                              <div className="space-y-1">
+                                {stock.map((s: any) => {
+                                  const overdue = s.nextReplacement && s.nextReplacement < today;
+                                  return (
+                                    <label key={s.id} className="flex items-center gap-3 rounded-lg border bg-card p-2.5 cursor-pointer hover:bg-muted/30">
+                                      <input type="checkbox" className="h-4 w-4 rounded shrink-0" />
+                                      <div className="flex-1 min-w-0">
+                                        <span className="text-sm font-medium">{s.name}</span>
+                                        <span className="text-xs text-muted-foreground ml-2">{s.roomName} · {s.type}</span>
+                                      </div>
+                                      <Badge variant={overdue ? "destructive" : "outline"} className="text-xs shrink-0">
+                                        {overdue ? "Overdue" : "Due Soon"}
+                                      </Badge>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                          {purchase.length > 0 && (
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
+                                <ShoppingCart className="w-3 h-3" /> Need to purchase
+                              </p>
+                              <div className="space-y-1">
+                                {purchase.map((s: any) => {
+                                  const overdue = s.nextReplacement && s.nextReplacement < today;
+                                  return (
+                                    <label key={s.id} className="flex items-center gap-3 rounded-lg border bg-card p-2.5 cursor-pointer hover:bg-muted/30">
+                                      <input type="checkbox" className="h-4 w-4 rounded shrink-0" />
+                                      <div className="flex-1 min-w-0">
+                                        <span className="text-sm font-medium">{s.name}</span>
+                                        <span className="text-xs text-muted-foreground ml-2">{s.roomName} · {s.type}</span>
+                                        {s.purchaseUrl && (
+                                          <a href={s.purchaseUrl} target="_blank" rel="noopener noreferrer" className="ml-2 text-xs text-teal-600 hover:underline">Buy →</a>
+                                        )}
+                                      </div>
+                                      <Badge variant={overdue ? "destructive" : "outline"} className="text-xs shrink-0">
+                                        {overdue ? "Overdue" : "Due Soon"}
+                                      </Badge>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+            </Tabs>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

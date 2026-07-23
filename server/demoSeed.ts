@@ -35,9 +35,12 @@ import {
   properties,
   propertyAccessItems,
   propertyVendors,
+  propertyForms,
+  propertyPortalSettings,
   tasks,
   taskChecklistItems,
   inspectionSchedules,
+  timeEntries,
   calendars,
   events,
   eventAttendees,
@@ -51,6 +54,7 @@ import {
   portalUsers,
   portalUserProperties,
   notifications,
+  conflictResolutions,
 } from "../shared/schema";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -924,7 +928,25 @@ export async function resetDemoTenant() {
   }
   console.log("  [del] tasks, checklists, inspections, access items");
 
-  // Properties (clear community link first)
+  // Time entries — must be cleared before properties (org-scoped, no cascade)
+  await db.delete(timeEntries).where(eq(timeEntries.orgId, DEMO_ORG_ID));
+  console.log("  [del] time entries");
+
+  // Property-scoped tables with non-cascade FK to properties — clear before deleting properties
+  if (pIds.length > 0) {
+    await db.delete(propertyForms).where(inArray(propertyForms.propertyId, pIds));
+    await db.delete(propertyPortalSettings).where(inArray(propertyPortalSettings.propertyId, pIds));
+    await db.delete(conflictResolutions).where(inArray(conflictResolutions.propertyId, pIds));
+    // Clear any form submissions linked directly to demo properties (outside demo-slug forms)
+    await db.delete(formSubmissions).where(inArray(formSubmissions.propertyId, pIds));
+  }
+  console.log("  [del] property forms, portal settings, conflict resolutions");
+
+  // Contacts must be deleted BEFORE properties because contacts.property_id FK → properties (no cascade)
+  await db.delete(contacts).where(eq(contacts.orgId, DEMO_ORG_ID));
+  console.log("  [del] contacts");
+
+  // Properties (clear community link first to avoid self-referential constraint)
   await db.update(properties).set({ communityId: null }).where(eq(properties.orgId, DEMO_ORG_ID));
   await db.delete(properties).where(eq(properties.orgId, DEMO_ORG_ID));
   console.log("  [del] properties");
@@ -937,10 +959,6 @@ export async function resetDemoTenant() {
     await db.delete(formFields).where(inArray(formFields.formId, fIds));
     await db.delete(forms).where(inArray(forms.id, fIds));
   }
-
-  // Contacts (all, including vendors)
-  await db.delete(contacts).where(eq(contacts.orgId, DEMO_ORG_ID));
-  console.log("  [del] contacts");
 
   // Staff users (all — re-seeded fresh, including password)
   await db.delete(users).where(eq(users.orgId, DEMO_ORG_ID));
