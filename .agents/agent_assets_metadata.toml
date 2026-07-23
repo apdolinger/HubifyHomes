@@ -11,3 +11,9 @@ id = "vrh_52mAh39_NGm0Y5gG7"
 uri = "file://screenshots/Hubify_User_Guide.pdf"
 type = "pdf"
 title = "Hubify User Guide"
+
+[[outputs]]
+id = "I00HbcsZumyeVJ8hxTvGC"
+uri = "file://screenshots/Hubify_Demo_Guide.pdf"
+type = "pdf"
+title = "Hubify Demo Walkthrough Guide"

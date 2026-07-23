@@ -22716,7 +22716,18 @@ contact@hubifyhomes.com`;
         return res.json({ accessByProperty: [], alertsByProperty: [], suppliesByProperty: [] });
       }
 
-      const props = await db.select().from(propsTable).where(inArray(propsTable.id, propertyIds));
+      // Verify ownership: only return properties that belong to this org.
+      // This prevents cross-tenant data leakage even if stop.propertyId values
+      // somehow reference another org's properties.
+      const props = await db.select().from(propsTable).where(
+        and(inArray(propsTable.id, propertyIds), eq(propsTable.orgId, orgId))
+      );
+      const verifiedPropertyIds = props.map(p => p.id);
+
+      if (verifiedPropertyIds.length === 0) {
+        return res.json({ accessByProperty: [], alertsByProperty: [], suppliesByProperty: [] });
+      }
+
       const propMap = Object.fromEntries(props.map(p => [p.id, p]));
       const primaryContactIds = [...new Set(props.map(p => p.primaryContactId).filter((id): id is number => id != null))];
 
@@ -22725,11 +22736,11 @@ contact@hubifyhomes.com`;
       const thirtyOneDaysOutStr = thirtyOneDaysOut.toISOString().split("T")[0];
 
       const [accessItems, rawPropertyAlerts, rawClientAlerts, roomsList] = await Promise.all([
-        db.select().from(paiTable).where(inArray(paiTable.propertyId, propertyIds)),
+        db.select().from(paiTable).where(inArray(paiTable.propertyId, verifiedPropertyIds)),
         db.select().from(alertsTable).where(and(
           eq(alertsTable.orgId, orgId),
           eq(alertsTable.isActive, true),
-          inArray(alertsTable.entityId, propertyIds)
+          inArray(alertsTable.entityId, verifiedPropertyIds)
         )),
         primaryContactIds.length > 0
           ? db.select().from(alertsTable).where(and(
@@ -22738,7 +22749,7 @@ contact@hubifyhomes.com`;
               inArray(alertsTable.entityId, primaryContactIds)
             ))
           : Promise.resolve([]),
-        db.select().from(roomsTable).where(inArray(roomsTable.propertyId, propertyIds)),
+        db.select().from(roomsTable).where(inArray(roomsTable.propertyId, verifiedPropertyIds)),
       ]);
 
       const propertyAlerts = rawPropertyAlerts.filter(a => a.type === "property");
@@ -22757,13 +22768,13 @@ contact@hubifyhomes.com`;
         return (order[a.severity] ?? 2) - (order[b.severity] ?? 2);
       };
 
-      const accessByProperty = propertyIds.map(pid => ({
+      const accessByProperty = verifiedPropertyIds.map(pid => ({
         propertyId: pid,
         propertyName: (propMap[pid] as any)?.name ?? `Property #${pid}`,
         items: accessItems.filter(a => a.propertyId === pid),
       })).filter(g => g.items.length > 0);
 
-      const alertsByProperty = propertyIds.map(pid => {
+      const alertsByProperty = verifiedPropertyIds.map(pid => {
         const prop = propMap[pid] as any;
         const propInstructions = propertyAlerts.filter(a => a.entityId === pid).sort(sortBySeverity);
         const clientNotes = prop?.primaryContactId
@@ -22780,13 +22791,16 @@ contact@hubifyhomes.com`;
 
       const roomToProperty = Object.fromEntries(roomsList.map(r => [r.id, r.propertyId]));
       const roomNameMap = Object.fromEntries(roomsList.map(r => [r.id, r.name]));
+      // Encode procurement split in the backend: needsPurchase = item has a purchase URL (must be ordered);
+      // otherwise it is assumed available from stock. This is the canonical split for the Route Brief UI.
       const supplyWithRoom = supplies.map(s => ({
         ...s,
         propertyId: roomToProperty[s.roomId],
         roomName: roomNameMap[s.roomId] ?? "Unknown Room",
+        needsPurchase: !!s.purchaseUrl,
       }));
 
-      const suppliesByProperty = propertyIds.map(pid => ({
+      const suppliesByProperty = verifiedPropertyIds.map(pid => ({
         propertyId: pid,
         propertyName: (propMap[pid] as any)?.name ?? `Property #${pid}`,
         supplies: supplyWithRoom.filter(s => s.propertyId === pid),

@@ -1033,8 +1033,8 @@ export default function DispatchCenter() {
                       </div>
                     )}
                     {prepKit?.suppliesByProperty.map(group => {
-                      const stock = group.supplies.filter((s: any) => !s.purchaseUrl);
-                      const purchase = group.supplies.filter((s: any) => !!s.purchaseUrl);
+                      const stock = group.supplies.filter((s: any) => !s.needsPurchase);
+                      const purchase = group.supplies.filter((s: any) => s.needsPurchase);
                       return (
                         <div key={group.propertyId}>
                           <h3 className="font-semibold text-sm mb-3 pb-2 border-b flex items-center gap-2">
