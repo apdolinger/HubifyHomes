@@ -19,9 +19,7 @@ export function useTour(tourKey: string, steps: TourStep[]) {
   const startTour = useCallback(() => {
     let reachedLastStep = false;
 
-    const driverRef: { current: ReturnType<typeof driver> | null } = { current: null };
-
-    driverRef.current = driver({
+    const driverObj = driver({
       showProgress: true,
       animate: true,
       overlayOpacity: 0.55,
@@ -31,8 +29,8 @@ export function useTour(tourKey: string, steps: TourStep[]) {
       nextBtnText: "Next →",
       prevBtnText: "← Back",
       doneBtnText: "Done",
-      onDestroyStarted: () => {
-        if (driverRef.current?.isLastStep()) {
+      onHighlightStarted: (_el, step, { state }) => {
+        if (state.activeIndex === steps.length - 1) {
           reachedLastStep = true;
         }
       },
@@ -45,7 +43,7 @@ export function useTour(tourKey: string, steps: TourStep[]) {
       steps,
     });
 
-    driverRef.current.drive();
+    driverObj.drive();
   }, [steps, storageKey]);
 
   return { startTour, hasCompleted };
