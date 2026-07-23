@@ -17,3 +17,9 @@ id = "I00HbcsZumyeVJ8hxTvGC"
 uri = "file://screenshots/Hubify_Demo_Guide.pdf"
 type = "pdf"
 title = "Hubify Demo Walkthrough Guide (Updated)"
+
+[[outputs]]
+id = "jKb7-3KInm2G_msD-p-BM"
+uri = "file://screenshots/Hubify_Demo_User_Guide.pdf"
+type = "pdf"
+title = "Hubify Demo Site — User Guide"
