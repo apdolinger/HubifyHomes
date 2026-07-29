@@ -2831,6 +2831,29 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
     }),
   });
 
+  const resendApprovalEmailMutationSheet = useMutation({
+    mutationFn: async (id: string) => {
+      const r = await fetch(`/api/super-admin/onboarding-prospects/${id}/resend-approval-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+        credentials: "include",
+      });
+      const body = await r.json() as { message?: string };
+      if (!r.ok) throw new Error(body.message || `Error ${r.status}`);
+      return body;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      toast({ title: "Approval email sent", description: "The applicant has been sent the onboarding link." });
+    },
+    onError: (e: any) => toast({
+      title: "Approval email failed",
+      description: e?.message || "Could not send approval email",
+      variant: "destructive",
+    }),
+  });
+
   const restoreMutation = useMutation({
     mutationFn: (id: string) =>
       apiRequest("PATCH", `/api/super-admin/onboarding-prospects/${id}`, { stage: "inquiry", droppedReason: null }),
@@ -3405,10 +3428,10 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
                         size="sm"
                         variant="outline"
                         className="h-7 text-xs"
-                        disabled={resendApprovalEmailMutation.isPending}
-                        onClick={() => resendApprovalEmailMutation.mutate(editingProspect.id)}
+                        disabled={resendApprovalEmailMutationSheet.isPending}
+                        onClick={() => resendApprovalEmailMutationSheet.mutate(editingProspect.id)}
                       >
-                        {resendApprovalEmailMutation.isPending ? "Sending…" : (editingProspect.approvalEmailSent ? "Resend" : "Send")}
+                        {resendApprovalEmailMutationSheet.isPending ? "Sending…" : (editingProspect.approvalEmailSent ? "Resend" : "Send")}
                       </Button>
                     </div>
                     {/* Status badge */}
