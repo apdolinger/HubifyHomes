@@ -3396,9 +3396,21 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
                 <>
                   <Separator className="my-4" />
                   <div className="space-y-2">
-                    <p className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-2">
-                      <Mail className="w-3.5 h-3.5" /> Approval Email
-                    </p>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                        <Mail className="w-3.5 h-3.5" /> Approval Email
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        disabled={resendApprovalEmailMutation.isPending}
+                        onClick={() => resendApprovalEmailMutation.mutate(editingProspect.id)}
+                      >
+                        {resendApprovalEmailMutation.isPending ? "Sending…" : (editingProspect.approvalEmailSent ? "Resend" : "Send")}
+                      </Button>
+                    </div>
                     {/* Status badge */}
                     {editingProspect.approvalEmailSent ? (
                       <div className="flex items-center gap-2 rounded-md bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-700">
