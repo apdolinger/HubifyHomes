@@ -1686,23 +1686,21 @@ function VerifyingPayment({
 
   if (isStuck) return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center">
-      <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-4">
-        <AlertTriangle className="w-7 h-7 text-amber-400" />
+      <div className="w-14 h-14 rounded-full bg-teal-50 flex items-center justify-center mx-auto mb-4">
+        <Building2 className="w-7 h-7 text-teal-500" />
       </div>
-      <h2 className="text-lg font-bold text-slate-900 mb-2">This is taking longer than expected</h2>
+      <h2 className="text-lg font-bold text-slate-900 mb-2">Your platform is being prepared</h2>
       <p className="text-slate-600 text-sm leading-relaxed mb-2">
-        Your payment was received — your workspace is being set up. Sometimes this takes a little longer.
+        Your payment was received and your workspace is on its way. This occasionally takes a few extra minutes.
       </p>
-      <p className="text-slate-500 text-sm mb-5">
-        Try refreshing — if your workspace is ready you'll move straight to the next step. If you keep seeing this, email us at{" "}
-        <a href="mailto:contact@hubifyhomes.com" className="text-teal-600 hover:underline font-medium">contact@hubifyhomes.com</a>{" "}
-        and we'll get you sorted within the hour.
+      <p className="text-slate-600 text-sm leading-relaxed mb-5">
+        <strong>You will receive an email with your login link as soon as it's ready</strong> — you don't need to stay on this page.
       </p>
       <button
         onClick={() => window.location.reload()}
         className="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors"
       >
-        <RefreshCw className="w-4 h-4" /> Refresh page
+        <RefreshCw className="w-4 h-4" /> Check again
       </button>
     </div>
   );
@@ -1715,7 +1713,7 @@ function VerifyingPayment({
         <>
           <Building2 className="w-8 h-8 text-teal-600 mx-auto mb-3" />
           <p className="text-slate-700 text-sm font-medium">Setting up your workspace…</p>
-          <p className="text-slate-400 text-xs mt-1">Payment confirmed. Creating your organization — almost done.</p>
+          <p className="text-slate-400 text-xs mt-1">Your platform will be prepared momentarily — you'll receive an email with your login link when it's ready.</p>
         </>
       ) : (
         <>
