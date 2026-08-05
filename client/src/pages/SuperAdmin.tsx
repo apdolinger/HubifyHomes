@@ -1039,6 +1039,19 @@ function ProspectCard({
         </div>
       )}
 
+      {/* Org already exists — show View Org link regardless of stage */}
+      {prospect.orgId && (
+        <button
+          className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium w-full text-xs"
+          onClick={() => onGoToOrganizations?.(prospect.orgId!)}
+          title={`Org ID: ${prospect.orgId}`}
+        >
+          <CheckCircle className="w-3 h-3 shrink-0" />
+          <span className="truncate">Org created — View Org</span>
+          <ExternalLink className="w-3 h-3 shrink-0 ml-auto" />
+        </button>
+      )}
+
       {prospect.stage === "welcome" && (
         <div className="text-xs space-y-1">
           {prospect.welcomeEmailSentAt ? (
@@ -1060,17 +1073,7 @@ function ProspectCard({
               }
             </Button>
           )}
-          {prospect.orgId ? (
-            <button
-              className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium w-full"
-              onClick={() => onGoToOrganizations?.(prospect.orgId!)}
-              title={`Org ID: ${prospect.orgId}`}
-            >
-              <CheckCircle className="w-3 h-3 shrink-0" />
-              <span className="truncate">Org created</span>
-              <ExternalLink className="w-3 h-3 shrink-0 ml-auto" />
-            </button>
-          ) : (
+          {!prospect.orgId && (
             <Button
               size="sm"
               variant="default"
@@ -1087,7 +1090,7 @@ function ProspectCard({
         </div>
       )}
 
-      {/* Initialize Platform — shown for any unprovisioned prospect past early inquiry stages */}
+      {/* Initialize Platform — any mid-to-late stage prospect without an org yet */}
       {!prospect.orgId &&
         prospect.stage !== "contact" &&
         prospect.stage !== "inquiry" &&
