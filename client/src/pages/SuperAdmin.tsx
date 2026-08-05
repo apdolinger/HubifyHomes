@@ -5517,12 +5517,36 @@ function StageEmailTemplatesPanel() {
     setDrafts(d => ({ ...d, [stage]: { ...getDraft(stage), ...patch } }));
   };
 
+  const [seedingDefaults, setSeedingDefaults] = useState(false);
+  const seedDefaultsMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/super-admin/stage-email-templates/seed-defaults", {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/stage-email-templates"] });
+      toast({ title: "Default templates loaded", description: "All stages now have starter content ready to edit." });
+      setSeedingDefaults(false);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Could not load default templates.", variant: "destructive" });
+      setSeedingDefaults(false);
+    },
+  });
+
   return (
     <div className="border rounded-xl p-4 space-y-3">
       <div className="flex items-center gap-2">
         <Mail className="w-4 h-4 text-indigo-600" />
         <h3 className="font-semibold text-sm text-gray-800">Stage Email Templates</h3>
         <span className="text-xs text-gray-400 ml-1">— Auto-send emails after N days in each stage</span>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="ml-auto h-7 text-xs"
+          disabled={seedDefaultsMutation.isPending}
+          onClick={() => seedDefaultsMutation.mutate()}
+        >
+          {seedDefaultsMutation.isPending ? "Loading…" : "Load defaults"}
+        </Button>
       </div>
       {isLoading ? (
         <div className="text-xs text-gray-400">Loading…</div>

@@ -19787,6 +19787,19 @@ contact@hubifyhomes.com`;
     }
   });
 
+  // ── Seed default stage email templates (insert-only, never overwrites) ───
+  app.post("/api/super-admin/stage-email-templates/seed-defaults", isSuperAdmin, requireMFA, async (_req, res) => {
+    try {
+      const { seedDefaultStageEmailTemplates } = await import("./seedTemplates.js");
+      await seedDefaultStageEmailTemplates();
+      const templates = await storage.listOnboardingStageEmailTemplates();
+      res.json({ message: "Default templates seeded", count: templates.length, templates });
+    } catch (error) {
+      console.error("Error seeding default stage email templates:", error);
+      res.status(500).json({ message: "Failed to seed default templates" });
+    }
+  });
+
   // ── Prospect confirmation email template ─────────────────────────────────
   app.get("/api/super-admin/prospect-confirmation-template", isSuperAdmin, requireMFA, async (_req, res) => {
     try {

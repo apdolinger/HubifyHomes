@@ -740,5 +740,13 @@ app.use((req, res, next) => {
     } catch (error) {
       console.error('Error initializing templates:', error);
     }
+
+    // Seed default stage email templates (insert-only, never overwrites customized content)
+    try {
+      const { initializeStageEmailTemplates } = await import('./seedTemplates.js');
+      await initializeStageEmailTemplates();
+    } catch (error) {
+      console.error('Error initializing stage email templates:', error);
+    }
   });
 })();
