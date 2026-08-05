@@ -61,9 +61,7 @@ const getNavigationItems = (user: any, flagEnabled: (key: string) => boolean) =>
     { name: "Team", href: "/team", icon: Users },
   );
 
-  if (flagEnabled("task_cost_tracking")) {
-    items.push({ name: "Time", href: "/time-tracking", icon: Clock, testId: "nav-time-tracking" });
-  }
+  items.push({ name: "Time", href: "/time-tracking", icon: Clock, testId: "nav-time-tracking" });
 
   if ((user as any)?.role === 'admin' || (user as any)?.role === 'manager') {
     items.push({ name: "Admin", href: "/admin", icon: Settings });
@@ -498,6 +496,10 @@ export default function Navigation() {
                 <DropdownMenuItem onClick={() => setIsNotificationSettingsOpen(true)}>
                   <Bell className="w-4 h-4 mr-2" />
                   Notification Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => window.location.href = '/time-tracking'}>
+                  <Clock className="w-4 h-4 mr-2" />
+                  Time Tracker
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>
