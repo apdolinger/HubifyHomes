@@ -229,9 +229,10 @@ const PIPELINE_STAGES: { key: OnboardingStage; label: string; color: string }[] 
   { key: "contact",           label: "Contact",            color: "border-slate-400 bg-slate-50" },
   { key: "inquiry",           label: "Submission",         color: "border-teal-400 bg-teal-50" },
   { key: "beta_approved",     label: "Founding Member Approved", color: "border-teal-500 bg-teal-100" },
-  { key: "agreement_pending", label: "Agreement Pending",  color: "border-yellow-500 bg-yellow-50" },
-  { key: "agreement",         label: "Agreement",          color: "border-yellow-400 bg-yellow-50" },
-  { key: "payment_pending",      label: "Payment Pending",      color: "border-orange-300 bg-orange-50" },
+  { key: "agreement_pending",  label: "Agreement Pending",  color: "border-yellow-500 bg-yellow-50" },
+  { key: "agreement",          label: "Agreement",          color: "border-yellow-400 bg-yellow-50" },
+  { key: "agreement_complete", label: "Agreement Complete", color: "border-green-500 bg-green-50" },
+  { key: "payment_pending",    label: "Payment Pending",    color: "border-orange-300 bg-orange-50" },
   { key: "payment_setup",        label: "Payment Setup",        color: "border-orange-400 bg-orange-50" },
   { key: "platform_initializing", label: "Platform Initializing", color: "border-violet-400 bg-violet-50" },
   { key: "provisioning_failed",   label: "Provisioning Failed",   color: "border-red-400 bg-red-50" },
@@ -245,7 +246,7 @@ const PIPELINE_STAGES: { key: OnboardingStage; label: string; color: string }[] 
   { key: "not_a_fit",         label: "Not a Fit",          color: "border-red-300 bg-red-50" },
 ];
 
-const STAGE_ORDER: OnboardingStage[] = ["contact", "inquiry", "beta_approved", "agreement_pending", "agreement", "payment_pending", "payment_setup", "platform_initializing", "initial_payment", "welcome"];
+const STAGE_ORDER: OnboardingStage[] = ["contact", "inquiry", "beta_approved", "agreement_pending", "agreement", "agreement_complete", "payment_pending", "payment_setup", "platform_initializing", "initial_payment", "welcome"];
 const DEMO_STAGE_ORDER: OnboardingStage[] = ["demo_requested", "demo_sent", "demo_completed", "follow_up_needed", "converted"];
 
 function nextStage(current: OnboardingStage): OnboardingStage | null {
@@ -353,6 +354,7 @@ const STAGE_BADGE_COLORS: Partial<Record<OnboardingStage, string>> = {
   beta_approved:        "bg-teal-100 text-teal-800",
   agreement_pending:    "bg-yellow-100 text-yellow-800",
   agreement:            "bg-yellow-100 text-yellow-700",
+  agreement_complete:   "bg-green-100 text-green-800",
   payment_pending:      "bg-orange-100 text-orange-700",
   payment_setup:        "bg-orange-100 text-orange-800",
   platform_initializing:"bg-violet-100 text-violet-700",
@@ -5520,8 +5522,9 @@ const TEMPLATE_STAGES: { key: OnboardingStage; label: string }[] = [
   { key: "inquiry",           label: "Submission" },
   { key: "beta_approved",     label: "Founding Member Approved" },
   { key: "agreement_pending", label: "Agreement Pending" },
-  { key: "agreement",         label: "Agreement" },
-  { key: "payment_setup",     label: "Payment Setup" },
+  { key: "agreement",          label: "Agreement" },
+  { key: "agreement_complete", label: "Agreement Complete" },
+  { key: "payment_setup",      label: "Payment Setup" },
   { key: "initial_payment",   label: "Initial Payment" },
   { key: "welcome",           label: "Welcome" },
   { key: "dropped",           label: "Dropped" },

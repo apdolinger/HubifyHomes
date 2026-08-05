@@ -3393,8 +3393,13 @@ export type PortalUserCookieConsent = typeof portalUserCookieConsent.$inferSelec
 // ─── Onboarding Prospects ───────────────────────────────────────────────────
 // Tracks new customer leads through the super-admin onboarding funnel.
 export type OnboardingStage =
+  | "contact"
   | "inquiry"
+  | "beta_approved"
+  | "agreement_pending"
   | "agreement"
+  | "agreement_complete"
+  | "payment_pending"
   | "payment_setup"
   | "platform_initializing"
   | "provisioning_failed"
