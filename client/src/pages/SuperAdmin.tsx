@@ -1193,6 +1193,29 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
     },
   });
 
+  const resendAgreementEmailMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const r = await fetch(`/api/super-admin/onboarding-prospects/${id}/resend-agreement-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+        credentials: "include",
+      });
+      const body = await r.json() as { success?: boolean; message?: string };
+      if (!r.ok) throw new Error(body.message || `Error ${r.status}`);
+      return body;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      toast({ title: "Agreement email sent", description: "Confirmation email has been re-sent to the prospect." });
+    },
+    onError: (e: any) => toast({
+      title: "Email failed",
+      description: e?.message || "Could not resend agreement confirmation email",
+      variant: "destructive",
+    }),
+  });
+
   const handleNotesChange = (val: string) => {
     setNotesValue(val);
     notesValueRef.current = val;
@@ -1840,6 +1863,20 @@ function SubmissionDetailSheet({ submission, onClose, onStatusChange, onNotesCha
                     <div>
                       <p className="text-slate-500 text-xs mb-0.5">Email Sent At</p>
                       <p className="font-medium text-slate-800">{new Date(submission.agreementEmailSentAt).toLocaleString()}</p>
+                    </div>
+                  )}
+                  {submission.agreementSignedAt && (
+                    <div className="col-span-2 pt-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs gap-1.5 border-slate-300"
+                        disabled={resendAgreementEmailMutation.isPending}
+                        onClick={() => resendAgreementEmailMutation.mutate(submission.id)}
+                      >
+                        <Send className="w-3 h-3" />
+                        {resendAgreementEmailMutation.isPending ? "Sending…" : "Resend Email"}
+                      </Button>
                     </div>
                   )}
                   {submission.agreementAcceptedUserAgent && (
@@ -2854,6 +2891,29 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
     }),
   });
 
+  const resendAgreementEmailMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const r = await fetch(`/api/super-admin/onboarding-prospects/${id}/resend-agreement-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+        credentials: "include",
+      });
+      const body = await r.json() as { success?: boolean; message?: string };
+      if (!r.ok) throw new Error(body.message || `Error ${r.status}`);
+      return body;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      toast({ title: "Agreement email sent", description: "Confirmation email has been re-sent to the prospect." });
+    },
+    onError: (e: any) => toast({
+      title: "Email failed",
+      description: e?.message || "Could not resend agreement confirmation email",
+      variant: "destructive",
+    }),
+  });
+
   const restoreMutation = useMutation({
     mutationFn: (id: string) =>
       apiRequest("PATCH", `/api/super-admin/onboarding-prospects/${id}`, { stage: "inquiry", droppedReason: null }),
@@ -3691,6 +3751,20 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
                         <div>
                           <p className="text-slate-500 mb-0.5">Email Sent At</p>
                           <p className="font-medium text-slate-800">{new Date(editingProspect.agreementEmailSentAt).toLocaleString()}</p>
+                        </div>
+                      )}
+                      {editingProspect.agreementSignedAt && (
+                        <div className="col-span-2 pt-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs gap-1.5 border-slate-300"
+                            disabled={resendAgreementEmailMutation.isPending}
+                            onClick={() => resendAgreementEmailMutation.mutate(editingProspect.id)}
+                          >
+                            <Send className="w-3 h-3" />
+                            {resendAgreementEmailMutation.isPending ? "Sending…" : "Resend Email"}
+                          </Button>
                         </div>
                       )}
                       {editingProspect.agreementAcceptedUserAgent && (

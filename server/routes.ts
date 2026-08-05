@@ -19952,6 +19952,98 @@ contact@hubifyhomes.com`;
     }
   });
 
+  // POST /api/super-admin/onboarding-prospects/:id/resend-agreement-email
+  // Resends the agreement confirmation email to the prospect and updates the email status fields.
+  app.post("/api/super-admin/onboarding-prospects/:id/resend-agreement-email", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const prospect = await storage.getOnboardingProspect(id);
+      if (!prospect) return res.status(404).json({ message: "Prospect not found" });
+      if (!prospect.agreementSignedAt) {
+        return res.status(422).json({ message: "Agreement has not been signed yet — cannot resend confirmation email." });
+      }
+      if (!resend) {
+        return res.status(503).json({ message: "Email service is not configured." });
+      }
+
+      const signerName = (prospect as any).agreementSignerName ?? prospect.name ?? "Founding Member";
+      const organizationName = (prospect as any).agreementOrganizationName ?? (prospect as any).company ?? "";
+      const agreementVersion = (prospect as any).agreementVersion ?? null;
+      const token = (prospect as any).onboardingToken ?? null;
+
+      const baseUrl = getAppBaseUrl();
+      const onboardingUrl = token ? `${baseUrl}/onboarding/${token}` : baseUrl;
+      const signedAt = new Date(prospect.agreementSignedAt).toLocaleString("en-US", {
+        month: "long", day: "numeric", year: "numeric",
+        hour: "numeric", minute: "2-digit", timeZoneName: "short",
+      });
+      const versionLabel = agreementVersion ? ` (v${agreementVersion})` : "";
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@hubifyhomes.com";
+
+      const now = new Date();
+      try {
+        const result = await resend.emails.send({
+          from: fromEmail,
+          to: prospect.email,
+          subject: "You've signed the Hubify Homes Founding Member Agreement",
+          html: `
+            <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
+              <div style="text-align:center;margin-bottom:28px">
+                <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="180" style="width:180px;max-width:180px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
+              </div>
+              <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 16px">Agreement Signed — You're In!</h1>
+              <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">
+                Hi ${signerName}, thanks for signing the Hubify Homes Founding Member Agreement${versionLabel}. Your onboarding step has been recorded — here's a summary for your records.
+              </p>
+              <table style="width:100%;border-collapse:collapse;font-size:14px;margin:0 0 28px">
+                <tr>
+                  <td style="padding:8px 0;color:#64748b;width:160px;vertical-align:top">Signer name</td>
+                  <td style="padding:8px 0;color:#0f172a;font-weight:600">${signerName}</td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;color:#64748b;vertical-align:top">Organization</td>
+                  <td style="padding:8px 0;color:#0f172a;font-weight:600">${organizationName}</td>
+                </tr>
+                ${agreementVersion ? `
+                <tr>
+                  <td style="padding:8px 0;color:#64748b;vertical-align:top">Agreement version</td>
+                  <td style="padding:8px 0;color:#0f172a">${agreementVersion}</td>
+                </tr>` : ""}
+                <tr>
+                  <td style="padding:8px 0;color:#64748b;vertical-align:top">Signed at</td>
+                  <td style="padding:8px 0;color:#0f172a">${signedAt}</td>
+                </tr>
+              </table>
+              <div style="text-align:center;margin:0 0 28px">
+                <a href="${onboardingUrl}" style="display:inline-block;background:#0097BD;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:6px">Continue to Payment Setup</a>
+              </div>
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px">
+              <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
+                You received this because you signed the Hubify Homes Founding Member Agreement. If you have questions please email <a href="mailto:contact@hubifyhomes.com" style="color:#0d9488">contact@hubifyhomes.com</a>.
+              </p>
+            </div>
+          `,
+        });
+        console.log(`[resend-agreement-email] sent to ${prospect.email} resend_id=${(result as any)?.data?.id}`);
+        await storage.updateOnboardingProspect(id, {
+          agreementEmailSentAt: now,
+          agreementEmailStatus: "sent",
+        } as any);
+        return res.json({ success: true, message: "Agreement confirmation email sent." });
+      } catch (emailErr: any) {
+        console.warn("[resend-agreement-email] send failed:", emailErr);
+        await storage.updateOnboardingProspect(id, {
+          agreementEmailSentAt: now,
+          agreementEmailStatus: "failed",
+        } as any);
+        return res.status(502).json({ message: "Failed to send email. Status has been updated." });
+      }
+    } catch (error) {
+      console.error("Error in resend-agreement-email:", error);
+      res.status(500).json({ message: "Failed to resend agreement email" });
+    }
+  });
+
   app.post("/api/super-admin/onboarding-prospects/:id/convert-to-org", isSuperAdmin, requireMFA, async (req, res) => {
     try {
       const { id } = req.params;
