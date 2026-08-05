@@ -19840,7 +19840,7 @@ contact@hubifyhomes.com`;
 
       if (emailErr) throw new Error(emailErr.message);
 
-      const updated = await storage.updateOnboardingProspect(id, { welcomeEmailSentAt: new Date() });
+      const updated = await storage.updateOnboardingProspect(id, { platformReadyEmailSentAt: new Date() } as any);
       res.json({ ...updated, emailSent: true });
     } catch (error) {
       console.error("Error resending platform-ready email:", error);

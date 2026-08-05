@@ -126,6 +126,7 @@ interface Prospect {
   stageHistory: StageHistoryEntry[];
   droppedReason: string | null;
   welcomeEmailSentAt: string | null;
+  platformReadyEmailSentAt: string | null;
   orgId: string | null;
   notes: string | null;
   agreementContent: string | null;
@@ -1064,13 +1065,13 @@ function ProspectCard({
           className="h-6 text-xs px-2 w-full border-teal-300 text-teal-700 hover:bg-teal-50"
           onClick={onResendPlatformReadyEmail}
           disabled={resendingPlatformReadyEmail}
-          title={prospect.welcomeEmailSentAt
-            ? `Last sent ${new Date(prospect.welcomeEmailSentAt).toLocaleDateString()} — click to resend`
+          title={prospect.platformReadyEmailSentAt
+            ? `Last sent ${new Date(prospect.platformReadyEmailSentAt).toLocaleDateString()} — click to resend`
             : "Send the 'platform is ready' notification to this client"}
         >
           {resendingPlatformReadyEmail
             ? <><RefreshCw className="w-3 h-3 mr-1 animate-spin" /> Sending…</>
-            : <><Send className="w-3 h-3 mr-1" />{prospect.welcomeEmailSentAt ? "Resend Ready Email" : "Send Ready Email"}</>
+            : <><Send className="w-3 h-3 mr-1" />{prospect.platformReadyEmailSentAt ? "Resend Ready Email" : "Send Ready Email"}</>
           }
         </Button>
       )}
@@ -2850,9 +2851,9 @@ function ProvisioningStatusPanel({ onGoToOrganizations }: { onGoToOrganizations?
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-xs text-gray-400">{p.email}</span>
-                    {p.welcomeEmailSentAt ? (
+                    {p.platformReadyEmailSentAt ? (
                       <span className="text-xs text-green-600 flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3" /> Ready email sent {new Date(p.welcomeEmailSentAt).toLocaleDateString()}
+                        <CheckCircle className="w-3 h-3" /> Ready email sent {new Date(p.platformReadyEmailSentAt).toLocaleDateString()}
                       </span>
                     ) : (
                       <span className="text-xs text-amber-600 flex items-center gap-1">
@@ -2868,11 +2869,11 @@ function ProvisioningStatusPanel({ onGoToOrganizations }: { onGoToOrganizations?
                   className="h-7 text-xs border-teal-300 text-teal-700 hover:bg-teal-50 whitespace-nowrap"
                   onClick={() => resendPlatformReadyMutation.mutate(p.id)}
                   disabled={resendPlatformReadyMutation.isPending && resendPlatformReadyMutation.variables === p.id}
-                  title={p.welcomeEmailSentAt ? "Resend platform-ready email" : "Send platform-ready email"}
+                  title={p.platformReadyEmailSentAt ? "Resend platform-ready email" : "Send platform-ready email"}
                 >
                   {resendPlatformReadyMutation.isPending && resendPlatformReadyMutation.variables === p.id
                     ? <><RefreshCw className="w-3 h-3 mr-1 animate-spin" /> Sending…</>
-                    : <><Send className="w-3 h-3 mr-1" />{p.welcomeEmailSentAt ? "Resend" : "Send"} Ready Email</>
+                    : <><Send className="w-3 h-3 mr-1" />{p.platformReadyEmailSentAt ? "Resend" : "Send"} Ready Email</>
                   }
                 </Button>
                 {onGoToOrganizations && p.orgId && (

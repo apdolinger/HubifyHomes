@@ -435,9 +435,9 @@ export async function provisionBetaOrg(
         // Track send time only after confirmed success (non-fatal if DB write fails)
         await db
           .update(onboardingProspects)
-          .set({ welcomeEmailSentAt: new Date() } as any)
+          .set({ platformReadyEmailSentAt: new Date() } as any)
           .where(eq(onboardingProspects.id, prospectId))
-          .catch((e: unknown) => log(`[betaProvisioning] welcomeEmailSentAt update failed: ${e}`));
+          .catch((e: unknown) => log(`[betaProvisioning] platformReadyEmailSentAt update failed: ${e}`));
       }
     } catch (emailErr) {
       log(`[betaProvisioning] Failed to send workspace-ready email: ${emailErr}`);

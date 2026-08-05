@@ -3425,6 +3425,7 @@ export const onboardingProspects = pgTable("onboarding_prospects", {
   stageHistory: jsonb("stage_history").$type<StageHistoryEntry[]>().notNull().default([]),
   droppedReason: text("dropped_reason"),
   welcomeEmailSentAt: timestamp("welcome_email_sent_at"),
+  platformReadyEmailSentAt: timestamp("platform_ready_email_sent_at"),
   notes: text("notes"),
   agreementContent: text("agreement_content"),
   agreementSignedAt: timestamp("agreement_signed_at"),
