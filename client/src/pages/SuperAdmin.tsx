@@ -8405,10 +8405,19 @@ function SystemIntegrationsCard() {
   );
 }
 
-// Encryption Card — queries /api/super-admin/platform/encryption-status (read-only)
-// Key generation is entirely client-side; no key material travels over the wire.
-// Re-encryption: the old key is supplied by the admin, sent to the server only for
-// the one-time re-encrypt call, then discarded.
+async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
+  const enc = new TextEncoder();
+  const keyMaterial = await window.crypto.subtle.importKey(
+    "raw", enc.encode(passphrase), "PBKDF2", false, ["deriveKey"]
+  );
+  return window.crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations: 250_000, hash: "SHA-256" },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
 function EncryptionCard() {
   const { toast } = useToast();
   const { data, isLoading, refetch } = useQuery<{
@@ -8426,10 +8435,23 @@ function EncryptionCard() {
   const [showReencrypt, setShowReencrypt] = useState(false);
   const [oldKey, setOldKey] = useState('');
 
+  // ── Backup state ──
+  const [showBackup, setShowBackup]           = useState(false);
+  const [backupPassphrase, setBackupPassphrase] = useState('');
+  const [backupPassphraseConfirm, setBackupPassphraseConfirm] = useState('');
+  const [backupBusy, setBackupBusy]           = useState(false);
+
+  // ── Restore state ──
+  const [showRestore, setShowRestore]         = useState(false);
+  const [restoreFile, setRestoreFile]         = useState<File | null>(null);
+  const [restorePassphrase, setRestorePassphrase] = useState('');
+  const [restorePreview, setRestorePreview]   = useState<{ entries: any[]; exportedAt: string } | null>(null);
+  const [restoreBusy, setRestoreBusy]         = useState(false);
+
   const generateKey = () => {
     const bytes = new Uint8Array(32);
     window.crypto.getRandomValues(bytes);
-    const b64 = btoa(String.fromCharCode(...bytes));
+    const b64 = uint8ToBase64(bytes);
     setGeneratedKey(b64);
     setCopied(false);
   };
@@ -8470,6 +8492,74 @@ function EncryptionCard() {
       refetch();
     },
     onError: (e: any) => toast({ title: 'Re-encryption failed', description: e.message, variant: 'destructive' }),
+  });
+
+  // ── Backup: fetch plaintext creds, encrypt client-side, download file ──
+  const handleDownloadBackup = async () => {
+    if (!backupPassphrase || backupPassphrase !== backupPassphraseConfirm) return;
+    setBackupBusy(true);
+    try {
+      const res = await apiRequest('GET', '/api/super-admin/platform/stripe-credentials-backup');
+      const payload = await res.json();
+      const encrypted = await encryptBackup(JSON.stringify(payload), backupPassphrase);
+      const blob = new Blob([encrypted], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const date = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `stripe-keys-backup-${date}.hubify-backup`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: 'Backup downloaded', description: `${payload.entries?.length ?? 0} org(s) included. Store this file securely.` });
+      setShowBackup(false);
+      setBackupPassphrase('');
+      setBackupPassphraseConfirm('');
+    } catch (e: any) {
+      toast({ title: 'Backup failed', description: e.message, variant: 'destructive' });
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  // ── Restore: decrypt file client-side, preview, then POST plaintext to server ──
+  const handleDecryptForRestore = async () => {
+    if (!restoreFile || !restorePassphrase) return;
+    setRestoreBusy(true);
+    try {
+      const text = await restoreFile.text();
+      const payload = await decryptBackup(text, restorePassphrase);
+      setRestorePreview(payload);
+    } catch (e: any) {
+      toast({ title: 'Decryption failed', description: 'Wrong passphrase or corrupted file.', variant: 'destructive' });
+    } finally {
+      setRestoreBusy(false);
+    }
+  };
+
+  const restoreMutation = useMutation({
+    mutationFn: async () => {
+      if (!restorePreview) throw new Error('No backup loaded');
+      const res = await apiRequest('POST', '/api/super-admin/platform/restore-stripe-credentials', { entries: restorePreview.entries });
+      return res.json();
+    },
+    onSuccess: (result: any) => {
+      const { restored, errors } = result;
+      if (errors?.length > 0) {
+        toast({
+          title: 'Restore completed with errors',
+          description: `${restored} restored, ${errors.length} failed.`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({ title: 'Restore complete', description: `${restored} org connection(s) restored and re-encrypted.` });
+      }
+      setShowRestore(false);
+      setRestoreFile(null);
+      setRestorePassphrase('');
+      setRestorePreview(null);
+      refetch();
+    },
+    onError: (e: any) => toast({ title: 'Restore failed', description: e.message, variant: 'destructive' }),
   });
 
   if (isLoading) {
@@ -8712,6 +8802,193 @@ function EncryptionCard() {
                 Cancel
               </Button>
             </div>
+          </div>
+        )}
+
+        {/* ── Backup / Restore section ── */}
+        <Separator />
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Archive className="w-4 h-4 text-slate-500" />
+            <span className="text-sm font-medium text-slate-800">Encrypted Backup</span>
+          </div>
+          <p className="text-xs text-slate-500 mb-3">
+            Download all stored Stripe credentials as an AES-256-encrypted file protected by a passphrase you choose.
+            The passphrase is never sent to the server — encryption and decryption happen entirely in your browser.
+            Store the file and passphrase separately in a secure location.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => { setShowBackup(true); setShowRestore(false); }}
+              data-testid="button-open-backup"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download encrypted backup
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => { setShowRestore(true); setShowBackup(false); setRestorePreview(null); }}
+              data-testid="button-open-restore"
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Restore from backup
+            </Button>
+          </div>
+        </div>
+
+        {/* ── Backup passphrase panel ── */}
+        {showBackup && (
+          <div className="border border-blue-200 rounded-lg p-4 space-y-3 bg-blue-50" data-testid="panel-backup">
+            <div className="font-medium text-blue-900 flex items-center gap-2">
+              <Download className="w-4 h-4" />
+              Download Encrypted Backup
+            </div>
+            <p className="text-sm text-blue-800">
+              Enter a passphrase to protect the backup file. You will need this passphrase to restore from the backup.
+              Use something long and memorable — it cannot be recovered if lost.
+            </p>
+            <div className="space-y-2">
+              <div className="space-y-1">
+                <Label htmlFor="backup-passphrase">Passphrase</Label>
+                <Input
+                  id="backup-passphrase"
+                  type="password"
+                  placeholder="Enter a strong passphrase…"
+                  value={backupPassphrase}
+                  onChange={(e) => setBackupPassphrase(e.target.value)}
+                  data-testid="input-backup-passphrase"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="backup-passphrase-confirm">Confirm passphrase</Label>
+                <Input
+                  id="backup-passphrase-confirm"
+                  type="password"
+                  placeholder="Re-enter your passphrase…"
+                  value={backupPassphraseConfirm}
+                  onChange={(e) => setBackupPassphraseConfirm(e.target.value)}
+                  data-testid="input-backup-passphrase-confirm"
+                />
+                {backupPassphraseConfirm && backupPassphrase !== backupPassphraseConfirm && (
+                  <p className="text-xs text-red-600">Passphrases do not match.</p>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                disabled={!backupPassphrase || backupPassphrase !== backupPassphraseConfirm || backupBusy}
+                onClick={handleDownloadBackup}
+                data-testid="button-confirm-backup"
+              >
+                {backupBusy ? 'Downloading…' : 'Download backup'}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => { setShowBackup(false); setBackupPassphrase(''); setBackupPassphraseConfirm(''); }}
+                disabled={backupBusy}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Restore panel ── */}
+        {showRestore && (
+          <div className="border border-amber-200 rounded-lg p-4 space-y-3 bg-amber-50" data-testid="panel-restore">
+            <div className="font-medium text-amber-900 flex items-center gap-2">
+              <RotateCcw className="w-4 h-4" />
+              Restore from Encrypted Backup
+            </div>
+            <p className="text-sm text-amber-800">
+              Upload your <code className="font-mono bg-amber-100 px-1 rounded">.hubify-backup</code> file and enter the
+              passphrase used when the backup was created. Credentials will be decrypted in your browser and then
+              re-encrypted server-side with the current <code className="font-mono bg-amber-100 px-1 rounded">PLATFORM_ENCRYPTION_KEY</code>.
+            </p>
+
+            {!restorePreview ? (
+              <>
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="restore-file">Backup file</Label>
+                    <Input
+                      id="restore-file"
+                      type="file"
+                      accept=".hubify-backup,.json"
+                      onChange={(e) => setRestoreFile(e.target.files?.[0] ?? null)}
+                      data-testid="input-restore-file"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="restore-passphrase">Passphrase</Label>
+                    <Input
+                      id="restore-passphrase"
+                      type="password"
+                      placeholder="Passphrase used when backup was created…"
+                      value={restorePassphrase}
+                      onChange={(e) => setRestorePassphrase(e.target.value)}
+                      data-testid="input-restore-passphrase"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    disabled={!restoreFile || !restorePassphrase || restoreBusy}
+                    onClick={handleDecryptForRestore}
+                    data-testid="button-decrypt-backup"
+                  >
+                    {restoreBusy ? 'Decrypting…' : 'Decrypt & preview'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => { setShowRestore(false); setRestoreFile(null); setRestorePassphrase(''); setRestorePreview(null); }}
+                    disabled={restoreBusy}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="rounded-lg bg-white border border-amber-200 p-3 text-sm space-y-1">
+                  <div className="font-medium text-slate-800">Backup decrypted successfully</div>
+                  <div className="text-slate-600">
+                    <strong>{restorePreview.entries?.length ?? 0}</strong> org connection{(restorePreview.entries?.length ?? 0) !== 1 ? 's' : ''} found
+                    {restorePreview.exportedAt ? ` · exported ${new Date(restorePreview.exportedAt).toLocaleString()}` : ''}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Clicking "Restore now" will re-encrypt each credential with the current key and overwrite the
+                    existing database rows. This action cannot be undone — ensure the current key is correct before proceeding.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={restoreMutation.isPending}
+                    onClick={() => restoreMutation.mutate()}
+                    data-testid="button-confirm-restore"
+                  >
+                    {restoreMutation.isPending ? 'Restoring…' : 'Restore now'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => { setShowRestore(false); setRestoreFile(null); setRestorePassphrase(''); setRestorePreview(null); }}
+                    disabled={restoreMutation.isPending}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         )}
       </CardContent>
@@ -12299,4 +12576,35 @@ export default function SuperAdmin() {
       </Tabs>
     </main>
   );
+}
+
+async function encryptBackup(plaintext: string, passphrase: string): Promise<string> {
+  const salt = window.crypto.getRandomValues(new Uint8Array(16));
+  const iv   = window.crypto.getRandomValues(new Uint8Array(12));
+  const key  = await deriveKey(passphrase, salt);
+  const enc  = new TextEncoder();
+  const cipherBuf = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc.encode(plaintext));
+  const payload = {
+    v: 1,
+    alg: "AES-256-GCM/PBKDF2-SHA256",
+    salt: uint8ToBase64(salt),
+    iv:   uint8ToBase64(iv),
+    data: uint8ToBase64(new Uint8Array(cipherBuf)),
+  };
+  return JSON.stringify(payload, null, 2);
+}
+
+async function decryptBackup(fileText: string, passphrase: string): Promise<any> {
+  const payload = JSON.parse(fileText);
+  if (payload.v !== 1) throw new Error("Unsupported backup format version");
+  const salt = Uint8Array.from(atob(payload.salt), (c) => c.charCodeAt(0));
+  const iv   = Uint8Array.from(atob(payload.iv),   (c) => c.charCodeAt(0));
+  const data = Uint8Array.from(atob(payload.data),  (c) => c.charCodeAt(0));
+  const key  = await deriveKey(passphrase, salt);
+  const plain = await window.crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data);
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+
+function uint8ToBase64(buf: Uint8Array): string {
+  return btoa(Array.from(buf, (b) => String.fromCharCode(b)).join(""));
 }

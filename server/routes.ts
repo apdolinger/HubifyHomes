@@ -4460,6 +4460,183 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Download plaintext Stripe credentials backup (Super Admin) ──────────
+  // Returns all org stripe credentials in plaintext for client-side passphrase
+  // encryption into an offline backup file.  No passphrase is ever sent to
+  // the server — encryption happens entirely in the browser.
+  //
+  // STRICT MODE: if a stored field looks encrypted (3-part iv:tag:ciphertext)
+  // but the active key cannot decrypt it (passthrough returned), the export
+  // fails with a 409 so the admin is not silently handed ciphertext in the
+  // "plaintext" backup.  Admins must resolve the key-mismatch first.
+  app.get("/api/super-admin/platform/stripe-credentials-backup", isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const { decrypt } = await import("./encryption");
+      const { orgStripeConnections: oscTable } = await import("@shared/schema");
+      const allConnections = await db.select().from(oscTable);
+
+      /** Decrypt a stored field strictly: returns null for null/empty values,
+       *  plaintext for successfully-decrypted ciphertext, and throws if the
+       *  value looks encrypted but the decryption is a no-op (wrong key). */
+      const strictDecrypt = (raw: string | null | undefined): string | null => {
+        if (!raw) return null;
+        const looksEncrypted = raw.split(":").length === 3;
+        const result = decrypt(raw);
+        if (looksEncrypted && result === raw) {
+          // decrypt() returned the ciphertext unchanged — key mismatch
+          throw new Error(`decrypt_failed: field still encrypted after decrypt (key mismatch)`);
+        }
+        return result;
+      };
+
+      const entries: any[] = [];
+      const decryptErrors: { orgId: string; error: string }[] = [];
+
+      // Include every org_stripe_connections row — even rows whose only
+      // credential is a stripeAccountId, stripePublishableKey, or accountType —
+      // so the backup is complete and a round-trip restore is lossless.
+      for (const c of allConnections) {
+        try {
+          entries.push({
+            orgId: c.orgId,
+            stripeAccountId: c.stripeAccountId ?? null,
+            stripePublishableKey: c.stripePublishableKey ?? null,
+            stripeSecretKey: strictDecrypt(c.stripeSecretKey),
+            accessToken: strictDecrypt(c.accessToken),
+            refreshToken: strictDecrypt(c.refreshToken),
+            stripeWebhookSecret: strictDecrypt(c.stripeWebhookSecret),
+            accountType: c.accountType,
+          });
+        } catch (err: any) {
+          decryptErrors.push({ orgId: c.orgId, error: err?.message ?? String(err) });
+        }
+      }
+
+      if (decryptErrors.length > 0) {
+        await AuditLogger.log({
+          req,
+          action: "download_stripe_credentials_backup",
+          actionType: "read",
+          resource: "org_stripe_connections",
+          severity: "warning",
+          success: false,
+          metadata: { decryptErrors },
+        });
+        return res.status(409).json({
+          message: "One or more Stripe credentials could not be decrypted with the current key. Resolve the key mismatch before downloading a backup.",
+          decryptErrors,
+        });
+      }
+
+      await AuditLogger.log({
+        req,
+        action: "download_stripe_credentials_backup",
+        actionType: "read",
+        resource: "org_stripe_connections",
+        severity: "warning",
+        success: true,
+        metadata: { entryCount: entries.length },
+      });
+
+      // Prevent any caching of the plaintext credentials payload.
+      res.set({
+        "Cache-Control": "no-store, no-cache, must-revalidate, private",
+        "Pragma": "no-cache",
+        "Expires": "0",
+      });
+      res.json({ entries, exportedAt: new Date().toISOString() });
+    } catch (err) {
+      console.error("Error exporting stripe credentials backup:", err);
+      res.status(500).json({ message: "Failed to export stripe credentials backup" });
+    }
+  });
+
+  // ── Restore Stripe credentials from decrypted backup (Super Admin) ────────
+  // Accepts plaintext credentials (decrypted client-side from the backup file)
+  // and re-encrypts each one with the current PLATFORM_ENCRYPTION_KEY, then
+  // fully overwrites the corresponding org_stripe_connections rows (upsert).
+  // All fields — including accountType and nullable credential fields — are
+  // written deterministically so the restore is idempotent and complete.
+  app.post("/api/super-admin/platform/restore-stripe-credentials", isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const { isEncryptionEnabled, encrypt } = await import("./encryption");
+
+      if (!isEncryptionEnabled()) {
+        return res.status(400).json({ message: "Encryption is not enabled. Set PLATFORM_ENCRYPTION_KEY before restoring." });
+      }
+
+      const { entries } = req.body as {
+        entries: Array<{
+          orgId: string;
+          stripeSecretKey: string | null;
+          accessToken: string | null;
+          refreshToken: string | null;
+          stripeWebhookSecret: string | null;
+          stripePublishableKey: string | null;
+          stripeAccountId: string | null;
+          accountType: string;
+        }>;
+      };
+
+      if (!Array.isArray(entries) || entries.length === 0) {
+        return res.status(400).json({ message: "entries array is required and must not be empty." });
+      }
+
+      const { orgStripeConnections: oscTable } = await import("@shared/schema");
+      let restored = 0;
+      const errors: { orgId: string; error: string }[] = [];
+
+      for (const entry of entries) {
+        try {
+          const accountType = (entry.accountType === "connect" || entry.accountType === "direct")
+            ? entry.accountType
+            : "direct";
+
+          // Build a complete, deterministic upsert — write every field explicitly,
+          // including nulls, so the restore fully overwrites stale data.
+          const fullRow = {
+            accountType,
+            stripeAccountId:      entry.stripeAccountId ?? null,
+            stripePublishableKey: entry.stripePublishableKey ?? null,
+            stripeSecretKey:      entry.stripeSecretKey      ? encrypt(entry.stripeSecretKey)      : null,
+            accessToken:          entry.accessToken           ? encrypt(entry.accessToken)           : null,
+            refreshToken:         entry.refreshToken          ? encrypt(entry.refreshToken)          : null,
+            stripeWebhookSecret:  entry.stripeWebhookSecret  ? encrypt(entry.stripeWebhookSecret)  : null,
+          };
+
+          const existing = await db
+            .select({ orgId: oscTable.orgId })
+            .from(oscTable)
+            .where(eq(oscTable.orgId, entry.orgId));
+
+          if (existing.length > 0) {
+            await db.update(oscTable).set(fullRow).where(eq(oscTable.orgId, entry.orgId));
+          } else {
+            await db.insert(oscTable).values({ orgId: entry.orgId, ...fullRow } as any);
+          }
+          restored++;
+        } catch (err: any) {
+          errors.push({ orgId: entry.orgId, error: err?.message ?? String(err) });
+        }
+      }
+
+      await AuditLogger.log({
+        req,
+        action: "restore_stripe_credentials",
+        actionType: "update",
+        resource: "org_stripe_connections",
+        severity: "critical",
+        success: errors.length === 0,
+        metadata: { restored, errorCount: errors.length },
+      });
+
+      res.json({ restored, errors });
+    } catch (err) {
+      console.error("Error restoring stripe credentials:", err);
+      res.status(500).json({ message: "Failed to restore stripe credentials" });
+    }
+  });
+
   // ── Integration Status (Super Admin) ─────────────────────────────────────
   app.get("/api/super-admin/integration-status", isSuperAdmin, requireMFA, async (_req, res) => {
     try {
