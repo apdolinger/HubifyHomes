@@ -2658,8 +2658,10 @@ function ProvisioningStatusPanel({ onGoToOrganizations }: { onGoToOrganizations?
   const now = Date.now();
   const fourteenDaysMs = 14 * 24 * 60 * 60 * 1000;
 
+  // Include prospects with an orgId that are still stuck at platform_initializing —
+  // their org may exist but the stage was never advanced to "converted"
   const waiting = allProspects
-    .filter(p => p.stage === "platform_initializing" && !p.orgId)
+    .filter(p => p.stage === "platform_initializing")
     .sort((a, b) => new Date(a.updatedAt ?? a.createdAt ?? 0).getTime() - new Date(b.updatedAt ?? b.createdAt ?? 0).getTime());
 
   const failed = allProspects
@@ -2696,6 +2698,11 @@ function ProvisioningStatusPanel({ onGoToOrganizations }: { onGoToOrganizations?
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-medium text-gray-900 truncate">{p.name}</span>
             {p.company && <span className="text-xs text-gray-500 truncate">— {p.company}</span>}
+            {p.orgId && (
+              <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded px-1.5 py-0.5 font-medium">
+                Org exists — stage not updated
+              </span>
+            )}
           </div>
           <div className="text-xs text-gray-400 mt-0.5">{p.email}</div>
           {showError && p.provisioningError && (
@@ -2708,22 +2715,34 @@ function ProvisioningStatusPanel({ onGoToOrganizations }: { onGoToOrganizations?
           {timeAgo(p.updatedAt ?? p.createdAt)}
         </div>
         <div className="flex gap-1.5 shrink-0">
-          <Button size="sm" variant="default"
-            className="h-7 text-xs px-2.5 bg-indigo-600 hover:bg-indigo-700"
-            onClick={() => convertToOrgMutation.mutate(p.id)}
-            disabled={converting || linking}
-            title="Provision this customer's workspace"
-          >
-            {converting ? <><RefreshCw className="w-3 h-3 mr-1 animate-spin" />Initializing…</> : <><Building2 className="w-3 h-3 mr-1" />Initialize</>}
-          </Button>
-          <Button size="sm" variant="outline"
-            className="h-7 text-xs px-2 border-amber-300 text-amber-700 hover:bg-amber-50"
-            onClick={() => forceLinkMutation.mutate(p.id)}
-            disabled={converting || linking}
-            title="Link to an existing org with the same email"
-          >
-            {linking ? <><RefreshCw className="w-3 h-3 mr-1 animate-spin" />Linking…</> : <><Link className="w-3 h-3 mr-1" />Force Link</>}
-          </Button>
+          {p.orgId ? (
+            <Button size="sm" variant="default"
+              className="h-7 text-xs px-2.5 bg-green-600 hover:bg-green-700"
+              onClick={() => onGoToOrganizations?.(p.orgId!)}
+              title="Navigate to this org in the Organizations tab"
+            >
+              <ExternalLink className="w-3 h-3 mr-1" />View Org
+            </Button>
+          ) : (
+            <Button size="sm" variant="default"
+              className="h-7 text-xs px-2.5 bg-indigo-600 hover:bg-indigo-700"
+              onClick={() => convertToOrgMutation.mutate(p.id)}
+              disabled={converting || linking}
+              title="Provision this customer's workspace"
+            >
+              {converting ? <><RefreshCw className="w-3 h-3 mr-1 animate-spin" />Initializing…</> : <><Building2 className="w-3 h-3 mr-1" />Initialize</>}
+            </Button>
+          )}
+          {!p.orgId && (
+            <Button size="sm" variant="outline"
+              className="h-7 text-xs px-2 border-amber-300 text-amber-700 hover:bg-amber-50"
+              onClick={() => forceLinkMutation.mutate(p.id)}
+              disabled={converting || linking}
+              title="Link to an existing org with the same email"
+            >
+              {linking ? <><RefreshCw className="w-3 h-3 mr-1 animate-spin" />Linking…</> : <><Link className="w-3 h-3 mr-1" />Force Link</>}
+            </Button>
+          )}
         </div>
       </div>
     );
