@@ -838,6 +838,8 @@ function ProspectCard({
   onSendDemoEmail,
   sendingDemoEmail,
   onGoToOrganizations,
+  onResendPlatformReadyEmail,
+  resendingPlatformReadyEmail,
 }: {
   prospect: Prospect;
   stuckDays: number;
@@ -854,6 +856,8 @@ function ProspectCard({
   onSendDemoEmail?: () => void;
   sendingDemoEmail?: boolean;
   onGoToOrganizations?: (orgId: string) => void;
+  onResendPlatformReadyEmail?: () => void;
+  resendingPlatformReadyEmail?: boolean;
 }) {
   const [, setLocation] = useLocation();
   const days = stageDays(prospect);
@@ -1050,6 +1054,25 @@ function ProspectCard({
           <span className="truncate">Org created — View Org</span>
           <ExternalLink className="w-3 h-3 shrink-0 ml-auto" />
         </button>
+      )}
+
+      {/* Resend platform-ready email — available once org is provisioned */}
+      {prospect.orgId && onResendPlatformReadyEmail && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-6 text-xs px-2 w-full border-teal-300 text-teal-700 hover:bg-teal-50"
+          onClick={onResendPlatformReadyEmail}
+          disabled={resendingPlatformReadyEmail}
+          title={prospect.welcomeEmailSentAt
+            ? `Last sent ${new Date(prospect.welcomeEmailSentAt).toLocaleDateString()} — click to resend`
+            : "Send the 'platform is ready' notification to this client"}
+        >
+          {resendingPlatformReadyEmail
+            ? <><RefreshCw className="w-3 h-3 mr-1 animate-spin" /> Sending…</>
+            : <><Send className="w-3 h-3 mr-1" />{prospect.welcomeEmailSentAt ? "Resend Ready Email" : "Send Ready Email"}</>
+          }
+        </Button>
       )}
 
       {prospect.stage === "welcome" && (
@@ -2655,6 +2678,16 @@ function ProvisioningStatusPanel({ onGoToOrganizations }: { onGoToOrganizations?
     onError: (e: Error) => toast({ title: "Force link failed", description: e?.message || "Could not link", variant: "destructive" }),
   });
 
+  const resendPlatformReadyMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/resend-platform-ready-email`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      toast({ title: "Platform-ready email sent!", description: "The client has been notified their workspace is ready." });
+    },
+    onError: (e: Error) => toast({ title: "Email failed", description: e?.message || "Could not send email", variant: "destructive" }),
+  });
+
   const now = Date.now();
   const fourteenDaysMs = 14 * 24 * 60 * 60 * 1000;
 
@@ -2815,9 +2848,33 @@ function ProvisioningStatusPanel({ onGoToOrganizations }: { onGoToOrganizations?
                     <span className="text-sm font-medium text-gray-900">{p.name}</span>
                     {p.company && <span className="text-xs text-gray-500">— {p.company}</span>}
                   </div>
-                  <div className="text-xs text-gray-400 mt-0.5">{p.email}</div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs text-gray-400">{p.email}</span>
+                    {p.welcomeEmailSentAt ? (
+                      <span className="text-xs text-green-600 flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" /> Ready email sent {new Date(p.welcomeEmailSentAt).toLocaleDateString()}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-amber-600 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> No ready email sent
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="text-xs text-gray-400 whitespace-nowrap">{timeAgo(p.convertedAt)}</div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs border-teal-300 text-teal-700 hover:bg-teal-50 whitespace-nowrap"
+                  onClick={() => resendPlatformReadyMutation.mutate(p.id)}
+                  disabled={resendPlatformReadyMutation.isPending && resendPlatformReadyMutation.variables === p.id}
+                  title={p.welcomeEmailSentAt ? "Resend platform-ready email" : "Send platform-ready email"}
+                >
+                  {resendPlatformReadyMutation.isPending && resendPlatformReadyMutation.variables === p.id
+                    ? <><RefreshCw className="w-3 h-3 mr-1 animate-spin" /> Sending…</>
+                    : <><Send className="w-3 h-3 mr-1" />{p.welcomeEmailSentAt ? "Resend" : "Send"} Ready Email</>
+                  }
+                </Button>
                 {onGoToOrganizations && p.orgId && (
                   <Button size="sm" variant="ghost"
                     className="h-7 text-xs text-indigo-600 hover:text-indigo-800"
@@ -3072,6 +3129,20 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
     onError: (e: Error) => toast({
       title: "Email failed",
       description: e?.message || "Could not send welcome email",
+      variant: "destructive",
+    }),
+  });
+
+  const resendPlatformReadyEmailMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/resend-platform-ready-email`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      toast({ title: "Platform-ready email sent!", description: "The client has been notified their workspace is ready." });
+    },
+    onError: (e: Error) => toast({
+      title: "Email failed",
+      description: e?.message || "Could not send platform-ready email",
       variant: "destructive",
     }),
   });
@@ -3456,6 +3527,8 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
                         onSendDemoEmail={() => demoEmailMutation.mutate(p.id)}
                         sendingDemoEmail={demoEmailMutation.isPending && demoEmailMutation.variables === p.id}
                         onGoToOrganizations={onGoToOrganizations}
+                        onResendPlatformReadyEmail={() => resendPlatformReadyEmailMutation.mutate(p.id)}
+                        resendingPlatformReadyEmail={resendPlatformReadyEmailMutation.isPending && resendPlatformReadyEmailMutation.variables === p.id}
                       />
                     ))
                   )}

@@ -38,19 +38,34 @@ function mapTier(
   return "starter";
 }
 
-function buildWorkspaceReadyEmail(opts: {
+export function buildWorkspaceReadyEmail(opts: {
   firstName: string;
   orgName: string;
   slug?: string;
   setupUrl: string;
-  expiresAt: Date;
+  /** Pass a Date when a setup-account token exists; null/undefined for login-only emails */
+  expiresAt?: Date | null;
 }): string {
   const { firstName, orgName, slug, setupUrl, expiresAt } = opts;
-  const expiry = expiresAt.toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+  const hasSetupToken = !!expiresAt;
+  const expiry = expiresAt
+    ? expiresAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+    : null;
+
+  const bodyText = hasSetupToken
+    ? `Your organization <strong>${orgName}</strong> has been set up. Click the button below to set your password and start using Hubify.`
+    : `Your organization <strong>${orgName}</strong> has been set up and is ready to use. Click the button below to log in.`;
+
+  const ctaLabel = hasSetupToken ? "Enter Your Workspace →" : "Log In to Your Workspace →";
+
+  const checklistItems = hasSetupToken
+    ? ["Set your password using the button above", "Complete your company profile in Settings", "Add your first property and invite a team member"]
+    : ["Complete your company profile in Settings", "Add your first property and invite a team member", "Explore the dashboard"];
+
+  const footer = expiry
+    ? `This setup link expires on ${expiry}. After that, email <a href="mailto:contact@hubifyhomes.com" style="color:#94a3b8">contact@hubifyhomes.com</a> to request a new one.`
+    : `Questions? Email <a href="mailto:contact@hubifyhomes.com" style="color:#94a3b8">contact@hubifyhomes.com</a> and we'll help you get started.`;
+
   return `
     <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
       <div style="text-align:center;margin-bottom:28px">
@@ -61,8 +76,7 @@ function buildWorkspaceReadyEmail(opts: {
         Your Hubify workspace is ready, ${firstName}!
       </h1>
       <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 20px">
-        Your organization <strong>${orgName}</strong> has been set up. Click the button below
-        to set your password and start using Hubify.
+        ${bodyText}
       </p>
       ${slug ? `
       <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:12px 16px;margin-bottom:20px">
@@ -74,7 +88,7 @@ function buildWorkspaceReadyEmail(opts: {
       <div style="text-align:center;margin-bottom:28px">
         <a href="${setupUrl}"
           style="display:inline-block;background:#0097BD;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 36px;border-radius:8px">
-          Enter Your Workspace →
+          ${ctaLabel}
         </a>
       </div>
       <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:28px">
@@ -82,16 +96,12 @@ function buildWorkspaceReadyEmail(opts: {
           Quick-start checklist
         </p>
         <ol style="padding-left:18px;margin:0;color:#334155;font-size:14px;line-height:1.9">
-          <li>Set your password using the button above</li>
-          <li>Complete your company profile in Settings</li>
-          <li>Add your first property and invite a team member</li>
+          ${checklistItems.map(i => `<li>${i}</li>`).join("")}
         </ol>
       </div>
       <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px" />
       <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0">
-        This setup link expires on ${expiry}. After that, email
-        <a href="mailto:contact@hubifyhomes.com" style="color:#94a3b8">contact@hubifyhomes.com</a>
-        to request a new one.
+        ${footer}
       </p>
     </div>
   `;
@@ -133,7 +143,8 @@ export async function provisionBetaOrg(
     orgName: string;
     slug?: string;
     setupUrl: string;
-    tokenExpiresAt: Date;
+    /** null = login-only variant (password was set in-wizard) */
+    tokenExpiresAt: Date | null;
   } | null = null;
 
   const result = await db.transaction(async (tx) => {
@@ -338,7 +349,7 @@ export async function provisionBetaOrg(
       });
       setupUrl = `${baseUrl}/setup-account/${setupToken}`;
 
-      // Capture email data — email is sent after the transaction commits
+      // Capture email data — setup variant with password-setup CTA
       emailPayload = {
         to: (prospect.email as string) ?? "",
         firstName,
@@ -346,6 +357,17 @@ export async function provisionBetaOrg(
         slug: org.slug ?? undefined,
         setupUrl,
         tokenExpiresAt,
+      };
+    } else {
+      // Password was set in-wizard — still send a "platform is ready" notification
+      // but with login-only CTA (no setup token required)
+      emailPayload = {
+        to: (prospect.email as string) ?? "",
+        firstName,
+        orgName,
+        slug: org.slug ?? undefined,
+        setupUrl, // already set to `${baseUrl}/staff/login`
+        tokenExpiresAt: null,
       };
     }
 
@@ -392,11 +414,14 @@ export async function provisionBetaOrg(
         const resend = new Resend(resendKey);
         const fromEmail =
           process.env.RESEND_FROM_EMAIL || "no-reply@hubifyhomesonline.com";
-        await resend.emails.send({
+        const subject = tokenExpiresAt
+          ? "Your Hubify workspace is ready — set up your account"
+          : "Your Hubify workspace is ready — log in now";
+        const { error: sendErr } = await resend.emails.send({
           from: fromEmail,
           replyTo: "contact@hubifyhomes.com",
           to,
-          subject: "Your Hubify workspace is ready — set up your account",
+          subject,
           html: buildWorkspaceReadyEmail({
             firstName,
             orgName,
@@ -405,7 +430,14 @@ export async function provisionBetaOrg(
             expiresAt: tokenExpiresAt,
           }),
         });
+        if (sendErr) throw new Error(`Resend API error: ${sendErr.message}`);
         log(`[betaProvisioning] Workspace-ready email sent to ${to}`);
+        // Track send time only after confirmed success (non-fatal if DB write fails)
+        await db
+          .update(onboardingProspects)
+          .set({ welcomeEmailSentAt: new Date() } as any)
+          .where(eq(onboardingProspects.id, prospectId))
+          .catch((e: unknown) => log(`[betaProvisioning] welcomeEmailSentAt update failed: ${e}`));
       }
     } catch (emailErr) {
       log(`[betaProvisioning] Failed to send workspace-ready email: ${emailErr}`);

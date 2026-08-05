@@ -19793,6 +19793,61 @@ contact@hubifyhomes.com`;
     }
   });
 
+  // ── Resend platform-ready email to a provisioned prospect ────────────────────
+  app.post("/api/super-admin/onboarding-prospects/:id/resend-platform-ready-email", isSuperAdmin, requireMFA, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const prospect = await storage.getOnboardingProspect(id);
+      if (!prospect) return res.status(404).json({ message: "Prospect not found" });
+      if (!prospect.orgId) return res.status(400).json({ message: "Prospect has not been provisioned yet — no org exists." });
+
+      if (!resend) {
+        return res.status(503).json({ message: "Email delivery is not configured (RESEND_API_KEY missing).", emailSent: false });
+      }
+
+      const org = await storage.getOrg(prospect.orgId);
+      if (!org) return res.status(404).json({ message: "Org record not found — the linked org may have been deleted." });
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+
+      // Look for a still-valid unclaimed setup token
+      const tokenRows = await db
+        .select()
+        .from(accountSetupTokens)
+        .where(and(eq(accountSetupTokens.prospectId, id), isNull(accountSetupTokens.claimedAt)))
+        .limit(1);
+      const tok = tokenRows[0];
+      const hasValidToken = tok && new Date(tok.expiresAt) > new Date();
+      const setupUrl = hasValidToken ? `${baseUrl}/setup-account/${tok.token}` : `${baseUrl}/staff/login`;
+      const tokenExpiresAt = hasValidToken ? new Date(tok.expiresAt) : null;
+
+      const firstName = (prospect as any).firstName || ((prospect.name || "").split(" ")[0]) || "";
+      const orgName = (prospect as any).agreementOrganizationName || prospect.company || prospect.name || "Your Organization";
+      const slug = (prospect as any).workspaceSlug || org?.slug || undefined;
+
+      const { buildWorkspaceReadyEmail } = await import("./betaProvisioning");
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "no-reply@hubifyhomesonline.com";
+      const subject = tokenExpiresAt
+        ? "Your Hubify workspace is ready — set up your account"
+        : "Your Hubify workspace is ready — log in now";
+
+      const { error: emailErr } = await resend.emails.send({
+        from: fromEmail,
+        replyTo: "contact@hubifyhomes.com",
+        to: prospect.email!,
+        subject,
+        html: buildWorkspaceReadyEmail({ firstName, orgName, slug, setupUrl, expiresAt: tokenExpiresAt }),
+      });
+
+      if (emailErr) throw new Error(emailErr.message);
+
+      const updated = await storage.updateOnboardingProspect(id, { welcomeEmailSentAt: new Date() });
+      res.json({ ...updated, emailSent: true });
+    } catch (error) {
+      console.error("Error resending platform-ready email:", error);
+      res.status(500).json({ message: "Failed to resend platform-ready email" });
+    }
+  });
+
   const confirmationEmailCooldowns = new Map<string, number>();
   const CONFIRMATION_EMAIL_COOLDOWN_MS = 60_000;
 
