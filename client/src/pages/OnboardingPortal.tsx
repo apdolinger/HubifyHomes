@@ -17,7 +17,7 @@ import { openCookiePreferences } from "@/lib/cookieConsent";
 import {
   CheckCircle, Clock, AlertTriangle, Loader2, Lock,
   ShieldCheck, CreditCard, ArrowRight, RefreshCw, XCircle,
-  FileText, ChevronDown, Scale, Shield, Building2, Globe,
+  FileText, ChevronDown, Scale, Shield, Building2, Globe, Pencil,
 } from "lucide-react";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -1738,6 +1738,8 @@ export default function OnboardingPortal() {
   const [signerNameLocal, setSignerNameLocal] = useState("");
   const [workspaceSetupUrl, setWorkspaceSetupUrl] = useState<string | null>(null);
   const [localSlugConfirmed, setLocalSlugConfirmed] = useState(false);
+  const [localSlugEditing, setLocalSlugEditing] = useState(false);
+  const [localConfirmedSlug, setLocalConfirmedSlug] = useState<string | null>(null);
   const [localAccountSet, setLocalAccountSet] = useState(false);
 
   const { data, isLoading, error } = useQuery<OnboardingDetails, { status: number; message: string }>({
@@ -1781,7 +1783,7 @@ export default function OnboardingPortal() {
   }
 
   const agreementSigned = data.alreadySigned || localSigned;
-  const slugConfirmed = localSlugConfirmed || !!data.workspaceSlug || data.paymentStatus === "paid" || data.stage === "platform_initializing" || data.stage === "converted";
+  const slugConfirmed = !localSlugEditing && (localSlugConfirmed || !!data.workspaceSlug || data.paymentStatus === "paid" || data.stage === "platform_initializing" || data.stage === "converted");
   const accountSet = localAccountSet || !!data.accountPasswordSet || data.paymentStatus === "paid" || data.stage === "platform_initializing" || data.stage === "converted";
   const paymentPaid = data.paymentStatus === "paid" || data.stage === "platform_initializing" || data.stage === "converted";
   const workspaceReady = data.stage === "converted" || !!workspaceSetupUrl;
@@ -1886,17 +1888,39 @@ export default function OnboardingPortal() {
             </div>
             <SlugPicker
               token={token!}
-              initialSlug={data.workspaceSlug || defaultSlug}
-              onConfirmed={() => setLocalSlugConfirmed(true)}
+              initialSlug={localConfirmedSlug || data.workspaceSlug || defaultSlug}
+              onConfirmed={(slug) => {
+                setLocalSlugConfirmed(true);
+                setLocalSlugEditing(false);
+                setLocalConfirmedSlug(slug);
+              }}
             />
           </>
         )}
 
         {slugConfirmed && !accountSet && (
           <>
-            <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 mb-4 text-sm text-teal-700">
-              <CheckCircle className="w-4 h-4 shrink-0" />
-              <span>Steps 1 &amp; 2 complete — agreement signed and workspace name chosen.</span>
+            <div className="flex items-start gap-2 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 mb-4 text-sm text-teal-700">
+              <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <span>Steps 1 &amp; 2 complete — agreement signed and workspace name chosen.</span>
+                {(localConfirmedSlug || data.workspaceSlug) && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="font-mono text-teal-800 font-medium text-xs">
+                      {(localConfirmedSlug || data.workspaceSlug)}.hubifyhomesonline.com
+                    </span>
+                    {data.stage !== "converted" && !paymentPaid && (
+                      <button
+                        onClick={() => setLocalSlugEditing(true)}
+                        className="inline-flex items-center gap-1 text-xs text-teal-600 hover:text-teal-800 underline underline-offset-2"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        Edit
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             <AccountSetupStep
               data={data}
@@ -1908,9 +1932,27 @@ export default function OnboardingPortal() {
 
         {accountSet && !paymentPaid && (
           <>
-            <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 mb-4 text-sm text-teal-700">
-              <CheckCircle className="w-4 h-4 shrink-0" />
-              <span>Steps 1–3 complete — agreement signed, workspace named, and login created.</span>
+            <div className="flex items-start gap-2 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 mb-4 text-sm text-teal-700">
+              <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <span>Steps 1–3 complete — agreement signed, workspace named, and login created.</span>
+                {(localConfirmedSlug || data.workspaceSlug) && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="font-mono text-teal-800 font-medium text-xs">
+                      {(localConfirmedSlug || data.workspaceSlug)}.hubifyhomesonline.com
+                    </span>
+                    {data.stage !== "converted" && (
+                      <button
+                        onClick={() => setLocalSlugEditing(true)}
+                        className="inline-flex items-center gap-1 text-xs text-teal-600 hover:text-teal-800 underline underline-offset-2"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        Edit
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             <PaymentStep data={data} token={token!} />
           </>
