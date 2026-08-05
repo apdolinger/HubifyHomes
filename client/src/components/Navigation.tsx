@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useTaskModal } from "@/contexts/TaskModalContext";
@@ -105,12 +105,96 @@ export default function Navigation() {
     }
   }, [isMobile, fieldModeEnabled]);
 
+  const navigationItems = getNavigationItems(user, isFlagEnabled);
+
+  // Overflow nav measurement
+  const navContainerRef = useRef<HTMLDivElement>(null);
+  const measureRowRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(9999);
+  const [itemWidths, setItemWidths] = useState<number[]>([]);
+  // approx width of the "More ▾" button so we reserve space for it
+  const MORE_BUTTON_WIDTH = 88;
+
+  // Watch container width
+  useEffect(() => {
+    const el = navContainerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      setContainerWidth(entries[0].contentRect.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Measure hidden items after navigationItems change
+  useEffect(() => {
+    const row = measureRowRef.current;
+    if (!row) return;
+    const children = Array.from(row.children) as HTMLElement[];
+    // +16 accounts for the space-x-4 (1rem) gap between items
+    setItemWidths(children.map((el) => el.offsetWidth + 16));
+  }, [navigationItems.length]);
+
+  // Compute visible vs overflow items
+  const { visibleItems, overflowItems } = useMemo(() => {
+    if (itemWidths.length !== navigationItems.length || containerWidth >= 9999) {
+      return { visibleItems: navigationItems, overflowItems: [] as typeof navigationItems };
+    }
+
+    const activeIdx = navigationItems.findIndex((item) => item.href === location);
+
+    // Greedily fit items, reserving MORE_BUTTON_WIDTH when not all items fit
+    const fitting: number[] = [];
+    let total = 0;
+    for (let i = 0; i < navigationItems.length; i++) {
+      const w = itemWidths[i] ?? 100;
+      // Reserve space for "More" button unless all remaining items would fit
+      const remainingWidth = itemWidths.slice(i).reduce((a, b) => a + b, 0);
+      const wouldFitAll = total + remainingWidth <= containerWidth;
+      const budgetRemaining = wouldFitAll ? containerWidth : containerWidth - MORE_BUTTON_WIDTH;
+      if (total + w <= budgetRemaining) {
+        fitting.push(i);
+        total += w;
+      }
+      // Once we can't fit an item the rest overflow too
+      else break;
+    }
+
+    const fittingSet = new Set(fitting);
+    const overflow = navigationItems
+      .map((_, i) => i)
+      .filter((i) => !fittingSet.has(i));
+
+    // Ensure the active item is always visible: swap it with the last fitting item.
+    // Only do this when at least one item already fits; if the container is so
+    // narrow that nothing fits at all, force the active item as the sole visible
+    // entry so we always show something meaningful.
+    if (activeIdx >= 0 && overflow.includes(activeIdx)) {
+      if (fitting.length > 0) {
+        const lastFittingIdx = fitting[fitting.length - 1];
+        fitting[fitting.length - 1] = activeIdx;
+        const swapPos = overflow.indexOf(activeIdx);
+        overflow[swapPos] = lastFittingIdx;
+        overflow.sort((a, b) => a - b);
+      } else {
+        // Container too narrow for any item — show only the active item, put rest in overflow
+        fitting.push(activeIdx);
+        const swapPos = overflow.indexOf(activeIdx);
+        overflow.splice(swapPos, 1);
+        overflow.sort((a, b) => a - b);
+      }
+    }
+
+    return {
+      visibleItems: fitting.map((i) => navigationItems[i]),
+      overflowItems: overflow.map((i) => navigationItems[i]),
+    };
+  }, [containerWidth, itemWidths, navigationItems, location]);
+
   const dismissBanner = () => {
     prefStorage.setItem("fieldModeEnabled", "false");
     setShowFieldModeBanner(false);
   };
-  
-  const navigationItems = getNavigationItems(user, isFlagEnabled);
 
   // Unread notification count — polls every 60s
   const { data: unreadData } = useQuery<{ count: number }>({
@@ -234,27 +318,70 @@ export default function Navigation() {
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:block">
-            <div className="ml-10 flex items-baseline space-x-4">
+          <div className="hidden md:flex items-baseline min-w-0 flex-1 ml-10" ref={navContainerRef}>
+            {/* Hidden measurement row — renders all items off-screen to capture widths */}
+            <div
+              ref={measureRowRef}
+              className="absolute invisible pointer-events-none flex items-baseline space-x-4"
+              aria-hidden="true"
+            >
               {navigationItems.map((item) => {
                 const Icon = item.icon;
+                return (
+                  <a key={item.name} className="nav-link">
+                    <Icon className="w-4 h-4 mr-2 inline" />
+                    {item.name}
+                  </a>
+                );
+              })}
+            </div>
+
+            {/* Visible items */}
+            <div className="flex items-baseline space-x-4">
+              {visibleItems.map((item) => {
+                const Icon = item.icon;
                 const isActive = location === item.href;
-                
                 return (
                   <Link key={item.name} href={item.href}>
-                    <a
-                      className={
-                        isActive
-                          ? "nav-link-active"
-                          : "nav-link"
-                      }
-                    >
+                    <a className={isActive ? "nav-link-active" : "nav-link"}>
                       <Icon className="w-4 h-4 mr-2 inline" />
                       {item.name}
                     </a>
                   </Link>
                 );
               })}
+
+              {/* More ▾ dropdown for overflow items */}
+              {overflowItems.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="nav-link flex items-center gap-1 whitespace-nowrap">
+                      More
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="min-w-[160px]">
+                    {overflowItems.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = location === item.href;
+                      return (
+                        <DropdownMenuItem key={item.name} asChild>
+                          <Link href={item.href}>
+                            <a
+                              className={`flex items-center w-full ${
+                                isActive ? "text-teal-700 font-medium" : ""
+                              }`}
+                            >
+                              <Icon className="w-4 h-4 mr-2 flex-shrink-0" />
+                              {item.name}
+                            </a>
+                          </Link>
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           </div>
 
