@@ -19363,6 +19363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fromEmail = process.env.RESEND_FROM_EMAIL;
       const recipientName = (existing as any).firstName ?? existing.name ?? "there";
       const orgName = existing.company ?? existing.name ?? "your organization";
+      const approvalWorkspaceSlug = (existing as any).workspaceSlug as string | null | undefined;
 
       if (!resend || !fromEmail) {
         // Email not configured — treat as failure; do NOT advance the stage.
@@ -19370,6 +19371,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "Approval fields saved but email service is not configured (RESEND_FROM_EMAIL missing). Fix the configuration and use 'Resend Approval Email' to complete approval.",
         });
       }
+
+      const workspaceSlugLine = approvalWorkspaceSlug
+        ? `  Workspace:      ${approvalWorkspaceSlug}`
+        : `  Workspace Name: You'll choose this during onboarding`;
 
       try {
         const betaApprovalText = `Hi ${recipientName},
@@ -19382,6 +19387,7 @@ Here are your membership details:
   Portfolio Tier: ${portfolioTier}${homes > 0 ? `\n  Properties:     ${homes}` : ""}
   Founding Member: #${cohortNumber}
   Monthly Rate:   $${discountedMonthlyPrice.toFixed(2)}/mo (${discountPct}% Founding Member rate, locked for life)${tierSetupFee > 0 ? `\n  Setup Fee:      $${tierSetupFee.toFixed(2)} one-time` : ""}
+${workspaceSlugLine}
 
 Your next step is to complete the Founding Member Agreement, set up billing, and activate your workspace. Use the link below — it walks you through the whole process:
 
@@ -19433,6 +19439,10 @@ contact@hubifyhomes.com`;
                   <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Setup Fee</td>
                   <td style="padding:4px 0;color:#0f172a">$${tierSetupFee.toFixed(2)} one-time</td>
                 </tr>` : ""}
+                <tr>
+                  <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Workspace</td>
+                  <td style="padding:4px 0;color:#0f172a">${approvalWorkspaceSlug ? `<span style="font-family:monospace;font-weight:600">${approvalWorkspaceSlug}</span>` : `<span style="color:#94a3b8;font-style:italic">You'll choose this during onboarding</span>`}</td>
+                </tr>
               </table>
               <p style="margin:0 0 20px">Your next step is to complete the Founding Member Agreement, set up billing, and activate your workspace.</p>
               <div style="text-align:center;margin:0 0 20px">
@@ -19532,6 +19542,7 @@ contact@hubifyhomes.com`;
       const tierSetupFee = Number((existing as any).setupFee ?? 0);
       const cohortNumber = (existing as any).betaCohortNumber ?? 1;
       const prospectHomes = (existing as any).estimatedHomes ?? 0;
+      const resendWorkspaceSlug = (existing as any).workspaceSlug as string | null | undefined;
 
       const resendApprovalLines = [
         `Hi ${recipientName},`,
@@ -19547,6 +19558,7 @@ contact@hubifyhomes.com`;
         `  Founding Member: #${cohortNumber}`,
         `  Monthly Rate:   $${discountedMonthlyPrice.toFixed(2)}/mo (${discountPct}% Founding Member rate, locked for life)`,
         ...(tierSetupFee > 0 ? [`  Setup Fee:      $${tierSetupFee.toFixed(2)} one-time`] : []),
+        resendWorkspaceSlug ? `  Workspace:      ${resendWorkspaceSlug}` : "  Workspace Name: You'll choose this during onboarding",
         "",
         "If you have any trouble, just reply to this email and we'll help.",
         "",
@@ -19592,6 +19604,10 @@ contact@hubifyhomes.com`;
                   <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Setup Fee</td>
                   <td style="padding:4px 0;color:#0f172a">$${tierSetupFee.toFixed(2)} one-time</td>
                 </tr>` : ""}
+                <tr>
+                  <td style="padding:4px 24px 4px 0;color:#64748b;white-space:nowrap">Workspace</td>
+                  <td style="padding:4px 0;color:#0f172a">${resendWorkspaceSlug ? `<span style="font-family:monospace;font-weight:600">${resendWorkspaceSlug}</span>` : `<span style="color:#94a3b8;font-style:italic">You'll choose this during onboarding</span>`}</td>
+                </tr>
               </table>
               <p style="margin:0 0 24px">If you have any trouble, just reply to this email and we'll help.</p>
               <p style="margin:0 0 4px">— The Hubify Team</p>

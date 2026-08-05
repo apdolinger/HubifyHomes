@@ -41,10 +41,11 @@ function mapTier(
 function buildWorkspaceReadyEmail(opts: {
   firstName: string;
   orgName: string;
+  slug?: string;
   setupUrl: string;
   expiresAt: Date;
 }): string {
-  const { firstName, orgName, setupUrl, expiresAt } = opts;
+  const { firstName, orgName, slug, setupUrl, expiresAt } = opts;
   const expiry = expiresAt.toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
@@ -63,6 +64,13 @@ function buildWorkspaceReadyEmail(opts: {
         Your organization <strong>${orgName}</strong> has been set up. Click the button below
         to set your password and start using Hubify.
       </p>
+      ${slug ? `
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:12px 16px;margin-bottom:20px">
+        <p style="font-size:12px;color:#0369a1;margin:0 0 4px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Your workspace identifier</p>
+        <p style="font-size:16px;color:#0c4a6e;font-weight:700;font-family:monospace;margin:0">${slug}</p>
+        <p style="font-size:12px;color:#0369a1;margin:4px 0 0">Your workspace will be accessible at <strong>hubifyhomesonline.com/${slug}</strong></p>
+      </div>
+      ` : ""}
       <div style="text-align:center;margin-bottom:28px">
         <a href="${setupUrl}"
           style="display:inline-block;background:#0097BD;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 36px;border-radius:8px">
@@ -123,6 +131,7 @@ export async function provisionBetaOrg(
     to: string;
     firstName: string;
     orgName: string;
+    slug?: string;
     setupUrl: string;
     tokenExpiresAt: Date;
   } | null = null;
@@ -334,6 +343,7 @@ export async function provisionBetaOrg(
         to: (prospect.email as string) ?? "",
         firstName,
         orgName,
+        slug: org.slug ?? undefined,
         setupUrl,
         tokenExpiresAt,
       };
@@ -374,7 +384,7 @@ export async function provisionBetaOrg(
 
   // ── Send workspace-ready email (outside transaction — failure is non-fatal) ─
   if (emailPayload) {
-    const { to, firstName, orgName, setupUrl, tokenExpiresAt } = emailPayload;
+    const { to, firstName, orgName, slug, setupUrl, tokenExpiresAt } = emailPayload;
     try {
       const resendKey = process.env.RESEND_API_KEY;
       if (resendKey) {
@@ -390,6 +400,7 @@ export async function provisionBetaOrg(
           html: buildWorkspaceReadyEmail({
             firstName,
             orgName,
+            slug,
             setupUrl,
             expiresAt: tokenExpiresAt,
           }),
