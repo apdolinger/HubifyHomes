@@ -19844,7 +19844,10 @@ contact@hubifyhomes.com`;
 
       // Enum mirrors OnboardingStage exactly (shared/schema.ts)
       const ONBOARDING_STAGES = [
-        "inquiry", "agreement", "payment_setup", "initial_payment", "welcome", "dropped",
+        "contact", "inquiry", "beta_approved", "agreement_pending", "agreement",
+        "payment_setup", "initial_payment", "welcome", "dropped",
+        "demo_requested", "demo_sent", "demo_completed", "follow_up_needed",
+        "converted", "not_a_fit", "payment_pending", "platform_initializing", "provisioning_failed",
       ] as const;
       const sendStageEmailSchema = z.object({
         stage: z.enum(ONBOARDING_STAGES),

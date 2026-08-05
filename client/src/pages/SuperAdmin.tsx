@@ -5442,13 +5442,15 @@ function DemoRequestsTab() {
 // Template panel includes `dropped` so admins can configure a "sorry to see
 // you go" email. Kanban PIPELINE_STAGES intentionally excludes dropped.
 const TEMPLATE_STAGES: { key: OnboardingStage; label: string }[] = [
-  { key: "contact",         label: "Contact" },
-  { key: "inquiry",         label: "Submission" },
-  { key: "agreement",       label: "Agreement" },
-  { key: "payment_setup",   label: "Payment Setup" },
-  { key: "initial_payment", label: "Initial Payment" },
-  { key: "welcome",         label: "Welcome" },
-  { key: "dropped",         label: "Dropped" },
+  { key: "contact",           label: "Contact" },
+  { key: "inquiry",           label: "Submission" },
+  { key: "beta_approved",     label: "Founding Member Approved" },
+  { key: "agreement_pending", label: "Agreement Pending" },
+  { key: "agreement",         label: "Agreement" },
+  { key: "payment_setup",     label: "Payment Setup" },
+  { key: "initial_payment",   label: "Initial Payment" },
+  { key: "welcome",           label: "Welcome" },
+  { key: "dropped",           label: "Dropped" },
 ];
 
 const PREVIEW_DUMMY = {
