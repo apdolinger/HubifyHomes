@@ -500,7 +500,85 @@ export async function runStuckProspectDigest(): Promise<{ sent: boolean; stuckCo
   return { sent: true, stuckCount: stuckProspects.length, message: `Digest sent to ${toEmail} — ${stuckProspects.length} stuck prospect(s).` };
 }
 
+// ── In-progress guard so two overlapping 10-min ticks don't double-provision ─
+let retryProvisioningRunning = false;
+
+/**
+ * Find prospects that are stuck in `platform_initializing` (paid, no org) and
+ * retry provisioning for each one. Runs every 10 minutes via cron.
+ *
+ * Safe to call concurrently — the guard flag and provisionBetaOrg's internal
+ * SELECT … FOR UPDATE transaction prevent double-provisioning.
+ */
+export async function retryStuckProvisioningJob(): Promise<{ retried: number; succeeded: number; errors: string[] }> {
+  if (retryProvisioningRunning) {
+    log('[PROVISION-RETRY] Job already running — skipping this tick');
+    return { retried: 0, succeeded: 0, errors: [] };
+  }
+  retryProvisioningRunning = true;
+
+  let retried = 0;
+  let succeeded = 0;
+  const errors: string[] = [];
+
+  try {
+    const STALE_MS = 5 * 60 * 1000; // 5 minutes
+    const now = Date.now();
+
+    const allProspects = await storage.listOnboardingProspects();
+    const stuck = allProspects.filter(p => {
+      if (p.stage !== 'platform_initializing') return false;
+      if (p.paymentStatus !== 'paid') return false;
+      if (p.orgId) return false; // already provisioned
+      const lastUpdated = p.updatedAt ? new Date(p.updatedAt).getTime() : 0;
+      return now - lastUpdated > STALE_MS;
+    });
+
+    if (stuck.length === 0) {
+      log('[PROVISION-RETRY] No stuck prospects — nothing to do');
+      return { retried: 0, succeeded: 0, errors: [] };
+    }
+
+    log(`[PROVISION-RETRY] Found ${stuck.length} stuck prospect(s) — retrying provisioning`);
+
+    const { provisionBetaOrg } = await import('./betaProvisioning');
+    const { getAppBaseUrl } = await import('./brandAsset');
+    const baseUrl = getAppBaseUrl();
+
+    for (const prospect of stuck) {
+      retried++;
+      try {
+        await provisionBetaOrg(prospect.id, baseUrl);
+        succeeded++;
+        log(`[PROVISION-RETRY] Provisioned ${prospect.email} (${prospect.id}) successfully`);
+      } catch (err) {
+        const msg = `Failed for ${prospect.email} (${prospect.id}): ${err}`;
+        errors.push(msg);
+        log(`[PROVISION-RETRY] ${msg}`);
+      }
+    }
+  } catch (err) {
+    const msg = `Job failed: ${err}`;
+    errors.push(msg);
+    log(`[PROVISION-RETRY] ${msg}`);
+  } finally {
+    retryProvisioningRunning = false;
+  }
+
+  log(`[PROVISION-RETRY] Done — retried: ${retried}, succeeded: ${succeeded}, errors: ${errors.length}`);
+  return { retried, succeeded, errors };
+}
+
 export function startScheduledTasks() {
+  // Retry stalled provisioning every 10 minutes
+  cron.schedule('*/10 * * * *', async () => {
+    try {
+      await retryStuckProvisioningJob();
+    } catch (err) {
+      log(`[CRON] Error in stalled-provisioning retry job: ${err}`);
+    }
+  });
+
   // Run conflict scan every 12 hours (at 2am and 2pm)
   cron.schedule('0 2,14 * * *', async () => {
     try {
