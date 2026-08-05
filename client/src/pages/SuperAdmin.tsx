@@ -1087,17 +1087,22 @@ function ProspectCard({
         </div>
       )}
 
-      {/* Initialize Platform — shown for paid prospects OR prospects past agreement stage, without an org */}
-      {!prospect.orgId && prospect.stage !== "welcome" &&
-        (prospect.paymentStatus === "paid" ||
-         ["agreement_complete","payment_pending","payment_setup","platform_initializing","provisioning_failed","initial_payment"].includes(prospect.stage)) && (
+      {/* Initialize Platform — shown for any unprovisioned prospect past early inquiry stages */}
+      {!prospect.orgId &&
+        prospect.stage !== "contact" &&
+        prospect.stage !== "inquiry" &&
+        prospect.stage !== "beta_approved" &&
+        prospect.stage !== "welcome" &&
+        prospect.stage !== "dropped" &&
+        prospect.stage !== "not_a_fit" &&
+        prospect.stage !== "converted" && (
         <Button
           size="sm"
           variant="default"
-          className="h-6 text-xs px-2 w-full bg-indigo-600 hover:bg-indigo-700"
+          className="h-7 text-xs px-2 w-full bg-indigo-600 hover:bg-indigo-700 font-medium"
           onClick={onConvertToOrg}
           disabled={convertingToOrg}
-          title="Manually provision this customer's workspace — no charge is created"
+          title="Create this customer's workspace now — no charge is created"
         >
           {convertingToOrg
             ? <><RefreshCw className="w-3 h-3 mr-1 animate-spin" /> Initializing…</>
