@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -2608,6 +2608,202 @@ function SubmissionsTab({ onMoveToPipeline, defaultSourceFilter, statusFilter, o
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function ProvisioningStatusPanel({ onGoToOrganizations }: { onGoToOrganizations?: (orgId: string) => void }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: allProspects = [], isLoading } = useQuery<Prospect[]>({
+    queryKey: ["/api/super-admin/onboarding-prospects"],
+    refetchInterval: 30_000, // refresh every 30 s so stuck/resolved states stay fresh
+  });
+
+  const convertToOrgMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/convert-to-org`, {});
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/organizations"] });
+      toast({ title: "Platform initialized!", description: "The organization has been created." });
+    },
+    onError: (e: Error) => toast({ title: "Initialization failed", description: e?.message || "Could not create organization", variant: "destructive" }),
+  });
+
+  const forceLinkMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/force-link-existing-org`, {});
+      if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error(b.message || "Force link failed"); }
+      return await res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/organizations"] });
+      toast({ title: "Linked!", description: `Linked to org: ${data.org?.name ?? data.orgId}.` });
+    },
+    onError: (e: Error) => toast({ title: "Force link failed", description: e?.message || "Could not link", variant: "destructive" }),
+  });
+
+  const now = Date.now();
+  const fourteenDaysMs = 14 * 24 * 60 * 60 * 1000;
+
+  const waiting = allProspects
+    .filter(p => p.stage === "platform_initializing" && !p.orgId)
+    .sort((a, b) => new Date(a.updatedAt ?? a.createdAt ?? 0).getTime() - new Date(b.updatedAt ?? b.createdAt ?? 0).getTime());
+
+  const failed = allProspects
+    .filter(p => (p.stage === "provisioning_failed" || !!p.provisioningFailed) && !p.orgId)
+    .sort((a, b) => new Date(b.updatedAt ?? b.createdAt ?? 0).getTime() - new Date(a.updatedAt ?? a.createdAt ?? 0).getTime());
+
+  const recentlyProvisioned = allProspects
+    .filter(p => !!p.orgId && p.stage === "converted" && p.convertedAt && (now - new Date(p.convertedAt).getTime()) <= fourteenDaysMs)
+    .sort((a, b) => new Date(b.convertedAt!).getTime() - new Date(a.convertedAt!).getTime());
+
+  const allClear = waiting.length === 0 && failed.length === 0;
+
+  function timeAgo(dateStr: string | null | undefined): string {
+    if (!dateStr) return "—";
+    const ms = now - new Date(dateStr).getTime();
+    const mins = Math.floor(ms / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  }
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>;
+  }
+
+  function ProspectRow({ p, showError }: { p: Prospect; showError?: boolean }) {
+    const converting = convertToOrgMutation.isPending && convertToOrgMutation.variables === p.id;
+    const linking = forceLinkMutation.isPending && forceLinkMutation.variables === p.id;
+    return (
+      <div className="flex items-start gap-3 px-4 py-3 border-b last:border-b-0 hover:bg-gray-50">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium text-gray-900 truncate">{p.name}</span>
+            {p.company && <span className="text-xs text-gray-500 truncate">— {p.company}</span>}
+          </div>
+          <div className="text-xs text-gray-400 mt-0.5">{p.email}</div>
+          {showError && p.provisioningError && (
+            <div className="text-xs text-red-500 mt-1 font-mono bg-red-50 rounded px-2 py-1 truncate" title={p.provisioningError}>
+              {p.provisioningError}
+            </div>
+          )}
+        </div>
+        <div className="text-xs text-gray-400 whitespace-nowrap pt-0.5">
+          {timeAgo(p.updatedAt ?? p.createdAt)}
+        </div>
+        <div className="flex gap-1.5 shrink-0">
+          <Button size="sm" variant="default"
+            className="h-7 text-xs px-2.5 bg-indigo-600 hover:bg-indigo-700"
+            onClick={() => convertToOrgMutation.mutate(p.id)}
+            disabled={converting || linking}
+            title="Provision this customer's workspace"
+          >
+            {converting ? <><RefreshCw className="w-3 h-3 mr-1 animate-spin" />Initializing…</> : <><Building2 className="w-3 h-3 mr-1" />Initialize</>}
+          </Button>
+          <Button size="sm" variant="outline"
+            className="h-7 text-xs px-2 border-amber-300 text-amber-700 hover:bg-amber-50"
+            onClick={() => forceLinkMutation.mutate(p.id)}
+            disabled={converting || linking}
+            title="Link to an existing org with the same email"
+          >
+            {linking ? <><RefreshCw className="w-3 h-3 mr-1 animate-spin" />Linking…</> : <><Link className="w-3 h-3 mr-1" />Force Link</>}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-gray-900">Provisioning Status</h2>
+          <p className="text-xs text-gray-500 mt-0.5">Refreshes every 30 seconds. Use Initialize to create an org, or Force Link if one already exists for that email.</p>
+        </div>
+        <Button size="sm" variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] })}>
+          <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh
+        </Button>
+      </div>
+
+      {allClear && (
+        <div className="border rounded-xl bg-green-50 border-green-200 p-8 text-center">
+          <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
+          <p className="text-sm font-medium text-green-800">All clear — no provisioning issues</p>
+          <p className="text-xs text-green-600 mt-1">No platforms are waiting or failed.</p>
+        </div>
+      )}
+
+      {/* Waiting */}
+      {waiting.length > 0 && (
+        <div className="border rounded-xl overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b bg-violet-50">
+            <div className="w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
+            <h3 className="text-sm font-semibold text-violet-800">Waiting for initialization</h3>
+            <span className="ml-auto text-xs text-violet-600 font-medium">{waiting.length} prospect{waiting.length !== 1 ? "s" : ""}</span>
+          </div>
+          <div className="bg-white">
+            {waiting.map(p => <ProspectRow key={p.id} p={p} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Failed */}
+      {failed.length > 0 && (
+        <div className="border rounded-xl overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b bg-red-50">
+            <AlertTriangle className="w-4 h-4 text-red-500" />
+            <h3 className="text-sm font-semibold text-red-800">Provisioning failed</h3>
+            <span className="ml-auto text-xs text-red-600 font-medium">{failed.length} prospect{failed.length !== 1 ? "s" : ""}</span>
+          </div>
+          <div className="bg-white">
+            {failed.map(p => <ProspectRow key={p.id} p={p} showError />)}
+          </div>
+        </div>
+      )}
+
+      {/* Recently provisioned */}
+      <div className="border rounded-xl overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 border-b bg-green-50">
+          <CheckCircle className="w-4 h-4 text-green-600" />
+          <h3 className="text-sm font-semibold text-green-800">Recently provisioned</h3>
+          <span className="ml-auto text-xs text-green-600 font-medium">last 14 days</span>
+        </div>
+        {recentlyProvisioned.length === 0 ? (
+          <div className="px-4 py-6 text-center text-sm text-gray-400 bg-white">No platforms provisioned in the last 14 days.</div>
+        ) : (
+          <div className="bg-white divide-y">
+            {recentlyProvisioned.map(p => (
+              <div key={p.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-gray-900">{p.name}</span>
+                    {p.company && <span className="text-xs text-gray-500">— {p.company}</span>}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-0.5">{p.email}</div>
+                </div>
+                <div className="text-xs text-gray-400 whitespace-nowrap">{timeAgo(p.convertedAt)}</div>
+                {onGoToOrganizations && p.orgId && (
+                  <Button size="sm" variant="ghost"
+                    className="h-7 text-xs text-indigo-600 hover:text-indigo-800"
+                    onClick={() => onGoToOrganizations(p.orgId!)}
+                  >
+                    <ExternalLink className="w-3 h-3 mr-1" /> View Org
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -11899,7 +12095,7 @@ export default function SuperAdmin() {
         {/* ── ONBOARDING ── */}
         <TabsContent value="onboarding">
           <Tabs value={onboardingInnerTab} onValueChange={setOnboardingInnerTab} className="space-y-4">
-            <TabsList className="grid w-full grid-cols-5 h-auto bg-muted/60 p-1">
+            <TabsList className="grid w-full grid-cols-6 h-auto bg-muted/60 p-1">
               <TabsTrigger value="new" className="relative text-xs py-2">
                 Submissions
                 {newSubmissionsCount > 0 && (
@@ -11909,6 +12105,9 @@ export default function SuperAdmin() {
                 )}
               </TabsTrigger>
               <TabsTrigger value="pipeline" className="text-xs py-2">Pipeline</TabsTrigger>
+              <TabsTrigger value="provisioning" className="relative text-xs py-2">
+                Provisioning
+              </TabsTrigger>
               <TabsTrigger value="beta" className="text-xs py-2">Founding Member Applications</TabsTrigger>
               <TabsTrigger value="demo-requests" className="text-xs py-2">Demo Requests</TabsTrigger>
               <TabsTrigger value="dropped" className="text-xs py-2">Dropped</TabsTrigger>
@@ -11951,6 +12150,11 @@ export default function SuperAdmin() {
               <OnboardingPipelineTab
                 prefill={pipelinePrefill}
                 onPrefillConsumed={() => setPipelinePrefill(null)}
+                onGoToOrganizations={(orgId) => { setActiveTab("organizations"); setOrgsInnerTab("orgs"); setPendingOpenOrgId(orgId); }}
+              />
+            </TabsContent>
+            <TabsContent value="provisioning">
+              <ProvisioningStatusPanel
                 onGoToOrganizations={(orgId) => { setActiveTab("organizations"); setOrgsInnerTab("orgs"); setPendingOpenOrgId(orgId); }}
               />
             </TabsContent>
