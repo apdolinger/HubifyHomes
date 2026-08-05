@@ -18355,14 +18355,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 Hi ${signerName}, thanks for signing the Hubify Homes Founding Member Agreement${versionLabel}. Your onboarding step has been recorded — here's a summary for your records.
               </p>
               <table style="width:100%;border-collapse:collapse;font-size:14px;margin:0 0 28px">
+                ${signerName ? `
                 <tr>
                   <td style="padding:8px 0;color:#64748b;width:160px;vertical-align:top">Signer name</td>
                   <td style="padding:8px 0;color:#0f172a;font-weight:600">${signerName}</td>
-                </tr>
+                </tr>` : ""}
+                ${organizationName ? `
                 <tr>
                   <td style="padding:8px 0;color:#64748b;vertical-align:top">Organization</td>
                   <td style="padding:8px 0;color:#0f172a;font-weight:600">${organizationName}</td>
-                </tr>
+                </tr>` : ""}
                 ${agreementVersion ? `
                 <tr>
                   <td style="padding:8px 0;color:#64748b;vertical-align:top">Agreement version</td>
@@ -19996,14 +19998,16 @@ contact@hubifyhomes.com`;
                 Hi ${signerName}, thanks for signing the Hubify Homes Founding Member Agreement${versionLabel}. Your onboarding step has been recorded — here's a summary for your records.
               </p>
               <table style="width:100%;border-collapse:collapse;font-size:14px;margin:0 0 28px">
+                ${signerName ? `
                 <tr>
                   <td style="padding:8px 0;color:#64748b;width:160px;vertical-align:top">Signer name</td>
                   <td style="padding:8px 0;color:#0f172a;font-weight:600">${signerName}</td>
-                </tr>
+                </tr>` : ""}
+                ${organizationName ? `
                 <tr>
                   <td style="padding:8px 0;color:#64748b;vertical-align:top">Organization</td>
                   <td style="padding:8px 0;color:#0f172a;font-weight:600">${organizationName}</td>
-                </tr>
+                </tr>` : ""}
                 ${agreementVersion ? `
                 <tr>
                   <td style="padding:8px 0;color:#64748b;vertical-align:top">Agreement version</td>
