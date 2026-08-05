@@ -8877,7 +8877,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/time-entries/missing-clockout", isAuthenticated, requireFeatureFlag("task_cost_tracking"), async (req: any, res) => {
+  app.get("/api/time-entries/missing-clockout", isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user;
       const orgId = user.claims?.orgId || user.orgId;
@@ -8917,7 +8917,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/time-entries/clock-in", isAuthenticated, requireFeatureFlag("task_cost_tracking"), async (req: any, res) => {
+  app.post("/api/time-entries/clock-in", isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user;
       const userId = user.claims?.sub || user.id;
@@ -8975,7 +8975,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/time-entries/:id/clock-out", isAuthenticated, requireFeatureFlag("task_cost_tracking"), async (req: any, res) => {
+  app.post("/api/time-entries/:id/clock-out", isAuthenticated, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const userId = req.user.claims.sub;
@@ -9003,7 +9003,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Submit a time entry for manager approval (staff action)
-  app.post("/api/time-entries/:id/submit", isAuthenticated, requireFeatureFlag("task_cost_tracking"), async (req: any, res) => {
+  app.post("/api/time-entries/:id/submit", isAuthenticated, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const userId = req.user.claims.sub;
@@ -9033,7 +9033,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Bulk approve / reject time entries (admin/supervisor action)
-  app.post("/api/time-entries/bulk-action", isAuthenticated, requireFeatureFlag("task_cost_tracking"), async (req: any, res) => {
+  app.post("/api/time-entries/bulk-action", isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user;
       const role = user.claims?.role || user.role;
@@ -9072,7 +9072,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Generate a draft client invoice from approved time entries (Phase 2)
-  app.post("/api/time-entries/generate-invoice", isAuthenticated, requireFeatureFlag("task_cost_tracking"), async (req: any, res) => {
+  app.post("/api/time-entries/generate-invoice", isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user;
       const orgId = user.claims?.orgId || user.orgId;
@@ -9146,7 +9146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/time-entries/:id", isAuthenticated, requireFeatureFlag("task_cost_tracking"), async (req: any, res) => {
+  app.patch("/api/time-entries/:id", isAuthenticated, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const user = req.user;
@@ -9202,7 +9202,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/time-entries/:id", isAuthenticated, requireFeatureFlag("task_cost_tracking"), async (req, res) => {
+  app.delete("/api/time-entries/:id", isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteTimeEntry(id);
