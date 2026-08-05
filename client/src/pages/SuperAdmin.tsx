@@ -1076,6 +1076,23 @@ function ProspectCard({
         </div>
       )}
 
+      {/* Initialize Platform — shown for any paid prospect without an org outside the welcome stage */}
+      {!prospect.orgId && prospect.paymentStatus === "paid" && prospect.stage !== "welcome" && (
+        <Button
+          size="sm"
+          variant="default"
+          className="h-6 text-xs px-2 w-full bg-indigo-600 hover:bg-indigo-700"
+          onClick={onConvertToOrg}
+          disabled={convertingToOrg}
+          title="Payment confirmed — provision this customer's workspace now"
+        >
+          {convertingToOrg
+            ? <><RefreshCw className="w-3 h-3 mr-1 animate-spin" /> Initializing…</>
+            : <><Building2 className="w-3 h-3 mr-1" /> Initialize Platform</>
+          }
+        </Button>
+      )}
+
       {/* Force-link button — shown when provisioning is stuck or failed and no org linked yet */}
       {!prospect.orgId && (prospect.provisioningFailed || prospect.stage === "provisioning_failed" || prospect.stage === "platform_initializing") && onForceLinkExistingOrg && (
         <Button
