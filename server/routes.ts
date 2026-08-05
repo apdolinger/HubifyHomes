@@ -11695,6 +11695,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/orgs/:orgId/check-slug?slug=xxx — live availability check for admins
+  app.get("/api/orgs/:orgId/check-slug", isAuthenticated, async (req, res) => {
+    try {
+      const orgId = req.params.orgId;
+      const userOrgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
+      const userRole = req.user?.claims?.role;
+
+      if (userOrgId !== orgId) return res.status(403).json({ message: "Access denied" });
+      if (userRole !== "admin") return res.status(403).json({ message: "Admins only" });
+
+      const slug = ((req.query.slug as string) || "").toLowerCase().trim();
+      const RESERVED = new Set(["www", "admin", "api", "app", "support", "demo"]);
+
+      if (!slug || slug.length < 3) return res.json({ available: false, reason: "Must be at least 3 characters" });
+      if (!/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(slug)) {
+        return res.json({ available: false, reason: "Only lowercase letters, numbers, and hyphens (not at start/end)" });
+      }
+      if (RESERVED.has(slug)) return res.json({ available: false, reason: `"${slug}" is a reserved word` });
+
+      // Own current slug is always available
+      const [current] = await db.select({ slug: orgs.slug }).from(orgs).where(eq(orgs.id, orgId)).limit(1);
+      if (current?.slug === slug) return res.json({ available: true });
+
+      // Check if taken by another org
+      const [existing] = await db.select({ id: orgs.id }).from(orgs).where(eq(orgs.slug, slug)).limit(1);
+      if (existing) return res.json({ available: false, reason: "This workspace name is already taken" });
+
+      res.json({ available: true });
+    } catch (err) {
+      console.error("check-slug error:", err);
+      res.status(500).json({ message: "Could not check availability" });
+    }
+  });
+
+  // PATCH /api/orgs/:orgId/slug — let admins update their own workspace slug
+  app.patch("/api/orgs/:orgId/slug", isAuthenticated, async (req, res) => {
+    try {
+      const orgId = req.params.orgId;
+      const userOrgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
+      const userRole = req.user?.claims?.role;
+
+      if (userOrgId !== orgId) return res.status(403).json({ message: "Access denied" });
+      if (userRole !== "admin") return res.status(403).json({ message: "Admins only" });
+
+      const { slug } = req.body ?? {};
+      if (typeof slug !== "string") return res.status(400).json({ message: "slug must be a string" });
+      const slugClean = slug.toLowerCase().trim();
+
+      const RESERVED = new Set(["www", "admin", "api", "app", "support", "demo"]);
+      if (!/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(slugClean)) {
+        return res.status(400).json({ message: "slug must be 3–63 chars: lowercase letters, numbers, hyphens (not at start/end)" });
+      }
+      if (RESERVED.has(slugClean)) {
+        return res.status(400).json({ message: `"${slugClean}" is a reserved slug` });
+      }
+
+      const updated = await storage.updateOrg(orgId, { slug: slugClean } as any);
+      if (!updated) return res.status(404).json({ message: "Organization not found" });
+
+      await AuditLogger.log({
+        req,
+        action: "update_organization",
+        actionType: "admin",
+        resource: "organization",
+        resourceId: orgId,
+        severity: "warning",
+        success: true,
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      if (error?.code === "23505") {
+        return res.status(409).json({ message: "That workspace name is already in use by another organization" });
+      }
+      console.error("Error updating org slug:", error);
+      res.status(500).json({ message: "Failed to update workspace name" });
+    }
+  });
+
   app.get("/api/orgs/:orgId/branding", isAuthenticated, async (req, res) => {
     try {
       const orgId = req.params.orgId;

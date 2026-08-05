@@ -60,6 +60,8 @@ import {
   Smartphone,
   Palette,
   Image as ImageIcon,
+  Loader2,
+  Pencil,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { enterFieldMode, exitFieldMode } from "@/components/FieldModeLayout";
@@ -596,6 +598,7 @@ function safeColor(value: string, fallback: string): string {
 type OrgRecord = {
   id: string;
   name?: string;
+  slug?: string;
   branding?: OrgBranding;
   address1?: string;
   address2?: string;
@@ -610,6 +613,186 @@ type OrgRecord = {
   primaryContact?: string;
   industry?: string;
 };
+
+// ── Workspace Slug Editor ─────────────────────────────────────────────────────
+function WorkspaceSlugEditor({ orgId, currentSlug }: { orgId: string; currentSlug: string }) {
+  const { toast } = useToast();
+  const queryClientLocal = useQueryClient();
+  const [isEditing, setIsEditing] = useState(false);
+  const [slug, setSlug] = useState(currentSlug);
+  const [checkResult, setCheckResult] = useState<{ available: boolean; reason?: string } | null>(null);
+  const [checking, setChecking] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Reset local state when currentSlug changes (e.g. after a save)
+  useEffect(() => {
+    if (!isEditing) setSlug(currentSlug);
+  }, [currentSlug, isEditing]);
+
+  function slugify(s: string) {
+    return s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 63);
+  }
+
+  async function runCheck(clean: string) {
+    if (!clean || clean.length < 3) return;
+    setChecking(true);
+    try {
+      const res = await fetch(`/api/orgs/${orgId}/check-slug?slug=${encodeURIComponent(clean)}`);
+      const body = await res.json();
+      setCheckResult(body);
+    } catch {
+      setCheckResult({ available: false, reason: "Could not check availability" });
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  function handleChange(val: string) {
+    const clean = slugify(val);
+    setSlug(clean);
+    setCheckResult(null);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!clean || clean.length < 3) return;
+    debounceRef.current = setTimeout(() => runCheck(clean), 500);
+  }
+
+  function startEditing() {
+    setSlug(currentSlug);
+    setCheckResult(null);
+    setIsEditing(true);
+    // Run initial check on mount so current value shows green immediately
+    setTimeout(() => runCheck(currentSlug), 50);
+  }
+
+  function cancel() {
+    setIsEditing(false);
+    setSlug(currentSlug);
+    setCheckResult(null);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+  }
+
+  const saveMutation = useMutation({
+    mutationFn: async (newSlug: string) => {
+      const res = await fetch(`/api/orgs/${orgId}/slug`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: newSlug }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message ?? "Could not save workspace name");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClientLocal.invalidateQueries({ queryKey: ["/api/orgs", orgId] });
+      setIsEditing(false);
+      toast({ title: "Workspace name updated", description: "Your workspace URL has been changed." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err?.message, variant: "destructive" });
+    },
+  });
+
+  const isUnchanged = slug === currentSlug;
+  const canSave = slug.length >= 3 && (checkResult?.available === true || isUnchanged) && !saveMutation.isPending && !checking;
+
+  return (
+    <Card className="mt-4">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center text-base">
+              <Globe className="w-4 h-4 mr-2" />
+              Workspace Name
+            </CardTitle>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Your unique URL identifier used to access the portal.
+            </p>
+          </div>
+          {!isEditing && (
+            <Button variant="outline" size="sm" onClick={startEditing} data-testid="button-edit-slug">
+              <Pencil className="w-3.5 h-3.5 mr-1.5" />
+              Edit
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {!isEditing ? (
+          <div className="flex items-center gap-2">
+            <code className="text-sm font-mono bg-slate-100 px-2 py-1 rounded text-slate-800">{currentSlug || "—"}</code>
+            {currentSlug && (
+              <span className="text-xs text-slate-500">{currentSlug}.hubifyhomesonline.com</span>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={slug}
+                onChange={(e) => handleChange(e.target.value)}
+                placeholder="my-company"
+                maxLength={63}
+                className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent font-mono"
+                data-testid="input-slug"
+              />
+              {checking && <Loader2 className="w-4 h-4 text-slate-400 animate-spin shrink-0" />}
+              {!checking && (isUnchanged || checkResult?.available === true) && slug.length >= 3 && (
+                <CheckCircle className="w-5 h-5 text-teal-600 shrink-0" />
+              )}
+              {!checking && !isUnchanged && checkResult?.available === false && (
+                <XCircle className="w-5 h-5 text-red-500 shrink-0" />
+              )}
+            </div>
+
+            {slug.length >= 3 && (
+              <p className="text-xs text-slate-500">
+                Workspace URL:{" "}
+                <span className="font-mono text-teal-700 font-medium">{slug}.hubifyhomesonline.com</span>
+              </p>
+            )}
+            {slug.length > 0 && slug.length < 3 && (
+              <p className="text-xs text-amber-600">Must be at least 3 characters</p>
+            )}
+            {!isUnchanged && checkResult?.available === false && (
+              <p className="text-xs text-red-600">{checkResult.reason}</p>
+            )}
+            {!isUnchanged && checkResult?.available === true && (
+              <p className="text-xs text-teal-600">✓ This name is available</p>
+            )}
+            <p className="text-xs text-slate-400">
+              Only lowercase letters, numbers, and hyphens. Min 3 characters.
+            </p>
+
+            <div className="flex gap-2 pt-1">
+              <Button
+                size="sm"
+                onClick={() => saveMutation.mutate(slug)}
+                disabled={!canSave}
+                data-testid="button-save-slug"
+              >
+                {saveMutation.isPending ? (
+                  <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Saving…</>
+                ) : (
+                  <><Save className="w-3.5 h-3.5 mr-1.5" />Save</>
+                )}
+              </Button>
+              <Button size="sm" variant="outline" onClick={cancel} data-testid="button-cancel-slug">
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function BrandingTab({ orgId, orgName }: { orgId: string; orgName: string }) {
   const { toast } = useToast();
@@ -1627,6 +1810,11 @@ export default function Account() {
               )}
             </CardContent>
           </Card>
+
+          {/* Workspace slug editor */}
+          {orgId && org && (
+            <WorkspaceSlugEditor orgId={orgId} currentSlug={org.slug ?? ""} />
+          )}
         </TabsContent>
 
         {/* Subscription & Billing Tab */}
