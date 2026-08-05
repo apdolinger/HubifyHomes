@@ -20,6 +20,112 @@ process.on("unhandledRejection", (reason: any) => {
 
 const app = express();
 
+/**
+ * Run once after startup migrations complete.
+ * If encryption is enabled and the stored canary cannot be decrypted with the
+ * current key, send a warning email to the platform admin address.
+ * Rate-limited to at most one email per 24 hours via a platform_settings key.
+ */
+async function checkEncryptionCanaryAndAlert(): Promise<void> {
+  const { isEncryptionEnabled, decrypt, getCanaryPlaintext } = await import('./encryption.js');
+
+  if (!isEncryptionEnabled()) {
+    // No key configured — nothing to check.
+    return;
+  }
+
+  const { storage } = await import('./storage.js');
+  const settings = await storage.getPlatformSettings();
+
+  const storedCanary = settings['encryption_canary_v1'] as string | undefined;
+  if (!storedCanary) {
+    // Canary not written yet — first boot with encryption. Nothing to alert.
+    return;
+  }
+
+  let canaryOk: boolean;
+  try {
+    const decrypted = decrypt(storedCanary);
+    canaryOk = decrypted === getCanaryPlaintext();
+  } catch {
+    canaryOk = false;
+  }
+
+  if (canaryOk) {
+    return;
+  }
+
+  console.error('[startup] ENCRYPTION KEY MISMATCH — stored canary cannot be decrypted with the current PLATFORM_ENCRYPTION_KEY. Stripe keys and other encrypted data will be unreadable until the correct key is restored.');
+
+  // Rate-limit: skip if an alert was already sent within the last 24 hours.
+  const RATE_LIMIT_MS = 24 * 60 * 60 * 1000;
+  const lastAlertIso = settings['encryption_mismatch_alert_sent_at'] as string | undefined;
+  if (lastAlertIso) {
+    const lastAlertMs = new Date(lastAlertIso).getTime();
+    if (!isNaN(lastAlertMs) && Date.now() - lastAlertMs < RATE_LIMIT_MS) {
+      console.warn(`[startup] Encryption mismatch alert already sent at ${lastAlertIso} — skipping duplicate.`);
+      return;
+    }
+  }
+
+  const adminEmail = process.env.ADMIN_EMAIL || process.env.SUPPORT_EMAIL;
+  if (!adminEmail) {
+    console.warn('[startup] No ADMIN_EMAIL or SUPPORT_EMAIL configured — cannot send encryption mismatch alert.');
+    return;
+  }
+
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('[startup] RESEND_API_KEY not configured — cannot send encryption mismatch alert email.');
+    return;
+  }
+
+  try {
+    const { sendGenericEmail } = await import('./emailUtils.js');
+    const platformSettingsUrl = `${process.env.PUBLIC_URL || ''}/super-admin/platform-settings`;
+
+    const htmlContent = `
+      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+        <h2 style="color:#dc2626;">⚠️ Encryption Key Mismatch Detected</h2>
+        <p>The platform encryption canary could not be decrypted with the current
+        <strong>PLATFORM_ENCRYPTION_KEY</strong> on startup (${new Date().toISOString()}).</p>
+        <p>This means the key has been rotated or changed without re-encrypting the stored data.
+        <strong>Stripe payment keys and other encrypted credentials will fail</strong> until the
+        correct key is restored or a re-encryption is performed.</p>
+        <h3>Recommended actions</h3>
+        <ol>
+          <li>Restore the previous <code>PLATFORM_ENCRYPTION_KEY</code> environment variable, or</li>
+          <li>Open Platform Settings and use the Re-encrypt tool to migrate data to the new key.</li>
+        </ol>
+        <p>
+          <a href="${platformSettingsUrl}"
+             style="display:inline-block;padding:10px 20px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;">
+            Open Platform Settings
+          </a>
+        </p>
+        <hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb;" />
+        <p style="color:#6b7280;font-size:13px;">This alert is sent at most once every 24 hours.</p>
+      </div>
+    `;
+
+    await sendGenericEmail({
+      to: adminEmail,
+      subject: '⚠️ Hubify: Encryption key mismatch detected at startup',
+      htmlContent,
+      fromName: 'Hubify Platform',
+    });
+
+    // Persist the timestamp so we don't flood on rapid restarts.
+    await storage.setPlatformSettings(
+      { encryption_mismatch_alert_sent_at: new Date().toISOString() },
+      null,
+    );
+
+    console.log(`[startup] Encryption mismatch alert sent to ${adminEmail}`);
+  } catch (emailErr) {
+    console.error('[startup] Failed to send encryption mismatch alert email:', emailErr);
+  }
+}
+
 // Security headers (production only — skip CSP in dev to keep Vite HMR working)
 if (process.env.NODE_ENV === "production") {
   app.use(
@@ -747,6 +853,13 @@ app.use((req, res, next) => {
       await initializeStageEmailTemplates();
     } catch (error) {
       console.error('Error initializing stage email templates:', error);
+    }
+
+    // Encryption canary check — alert admin by email if key mismatch is detected
+    try {
+      await checkEncryptionCanaryAndAlert();
+    } catch (error) {
+      console.error('[startup] Error during encryption canary check:', error);
     }
   });
 })();
