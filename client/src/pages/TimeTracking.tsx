@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
@@ -86,6 +86,17 @@ export default function TimeTracking() {
   const { user: _user } = useAuth();
   const user = _user as any;
   const canManage = user?.role === "admin" || user?.role === "supervisor";
+
+  // Auto-open clock-in dialog when navigated here with ?clockin=1
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("clockin") === "1") {
+      setShowClockInDialog(true);
+      // Clean the param from the URL without a page reload
+      const clean = window.location.pathname;
+      window.history.replaceState({}, "", clean);
+    }
+  }, []);
 
   const [userFilter, setUserFilter] = useState("all");
   const [propertyFilter, setPropertyFilter] = useState("all");

@@ -31,6 +31,7 @@ import {
   Calendar,
   MapPin,
   Clock,
+  Play,
   Bell,
   MessageSquare,
   ClipboardCheck,
@@ -60,8 +61,6 @@ const getNavigationItems = (user: any, flagEnabled: (key: string) => boolean) =>
     { name: "Messages", href: "/messages", icon: MessageSquare },
     { name: "Team", href: "/team", icon: Users },
   );
-
-  items.push({ name: "Time", href: "/time-tracking", icon: Clock, testId: "nav-time-tracking" });
 
   if ((user as any)?.role === 'admin' || (user as any)?.role === 'manager') {
     items.push({ name: "Admin", href: "/admin", icon: Settings });
@@ -349,11 +348,11 @@ export default function Navigation() {
                 );
               })}
 
-              {/* More ▾ dropdown for overflow items */}
-              {overflowItems.length > 0 && (
+              {/* More ▾ dropdown — overflow items + always-pinned items */}
+              {(overflowItems.length > 0 || true) && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="nav-link flex items-center gap-1 whitespace-nowrap">
+                    <button className={`nav-link flex items-center gap-1 whitespace-nowrap${location === "/time-tracking" ? " nav-link-active" : ""}`}>
                       More
                       <ChevronDown className="w-3.5 h-3.5" />
                     </button>
@@ -377,6 +376,15 @@ export default function Navigation() {
                         </DropdownMenuItem>
                       );
                     })}
+                    {overflowItems.length > 0 && <DropdownMenuSeparator />}
+                    <DropdownMenuItem asChild>
+                      <Link href="/time-tracking">
+                        <a className={`flex items-center w-full ${location === "/time-tracking" ? "text-teal-700 font-medium" : ""}`}>
+                          <Clock className="w-4 h-4 mr-2 flex-shrink-0" />
+                          Time Tracker
+                        </a>
+                      </Link>
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
@@ -496,6 +504,10 @@ export default function Navigation() {
                 <DropdownMenuItem onClick={() => setIsNotificationSettingsOpen(true)}>
                   <Bell className="w-4 h-4 mr-2" />
                   Notification Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => window.location.href = '/time-tracking?clockin=1'}>
+                  <Play className="w-4 h-4 mr-2" />
+                  Clock In
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => window.location.href = '/time-tracking'}>
                   <Clock className="w-4 h-4 mr-2" />
