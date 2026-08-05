@@ -333,7 +333,8 @@ function isChecklistItemComplete(
   item: { key: string; auto: ((p: Prospect) => boolean) | null },
   prospect: Prospect,
 ): boolean {
-  if (item.auto) return item.auto(prospect);
+  // Auto items: system signal OR manual admin override both count
+  if (item.auto) return item.auto(prospect) || !!(prospect.onboardingChecklist?.[item.key]);
   return !!(prospect.onboardingChecklist?.[item.key]);
 }
 
@@ -751,7 +752,11 @@ function OnboardingTrackerSection({
                       <div className="divide-y bg-white">
                         {section.items.map(item => {
                           const isAuto = !!item.auto;
-                          const checked = isAuto ? item.auto!(selected) : !!(draftChecklist[item.key]);
+                          const autoSignal = isAuto && item.auto!(selected);
+                          const manualOverride = !!(draftChecklist[item.key]);
+                          const checked = isAuto ? (autoSignal || manualOverride) : manualOverride;
+                          // Lock the checkbox only when the system has already confirmed it — admins can override when auto hasn't fired
+                          const locked = isAuto && autoSignal;
                           return (
                             <div
                               key={item.key}
@@ -759,11 +764,11 @@ function OnboardingTrackerSection({
                             >
                               <Checkbox
                                 checked={checked}
-                                disabled={isAuto}
+                                disabled={locked}
                                 onCheckedChange={(v) => {
-                                  if (!isAuto) setDraftChecklist(prev => ({ ...prev, [item.key]: !!v }));
+                                  setDraftChecklist(prev => ({ ...prev, [item.key]: !!v }));
                                 }}
-                                className={isAuto ? "opacity-50" : ""}
+                                className={locked ? "opacity-50" : ""}
                               />
                               <span className={`text-xs flex-1 ${checked ? "line-through text-gray-400" : "text-gray-700"}`}>
                                 {item.label}
@@ -771,9 +776,15 @@ function OnboardingTrackerSection({
                               {isAuto && (
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <span className="text-xs text-gray-400 italic cursor-help">auto</span>
+                                    <span className="text-xs text-gray-400 italic cursor-help">
+                                      {autoSignal ? "auto" : manualOverride ? "manual ✓" : "auto"}
+                                    </span>
                                   </TooltipTrigger>
-                                  <TooltipContent className="text-xs">Auto-detected from system data</TooltipContent>
+                                  <TooltipContent className="text-xs">
+                                    {autoSignal
+                                      ? "Auto-detected from system data"
+                                      : "Not yet auto-detected — check manually to mark as done"}
+                                  </TooltipContent>
                                 </Tooltip>
                               )}
                             </div>
@@ -1076,15 +1087,17 @@ function ProspectCard({
         </div>
       )}
 
-      {/* Initialize Platform — shown for any paid prospect without an org outside the welcome stage */}
-      {!prospect.orgId && prospect.paymentStatus === "paid" && prospect.stage !== "welcome" && (
+      {/* Initialize Platform — shown for paid prospects OR prospects past agreement stage, without an org */}
+      {!prospect.orgId && prospect.stage !== "welcome" &&
+        (prospect.paymentStatus === "paid" ||
+         ["agreement_complete","payment_pending","payment_setup","platform_initializing","provisioning_failed","initial_payment"].includes(prospect.stage)) && (
         <Button
           size="sm"
           variant="default"
           className="h-6 text-xs px-2 w-full bg-indigo-600 hover:bg-indigo-700"
           onClick={onConvertToOrg}
           disabled={convertingToOrg}
-          title="Payment confirmed — provision this customer's workspace now"
+          title="Manually provision this customer's workspace — no charge is created"
         >
           {convertingToOrg
             ? <><RefreshCw className="w-3 h-3 mr-1 animate-spin" /> Initializing…</>
