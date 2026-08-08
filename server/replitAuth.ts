@@ -308,3 +308,83 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 
   return next();
 };
+
+// ── Global deny-by-default API auth gate ─────────────────────────────────────
+// Paths (prefix-matched) that are intentionally reachable without a session.
+// Everything else under /api/* requires either a staff session or a super-admin
+// session.  Per-route guards (isAuthenticated, isPortalAuthenticated, etc.) are
+// kept in place as a second layer; this middleware is the first line of defense.
+const PUBLIC_API_PREFIXES: string[] = [
+  // Tenant resolution (needed before any login UI renders)
+  "/api/tenant",
+
+  // Staff auth flows registered by setupAuth() — login, logout, password reset
+  "/api/auth/",
+  "/api/staff/login",
+  "/api/staff/logout",
+  "/api/staff/forgot-password",
+  "/api/staff/reset-password",
+  "/api/staff/setup-password",   // ADMIN_PASSWORD-gated bootstrap endpoint
+  "/api/logout",                  // GET logout — redirect to /staff/login
+  "/api/login",                   // GET redirect shim
+  "/api/callback",                // GET redirect shim
+
+  // Super-admin auth (credential-gated internally)
+  "/api/super-admin/login",
+  "/api/super-admin/logout",
+  "/api/super-admin/session",
+
+  // Dev-only test login (already hard-gated on NODE_ENV inside the handler)
+  "/api/dev/login",
+
+  // Public inquiry / contact / beta / onboarding / account-setup flows
+  "/api/public/",
+
+  // Portal: login, register, password-reset, cookie notice, and all
+  // authenticated portal endpoints (isPortalAuthenticated guards those)
+  "/api/portal/",
+
+  // Token-based payment collection (no staff session, uses a signed token)
+  "/api/payment-collection/",
+
+  // Stripe inbound webhooks (registered in index.ts before registerRoutes,
+  // signature-validated inside each handler)
+  "/api/stripe/webhooks/",
+  "/api/stripe-webhook",
+
+  // Public signup flow (powers the /signup page)
+  "/api/signup",
+  "/api/signup/config",
+
+  // Public discount-code validation (used on public pricing/signup pages)
+  "/api/discount-codes/validate",
+
+  // Support info endpoint (consumed by Hubify Console and public surfaces)
+  "/api/support-info",
+];
+
+export const requireApiSession: RequestHandler = (req, res, next) => {
+  const path = req.path;
+
+  // Only gate /api/* — let everything else through (static files, HTML, etc.)
+  if (!path.startsWith("/api/") && path !== "/api") {
+    return next();
+  }
+
+  // Allow explicitly public paths (prefix match against the full path)
+  for (const prefix of PUBLIC_API_PREFIXES) {
+    if (path === prefix || path.startsWith(prefix)) {
+      return next();
+    }
+  }
+
+  const session = (req as any).session;
+  const staffUser   = session?.staffUser;
+  const superAdmin  = session?.superAdmin;
+
+  if (staffUser?.id || superAdmin?.authenticated) {
+    return next();
+  }
+
+  return res.status(401).json({ message: "Unauthorized" });
+};

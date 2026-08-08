@@ -349,64 +349,8 @@ app.post("/api/stripe/webhooks/org/:orgId", express.raw({ type: "application/jso
   }
 });
 
-// Stripe Connect return URL — Stripe bounces the browser here after onboarding completes
-app.get("/api/orgs/:orgId/stripe-connect/return", async (req, res) => {
-  try {
-    const { orgId } = req.params;
-    const { storage } = await import("./storage");
-    const { getMasterStripe } = await import("./stripe");
-
-    const connection = await storage.getOrgStripeConnection(orgId);
-    if (!connection?.stripeAccountId) {
-      return res.redirect("/settings/stripe?error=no_account");
-    }
-
-    const stripe = getMasterStripe();
-    const account = await stripe.accounts.retrieve(connection.stripeAccountId);
-
-    await storage.updateOrgStripeConnection(orgId, {
-      isActive: account.charges_enabled || account.details_submitted,
-      chargesEnabled: account.charges_enabled,
-      payoutsEnabled: account.payouts_enabled,
-      detailsSubmitted: account.details_submitted,
-      lastSyncedAt: new Date(),
-    });
-
-    const success = account.charges_enabled || account.details_submitted;
-    res.redirect(`/settings/stripe?${success ? "connected=true" : "onboarding=incomplete"}`);
-  } catch (error) {
-    console.error("Connect return error:", error);
-    res.redirect("/settings/stripe?error=verification_failed");
-  }
-});
-
-// Stripe Connect refresh URL — re-generates the onboarding link when user abandoned or link expired
-app.get("/api/orgs/:orgId/stripe-connect/refresh", async (req, res) => {
-  try {
-    const { orgId } = req.params;
-    const { storage } = await import("./storage");
-    const { createStripeConnectAccountLink } = await import("./stripe");
-
-    const connection = await storage.getOrgStripeConnection(orgId);
-    if (!connection?.stripeAccountId) {
-      return res.redirect("/settings/stripe?error=no_account");
-    }
-
-    const host = `${req.protocol}://${req.get("host")}`;
-    const returnUrl = `${host}/api/orgs/${orgId}/stripe-connect/return`;
-    const refreshUrl = `${host}/api/orgs/${orgId}/stripe-connect/refresh`;
-
-    const accountLink = await createStripeConnectAccountLink(
-      connection.stripeAccountId,
-      returnUrl,
-      refreshUrl
-    );
-    res.redirect(accountLink.url);
-  } catch (error) {
-    console.error("Connect refresh error:", error);
-    res.redirect("/settings/stripe?error=refresh_failed");
-  }
-});
+// Stripe Connect return/refresh callbacks are registered inside registerRoutes()
+// so they run behind the global API auth gate with isAuthenticated guards.
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));

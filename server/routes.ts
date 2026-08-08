@@ -9,7 +9,7 @@ import bcrypt from "bcryptjs";
 import { nanoid } from "nanoid";
 import crypto from "crypto";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated, requireApiSession } from "./replitAuth";
 import { ObjectStorageService } from "./objectStorage";
 import { importSampleData } from "./import-data";
 import { getBrandingLevel, enforceBrandingPolicy, getBrandingCapabilities } from "./branding";
@@ -916,7 +916,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Auth middleware
   await setupAuth(app);
-  
+
+  // Global deny-by-default API auth gate — rejects any request to /api/*
+  // that lacks a valid staff or super-admin session, unless the path is on
+  // the explicit public allowlist in replitAuth.ts.  Per-route guards are
+  // kept in place as a second layer.
+  app.use(requireApiSession);
+
   // Global security middlewares
   app.use(trackSession);
   app.use(auditMiddleware);
@@ -11357,7 +11363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Data import endpoint (for importing sample data)
-  app.post("/api/import-sample-data", async (req: any, res) => {
+  app.post("/api/import-sample-data", isAuthenticated, async (req: any, res) => {
     try {
       console.log("Starting sample data import...");
       
@@ -14065,7 +14071,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/orgs/:orgId/stripe-connect/return
   // Stripe redirects here after the user completes (or cancels) the Connect onboarding flow.
   // We retrieve the account, flip isActive if charges are enabled, then redirect to the settings page.
-  app.get("/api/orgs/:orgId/stripe-connect/return", async (req, res) => {
+  app.get("/api/orgs/:orgId/stripe-connect/return", isAuthenticated, async (req, res) => {
     const { orgId } = req.params;
     try {
       const connection = await storage.getOrgStripeConnection(orgId);
@@ -14102,7 +14108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/orgs/:orgId/stripe-connect/refresh
   // Stripe redirects here when the account link has expired (user took too long).
   // We generate a fresh account link and redirect the user back to Stripe.
-  app.get("/api/orgs/:orgId/stripe-connect/refresh", async (req, res) => {
+  app.get("/api/orgs/:orgId/stripe-connect/refresh", isAuthenticated, async (req, res) => {
     const { orgId } = req.params;
     try {
       const connection = await storage.getOrgStripeConnection(orgId);
