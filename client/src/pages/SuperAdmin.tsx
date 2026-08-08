@@ -4911,8 +4911,11 @@ function PlatformAdminsTab() {
   const changePwMutation = useMutation({
     mutationFn: () => apiRequest("PATCH", `/api/super-admin/admins/${changePwTarget?.id}/password`, { password: changePw }),
     onSuccess: () => {
-      toast({ title: "Password updated" });
-      setChangePwTarget(null); setChangePw("");
+      toast({
+        title: "Password updated",
+        description: `Password for ${changePwTarget?.email} has been changed. Use the new password on next login.`,
+      });
+      setChangePwTarget(null); setChangePw(""); setShowChangePw(false);
     },
     onError: (e: any) => toast({ title: "Failed to update password", description: e.message, variant: "destructive" }),
   });

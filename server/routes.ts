@@ -1335,7 +1335,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await AuditLogger.log({ req, action: 'platform_admin_password_changed', metadata: { id: req.params.id } });
       res.json({ ok: true });
     } catch (err: any) {
-      res.status(400).json({ message: err.message || 'Failed to change password' });
+      const msg = err.message || 'Failed to change password';
+      const status = msg === 'Admin not found.' ? 404 : 500;
+      res.status(status).json({ message: msg });
     }
   });
 
