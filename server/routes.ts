@@ -4192,6 +4192,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DELETE /api/super-admin/orgs/:orgId — permanently delete an org and all its data
+  app.delete("/api/super-admin/orgs/:orgId", isAuthenticated, isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      const org = await storage.getOrg(orgId);
+      if (!org) return res.status(404).json({ message: "Organization not found" });
+
+      // Audit BEFORE deletion so the record exists while the org row is still intact
+      // and the security_audit_logs table still has org_id references.
+      await AuditLogger.log({
+        req,
+        action: 'platform_admin_deleted_org',
+        actionType: 'admin',
+        resource: 'organization',
+        resourceId: orgId,
+        metadata: { orgName: org.name, orgSlug: org.slug },
+        severity: 'warning',
+        success: true,
+      });
+
+      await storage.deleteOrg(orgId);
+
+      res.json({ ok: true });
+    } catch (err: any) {
+      console.error("Error deleting org:", err);
+      const msg = err.message || 'Failed to delete organization';
+      res.status(err.code === '23503' ? 409 : 500).json({ message: msg });
+    }
+  });
+
+  // DELETE /api/super-admin/users/:userId — permanently delete a user account
+  app.delete("/api/super-admin/users/:userId", isAuthenticated, isSuperAdmin, requireMFA, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+
+      // Prevent super-admin from deleting their own staff user account via this endpoint
+      const sessionUserId = req.user?.claims?.sub ?? req.user?.id;
+      if (sessionUserId && sessionUserId === userId) {
+        return res.status(400).json({ message: "You cannot delete your own account" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      // Audit BEFORE deletion so the user row still exists when the log is written
+      await AuditLogger.log({
+        req,
+        action: 'platform_admin_deleted_user',
+        actionType: 'admin',
+        resource: 'user',
+        resourceId: userId,
+        metadata: { email: user.email, orgId: user.orgId },
+        severity: 'warning',
+        success: true,
+      });
+
+      await storage.deleteOrgUser(userId);
+
+      res.json({ ok: true });
+    } catch (err: any) {
+      console.error("Error deleting user:", err);
+      const msg = err.message || 'Failed to delete user';
+      // 23503 = foreign key violation — data that couldn't be auto-cleaned
+      res.status(err.code === '23503' ? 409 : 500).json({
+        message: err.code === '23503'
+          ? 'This user has associated records that cannot be automatically removed. Deactivate them instead.'
+          : msg,
+      });
+    }
+  });
+
   // System health: process info, counts, recent failed webhooks/notifications
   app.get("/api/super-admin/system-health", isAuthenticated, isSuperAdmin, requireMFA, async (req, res) => {
     try {

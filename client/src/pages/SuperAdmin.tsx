@@ -11564,6 +11564,20 @@ function OrganizationsTab({ openOrgId, onOrgOpened }: { openOrgId?: string | nul
     },
   });
 
+  const [deleteOrgTarget, setDeleteOrgTarget] = useState<OrgOverviewRow | null>(null);
+  const [deleteOrgConfirm, setDeleteOrgConfirm] = useState("");
+
+  const deleteOrgMut = useMutation({
+    mutationFn: (orgId: string) => apiRequest("DELETE", `/api/super-admin/orgs/${orgId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/orgs-overview"] });
+      toast({ title: "Organization deleted", description: `${deleteOrgTarget?.name} and all its data have been permanently removed.` });
+      setDeleteOrgTarget(null);
+      setDeleteOrgConfirm("");
+    },
+    onError: (err: any) => toast({ title: "Delete failed", description: err?.message || "Could not delete organization", variant: "destructive" }),
+  });
+
   function saveSlug(orgId: string) {
     const slug = (slugDraft[orgId] ?? "").trim().toLowerCase();
     if (!slug) { setSlugEditing(null); return; }
@@ -11758,6 +11772,14 @@ function OrganizationsTab({ openOrgId, onOrgOpened }: { openOrgId?: string | nul
                               <Play className="w-4 h-4" />
                             </Button>
                           )}
+                          <Button
+                            size="sm" variant="ghost" title="Delete organization permanently"
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => { setDeleteOrgTarget(o); setDeleteOrgConfirm(""); }}
+                            data-testid={`button-delete-org-${o.id}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -11774,6 +11796,43 @@ function OrganizationsTab({ openOrgId, onOrgOpened }: { openOrgId?: string | nul
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
       />
+
+      {/* Delete org confirmation dialog */}
+      <Dialog open={!!deleteOrgTarget} onOpenChange={open => { if (!open) { setDeleteOrgTarget(null); setDeleteOrgConfirm(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-700 flex items-center gap-2">
+              <Trash2 className="w-4 h-4" /> Delete Organization
+            </DialogTitle>
+            <DialogDescription>
+              This will <strong>permanently delete</strong> <strong>{deleteOrgTarget?.name}</strong> and all of its data — users, properties, invoices, tasks, time entries, portal access, and more. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-xs text-slate-600">
+              Type <span className="font-mono font-semibold">{deleteOrgTarget?.name}</span> to confirm:
+            </p>
+            <Input
+              placeholder={deleteOrgTarget?.name ?? ""}
+              value={deleteOrgConfirm}
+              onChange={e => setDeleteOrgConfirm(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setDeleteOrgTarget(null); setDeleteOrgConfirm(""); }}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteOrgConfirm !== deleteOrgTarget?.name || deleteOrgMut.isPending}
+              onClick={() => deleteOrgTarget && deleteOrgMut.mutate(deleteOrgTarget.id)}
+            >
+              {deleteOrgMut.isPending ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Deleting…</> : "Delete permanently"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
@@ -12004,11 +12063,24 @@ function UserDetailSheet({ user, open, onClose }: { user: UserDetailRow | null; 
 }
 
 function AllUsersTab() {
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [detailUser, setDetailUser] = useState<UserDetailRow | null>(null);
   const [detailUserOpen, setDetailUserOpen] = useState(false);
+  const [deleteUserTarget, setDeleteUserTarget] = useState<UserOverviewRow | null>(null);
+
+  const deleteUserMut = useMutation({
+    mutationFn: (userId: string) => apiRequest("DELETE", `/api/super-admin/users/${userId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/super-admin/users-overview"] });
+      const name = [deleteUserTarget?.firstName, deleteUserTarget?.lastName].filter(Boolean).join(" ") || deleteUserTarget?.email || "User";
+      toast({ title: "User deleted", description: `${name} has been permanently removed.` });
+      setDeleteUserTarget(null);
+    },
+    onError: (err: any) => toast({ title: "Delete failed", description: err?.message || "Could not delete user", variant: "destructive" }),
+  });
 
   const { data: users = [], isLoading } = useQuery<UserOverviewRow[]>({
     queryKey: ["/api/super-admin/users-overview"],
@@ -12090,6 +12162,7 @@ function AllUsersTab() {
                   <TableHead>Status</TableHead>
                   <TableHead>Last Active</TableHead>
                   <TableHead>Created</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -12118,6 +12191,17 @@ function AllUsersTab() {
                       </TableCell>
                       <TableCell className="text-sm text-slate-600">{formatRelative(u.lastActiveAt)}</TableCell>
                       <TableCell className="text-sm text-slate-600">{formatDateOnly(u.createdAt)}</TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm" variant="ghost"
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0"
+                          title="Delete user permanently"
+                          onClick={() => setDeleteUserTarget(u)}
+                          data-testid={`button-delete-user-${u.id}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -12134,6 +12218,35 @@ function AllUsersTab() {
         open={detailUserOpen}
         onClose={() => setDetailUserOpen(false)}
       />
+
+      {/* Delete user confirmation dialog */}
+      <Dialog open={!!deleteUserTarget} onOpenChange={open => { if (!open) setDeleteUserTarget(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-red-700 flex items-center gap-2">
+              <Trash2 className="w-4 h-4" /> Delete User
+            </DialogTitle>
+            <DialogDescription>
+              Permanently remove{" "}
+              <strong>
+                {[deleteUserTarget?.firstName, deleteUserTarget?.lastName].filter(Boolean).join(" ") || deleteUserTarget?.email}
+              </strong>
+              {deleteUserTarget?.orgName ? <> from <strong>{deleteUserTarget.orgName}</strong></> : ""}?
+              This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteUserTarget(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={deleteUserMut.isPending}
+              onClick={() => deleteUserTarget && deleteUserMut.mutate(deleteUserTarget.id)}
+            >
+              {deleteUserMut.isPending ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Deleting…</> : "Delete permanently"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

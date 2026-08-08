@@ -403,6 +403,8 @@ export interface IStorage {
   getOrg(id: string): Promise<Org | undefined>;
   createOrg(org: InsertOrg): Promise<Org>;
   updateOrg(id: string, org: Partial<InsertOrg>): Promise<Org>;
+  deleteOrg(orgId: string): Promise<void>;
+  deleteOrgUser(userId: string): Promise<void>;
   getOrgsOverview(): Promise<Array<{
     id: string;
     name: string;
@@ -8297,6 +8299,334 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(desc(propertyServiceAssignments.createdAt));
   }
+  /**
+   * Permanently deletes an organization and all its dependent data.
+   * Executes inside a transaction with FK-safe delete ordering derived
+   * from a complete schema FK audit.
+   *
+   * Key structural notes:
+   * - communities have no org_id (shared entities linked via properties.community_id).
+   *   We SET NULL their nullable manager FKs and leave community rows intact.
+   * - platform_alerts/acknowledgements are platform-scoped but must be cleaned up
+   *   before this org's users are deleted.
+   * - message_reactions.messageId -> teamMessages CASCADE, so no explicit delete needed.
+   */
+  async deleteOrg(orgId: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      // Inline subquery reused across multiple steps
+      const usersInOrg = sql`SELECT id FROM users WHERE org_id = ${orgId}`;
+
+      // 1. Notification/audit/support tables (leaf, no user FK dependency)
+      await tx.execute(sql`DELETE FROM notification_logs WHERE org_id = ${orgId}`);
+      await tx.execute(sql`DELETE FROM support_requests WHERE organization_id = ${orgId}`);
+      await tx.execute(sql`DELETE FROM security_audit_logs WHERE org_id = ${orgId}`);
+
+      // 2. Time entries
+      await tx.execute(sql`DELETE FROM time_entries WHERE org_id = ${orgId}`);
+
+      // 3. Tasks -- cascades task_checklist_items and task_comments
+      await tx.execute(sql`DELETE FROM tasks WHERE org_id = ${orgId}`);
+
+      // 4. Inspection schedules
+      await tx.execute(sql`DELETE FROM inspection_schedules WHERE org_id = ${orgId}`);
+
+      // 5. Billing chain
+      await tx.execute(sql`DELETE FROM billing_submissions WHERE org_id = ${orgId}`);
+      await tx.execute(sql`DELETE FROM client_invoices WHERE org_id = ${orgId}`);
+      // clients cascades: clientPaymentMethods, clientBillingPrefs,
+      //   recurringBillingSchedules, paymentCollectionTokens
+      await tx.execute(sql`DELETE FROM clients WHERE org_id = ${orgId}`);
+      await tx.execute(sql`DELETE FROM platform_invoices WHERE org_id = ${orgId}`);
+      await tx.execute(sql`DELETE FROM stripe_webhook_events WHERE org_id = ${orgId}`);
+
+      // 6. QuickBooks
+      await tx.execute(sql`DELETE FROM quickbooks_sync_logs WHERE org_id = ${orgId}`);
+      await tx.execute(sql`DELETE FROM quickbooks_connections WHERE org_id = ${orgId}`);
+
+      // 7. Email/scheduled BEFORE contacts (recipient_contact_id -> contacts NO ACTION)
+      await tx.execute(sql`DELETE FROM email_history WHERE org_id = ${orgId}`);
+      await tx.execute(sql`DELETE FROM scheduled_emails WHERE org_id = ${orgId}`);
+
+      // 8. Contacts -- cascades contact_properties, vendor_employees, property_vendors
+      await tx.execute(sql`DELETE FROM contacts WHERE org_id = ${orgId}`);
+
+      // 9. Community documents BEFORE properties (uploaded_by NOT NULL NO ACTION -> users).
+      //   community_documents.property_id -> properties CASCADE, so delete them before
+      //   properties are dropped. Community-wide docs (property_id IS NULL) uploaded by
+      //   this org's users are also cleaned up here.
+      await tx.execute(sql`
+        DELETE FROM community_documents
+        WHERE property_id IN (SELECT id FROM properties WHERE org_id = ${orgId})
+      `);
+      await tx.execute(sql`
+        DELETE FROM community_documents
+        WHERE property_id IS NULL AND uploaded_by IN (${usersInOrg})
+      `);
+
+      // 10. Properties -- cascades rooms->room_*, vehicles->vehicle_*,
+      //   property_access_items, contact_properties, property_vendors.
+      //   properties.manager_id and hoa_president_id reference users (nullable NO ACTION).
+      //   Users are deleted later, so SET NULL these FKs now before dropping the rows.
+      await tx.execute(sql`
+        UPDATE properties SET manager_id = NULL WHERE org_id = ${orgId} AND manager_id IS NOT NULL
+      `);
+      await tx.execute(sql`
+        UPDATE properties SET hoa_president_id = NULL WHERE org_id = ${orgId} AND hoa_president_id IS NOT NULL
+      `);
+      await tx.execute(sql`DELETE FROM property_forms WHERE org_id = ${orgId}`);
+      await tx.execute(sql`DELETE FROM property_portal_settings WHERE org_id = ${orgId}`);
+      await tx.execute(sql`DELETE FROM properties WHERE org_id = ${orgId}`);
+
+      // 11. communities have no org_id (shared across orgs via properties.community_id).
+      //   SET NULL the nullable manager FKs that reference this org's users so they
+      //   do not block user deletion. We do NOT delete community rows.
+      await tx.execute(sql`
+        UPDATE communities SET manager_id = NULL WHERE manager_id IN (${usersInOrg})
+      `);
+      await tx.execute(sql`
+        UPDATE communities SET hoa_president_id = NULL WHERE hoa_president_id IN (${usersInOrg})
+      `);
+
+      // 12. Document templates (uploaded_by NOT NULL NO ACTION -> must precede user deletion)
+      await tx.execute(sql`DELETE FROM document_templates WHERE org_id = ${orgId}`);
+
+      // 13. System alerts -- cascades system_alert_acknowledgements via alertId CASCADE.
+      //   created_by NOT NULL NO ACTION -> must precede user deletion.
+      await tx.execute(sql`DELETE FROM system_alerts WHERE org_id = ${orgId}`);
+      // Acknowledgements of OTHER orgs' system alerts made by this org's users
+      await tx.execute(sql`DELETE FROM system_alert_acknowledgements WHERE user_id IN (${usersInOrg})`);
+
+      // 14. Platform alerts/acknowledgements (platform-scoped, no org_id).
+      //   platform_alerts.created_by NOT NULL NO ACTION -> must precede user deletion.
+      //   Deleting platform_alerts cascades their platform_alert_acknowledgements.
+      await tx.execute(sql`DELETE FROM platform_alerts WHERE created_by IN (${usersInOrg})`);
+      // Acknowledgements of other platform alerts made by this org's users
+      await tx.execute(sql`DELETE FROM platform_alert_acknowledgements WHERE user_id IN (${usersInOrg})`);
+
+      // 15. Misc org tables
+      //   alerts.created_by NOT NULL NO ACTION -> delete before users
+      await tx.execute(sql`DELETE FROM alerts WHERE org_id = ${orgId}`);
+      await tx.execute(sql`DELETE FROM custom_fields WHERE org_id = ${orgId}`);
+      await tx.execute(sql`DELETE FROM forms WHERE org_id = ${orgId}`); // cascades form_fields
+      await tx.execute(sql`DELETE FROM ignored_duplicates WHERE org_id = ${orgId}`);
+      await tx.execute(sql`DELETE FROM duplicate_history WHERE org_id = ${orgId}`);
+
+      // 16. Calendar chain (ordering critical)
+      //   ics_feeds.calendar_id -> calendars NO ACTION -> delete before calendars
+      //   event_imports.calendar_id -> calendars NOT NULL NO ACTION -> delete before calendars
+      //   events.org_id NOT NULL NO ACTION -> explicit delete (covers organizer_id NOT NULL too)
+      //   conflict_resolutions.requested_by_id NOT NULL NO ACTION -> delete before users
+      await tx.execute(sql`DELETE FROM ics_feeds WHERE org_id = ${orgId}`);
+      await tx.execute(sql`DELETE FROM event_imports WHERE org_id = ${orgId}`);
+      await tx.execute(sql`DELETE FROM conflict_resolutions WHERE org_id = ${orgId}`);
+      await tx.execute(sql`DELETE FROM events WHERE org_id = ${orgId}`);
+      // calendars cascades remaining events (via calendarId), event_attendees, event_reminders
+      await tx.execute(sql`DELETE FROM calendars WHERE org_id = ${orgId}`);
+
+      // 17. API / webhook chain
+      await tx.execute(sql`DELETE FROM webhook_deliveries WHERE org_id = ${orgId}`);
+      await tx.execute(sql`DELETE FROM webhook_endpoints WHERE org_id = ${orgId}`);
+      await tx.execute(sql`DELETE FROM api_keys WHERE org_id = ${orgId}`);
+      await tx.execute(sql`DELETE FROM import_history WHERE org_id = ${orgId}`);
+      await tx.execute(sql`DELETE FROM org_email_templates WHERE org_id = ${orgId}`);
+
+      // 18. Teams -- must precede user deletion (created_by NOT NULL NO ACTION).
+      //   message_reactions.message_id -> teamMessages CASCADE, so reactions are
+      //   automatically deleted when team_messages are deleted.
+      await tx.execute(sql`DELETE FROM team_messages WHERE org_id = ${orgId}`);
+      // teams cascades teamMembers
+      await tx.execute(sql`DELETE FROM teams WHERE org_id = ${orgId}`);
+
+      // 19. management_notes.author_id NOT NULL NO ACTION -> delete before users
+      //   (notes where this org's user is the *subject* cascade automatically via userId)
+      await tx.execute(sql`DELETE FROM management_notes WHERE author_id IN (${usersInOrg})`);
+
+      // 20. Portal invitations created by this org's users (NOT NULL NO ACTION -> before users)
+      await tx.execute(sql`DELETE FROM portal_invitations WHERE created_by_user_id IN (${usersInOrg})`);
+
+      // 21. Portal users (org_id NO ACTION NOT NULL -> explicit delete;
+      //   cascades portalUserProperties, portalSessions, portalUserCookieConsent)
+      await tx.execute(sql`DELETE FROM portal_users WHERE org_id = ${orgId}`);
+
+      // 22. Self-referencing supervisor FK (nullable NO ACTION) -> SET NULL before users
+      await tx.execute(sql`UPDATE users SET supervisor_id = NULL WHERE supervisor_id IN (${usersInOrg})`);
+
+      // 23. Remaining user-scoped records
+      await tx.execute(sql`DELETE FROM out_of_office_periods WHERE org_id = ${orgId}`);
+      await tx.execute(sql`DELETE FROM user_mfa_settings WHERE user_id IN (${usersInOrg})`);
+      await tx.execute(sql`DELETE FROM user_notification_preferences WHERE user_id IN (${usersInOrg})`);
+      await tx.execute(sql`DELETE FROM user_cookie_consent WHERE user_id IN (${usersInOrg})`);
+      await tx.execute(sql`DELETE FROM user_sessions WHERE user_id IN (${usersInOrg})`);
+
+      // 24. Users (accountSetupTokens.userId cascades from users)
+      await tx.execute(sql`DELETE FROM users WHERE org_id = ${orgId}`);
+
+      // 25. Org subscription / stripe data
+      await tx.execute(sql`DELETE FROM org_stripe_connections WHERE org_id = ${orgId}`);
+      await tx.execute(sql`DELETE FROM org_subscriptions WHERE org_id = ${orgId}`);
+
+      // 26. The org itself.
+      // Remaining cascade-from-org tables handled by the DB automatically:
+      //   password_reset_tokens, portal_invitations (orgId CASCADE), management_notes (orgId),
+      //   checklist_templates, notifications, organization_services, orgSignupTokens,
+      //   orgSetupProgress, propertyServiceAssignments, itinerary_*, review_automation_settings,
+      //   client_sentiment_surveys, review_requests, testimonials, visit_reports.
+      //   discount_code_usages.orgId -> SET NULL (auto).
+      await tx.execute(sql`DELETE FROM orgs WHERE id = ${orgId}`);
+    });
+  }
+
+  /**
+   * Permanently deletes a single user account.
+   * Policy per FK reference to users.id:
+   *   - Nullable columns             -> SET NULL (preserves related data)
+   *   - NOT NULL user-owned rows     -> DELETE the record
+   *   - Cascade-declared FKs (onDelete: cascade/set null) -> auto-handled
+   */
+  async deleteOrgUser(userId: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      // -- SET NULL on nullable FK columns (no FK violation, but clean up stale refs) --
+      await tx.execute(sql`UPDATE tasks SET assigned_to_id = NULL WHERE assigned_to_id = ${userId}`);
+      await tx.execute(sql`UPDATE tasks SET assigned_by_id = NULL WHERE assigned_by_id = ${userId}`);
+      await tx.execute(sql`UPDATE task_checklist_items SET assigned_to_id = NULL WHERE assigned_to_id = ${userId}`);
+      await tx.execute(sql`UPDATE task_checklist_items SET completed_by = NULL WHERE completed_by = ${userId}`);
+      await tx.execute(sql`UPDATE properties SET manager_id = NULL WHERE manager_id = ${userId}`);
+      await tx.execute(sql`UPDATE properties SET hoa_president_id = NULL WHERE hoa_president_id = ${userId}`);
+      await tx.execute(sql`UPDATE contacts SET supervisor_id = NULL WHERE supervisor_id = ${userId}`);
+      await tx.execute(sql`UPDATE billing_submissions SET authorized_by = NULL WHERE authorized_by = ${userId}`);
+      await tx.execute(sql`UPDATE conflict_resolutions SET supervisor_id = NULL WHERE supervisor_id = ${userId}`);
+      // communities.manager_id / hoa_president_id (nullable NO ACTION)
+      await tx.execute(sql`UPDATE communities SET manager_id = NULL WHERE manager_id = ${userId}`);
+      await tx.execute(sql`UPDATE communities SET hoa_president_id = NULL WHERE hoa_president_id = ${userId}`);
+      // users self-FK: supervisor_id (nullable NO ACTION)
+      await tx.execute(sql`UPDATE users SET supervisor_id = NULL WHERE supervisor_id = ${userId}`);
+      // financial nullable refs
+      await tx.execute(sql`UPDATE client_invoices SET created_by = NULL WHERE created_by = ${userId}`);
+      await tx.execute(sql`UPDATE payment_collection_tokens SET created_by_user_id = NULL WHERE created_by_user_id = ${userId}`);
+      // team_messages.author_id (nullable NO ACTION)
+      await tx.execute(sql`UPDATE team_messages SET author_id = NULL WHERE author_id = ${userId}`);
+      // calendars.owner_id (nullable NO ACTION; created_by_id is NOT NULL and handled below)
+      await tx.execute(sql`UPDATE calendars SET owner_id = NULL WHERE owner_id = ${userId}`);
+      // checklist / inspection nullable creators
+      await tx.execute(sql`UPDATE checklist_templates SET created_by = NULL WHERE created_by = ${userId}`);
+      await tx.execute(sql`UPDATE inspection_schedules SET created_by = NULL WHERE created_by = ${userId}`);
+      // inspection_schedules.inspector_user_id has onDelete: set null -- auto-handled,
+      // but explicit SET NULL here is safe and ensures immediate cleanup
+      await tx.execute(sql`UPDATE inspection_schedules SET inspector_user_id = NULL WHERE inspector_user_id = ${userId}`);
+      // platform_settings.updated_by (nullable NO ACTION)
+      await tx.execute(sql`UPDATE platform_settings SET updated_by = NULL WHERE updated_by = ${userId}`);
+      // event_attendees.user_id (nullable NO ACTION) - clear attendee link, keep record
+      await tx.execute(sql`UPDATE event_attendees SET user_id = NULL WHERE user_id = ${userId}`);
+      // ics_feeds.user_id (nullable NO ACTION) - distinct from calendar_id FK handled below
+      await tx.execute(sql`UPDATE ics_feeds SET user_id = NULL WHERE user_id = ${userId}`);
+      // activity_log.user_id (nullable NO ACTION)
+      await tx.execute(sql`UPDATE activity_log SET user_id = NULL WHERE user_id = ${userId}`);
+
+      // -- DELETE user-owned records (NOT NULL FK, cannot be set null) --
+
+      // alerts.created_by NOT NULL NO ACTION
+      await tx.execute(sql`DELETE FROM alerts WHERE created_by = ${userId}`);
+
+      // Task comments (user_id NOT NULL NO ACTION)
+      await tx.execute(sql`DELETE FROM task_comments WHERE user_id = ${userId}`);
+
+      // Duplicate / ignored history (performed_by / ignored_by NOT NULL NO ACTION)
+      await tx.execute(sql`DELETE FROM ignored_duplicates WHERE ignored_by = ${userId}`);
+      await tx.execute(sql`DELETE FROM duplicate_history WHERE performed_by = ${userId}`);
+
+      // Conflict resolutions where this user is the requester (NOT NULL NO ACTION)
+      await tx.execute(sql`DELETE FROM conflict_resolutions WHERE requested_by_id = ${userId}`);
+
+      // System alerts created by this user (created_by NOT NULL NO ACTION);
+      //   cascades system_alert_acknowledgements for those alerts via alertId CASCADE
+      await tx.execute(sql`DELETE FROM system_alerts WHERE created_by = ${userId}`);
+      // Acknowledgements of OTHER system alerts by this user (user_id NOT NULL NO ACTION)
+      await tx.execute(sql`DELETE FROM system_alert_acknowledgements WHERE user_id = ${userId}`);
+
+      // Platform alerts created by this user (created_by NOT NULL NO ACTION);
+      //   cascades platform_alert_acknowledgements for those alerts via alertId CASCADE
+      await tx.execute(sql`DELETE FROM platform_alerts WHERE created_by = ${userId}`);
+      // Acknowledgements of OTHER platform alerts by this user (user_id NOT NULL NO ACTION)
+      await tx.execute(sql`DELETE FROM platform_alert_acknowledgements WHERE user_id = ${userId}`);
+
+      // Document templates uploaded by this user (uploaded_by NOT NULL NO ACTION)
+      await tx.execute(sql`DELETE FROM document_templates WHERE uploaded_by = ${userId}`);
+
+      // Community documents uploaded by this user (uploaded_by NOT NULL NO ACTION)
+      await tx.execute(sql`DELETE FROM community_documents WHERE uploaded_by = ${userId}`);
+
+      // Import history initiated by this user (initiated_by NOT NULL NO ACTION)
+      await tx.execute(sql`DELETE FROM import_history WHERE initiated_by = ${userId}`);
+
+      // Vehicle sub-records (created_by_id NOT NULL NO ACTION; not cascade-deleted
+      //   when the user is deleted independently of their vehicle's property)
+      await tx.execute(sql`DELETE FROM vehicle_maintenance WHERE created_by_id = ${userId}`);
+      await tx.execute(sql`DELETE FROM vehicle_notes WHERE created_by_id = ${userId}`);
+      await tx.execute(sql`DELETE FROM vehicle_photos WHERE uploaded_by_id = ${userId}`);
+
+      // Room sub-records (created_by_id / uploaded_by_id NOT NULL NO ACTION)
+      await tx.execute(sql`DELETE FROM room_notes WHERE created_by_id = ${userId}`);
+      await tx.execute(sql`DELETE FROM room_devices WHERE created_by_id = ${userId}`);
+      await tx.execute(sql`DELETE FROM room_surfaces WHERE created_by_id = ${userId}`);
+      await tx.execute(sql`DELETE FROM room_surface_links WHERE created_by_id = ${userId}`);
+      await tx.execute(sql`DELETE FROM room_fixtures WHERE created_by_id = ${userId}`);
+      await tx.execute(sql`DELETE FROM room_photos WHERE uploaded_by_id = ${userId}`);
+      // room_checklists.created_by_id NOT NULL NO ACTION; completed_by_id is nullable (ok)
+      await tx.execute(sql`DELETE FROM room_checklists WHERE created_by_id = ${userId}`);
+      await tx.execute(sql`DELETE FROM property_access_items WHERE created_by_id = ${userId}`);
+
+      // Calendar chain: events.organizer_id NOT NULL NO ACTION -> delete events where this
+      //   user is organizer (covers calendars they don't own too), then clean up calendars.
+      //   ics_feeds/event_imports must be deleted BEFORE calendars (calendar_id NO ACTION).
+      await tx.execute(sql`DELETE FROM events WHERE organizer_id = ${userId}`);
+      await tx.execute(sql`
+        DELETE FROM ics_feeds
+        WHERE calendar_id IN (SELECT id FROM calendars WHERE created_by_id = ${userId})
+      `);
+      await tx.execute(sql`
+        DELETE FROM event_imports
+        WHERE calendar_id IN (SELECT id FROM calendars WHERE created_by_id = ${userId})
+      `);
+      // Orphan events created by this user with no parent calendar (not caught above)
+      await tx.execute(sql`DELETE FROM events WHERE created_by_id = ${userId} AND calendar_id IS NULL`);
+      // Calendars (created_by_id NOT NULL NO ACTION); cascades remaining events,
+      //   event_attendees, event_reminders
+      await tx.execute(sql`DELETE FROM calendars WHERE created_by_id = ${userId}`);
+
+      // Team chain: team_messages.author_id already SET NULL above.
+      //   message_reactions.message_id -> teamMessages CASCADE (no explicit delete needed).
+      //   teams.created_by NOT NULL NO ACTION -> delete teams created by this user.
+      await tx.execute(sql`
+        DELETE FROM team_messages
+        WHERE team_id IN (SELECT id FROM teams WHERE created_by = ${userId})
+      `);
+      // teams cascades team_members
+      await tx.execute(sql`DELETE FROM teams WHERE created_by = ${userId}`);
+
+      // Management notes authored by this user (author_id NOT NULL NO ACTION)
+      //   Notes where this user is the *subject* cascade from the users row automatically.
+      await tx.execute(sql`DELETE FROM management_notes WHERE author_id = ${userId}`);
+
+      // Portal invitations created by this user (created_by_user_id NOT NULL NO ACTION)
+      await tx.execute(sql`DELETE FROM portal_invitations WHERE created_by_user_id = ${userId}`);
+
+      // Time entries and scheduling
+      await tx.execute(sql`DELETE FROM time_entries WHERE user_id = ${userId}`);
+      await tx.execute(sql`DELETE FROM out_of_office_periods WHERE user_id = ${userId}`);
+
+      // User-scoped metadata
+      await tx.execute(sql`DELETE FROM user_mfa_settings WHERE user_id = ${userId}`);
+      await tx.execute(sql`DELETE FROM user_notification_preferences WHERE user_id = ${userId}`);
+      await tx.execute(sql`DELETE FROM user_cookie_consent WHERE user_id = ${userId}`);
+      await tx.execute(sql`DELETE FROM user_sessions WHERE user_id = ${userId}`);
+
+      // Delete the user row.
+      // Auto-cascades: management_notes (userId), team_members, account_setup_tokens,
+      //   message_mentions (mentionedUserId).
+      await tx.execute(sql`DELETE FROM users WHERE id = ${userId}`);
+    });
+  }
+
 }
 
 export const storage = new DatabaseStorage();
