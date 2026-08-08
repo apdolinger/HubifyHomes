@@ -7,6 +7,7 @@ import express from "express";
 import PDFDocument from "pdfkit";
 import bcrypt from "bcryptjs";
 import { nanoid } from "nanoid";
+import crypto from "crypto";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { ObjectStorageService } from "./objectStorage";
@@ -19817,8 +19818,49 @@ contact@hubifyhomes.com`;
         .limit(1);
       const tok = tokenRows[0];
       const hasValidToken = tok && new Date(tok.expiresAt) > new Date();
-      const setupUrl = hasValidToken ? `${baseUrl}/setup-account/${tok.token}` : `${baseUrl}/staff/login`;
-      const tokenExpiresAt = hasValidToken ? new Date(tok.expiresAt) : null;
+
+      let setupUrl: string;
+      let tokenExpiresAt: Date | null;
+      let linkType: "setup" | "login";
+
+      if (hasValidToken) {
+        setupUrl = `${baseUrl}/setup-account/${tok.token}`;
+        tokenExpiresAt = new Date(tok.expiresAt);
+        linkType = "setup";
+      } else {
+        // No valid unclaimed token — check whether the provisioned user has a password hash.
+        // If they never set a password (e.g. skipped the wizard step), sending them to the
+        // login URL would leave them locked out. Instead, mint a fresh 7-day setup token.
+        //
+        // Look up by orgId + email (not just orgId + role) so we always find the exact
+        // account that was created for this prospect, even in multi-admin orgs.
+        const provisionedUserRows = await db
+          .select({ id: users.id, passwordHash: users.passwordHash })
+          .from(users)
+          .where(and(eq(users.orgId, prospect.orgId!), eq(users.email, prospect.email!)))
+          .limit(1);
+        const provisionedUser = provisionedUserRows[0];
+
+        if (provisionedUser && !provisionedUser.passwordHash) {
+          // No password — mint a fresh 7-day setup token so they can set one
+          const newToken = crypto.randomBytes(32).toString("hex");
+          const newExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+          await db.insert(accountSetupTokens).values({
+            prospectId: id,
+            userId: provisionedUser.id,
+            token: newToken,
+            expiresAt: newExpiresAt,
+          });
+          setupUrl = `${baseUrl}/setup-account/${newToken}`;
+          tokenExpiresAt = newExpiresAt;
+          linkType = "setup";
+        } else {
+          // User already has a password — the login URL is correct
+          setupUrl = `${baseUrl}/staff/login`;
+          tokenExpiresAt = null;
+          linkType = "login";
+        }
+      }
 
       const firstName = (prospect as any).firstName || ((prospect.name || "").split(" ")[0]) || "";
       const orgName = (prospect as any).agreementOrganizationName || prospect.company || prospect.name || "Your Organization";
@@ -19841,7 +19883,7 @@ contact@hubifyhomes.com`;
       if (emailErr) throw new Error(emailErr.message);
 
       const updated = await storage.updateOnboardingProspect(id, { platformReadyEmailSentAt: new Date() } as any);
-      res.json({ ...updated, emailSent: true });
+      res.json({ ...updated, emailSent: true, linkType });
     } catch (error) {
       console.error("Error resending platform-ready email:", error);
       res.status(500).json({ message: "Failed to resend platform-ready email" });

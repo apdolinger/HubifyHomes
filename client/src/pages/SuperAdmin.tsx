@@ -2680,11 +2680,16 @@ function ProvisioningStatusPanel({ onGoToOrganizations }: { onGoToOrganizations?
   });
 
   const resendPlatformReadyMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/resend-platform-ready-email`, {}),
-    onSuccess: () => {
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/resend-platform-ready-email`, {});
+      return await res.json() as { linkType?: "setup" | "login"; [key: string]: any };
+    },
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
-      toast({ title: "Platform-ready email sent!", description: "The client has been notified their workspace is ready." });
+      const description = data?.linkType === "setup"
+        ? "A setup link was sent — the client will set their password on first login."
+        : "A login link was sent — the client can sign in with their existing password.";
+      toast({ title: "Platform-ready email sent!", description });
     },
     onError: (e: Error) => toast({ title: "Email failed", description: e?.message || "Could not send email", variant: "destructive" }),
   });
@@ -3135,11 +3140,16 @@ function OnboardingPipelineTab({ prefill, onPrefillConsumed, initialBetaOnly, in
   });
 
   const resendPlatformReadyEmailMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/resend-platform-ready-email`, {}),
-    onSuccess: () => {
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/super-admin/onboarding-prospects/${id}/resend-platform-ready-email`, {});
+      return await res.json() as { linkType?: "setup" | "login"; [key: string]: any };
+    },
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/super-admin/onboarding-prospects"] });
-      toast({ title: "Platform-ready email sent!", description: "The client has been notified their workspace is ready." });
+      const description = data?.linkType === "setup"
+        ? "A setup link was sent — the client will set their password on first login."
+        : "A login link was sent — the client can sign in with their existing password.";
+      toast({ title: "Platform-ready email sent!", description });
     },
     onError: (e: Error) => toast({
       title: "Email failed",
