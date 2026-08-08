@@ -32,6 +32,8 @@ import {
   MapPin,
   Clock,
   Play,
+  StopCircle,
+  Loader2,
   Bell,
   MessageSquare,
   ClipboardCheck,
@@ -243,6 +245,32 @@ export default function Navigation() {
       toast({ title: "Error", description: "Failed to update notification preferences.", variant: "destructive" });
     },
   });
+
+  // Active time entry — determines whether to show Clock In or Clock Out
+  const { data: activeEntry, isLoading: activeEntryLoading } = useQuery<{ id: number; clockIn: string } | null>({
+    queryKey: ["/api/time-entries/active"],
+    refetchInterval: 60000,
+    enabled: !!(user as any)?.id,
+  });
+
+  const clockOutMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("POST", `/api/time-entries/${id}/clock-out`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/time-entries/active"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/time-entries"] });
+      toast({ title: "Clocked Out", description: "Your time entry has been completed." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to clock out. Please try again.", variant: "destructive" });
+    },
+  });
+
+  const handleClockOut = () => {
+    if (!activeEntry) return;
+    if (window.confirm("Clock out now? This will end your current time entry.")) {
+      clockOutMutation.mutate(activeEntry.id);
+    }
+  };
 
   const handleLogout = () => {
     window.location.href = "/api/logout";
@@ -505,10 +533,30 @@ export default function Navigation() {
                   <Bell className="w-4 h-4 mr-2" />
                   Notification Settings
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => window.location.href = '/time-tracking?clockin=1'}>
-                  <Play className="w-4 h-4 mr-2" />
-                  Clock In
-                </DropdownMenuItem>
+                {activeEntryLoading ? (
+                  <DropdownMenuItem disabled>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Loading...
+                  </DropdownMenuItem>
+                ) : activeEntry ? (
+                  <DropdownMenuItem
+                    onClick={handleClockOut}
+                    disabled={clockOutMutation.isPending}
+                    className="text-red-600 focus:text-red-600"
+                  >
+                    {clockOutMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <StopCircle className="w-4 h-4 mr-2" />
+                    )}
+                    Clock Out
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onClick={() => window.location.href = '/time-tracking?clockin=1'}>
+                    <Play className="w-4 h-4 mr-2" />
+                    Clock In
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => window.location.href = '/time-tracking'}>
                   <Clock className="w-4 h-4 mr-2" />
                   Time Tracker
