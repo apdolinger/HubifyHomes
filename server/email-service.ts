@@ -112,11 +112,11 @@ export function wrapInEmailTemplate(params: {
 }): string {
   const { body, subject, organizationName, organizationBranding = {} } = params;
   
-  const primaryColor = organizationBranding.primaryColor || '#0066cc';
-  const secondaryColor = organizationBranding.secondaryColor || '#004499';
-  const orgLogo = organizationBranding.logo;
-  const logo = orgLogo || getHubifyHomesEmailLogoUrl();
-  const logoAlt = orgLogo ? organizationName : 'Hubify Homes';
+  // Use org branding colors; default to Hubify teal (not the old blue)
+  const primaryColor = organizationBranding.primaryColor || '#0097BD';
+  const secondaryColor = organizationBranding.secondaryColor || '#007a99';
+  // Only show a logo if the org has explicitly set one — never fall back to the Hubify Homes logo
+  const orgLogo = organizationBranding.logo || null;
   
   return `
 <!DOCTYPE html>
@@ -125,71 +125,36 @@ export function wrapInEmailTemplate(params: {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${subject}</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      background-color: #f5f5f5;
-      color: #333333;
-    }
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
-      background-color: #ffffff;
-    }
-    .header {
-      background: linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%);
-      padding: 30px 20px;
-      text-align: center;
-    }
-    ${logo ? `
-    .logo {
-      max-width: 200px;
-      max-height: 80px;
-      margin-bottom: 15px;
-    }
-    ` : ''}
-    .header-text {
-      color: #ffffff;
-      font-size: 20px;
-      font-weight: 600;
-      margin: 0;
-    }
-    .content {
-      padding: 40px 30px;
-    }
-    .message {
-      line-height: 1.6;
-      color: #333333;
-      white-space: pre-wrap;
-    }
-    .footer {
-      background-color: #f5f5f5;
-      padding: 20px;
-      text-align: center;
-      border-top: 1px solid #e0e0e0;
-    }
-    .footer-text {
-      color: #777777;
-      font-size: 14px;
-      margin: 5px 0;
-    }
-  </style>
 </head>
-<body>
-  <div class="container">
-    <div class="header">
-      ${logo ? `<img src="${logo}" alt="${logoAlt}" width="180" class="logo" style="width:180px;max-width:180px;height:auto;display:block;margin:0 auto 8px;border:0;outline:none;text-decoration:none;">` : ''}
-      <p class="header-text">${organizationName}</p>
-    </div>
-    <div class="content">
-      <div class="message">${body}</div>
-    </div>
-    <div class="footer">
-      <p class="footer-text">This message was sent from ${organizationName}</p>
-    </div>
-  </div>
+<body style="margin:0;padding:0;background-color:#f4f6f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f8;padding:24px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;">
+          <!-- Header -->
+          <tr>
+            <td style="background:linear-gradient(135deg,${primaryColor} 0%,${secondaryColor} 100%);padding:${orgLogo ? '24px 32px' : '28px 32px'};text-align:center;">
+              ${orgLogo
+                ? `<img src="${orgLogo}" alt="${organizationName}" style="display:block;margin:0 auto 12px;max-width:160px;max-height:60px;width:auto;height:auto;object-fit:contain;"><p style="margin:0;color:#ffffff;font-size:14px;font-weight:500;opacity:0.9;">${organizationName}</p>`
+                : `<p style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.3px;">${organizationName}</p>`}
+            </td>
+          </tr>
+          <!-- Body -->
+          <tr>
+            <td style="padding:36px 40px 32px;">
+              <div style="color:#1e293b;font-size:15px;line-height:1.7;">${body}</div>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 40px;text-align:center;">
+              <p style="margin:0;color:#94a3b8;font-size:13px;">This message was sent from ${organizationName}</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>
 `.trim();
