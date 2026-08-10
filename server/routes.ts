@@ -1444,7 +1444,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { getEffectiveFeatureFlags } = await import("./featureFlags");
       const featureFlags = await getEffectiveFeatureFlags(orgId ?? null);
 
-      res.json({ ...user, orgId, role, featureFlags });
+      const { passwordHash: _ph, ...safeUser } = (user ?? {}) as any;
+      res.json({ ...safeUser, orgId, role, featureFlags });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -1509,7 +1510,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
-      res.json(user);
+      const { passwordHash: _ph, ...safeUser } = user as any;
+      res.json({ ...safeUser, hasPassword: !!_ph });
     } catch (error) {
       console.error("Error fetching current user:", error);
       res.status(500).json({ message: "Failed to fetch current user" });
@@ -1521,7 +1523,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const orgId = req.user?.claims?.orgId || req.user?.orgId;
       if (!orgId) return res.status(400).json({ message: "Organization not found" });
       const users = await storage.getUsersByOrg(orgId);
-      res.json(users);
+      // Strip passwordHash from the response but expose a safe boolean instead
+      const safeUsers = users.map(({ passwordHash, ...u }: any) => ({
+        ...u,
+        hasPassword: !!passwordHash,
+      }));
+      res.json(safeUsers);
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ message: "Failed to fetch users" });
@@ -1676,10 +1683,116 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
-      res.json(user);
+      const { passwordHash: _ph, ...safeUser } = user as any;
+      res.json({ ...safeUser, hasPassword: !!_ph });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // ── Resend setup invitation to a staff member who has not yet set a password ─
+  app.post("/api/users/:id/resend-invite", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const adminOrgId = req.user?.claims?.orgId || (req.user as any)?.orgId;
+      if (!adminOrgId) return res.status(400).json({ message: "Organization not found" });
+
+      const targetUserId = req.params.id;
+      const targetUser = await storage.getUser(targetUserId);
+      if (!targetUser) return res.status(404).json({ message: "User not found" });
+
+      // Ensure the target user belongs to the admin's org
+      if ((targetUser as any).orgId !== adminOrgId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Only allowed when the user has not yet set a password
+      if ((targetUser as any).passwordHash) {
+        return res.status(400).json({ message: "User has already set a password" });
+      }
+
+      // Invalidate any existing unclaimed tokens for this user
+      await db
+        .delete(accountSetupTokens)
+        .where(
+          and(
+            eq(accountSetupTokens.userId, targetUserId),
+            isNull(accountSetupTokens.claimedAt),
+          ),
+        );
+
+      // Create a fresh 7-day token
+      const setupToken = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await db.insert(accountSetupTokens).values({
+        userId: targetUserId,
+        token: setupToken,
+        expiresAt,
+      });
+
+      const baseUrl = `${req.protocol}://${req.hostname}`;
+      const setupUrl = `${baseUrl}/setup-account/${setupToken}`;
+
+      const org = await storage.getOrg(adminOrgId);
+      const orgName = org?.name ?? "your team";
+      const inviterName =
+        `${req.user?.claims?.first_name ?? ""} ${req.user?.claims?.last_name ?? ""}`.trim() ||
+        "Your admin";
+      const roleLabel =
+        (targetUser as any).role === "admin"
+          ? "Admin"
+          : (targetUser as any).role === "supervisor"
+          ? "Supervisor"
+          : "Staff";
+      const firstName = (targetUser as any).firstName ?? "there";
+      const normalizedEmail = (targetUser as any).email;
+
+      try {
+        const { sendEmail } = await import("./email-service");
+        await sendEmail({
+          to: normalizedEmail,
+          subject: `You've been added to ${orgName} on Hubify — set up your password`,
+          orgId: adminOrgId,
+          body: `<p style="font-size:16px;margin:0 0 20px;">Hi ${firstName},</p>
+<p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px;">
+  ${inviterName} has added you to <strong>${orgName}</strong> on Hubify as a <strong>${roleLabel}</strong>.
+  Hubify is the property management platform your team uses to track tasks, manage properties, and stay coordinated.
+</p>
+
+<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px 24px;margin:0 0 28px;">
+  <p style="font-size:13px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin:0 0 12px;">What you can do in Hubify</p>
+  <ul style="margin:0;padding-left:20px;color:#475569;font-size:14px;line-height:2;">
+    <li>See and act on tasks assigned to you</li>
+    <li>View property details, access codes, and notes</li>
+    <li>Communicate with your team in real time</li>
+    <li>Log your work and track time on jobs</li>
+  </ul>
+</div>
+
+<p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 28px;">
+  Click the button below to choose a password and activate your account. This link expires in 7 days.
+</p>
+
+<p style="margin:0 0 28px;text-align:center;">
+  <a href="${setupUrl}"
+     style="display:inline-block;background:#0097BD;color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">
+    Set up your password
+  </a>
+</p>
+
+<p style="font-size:13px;color:#94a3b8;margin:0;">
+  If you have questions, please email <a href="mailto:contact@hubifyhomes.com" style="color:#94a3b8;">contact@hubifyhomes.com</a>
+</p>`,
+        });
+      } catch (emailErr) {
+        console.warn("[RESEND-INVITE] Failed to send invitation email to", normalizedEmail, emailErr);
+        return res.status(500).json({ message: "Failed to send invitation email" });
+      }
+
+      res.json({ message: "Invitation sent" });
+    } catch (error) {
+      console.error("Error resending invite:", error);
+      res.status(500).json({ message: "Failed to resend invite" });
     }
   });
 

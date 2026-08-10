@@ -175,18 +175,14 @@ app.use("/api/portal/register", authLimiter);
 app.post("/api/stripe/webhooks/master", express.raw({ type: "application/json" }), async (req, res) => {
   try {
     const { getMasterStripe, handleMasterWebhook } = await import("./stripe");
-    const stripe = getMasterStripe();
+      const stripe = getMasterStripe();
     const sig = req.headers["stripe-signature"];
 
     if (!sig || !process.env.STRIPE_WEBHOOK_SECRET) {
       return res.status(400).json({ message: "Missing signature or webhook secret" });
     }
 
-    const event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
+    const event = orgStripeConnection.stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
 
     await handleMasterWebhook(event);
     res.json({ received: true });
@@ -200,9 +196,12 @@ app.post("/api/stripe/webhooks/master", express.raw({ type: "application/json" }
 app.post("/api/stripe/webhooks/beta-onboarding", express.raw({ type: "application/json" }), async (req, res) => {
   try {
     const sig = req.headers["stripe-signature"];
-    const webhookSecret = process.env.STRIPE_BETA_ONBOARDING_WEBHOOK_SECRET;
+    const webhookSecret =
+      connection?.stripeWebhookSecret ||
+      process.env[`STRIPE_ORG_WEBHOOK_SECRET_${orgId}`] ||
+      process.env.STRIPE_ORG_WEBHOOK_SECRET;
 
-    let event: any;
+    const event = orgStripeConnection.stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
     if (sig && webhookSecret) {
       const { getMasterStripe } = await import("./stripe");
       const stripe = getMasterStripe();

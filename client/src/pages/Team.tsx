@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Plus, Mail, User, Search, Settings, ArrowUpDown, ArrowUp, ArrowDown, Filter, ChevronDown, ChevronUp, UserPlus, UserCheck, ShieldCheck, UserCog } from "lucide-react";
+import { Users, Plus, Mail, User, Search, Settings, ArrowUpDown, ArrowUp, ArrowDown, Filter, ChevronDown, ChevronUp, UserPlus, UserCheck, ShieldCheck, UserCog, Send } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { prefStorage } from "@/lib/cookieConsent";
@@ -365,6 +365,26 @@ export default function Team() {
       toast({
         title: "Error",
         description: error.message || "Failed to remove team member. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation for resending a setup invitation to a staff member who hasn't set a password yet
+  const resendInviteMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return apiRequest("POST", `/api/users/${userId}/resend-invite`, {});
+    },
+    onSuccess: () => {
+      toast({
+        title: "Invite resent",
+        description: "A fresh setup link has been emailed to the team member.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to resend invite. Please try again.",
         variant: "destructive",
       });
     },
@@ -1004,6 +1024,7 @@ export default function Team() {
                   {columns.find(col => col.id === 'status')?.visible && (
                     <TableHead>Status</TableHead>
                   )}
+                  <TableHead className="w-[140px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1032,6 +1053,7 @@ export default function Team() {
                         <div className="h-5 w-12 bg-slate-200 rounded animate-pulse"></div>
                       </TableCell>
                     )}
+                    <TableCell></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -1076,6 +1098,7 @@ export default function Team() {
                   {columns.find(col => col.id === 'status')?.visible && (
                     <TableHead>Status</TableHead>
                   )}
+                  <TableHead className="w-[140px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1134,6 +1157,22 @@ export default function Team() {
                         </div>
                       </TableCell>
                     )}
+
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      {!member.hasPassword && (currentUser as any)?.role === "admin" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs"
+                          data-testid={`resend-invite-btn-${member.id}`}
+                          disabled={resendInviteMutation.isPending}
+                          onClick={() => resendInviteMutation.mutate(member.id)}
+                        >
+                          <Send className="w-3 h-3 mr-1" />
+                          Resend invite
+                        </Button>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
