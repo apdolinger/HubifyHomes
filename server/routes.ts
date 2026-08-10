@@ -1913,12 +1913,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Send email immediately
           await sendEmail({
-            recipientEmail: member.email,
-            recipientName: `${member.firstName} ${member.lastName}`,
+            to: member.email,
             subject: processedSubject,
             body: processedBody,
             orgId,
-            senderId: userId,
           });
 
           successCount.value++;
