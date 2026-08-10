@@ -11272,7 +11272,7 @@ const TICKET_STATUS_CONFIG: Record<string, { label: string; className: string }>
   resolved:    { label: "Resolved",    className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
 };
 
-function OrgDetailSheet({ org, open, onClose }: { org: OrgOverviewRow | null; open: boolean; onClose: () => void }) {
+function OrgDetailSheet({ org, open, onClose, onDelete }: { org: OrgOverviewRow | null; open: boolean; onClose: () => void; onDelete: (org: OrgOverviewRow) => void }) {
   const [innerTab, setInnerTab] = useState("overview");
   const [detailUser, setDetailUser] = useState<UserDetailRow | null>(null);
   const [detailUserOpen, setDetailUserOpen] = useState(false);
@@ -11323,10 +11323,21 @@ function OrgDetailSheet({ org, open, onClose }: { org: OrgOverviewRow | null; op
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
         <SheetHeader className="mb-4">
-          <SheetTitle className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-slate-500" />
-            {org.name}
-          </SheetTitle>
+          <div className="flex items-start justify-between gap-2">
+            <SheetTitle className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-slate-500" />
+              {org.name}
+            </SheetTitle>
+            <Button
+              size="sm" variant="ghost"
+              className="text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0"
+              title="Delete organization permanently"
+              onClick={() => { onClose(); onDelete(org); }}
+            >
+              <Trash2 className="w-4 h-4 mr-1.5" />
+              Delete
+            </Button>
+          </div>
           <SheetDescription className="flex items-center gap-3">
             {org.slug
               ? <span className="font-mono text-xs">{org.slug}.hubifyhomesonline.com</span>
@@ -11795,6 +11806,7 @@ function OrganizationsTab({ openOrgId, onOrgOpened }: { openOrgId?: string | nul
         org={detailOrg}
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
+        onDelete={(o) => { setDeleteOrgTarget(o); setDeleteOrgConfirm(""); }}
       />
 
       {/* Delete org confirmation dialog */}
