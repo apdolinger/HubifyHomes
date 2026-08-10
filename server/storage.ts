@@ -8380,14 +8380,16 @@ export class DatabaseStorage implements IStorage {
       await tx.execute(sql`
         UPDATE communities SET manager_id = NULL WHERE manager_id IN (${usersInOrg})
       `);
-      // hoa_president_id may not exist yet if the migration hasn't run — skip gracefully
-      try {
-        await tx.execute(sql`
-          UPDATE communities SET hoa_president_id = NULL WHERE hoa_president_id IN (${usersInOrg})
-        `);
-      } catch (colErr: any) {
-        if (!colErr?.message?.includes('does not exist')) throw colErr;
-      }
+      // hoa_president_id may not exist yet — use a DO block so a missing-column error
+      // is caught inside PG itself and does NOT abort the outer transaction.
+      await tx.execute(sql`
+        DO $$ BEGIN
+          UPDATE communities SET hoa_president_id = NULL WHERE hoa_president_id = ANY(ARRAY(
+            SELECT id FROM users WHERE org_id = ${orgId}
+          ));
+        EXCEPTION WHEN undefined_column THEN NULL;
+        END $$
+      `);
 
       // 12. Document templates (uploaded_by NOT NULL NO ACTION -> must precede user deletion)
       await tx.execute(sql`DELETE FROM document_templates WHERE org_id = ${orgId}`);
@@ -8498,12 +8500,14 @@ export class DatabaseStorage implements IStorage {
       await tx.execute(sql`UPDATE conflict_resolutions SET supervisor_id = NULL WHERE supervisor_id = ${userId}`);
       // communities.manager_id / hoa_president_id (nullable NO ACTION)
       await tx.execute(sql`UPDATE communities SET manager_id = NULL WHERE manager_id = ${userId}`);
-      // hoa_president_id may not exist yet if the migration hasn't run — skip gracefully
-      try {
-        await tx.execute(sql`UPDATE communities SET hoa_president_id = NULL WHERE hoa_president_id = ${userId}`);
-      } catch (colErr: any) {
-        if (!colErr?.message?.includes('does not exist')) throw colErr;
-      }
+      // hoa_president_id may not exist yet — DO block catches the missing-column error
+      // inside PG itself so the outer transaction is not aborted.
+      await tx.execute(sql`
+        DO $$ BEGIN
+          UPDATE communities SET hoa_president_id = NULL WHERE hoa_president_id = ${userId};
+        EXCEPTION WHEN undefined_column THEN NULL;
+        END $$
+      `);
       // users self-FK: supervisor_id (nullable NO ACTION)
       await tx.execute(sql`UPDATE users SET supervisor_id = NULL WHERE supervisor_id = ${userId}`);
       // financial nullable refs
