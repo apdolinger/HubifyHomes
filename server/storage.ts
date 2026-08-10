@@ -8370,14 +8370,6 @@ export class DatabaseStorage implements IStorage {
       await tx.execute(sql`
         UPDATE properties SET manager_id = NULL WHERE org_id = ${orgId} AND manager_id IS NOT NULL
       `);
-      // hoa_president_id may not exist yet on properties if migration hasn't run — skip gracefully
-      try {
-        await tx.execute(sql`
-          UPDATE properties SET hoa_president_id = NULL WHERE org_id = ${orgId} AND hoa_president_id IS NOT NULL
-        `);
-      } catch (colErr: any) {
-        if (!colErr?.message?.includes('does not exist')) throw colErr;
-      }
       await tx.execute(sql`DELETE FROM property_forms WHERE org_id = ${orgId}`);
       await tx.execute(sql`DELETE FROM property_portal_settings WHERE org_id = ${orgId}`);
       await tx.execute(sql`DELETE FROM properties WHERE org_id = ${orgId}`);
@@ -8501,12 +8493,6 @@ export class DatabaseStorage implements IStorage {
       await tx.execute(sql`UPDATE task_checklist_items SET assigned_to_id = NULL WHERE assigned_to_id = ${userId}`);
       await tx.execute(sql`UPDATE task_checklist_items SET completed_by = NULL WHERE completed_by = ${userId}`);
       await tx.execute(sql`UPDATE properties SET manager_id = NULL WHERE manager_id = ${userId}`);
-      // hoa_president_id may not exist yet on properties if migration hasn't run — skip gracefully
-      try {
-        await tx.execute(sql`UPDATE properties SET hoa_president_id = NULL WHERE hoa_president_id = ${userId}`);
-      } catch (colErr: any) {
-        if (!colErr?.message?.includes('does not exist')) throw colErr;
-      }
       await tx.execute(sql`UPDATE contacts SET supervisor_id = NULL WHERE supervisor_id = ${userId}`);
       await tx.execute(sql`UPDATE billing_submissions SET authorized_by = NULL WHERE authorized_by = ${userId}`);
       await tx.execute(sql`UPDATE conflict_resolutions SET supervisor_id = NULL WHERE supervisor_id = ${userId}`);
