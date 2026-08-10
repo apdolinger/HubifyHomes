@@ -1559,13 +1559,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const orgName = org?.name ?? "your team";
       const inviterName = `${req.user?.claims?.first_name ?? ""} ${req.user?.claims?.last_name ?? ""}`.trim() || "Your admin";
       const roleLabel = role === "admin" ? "Admin" : role === "supervisor" ? "Supervisor" : "Staff";
-      const loginUrl = `${req.protocol}://${req.hostname}/staff/login`;
+      const baseUrl = `${req.protocol}://${req.hostname}`;
+
+      // Generate a password-setup token so the new member can set their own password.
+      // accountSetupTokens.prospect_id is nullable (staff invites have no prospect).
+      let setupUrl: string;
+      try {
+        const setupToken = crypto.randomBytes(32).toString("hex"); // 64-char hex
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+        await db.insert(accountSetupTokens).values({
+          userId: (user as any).id,
+          token: setupToken,
+          expiresAt,
+        });
+        setupUrl = `${baseUrl}/setup-account/${setupToken}`;
+      } catch (tokenErr) {
+        console.warn("[INVITE] Failed to create setup token, falling back to login URL:", tokenErr);
+        setupUrl = `${baseUrl}/staff/login`;
+      }
 
       try {
         const { sendEmail } = await import("./email-service");
         await sendEmail({
           to: normalizedEmail,
-          subject: `You've been added to ${orgName} on Hubify`,
+          subject: `You've been added to ${orgName} on Hubify — set up your password`,
           orgId,
           body: `<p style="font-size:16px;margin:0 0 20px;">Hi ${firstName},</p>
 <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px;">
@@ -1584,14 +1601,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 </div>
 
 <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 28px;">
-  To get in, click the button below and sign in with the email address this was sent to:
-  <strong style="color:#1e293b;">${normalizedEmail}</strong>
+  Click the button below to choose a password and activate your account. This link expires in 7 days.
 </p>
 
 <p style="margin:0 0 28px;text-align:center;">
-  <a href="${loginUrl}"
+  <a href="${setupUrl}"
      style="display:inline-block;background:#0097BD;color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">
-    Log in to Hubify
+    Set up your password
   </a>
 </p>
 

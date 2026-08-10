@@ -8383,9 +8383,14 @@ export class DatabaseStorage implements IStorage {
       await tx.execute(sql`
         UPDATE communities SET manager_id = NULL WHERE manager_id IN (${usersInOrg})
       `);
-      await tx.execute(sql`
-        UPDATE communities SET hoa_president_id = NULL WHERE hoa_president_id IN (${usersInOrg})
-      `);
+      // hoa_president_id may not exist yet if the migration hasn't run — skip gracefully
+      try {
+        await tx.execute(sql`
+          UPDATE communities SET hoa_president_id = NULL WHERE hoa_president_id IN (${usersInOrg})
+        `);
+      } catch (colErr: any) {
+        if (!colErr?.message?.includes('does not exist')) throw colErr;
+      }
 
       // 12. Document templates (uploaded_by NOT NULL NO ACTION -> must precede user deletion)
       await tx.execute(sql`DELETE FROM document_templates WHERE org_id = ${orgId}`);
@@ -8497,7 +8502,12 @@ export class DatabaseStorage implements IStorage {
       await tx.execute(sql`UPDATE conflict_resolutions SET supervisor_id = NULL WHERE supervisor_id = ${userId}`);
       // communities.manager_id / hoa_president_id (nullable NO ACTION)
       await tx.execute(sql`UPDATE communities SET manager_id = NULL WHERE manager_id = ${userId}`);
-      await tx.execute(sql`UPDATE communities SET hoa_president_id = NULL WHERE hoa_president_id = ${userId}`);
+      // hoa_president_id may not exist yet if the migration hasn't run — skip gracefully
+      try {
+        await tx.execute(sql`UPDATE communities SET hoa_president_id = NULL WHERE hoa_president_id = ${userId}`);
+      } catch (colErr: any) {
+        if (!colErr?.message?.includes('does not exist')) throw colErr;
+      }
       // users self-FK: supervisor_id (nullable NO ACTION)
       await tx.execute(sql`UPDATE users SET supervisor_id = NULL WHERE supervisor_id = ${userId}`);
       // financial nullable refs

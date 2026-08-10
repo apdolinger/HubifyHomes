@@ -1353,3 +1353,43 @@ export async function ensureDispatchStopActualTimeColumns(): Promise<void> {
     client.release();
   }
 }
+
+/**
+ * Add hoa_president_id to the communities table.
+ * The Drizzle schema defines this column but it was never migrated to the DB.
+ * Idempotent (ADD COLUMN IF NOT EXISTS).
+ */
+export async function ensureCommunityHoaPresidentIdColumn(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE communities
+        ADD COLUMN IF NOT EXISTS hoa_president_id VARCHAR REFERENCES users(id) ON DELETE SET NULL;
+    `);
+    log("[MIGRATE] communities.hoa_president_id column verified.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to ensure communities.hoa_president_id: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Make account_setup_tokens.prospect_id nullable so staff invite tokens
+ * can be created without a linked onboarding prospect.
+ * Idempotent — ALTER COLUMN on an already-nullable column is a no-op.
+ */
+export async function ensureAccountSetupTokenProspectNullable(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE account_setup_tokens
+        ALTER COLUMN prospect_id DROP NOT NULL;
+    `);
+    log("[MIGRATE] account_setup_tokens.prospect_id is now nullable.");
+  } catch (err: any) {
+    log(`[MIGRATE] Failed to make account_setup_tokens.prospect_id nullable: ${err?.message ?? err}`);
+  } finally {
+    client.release();
+  }
+}

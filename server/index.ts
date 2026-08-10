@@ -8,6 +8,8 @@ import { setupVite, serveStatic, log } from "./vite";
 import { startScheduledTasks } from "./scheduledTasks";
 import { logError } from "./errorLogger";
 import { tenantMiddleware } from "./tenantMiddleware";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 
 // Install process-level error guards as early as possible so transient
 // database / WebSocket drops during startup don't crash the process.
@@ -759,6 +761,18 @@ app.use((req, res, next) => {
       } catch (err) {
         console.error('Error ensuring dispatch stop actual time columns:', err);
       }
+      try {
+        const { ensureAccountSetupTokenProspectNullable } = await import('./runMigrations.js');
+        await ensureAccountSetupTokenProspectNullable();
+      } catch (err) {
+        console.error('Error making account_setup_tokens.prospect_id nullable:', err);
+      }
+      try {
+        const { ensureCommunityHoaPresidentIdColumn } = await import('./runMigrations.js');
+        await ensureCommunityHoaPresidentIdColumn();
+      } catch (err) {
+        console.error('Error ensuring communities.hoa_president_id column:', err);
+      }
     } catch (error) {
       console.error('Error loading startup migrations:', error);
     }
@@ -805,5 +819,38 @@ app.use((req, res, next) => {
     } catch (error) {
       console.error('[startup] Error during encryption canary check:', error);
     }
+
+    // DDL migrations that need to run but cannot block startup (Neon suspends
+    // its endpoint after inactivity; it only wakes once real traffic arrives).
+    // Fire-and-forget: retry in the background until the DB is reachable.
+    const runDdlBackground = (label: string, query: any, delayMs = 10000) => {
+      const attempt = async () => {
+        try {
+          await db.execute(query);
+          log(`[MIGRATE] ${label} verified.`);
+        } catch (err: any) {
+          const msg: string = err?.message ?? String(err);
+          const isTransient = msg.includes('endpoint has been disabled') ||
+                              msg.includes('Connection terminated') ||
+                              msg.includes('ECONNRESET');
+          if (isTransient) {
+            setTimeout(attempt, delayMs);
+          } else {
+            console.error(`[MIGRATE] ${label} failed permanently:`, msg);
+          }
+        }
+      };
+      // Start first attempt after a short delay to let traffic warm the DB
+      setTimeout(attempt, 5000);
+    };
+
+    runDdlBackground(
+      'communities.hoa_president_id',
+      sql`ALTER TABLE communities ADD COLUMN IF NOT EXISTS hoa_president_id VARCHAR REFERENCES users(id) ON DELETE SET NULL`
+    );
+    runDdlBackground(
+      'account_setup_tokens.prospect_id nullable',
+      sql`ALTER TABLE account_setup_tokens ALTER COLUMN prospect_id DROP NOT NULL`
+    );
   });
 })();

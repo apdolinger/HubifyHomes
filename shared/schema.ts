@@ -3526,7 +3526,7 @@ export const onboardingProspects = pgTable("onboarding_prospects", {
 // Account setup tokens — single-use links for provisioned beta org admins to set their password
 export const accountSetupTokens = pgTable("account_setup_tokens", {
   id: uuid("id").primaryKey().defaultRandom(),
-  prospectId: uuid("prospect_id").notNull().references(() => onboardingProspects.id, { onDelete: "cascade" }),
+  prospectId: uuid("prospect_id").references(() => onboardingProspects.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   token: varchar("token", { length: 64 }).notNull().unique(),
   expiresAt: timestamp("expires_at").notNull(),

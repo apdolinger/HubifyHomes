@@ -1,0 +1,44 @@
+Redesign the Hubify welcome/invitation email from the ground up. Do not simply tweak the existing spacing. Keep the existing functionality, links, recipient-specific data, and authentication flow, but completely improve the email’s visual presentation.
+
+The email should feel like a polished SaaS invitation email from a premium property-management platform. It should be clean, warm, professional, restrained, and clearly branded as Hubify.
+
+Make these specific changes:
+
+1. Fix the overall email structure. Use a centered email container approximately 560–600px wide on a very light neutral/off-white page background. The actual email should be a white card with consistent padding. Do not allow content to float across a huge empty page.
+2. Completely fix the logo/header. The current Hubify/LBC logo is compressed, distorted, and sitting inside an oversized blue rectangle. Preserve the logo’s original aspect ratio. Do not stretch or squash it. Remove the large blue background block. Give the logo breathing room and size it appropriately—roughly 120–160px wide depending on the asset.
+3. Create a proper opening hierarchy. After the logo, use a strong headline such as “Welcome to Hubify” or “You’ve been invited to Hubify.” Underneath, show a short personalized message explaining that [inviter/organization] has invited the recipient to join [property/team/account].
+4. Remove the current gray “WHAT YOU CAN DO IN HUBIFY” box. It looks disconnected from the rest of the email. Replace it with a clean section headed “What you can do in Hubify”, followed by 3–4 concise benefits with simple checkmarks or subtle icons. No unnecessary border or gray floating rectangle.
+5. Improve typography. Establish consistent font sizes and line heights. Body copy should be approximately 15–16px and easy to read. Headings should clearly stand apart from body text. Avoid tiny text. Keep text left-aligned within the main content area rather than centering every piece of copy.
+6. Make the CTA the visual focal point. Use one prominent “Log in to Hubify” button after the introductory copy/benefits. It should use Hubify’s primary brand color, have comfortable padding, rounded corners consistent with the application, and be large enough to immediately identify as the next action.
+7. Handle the login email elegantly. Instead of having the email address floating awkwardly above the button, say something like: “Use [email address] to sign in.” Keep this visually secondary to the CTA.
+8. Simplify the footer. Put support information and “This message was sent from [organization]” in a subtle footer separated from the main content with whitespace or a light divider. The footer should not compete with the invitation.
+9. Use Hubify branding consistently. Pull colors, border radius, typography, logo treatment, and button styling from the existing Hubify application/design system. Do not invent a generic blue email theme if that is not Hubify’s visual identity.
+10. Make the email responsive. It needs to render correctly in Gmail desktop, Gmail mobile, Apple Mail, and Outlook. On mobile, the card should become nearly full-width with ~20–24px horizontal padding. Nothing should stretch, overflow, or become extremely narrow.
+11. Use email-safe HTML/CSS. Build this as a real transactional email, not as a normal webpage. Prefer table-based layout and inline/email-compatible styles where necessary. Avoid CSS that major email clients will strip.
+12. Test the final rendered email before considering this complete. Specifically verify logo aspect ratio, desktop width, mobile width, spacing, button rendering, text sizes, and Gmail rendering.
+
+Desired visual order:
+
+Hubify logo
+
+Welcome to Hubify
+
+You’ve been invited by LBC to join Hubify.
+
+Short 1–2 sentence explanation.
+
+What you can do
+✓ See and act on tasks assigned to you
+✓ View property details, access codes, and notes
+✓ Communicate with your team
+✓ Log work and time on jobs
+
+[ Log in to Hubify ]
+
+Use recipient@email.com to sign in.
+
+Need help? Contact support
+
+This invitation was sent by LBC
+
+Important: Do not make incremental cosmetic changes to the existing layout. Refactor the email template so it has a coherent, intentional design and visual hierarchy while preserving all existing invitation/login functionality.
