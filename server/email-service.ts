@@ -111,53 +111,77 @@ export function wrapInEmailTemplate(params: {
   };
 }): string {
   const { body, subject, organizationName, organizationBranding = {} } = params;
-  
-  // Use org branding colors; default to Hubify teal (not the old blue)
+
+  // Use org branding colors; default to Hubify teal
   const primaryColor = organizationBranding.primaryColor || '#0097BD';
-  const secondaryColor = organizationBranding.secondaryColor || '#007a99';
-  // Only show a logo if the org has explicitly set one — never fall back to the Hubify Homes logo
+  // Only show a logo if the org has explicitly set one
   const orgLogo = organizationBranding.logo || null;
-  
-  return `
-<!DOCTYPE html>
+
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>${subject}</title>
 </head>
-<body style="margin:0;padding:0;background-color:#f4f6f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f8;padding:24px 0;">
+<body style="margin:0;padding:0;background-color:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <!--[if mso]><table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center"><![endif]-->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0f2f5;min-width:100%;">
     <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;">
-          <!-- Header -->
+      <td align="center" style="padding:32px 16px;">
+
+        <!-- Card -->
+        <table role="presentation" width="580" cellpadding="0" cellspacing="0" border="0" style="max-width:580px;width:100%;background-color:#ffffff;border-radius:10px;border:1px solid #dde1e7;overflow:hidden;">
+
+          <!-- Accent bar -->
           <tr>
-            <td style="background:linear-gradient(135deg,${primaryColor} 0%,${secondaryColor} 100%);padding:${orgLogo ? '24px 32px' : '28px 32px'};text-align:center;">
+            <td style="background-color:${primaryColor};height:4px;font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+
+          <!-- Logo / Brand header -->
+          <tr>
+            <td align="center" style="padding:32px 40px 24px;">
               ${orgLogo
-                ? `<img src="${orgLogo}" alt="${organizationName}" style="display:block;margin:0 auto 12px;max-width:160px;max-height:60px;width:auto;height:auto;object-fit:contain;"><p style="margin:0;color:#ffffff;font-size:14px;font-weight:500;opacity:0.9;">${organizationName}</p>`
-                : `<p style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.3px;">${organizationName}</p>`}
+                ? `<img src="${orgLogo}" alt="${organizationName}" width="140" style="display:block;margin:0 auto;max-width:140px;height:auto;border:0;">`
+                : `<p style="margin:0;font-size:20px;font-weight:700;color:#0f172a;letter-spacing:-0.3px;">${organizationName}</p>`}
             </td>
           </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding:0 40px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr><td style="border-top:1px solid #e8eaed;font-size:0;line-height:0;">&nbsp;</td></tr>
+              </table>
+            </td>
+          </tr>
+
           <!-- Body -->
           <tr>
-            <td style="padding:36px 40px 32px;">
+            <td style="padding:32px 40px 28px;">
               <div style="color:#1e293b;font-size:15px;line-height:1.7;">${body}</div>
             </td>
           </tr>
+
           <!-- Footer -->
           <tr>
-            <td style="background-color:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 40px;text-align:center;">
-              <p style="margin:0;color:#94a3b8;font-size:13px;">This message was sent from ${organizationName}</p>
+            <td style="background-color:#f8fafc;border-top:1px solid #e8eaed;padding:18px 40px;text-align:center;">
+              <p style="margin:0;color:#94a3b8;font-size:12px;line-height:1.5;">
+                This message was sent by <strong style="color:#64748b;">${organizationName}</strong>
+              </p>
             </td>
           </tr>
+
         </table>
+        <!-- /Card -->
+
       </td>
     </tr>
   </table>
+  <!--[if mso]></td></tr></table><![endif]-->
 </body>
-</html>
-`.trim();
+</html>`;
 }
 
 /**

@@ -1584,36 +1584,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
           to: normalizedEmail,
           subject: `You've been added to ${orgName} on Hubify — set up your password`,
           orgId,
-          body: `<p style="font-size:16px;margin:0 0 20px;">Hi ${firstName},</p>
-<p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px;">
-  ${inviterName} has added you to <strong>${orgName}</strong> on Hubify as a <strong>${roleLabel}</strong>.
-  Hubify is the property management platform your team uses to track tasks, manage properties, and stay coordinated.
+          body: `
+<!-- Headline -->
+<h1 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;letter-spacing:-0.3px;line-height:1.3;">You've been invited to Hubify</h1>
+<p style="margin:0 0 20px;font-size:15px;color:#64748b;line-height:1.6;">
+  <strong style="color:#0f172a;">${inviterName}</strong> has added you to <strong style="color:#0f172a;">${orgName}</strong> as a <strong style="color:#0f172a;">${roleLabel}</strong>.
 </p>
 
-<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px 24px;margin:0 0 28px;">
-  <p style="font-size:13px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin:0 0 12px;">What you can do in Hubify</p>
-  <ul style="margin:0;padding-left:20px;color:#475569;font-size:14px;line-height:2;">
-    <li>See and act on tasks assigned to you</li>
-    <li>View property details, access codes, and notes</li>
-    <li>Communicate with your team in real time</li>
-    <li>Log your work and track time on jobs</li>
-  </ul>
-</div>
-
-<p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 28px;">
-  Click the button below to choose a password and activate your account. This link expires in 7 days.
+<p style="margin:0 0 24px;font-size:15px;color:#475569;line-height:1.7;">
+  Hubify is the property management platform your team uses to coordinate tasks, track jobs, and stay organised across properties.
 </p>
 
-<p style="margin:0 0 28px;text-align:center;">
-  <a href="${setupUrl}"
-     style="display:inline-block;background:#0097BD;color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">
-    Set up your password
-  </a>
-</p>
+<!-- Benefits heading -->
+<p style="margin:0 0 14px;font-size:13px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;">What you can do in Hubify</p>
 
-<p style="font-size:13px;color:#94a3b8;margin:0;">
-  If you have questions, please email <a href="mailto:contact@hubifyhomes.com" style="color:#94a3b8;">contact@hubifyhomes.com</a>
-</p>`,
+<!-- Benefits -->
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px;width:100%;">
+  <tr>
+    <td style="padding:0 0 10px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td style="width:24px;vertical-align:top;padding-top:1px;font-size:15px;color:#0097BD;font-weight:700;">&#10003;</td>
+          <td style="font-size:15px;color:#334155;line-height:1.5;">See and act on tasks assigned to you</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:0 0 10px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td style="width:24px;vertical-align:top;padding-top:1px;font-size:15px;color:#0097BD;font-weight:700;">&#10003;</td>
+          <td style="font-size:15px;color:#334155;line-height:1.5;">View property details, access codes, and notes</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:0 0 10px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td style="width:24px;vertical-align:top;padding-top:1px;font-size:15px;color:#0097BD;font-weight:700;">&#10003;</td>
+          <td style="font-size:15px;color:#334155;line-height:1.5;">Communicate with your team in real time</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td style="width:24px;vertical-align:top;padding-top:1px;font-size:15px;color:#0097BD;font-weight:700;">&#10003;</td>
+          <td style="font-size:15px;color:#334155;line-height:1.5;">Log your work and track time on jobs</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<!-- CTA -->
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;">
+  <tr>
+    <td style="border-radius:8px;background-color:#0097BD;">
+      <a href="${setupUrl}" style="display:inline-block;padding:14px 36px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;letter-spacing:0.1px;">Set up your password</a>
+    </td>
+  </tr>
+</table>
+
+<!-- Sign-in note -->
+<p style="margin:0 0 16px;font-size:13px;color:#94a3b8;">Use <strong style="color:#64748b;">${normalizedEmail}</strong> to sign in. This link expires in 7&nbsp;days.</p>
+
+<!-- Support -->
+<p style="margin:0;font-size:13px;color:#94a3b8;">Questions? Email <a href="mailto:contact@hubifyhomes.com" style="color:#0097BD;text-decoration:none;">contact@hubifyhomes.com</a></p>`,
         });
       } catch (emailErr) {
         // Don't fail the request if the email can't send — user is still created
