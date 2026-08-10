@@ -22,10 +22,7 @@ import {
   users,
 } from "@shared/schema";
 import { log } from "./vite";
-
-function getHubifyLogoUrl(): string {
-  return "https://storage.googleapis.com/hubify-assets/hubify-homes-logo.png";
-}
+import { getHubifyHomesEmailLogoUrl } from "./brandAsset";
 
 function mapTier(
   suggested: string | null | undefined
@@ -69,7 +66,7 @@ export function buildWorkspaceReadyEmail(opts: {
   return `
     <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
       <div style="text-align:center;margin-bottom:28px">
-        <img src="${getHubifyLogoUrl()}" alt="Hubify Homes" width="180"
+        <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="180"
           style="width:180px;max-width:180px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
       </div>
       <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">

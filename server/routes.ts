@@ -2318,34 +2318,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send email with reset link
       const resetUrl = `${process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : 'http://localhost:5000'}/portal/reset-password?token=${resetToken}`;
       
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head><meta charset="UTF-8"></head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-          <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #2563eb;">Password Reset Request</h2>
-            <p>Hello ${user.firstName || 'User'},</p>
-            <p>We received a request to reset your password for your ${orgName} portal account.</p>
-            <p>Click the button below to reset your password:</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${resetUrl}" style="background-color: #0097BD; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block;">Reset Password</a>
-            </div>
-            <p>This link will expire in 1 hour.</p>
-            <p>If you did not request a password reset, please ignore this email.</p>
-            <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-            <p style="color: #666; font-size: 12px;">This email was sent by ${orgName}.</p>
-          </div>
-        </body>
-        </html>
-      `;
+      const resetEmailBody = `
+<h1 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;line-height:1.3;">Password Reset Request</h1>
+<p style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">
+  Hello <strong style="color:#0f172a;">${user.firstName || 'there'}</strong>,
+</p>
+<p style="margin:0 0 24px;font-size:15px;color:#475569;line-height:1.7;">
+  We received a request to reset your password for your <strong>${orgName}</strong> portal account.
+  Click the button below to choose a new password. This link expires in 1&nbsp;hour.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;">
+  <tr>
+    <td style="border-radius:8px;background-color:#0097BD;">
+      <a href="${resetUrl}" style="display:inline-block;padding:14px 36px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">Reset Password</a>
+    </td>
+  </tr>
+</table>
+<p style="margin:0;font-size:13px;color:#94a3b8;">If you did not request a password reset, you can safely ignore this email.</p>`;
 
       try {
-        const { sendGenericEmail } = await import('./emailUtils');
-        await sendGenericEmail({
+        const { sendEmail } = await import('./email-service');
+        await sendEmail({
           to: email.toLowerCase(),
-          subject: `Password Reset Request - ${orgName}`,
-          htmlContent,
+          subject: `Password Reset Request — ${orgName}`,
+          body: resetEmailBody,
+          orgId,
         });
       } catch (emailError) {
         console.error('Failed to send password reset email:', emailError);
@@ -5094,7 +5091,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           html: `
             <div style="font-family:sans-serif;max-width:580px;margin:0 auto;padding:32px 24px;background:#ffffff">
               <div style="text-align:center;margin-bottom:28px">
-                <div style="font-size:22px;font-weight:800;color:#0d9488;letter-spacing:-0.5px">Hubify</div>
+                <img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="150"
+                  style="width:150px;max-width:150px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
               </div>
               <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 8px">Hi ${firstName}, you're a Founding Member!</h1>
               <p style="font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px">

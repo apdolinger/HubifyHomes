@@ -43,8 +43,8 @@ export function generateEventInvitationHTML(data: EventInvitationData): string {
   const secondaryColor = organizationBranding.secondaryColor || '#004499';
   const accentColor = organizationBranding.accentColor || '#00aaff';
   const orgLogo = organizationBranding.logo;
-  const logo = orgLogo || getHubifyHomesEmailLogoUrl();
-  const logoAlt = orgLogo ? organizationName : 'Hubify Homes';
+  // Always show the Hubify platform logo; org logo shown below as secondary if set
+  const hubifyLogo = getHubifyHomesEmailLogoUrl();
 
   const formatDateTime = (date: Date) => {
     return new Intl.DateTimeFormat('en-US', {
@@ -189,7 +189,8 @@ export function generateEventInvitationHTML(data: EventInvitationData): string {
 <body>
   <div class="container">
     <div class="header">
-      ${logo ? `<img src="${logo}" alt="${logoAlt}" width="180" class="logo" style="width:180px;max-width:180px;height:auto;display:block;margin:0 auto 8px;border:0;outline:none;text-decoration:none;">` : ''}
+      <img src="${hubifyLogo}" alt="Hubify Homes" width="150" class="logo" style="width:150px;max-width:150px;height:auto;display:block;margin:0 auto 8px;border:0;outline:none;text-decoration:none;">
+      ${orgLogo ? `<img src="${orgLogo}" alt="${organizationName}" width="90" style="width:90px;max-width:90px;height:auto;display:block;margin:4px auto 8px;border:0;opacity:0.85;">` : ''}
       <p class="header-text">You're Invited to an Event</p>
     </div>
     
@@ -346,7 +347,7 @@ export async function sendEventInvitationEmail(
     if (template) {
       const variables = createEventInvitationVariables({
         organizationName: eventData.organizationName,
-        organizationLogoUrl: eventData.organizationBranding?.logo || getHubifyHomesEmailLogoUrl(),
+        organizationLogoUrl: getHubifyHomesEmailLogoUrl(),
         eventTitle: eventData.eventTitle,
         eventDescription: eventData.eventDescription || null,
         eventLocation: eventData.eventLocation || null,
@@ -357,12 +358,24 @@ export async function sendEventInvitationEmail(
       });
       
       const processed = processTemplate({
-        subject: template.subject,
-        htmlContent: template.htmlContent,
+        subject: template.subject ?? '',
+        htmlContent: template.htmlContent ?? '',
       }, variables);
       
-      htmlContent = processed.htmlContent;
       subject = processed.subject;
+      // Prepend a non-bypassable Hubify platform header so the logo always
+      // appears at the top regardless of what the editable template markup contains.
+      const hubifyHeader = `<div style="text-align:center;padding:24px 0 16px;background:#ffffff;">` +
+        `<img src="${getHubifyHomesEmailLogoUrl()}" alt="Hubify Homes" width="150" ` +
+        `style="width:150px;max-width:150px;height:auto;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">` +
+        `</div>`;
+      // Guard: processTemplate may return null for htmlContent
+      const rawHtml: string = processed.htmlContent ?? '';
+      // Insert after <body> (or <body ...>) if present; otherwise prepend.
+      const bodyTagMatch = rawHtml.match(/<body[^>]*>/i);
+      htmlContent = bodyTagMatch
+        ? rawHtml.replace(/<body[^>]*>/i, (tag) => `${tag}${hubifyHeader}`)
+        : hubifyHeader + rawHtml;
       console.log(`Using stored template: ${template.name}`);
     } else {
       htmlContent = generateEventInvitationHTML(eventData);

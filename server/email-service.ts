@@ -114,8 +114,10 @@ export function wrapInEmailTemplate(params: {
 
   // Use org branding colors; default to Hubify teal
   const primaryColor = organizationBranding.primaryColor || '#0097BD';
-  // Only show a logo if the org has explicitly set one
+  // Only show an org logo if the org has explicitly set one
   const orgLogo = organizationBranding.logo || null;
+  // Always use the canonical email-optimised Hubify logo via the brand-asset helper
+  const hubifyLogoUrl = getHubifyHomesEmailLogoUrl();
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -141,10 +143,17 @@ export function wrapInEmailTemplate(params: {
 
           <!-- Logo / Brand header -->
           <tr>
-            <td align="center" style="padding:32px 40px 24px;">
-              ${orgLogo
-                ? `<img src="${orgLogo}" alt="${organizationName}" width="140" style="display:block;margin:0 auto;max-width:140px;height:auto;border:0;">`
-                : `<p style="margin:0;font-size:20px;font-weight:700;color:#0f172a;letter-spacing:-0.3px;">${organizationName}</p>`}
+            <td align="center" style="padding:32px 40px 20px;">
+              <!-- Hubify platform wordmark — always shown via canonical brand-asset helper -->
+              <img src="${hubifyLogoUrl}"
+                   alt="Hubify" width="150"
+                   style="display:block;margin:0 auto;max-width:150px;height:auto;border:0;">
+              ${orgLogo ? `
+              <!-- Org logo — shown below as secondary context when org has branding -->
+              <p style="margin:16px 0 0;font-size:11px;color:#cbd5e1;text-transform:uppercase;letter-spacing:0.08em;">on behalf of</p>
+              <img src="${orgLogo}" alt="${organizationName}" width="100"
+                   style="display:block;margin:6px auto 0;max-width:100px;height:auto;border:0;">
+              ` : ''}
             </td>
           </tr>
 
