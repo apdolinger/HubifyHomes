@@ -201,7 +201,7 @@ app.post("/api/stripe/webhooks/beta-onboarding", express.raw({ type: "applicatio
       process.env[`STRIPE_ORG_WEBHOOK_SECRET_${orgId}`] ||
       process.env.STRIPE_ORG_WEBHOOK_SECRET;
 
-    const event = orgStripeConnection.stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    let event: any;
     if (sig && webhookSecret) {
       const { getMasterStripe } = await import("./stripe");
       const stripe = getMasterStripe();
