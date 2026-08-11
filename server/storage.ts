@@ -8312,6 +8312,13 @@ export class DatabaseStorage implements IStorage {
    * - message_reactions.messageId -> teamMessages CASCADE, so no explicit delete needed.
    */
   async deleteOrg(orgId: string): Promise<void> {
+    // Check before the transaction so we never run a statement that fails mid-tx.
+    const hoaColCheck = await db.execute(sql`
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'communities' AND column_name = 'hoa_president_id' LIMIT 1
+    `);
+    const hasHoaPresidentId = ((hoaColCheck as any).rows?.length ?? 0) > 0;
+
     await db.transaction(async (tx) => {
       // Inline subquery reused across multiple steps
       const usersInOrg = sql`SELECT id FROM users WHERE org_id = ${orgId}`;
@@ -8380,16 +8387,13 @@ export class DatabaseStorage implements IStorage {
       await tx.execute(sql`
         UPDATE communities SET manager_id = NULL WHERE manager_id IN (${usersInOrg})
       `);
-      // hoa_president_id may not exist yet — use a DO block so a missing-column error
-      // is caught inside PG itself and does NOT abort the outer transaction.
-      await tx.execute(sql`
-        DO $$ BEGIN
-          UPDATE communities SET hoa_president_id = NULL WHERE hoa_president_id = ANY(ARRAY(
-            SELECT id FROM users WHERE org_id = ${orgId}
-          ));
-        EXCEPTION WHEN undefined_column THEN NULL;
-        END $$
-      `);
+      // hoa_president_id only exists after its migration runs — skip if absent.
+      if (hasHoaPresidentId) {
+        await tx.execute(sql`
+          UPDATE communities SET hoa_president_id = NULL
+          WHERE hoa_president_id IN (SELECT id FROM users WHERE org_id = ${orgId})
+        `);
+      }
 
       // 12. Document templates (uploaded_by NOT NULL NO ACTION -> must precede user deletion)
       await tx.execute(sql`DELETE FROM document_templates WHERE org_id = ${orgId}`);
@@ -8488,6 +8492,12 @@ export class DatabaseStorage implements IStorage {
    *   - Cascade-declared FKs (onDelete: cascade/set null) -> auto-handled
    */
   async deleteOrgUser(userId: string): Promise<void> {
+    const hoaColCheck = await db.execute(sql`
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'communities' AND column_name = 'hoa_president_id' LIMIT 1
+    `);
+    const hasHoaPresidentId = ((hoaColCheck as any).rows?.length ?? 0) > 0;
+
     await db.transaction(async (tx) => {
       // -- SET NULL on nullable FK columns (no FK violation, but clean up stale refs) --
       await tx.execute(sql`UPDATE tasks SET assigned_to_id = NULL WHERE assigned_to_id = ${userId}`);
@@ -8500,14 +8510,10 @@ export class DatabaseStorage implements IStorage {
       await tx.execute(sql`UPDATE conflict_resolutions SET supervisor_id = NULL WHERE supervisor_id = ${userId}`);
       // communities.manager_id / hoa_president_id (nullable NO ACTION)
       await tx.execute(sql`UPDATE communities SET manager_id = NULL WHERE manager_id = ${userId}`);
-      // hoa_president_id may not exist yet — DO block catches the missing-column error
-      // inside PG itself so the outer transaction is not aborted.
-      await tx.execute(sql`
-        DO $$ BEGIN
-          UPDATE communities SET hoa_president_id = NULL WHERE hoa_president_id = ${userId};
-        EXCEPTION WHEN undefined_column THEN NULL;
-        END $$
-      `);
+      // hoa_president_id only exists after its migration runs — skip if absent.
+      if (hasHoaPresidentId) {
+        await tx.execute(sql`UPDATE communities SET hoa_president_id = NULL WHERE hoa_president_id = ${userId}`);
+      }
       // users self-FK: supervisor_id (nullable NO ACTION)
       await tx.execute(sql`UPDATE users SET supervisor_id = NULL WHERE supervisor_id = ${userId}`);
       // financial nullable refs
